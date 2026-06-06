@@ -1,0 +1,60 @@
+extends: default
+
+rules:
+  document-start: disable
+
+  line-length:
+    max: 120
+    level: warning
+
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off', 'YES', 'NO', 'ON', 'OFF']
+    check-keys: false
+
+  comments:
+    min-spaces-from-content: 1
+
+  trailing-spaces: enable
+
+  new-line-at-end-of-file: enable
+
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  empty-lines:
+    max: 2
+    max-start: 2
+    max-end: 1
+
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  hyphens:
+    max-spaces-after: 1
+
+  brackets:
+    forbid: false
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+  braces:
+    forbid: false
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+
+  key-ordering: disable
+
+  quoted-strings:
+    quote-type: any
+    required: false
+    extra-required: []
+    extra-allowed: []
+    check-keys: false
