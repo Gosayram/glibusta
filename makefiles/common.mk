@@ -15,6 +15,17 @@ FLUTTER ?= flutter
 DART ?= dart
 NPM ?= npm
 NPX ?= npx
+PYTHON ?= python3
+SHELLCHECK ?= shellcheck
+PYTHON_TOOLS_VENV ?= .venv-tools
+PIP ?= $(PYTHON_TOOLS_VENV)/bin/pip
+RUFF ?= $(PYTHON_TOOLS_VENV)/bin/ruff
+CODESIGN ?= codesign
+DITTO ?= ditto
+
+SCRIPTS_DIR ?= scripts
+PUBSPEC_VALUE_SCRIPT ?= $(SCRIPTS_DIR)/pubspec_value.py
+MAKE_HELP_SCRIPT ?= $(SCRIPTS_DIR)/make_help.py
 
 PUB_GET := $(FLUTTER) pub get
 DART_FORMAT := $(DART) format
@@ -22,14 +33,48 @@ DART_FIX := $(DART) fix
 FLUTTER_ANALYZE := $(FLUTTER) analyze
 FLUTTER_TEST := $(FLUTTER) test
 PRETTIER := $(NPX) prettier
+RUFF_CHECK := $(RUFF) check
+RUFF_FORMAT := $(RUFF) format
+SHELLCHECK_RUN := $(SHELLCHECK)
 
 DART_FORMAT_PATHS ?= .
 PRETTIER_GLOBS ?= **/*.{md,yml,yaml,json}
+PYTHON_PATHS ?= scripts
+SHELL_SCRIPT_PATHS ?= $(shell find scripts -type f -name '*.sh' 2>/dev/null)
 
 PRINT_HEADER = printf "\n$(C_BOLD)$(C_BLUE)%s$(C_RESET)\n\n"
 PRINT_STEP = printf "$(C_BOLD)$(C_CYAN)==>$(C_RESET) %s\n"
 PRINT_OK = printf "$(C_GREEN)OK$(C_RESET) %s\n"
 PRINT_WARN = printf "$(C_YELLOW)WARN$(C_RESET) %s\n"
 PRINT_ERROR = printf "$(C_RED)ERROR$(C_RESET) %s\n"
+
+REQUIRE_TOOL = command -v "$(1)" >/dev/null 2>&1 || { $(PRINT_ERROR) "Required tool not found: $(1)"; exit 127; }
+
+##@ Tooling
+
+.PHONY: require-flutter
+require-flutter: ## Verify Flutter is available
+	@$(call REQUIRE_TOOL,$(FLUTTER))
+
+.PHONY: require-dart
+require-dart: ## Verify Dart is available
+	@$(call REQUIRE_TOOL,$(DART))
+
+.PHONY: require-node
+require-node: ## Verify npm and npx are available
+	@$(call REQUIRE_TOOL,$(NPM))
+	@$(call REQUIRE_TOOL,$(NPX))
+
+.PHONY: require-python
+require-python: ## Verify Python is available
+	@$(call REQUIRE_TOOL,$(PYTHON))
+
+.PHONY: require-shellcheck
+require-shellcheck: ## Verify ShellCheck is available
+	@$(call REQUIRE_TOOL,$(SHELLCHECK))
+
+.PHONY: require-ruff
+require-ruff: ## Verify Ruff is available
+	@$(call REQUIRE_TOOL,$(RUFF))
 
 endif

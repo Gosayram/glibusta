@@ -3,6 +3,7 @@ SHELL := /bin/bash
 PROJECT_NAME := Glibusta
 
 include makefiles/common.mk
+include makefiles/build.mk
 include makefiles/quality.mk
 include makefiles/signing.mk
 
@@ -10,11 +11,7 @@ include makefiles/signing.mk
 
 .PHONY: help
 help: ## Show this help
-	@$(PRINT_HEADER) "$(PROJECT_NAME) make targets"
-	@awk 'BEGIN {FS = ":.*##"; section = ""} \
-		/^[a-zA-Z0-9_.-]+:.*##/ { \
-			printf "  $(C_CYAN)%-28s$(C_RESET) %s\n", $$1, $$2; \
-		} \
-		/^##@/ { \
-			printf "\n$(C_BOLD)%s$(C_RESET)\n", substr($$0, 5); \
-		}' $(MAKEFILE_LIST)
+	@$(PYTHON) $(MAKE_HELP_SCRIPT) \
+		--project-name "$(PROJECT_NAME)" \
+		--version "$(APP_ARTIFACT_VERSION)" \
+		$(MAKEFILE_LIST)

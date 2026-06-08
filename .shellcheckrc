@@ -1,0 +1,3 @@
+external-sources=false
+shell=bash
+exclude=SC1090,SC1091

@@ -3,6 +3,7 @@
 .flutter-plugins-dependencies
 .git/
 .idea/
+.venv-tools/
 .metadata
 .packages
 build/

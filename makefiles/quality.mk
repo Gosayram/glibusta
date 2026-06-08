@@ -4,56 +4,88 @@ QUALITY_MK := 1
 ##@ Quality
 
 .PHONY: get
-get: ## Install Flutter dependencies
+get: require-flutter ## Install Flutter dependencies
 	@$(PRINT_STEP) "Installing Flutter dependencies"
 	$(PUB_GET)
 
 .PHONY: npm-install
-npm-install: ## Install Node dependencies for docs/config formatting
+npm-install: require-node ## Install Node dependencies for docs/config formatting
 	@$(PRINT_STEP) "Installing Node dependencies"
 	$(NPM) install
 
+.PHONY: install-python-tools
+install-python-tools: require-python ## Install local Python quality tools
+	@$(PRINT_STEP) "Installing Python quality tools"
+	@if [ ! -d "$(PYTHON_TOOLS_VENV)" ]; then \
+		$(PYTHON) -m venv "$(PYTHON_TOOLS_VENV)"; \
+	fi
+	$(PIP) install --upgrade pip ruff
+
 .PHONY: format
-format: ## Format Dart sources
+format: require-dart ## Format Dart sources
 	@$(PRINT_STEP) "Formatting Dart sources"
 	$(DART_FORMAT) $(DART_FORMAT_PATHS)
 
 .PHONY: format-check
-format-check: ## Check Dart formatting
+format-check: require-dart ## Check Dart formatting
 	@$(PRINT_STEP) "Checking Dart formatting"
 	$(DART_FORMAT) --set-exit-if-changed $(DART_FORMAT_PATHS)
 
 .PHONY: fix
-fix: ## Apply Dart automated fixes
+fix: require-dart ## Apply Dart automated fixes
 	@$(PRINT_STEP) "Applying Dart fixes"
 	$(DART_FIX) --apply .
 
 .PHONY: prettier
-prettier: ## Format Markdown, YAML, and JSON files
+prettier: require-node ## Format Markdown, YAML, and JSON files
 	@$(PRINT_STEP) "Formatting docs/config files"
 	$(PRETTIER) --write "$(PRETTIER_GLOBS)"
 
 .PHONY: prettier-check
-prettier-check: ## Check Markdown, YAML, and JSON formatting
+prettier-check: require-node ## Check Markdown, YAML, and JSON formatting
 	@$(PRINT_STEP) "Checking docs/config formatting"
 	$(PRETTIER) --check "$(PRETTIER_GLOBS)"
 
+.PHONY: ruff-format
+ruff-format: require-ruff ## Format Python scripts with Ruff
+	@$(PRINT_STEP) "Formatting Python scripts"
+	$(RUFF_FORMAT) $(PYTHON_PATHS)
+
+.PHONY: ruff-check
+ruff-check: require-ruff ## Lint Python scripts with Ruff
+	@$(PRINT_STEP) "Checking Python scripts"
+	$(RUFF_CHECK) $(PYTHON_PATHS)
+
+.PHONY: ruff-fix
+ruff-fix: require-ruff ## Apply Ruff fixes to Python scripts
+	@$(PRINT_STEP) "Applying Ruff fixes"
+	$(RUFF_CHECK) --fix $(PYTHON_PATHS)
+
+.PHONY: shellcheck
+shellcheck: require-shellcheck ## Check shell scripts with ShellCheck
+	@$(PRINT_STEP) "Checking shell scripts"
+	@if [ -n "$(SHELL_SCRIPT_PATHS)" ]; then \
+		$(SHELLCHECK_RUN) $(SHELL_SCRIPT_PATHS); \
+	else \
+		$(PRINT_WARN) "No shell scripts found"; \
+	fi
+
 .PHONY: analyze
-analyze: ## Run Flutter analyzer
+analyze: require-flutter ## Run Flutter analyzer
 	@$(PRINT_STEP) "Running Flutter analyzer"
 	$(FLUTTER_ANALYZE)
 
 .PHONY: test
-test: ## Run Flutter tests
+test: require-flutter ## Run Flutter tests
 	@$(PRINT_STEP) "Running Flutter tests"
 	$(FLUTTER_TEST)
 
 .PHONY: fix-all
-fix-all: get npm-install format fix prettier ## Apply all automatic fixes and formatting
+fix-all: get npm-install install-python-tools format fix prettier ruff-format ruff-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: format-check prettier-check analyze test ## Run all local verification checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck analyze test ## Run all local verification checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

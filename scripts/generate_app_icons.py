@@ -6,7 +6,6 @@ from pathlib import Path
 
 from PIL import Image
 
-
 ANDROID_SIZES = {
     "mipmap-mdpi": 48,
     "mipmap-hdpi": 72,
