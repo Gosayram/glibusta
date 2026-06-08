@@ -11,18 +11,22 @@ class SettingsScreen extends ConsumerWidget {
         title: const Text('Настройки'),
       ),
       body: ListView(
-        children: const [
-          ListTile(
+        children: [
+          const ListTile(
             title: Text('Источник'),
             subtitle: Text('flibusta.site'),
           ),
-          ListTile(
+          const ListTile(
             title: Text('Язык'),
             subtitle: Text('Русский'),
           ),
-          ListTile(
+          const ListTile(
             title: Text('Тема'),
             subtitle: Text('Системная'),
+          ),
+          const ListTile(
+            title: Text('Параллельные загрузки'),
+            subtitle: Text('3'),
           ),
         ],
       ),

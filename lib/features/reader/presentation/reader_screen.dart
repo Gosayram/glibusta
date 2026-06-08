@@ -12,11 +12,34 @@ class ReaderScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Читалка'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.brightness_6),
+            onPressed: () => _cycleTheme(ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.text_format),
+            onPressed: () => _increaseFontSize(ref),
+          ),
+        ],
       ),
       body: Center(
         child: Text('Reader for $bookId - coming soon'),
       ),
     );
+  }
+
+  void _cycleTheme(WidgetRef ref) {
+    final current = ref.read(readerSettingsProvider).theme;
+    final next = ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
+    ref.read(readerSettingsProvider.notifier).state = 
+        ref.read(readerSettingsProvider).copyWith(theme: next);
+  }
+
+  void _increaseFontSize(WidgetRef ref) {
+    final current = ref.read(readerSettingsProvider).fontSize;
+    ref.read(readerSettingsProvider.notifier).state = 
+        ref.read(readerSettingsProvider).copyWith(fontSize: current + 2);
   }
 }
 

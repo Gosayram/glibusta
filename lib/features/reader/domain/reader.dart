@@ -1,26 +1,22 @@
-// ignore_for_file: unnecessary_import
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 
 enum ReaderTheme { light, dark, sepia }
 
 enum ReaderMode { paginated, continuous }
 
-@immutable
 class ReaderSettings {
   final ReaderTheme theme;
   final ReaderMode mode;
   final double fontSize;
   final double lineHeight;
-  final EdgeInsets margin;
+  final double margin;
 
   const ReaderSettings({
     this.theme = ReaderTheme.light,
     this.mode = ReaderMode.paginated,
     this.fontSize = 16.0,
     this.lineHeight = 1.5,
-    this.margin = const EdgeInsets.all(16.0),
+    this.margin = 16.0,
   });
 
   ReaderSettings copyWith({
@@ -28,7 +24,7 @@ class ReaderSettings {
     ReaderMode? mode,
     double? fontSize,
     double? lineHeight,
-    EdgeInsets? margin,
+    double? margin,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -40,7 +36,6 @@ class ReaderSettings {
   }
 }
 
-@immutable
 class ReadingProgress {
   final String bookId;
   final int currentPosition;
