@@ -149,7 +149,7 @@ class DownloadQueue {
     }
   }
 
-  void _startTask(DownloadTask task) async {
+  Future<void> _startTask(DownloadTask task) async {
     _runningCount++;
     final running = DownloadTask(
       id: task.id,

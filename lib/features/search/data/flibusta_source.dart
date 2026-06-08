@@ -150,7 +150,7 @@ class FlibustaHtmlSource extends BookSource {
         .toList();
 
     final downloadElements = document.querySelectorAll(
-      'a[href*="/download/"], a[href\$=".fb2"], a[href\$=".epub"], a[href\$=".txt"], a[href\$=".mobi"]',
+      r'a[href*="/download/"], a[href$=".fb2"], a[href$=".epub"], a[href$=".txt"], a[href$=".mobi"]',
     );
     final formats = <BookFormat>[];
     final downloadUrls = <String>[];
@@ -232,7 +232,7 @@ class FlibustaHtmlSource extends BookSource {
 
   List<BookFormat> _extractFormats(Element element) {
     final links = element.querySelectorAll(
-      'a[href*="/download/"], a[href\$=".fb2"], a[href\$=".epub"], a[href\$=".txt"], a[href\$=".mobi"]',
+      r'a[href*="/download/"], a[href$=".fb2"], a[href$=".epub"], a[href$=".txt"], a[href$=".mobi"]',
     );
     final formats = <BookFormat>[];
     for (final Element link in links) {

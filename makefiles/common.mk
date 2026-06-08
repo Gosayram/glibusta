@@ -32,12 +32,17 @@ BOOTSTRAP_SCRIPT ?= $(SCRIPTS_DIR)/bootstrap_tools.py
 DIAGNOSTICS_SCRIPT ?= $(SCRIPTS_DIR)/dart_diagnostics.py
 
 PUB_GET := $(FLUTTER) pub get
+PUB_OUTDATED := $(FLUTTER) pub outdated
+PUB_UPGRADE := $(FLUTTER) pub upgrade
+PUB_UPGRADE_MAJOR := $(FLUTTER) pub upgrade --major-versions
 DART_FORMAT := $(DART) format
 DART_FIX := $(DART) fix
 FLUTTER_ANALYZE := $(FLUTTER) analyze
 FLUTTER_ANALYZE_NO_FATAL := $(FLUTTER) analyze --no-fatal-infos --no-fatal-warnings
 FLUTTER_TEST := $(FLUTTER) test
 PRETTIER := $(NPX) prettier
+NPM_OUTDATED := $(NPM) outdated
+NPM_UPDATE := $(NPM) update
 RUFF_CHECK := $(RUFF) check
 RUFF_FORMAT := $(RUFF) format
 SHELLCHECK_RUN := $(SHELLCHECK)

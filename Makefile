@@ -6,6 +6,7 @@ include makefiles/common.mk
 include makefiles/bootstrap.mk
 include makefiles/build.mk
 include makefiles/quality.mk
+include makefiles/upgrade.mk
 include makefiles/signing.mk
 
 .DEFAULT_GOAL := help
