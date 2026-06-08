@@ -1,10 +1,10 @@
 import 'package:file/file.dart';
 import 'package:file/local.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final _fileSystemServiceProvider = Provider<FileSystemService>((ref) {
+final fileSystemServiceProvider = Provider<FileSystemService>((ref) {
   return FileSystemService();
 });
 

@@ -5,10 +5,6 @@ linter:
   rules:
     # Style
     prefer_single_quotes: true
-    sort_constructors_first: true
+    sort_constructors_first: false  # Disabled to avoid conflicts with Dart style
     avoid_empty_else: true
     unnecessary_late: true
-
-    # Dart 3 best practices
-    prefer_expression_function_bodies: true
-    avoid_redundant_argument_values: true

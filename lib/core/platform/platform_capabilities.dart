@@ -1,5 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 class PlatformCapabilities {
   final bool hasArbitraryFileSelection;
   final bool supportsBackgroundDownloads;

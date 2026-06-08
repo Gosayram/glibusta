@@ -56,6 +56,7 @@ unlinked_spec.ds
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
 *.jks
+.signing/
 
 # iOS/XCode related
 **/ios/**/*.mode1v3
@@ -121,6 +122,7 @@ app.*.symbols
 # Custome ignore folders
 test_results/
 docs/
+.key-generate.conf
 
 # IDEA's
 .vscode/
