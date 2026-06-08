@@ -29,7 +29,8 @@ install-python-tools: require-python ## Install local Python quality tools
 	@if [ ! -d "$(PYTHON_TOOLS_VENV)" ]; then \
 		$(PYTHON) -m venv "$(PYTHON_TOOLS_VENV)"; \
 	fi
-	$(PIP) install --upgrade pip ruff
+	$(PIP) install --upgrade pip
+	$(PIP) install --upgrade -r "$(PYTHON_REQUIREMENTS)"
 
 .PHONY: format
 format: require-dart ## Format Dart sources

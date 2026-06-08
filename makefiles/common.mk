@@ -18,6 +18,7 @@ NPX ?= npx
 PYTHON ?= python3
 SHELLCHECK ?= shellcheck
 PYTHON_TOOLS_VENV ?= .venv-tools
+PYTHON_REQUIREMENTS ?= requirements.txt
 PIP ?= $(PYTHON_TOOLS_VENV)/bin/pip
 RUFF ?= $(PYTHON_TOOLS_VENV)/bin/ruff
 CODESIGN ?= codesign

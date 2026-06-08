@@ -37,7 +37,8 @@ upgrade-node: require-nvm ## Upgrade npm packages within current semver ranges
 .PHONY: upgrade-python-tools
 upgrade-python-tools: install-python-tools ## Upgrade local Python quality tools
 	@$(PRINT_STEP) "Upgrading Python quality tools"
-	$(PIP) install --upgrade pip ruff
+	$(PIP) install --upgrade pip
+	$(PIP) install --upgrade -r "$(PYTHON_REQUIREMENTS)"
 
 .PHONY: upgrade-all
 upgrade-all: upgrade-check upgrade-dart upgrade-node upgrade-python-tools get npm-install-nvm ## Safely upgrade packages within current constraints
@@ -59,7 +60,8 @@ upgrade-major: require-flutter require-nvm install-python-tools ## Interactively
 	@$(PRINT_STEP) "Upgrading npm packages to latest versions"
 	@$(call NVM_EXEC,$(NPX) npm-check-updates -u && $(NPM) install)
 	@$(PRINT_STEP) "Upgrading Python quality tools"
-	$(PIP) install --upgrade pip ruff
+	$(PIP) install --upgrade pip
+	$(PIP) install --upgrade -r "$(PYTHON_REQUIREMENTS)"
 	@$(PRINT_WARN) "Run 'make check-all' and review generated diffs before committing."
 
 endif

@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv-tools"
 NVMRC = ROOT / ".nvmrc"
+PYTHON_REQUIREMENTS = ROOT / "requirements.txt"
 
 
 @dataclass(frozen=True)
@@ -192,7 +193,11 @@ def install_python_tools() -> None:
         run(["python3", "-m", "venv", str(VENV_DIR)])
 
     pip = VENV_DIR / ("Scripts/pip.exe" if host_os() == "windows" else "bin/pip")
-    run([str(pip), "install", "--upgrade", "pip", "ruff"])
+    run([str(pip), "install", "--upgrade", "pip"])
+    if PYTHON_REQUIREMENTS.exists():
+        run([str(pip), "install", "--upgrade", "-r", str(PYTHON_REQUIREMENTS)])
+    else:
+        run([str(pip), "install", "--upgrade", "ruff"])
 
 
 def install_node_deps() -> None:
