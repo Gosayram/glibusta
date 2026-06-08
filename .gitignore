@@ -123,6 +123,7 @@ app.*.symbols
 test_results/
 docs/
 .key-generate.conf
+*.backup
 
 # IDEA's
 .vscode/
