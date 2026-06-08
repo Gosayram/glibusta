@@ -1,0 +1,10 @@
+{
+  "@@locale": "en",
+  "appTitle": "Glibusta",
+  "homeTitle": "Home",
+  "searchTitle": "Search",
+  "libraryTitle": "Library",
+  "downloadsTitle": "Downloads",
+  "readerTitle": "Reader",
+  "settingsTitle": "Settings"
+}

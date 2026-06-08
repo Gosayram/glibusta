@@ -120,6 +120,7 @@ app.*.symbols
 
 # Custome ignore folders
 test_results/
+docs/
 
 # IDEA's
 .vscode/
