@@ -1,4 +1,4 @@
-enum DownloadStatus { queued, running, paused, completed, failed, canceled }
+import 'book.dart';
 
 class SearchQuery {
   final String query;
@@ -19,7 +19,7 @@ class SearchQuery {
 }
 
 class SearchResultPage {
-  final List<dynamic> books;
+  final List<Book> books;
   final int totalCount;
   final int currentPage;
   final int totalPages;

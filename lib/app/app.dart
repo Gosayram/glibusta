@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/search/presentation/search_screen.dart';
+import '../features/library/presentation/library_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
+import '../features/reader/presentation/reader_screen.dart';
+import '../core/platform/lifecycle_service.dart';
+
 final routerProvider = Provider<GoRouter>((ref) => GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
@@ -25,14 +31,43 @@ final routerProvider = Provider<GoRouter>((ref) => GoRouter(
           name: 'settings',
           builder: (context, state) => const SettingsScreen(),
         ),
+        GoRoute(
+          path: '/reader/:bookId',
+          name: 'reader',
+          builder: (context, state) {
+            final bookId = state.pathParameters['bookId']!;
+            return ReaderScreen(bookId: bookId);
+          },
+        ),
       ],
     ));
 
-class GlibustaApp extends ConsumerWidget {
+class GlibustaApp extends ConsumerStatefulWidget {
   const GlibustaApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GlibustaApp> createState() => _GlibustaAppState();
+}
+
+class _GlibustaAppState extends ConsumerState<GlibustaApp> {
+  late final LifecycleObserver _observer;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = ref.read(lifecycleServiceProvider);
+    _observer = LifecycleObserver(service);
+    WidgetsBinding.instance.addObserver(_observer);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(_observer);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Glibusta',
@@ -58,58 +93,12 @@ class GlibustaApp extends ConsumerWidget {
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Glibusta')),
       body: const Center(child: Text('Home')),
-    );
-  }
-}
-
-class SearchScreen extends StatelessWidget {
-  const SearchScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Поиск')),
-      body: const Center(child: Text('Search')),
-    );
-  }
-}
-
-class LibraryScreen extends StatelessWidget {
-  const LibraryScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Библиотека')),
-      body: const Center(child: Text('Library')),
-    );
-  }
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
-      body: const Center(child: Text('Settings')),
-    );
-  }
-}
-
-class ErrorScreen extends StatelessWidget {
-  const ErrorScreen({super.key, this.error});
-
-  final Exception? error;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ошибка')),
-      body: Center(child: Text('Error: $error')),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'book.dart';
-import 'search_query.dart';
+
+enum DownloadStatus { queued, running, paused, completed, failed, canceled }
 
 class DownloadTask {
   final String id;
