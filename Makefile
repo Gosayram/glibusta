@@ -3,6 +3,7 @@ SHELL := /bin/bash
 PROJECT_NAME := Glibusta
 
 include makefiles/common.mk
+include makefiles/bootstrap.mk
 include makefiles/build.mk
 include makefiles/quality.mk
 include makefiles/signing.mk

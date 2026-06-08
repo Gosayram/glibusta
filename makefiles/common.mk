@@ -26,11 +26,14 @@ DITTO ?= ditto
 SCRIPTS_DIR ?= scripts
 PUBSPEC_VALUE_SCRIPT ?= $(SCRIPTS_DIR)/pubspec_value.py
 MAKE_HELP_SCRIPT ?= $(SCRIPTS_DIR)/make_help.py
+BOOTSTRAP_SCRIPT ?= $(SCRIPTS_DIR)/bootstrap_tools.py
+DIAGNOSTICS_SCRIPT ?= $(SCRIPTS_DIR)/dart_diagnostics.py
 
 PUB_GET := $(FLUTTER) pub get
 DART_FORMAT := $(DART) format
 DART_FIX := $(DART) fix
 FLUTTER_ANALYZE := $(FLUTTER) analyze
+FLUTTER_ANALYZE_NO_FATAL := $(FLUTTER) analyze --no-fatal-infos --no-fatal-warnings
 FLUTTER_TEST := $(FLUTTER) test
 PRETTIER := $(NPX) prettier
 RUFF_CHECK := $(RUFF) check

@@ -75,6 +75,16 @@ analyze: require-flutter ## Run Flutter analyzer
 	@$(PRINT_STEP) "Running Flutter analyzer"
 	$(FLUTTER_ANALYZE)
 
+.PHONY: diagnostics
+diagnostics: require-flutter require-python ## Summarize Dart analyzer diagnostics with docs links
+	@$(PRINT_STEP) "Collecting Dart analyzer diagnostics"
+	@$(PYTHON) $(DIAGNOSTICS_SCRIPT) -- $(FLUTTER_ANALYZE_NO_FATAL)
+
+.PHONY: diagnostics-strict
+diagnostics-strict: require-flutter require-python ## Summarize diagnostics and fail on any analyzer issue
+	@$(PRINT_STEP) "Collecting strict Dart analyzer diagnostics"
+	@$(PYTHON) $(DIAGNOSTICS_SCRIPT) --strict -- $(FLUTTER_ANALYZE_NO_FATAL)
+
 .PHONY: test
 test: require-flutter ## Run Flutter tests
 	@$(PRINT_STEP) "Running Flutter tests"
@@ -85,7 +95,7 @@ fix-all: get npm-install install-python-tools format fix prettier ruff-format ru
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck analyze test ## Run all local verification checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict test ## Run all local verification checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check
