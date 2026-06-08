@@ -128,3 +128,6 @@ docs/
 # IDEA's
 .vscode/
 .idea/
+
+# Node
+node_modules/

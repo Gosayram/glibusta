@@ -4,37 +4,55 @@ import 'package:go_router/go_router.dart';
 
 import '../features/search/presentation/search_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
-import '../core/platform/lifecycle_service.dart';
+import '../shared/widgets/adaptive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) => GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          name: 'home',
-          builder: (context, state) => const HomeScreen(),
-        ),
-        GoRoute(
-          path: '/search',
-          name: 'search',
-          builder: (context, state) => const SearchScreen(),
-        ),
-        GoRoute(
-          path: '/library',
-          name: 'library',
-          builder: (context, state) => const LibraryScreen(),
-        ),
-        GoRoute(
-          path: '/settings',
-          name: 'settings',
-          builder: (context, state) => const SettingsScreen(),
+        ShellRoute(
+          builder: (BuildContext context, GoRouterState state, Widget child) {
+            return ScaffoldWithNav(child: child);
+          },
+          routes: [
+            GoRoute(
+              path: '/',
+              name: 'home',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const HomeScreen(),
+            ),
+            GoRoute(
+              path: '/search',
+              name: 'search',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const SearchScreen(),
+            ),
+            GoRoute(
+              path: '/library',
+              name: 'library',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const LibraryScreen(),
+            ),
+            GoRoute(
+              path: '/downloads',
+              name: 'downloads',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const DownloadsScreen(),
+            ),
+            GoRoute(
+              path: '/settings',
+              name: 'settings',
+              builder: (BuildContext context, GoRouterState state) =>
+                  const SettingsScreen(),
+            ),
+          ],
         ),
         GoRoute(
           path: '/reader/:bookId',
           name: 'reader',
-          builder: (context, state) {
+          builder: (BuildContext context, GoRouterState state) {
             final bookId = state.pathParameters['bookId']!;
             return ReaderScreen(bookId: bookId);
           },
@@ -49,21 +67,37 @@ class GlibustaApp extends ConsumerStatefulWidget {
   ConsumerState<GlibustaApp> createState() => _GlibustaAppState();
 }
 
-class _GlibustaAppState extends ConsumerState<GlibustaApp> {
-  late final LifecycleObserver _observer;
-
+class _GlibustaAppState extends ConsumerState<GlibustaApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    final service = ref.read(lifecycleServiceProvider);
-    _observer = LifecycleObserver(service);
-    WidgetsBinding.instance.addObserver(_observer);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(_observer);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _saveState();
+        break;
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
+  void _saveState() {
+    // Persist reading progress, download states, etc.
+    // Handled by Drift auto-persistence in repositories
   }
 
   @override
@@ -97,8 +131,40 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Glibusta')),
-      body: const Center(child: Text('Home')),
+      appBar: AppBar(
+        title: const Text('Glibusta'),
+        automaticallyImplyLeading: false,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu_book,
+              size: 80,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Glibusta',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Кросс-платформенная библиотека',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 32),
+            FilledButton.icon(
+              onPressed: () => context.go('/search'),
+              icon: const Icon(Icons.search),
+              label: const Text('Найти книгу'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

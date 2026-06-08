@@ -1,33 +1,36 @@
-class AppFailure {
+sealed class AppFailure {
   final String? message;
 
   const AppFailure([this.message]);
+
+  @override
+  String toString() => '${runtimeType}: ${message ?? 'Unknown error'}';
 }
 
-class NetworkFailure extends AppFailure {
+final class NetworkFailure extends AppFailure {
   const NetworkFailure([super.message]);
 }
 
-class SourceUnavailableFailure extends AppFailure {
+final class SourceUnavailableFailure extends AppFailure {
   const SourceUnavailableFailure([super.message]);
 }
 
-class ParserFailure extends AppFailure {
+final class ParserFailure extends AppFailure {
   const ParserFailure([super.message]);
 }
 
-class DownloadFailure extends AppFailure {
+final class DownloadFailure extends AppFailure {
   const DownloadFailure([super.message]);
 }
 
-class StorageFailure extends AppFailure {
+final class StorageFailure extends AppFailure {
   const StorageFailure([super.message]);
 }
 
-class CancelledFailure extends AppFailure {
+final class CancelledFailure extends AppFailure {
   const CancelledFailure();
 }
 
-class UnknownFailure extends AppFailure {
+final class UnknownFailure extends AppFailure {
   const UnknownFailure([super.message]);
 }

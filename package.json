@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "format:docs": "prettier --write \"**/*.{md,yml,yaml,json}\"",
+    "check:docs": "prettier --check \"**/*.{md,yml,yaml,json}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}

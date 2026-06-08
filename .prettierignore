@@ -1,0 +1,15 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.git/
+.idea/
+.metadata
+.packages
+build/
+coverage/
+android/.gradle/
+android/app/build/
+macos/Flutter/ephemeral/
+pubspec.lock
+package-lock.json
+test_results/

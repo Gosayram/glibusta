@@ -4,6 +4,37 @@
 
 SIGNING_SCRIPT=.key-generate.conf
 
+.PHONY: get
+get: ## Install Flutter dependencies
+	flutter pub get
+
+.PHONY: format
+format: ## Format Dart sources
+	dart format .
+
+.PHONY: format-check
+format-check: ## Check Dart formatting
+	dart format --set-exit-if-changed .
+
+.PHONY: prettier
+prettier: ## Format Markdown, YAML, and JSON files with Prettier
+	npx prettier --write "**/*.{md,yml,yaml,json}"
+
+.PHONY: prettier-check
+prettier-check: ## Check Markdown, YAML, and JSON formatting with Prettier
+	npx prettier --check "**/*.{md,yml,yaml,json}"
+
+.PHONY: analyze
+analyze: ## Run Flutter analyzer
+	flutter analyze
+
+.PHONY: test
+test: ## Run Flutter tests
+	flutter test
+
+.PHONY: check
+check: format-check prettier-check analyze test ## Run all local quality checks
+
 .PHONY: sign-android
 sign-android: ## Generate signing keys and setup Android signing
 	@if [ -f "$(SIGNING_SCRIPT)" ]; then \

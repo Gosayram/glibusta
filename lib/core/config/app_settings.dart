@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 @immutable
 class AppSettings {
@@ -10,7 +11,11 @@ class AppSettings {
 
   const AppSettings({
     this.baseUrl = 'https://flibusta.site',
-    this.mirrors = const [],
+    this.mirrors = const [
+      'https://flibusta.me',
+      'https://flibusta.is',
+      'https://flibusta.top',
+    ],
     this.requestTimeout = const Duration(seconds: 30),
     this.maxConcurrentDownloads = 3,
     this.enableLogging = false,
@@ -22,12 +27,15 @@ class AppSettings {
     Duration? requestTimeout,
     int? maxConcurrentDownloads,
     bool? enableLogging,
-  }) =>
-      AppSettings(
-        baseUrl: baseUrl ?? this.baseUrl,
-        mirrors: mirrors ?? this.mirrors,
-        requestTimeout: requestTimeout ?? this.requestTimeout,
-        maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
-        enableLogging: enableLogging ?? this.enableLogging,
-      );
+  }) => AppSettings(
+    baseUrl: baseUrl ?? this.baseUrl,
+    mirrors: mirrors ?? this.mirrors,
+    requestTimeout: requestTimeout ?? this.requestTimeout,
+    maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
+    enableLogging: enableLogging ?? this.enableLogging,
+  );
 }
+
+final appSettingsProvider = StateProvider<AppSettings>((ref) {
+  return const AppSettings();
+});

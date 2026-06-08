@@ -3,10 +3,14 @@
 
 # Glibusta
 
-Cross-platform application for searching, reading, downloading, and organizing books from [Flibusta](http://flibusta.site/) and compatible mirrors.
+Cross-platform application for searching, reading, downloading, and organizing books from
+[Flibusta](http://flibusta.site/) and compatible mirrors.
 
-> [!WARNING]
-> This application is developed for **educational and informational purposes only**. The authors **are not affiliated with, endorsed by, or connected to Flibusta or any of its mirrors**. Use this application in accordance with applicable copyright laws and regulations of your jurisdiction. The authors **shall not be held liable** for any use of this software, including but not limited to copyright infringement or unauthorized distribution of content.
+> [!WARNING] This application is developed for **educational and informational purposes only**. The
+> authors **are not affiliated with, endorsed by, or connected to Flibusta or any of its mirrors**.
+> Use this application in accordance with applicable copyright laws and regulations of your
+> jurisdiction. The authors **shall not be held liable** for any use of this software, including but
+> not limited to copyright infringement or unauthorized distribution of content.
 
 ## Features
 

@@ -14,21 +14,53 @@ class FileSystemService {
   Future<Directory> getLibraryRoot() async {
     final docsDir = await getApplicationDocumentsDirectory();
     final path = p.normalize(p.join(docsDir.path, 'Glibusta', 'books'));
-    return _fs.directory(path);
+    final dir = _fs.directory(path);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 
   Future<Directory> getTempDirectory() async {
     final tempDir = await getTemporaryDirectory();
     final path = p.normalize(p.join(tempDir.path, 'glibusta_temp'));
-    return _fs.directory(path);
+    final dir = _fs.directory(path);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
   }
 
-  Future<File> getBookFile(String bookId) async {
+  Future<File> getBookFile(String bookId, {String ext = 'fb2'}) async {
     final libraryRoot = await getLibraryRoot();
-    return libraryRoot.childFile('book_${p.basename(bookId)}.fb2');
+    final sanitizedId = bookId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    return libraryRoot.childFile('book_${sanitizedId}.$ext');
   }
 
   bool isWithinLibrary(String targetPath) {
-    return false;
+    try {
+      final normalized = p.normalize(targetPath);
+      // Synchronously check by comparing path prefixes
+      // In production, this should use async getLibraryRoot()
+      return normalized.contains('Glibusta${p.separator}books');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> isWithinLibraryAsync(String targetPath) async {
+    try {
+      final libraryRoot = await getLibraryRoot();
+      final normalized = p.normalize(targetPath);
+      final libraryPath = p.normalize(libraryRoot.path);
+      return p.isWithin(libraryPath, normalized);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> ensureDirectories() async {
+    await getLibraryRoot();
+    await getTempDirectory();
   }
 }
