@@ -34,8 +34,7 @@ class PlatformMenuWidget extends ConsumerWidget implements PreferredSizeWidget {
           menus: [
             PlatformMenuItem(
               label: 'Открыть книгу...',
-              shortcut:
-                  const SingleActivator(LogicalKeyboardKey.keyO, meta: true),
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyO, meta: true),
               onSelected: () {},
             ),
           ],
@@ -45,8 +44,7 @@ class PlatformMenuWidget extends ConsumerWidget implements PreferredSizeWidget {
           menus: [
             PlatformMenuItem(
               label: 'Найти...',
-              shortcut:
-                  const SingleActivator(LogicalKeyboardKey.keyF, meta: true),
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyF, meta: true),
               onSelected: () => context.go('/search'),
             ),
           ],

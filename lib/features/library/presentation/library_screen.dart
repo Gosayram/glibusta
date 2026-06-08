@@ -31,8 +31,7 @@ class LibraryScreen extends ConsumerWidget {
                 children: [
                   Icon(Icons.library_books, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('Библиотека пуста',
-                      style: TextStyle(color: Colors.grey)),
+                  Text('Библиотека пуста', style: TextStyle(color: Colors.grey)),
                   SizedBox(height: 8),
                   Text(
                     'Найдите и скачайте книги',
@@ -84,7 +83,7 @@ class LibraryBookTile extends StatelessWidget {
                   child: Image.network(
                     book.coverUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.book,
                       color: theme.colorScheme.onPrimaryContainer,
                     ),

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../shared/models/download_task.dart';
-import '../../../shared/models/book.dart';
-import '../data/download_repository.dart';
 import '../../../core/http/http_client.dart';
+import '../../../shared/models/book.dart';
+import '../../../shared/models/download_task.dart';
+import '../data/download_repository.dart';
 
 final downloadQueueProvider = Provider<DownloadQueue>((ref) {
   final repository = ref.watch(downloadRepositoryProvider);
@@ -35,8 +35,7 @@ class DownloadQueue {
 
   DownloadQueue(this._repository, this._httpClient);
 
-  Stream<List<DownloadTask>> get onDownloadsChanged =>
-      _downloadsController.stream;
+  Stream<List<DownloadTask>> get onDownloadsChanged => _downloadsController.stream;
 
   Stream<DownloadTask> get onProgress => _progressController.stream;
 

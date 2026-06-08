@@ -10,8 +10,7 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(
-    tables: [SavedBooks, Authors, Genres, Downloads, ReadingProgress])
+@DriftDatabase(tables: [SavedBooks, Authors, Genres, Downloads, ReadingProgress])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -22,10 +21,10 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+    },
+  );
 
   // --- SavedBooks ---
   Future<List<SavedBook>> getAllBooks() async {
@@ -33,8 +32,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<SavedBook?> getBookById(String id) async {
-    return (select(savedBooks)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (select(savedBooks)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<int> insertBook(SavedBooksCompanion entry) {
@@ -65,20 +63,15 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Downloads ---
   Future<List<Download>> getAllDownloads() async {
-    return (select(downloads)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-        .get();
+    return (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
   }
 
   Stream<List<Download>> watchAllDownloads() {
-    return (select(downloads)
-          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-        .watch();
+    return (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
   }
 
   Future<Download?> getDownloadById(String id) async {
-    return (select(downloads)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (select(downloads)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<int> insertDownload(DownloadsCompanion entry) {
@@ -106,8 +99,7 @@ class AppDatabase extends _$AppDatabase {
 
   // --- Reading Progress ---
   Future<ReadingProgressData?> getReadingProgress(String bookId) async {
-    return (select(readingProgress)..where((t) => t.bookId.equals(bookId)))
-        .getSingleOrNull();
+    return (select(readingProgress)..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
   }
 
   Future<int> upsertReadingProgress(ReadingProgressCompanion entry) {
@@ -115,8 +107,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<int> deleteReadingProgress(String bookId) {
-    return (delete(readingProgress)..where((t) => t.bookId.equals(bookId)))
-        .go();
+    return (delete(readingProgress)..where((t) => t.bookId.equals(bookId))).go();
   }
 }
 

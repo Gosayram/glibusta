@@ -1,13 +1,13 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:html/dom.dart' show Document, Element;
 import 'package:html/parser.dart' show parse;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../shared/models/book.dart';
-import '../../../shared/models/search_query.dart';
-import '../../../shared/models/download_task.dart';
-import '../domain/book_source.dart';
-import '../../../core/http/http_client.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../core/http/http_client.dart';
+import '../../../shared/models/book.dart';
+import '../../../shared/models/download_task.dart';
+import '../../../shared/models/search_query.dart';
+import '../domain/book_source.dart';
 
 final flibustaSourceProvider = Provider<FlibustaHtmlSource>((ref) {
   final settings = ref.watch(appSettingsProvider);
@@ -125,7 +125,8 @@ class FlibustaHtmlSource extends BookSource {
   BookDetails _parseBookDetails(String html, String bookId) {
     final document = parse(html);
 
-    final title = document.querySelector('h1')?.text.trim() ??
+    final title =
+        document.querySelector('h1')?.text.trim() ??
         document.querySelector('title')?.text.trim() ??
         '';
 
@@ -134,16 +135,14 @@ class FlibustaHtmlSource extends BookSource {
         ?.text
         .trim();
 
-    final authorElements =
-        document.querySelectorAll('a[href^="/a/"], .book_author a');
+    final authorElements = document.querySelectorAll('a[href^="/a/"], .book_author a');
     final authorIds = authorElements
         .map((a) => _extractIdFromHref(a.attributes['href'] ?? ''))
         .whereType<String>()
         .where((id) => id.isNotEmpty)
         .toList();
 
-    final genreElements =
-        document.querySelectorAll('a[href^="/g/"], .genre_list a');
+    final genreElements = document.querySelectorAll('a[href^="/g/"], .genre_list a');
     final genreIds = genreElements
         .map((g) => _extractIdFromHref(g.attributes['href'] ?? ''))
         .whereType<String>()
@@ -222,17 +221,13 @@ class FlibustaHtmlSource extends BookSource {
   List<String> _extractAuthors(Element element) {
     final authorLinks = element.querySelectorAll('a[href*="/a/"]');
     if (authorLinks.isEmpty) {
-      final fallbackLinks =
-          element.querySelectorAll('a.author, a.book-author, .author a');
+      final fallbackLinks = element.querySelectorAll('a.author, a.book-author, .author a');
       return fallbackLinks
           .map((Element a) => a.text.trim())
           .where((String t) => t.isNotEmpty)
           .toList();
     }
-    return authorLinks
-        .map((Element a) => a.text.trim())
-        .where((String t) => t.isNotEmpty)
-        .toList();
+    return authorLinks.map((Element a) => a.text.trim()).where((String t) => t.isNotEmpty).toList();
   }
 
   List<BookFormat> _extractFormats(Element element) {
@@ -256,8 +251,7 @@ class FlibustaHtmlSource extends BookSource {
   }
 
   String? _extractDescription(Element element) {
-    final desc =
-        element.querySelector('.annotation, .description, .book-description');
+    final desc = element.querySelector('.annotation, .description, .book-description');
     return desc?.text.trim();
   }
 
@@ -294,11 +288,9 @@ class FlibustaHtmlSource extends BookSource {
       }
     }
 
-    final totalText =
-        document.querySelector('.pager, .pagination')?.text ?? '';
+    final totalText = document.querySelector('.pager, .pagination')?.text ?? '';
     final totalMatch = RegExp(r'(\d+)').firstMatch(totalText);
-    final totalCount =
-        totalMatch != null ? int.tryParse(totalMatch.group(1) ?? '') ?? 0 : 0;
+    final totalCount = totalMatch != null ? int.tryParse(totalMatch.group(1) ?? '') ?? 0 : 0;
 
     return _PaginationInfo(totalCount: totalCount, totalPages: maxPage);
   }

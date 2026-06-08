@@ -2,14 +2,14 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/search/domain/book_source.dart';
-import 'package:glibusta/shared/models/search_query.dart';
 import 'package:glibusta/shared/models/book.dart';
+import 'package:glibusta/shared/models/search_query.dart';
 
 void main() {
   group('MockBookSource', () {
     test('returns empty results for search', () async {
       final source = MockBookSource();
-      final result = await source.searchBooks(SearchQuery(query: 'test'));
+      final result = await source.searchBooks(const SearchQuery(query: 'test'));
 
       expect(result.books, isEmpty);
       expect(result.hasNextPage, isFalse);

@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../shared/models/book.dart';
-import '../../../shared/models/search_query.dart';
-import '../../../shared/models/download_task.dart';
 import '../../../core/errors/failures.dart';
+import '../../../shared/models/book.dart';
+import '../../../shared/models/download_task.dart';
+import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
 import 'flibusta_source.dart';
 

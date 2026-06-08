@@ -1,8 +1,8 @@
 import 'package:file/file.dart';
 import 'package:file/local.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final fileSystemServiceProvider = Provider<FileSystemService>((ref) {
   return FileSystemService();
@@ -34,7 +34,7 @@ class FileSystemService {
   Future<File> getBookFile(String bookId, {String ext = 'fb2'}) async {
     final libraryRoot = await getLibraryRoot();
     final sanitizedId = bookId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
-    return libraryRoot.childFile('book_${sanitizedId}.$ext');
+    return libraryRoot.childFile('book_$sanitizedId.$ext');
   }
 
   bool isWithinLibrary(String targetPath) {

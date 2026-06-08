@@ -3,9 +3,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../shared/models/book.dart';
 import '../../../core/database/app_database.dart';
-import '../../../core/database/tables.dart';
+import '../../../shared/models/book.dart';
 
 final bookRepositoryProvider = Provider<BookRepository>((ref) {
   final db = ref.watch(databaseProvider);

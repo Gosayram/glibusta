@@ -1,13 +1,12 @@
 import 'package:async/async.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
 import '../data/composite_source.dart';
 import '../domain/book_source.dart';
 
-final searchControllerProvider =
-    StateNotifierProvider<SearchStateController, SearchState>((ref) {
+final searchControllerProvider = StateNotifierProvider<SearchStateController, SearchState>((ref) {
   final source = ref.watch(compositeSourceProvider);
   return SearchStateController(source);
 });
@@ -58,13 +57,11 @@ class SearchStateController extends StateNotifier<SearchState> {
     _currentSearch?.cancel();
     state = state.copyWith(
       isLoading: true,
-      error: null,
       lastQuery: query,
     );
 
     final searchQuery = SearchQuery(query: query);
-    _currentSearch =
-        CancelableOperation.fromFuture(source.searchBooks(searchQuery));
+    _currentSearch = CancelableOperation.fromFuture(source.searchBooks(searchQuery));
 
     try {
       final result = await _currentSearch!.value;
@@ -90,8 +87,7 @@ class SearchStateController extends StateNotifier<SearchState> {
       query: state.lastQuery,
       page: state.currentPage + 1,
     );
-    _currentSearch =
-        CancelableOperation.fromFuture(source.searchBooks(searchQuery));
+    _currentSearch = CancelableOperation.fromFuture(source.searchBooks(searchQuery));
 
     try {
       final result = await _currentSearch!.value;

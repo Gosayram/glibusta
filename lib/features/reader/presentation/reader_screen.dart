@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
-import '../domain/reader.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
+import '../domain/reader.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({super.key, required this.bookId});
@@ -43,19 +44,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  settings.mode == ReaderMode.paginated
-                      ? Icons.view_carousel
-                      : Icons.view_stream,
+                  settings.mode == ReaderMode.paginated ? Icons.view_carousel : Icons.view_stream,
                 ),
-                tooltip: settings.mode == ReaderMode.paginated
-                    ? 'Непрерывный'
-                    : 'По страницам',
+                tooltip: settings.mode == ReaderMode.paginated ? 'Непрерывный' : 'По страницам',
                 onPressed: () {
                   final nextMode = settings.mode == ReaderMode.paginated
                       ? ReaderMode.continuous
                       : ReaderMode.paginated;
-                  ref.read(readerSettingsProvider.notifier).state =
-                      settings.copyWith(mode: nextMode);
+                  ref.read(readerSettingsProvider.notifier).state = settings.copyWith(
+                    mode: nextMode,
+                  );
                 },
               ),
               IconButton(
@@ -70,12 +68,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ),
                 tooltip: 'Размер шрифта',
                 onSelected: (double size) {
-                  ref.read(readerSettingsProvider.notifier).state =
-                      settings.copyWith(fontSize: size);
+                  ref.read(readerSettingsProvider.notifier).state = settings.copyWith(
+                    fontSize: size,
+                  );
                 },
                 itemBuilder: (BuildContext context) {
-                  return [12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 32.0]
-                      .map<PopupMenuItem<double>>((double s) {
+                  return [
+                    12.0,
+                    14.0,
+                    16.0,
+                    18.0,
+                    20.0,
+                    24.0,
+                    28.0,
+                    32.0,
+                  ].map<PopupMenuItem<double>>((double s) {
                     return PopupMenuItem<double>(
                       value: s,
                       child: Text('${s.round()}px'),
@@ -91,8 +98,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               setState(() {
                 _currentPage = page;
               });
-              ref.read(readingProgressProvider.notifier).state =
-                  ReadingProgress(
+              ref.read(readingProgressProvider.notifier).state = ReadingProgress(
                 bookId: widget.bookId,
                 currentPosition: page,
                 lastRead: DateTime.now(),
@@ -156,10 +162,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _cycleTheme(WidgetRef ref) {
     final current = ref.read(readerSettingsProvider).theme;
-    final next =
-        ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
-    ref.read(readerSettingsProvider.notifier).state =
-        ref.read(readerSettingsProvider).copyWith(theme: next);
+    final next = ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
+    ref.read(readerSettingsProvider.notifier).state = ref
+        .read(readerSettingsProvider)
+        .copyWith(theme: next);
   }
 
   IconData _themeIcon(ReaderTheme theme) {
@@ -174,17 +180,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final base = Theme.of(context);
     return switch (theme) {
       ReaderTheme.light => base.copyWith(
-          scaffoldBackgroundColor: Colors.white,
-          textTheme: base.textTheme.apply(bodyColor: Colors.black87),
-        ),
+        scaffoldBackgroundColor: Colors.white,
+        textTheme: base.textTheme.apply(bodyColor: Colors.black87),
+      ),
       ReaderTheme.dark => base.copyWith(
-          scaffoldBackgroundColor: const Color(0xFF1A1A2E),
-          textTheme: base.textTheme.apply(bodyColor: Colors.white70),
-        ),
+        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
+        textTheme: base.textTheme.apply(bodyColor: Colors.white70),
+      ),
       ReaderTheme.sepia => base.copyWith(
-          scaffoldBackgroundColor: const Color(0xFFF4ecd8),
-          textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
-        ),
+        scaffoldBackgroundColor: const Color(0xFFF4ecd8),
+        textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
+      ),
     };
   }
 }

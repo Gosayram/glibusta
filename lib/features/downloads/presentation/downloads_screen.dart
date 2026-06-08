@@ -18,8 +18,7 @@ class DownloadsScreen extends ConsumerWidget {
           downloadsAsync.when(
             data: (List<DownloadTask> downloads) {
               final active = downloads
-                  .where((DownloadTask d) =>
-                      d.status == DownloadStatus.running)
+                  .where((DownloadTask d) => d.status == DownloadStatus.running)
                   .length;
               return active > 0
                   ? Center(
@@ -31,7 +30,7 @@ class DownloadsScreen extends ConsumerWidget {
                   : const SizedBox.shrink();
             },
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
           ),
         ],
       ),
@@ -44,8 +43,7 @@ class DownloadsScreen extends ConsumerWidget {
                 children: [
                   Icon(Icons.download_done, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('Нет загрузок',
-                      style: TextStyle(color: Colors.grey)),
+                  Text('Нет загрузок', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             );
@@ -86,8 +84,7 @@ class DownloadTile extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(_statusIcon(task.status),
-                    size: 20, color: _statusColor(task.status)),
+                Icon(_statusIcon(task.status), size: 20, color: _statusColor(task.status)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -103,8 +100,7 @@ class DownloadTile extends ConsumerWidget {
                 ),
               ],
             ),
-            if (task.status == DownloadStatus.running ||
-                task.status == DownloadStatus.paused) ...[
+            if (task.status == DownloadStatus.running || task.status == DownloadStatus.paused) ...[
               const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: task.totalBytes != null && task.totalBytes! > 0

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'search_controller.dart';
 import '../../../shared/models/book.dart';
+import 'search_controller.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -79,8 +79,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: Column(
         children: [
-          if (state.isLoading && state.books.isEmpty)
-            const LinearProgressIndicator(),
+          if (state.isLoading && state.books.isEmpty) const LinearProgressIndicator(),
           if (state.error != null)
             Padding(
               padding: const EdgeInsets.all(8),
@@ -114,10 +113,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollEndNotification &&
-            notification.metrics.pixels >=
-                notification.metrics.maxScrollExtent - 200) {
-          unawaited(
-              ref.read(searchControllerProvider.notifier).loadMore());
+            notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
+          unawaited(ref.read(searchControllerProvider.notifier).loadMore());
         }
         return false;
       },
@@ -167,7 +164,7 @@ class BookListItem extends StatelessWidget {
                   width: 48,
                   height: 64,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     width: 48,
                     height: 64,
                     color: theme.colorScheme.surfaceContainerHighest,
@@ -206,15 +203,16 @@ class BookListItem extends StatelessWidget {
               Wrap(
                 spacing: 4,
                 children: book.availableFormats
-                    .map((f) => Chip(
-                          label: Text(
-                            f.name.toUpperCase(),
-                            style: const TextStyle(fontSize: 10),
-                          ),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ))
+                    .map(
+                      (f) => Chip(
+                        label: Text(
+                          f.name.toUpperCase(),
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    )
                     .toList(),
               ),
           ],

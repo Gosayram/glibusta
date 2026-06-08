@@ -39,10 +39,12 @@ class AdaptiveNavigation extends ConsumerWidget {
           child: Icon(Icons.menu_book, size: 28),
         ),
         destinations: destinations
-            .map((NavigationDestination d) => NavigationRailDestination(
-                  icon: d.icon,
-                  label: Text(d.label),
-                ))
+            .map(
+              (NavigationDestination d) => NavigationRailDestination(
+                icon: d.icon,
+                label: Text(d.label),
+              ),
+            )
             .toList(),
       );
     }

@@ -4,7 +4,7 @@ sealed class AppFailure {
   const AppFailure([this.message]);
 
   @override
-  String toString() => '${runtimeType}: ${message ?? 'Unknown error'}';
+  String toString() => '$runtimeType: ${message ?? 'Unknown error'}';
 }
 
 final class NetworkFailure extends AppFailure {

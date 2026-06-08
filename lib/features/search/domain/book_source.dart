@@ -1,6 +1,6 @@
 import '../../../shared/models/book.dart';
-import '../../../shared/models/search_query.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/models/search_query.dart';
 
 abstract class BookSource {
   Future<SearchResultPage> searchBooks(SearchQuery query);
@@ -36,7 +36,7 @@ class MockBookSource implements BookSource {
         coverUrl: null,
         publishDate: null,
         availableFormats: const [],
-        source: BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
+        source: const BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
       ),
       description: 'Mock description',
       availableFormats: const [],

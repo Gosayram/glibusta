@@ -117,8 +117,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: const Text('Базовый URL'),
         content: TextField(
           controller: controller,
-          decoration:
-              const InputDecoration(hintText: 'https://flibusta.site'),
+          decoration: const InputDecoration(hintText: 'https://flibusta.site'),
         ),
         actions: [
           TextButton(
@@ -127,8 +126,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           TextButton(
             onPressed: () {
-              ref.read(appSettingsProvider.notifier).state =
-                  settings.copyWith(baseUrl: controller.text);
+              ref.read(appSettingsProvider.notifier).state = settings.copyWith(
+                baseUrl: controller.text,
+              );
               Navigator.of(context).pop();
             },
             child: const Text('Сохранить'),
@@ -169,8 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   .map((String l) => l.trim())
                   .where((String l) => l.isNotEmpty)
                   .toList();
-              ref.read(appSettingsProvider.notifier).state =
-                  settings.copyWith(mirrors: mirrors);
+              ref.read(appSettingsProvider.notifier).state = settings.copyWith(mirrors: mirrors);
               Navigator.of(context).pop();
             },
             child: const Text('Сохранить'),
@@ -192,8 +191,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [1, 2, 3, 5, 10].map((int n) {
           return SimpleDialogOption(
             onPressed: () {
-              ref.read(appSettingsProvider.notifier).state =
-                  settings.copyWith(maxConcurrentDownloads: n);
+              ref.read(appSettingsProvider.notifier).state = settings.copyWith(
+                maxConcurrentDownloads: n,
+              );
               Navigator.of(context).pop();
             },
             child: Row(
@@ -225,9 +225,9 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
