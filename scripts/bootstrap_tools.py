@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VENV_DIR = ROOT / ".venv-tools"
+NVMRC = ROOT / ".nvmrc"
 
 
 @dataclass(frozen=True)
@@ -24,8 +25,8 @@ class Tool:
 TOOLS = [
     Tool("Flutter", "flutter", install_hint="Install Flutter SDK and add it to PATH."),
     Tool("Dart", "dart", install_hint="Usually installed with Flutter."),
-    Tool("Node npm", "npm", install_hint="Install Node.js LTS."),
-    Tool("Node npx", "npx", install_hint="Install Node.js LTS."),
+    Tool("Node npm", "npm", install_hint="Install/select Node through nvm."),
+    Tool("Node npx", "npx", install_hint="Install/select Node through nvm."),
     Tool("Python", "python3", install_hint="Install Python 3."),
     Tool("ShellCheck", "shellcheck", install_hint="Install with Homebrew/apt/winget."),
 ]
@@ -80,10 +81,24 @@ def package_manager() -> str | None:
     return None
 
 
+def nvm_sh_path() -> Path:
+    home = Path.home()
+    return home / ".nvm" / "nvm.sh"
+
+
+def has_nvm() -> bool:
+    return nvm_sh_path().exists()
+
+
+def nvm_command(command: str) -> list[str]:
+    return ["bash", "-lc", f'source "{nvm_sh_path()}" && {command}']
+
+
 def print_status() -> dict[str, bool]:
     status = {tool.command: has(tool.command) for tool in TOOLS}
     ruff_path = VENV_DIR / ("Scripts/ruff.exe" if host_os() == "windows" else "bin/ruff")
     status["ruff"] = ruff_path.exists()
+    status["nvm"] = has_nvm()
 
     print()
     print(color("1;34", "Bootstrap environment check"))
@@ -95,6 +110,12 @@ def print_status() -> dict[str, bool]:
         marker = ok("OK") if status[tool.command] else err("MISS")
         location = shutil.which(tool.command) or tool.install_hint
         print(f"{marker:>4} {tool.name:<14} {location}")
+
+    marker = ok("OK") if status["nvm"] else err("MISS")
+    print(f"{marker:>4} {'nvm':<14} {nvm_sh_path()}")
+
+    if NVMRC.exists():
+        print(f"     {'.nvmrc':<14} {NVMRC.read_text(encoding='utf-8').strip()}")
 
     marker = ok("OK") if status["ruff"] else err("MISS")
     print(f"{marker:>4} {'Ruff local':<14} {ruff_path}")
@@ -123,6 +144,46 @@ def install_shellcheck(manager: str | None) -> None:
         print(warn("ShellCheck was not installed: no supported package manager detected."))
 
 
+def install_nvm(manager: str | None) -> None:
+    if has_nvm():
+        return
+    if manager == "brew":
+        run(["brew", "install", "nvm"])
+        print(
+            warn(
+                "Homebrew installed nvm. Ensure your shell sources nvm.sh, "
+                "then rerun make bootstrap.",
+            ),
+        )
+    elif host_os() in {"macos", "linux"}:
+        run(
+            [
+                "bash",
+                "-lc",
+                "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash",
+            ],
+        )
+    elif manager == "winget":
+        run(["winget", "install", "--id", "CoreyButler.NVMforWindows", "-e"])
+        print(warn("Restart your shell after installing nvm-windows, then rerun make bootstrap."))
+    elif manager == "choco":
+        run(["choco", "install", "nvm", "-y"])
+        print(warn("Restart your shell after installing nvm-windows, then rerun make bootstrap."))
+    else:
+        print(warn("nvm was not installed: no supported installer detected."))
+
+
+def use_node_from_nvmrc() -> bool:
+    if not NVMRC.exists():
+        print(warn("Skipping nvm use: .nvmrc is missing."))
+        return False
+    if not has_nvm():
+        print(warn("Skipping nvm use: nvm is missing."))
+        return False
+    run(nvm_command("(nvm use || (nvm install && nvm use)) && node --version && npm --version"))
+    return True
+
+
 def install_python_tools() -> None:
     if not has("python3"):
         print(warn("Skipping Python tools: python3 is missing."))
@@ -135,6 +196,11 @@ def install_python_tools() -> None:
 
 
 def install_node_deps() -> None:
+    if use_node_from_nvmrc():
+        if (ROOT / "package.json").exists():
+            run(nvm_command("npm install"))
+        return
+
     if not has("npm"):
         print(warn("Skipping npm install: npm is missing."))
         return
@@ -171,6 +237,8 @@ def print_manual_notes(status: dict[str, bool]) -> None:
                 "Install Flutter and Visual Studio manually.",
             ),
         )
+    if not status.get("nvm"):
+        print(warn("nvm is recommended for Node selection. Bootstrap can install it if confirmed."))
 
 
 def main() -> int:
@@ -194,6 +262,7 @@ def main() -> int:
 
     manager = package_manager()
     step("Installing supported missing tools")
+    install_nvm(manager)
     install_shellcheck(manager)
 
     step("Installing project-local dependencies")

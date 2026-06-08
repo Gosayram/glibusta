@@ -13,6 +13,16 @@ npm-install: require-node ## Install Node dependencies for docs/config formattin
 	@$(PRINT_STEP) "Installing Node dependencies"
 	$(NPM) install
 
+.PHONY: nvm-use
+nvm-use: require-nvm ## Install/use the Node version from .nvmrc
+	@$(PRINT_STEP) "Installing and selecting Node via nvm"
+	@$(call NVM_EXEC,node --version && npm --version)
+
+.PHONY: npm-install-nvm
+npm-install-nvm: require-nvm ## Install Node dependencies using nvm-selected Node
+	@$(PRINT_STEP) "Installing Node dependencies via nvm"
+	@$(call NVM_EXEC,npm install)
+
 .PHONY: install-python-tools
 install-python-tools: require-python ## Install local Python quality tools
 	@$(PRINT_STEP) "Installing Python quality tools"
@@ -91,7 +101,7 @@ test: require-flutter ## Run Flutter tests
 	$(FLUTTER_TEST)
 
 .PHONY: fix-all
-fix-all: get npm-install install-python-tools format fix prettier ruff-format ruff-fix ## Apply all automatic fixes and formatting
+fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all

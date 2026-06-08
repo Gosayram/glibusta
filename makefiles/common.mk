@@ -22,6 +22,8 @@ PIP ?= $(PYTHON_TOOLS_VENV)/bin/pip
 RUFF ?= $(PYTHON_TOOLS_VENV)/bin/ruff
 CODESIGN ?= codesign
 DITTO ?= ditto
+NVM_DIR ?= $(HOME)/.nvm
+NVM_SH ?= $(NVM_DIR)/nvm.sh
 
 SCRIPTS_DIR ?= scripts
 PUBSPEC_VALUE_SCRIPT ?= $(SCRIPTS_DIR)/pubspec_value.py
@@ -52,6 +54,7 @@ PRINT_WARN = printf "$(C_YELLOW)WARN$(C_RESET) %s\n"
 PRINT_ERROR = printf "$(C_RED)ERROR$(C_RESET) %s\n"
 
 REQUIRE_TOOL = command -v "$(1)" >/dev/null 2>&1 || { $(PRINT_ERROR) "Required tool not found: $(1)"; exit 127; }
+NVM_EXEC = bash -lc 'source "$(NVM_SH)" && (nvm use || (nvm install && nvm use)) && $(1)'
 
 ##@ Tooling
 
@@ -67,6 +70,10 @@ require-dart: ## Verify Dart is available
 require-node: ## Verify npm and npx are available
 	@$(call REQUIRE_TOOL,$(NPM))
 	@$(call REQUIRE_TOOL,$(NPX))
+
+.PHONY: require-nvm
+require-nvm: ## Verify nvm is available
+	@test -f "$(NVM_SH)" || { $(PRINT_ERROR) "nvm not found: $(NVM_SH)"; exit 127; }
 
 .PHONY: require-python
 require-python: ## Verify Python is available
