@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
@@ -91,6 +92,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Горячие клавиши',
             subtitle: 'Список сочетаний клавиш',
             onTap: () => _showShortcuts(context),
+          ),
+          _SettingsTile(
+            icon: Icons.bug_report_outlined,
+            title: 'Диагностика',
+            subtitle: 'Информация для отладки',
+            onTap: () => context.push('/settings/diagnostics'),
           ),
         ],
       ),

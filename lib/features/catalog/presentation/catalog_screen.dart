@@ -39,65 +39,77 @@ class CatalogScreen extends ConsumerWidget {
       ),
       body: ListView(
         children: [
-          categoriesAsync.when(
-            data: (List<String> categories) => _buildCategories(context, categories),
-            loading: () => SizedBox(
-              height: 100,
-              child: Skeletonizer(
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: 5,
-                  itemBuilder: (_, _) => const Card(
-                    margin: EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      width: 100,
-                      child: Center(child: Bone.text(words: 1)),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: KeyedSubtree(
+              key: ValueKey(categoriesAsync.isLoading ? 'cat_loading' : categoriesAsync.hasError ? 'cat_error' : 'cat_data_${categoriesAsync.value?.length ?? 0}'),
+              child: categoriesAsync.when(
+                data: (List<String> categories) => _buildCategories(context, categories),
+                loading: () => SizedBox(
+                  height: 100,
+                  child: Skeletonizer(
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: 5,
+                      itemBuilder: (_, _) => const Card(
+                        margin: EdgeInsets.only(right: 8),
+                        child: SizedBox(
+                          width: 100,
+                          child: Center(child: Bone.text(words: 1)),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            error: (Object e, _) => SizedBox(
-              height: 100,
-              child: ErrorStateWidget(
-                message: 'Не удалось загрузить категории',
-                details: e.toString(),
-                onRetry: () => ref.invalidate(categoriesProvider),
+                error: (Object e, _) => SizedBox(
+                  height: 100,
+                  child: ErrorStateWidget(
+                    message: 'Не удалось загрузить категории',
+                    details: e.toString(),
+                    onRetry: () => ref.invalidate(categoriesProvider),
+                  ),
+                ),
               ),
             ),
           ),
           const Divider(),
-          popularAsync.when(
-            data: (List<Book> books) => _buildPopularBooks(context, ref, books),
-            loading: () => SizedBox(
-              height: 200,
-              child: Skeletonizer(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: 6,
-                  itemBuilder: (_, _) => const Card(
-                    child: ListTile(
-                      leading: Bone.circle(size: 48),
-                      title: Bone.text(words: 3),
-                      subtitle: Bone.text(words: 2),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: KeyedSubtree(
+              key: ValueKey(popularAsync.isLoading ? 'pop_loading' : popularAsync.hasError ? 'pop_error' : 'pop_data_${popularAsync.value?.length ?? 0}'),
+              child: popularAsync.when(
+                data: (List<Book> books) => _buildPopularBooks(context, ref, books),
+                loading: () => SizedBox(
+                  height: 200,
+                  child: Skeletonizer(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemCount: 6,
+                      itemBuilder: (_, _) => const Card(
+                        child: ListTile(
+                          leading: Bone.circle(size: 48),
+                          title: Bone.text(words: 3),
+                          subtitle: Bone.text(words: 2),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            error: (Object e, _) => SizedBox(
-              height: 200,
-              child: ErrorStateWidget(
-                message: 'Не удалось загрузить популярные книги',
-                details: e.toString(),
-                onRetry: () => ref.invalidate(popularBooksProvider),
+                error: (Object e, _) => SizedBox(
+                  height: 200,
+                  child: ErrorStateWidget(
+                    message: 'Не удалось загрузить популярные книги',
+                    details: e.toString(),
+                    onRetry: () => ref.invalidate(popularBooksProvider),
+                  ),
+                ),
               ),
             ),
           ),

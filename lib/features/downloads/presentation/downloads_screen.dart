@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -38,13 +39,20 @@ class DownloadsScreen extends ConsumerWidget {
       body: downloadsAsync.when(
         data: (List<DownloadTask> downloads) {
           if (downloads.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.download_done, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Нет загрузок', style: TextStyle(color: Colors.grey)),
+                  const Icon(Icons.download_done, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('Нет загрузок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  const Text('Скачайте книги из каталога', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const SizedBox(height: 24),
+                  FilledButton.tonal(
+                    onPressed: () => context.go('/catalog'),
+                    child: const Text('Перейти в каталог'),
+                  ),
                 ],
               ),
             );

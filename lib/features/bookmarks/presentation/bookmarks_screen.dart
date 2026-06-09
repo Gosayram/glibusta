@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -29,17 +30,19 @@ class BookmarksScreen extends ConsumerWidget {
       body: bookmarksAsync.when(
         data: (bookmarks) {
           if (bookmarks.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.bookmark_border, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Нет закладок', style: TextStyle(color: Colors.grey)),
-                  SizedBox(height: 8),
-                  Text(
-                    'Добавьте закладку во время чтения',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  const Icon(Icons.bookmark_border, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('Нет закладок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  const Text('Закладки появятся при чтении книг', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const SizedBox(height: 24),
+                  FilledButton.tonal(
+                    onPressed: () => context.go('/library'),
+                    child: const Text('Открыть библиотеку'),
                   ),
                 ],
               ),

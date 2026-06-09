@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -29,17 +30,19 @@ class NotesScreen extends ConsumerWidget {
       body: notesAsync.when(
         data: (notes) {
           if (notes.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.note_alt_outlined, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Нет заметок', style: TextStyle(color: Colors.grey)),
-                  SizedBox(height: 8),
-                  Text(
-                    'Добавьте заметку во время чтения',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  const Icon(Icons.note_alt_outlined, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('Нет заметок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  const Text('Заметки появятся при чтении книг', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const SizedBox(height: 24),
+                  FilledButton.tonal(
+                    onPressed: () => context.go('/library'),
+                    child: const Text('Открыть библиотеку'),
                   ),
                 ],
               ),
