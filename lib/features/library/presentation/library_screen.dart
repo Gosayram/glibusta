@@ -305,12 +305,15 @@ class LibraryBookTile extends ConsumerWidget {
                 child: book.coverUrl != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          book.coverUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
-                            Icons.book,
-                            color: theme.colorScheme.onPrimaryContainer,
+                        child: Semantics(
+                          label: 'Обложка: ${book.title}',
+                          child: Image.network(
+                            book.coverUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Icon(
+                              Icons.book,
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
                           ),
                         ),
                       )
@@ -366,6 +369,7 @@ class LibraryBookTile extends ConsumerWidget {
             book.title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            semanticsLabel: book.title,
           ),
           subtitle: book.authorIds.isNotEmpty
               ? Text(

@@ -280,9 +280,12 @@ class CatalogScreen extends ConsumerWidget {
   }
 
   Widget _buildBookCard(BuildContext context, Book book, {bool? isDownloaded}) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Card(
+    return Semantics(
+      label: 'Книга: ${book.title}',
+      button: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Card(
         margin: const EdgeInsets.only(right: 8),
         child: Stack(
           children: [
@@ -340,6 +343,7 @@ class CatalogScreen extends ConsumerWidget {
               ),
           ],
         ),
+      ),
       ),
     );
   }

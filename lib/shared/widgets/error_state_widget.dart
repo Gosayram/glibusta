@@ -30,15 +30,18 @@ class ErrorStateWidget extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge,
+              semanticsLabel: message,
             ),
             if (details != null) ...[
               const SizedBox(height: 8),
-              Text(
-                details!,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.disabledColor),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+              ExcludeSemantics(
+                child: Text(
+                  details!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.disabledColor),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
             const SizedBox(height: 24),

@@ -106,7 +106,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pageController = PageController();
     _loadBook();
     _progressTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveProgress());
   }
@@ -116,16 +115,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       final service = ref.read(bookOpenServiceProvider);
       final book = await service.openBookWithCache(widget.bookId);
       if (!mounted) return;
+      final savedChapter = await _loadSavedChapterIndex();
       setState(() {
         _book = book;
         _isLoading = false;
+        _currentChapterIndex = savedChapter.clamp(0, book.chapters.length - 1);
       });
+      _pageController = PageController(initialPage: _currentChapterIndex);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
       });
+    }
+  }
+
+  Future<int> _loadSavedChapterIndex() async {
+    try {
+      final db = ref.read(databaseProvider);
+      final row = await (db.select(db.readingProgress)
+            ..where((t) => t.bookId.equals(widget.bookId)))
+          .getSingleOrNull();
+      return row?.currentPosition ?? 0;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -207,15 +221,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       data: theme,
       child: ReaderShortcuts(
         onNextPage: () {
-          unawaited(
-            _pageController.nextPage(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-            ),
-          );
+          if (_currentChapterIndex < (_book?.chapters.length ?? 1) - 1) {
+            unawaited(
+              _pageController.nextPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              ),
+            );
+          }
         },
         onPreviousPage: () {
-          if (_currentPage > 0) {
+          if (_currentChapterIndex > 0) {
             unawaited(
               _pageController.previousPage(
                 duration: const Duration(milliseconds: 300),
@@ -484,35 +500,49 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     };
   }
 
+  static const int _virtualWindow = 1;
+
+  bool _isChapterVisible(int index) {
+    return (index - _currentChapterIndex).abs() <= _virtualWindow;
+  }
+
   Widget _buildReaderBody(BuildContext context, ReaderSettings settings) {
+    if (_book == null || _book!.chapters.isEmpty) {
+      return const Center(child: Text('Нет содержимого'));
+    }
+    final chapterCount = _book!.chapters.length;
     return SafeArea(
       top: settings.mode != ReaderMode.fullscreen,
       bottom: settings.mode != ReaderMode.fullscreen,
       child: PageView.builder(
         controller: _pageController,
+        itemCount: chapterCount,
         onPageChanged: (int page) {
           setState(() {
+            _currentChapterIndex = page;
             _currentPage = page;
           });
-          ref
-              .read(readingProgressProvider.notifier)
-              .updateProgress(
-                ReadingProgress(
-                  bookId: widget.bookId,
-                  currentPosition: page,
-                  lastRead: DateTime.now(),
-                ),
-              );
+          ref.read(readingProgressProvider.notifier).updateProgress(
+            ReadingProgress(
+              bookId: widget.bookId,
+              currentPosition: page,
+              lastRead: DateTime.now(),
+            ),
+          );
         },
         itemBuilder: (BuildContext context, int index) {
-          return _buildPage(context, index, settings);
+          if (!_isChapterVisible(index)) {
+            return const SizedBox.shrink();
+          }
+          return _buildChapterPage(context, index, settings);
         },
       ),
     );
   }
 
   Widget get _buildReaderBottomNav {
-    final chapterTitle = _book != null && _book!.chapters.isNotEmpty
+    final totalChapters = _book?.chapters.length ?? 0;
+    final chapterTitle = _book != null && _currentChapterIndex < totalChapters
         ? _book!.chapters[_currentChapterIndex].title
         : '';
     return BottomAppBar(
@@ -521,7 +551,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         children: [
           Expanded(
             child: Text(
-              'Гл. ${_currentChapterIndex + 1}${chapterTitle.isNotEmpty ? ': $chapterTitle' : ''}',
+              'Гл. ${_currentChapterIndex + 1}/$totalChapters${chapterTitle.isNotEmpty ? ': $chapterTitle' : ''}',
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -529,7 +559,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             children: [
               IconButton(
                 icon: const Icon(Icons.arrow_left),
-                onPressed: _currentPage > 0
+                onPressed: _currentChapterIndex > 0
                     ? () {
                         unawaited(
                           _pageController.previousPage(
@@ -542,14 +572,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               ),
               IconButton(
                 icon: const Icon(Icons.arrow_right),
-                onPressed: () {
-                  unawaited(
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    ),
-                  );
-                },
+                onPressed: _currentChapterIndex < totalChapters - 1
+                    ? () {
+                        unawaited(
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          ),
+                        );
+                      }
+                    : null,
               ),
             ],
           ),
@@ -566,16 +598,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     return _buildReaderBody(context, settings);
   }
 
-  Widget _buildPage(
+  Widget _buildChapterPage(
     BuildContext context,
-    int index,
+    int chapterIndex,
     ReaderSettings settings,
   ) {
-    if (_book == null || _book!.chapters.isEmpty) {
+    if (_book == null || chapterIndex < 0 || chapterIndex >= _book!.chapters.length) {
       return const Center(child: Text('Нет содержимого'));
     }
 
-    final chapter = _book!.chapters[_currentChapterIndex];
+    final chapter = _book!.chapters[chapterIndex];
     final textAlign = switch (settings.textAlign) {
       ReaderTextAlign.left => TextAlign.left,
       ReaderTextAlign.justify => TextAlign.justify,
@@ -601,19 +633,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               ),
             ),
           ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
-          if (_currentChapterIndex < _book!.chapters.length - 1)
+          if (chapterIndex < _book!.chapters.length - 1)
             Padding(
               padding: EdgeInsets.only(top: settings.paragraphSpacing * 3),
               child: Center(
-                child: FilledButton.tonal(
-                  onPressed: () {
-                    setState(() {
-                      _currentChapterIndex++;
-                      _currentPage = 0;
-                    });
-                    _pageController.jumpToPage(0);
-                  },
-                  child: Text('Следующая глава: ${_book!.chapters[_currentChapterIndex].title}'),
+                child: Text(
+                  '— ${_book!.chapters[chapterIndex + 1].title} —',
+                  style: _getReaderStyle(settings).copyWith(
+                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                  ),
+                  textAlign: textAlign,
                 ),
               ),
             ),

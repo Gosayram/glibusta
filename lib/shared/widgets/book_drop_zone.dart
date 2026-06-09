@@ -19,7 +19,10 @@ class BookDropZone extends ConsumerWidget {
         final paths = details.files.map((f) => f.path).toList();
         onBooksDropped(paths);
       },
-      child: child,
+      child: Semantics(
+        label: 'Зона для импорта книг перетаскиванием',
+        child: child,
+      ),
     );
   }
 }
