@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'dio_provider.dart';
 
-final httpClientProvider = Provider<HttpClient>((ref) {
+part 'http_client.g.dart';
+
+@riverpod
+HttpClient httpClient(Ref ref) {
   final dio = ref.watch(dioProvider);
   return HttpClient(dio);
-});
+}
 
 class HttpClient {
   final Dio _dio;

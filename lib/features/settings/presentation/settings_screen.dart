@@ -17,7 +17,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(appSettingsProvider);
+    final settings = ref.watch(appSettingsControllerProvider);
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
@@ -188,9 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             TextButton(
               onPressed: () {
-                ref.read(appSettingsProvider.notifier).state = settings.copyWith(
-                  baseUrl: controller.text,
-                );
+                ref.read(appSettingsControllerProvider.notifier).updateBaseUrl(controller.text);
                 Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
@@ -233,7 +231,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     .map((String l) => l.trim())
                     .where((String l) => l.isNotEmpty)
                     .toList();
-                ref.read(appSettingsProvider.notifier).state = settings.copyWith(mirrors: mirrors);
+                ref.read(appSettingsControllerProvider.notifier).updateMirrors(mirrors);
                 Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),
@@ -257,9 +255,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [1, 2, 3, 5, 10].map((int n) {
             return SimpleDialogOption(
               onPressed: () {
-                ref.read(appSettingsProvider.notifier).state = settings.copyWith(
-                  maxConcurrentDownloads: n,
-                );
+                ref.read(appSettingsControllerProvider.notifier).updateMaxConcurrentDownloads(n);
                 Navigator.of(context).pop();
               },
               child: Row(

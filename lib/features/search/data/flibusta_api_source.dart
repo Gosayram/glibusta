@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
@@ -6,10 +6,13 @@ import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
 import 'flibusta_api_client.dart';
 
-final flibustaApiSourceProvider = Provider<FlibustaApiSource>((ref) {
+part 'flibusta_api_source.g.dart';
+
+@riverpod
+FlibustaApiSource flibustaApiSource(Ref ref) {
   final client = ref.watch(flibustaApiClientProvider);
   return FlibustaApiSource(client);
-});
+}
 
 class FlibustaApiSource extends BookSource {
   final FlibustaApiClient _client;

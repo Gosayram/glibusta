@@ -2,10 +2,44 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../domain/reader.dart';
+
+part 'reader_screen.g.dart';
+
+@riverpod
+class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
+  @override
+  ReaderSettings build() {
+    return const ReaderSettings();
+  }
+
+  void updateTheme(ReaderTheme theme) {
+    state = state.copyWith(theme: theme);
+  }
+
+  void updateFontSize(double fontSize) {
+    state = state.copyWith(fontSize: fontSize);
+  }
+
+  void updateMode(ReaderMode mode) {
+    state = state.copyWith(mode: mode);
+  }
+}
+
+@riverpod
+class ReadingProgressNotifier extends _$ReadingProgressNotifier {
+  @override
+  ReadingProgress? build() {
+    return null;
+  }
+
+  void updateProgress(ReadingProgress progress) {
+    state = progress;
+  }
+}
 
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({super.key, required this.bookId});
@@ -46,16 +80,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  settings.mode == ReaderMode.paginated ? Icons.view_carousel : Icons.view_stream,
+                  settings.mode == ReaderMode.paginated
+                      ? Icons.view_carousel
+                      : Icons.view_stream,
                 ),
-                tooltip: settings.mode == ReaderMode.paginated ? 'Непрерывный' : 'По страницам',
+                tooltip: settings.mode == ReaderMode.paginated
+                    ? 'Непрерывный'
+                    : 'По страницам',
                 onPressed: () {
                   final nextMode = settings.mode == ReaderMode.paginated
                       ? ReaderMode.continuous
                       : ReaderMode.paginated;
-                  ref.read(readerSettingsProvider.notifier).state = settings.copyWith(
-                    mode: nextMode,
-                  );
+                  ref.read(readerSettingsProvider.notifier).updateMode(nextMode);
                 },
               ),
               IconButton(
@@ -70,9 +106,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ),
                 tooltip: 'Размер шрифта',
                 onSelected: (double size) {
-                  ref.read(readerSettingsProvider.notifier).state = settings.copyWith(
-                    fontSize: size,
-                  );
+                  ref.read(readerSettingsProvider.notifier).updateFontSize(size);
                 },
                 itemBuilder: (BuildContext context) {
                   return [
@@ -100,11 +134,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               setState(() {
                 _currentPage = page;
               });
-              ref.read(readingProgressProvider.notifier).state = ReadingProgress(
-                bookId: widget.bookId,
-                currentPosition: page,
-                lastRead: DateTime.now(),
-              );
+              ref.read(readingProgressProvider.notifier).updateProgress(
+                    ReadingProgress(
+                      bookId: widget.bookId,
+                      currentPosition: page,
+                      lastRead: DateTime.now(),
+                    ),
+                  );
             },
             itemBuilder: (BuildContext context, int index) {
               return _buildPage(context, index, settings);
@@ -168,10 +204,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _cycleTheme(WidgetRef ref) {
     final current = ref.read(readerSettingsProvider).theme;
-    final next = ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
-    ref.read(readerSettingsProvider.notifier).state = ref
-        .read(readerSettingsProvider)
-        .copyWith(theme: next);
+    final next =
+        ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
+    ref.read(readerSettingsProvider.notifier).updateTheme(next);
   }
 
   IconData _themeIcon(ReaderTheme theme) {
@@ -186,25 +221,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final base = Theme.of(context);
     return switch (theme) {
       ReaderTheme.light => base.copyWith(
-        scaffoldBackgroundColor: Colors.white,
-        textTheme: base.textTheme.apply(bodyColor: Colors.black87),
-      ),
+          scaffoldBackgroundColor: Colors.white,
+          textTheme: base.textTheme.apply(bodyColor: Colors.black87),
+        ),
       ReaderTheme.dark => base.copyWith(
-        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
-        textTheme: base.textTheme.apply(bodyColor: Colors.white70),
-      ),
+          scaffoldBackgroundColor: const Color(0xFF1A1A2E),
+          textTheme: base.textTheme.apply(bodyColor: Colors.white70),
+        ),
       ReaderTheme.sepia => base.copyWith(
-        scaffoldBackgroundColor: const Color(0xFFF4ecd8),
-        textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
-      ),
+          scaffoldBackgroundColor: const Color(0xFFF4ecd8),
+          textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
+        ),
     };
   }
 }
-
-final readerSettingsProvider = StateProvider<ReaderSettings>((ref) {
-  return const ReaderSettings();
-});
-
-final readingProgressProvider = StateProvider<ReadingProgress?>((ref) {
-  return null;
-});

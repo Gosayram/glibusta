@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/models/book.dart';
 import '../data/book_repository_impl.dart';
 
-final libraryBooksProvider = FutureProvider<List<Book>>((ref) async {
+part 'library_screen.g.dart';
+
+@riverpod
+Future<List<Book>> libraryBooks(Ref ref) async {
   final repository = ref.watch(bookRepositoryProvider);
   return repository.getAllBooks();
-});
+}
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});

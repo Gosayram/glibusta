@@ -1,4 +1,4 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/failures.dart';
 import '../../../shared/models/book.dart';
@@ -8,13 +8,16 @@ import '../domain/book_source.dart';
 import 'flibusta_api_source.dart';
 import 'flibusta_source.dart';
 
-final bookSourceProvider = Provider<BookSource>((ref) {
+part 'composite_source.g.dart';
+
+@riverpod
+BookSource bookSource(Ref ref) {
   final sources = <BookSource>[
     ref.watch(flibustaApiSourceProvider),
     ref.watch(flibustaSourceProvider),
   ];
   return CompositeBookSource(sources);
-});
+}
 
 class CompositeBookSource extends BookSource {
   final List<BookSource> sources;

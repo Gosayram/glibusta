@@ -1,12 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/http/dio_provider.dart';
 
-final flibustaApiClientProvider = Provider<FlibustaApiClient>((ref) {
+part 'flibusta_api_client.g.dart';
+
+@riverpod
+FlibustaApiClient flibustaApiClient(Ref ref) {
   final dio = ref.watch(dioProvider);
   return FlibustaApiClient(dio);
-});
+}
 
 class FlibustaApiClient {
   final Dio _dio;

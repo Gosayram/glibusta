@@ -1,6 +1,6 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:html/dom.dart' show Document, Element;
 import 'package:html/parser.dart' show parse;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/http/http_client.dart';
 import '../../../shared/models/book.dart';
@@ -8,10 +8,13 @@ import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
 
-final flibustaSourceProvider = Provider<FlibustaHtmlSource>((ref) {
+part 'flibusta_source.g.dart';
+
+@riverpod
+FlibustaHtmlSource flibustaSource(Ref ref) {
   final client = ref.watch(httpClientProvider);
   return FlibustaHtmlSource(client);
-});
+}
 
 class FlibustaHtmlSource extends BookSource {
   final HttpClient client;

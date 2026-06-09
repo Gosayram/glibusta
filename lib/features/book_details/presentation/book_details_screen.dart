@@ -3,15 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../data/book_details_repository_impl.dart';
 
-final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
+part 'book_details_screen.g.dart';
+
+@riverpod
+Future<BookDetails> bookDetails(Ref ref, String bookId) async {
   final repository = ref.watch(bookDetailsRepositoryProvider);
   return repository.getBookDetails(bookId);
-});
+}
 
 class BookDetailsScreen extends ConsumerWidget {
   final String bookId;

@@ -2,9 +2,11 @@ import 'dart:io' as io;
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
+
+part 'dio_provider.g.dart';
 
 class _HttpOverrides extends io.HttpOverrides {
   @override
@@ -18,8 +20,9 @@ void enableSslBypass() {
   io.HttpOverrides.global = _HttpOverrides();
 }
 
-final dioProvider = Provider<Dio>((ref) {
-  final settings = ref.watch(appSettingsProvider);
+@riverpod
+Dio dio(Ref ref) {
+  final settings = ref.watch(appSettingsControllerProvider);
   final dio = Dio(BaseOptions(
     baseUrl: settings.baseUrl,
     connectTimeout: const Duration(seconds: 10),
@@ -34,4 +37,4 @@ final dioProvider = Provider<Dio>((ref) {
       ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
   };
   return dio;
-});
+}

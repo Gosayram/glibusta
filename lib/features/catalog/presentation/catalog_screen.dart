@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/models/book.dart';
 import '../data/catalog_repository_impl.dart';
 
-final categoriesProvider = FutureProvider<List<String>>((ref) async {
+part 'catalog_screen.g.dart';
+
+@riverpod
+Future<List<String>> categories(Ref ref) async {
   final repository = ref.watch(catalogRepositoryProvider);
   return repository.getCategories();
-});
+}
 
-final popularBooksProvider = FutureProvider<List<Book>>((ref) async {
+@riverpod
+Future<List<Book>> popularBooks(Ref ref) async {
   final repository = ref.watch(catalogRepositoryProvider);
   return repository.getPopularBooks();
-});
+}
 
 class CatalogScreen extends ConsumerWidget {
   const CatalogScreen({super.key});
