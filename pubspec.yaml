@@ -39,6 +39,7 @@ dependencies:
   async: ^2.13.0
   collection: ^1.19.1
   crypto: ^3.0.7
+  flutter_dotenv: ^6.0.1
   package_info_plus: ^8.3.1
   path_provider: ^2.1.5
   uuid: ^4.5.0
@@ -57,5 +58,6 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - lib/l10n/app_ru.arb
     - lib/l10n/app_en.arb

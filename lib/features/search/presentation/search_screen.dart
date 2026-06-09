@@ -32,7 +32,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return;
     }
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      ref.read(searchControllerProvider.notifier).search(value.trim());
+      unawaited(ref.read(searchControllerProvider.notifier).search(value.trim()));
     });
   }
 
@@ -49,7 +49,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           onSubmitted: (value) {
             _debounceTimer?.cancel();
             if (value.trim().isNotEmpty) {
-              ref.read(searchControllerProvider.notifier).search(value.trim());
+              unawaited(ref.read(searchControllerProvider.notifier).search(value.trim()));
             }
           },
           suggestionsBuilder: (context, controller) {
@@ -134,7 +134,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return BookListItem(
             book: book,
             onTap: () {
-              context.push('/reader/${book.id}');
+              unawaited(context.push('/reader/${book.id}'));
             },
           );
         },

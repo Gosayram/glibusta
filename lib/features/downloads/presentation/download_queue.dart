@@ -6,6 +6,7 @@ import '../../../core/http/http_client.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../data/download_repository.dart';
+import '../domain/download_repository.dart';
 
 final downloadQueueProvider = Provider<DownloadQueue>((ref) {
   final repository = ref.watch(downloadRepositoryProvider);
@@ -144,7 +145,7 @@ class DownloadQueue {
     while (_runningCount < _maxConcurrent && _pendingQueue.isNotEmpty) {
       final next = _pendingQueue.removeAt(0);
       if (next.status == DownloadStatus.queued) {
-        _startTask(next);
+        unawaited(_startTask(next));
       }
     }
   }
@@ -200,7 +201,7 @@ class DownloadQueue {
       );
       _tasks[task.id] = completed;
       await _repository.updateStatus(task.id, DownloadStatus.completed);
-    } catch (e) {
+    } on Object {
       final failed = DownloadTask(
         id: task.id,
         bookId: task.bookId,
@@ -225,7 +226,7 @@ class DownloadQueue {
   }
 
   void dispose() {
-    _downloadsController.close();
-    _progressController.close();
+    unawaited(_downloadsController.close());
+    unawaited(_progressController.close());
   }
 }

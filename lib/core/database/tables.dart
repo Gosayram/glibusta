@@ -8,8 +8,8 @@ class SavedBooks extends Table {
   TextColumn get description => text().nullable()();
   TextColumn get coverUrl => text().nullable()();
   DateTimeColumn get publishDate => dateTime().nullable()();
-  TextColumn get sourceId => text().withDefault(const Constant('flibusta'))();
-  TextColumn get sourceUrl => text().withDefault(const Constant(''))();
+  TextColumn get sourceId => text().nullable()();
+  TextColumn get sourceUrl => text().nullable()();
   DateTimeColumn get addedAt => dateTime().clientDefault(DateTime.now)();
 
   @override

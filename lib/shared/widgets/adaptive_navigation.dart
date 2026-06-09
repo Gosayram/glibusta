@@ -9,6 +9,7 @@ class AdaptiveNavigation extends ConsumerWidget {
 
   static const List<NavigationDestination> destinations = [
     NavigationDestination(icon: Icon(Icons.home), label: 'Главная'),
+    NavigationDestination(icon: Icon(Icons.explore), label: 'Каталог'),
     NavigationDestination(icon: Icon(Icons.search), label: 'Поиск'),
     NavigationDestination(icon: Icon(Icons.library_books), label: 'Библиотека'),
     NavigationDestination(icon: Icon(Icons.download), label: 'Загрузки'),
@@ -17,6 +18,7 @@ class AdaptiveNavigation extends ConsumerWidget {
 
   static const List<String> routes = [
     '/',
+    '/catalog',
     '/search',
     '/library',
     '/downloads',

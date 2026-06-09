@@ -5,19 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
+import '../domain/book_repository.dart';
 
 final bookRepositoryProvider = Provider<BookRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return BookRepositoryImpl(db);
 });
-
-abstract class BookRepository {
-  Future<List<Book>> getAllBooks();
-  Future<Book?> getBookById(String id);
-  Future<void> saveBook(Book book);
-  Future<void> deleteBook(String id);
-  Future<bool> isBookInLibrary(String id);
-}
 
 class BookRepositoryImpl implements BookRepository {
   final AppDatabase _db;
@@ -83,8 +76,8 @@ class BookRepositoryImpl implements BookRepository {
       publishDate: row.publishDate,
       availableFormats: const [],
       source: BookSourceInfo(
-        sourceId: row.sourceId,
-        sourceUrl: row.sourceUrl,
+        sourceId: row.sourceId ?? '',
+        sourceUrl: row.sourceUrl ?? '',
       ),
     );
   }

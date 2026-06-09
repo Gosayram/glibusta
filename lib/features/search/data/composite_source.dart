@@ -14,6 +14,10 @@ final compositeSourceProvider = Provider<CompositeBookSource>((ref) {
   return CompositeBookSource(sources);
 });
 
+final bookSourceProvider = Provider<BookSource>((ref) {
+  return ref.watch(compositeSourceProvider);
+});
+
 class CompositeBookSource extends BookSource {
   final List<BookSource> sources;
 
@@ -28,7 +32,7 @@ class CompositeBookSource extends BookSource {
         if (result.books.isNotEmpty) return result;
       } on AppFailure catch (e) {
         errors.add(e);
-      } catch (e) {
+      } on Object catch (e) {
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -54,7 +58,7 @@ class CompositeBookSource extends BookSource {
         return await source.getBookDetails(bookId);
       } on AppFailure catch (e) {
         errors.add(e);
-      } catch (e) {
+      } on Object catch (e) {
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -72,7 +76,7 @@ class CompositeBookSource extends BookSource {
         if (formats.isNotEmpty) return formats;
       } on AppFailure catch (e) {
         errors.add(e);
-      } catch (e) {
+      } on Object catch (e) {
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -88,7 +92,7 @@ class CompositeBookSource extends BookSource {
         if (url.isNotEmpty) return url;
       } on AppFailure catch (e) {
         errors.add(e);
-      } catch (e) {
+      } on Object catch (e) {
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }

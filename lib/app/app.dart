@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/book_details/presentation/book_details_screen.dart';
+import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
@@ -24,6 +26,11 @@ final routerProvider = Provider<GoRouter>(
             builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
           ),
           GoRoute(
+            path: '/catalog',
+            name: 'catalog',
+            builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
+          ),
+          GoRoute(
             path: '/search',
             name: 'search',
             builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
@@ -44,6 +51,14 @@ final routerProvider = Provider<GoRouter>(
             builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/book/:bookId',
+        name: 'bookDetails',
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return BookDetailsScreen(bookId: bookId);
+        },
       ),
       GoRoute(
         path: '/reader/:bookId',

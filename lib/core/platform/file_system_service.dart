@@ -43,7 +43,7 @@ class FileSystemService {
       // Synchronously check by comparing path prefixes
       // In production, this should use async getLibraryRoot()
       return normalized.contains('Glibusta${p.separator}books');
-    } catch (_) {
+    } on Object {
       return false;
     }
   }
@@ -54,7 +54,7 @@ class FileSystemService {
       final normalized = p.normalize(targetPath);
       final libraryPath = p.normalize(libraryRoot.path);
       return p.isWithin(libraryPath, normalized);
-    } catch (_) {
+    } on Object {
       return false;
     }
   }

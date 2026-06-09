@@ -21,8 +21,9 @@ final flibustaSourceProvider = Provider<FlibustaHtmlSource>((ref) {
 class FlibustaHtmlSource extends BookSource {
   final HttpClient client;
   final String baseUrl;
+  final String sourceId;
 
-  FlibustaHtmlSource(this.client, this.baseUrl);
+  FlibustaHtmlSource(this.client, this.baseUrl) : sourceId = Uri.parse(baseUrl).host;
 
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query) async {
@@ -118,7 +119,7 @@ class FlibustaHtmlSource extends BookSource {
       coverUrl: coverUrl,
       publishDate: null,
       availableFormats: formats,
-      source: BookSourceInfo(sourceId: 'flibusta', sourceUrl: '$baseUrl/b/$id'),
+      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$baseUrl/b/$id'),
     );
   }
 
@@ -184,7 +185,7 @@ class FlibustaHtmlSource extends BookSource {
         publishDate: null,
         availableFormats: formats,
         source: BookSourceInfo(
-          sourceId: 'flibusta',
+          sourceId: sourceId,
           sourceUrl: '$baseUrl/b/$bookId',
         ),
       ),

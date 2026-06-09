@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 @immutable
@@ -10,16 +11,26 @@ class AppSettings {
   final bool enableLogging;
 
   const AppSettings({
-    this.baseUrl = 'https://flibusta.site',
-    this.mirrors = const [
-      'https://flibusta.me',
-      'https://flibusta.is',
-      'https://flibusta.top',
-    ],
+    required this.baseUrl,
+    this.mirrors = const [],
     this.requestTimeout = const Duration(seconds: 30),
     this.maxConcurrentDownloads = 3,
     this.enableLogging = false,
   });
+
+  factory AppSettings.fromEnv() {
+    final baseUrl = dotenv.env['BASE_URL'] ?? '';
+    final mirrorsRaw = dotenv.env['MIRRORS'] ?? '';
+    final mirrors = mirrorsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    final concurrentStr = dotenv.env['CONCURRENT_DOWNLOADS'] ?? '3';
+    final maxConcurrentDownloads = int.tryParse(concurrentStr) ?? 3;
+
+    return AppSettings(
+      baseUrl: baseUrl,
+      mirrors: mirrors,
+      maxConcurrentDownloads: maxConcurrentDownloads,
+    );
+  }
 
   AppSettings copyWith({
     String? baseUrl,
@@ -37,5 +48,5 @@ class AppSettings {
 }
 
 final appSettingsProvider = StateProvider<AppSettings>((ref) {
-  return const AppSettings();
+  return AppSettings.fromEnv();
 });

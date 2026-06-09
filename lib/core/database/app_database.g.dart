@@ -90,10 +90,9 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
   late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
     'source_id',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('flibusta'),
   );
   static const VerificationMeta _sourceUrlMeta = const VerificationMeta(
     'sourceUrl',
@@ -102,10 +101,9 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
   late final GeneratedColumn<String> sourceUrl = GeneratedColumn<String>(
     'source_url',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant(''),
   );
   static const VerificationMeta _addedAtMeta = const VerificationMeta(
     'addedAt',
@@ -251,11 +249,11 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
       sourceId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}source_id'],
-      )!,
+      ),
       sourceUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}source_url'],
-      )!,
+      ),
       addedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}added_at'],
@@ -277,8 +275,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final String? description;
   final String? coverUrl;
   final DateTime? publishDate;
-  final String sourceId;
-  final String sourceUrl;
+  final String? sourceId;
+  final String? sourceUrl;
   final DateTime addedAt;
   const SavedBook({
     required this.id,
@@ -288,8 +286,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     this.description,
     this.coverUrl,
     this.publishDate,
-    required this.sourceId,
-    required this.sourceUrl,
+    this.sourceId,
+    this.sourceUrl,
     required this.addedAt,
   });
   @override
@@ -308,8 +306,12 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || publishDate != null) {
       map['publish_date'] = Variable<DateTime>(publishDate);
     }
-    map['source_id'] = Variable<String>(sourceId);
-    map['source_url'] = Variable<String>(sourceUrl);
+    if (!nullToAbsent || sourceId != null) {
+      map['source_id'] = Variable<String>(sourceId);
+    }
+    if (!nullToAbsent || sourceUrl != null) {
+      map['source_url'] = Variable<String>(sourceUrl);
+    }
     map['added_at'] = Variable<DateTime>(addedAt);
     return map;
   }
@@ -323,8 +325,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       description: description == null && nullToAbsent ? const Value.absent() : Value(description),
       coverUrl: coverUrl == null && nullToAbsent ? const Value.absent() : Value(coverUrl),
       publishDate: publishDate == null && nullToAbsent ? const Value.absent() : Value(publishDate),
-      sourceId: Value(sourceId),
-      sourceUrl: Value(sourceUrl),
+      sourceId: sourceId == null && nullToAbsent ? const Value.absent() : Value(sourceId),
+      sourceUrl: sourceUrl == null && nullToAbsent ? const Value.absent() : Value(sourceUrl),
       addedAt: Value(addedAt),
     );
   }
@@ -342,8 +344,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       description: serializer.fromJson<String?>(json['description']),
       coverUrl: serializer.fromJson<String?>(json['coverUrl']),
       publishDate: serializer.fromJson<DateTime?>(json['publishDate']),
-      sourceId: serializer.fromJson<String>(json['sourceId']),
-      sourceUrl: serializer.fromJson<String>(json['sourceUrl']),
+      sourceId: serializer.fromJson<String?>(json['sourceId']),
+      sourceUrl: serializer.fromJson<String?>(json['sourceUrl']),
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
     );
   }
@@ -358,8 +360,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'description': serializer.toJson<String?>(description),
       'coverUrl': serializer.toJson<String?>(coverUrl),
       'publishDate': serializer.toJson<DateTime?>(publishDate),
-      'sourceId': serializer.toJson<String>(sourceId),
-      'sourceUrl': serializer.toJson<String>(sourceUrl),
+      'sourceId': serializer.toJson<String?>(sourceId),
+      'sourceUrl': serializer.toJson<String?>(sourceUrl),
       'addedAt': serializer.toJson<DateTime>(addedAt),
     };
   }
@@ -372,8 +374,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     Value<String?> description = const Value.absent(),
     Value<String?> coverUrl = const Value.absent(),
     Value<DateTime?> publishDate = const Value.absent(),
-    String? sourceId,
-    String? sourceUrl,
+    Value<String?> sourceId = const Value.absent(),
+    Value<String?> sourceUrl = const Value.absent(),
     DateTime? addedAt,
   }) => SavedBook(
     id: id ?? this.id,
@@ -383,8 +385,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     description: description.present ? description.value : this.description,
     coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
     publishDate: publishDate.present ? publishDate.value : this.publishDate,
-    sourceId: sourceId ?? this.sourceId,
-    sourceUrl: sourceUrl ?? this.sourceUrl,
+    sourceId: sourceId.present ? sourceId.value : this.sourceId,
+    sourceUrl: sourceUrl.present ? sourceUrl.value : this.sourceUrl,
     addedAt: addedAt ?? this.addedAt,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
@@ -456,8 +458,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<String?> description;
   final Value<String?> coverUrl;
   final Value<DateTime?> publishDate;
-  final Value<String> sourceId;
-  final Value<String> sourceUrl;
+  final Value<String?> sourceId;
+  final Value<String?> sourceUrl;
   final Value<DateTime> addedAt;
   final Value<int> rowid;
   const SavedBooksCompanion({
@@ -523,8 +525,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<String?>? description,
     Value<String?>? coverUrl,
     Value<DateTime?>? publishDate,
-    Value<String>? sourceId,
-    Value<String>? sourceUrl,
+    Value<String?>? sourceId,
+    Value<String?>? sourceUrl,
     Value<DateTime>? addedAt,
     Value<int>? rowid,
   }) {
@@ -2157,8 +2159,8 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<String?> description,
       Value<String?> coverUrl,
       Value<DateTime?> publishDate,
-      Value<String> sourceId,
-      Value<String> sourceUrl,
+      Value<String?> sourceId,
+      Value<String?> sourceUrl,
       Value<DateTime> addedAt,
       Value<int> rowid,
     });
@@ -2171,8 +2173,8 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<String?> coverUrl,
       Value<DateTime?> publishDate,
-      Value<String> sourceId,
-      Value<String> sourceUrl,
+      Value<String?> sourceId,
+      Value<String?> sourceUrl,
       Value<DateTime> addedAt,
       Value<int> rowid,
     });
@@ -2374,8 +2376,8 @@ class $$SavedBooksTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
-                Value<String> sourceId = const Value.absent(),
-                Value<String> sourceUrl = const Value.absent(),
+                Value<String?> sourceId = const Value.absent(),
+                Value<String?> sourceUrl = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
@@ -2400,8 +2402,8 @@ class $$SavedBooksTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
-                Value<String> sourceId = const Value.absent(),
-                Value<String> sourceUrl = const Value.absent(),
+                Value<String?> sourceId = const Value.absent(),
+                Value<String?> sourceUrl = const Value.absent(),
                 Value<DateTime> addedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(

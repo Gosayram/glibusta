@@ -4,48 +4,53 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/config/app_settings.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/http/http_client.dart';
 import '../../../core/platform/file_system_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../domain/download_repository.dart';
 
 final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  final httpClient = ref.watch(httpClientProvider);
   final fileSystem = ref.watch(fileSystemServiceProvider);
-  return DownloadRepository(db, httpClient, fileSystem);
+  return DownloadRepositoryImpl(db, fileSystem);
 });
 
 final httpClientProvider = Provider<HttpClient>((ref) {
-  return HttpClient(baseUrl: 'https://flibusta.site');
+  final settings = ref.watch(appSettingsProvider);
+  return HttpClient(baseUrl: settings.baseUrl);
 });
 
-class DownloadRepository {
+class DownloadRepositoryImpl implements DownloadRepository {
   final AppDatabase _db;
-  final HttpClient _httpClient;
   final FileSystemService _fileSystem;
 
-  DownloadRepository(this._db, this._httpClient, this._fileSystem);
+  DownloadRepositoryImpl(this._db, this._fileSystem);
 
+  @override
   Stream<List<DownloadTask>> watchAllDownloads() {
     return _db.watchAllDownloads().map((List<Download> rows) {
       return rows.map(_rowToTask).toList();
     });
   }
 
+  @override
   Future<List<DownloadTask>> getAllDownloads() async {
     final rows = await _db.getAllDownloads();
     return rows.map(_rowToTask).toList();
   }
 
+  @override
   Future<DownloadTask?> getDownloadById(String id) async {
     final row = await _db.getDownloadById(id);
     if (row == null) return null;
     return _rowToTask(row);
   }
 
+  @override
   Future<DownloadTask> startDownload({
     required String bookId,
     required String bookTitle,
@@ -82,6 +87,7 @@ class DownloadRepository {
     );
   }
 
+  @override
   Future<void> updateProgress(
     String taskId,
     int downloaded,
@@ -90,15 +96,18 @@ class DownloadRepository {
     await _db.updateDownloadProgress(taskId, downloaded, total);
   }
 
+  @override
   Future<void> updateStatus(String taskId, DownloadStatus status) async {
     final driftStatus = _statusToDrift(status);
     await _db.updateDownloadStatus(taskId, driftStatus);
   }
 
+  @override
   Future<void> cancelDownload(String taskId) async {
     await _db.updateDownloadStatus(taskId, DownloadStatusDb.canceled);
   }
 
+  @override
   Future<void> removeDownload(String taskId) async {
     await _db.deleteDownload(taskId);
   }

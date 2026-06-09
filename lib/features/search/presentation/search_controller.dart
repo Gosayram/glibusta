@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:async/async.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
@@ -7,7 +9,7 @@ import '../data/composite_source.dart';
 import '../domain/book_source.dart';
 
 final searchControllerProvider = StateNotifierProvider<SearchStateController, SearchState>((ref) {
-  final source = ref.watch(compositeSourceProvider);
+  final source = ref.watch(bookSourceProvider);
   return SearchStateController(source);
 });
 
@@ -54,7 +56,7 @@ class SearchStateController extends StateNotifier<SearchState> {
   SearchStateController(this.source) : super(const SearchState());
 
   Future<void> search(String query) async {
-    _currentSearch?.cancel();
+    unawaited(_currentSearch?.cancel());
     state = state.copyWith(
       isLoading: true,
       lastQuery: query,
@@ -72,7 +74,7 @@ class SearchStateController extends StateNotifier<SearchState> {
         hasMore: result.hasNextPage,
         currentPage: result.currentPage,
       );
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -98,20 +100,20 @@ class SearchStateController extends StateNotifier<SearchState> {
         hasMore: result.hasNextPage,
         currentPage: result.currentPage,
       );
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   void clearResults() {
-    _currentSearch?.cancel();
+    unawaited(_currentSearch?.cancel());
     state = const SearchState();
   }
 
   @override
   void dispose() {
-    _currentSearch?.cancel();
+    unawaited(_currentSearch?.cancel());
     super.dispose();
   }
 }

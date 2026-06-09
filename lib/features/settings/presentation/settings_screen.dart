@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -76,31 +78,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showShortcuts(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Горячие клавиши'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ShortcutRow(shortcut: '⌘ + 1', action: 'Главная'),
-            _ShortcutRow(shortcut: '⌘ + F', action: 'Поиск'),
-            _ShortcutRow(shortcut: '⌘ + L', action: 'Библиотека'),
-            _ShortcutRow(shortcut: '⌘ + ⇧ + D', action: 'Загрузки'),
-            _ShortcutRow(shortcut: '⌘ + ,', action: 'Настройки'),
-            _ShortcutRow(shortcut: '→', action: 'Следующая страница'),
-            _ShortcutRow(shortcut: '←', action: 'Предыдущая страница'),
-            _ShortcutRow(shortcut: '+', action: 'Увеличить шрифт'),
-            _ShortcutRow(shortcut: '-', action: 'Уменьшить шрифт'),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Горячие клавиши'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ShortcutRow(shortcut: '⌘ + 1', action: 'Главная'),
+              _ShortcutRow(shortcut: '⌘ + F', action: 'Поиск'),
+              _ShortcutRow(shortcut: '⌘ + L', action: 'Библиотека'),
+              _ShortcutRow(shortcut: '⌘ + ⇧ + D', action: 'Загрузки'),
+              _ShortcutRow(shortcut: '⌘ + ,', action: 'Настройки'),
+              _ShortcutRow(shortcut: '→', action: 'Следующая страница'),
+              _ShortcutRow(shortcut: '←', action: 'Предыдущая страница'),
+              _ShortcutRow(shortcut: '+', action: 'Увеличить шрифт'),
+              _ShortcutRow(shortcut: '-', action: 'Уменьшить шрифт'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Закрыть'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Закрыть'),
-          ),
-        ],
       ),
     );
   }
@@ -111,29 +115,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     AppSettings settings,
   ) {
     final controller = TextEditingController(text: settings.baseUrl);
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Базовый URL'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'https://flibusta.site'),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Базовый URL'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: 'https://example.com'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                ref.read(appSettingsProvider.notifier).state = settings.copyWith(
+                  baseUrl: controller.text,
+                );
+                Navigator.of(context).pop();
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () {
-              ref.read(appSettingsProvider.notifier).state = settings.copyWith(
-                baseUrl: controller.text,
-              );
-              Navigator.of(context).pop();
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
       ),
     );
   }
@@ -146,35 +152,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final controller = TextEditingController(
       text: settings.mirrors.join('\n'),
     );
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: const Text('Зеркала (по одному на строку)'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'https://flibusta.me\nhttps://flibusta.is',
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Зеркала (по одному на строку)'),
+          content: TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              hintText: 'https://mirror1.example.com\nhttps://mirror2.example.com',
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                final mirrors = controller.text
+                    .split('\n')
+                    .map((String l) => l.trim())
+                    .where((String l) => l.isNotEmpty)
+                    .toList();
+                ref.read(appSettingsProvider.notifier).state = settings.copyWith(mirrors: mirrors);
+                Navigator.of(context).pop();
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () {
-              final mirrors = controller.text
-                  .split('\n')
-                  .map((String l) => l.trim())
-                  .where((String l) => l.isNotEmpty)
-                  .toList();
-              ref.read(appSettingsProvider.notifier).state = settings.copyWith(mirrors: mirrors);
-              Navigator.of(context).pop();
-            },
-            child: const Text('Сохранить'),
-          ),
-        ],
       ),
     );
   }
@@ -184,30 +192,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     WidgetRef ref,
     AppSettings settings,
   ) {
-    showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => SimpleDialog(
-        title: const Text('Параллельные загрузки'),
-        children: [1, 2, 3, 5, 10].map((int n) {
-          return SimpleDialogOption(
-            onPressed: () {
-              ref.read(appSettingsProvider.notifier).state = settings.copyWith(
-                maxConcurrentDownloads: n,
-              );
-              Navigator.of(context).pop();
-            },
-            child: Row(
-              children: [
-                if (n == settings.maxConcurrentDownloads)
-                  const Icon(Icons.check, size: 20)
-                else
-                  const SizedBox(width: 20),
-                const SizedBox(width: 12),
-                Text('$n'),
-              ],
-            ),
-          );
-        }).toList(),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => SimpleDialog(
+          title: const Text('Параллельные загрузки'),
+          children: [1, 2, 3, 5, 10].map((int n) {
+            return SimpleDialogOption(
+              onPressed: () {
+                ref.read(appSettingsProvider.notifier).state = settings.copyWith(
+                  maxConcurrentDownloads: n,
+                );
+                Navigator.of(context).pop();
+              },
+              child: Row(
+                children: [
+                  if (n == settings.maxConcurrentDownloads)
+                    const Icon(Icons.check, size: 20)
+                  else
+                    const SizedBox(width: 20),
+                  const SizedBox(width: 12),
+                  Text('$n'),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

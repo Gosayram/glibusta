@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -117,9 +119,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   icon: const Icon(Icons.arrow_left),
                   onPressed: _currentPage > 0
                       ? () {
-                          _pageController.previousPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
+                          unawaited(
+                            _pageController.previousPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            ),
                           );
                         }
                       : null,
@@ -127,9 +131,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 IconButton(
                   icon: const Icon(Icons.arrow_right),
                   onPressed: () {
-                    _pageController.nextPage(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
+                    unawaited(
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      ),
                     );
                   },
                 ),
