@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
+import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_settings_persistence.dart';
@@ -84,6 +85,21 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
+  void updateAutoThemeMode(AutoThemeMode mode) {
+    state = state.copyWith(autoThemeMode: mode);
+    _persist();
+  }
+
+  void updateCustomDayHour(int hour) {
+    state = state.copyWith(customDayHour: hour);
+    _persist();
+  }
+
+  void updateCustomNightHour(int hour) {
+    state = state.copyWith(customNightHour: hour);
+    _persist();
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
     _persist();
@@ -113,12 +129,14 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
   late final ScrollController _scrollController;
+  final _autoThemeService = AutoThemeService();
   int _currentChapterIndex = 0;
   NormalizedBook? _book;
   bool _isLoading = true;
   String? _errorMessage;
   Timer? _progressTimer;
   Timer? _hideTimer;
+  Timer? _autoThemeTimer;
   bool _uiVisible = true;
   bool _isBottomSheetOpen = false;
   double _scrollProgress = 0.0;
@@ -133,6 +151,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     _scrollController.addListener(_onScroll);
     unawaited(_loadBook());
     _progressTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveProgress());
+    _autoThemeTimer = Timer.periodic(const Duration(minutes: 1), (_) => _checkAutoTheme());
     _startHideTimer();
   }
 
@@ -178,6 +197,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   void _toggleUi() {
     setState(() => _uiVisible = !_uiVisible);
     if (_uiVisible) _startHideTimer();
+  }
+
+  void _checkAutoTheme() {
+    if (!mounted) return;
+    final settings = ref.read(readerSettingsProvider);
+    if (settings.autoThemeMode == AutoThemeMode.off) return;
+    final resolved = _autoThemeService.resolveTheme(
+      settings.autoThemeMode,
+      settings.theme,
+    );
+    if (resolved != settings.theme) {
+      ref.read(readerSettingsProvider.notifier).updateTheme(resolved);
+    }
+  }
+
+  ReaderTheme _resolveTheme(ReaderSettings settings) {
+    if (settings.autoThemeMode == AutoThemeMode.off) return settings.theme;
+    return _autoThemeService.resolveTheme(settings.autoThemeMode, settings.theme);
   }
 
   Future<void> _loadBook() async {
@@ -226,6 +263,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     _saveProgress();
     _progressTimer?.cancel();
     _hideTimer?.cancel();
+    _autoThemeTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _scrollController.removeListener(_onScroll);
@@ -259,7 +297,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
-    final theme = _getThemeData(settings.theme);
+    final resolvedTheme = _resolveTheme(settings);
+    final theme = _getThemeData(resolvedTheme);
 
     if (_isLoading) {
       return Theme(
@@ -969,6 +1008,11 @@ class _QuickSettingsSheet extends ConsumerWidget {
             _buildMarginRow(context, settings, notifier),
             const SizedBox(height: 20),
 
+            const Text('Авто-тема', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _buildAutoThemeRow(context, settings, notifier),
+            const SizedBox(height: 20),
+
             const Text('Режим', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             _buildModeRow(context, settings, notifier),
@@ -1116,6 +1160,62 @@ class _QuickSettingsSheet extends ConsumerWidget {
           onSelected: (_) => notifier.updateMargin(v),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildAutoThemeRow(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: AutoThemeMode.values.map((mode) {
+            final isSelected = settings.autoThemeMode == mode;
+            return ChoiceChip(
+              label: Text(mode.displayName),
+              selected: isSelected,
+              onSelected: (_) => notifier.updateAutoThemeMode(mode),
+            );
+          }).toList(),
+        ),
+        if (settings.autoThemeMode == AutoThemeMode.custom) ...[
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text('День с: ', style: TextStyle(fontSize: 13)),
+              SizedBox(
+                width: 50,
+                child: DropdownButton<int>(
+                  value: settings.customDayHour,
+                  isDense: true,
+                  items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text('$i:00'))),
+                  onChanged: (v) {
+                    if (v != null) notifier.updateCustomDayHour(v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Text('Ночь с: ', style: TextStyle(fontSize: 13)),
+              SizedBox(
+                width: 50,
+                child: DropdownButton<int>(
+                  value: settings.customNightHour,
+                  isDense: true,
+                  items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text('$i:00'))),
+                  onChanged: (v) {
+                    if (v != null) notifier.updateCustomNightHour(v);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 

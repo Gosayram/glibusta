@@ -4,6 +4,16 @@ enum ReaderTheme { light, paper, sepia, dark, oled, bedtime }
 
 enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
 
+enum AutoThemeMode {
+  off('Выкл'),
+  system('Системная'),
+  sunset('Закат'),
+  custom('По времени');
+
+  const AutoThemeMode(this.displayName);
+  final String displayName;
+}
+
 enum ReaderFont {
   sourceSerif('Source Serif 4'),
   literata('Literata'),
@@ -34,6 +44,9 @@ class ReaderSettings {
   final double paragraphSpacing;
   final double letterSpacing;
   final ReaderTextAlign textAlign;
+  final AutoThemeMode autoThemeMode;
+  final int customDayHour;
+  final int customNightHour;
 
   const ReaderSettings({
     this.theme = ReaderTheme.dark,
@@ -45,6 +58,9 @@ class ReaderSettings {
     this.paragraphSpacing = 8.0,
     this.letterSpacing = 0.0,
     this.textAlign = ReaderTextAlign.justify,
+    this.autoThemeMode = AutoThemeMode.off,
+    this.customDayHour = 7,
+    this.customNightHour = 20,
   });
 
   ReaderSettings copyWith({
@@ -57,6 +73,9 @@ class ReaderSettings {
     double? paragraphSpacing,
     double? letterSpacing,
     ReaderTextAlign? textAlign,
+    AutoThemeMode? autoThemeMode,
+    int? customDayHour,
+    int? customNightHour,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -68,6 +87,9 @@ class ReaderSettings {
       paragraphSpacing: paragraphSpacing ?? this.paragraphSpacing,
       letterSpacing: letterSpacing ?? this.letterSpacing,
       textAlign: textAlign ?? this.textAlign,
+      autoThemeMode: autoThemeMode ?? this.autoThemeMode,
+      customDayHour: customDayHour ?? this.customDayHour,
+      customNightHour: customNightHour ?? this.customNightHour,
     );
   }
 }
