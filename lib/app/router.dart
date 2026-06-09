@@ -24,38 +24,32 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/',
             name: 'home',
-            builder: (BuildContext context, GoRouterState state) =>
-                const HomeScreen(),
+            builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
           ),
           GoRoute(
             path: '/catalog',
             name: 'catalog',
-            builder: (BuildContext context, GoRouterState state) =>
-                const CatalogScreen(),
+            builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
           ),
           GoRoute(
             path: '/search',
             name: 'search',
-            builder: (BuildContext context, GoRouterState state) =>
-                const SearchScreen(),
+            builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
           ),
           GoRoute(
             path: '/library',
             name: 'library',
-            builder: (BuildContext context, GoRouterState state) =>
-                const LibraryScreen(),
+            builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
           ),
           GoRoute(
             path: '/downloads',
             name: 'downloads',
-            builder: (BuildContext context, GoRouterState state) =>
-                const DownloadsScreen(),
+            builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
           ),
           GoRoute(
             path: '/settings',
             name: 'settings',
-            builder: (BuildContext context, GoRouterState state) =>
-                const SettingsScreen(),
+            builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
           ),
         ],
       ),

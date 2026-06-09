@@ -33,7 +33,8 @@ class FlibustaApiClient {
     int page = 0,
     int limit = 20,
   }) async {
-    final url = 'opds/opensearch?searchTerm=${Uri.encodeComponent(name)}&searchType=books&pageNumber=$page';
+    final url =
+        'opds/opensearch?searchTerm=${Uri.encodeComponent(name)}&searchType=books&pageNumber=$page';
     final response = await _dio.get<String>(url);
     return _parseOpdsSearchResponse(response.data ?? '');
   }
@@ -166,7 +167,10 @@ class FlibustaApiClient {
     final titleMatch = RegExp(r'<h1>(.*?)</h1>').firstMatch(html);
     final title = titleMatch?.group(1) ?? '';
 
-    final descriptionMatch = RegExp(r'<div class="book_description">(.*?)</div>', dotAll: true).firstMatch(html);
+    final descriptionMatch = RegExp(
+      r'<div class="book_description">(.*?)</div>',
+      dotAll: true,
+    ).firstMatch(html);
     final description = descriptionMatch?.group(1) ?? '';
 
     final coverMatch = RegExp(r'<img src="(/i/[^"]+)"').firstMatch(html);

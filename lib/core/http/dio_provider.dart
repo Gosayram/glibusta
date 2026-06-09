@@ -23,15 +23,17 @@ void enableSslBypass() {
 @riverpod
 Dio dio(Ref ref) {
   final settings = ref.watch(appSettingsControllerProvider);
-  final dio = Dio(BaseOptions(
-    baseUrl: settings.baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 30),
-    headers: {
-      'User-Agent': 'Glibusta/0.1.0',
-    },
-    responseType: ResponseType.plain,
-  ));
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: settings.baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 30),
+      headers: {
+        'User-Agent': 'Glibusta/0.1.0',
+      },
+      responseType: ResponseType.plain,
+    ),
+  );
   (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
     return io.HttpClient()
       ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;

@@ -13,12 +13,7 @@ part of 'catalog_screen.dart';
 final categoriesProvider = CategoriesProvider._();
 
 final class CategoriesProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<String>>,
-          List<String>,
-          FutureOr<List<String>>
-        >
+    extends $FunctionalProvider<AsyncValue<List<String>>, List<String>, FutureOr<List<String>>>
     with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
   CategoriesProvider._()
     : super(
@@ -52,12 +47,7 @@ String _$categoriesHash() => r'8d5efbea107941e11b2e53d1075b8722168af299';
 final popularBooksProvider = PopularBooksProvider._();
 
 final class PopularBooksProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Book>>,
-          List<Book>,
-          FutureOr<List<Book>>
-        >
+    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   PopularBooksProvider._()
     : super(

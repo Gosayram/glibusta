@@ -85,13 +85,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             actions: [
               IconButton(
                 icon: Icon(
-                  settings.mode == ReaderMode.paginated
-                      ? Icons.view_carousel
-                      : Icons.view_stream,
+                  settings.mode == ReaderMode.paginated ? Icons.view_carousel : Icons.view_stream,
                 ),
-                tooltip: settings.mode == ReaderMode.paginated
-                    ? 'Непрерывный'
-                    : 'По страницам',
+                tooltip: settings.mode == ReaderMode.paginated ? 'Непрерывный' : 'По страницам',
                 onPressed: () {
                   final nextMode = settings.mode == ReaderMode.paginated
                       ? ReaderMode.continuous
@@ -154,7 +150,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               setState(() {
                 _currentPage = page;
               });
-              ref.read(readingProgressProvider.notifier).updateProgress(
+              ref
+                  .read(readingProgressProvider.notifier)
+                  .updateProgress(
                     ReadingProgress(
                       bookId: widget.bookId,
                       currentPosition: page,
@@ -208,7 +206,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     int index,
     ReaderSettings settings,
   ) {
-    final isDark = settings.theme == ReaderTheme.dark;
+    final isDark = settings.theme == ReaderTheme.dark || settings.theme == ReaderTheme.oledBlack;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(settings.margin),
@@ -238,8 +236,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _cycleTheme(WidgetRef ref) {
     final current = ref.read(readerSettingsProvider).theme;
-    final next =
-        ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
+    final next = ReaderTheme.values[(current.index + 1) % ReaderTheme.values.length];
     ref.read(readerSettingsProvider.notifier).updateTheme(next);
   }
 
@@ -248,6 +245,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       ReaderTheme.light => Icons.light_mode,
       ReaderTheme.dark => Icons.dark_mode,
       ReaderTheme.sepia => Icons.auto_awesome,
+      ReaderTheme.oledBlack => Icons.brightness_1,
+      ReaderTheme.paper => Icons.description,
     };
   }
 
@@ -255,17 +254,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final base = Theme.of(context);
     return switch (theme) {
       ReaderTheme.light => base.copyWith(
-          scaffoldBackgroundColor: Colors.white,
-          textTheme: base.textTheme.apply(bodyColor: Colors.black87),
-        ),
+        scaffoldBackgroundColor: Colors.white,
+        textTheme: base.textTheme.apply(bodyColor: Colors.black87),
+      ),
       ReaderTheme.dark => base.copyWith(
-          scaffoldBackgroundColor: const Color(0xFF1A1A2E),
-          textTheme: base.textTheme.apply(bodyColor: Colors.white70),
-        ),
+        scaffoldBackgroundColor: const Color(0xFF1A1A2E),
+        textTheme: base.textTheme.apply(bodyColor: Colors.white70),
+      ),
       ReaderTheme.sepia => base.copyWith(
-          scaffoldBackgroundColor: const Color(0xFFF4ecd8),
-          textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
-        ),
+        scaffoldBackgroundColor: const Color(0xFFF4ecd8),
+        textTheme: base.textTheme.apply(bodyColor: const Color(0xFF5B4636)),
+      ),
+      ReaderTheme.oledBlack => base.copyWith(
+        scaffoldBackgroundColor: Colors.black,
+        textTheme: base.textTheme.apply(bodyColor: Colors.white70),
+      ),
+      ReaderTheme.paper => base.copyWith(
+        scaffoldBackgroundColor: const Color(0xFFF5F0E6),
+        textTheme: base.textTheme.apply(bodyColor: const Color(0xFF3E3225)),
+      ),
     };
   }
 }

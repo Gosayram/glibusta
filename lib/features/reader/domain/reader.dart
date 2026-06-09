@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-enum ReaderTheme { light, dark, sepia }
+enum ReaderTheme { light, dark, sepia, oledBlack, paper }
 
 enum ReaderMode { paginated, continuous }
 

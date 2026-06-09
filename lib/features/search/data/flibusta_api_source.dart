@@ -27,20 +27,24 @@ class FlibustaApiSource extends BookSource {
         page: query.page,
       );
 
-      final books = result.books.map((item) => Book(
-        id: item.id,
-        title: item.name,
-        authorIds: const [],
-        genreIds: const [],
-        description: null,
-        coverUrl: null,
-        publishDate: null,
-        availableFormats: const [],
-        source: BookSourceInfo(
-          sourceId: 'flibusta-api',
-          sourceUrl: '${_client.dio.options.baseUrl}/b/${item.id}',
-        ),
-      )).toList();
+      final books = result.books
+          .map(
+            (item) => Book(
+              id: item.id,
+              title: item.name,
+              authorIds: const [],
+              genreIds: const [],
+              description: null,
+              coverUrl: null,
+              publishDate: null,
+              availableFormats: const [],
+              source: BookSourceInfo(
+                sourceId: 'flibusta-api',
+                sourceUrl: '${_client.dio.options.baseUrl}/b/${item.id}',
+              ),
+            ),
+          )
+          .toList();
 
       return SearchResultPage(
         books: books,

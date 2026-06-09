@@ -159,11 +159,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     unawaited(
-      ref.read(authStateProvider.notifier).login(
-        _nameController.text.trim(),
-        _passwordController.text,
-        _persistent,
-      ),
+      ref
+          .read(authStateProvider.notifier)
+          .login(
+            _nameController.text.trim(),
+            _passwordController.text,
+            _persistent,
+          ),
     );
   }
 }

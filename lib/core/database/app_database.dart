@@ -10,7 +10,23 @@ import 'tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [SavedBooks, Authors, Genres, Downloads, ReadingProgress])
+@DriftDatabase(
+  tables: [
+    SavedBooks,
+    Authors,
+    Series,
+    BookSeries,
+    Genres,
+    Downloads,
+    ReadingProgress,
+    Bookmarks,
+    Notes,
+    Quotes,
+    SearchHistory,
+    Collections,
+    BookCollections,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 

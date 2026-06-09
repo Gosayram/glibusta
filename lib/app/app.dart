@@ -11,8 +11,7 @@ class GlibustaApp extends ConsumerStatefulWidget {
   ConsumerState<GlibustaApp> createState() => _GlibustaAppState();
 }
 
-class _GlibustaAppState extends ConsumerState<GlibustaApp>
-    with WidgetsBindingObserver {
+class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
