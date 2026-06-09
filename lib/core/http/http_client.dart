@@ -1,4 +1,15 @@
+import 'dart:io' as io;
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+
+class _HttpOverrides extends io.HttpOverrides {
+  @override
+  io.HttpClient createHttpClient(io.SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
+  }
+}
 
 class HttpClient {
   final String baseUrl;
@@ -11,6 +22,15 @@ class HttpClient {
     _dio.options.receiveTimeout = const Duration(seconds: 30);
     _dio.options.headers['User-Agent'] = 'Glibusta/0.1.0';
     _dio.options.responseType = ResponseType.plain;
+    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      return io.HttpOverrides.current?.createHttpClient(null) ??
+          io.HttpClient()
+            ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
+    };
+  }
+
+  static void enableSslBypass() {
+    io.HttpOverrides.global = _HttpOverrides();
   }
 
   Future<String> get(String url) async {
