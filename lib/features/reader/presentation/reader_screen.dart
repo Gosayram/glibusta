@@ -33,6 +33,18 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   void updateFont(ReaderFont font) {
     state = state.copyWith(font: font);
   }
+
+  void updateParagraphSpacing(double spacing) {
+    state = state.copyWith(paragraphSpacing: spacing);
+  }
+
+  void updateLetterSpacing(double spacing) {
+    state = state.copyWith(letterSpacing: spacing);
+  }
+
+  void updateTextAlign(ReaderTextAlign align) {
+    state = state.copyWith(textAlign: align);
+  }
 }
 
 @riverpod
@@ -80,6 +92,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     return Theme(
       data: theme,
       child: ReaderShortcuts(
+        onNextPage: () {
+          unawaited(
+            _pageController.nextPage(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            ),
+          );
+        },
+        onPreviousPage: () {
+          if (_currentPage > 0) {
+            unawaited(
+              _pageController.previousPage(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              ),
+            );
+          }
+        },
+        onIncreaseFontSize: () {
+          final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
+          ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+        },
+        onDecreaseFontSize: () {
+          final newSize = (settings.fontSize - 2.0).clamp(12.0, 32.0);
+          ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+        },
+        onClosePanel: () => Navigator.of(context).pop(),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
@@ -208,6 +247,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       ),
       _buildFontSizeMenu(settings),
       _buildFontMenu(settings),
+      _buildTextAlignMenu(settings),
     ];
   }
 
@@ -252,6 +292,39 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  Widget _buildTextAlignMenu(ReaderSettings settings) {
+    return PopupMenuButton<ReaderTextAlign>(
+      icon: Icon(_getTextAlignIcon(settings.textAlign)),
+      tooltip: 'Выравнивание',
+      onSelected: (ReaderTextAlign align) {
+        ref.read(readerSettingsProvider.notifier).updateTextAlign(align);
+      },
+      itemBuilder: (BuildContext context) {
+        return ReaderTextAlign.values.map<PopupMenuItem<ReaderTextAlign>>((ReaderTextAlign align) {
+          return PopupMenuItem<ReaderTextAlign>(
+            value: align,
+            child: Row(
+              children: [
+                Icon(_getTextAlignIcon(align), size: 18),
+                const SizedBox(width: 8),
+                Text(align.displayName),
+              ],
+            ),
+          );
+        }).toList();
+      },
+    );
+  }
+
+  IconData _getTextAlignIcon(ReaderTextAlign align) {
+    return switch (align) {
+      ReaderTextAlign.left => Icons.format_align_left,
+      ReaderTextAlign.justify => Icons.format_align_justify,
+      ReaderTextAlign.center => Icons.format_align_center,
+      ReaderTextAlign.right => Icons.format_align_right,
+    };
+  }
+
   IconData _getModeIcon(ReaderMode mode) {
     return switch (mode) {
       ReaderMode.paginated => Icons.view_carousel,
@@ -283,23 +356,29 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Widget _buildReaderBody(BuildContext context, ReaderSettings settings) {
-    return PageView.builder(
-      controller: _pageController,
-      onPageChanged: (int page) {
-        setState(() {
-          _currentPage = page;
-        });
-        ref.read(readingProgressProvider.notifier).updateProgress(
-              ReadingProgress(
-                bookId: widget.bookId,
-                currentPosition: page,
-                lastRead: DateTime.now(),
-              ),
-            );
-      },
-      itemBuilder: (BuildContext context, int index) {
-        return _buildPage(context, index, settings);
-      },
+    return SafeArea(
+      top: settings.mode != ReaderMode.fullscreen,
+      bottom: settings.mode != ReaderMode.fullscreen,
+      left: true,
+      right: true,
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (int page) {
+          setState(() {
+            _currentPage = page;
+          });
+          ref.read(readingProgressProvider.notifier).updateProgress(
+                ReadingProgress(
+                  bookId: widget.bookId,
+                  currentPosition: page,
+                  lastRead: DateTime.now(),
+                ),
+              );
+        },
+        itemBuilder: (BuildContext context, int index) {
+          return _buildPage(context, index, settings);
+        },
+      ),
     );
   }
 
@@ -356,6 +435,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings,
   ) {
     final isDark = settings.theme == ReaderTheme.dark || settings.theme == ReaderTheme.oledBlack;
+    final textAlign = switch (settings.textAlign) {
+      ReaderTextAlign.left => TextAlign.left,
+      ReaderTextAlign.justify => TextAlign.justify,
+      ReaderTextAlign.center => TextAlign.center,
+      ReaderTextAlign.right => TextAlign.right,
+    };
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(settings.margin),
@@ -364,22 +449,44 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         'Загрузите книгу для чтения.\n\n'
         'Здесь будет отображаться текст книги в формате ${settings.mode.name}.\n\n'
         'Шрифт: ${settings.font.displayName}',
-        style: _getReaderStyle(settings.font, isDark, settings.fontSize, settings.lineHeight),
+        style: _getReaderStyle(settings),
+        textAlign: textAlign,
       ),
     );
   }
 
-  TextStyle _getReaderStyle(ReaderFont font, bool isDark, double fontSize, double lineHeight) {
+  TextStyle _getReaderStyle(ReaderSettings settings) {
+    final isDark = settings.theme == ReaderTheme.dark || settings.theme == ReaderTheme.oledBlack;
     final color = isDark ? Colors.white70 : Colors.black87;
-    switch (font) {
+    switch (settings.font) {
       case ReaderFont.merriweather:
-        return GoogleFonts.merriweather(fontSize: fontSize, height: lineHeight, color: color);
+        return GoogleFonts.merriweather(
+          fontSize: settings.fontSize,
+          height: settings.lineHeight,
+          color: color,
+          letterSpacing: settings.letterSpacing,
+        );
       case ReaderFont.sourceSerif:
-        return GoogleFonts.sourceSerif4(fontSize: fontSize, height: lineHeight, color: color);
+        return GoogleFonts.sourceSerif4(
+          fontSize: settings.fontSize,
+          height: settings.lineHeight,
+          color: color,
+          letterSpacing: settings.letterSpacing,
+        );
       case ReaderFont.robotoSerif:
-        return GoogleFonts.robotoSerif(fontSize: fontSize, height: lineHeight, color: color);
+        return GoogleFonts.robotoSerif(
+          fontSize: settings.fontSize,
+          height: settings.lineHeight,
+          color: color,
+          letterSpacing: settings.letterSpacing,
+        );
       case ReaderFont.literata:
-        return GoogleFonts.literata(fontSize: fontSize, height: lineHeight, color: color);
+        return GoogleFonts.literata(
+          fontSize: settings.fontSize,
+          height: settings.lineHeight,
+          color: color,
+          letterSpacing: settings.letterSpacing,
+        );
     }
   }
 

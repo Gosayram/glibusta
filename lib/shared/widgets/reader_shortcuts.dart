@@ -1,34 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+typedef VoidCallback = void Function();
+
 class ReaderShortcuts extends StatefulWidget {
-  const ReaderShortcuts({super.key, required this.child});
+  const ReaderShortcuts({
+    super.key,
+    required this.child,
+    this.onNextPage,
+    this.onPreviousPage,
+    this.onIncreaseFontSize,
+    this.onDecreaseFontSize,
+    this.onSearch,
+    this.onBookmarks,
+    this.onLibrary,
+    this.onSettings,
+    this.onClosePanel,
+  });
 
   final Widget child;
+  final VoidCallback? onNextPage;
+  final VoidCallback? onPreviousPage;
+  final VoidCallback? onIncreaseFontSize;
+  final VoidCallback? onDecreaseFontSize;
+  final VoidCallback? onSearch;
+  final VoidCallback? onBookmarks;
+  final VoidCallback? onLibrary;
+  final VoidCallback? onSettings;
+  final VoidCallback? onClosePanel;
 
   @override
   State<ReaderShortcuts> createState() => _ReaderShortcutsState();
 }
 
 class _ReaderShortcutsState extends State<ReaderShortcuts> {
-  static final Map<ShortcutActivator, Intent> _shortcuts = {
-    // Navigation
-    SingleActivator(LogicalKeyboardKey.arrowRight): NextPageIntent(),
-    SingleActivator(LogicalKeyboardKey.arrowLeft): PreviousPageIntent(),
-    SingleActivator(LogicalKeyboardKey.space): NextPageIntent(),
+  late Map<ShortcutActivator, Intent> _shortcuts;
 
-    // Font size
-    SingleActivator(LogicalKeyboardKey.add): IncreaseFontSizeIntent(),
-    SingleActivator(LogicalKeyboardKey.equal): IncreaseFontSizeIntent(), // For Cmd+= on some keyboards
-    SingleActivator(LogicalKeyboardKey.minus): DecreaseFontSizeIntent(),
-
-    // macOS shortcuts - using SingleActivator with character
-    SingleActivator(LogicalKeyboardKey.keyF, meta: true): SearchIntent(),
-    SingleActivator(LogicalKeyboardKey.keyB, meta: true): BookmarksIntent(),
-    SingleActivator(LogicalKeyboardKey.keyL, meta: true): LibraryIntent(),
-    SingleActivator(LogicalKeyboardKey.comma, meta: true): SettingsIntent(),
-    SingleActivator(LogicalKeyboardKey.escape): ClosePanelIntent(),
-  };
+  @override
+  void initState() {
+    super.initState();
+    _shortcuts = {
+      SingleActivator(LogicalKeyboardKey.arrowRight): NextPageIntent(),
+      SingleActivator(LogicalKeyboardKey.arrowLeft): PreviousPageIntent(),
+      SingleActivator(LogicalKeyboardKey.space): NextPageIntent(),
+      SingleActivator(LogicalKeyboardKey.add): IncreaseFontSizeIntent(),
+      SingleActivator(LogicalKeyboardKey.equal): IncreaseFontSizeIntent(),
+      SingleActivator(LogicalKeyboardKey.minus): DecreaseFontSizeIntent(),
+      SingleActivator(LogicalKeyboardKey.keyF, meta: true): SearchIntent(),
+      SingleActivator(LogicalKeyboardKey.keyB, meta: true): BookmarksIntent(),
+      SingleActivator(LogicalKeyboardKey.keyL, meta: true): LibraryIntent(),
+      SingleActivator(LogicalKeyboardKey.comma, meta: true): SettingsIntent(),
+      SingleActivator(LogicalKeyboardKey.escape): ClosePanelIntent(),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,15 +60,33 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
       shortcuts: _shortcuts,
       child: Actions(
         actions: <Type, Action<Intent>>{
-          NextPageIntent: NextPageAction(),
-          PreviousPageIntent: PreviousPageAction(),
-          IncreaseFontSizeIntent: IncreaseFontSizeAction(),
-          DecreaseFontSizeIntent: DecreaseFontSizeAction(),
-          SearchIntent: SearchAction(),
-          BookmarksIntent: BookmarksAction(),
-          LibraryIntent: LibraryAction(),
-          SettingsIntent: SettingsAction(),
-          ClosePanelIntent: ClosePanelAction(),
+          NextPageIntent: CallbackAction<NextPageIntent>(
+            onInvoke: (_) => widget.onNextPage?.call(),
+          ),
+          PreviousPageIntent: CallbackAction<PreviousPageIntent>(
+            onInvoke: (_) => widget.onPreviousPage?.call(),
+          ),
+          IncreaseFontSizeIntent: CallbackAction<IncreaseFontSizeIntent>(
+            onInvoke: (_) => widget.onIncreaseFontSize?.call(),
+          ),
+          DecreaseFontSizeIntent: CallbackAction<DecreaseFontSizeIntent>(
+            onInvoke: (_) => widget.onDecreaseFontSize?.call(),
+          ),
+          SearchIntent: CallbackAction<SearchIntent>(
+            onInvoke: (_) => widget.onSearch?.call(),
+          ),
+          BookmarksIntent: CallbackAction<BookmarksIntent>(
+            onInvoke: (_) => widget.onBookmarks?.call(),
+          ),
+          LibraryIntent: CallbackAction<LibraryIntent>(
+            onInvoke: (_) => widget.onLibrary?.call(),
+          ),
+          SettingsIntent: CallbackAction<SettingsIntent>(
+            onInvoke: (_) => widget.onSettings?.call(),
+          ),
+          ClosePanelIntent: CallbackAction<ClosePanelIntent>(
+            onInvoke: (_) => widget.onClosePanel?.call(),
+          ),
         },
         child: widget.child,
       ),
@@ -86,76 +128,4 @@ class SettingsIntent extends Intent {
 
 class ClosePanelIntent extends Intent {
   const ClosePanelIntent();
-}
-
-class NextPageAction extends Action<NextPageIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Navigate to next page
-    return null;
-  }
-}
-
-class PreviousPageAction extends Action<PreviousPageIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Navigate to previous page
-    return null;
-  }
-}
-
-class IncreaseFontSizeAction extends Action<IncreaseFontSizeIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Increase font size
-    return null;
-  }
-}
-
-class DecreaseFontSizeAction extends Action<DecreaseFontSizeIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Decrease font size
-    return null;
-  }
-}
-
-class SearchAction extends Action<SearchIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Open search
-    return null;
-  }
-}
-
-class BookmarksAction extends Action<BookmarksIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Go to bookmarks
-    return null;
-  }
-}
-
-class LibraryAction extends Action<LibraryIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Go to library
-    return null;
-  }
-}
-
-class SettingsAction extends Action<SettingsIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Open settings
-    return null;
-  }
-}
-
-class ClosePanelAction extends Action<ClosePanelIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Close panel/sidebar
-    return null;
-  }
 }

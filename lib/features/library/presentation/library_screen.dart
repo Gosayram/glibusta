@@ -9,6 +9,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/book_drop_zone.dart';
 import '../data/book_repository_impl.dart';
 
 part 'library_screen.g.dart';
@@ -31,12 +32,27 @@ class LibraryScreen extends ConsumerWidget {
         title: const Text('Библиотека'),
         automaticallyImplyLeading: false,
       ),
-      body: booksAsync.when(
-        data: (List<Book> books) => _buildBooksGrid(context, ref, books),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+      body: BookDropZone(
+        onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
+        child: booksAsync.when(
+          data: (List<Book> books) => _buildBooksGrid(context, ref, books),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+        ),
       ),
     );
+  }
+
+  void _handleBooksDropped(WidgetRef ref, List<String> paths) {
+    // TODO: Implement actual book import logic
+    for (final path in paths) {
+      // Check file extension and import book
+      if (path.toLowerCase().endsWith('.fb2') ||
+          path.toLowerCase().endsWith('.epub') ||
+          path.toLowerCase().endsWith('.txt')) {
+        // Import book via download service or parser
+      }
+    }
   }
 
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
@@ -175,7 +191,7 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
-class LibraryBookTile extends StatelessWidget {
+class LibraryBookTile extends ConsumerWidget {
   final Book book;
   final double? progress; // 0.0 to 1.0
   final bool? isDownloaded; // true if downloaded, false if not, null if unknown
@@ -188,97 +204,122 @@ class LibraryBookTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: ListTile(
-        leading: Stack(
-          children: [
-            Container(
-              width: 48,
-              height: 64,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: book.coverUrl != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Image.network(
-                        book.coverUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => Icon(
-                          Icons.book,
-                          color: theme.colorScheme.onPrimaryContainer,
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: ListTile(
+          leading: Stack(
+            children: [
+              Container(
+                width: 48,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: book.coverUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.network(
+                          book.coverUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(
+                            Icons.book,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
                         ),
+                      )
+                    : Icon(
+                        Icons.book,
+                        color: theme.colorScheme.onPrimaryContainer,
                       ),
-                    )
-                  : Icon(
-                      Icons.book,
-                      color: theme.colorScheme.onPrimaryContainer,
+              ),
+              // Progress indicator
+              if (progress != null)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(4),
+                        bottomRight: Radius.circular(4),
+                      ),
+                      color: progress == 1.0
+                          ? Theme.of(context).colorScheme.secondary
+                          : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                     ),
-            ),
-            // Progress indicator
-            if (progress != null)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(4),
-                      bottomRight: Radius.circular(4),
-                    ),
-                    color: progress == 1.0
-                        ? Theme.of(context).colorScheme.secondary
-                        : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
+                    width: progress! * 48, // 48 is the width of the container
                   ),
-                  width: progress! * 48, // 48 is the width of the container
                 ),
-              ),
-            // Download status indicator
-            if (isDownloaded == true)
-              const Positioned(
-                top: 0,
-                right: 0,
-                child: Icon(
-                  Icons.download_done,
-                  size: 16,
-                  color: Colors.green,
+              // Download status indicator
+              if (isDownloaded == true)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.download_done,
+                    size: 16,
+                    color: Colors.green,
+                  ),
+                )
+              else if (isDownloaded == false)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.cloud_download_outlined,
+                    size: 16,
+                    color: Colors.blue,
+                  ),
                 ),
-              )
-            else if (isDownloaded == false)
-              const Positioned(
-                top: 0,
-                right: 0,
-                child: Icon(
-                  Icons.cloud_download_outlined,
-                  size: 16,
-                  color: Colors.blue,
-                ),
-              ),
-          ],
+            ],
+          ),
+          title: Text(
+            book.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: book.authorIds.isNotEmpty
+              ? Text(
+                  book.authorIds.join(', '),
+                  style: theme.textTheme.bodySmall,
+                )
+              : null,
+          trailing: PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) => _handleMenuAction(context, ref, value),
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'read', child: Text('Читать')),
+              const PopupMenuItem(value: 'download', child: Text('Скачать')),
+              const PopupMenuItem(value: 'bookmark', child: Text('Добавить закладку')),
+              const PopupMenuItem(value: 'delete', child: Text('Удалить')),
+            ],
+          ),
+          onTap: () {
+            unawaited(context.push('/reader/${book.id}'));
+          },
         ),
-        title: Text(
-          book.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: book.authorIds.isNotEmpty
-            ? Text(
-                book.authorIds.join(', '),
-                style: theme.textTheme.bodySmall,
-              )
-            : null,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {
-          unawaited(context.push('/reader/${book.id}'));
-        },
       ),
     );
+  }
+
+  void _handleMenuAction(BuildContext context, WidgetRef ref, String value) {
+    switch (value) {
+      case 'read':
+        unawaited(context.push('/reader/${book.id}'));
+      case 'download':
+        // TODO: Implement download
+      case 'bookmark':
+        // TODO: Implement bookmark
+      case 'delete':
+        // TODO: Implement delete
+    }
   }
 }

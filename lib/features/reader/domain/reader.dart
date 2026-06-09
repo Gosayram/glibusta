@@ -14,6 +14,16 @@ enum ReaderFont {
   final String displayName;
 }
 
+enum ReaderTextAlign {
+  left('По левому краю'),
+  justify('По ширине'),
+  center('По центру'),
+  right('По правому краю');
+
+  const ReaderTextAlign(this.displayName);
+  final String displayName;
+}
+
 class ReaderSettings {
   final ReaderTheme theme;
   final ReaderMode mode;
@@ -21,6 +31,9 @@ class ReaderSettings {
   final double lineHeight;
   final double margin;
   final ReaderFont font;
+  final double paragraphSpacing;
+  final double letterSpacing;
+  final ReaderTextAlign textAlign;
 
   const ReaderSettings({
     this.theme = ReaderTheme.light,
@@ -29,6 +42,9 @@ class ReaderSettings {
     this.lineHeight = 1.5,
     this.margin = 16.0,
     this.font = ReaderFont.literata,
+    this.paragraphSpacing = 8.0,
+    this.letterSpacing = 0.0,
+    this.textAlign = ReaderTextAlign.justify,
   });
 
   ReaderSettings copyWith({
@@ -38,6 +54,9 @@ class ReaderSettings {
     double? lineHeight,
     double? margin,
     ReaderFont? font,
+    double? paragraphSpacing,
+    double? letterSpacing,
+    ReaderTextAlign? textAlign,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -46,6 +65,9 @@ class ReaderSettings {
       lineHeight: lineHeight ?? this.lineHeight,
       margin: margin ?? this.margin,
       font: font ?? this.font,
+      paragraphSpacing: paragraphSpacing ?? this.paragraphSpacing,
+      letterSpacing: letterSpacing ?? this.letterSpacing,
+      textAlign: textAlign ?? this.textAlign,
     );
   }
 }
