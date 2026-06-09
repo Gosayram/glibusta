@@ -15,6 +15,7 @@ class HttpClient {
   final String baseUrl;
   final List<String> mirrors;
   final Dio _dio;
+  Map<String, String> _sessionCookies = {};
 
   HttpClient({required this.baseUrl, this.mirrors = const []}) : _dio = Dio() {
     _dio.options.baseUrl = baseUrl;
@@ -32,6 +33,18 @@ class HttpClient {
   static void enableSslBypass() {
     io.HttpOverrides.global = _HttpOverrides();
   }
+
+  void setSessionCookies(Map<String, String> cookies) {
+    _sessionCookies = Map.from(cookies);
+    if (cookies.isNotEmpty) {
+      final cookieHeader = cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      _dio.options.headers['Cookie'] = cookieHeader;
+    } else {
+      _dio.options.headers.remove('Cookie');
+    }
+  }
+
+  Map<String, String> get sessionCookies => Map.from(_sessionCookies);
 
   Future<String> get(String url) async {
     try {

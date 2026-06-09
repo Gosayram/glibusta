@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../auth/presentation/login_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -16,6 +18,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsProvider);
+    final authState = ref.watch(authStateProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -24,6 +27,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
       body: ListView(
         children: [
+          const _SectionHeader(title: 'Аккаунт'),
+          if (authState.isAuthenticated)
+            _SettingsTile(
+              icon: Icons.person,
+              title: authState.session?.name ?? 'Пользователь',
+              subtitle: 'Нажмите, чтобы выйти',
+              onTap: () => _logout(context, ref),
+            )
+          else
+            _SettingsTile(
+              icon: Icons.login,
+              title: 'Вход',
+              subtitle: 'Войдите для доступа к дополнительным функциям',
+              onTap: () => _login(context),
+            ),
+
+          const Divider(),
           const _SectionHeader(title: 'Источник'),
           _SettingsTile(
             icon: Icons.language,
@@ -102,6 +122,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _login(BuildContext context) {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => const LoginScreen(),
+        ),
+      ),
+    );
+  }
+
+  void _logout(BuildContext context, WidgetRef ref) {
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: const Text('Выход'),
+          content: const Text('Вы уверены, что хотите выйти?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                unawaited(
+                  ref.read(authStateProvider.notifier).logout(
+                    ref.read(authRepositoryProvider),
+                  ),
+                );
+                Navigator.of(context).pop();
+              },
+              child: const Text('Выйти'),
             ),
           ],
         ),

@@ -1,330 +1,301 @@
 #!/usr/bin/env python3
-"""
-Flibusta API Explorer
-Для исследования возможностей ресурса
-"""
+"""Flibusta API Research — focused, fast"""
 
-import os
 import json
-import re
-import sys
 from pathlib import Path
-from typing import Any
+from urllib.parse import urljoin
+from xml.etree import ElementTree as ET
 
 import requests
+import urllib3
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 
-# Конфигурация
-OUTPUT_DIR = Path("/tmp/flibusta_pars")
-OUTPUT_DIR.mkdir(exist_ok=True)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Загрузка URL из .env
-def load_base_url() -> str:
-    env_path = Path(__file__).parent.parent / ".env"
-    if env_path.exists():
-        with open(env_path) as f:
-            for line in f:
-                if line.startswith("BASE_URL="):
-                    return line.split("=", 1)[1].strip()
+OUTPUT = Path("/tmp/flibusta_pars")
+OUTPUT.mkdir(exist_ok=True)
+
+def load_url() -> str:
+    env = Path(__file__).parent.parent / ".env"
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if line.startswith("BASE_URL="):
+                return line.split("=", 1)[1].strip()
     return "http://flibusta.is"
 
-BASE_URL = load_base_url()
+BASE = load_url()
+S = requests.Session()
+S.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 
-# Сессия для куки
-session = requests.Session()
-session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-})
-
-def save_result(name: str, data: Any) -> None:
-    """Сохранить результат в JSON"""
-    filepath = OUTPUT_DIR / f"{name}.json"
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    print(f"[+] Saved: {filepath}")
-
-def save_html(name: str, html: str) -> None:
-    """Сохранить HTML"""
-    filepath = OUTPUT_DIR / f"{name}.html"
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"[+] Saved: {filepath}")
-
-def test_endpoint(path: str, name: str) -> dict:
-    """Тестировать эндпоинт"""
-    url = urljoin(BASE_URL, path)
-    print(f"\n[*] Testing: {url}")
-    
+def get(path: str) -> requests.Response | None:
     try:
-        resp = session.get(url, timeout=15, verify=False)
-        print(f"    Status: {resp.status_code}")
-        print(f"    Content-Type: {resp.headers.get('Content-Type', 'N/A')}")
-        
-        result = {
-            "url": url,
-            "status": resp.status_code,
-            "content_type": resp.headers.get("Content-Type"),
-            "length": len(resp.text),
-            "headers": dict(resp.headers),
-        }
-        
-        # Сохраняем HTML
-        save_html(name, resp.text)
-        
-        return result
+        return S.get(urljoin(BASE, path), timeout=15, verify=False)
     except Exception as e:
-        print(f"    Error: {e}")
-        return {"url": url, "error": str(e)}
+        print(f"  ERR {path}: {e}")
+        return None
 
-def explore_main_page() -> None:
-    """Исследовать главную страницу"""
-    print("\n" + "="*60)
-    print("1. ГЛАВНАЯ СТРАНИЦА")
-    print("="*60)
-    
-    result = test_endpoint("/", "main_page")
-    
-    # Ищем ссылки на регистрацию/логин
-    soup = BeautifulSoup(open(OUTPUT_DIR / "main_page.html"), "html.parser")
-    
-    auth_links = []
-    for link in soup.find_all("a", href=True):
-        href = link["href"].lower()
-        text = link.get_text(strip=True).lower()
-        if any(w in href + text for w in ["login", "signin", "auth", "register", "signup", "войти", "регистр", "вход"]):
-            auth_links.append({"href": link["href"], "text": link.get_text(strip=True)})
-    
-    if auth_links:
-        print("\n[+] Найдены ссылки на авторизацию:")
-        for link in auth_links:
-            print(f"    {link['text']}: {link['href']}")
-        result["auth_links"] = auth_links
+def post(path: str, data: dict) -> requests.Response | None:
+    try:
+        return S.post(urljoin(BASE, path), data=data, timeout=15, verify=False,
+                      allow_redirects=True)
+    except Exception as e:
+        print(f"  ERR POST {path}: {e}")
+        return None
+
+def save(name: str, data) -> None:
+    p = OUTPUT / name
+    if isinstance(data, (dict, list)):
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     else:
-        print("\n[-] Ссылки на авторизацию не найдены")
-    
-    save_result("main_page_analysis", result)
+        p.write_text(str(data), encoding="utf-8")
+    print(f"  -> {p.name}")
 
-def explore_opds() -> None:
-    """Исследовать OPDS каталог"""
-    print("\n" + "="*60)
-    print("2. OPDS КАТАЛОГ")
-    print("="*60)
-    
-    endpoints = [
-        "/opds/",
-        "/opds/opensearch?searchTerm=test&searchType=books&pageNumber=0",
-        "/opds/popular",
-        "/opds/recent",
-        "/opds/authors",
-        "/opds/genres",
-    ]
-    
-    results = []
-    for endpoint in endpoints:
-        name = endpoint.replace("/", "_").replace("?", "_").replace("&", "_")[:50]
-        result = test_endpoint(endpoint, f"opds_{name}")
-        results.append(result)
-    
-    save_result("opds_endpoints", results)
+def soup(html: str) -> BeautifulSoup:
+    return BeautifulSoup(html, "html.parser")
 
-def explore_search() -> None:
-    """Исследовать поиск"""
-    print("\n" + "="*60)
-    print("3. ПОИСК")
-    print("="*60)
-    
-    search_queries = [
-        "/booksearch?ask=тест&chb=on",
-        "/authorsearch?ask=тест",
-        "/series?search=тест",
-        "/genres?search=тест",
-    ]
-    
-    results = []
-    for query in search_queries:
-        name = query.split("?")[0].replace("/", "_")
-        result = test_endpoint(query, f"search_{name}")
-        
-        # Парсим результаты
-        if "error" not in result:
-            soup = BeautifulSoup(open(OUTPUT_DIR / f"search_{name}.html"), "html.parser")
-            items = soup.find_all("li")
-            result["items_count"] = len(items)
-        
-        results.append(result)
-    
-    save_result("search_endpoints", results)
+def links(html: str) -> list[dict]:
+    s = soup(html)
+    result = []
+    for a in s.find_all("a", href=True):
+        result.append({"href": a["href"], "text": a.get_text(strip=True)[:100]})
+    return result
 
-def explore_book_details() -> None:
-    """Исследовать детали книги"""
-    print("\n" + "="*60)
-    print("4. ДЕТАЛИ КНИГИ")
-    print("="*60)
-    
-    # Пробуем найти книгу из предыдущих результатов
-    book_ids = ["12345", "1", "100", "1000"]
-    
-    results = []
-    for book_id in book_ids:
-        result = test_endpoint(f"/b/{book_id}", f"book_{book_id}")
-        
-        if "error" not in result:
-            soup = BeautifulSoup(open(OUTPUT_DIR / f"book_{book_id}.html"), "html.parser")
-            
-            # Ищем форму логина
-            login_forms = soup.find_all("form", action=re.compile(r"login|auth|signin", re.I))
-            if login_forms:
-                print(f"    [+] Найдена форма логина на странице книги!")
-                result["login_forms"] = [
-                    {"action": form.get("action"), "method": form.get("method")}
-                    for form in login_forms
-                ]
-        
-        results.append(result)
-    
-    save_result("book_details", results)
+# ── 1. Main ──────────────────────────────
+def probe_main():
+    print("\n=== 1. MAIN PAGE ===")
+    r = get("/")
+    if not r:
+        return
+    save("01_main.html", r.text)
 
-def explore_registration() -> None:
-    """Исследовать регистрацию"""
-    print("\n" + "="*60)
-    print("5. РЕГИСТРАЦИЯ/АВТОРИЗАЦИЯ")
-    print("="*60)
-    
-    auth_endpoints = [
-        "/user/register",
-        "/register",
-        "/signup",
-        "/auth/register",
-        "/user/login",
-        "/login",
-        "/signin",
-        "/auth/login",
-        "/node/login",
-    ]
-    
-    results = []
-    for endpoint in auth_endpoints:
-        name = endpoint.replace("/", "_")
-        result = test_endpoint(endpoint, f"auth_{name}")
-        results.append(result)
-    
-    save_result("auth_endpoints", results)
+    all_links = links(r.text)
+    save("02_all_links.json", all_links)
 
-def explore_api_endpoints() -> None:
-    """Исследовать API эндпоинты"""
-    print("\n" + "="*60)
-    print("6. API ЭНДПОИНТЫ")
-    print("="*60)
-    
-    api_endpoints = [
-        "/api/v1/books",
-        "/api/v1/authors",
-        "/api/books",
-        "/api/authors",
-        "/api/search",
-        "/json",
-        "/xml",
-        "/rss",
-        "/feed",
-    ]
-    
-    results = []
-    for endpoint in api_endpoints:
-        name = endpoint.replace("/", "_")
-        result = test_endpoint(endpoint, f"api_{name}")
-        results.append(result)
-    
-    save_result("api_endpoints", results)
+    auth = [l for l in all_links if any(k in (l["href"] + l["text"]).lower()
+            for k in ["login", "auth", "register", "user", "профил", "вход", "openid"])]
+    save("03_auth.json", auth)
+    print(f"  Auth links ({len(auth)}):")
+    for a in auth:
+        print(f"    [{a['text']}] -> {a['href']}")
 
-def explore_user_features() -> None:
-    """Исследовать пользовательские функции"""
-    print("\n" + "="*60)
-    print("7. ПОЛЬЗОВАТЕЛЬСКИЕ ФУНКЦИИ")
-    print("="*60)
-    
-    user_endpoints = [
-        "/user/profile",
-        "/profile",
-        "/user/settings",
-        "/user/library",
-        "/user/collections",
-        "/user/history",
-        "/user/downloads",
-        "/user/favorites",
-        "/user/wishlist",
-        "/user/messages",
-        "/user/notifications",
-    ]
-    
-    results = []
-    for endpoint in user_endpoints:
-        name = endpoint.replace("/", "_")
-        result = test_endpoint(endpoint, f"user_{name}")
-        results.append(result)
-    
-    save_result("user_endpoints", results)
+# ── 2. OPDS ──────────────────────────────
+def probe_opds():
+    print("\n=== 2. OPDS ===")
+    for p in ["/opds/", "/opds/popular", "/opds/recent", "/opds/genres", "/opds/authors"]:
+        r = get(p)
+        if r:
+            name = p.replace("/", "_")
+            save(f"04_opds_{name}.html", r.text)
+            print(f"  {p}: {r.status_code} ({len(r.text)}b)")
 
-def check_opds_structure() -> None:
-    """Проверить структуру OPDS каталога"""
-    print("\n" + "="*60)
-    print("8. СТРУКТУРА OPDS КАТАЛОГА")
-    print("="*60)
-    
+# ── 3. OPDS XML search ───────────────────
+def probe_opds_search():
+    print("\n=== 3. OPDS SEARCH (XML) ===")
+    r = get("/opds/opensearch?searchTerm=Толстой&searchType=books&pageNumber=0")
+    if not r:
+        return
+    save("05_opds_search.xml", r.text)
     try:
-        resp = session.get(urljoin(BASE_URL, "/opds/"), timeout=15, verify=False)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            
-            # Ищем все ссылки
-            links = soup.find_all("a", href=True)
-            opds_links = []
-            for link in links:
-                href = link["href"]
-                if "opds" in href or href.startswith("/"):
-                    opds_links.append({
-                        "href": href,
-                        "text": link.get_text(strip=True),
-                    })
-            
-            print(f"[+] Найдено {len(opds_links)} ссылок в OPDS каталоге")
-            
-            # Сохраняем структуру
-            save_result("opds_structure", {
-                "total_links": len(opds_links),
-                "links": opds_links[:50],  # Первые 50
+        ns = {"a": "http://www.w3.org/2005/Atom", "os": "http://a9.com/-/spec/opensearch/1.1/"}
+        root = ET.fromstring(r.text)
+        total = root.findtext("os:totalResults", namespaces=ns)
+        per_page = root.findtext("os:itemsPerPage", namespaces=ns)
+        start = root.findtext("os:startIndex", namespaces=ns)
+        entries = root.findall("a:entry", namespaces=ns)
+        print(f"  total={total} perPage={per_page} startIndex={start} entries={len(entries)}")
+        books = []
+        for e in entries[:5]:
+            t = e.findtext("a:title", namespaces=ns)
+            eid = e.findtext("a:id", namespaces=ns)
+            links_el = e.findall("a:link", namespaces=ns)
+            link_hrefs = [l.get("href", "") for l in links_el]
+            authors_el = e.findall("a:author/a:name", namespaces=ns)
+            author_names = [a.text for a in authors_el if a.text]
+            cats = e.findall("a:category", namespaces=ns)
+            cat_labels = [c.get("label", "") for c in cats]
+            content = e.findtext("a:content", namespaces=ns) or ""
+            print(f"  BOOK: {t} | id={eid} | authors={author_names}")
+            print(f"        links={link_hrefs[:3]} cats={cat_labels[:3]}")
+            print(f"        desc={content[:120]}...")
+            books.append({
+                "title": t, "id": eid, "links": link_hrefs,
+                "authors": author_names, "categories": cat_labels,
+                "description": content[:500],
             })
-    except Exception as e:
-        print(f"[-] Error: {e}")
+        save("06_opds_books.json", books)
+    except Exception as ex:
+        print(f"  XML error: {ex}")
 
-def main() -> None:
-    """Основная функция"""
-    print("="*60)
-    print("FLIBUSTA API EXPLORER")
-    print("="*60)
-    print(f"Base URL: {BASE_URL}")
-    print(f"Output: {OUTPUT_DIR}")
-    print("="*60)
-    
-    # Отключаем предупреждения SSL
-    import urllib3
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    
-    # Запускаем исследования
-    explore_main_page()
-    explore_opds()
-    explore_search()
-    explore_book_details()
-    explore_registration()
-    explore_api_endpoints()
-    explore_user_features()
-    check_opds_structure()
-    
-    print("\n" + "="*60)
-    print("ИССЛЕДОВАНИЕ ЗАВЕРШЕНО")
-    print("="*60)
-    print(f"Результаты сохранены в: {OUTPUT_DIR}")
-    print("="*60)
+# ── 4. HTML search ───────────────────────
+def probe_search():
+    print("\n=== 4. HTML SEARCH ===")
+    for label, path in [
+        ("books", "/booksearch?ask=Толстой&chb=on"),
+        ("authors", "/authorsearch?ask=Толстой"),
+        ("series", "/series?search=Толстой"),
+    ]:
+        r = get(path)
+        if r:
+            save(f"07_search_{label}.html", r.text)
+            s = soup(r.text)
+            items = s.select("ul li")
+            print(f"  {label}: {len(items)} items")
 
+# ── 5. Book details ──────────────────────
+def probe_book(bid: str):
+    print(f"\n=== 5. BOOK #{bid} ===")
+    r = get(f"/b/{bid}")
+    if not r:
+        return
+    save(f"08_book_{bid}.html", r.text)
+    s = soup(r.text)
+
+    h1 = s.find("h1")
+    print(f"  Title: {h1.get_text(strip=True) if h1 else 'N/A'}")
+
+    img = s.find("img", src=True)
+    if img:
+        print(f"  Cover: {img['src']}")
+
+    desc = s.find("div", id="book_description") or s.find("div", class_="book_description")
+    if desc:
+        print(f"  Desc: {desc.get_text(strip=True)[:150]}...")
+
+    dls = [a for a in s.find_all("a", href=True)
+           if "/download/" in a["href"]
+           or any(a["href"].endswith(ext) for ext in [".fb2", ".epub", ".txt", ".mobi", ".pdf", ".djvu"])]
+    print(f"  Downloads: {len(dls)}")
+    for d in dls[:8]:
+        print(f"    {d.get_text(strip=True)}: {d['href']}")
+
+    # Проверяем наличие Opds-ссылок
+    opds = [a for a in s.find_all("a", href=True) if "opds" in a["href"].lower()]
+    if opds:
+        print(f"  OPDS links: {len(opds)}")
+        for o in opds[:3]:
+            print(f"    {o.get_text(strip=True)}: {o['href']}")
+
+# ── 6. Auth pages ────────────────────────
+def probe_auth():
+    print("\n=== 6. AUTH PAGES ===")
+    for p in ["/user/register", "/user/login", "/user/password", "/user", "/my"]:
+        r = get(p)
+        if r:
+            name = p.replace("/", "_")
+            save(f"09_auth_{name}.html", r.text)
+            s = soup(r.text)
+            forms = s.find_all("form")
+            print(f"\n  {p}: {r.status_code}, forms={len(forms)}")
+            for f in forms:
+                action = f.get("action", "N/A")
+                method = f.get("method", "GET").upper()
+                inputs = [i.get("name") for i in f.find_all("input") if i.get("name")]
+                textareas = [t.get("name") for t in f.find_all("textarea") if t.get("name")]
+                selects = [sl.get("name") for sl in f.find_all("select") if sl.get("name")]
+                fields = inputs + textareas + selects
+                print(f"    FORM: {method} {action}")
+                print(f"    Fields: {fields}")
+
+# ── 7. Genres ────────────────────────────
+def probe_genres():
+    print("\n=== 7. GENRES ===")
+    r = get("/genres")
+    if not r:
+        return
+    save("10_genres.html", r.text)
+    s = soup(r.text)
+    genre_links = s.select("a[href*='/g/']")
+    print(f"  Genre links: {len(genre_links)}")
+    for g in genre_links[:15]:
+        print(f"    {g.get_text(strip=True)}: {g['href']}")
+
+# ── 8. Author page ───────────────────────
+def probe_author(aid: str):
+    print(f"\n=== 8. AUTHOR #{aid} ===")
+    r = get(f"/a/{aid}")
+    if not r:
+        return
+    save(f"11_author_{aid}.html", r.text)
+    s = soup(r.text)
+    h1 = s.find("h1")
+    print(f"  Name: {h1.get_text(strip=True) if h1 else 'N/A'}")
+    book_links = [a for a in s.find_all("a", href=True) if "/b/" in a["href"]]
+    print(f"  Book links: {len(book_links)}")
+    for b in book_links[:5]:
+        print(f"    {b.get_text(strip=True)}: {b['href']}")
+
+# ── 9. OPDS author books ─────────────────
+def probe_opds_author_books():
+    print("\n=== 9. OPDS AUTHOR BOOKS ===")
+    r = get("/opds/opensearch?searchType=authors&searchTerm=Толстой&pageNumber=0")
+    if not r:
+        return
+    save("12_opds_author_search.xml", r.text)
+    try:
+        ns = {"a": "http://www.w3.org/2005/Atom", "os": "http://a9.com/-/spec/opensearch/1.1/"}
+        root = ET.fromstring(r.text)
+        entries = root.findall("a:entry", namespaces=ns)
+        total = root.findtext("os:totalResults", namespaces=ns)
+        print(f"  Total: {total}, entries on page: {len(entries)}")
+        authors = []
+        for e in entries[:5]:
+            t = e.findtext("a:title", namespaces=ns)
+            eid = e.findtext("a:id", namespaces=ns)
+            print(f"  AUTHOR: {t} | id={eid}")
+            authors.append({"title": t, "id": eid})
+        save("13_opds_authors.json", authors)
+    except Exception as ex:
+        print(f"  XML error: {ex}")
+
+# ── 10. OPDS genres list ─────────────────
+def probe_opds_genres():
+    print("\n=== 10. OPDS GENRES ===")
+    r = get("/opds/genres")
+    if not r:
+        return
+    save("14_opds_genres.xml", r.text)
+    try:
+        ns = {"a": "http://www.w3.org/2005/Atom"}
+        root = ET.fromstring(r.text)
+        entries = root.findall("a:entry", namespaces=ns)
+        print(f"  Genres: {len(entries)}")
+        for e in entries[:15]:
+            t = e.findtext("a:title", namespaces=ns)
+            eid = e.findtext("a:id", namespaces=ns)
+            print(f"    {t}: {eid}")
+    except Exception as ex:
+        print(f"  XML error: {ex}")
+
+# ── 11. Try login with form token ────────
+def probe_login_form():
+    print("\n=== 11. LOGIN FORM ANALYSIS ===")
+    r = get("/user/login")
+    if not r:
+        return
+    s = soup(r.text)
+    forms = s.find_all("form")
+    for f in forms:
+        action = f.get("action", "")
+        method = f.get("method", "GET")
+        hidden = [(i["name"], i.get("value", "")) for i in f.find_all("input", {"type": "hidden"})]
+        visible = [(i["name"], i.get("type", "text")) for i in f.find_all("input") if i.get("type") != "hidden" and i.get("name")]
+        print(f"  Form: {method} {action}")
+        print(f"  Hidden fields: {hidden}")
+        print(f"  Visible fields: {visible}")
+
+# ── Main ─────────────────────────────────
 if __name__ == "__main__":
-    main()
+    print(f"BASE: {BASE}\nOutput: {OUTPUT}")
+    probe_main()
+    probe_opds()
+    probe_opds_search()
+    probe_opds_author_books()
+    probe_opds_genres()
+    probe_search()
+    probe_book("12345")
+    probe_book("1")
+    probe_auth()
+    probe_genres()
+    probe_author("6116")
+    probe_login_form()
+    print(f"\n{'='*50}\nDone! Results: {OUTPUT}\n{'='*50}")
