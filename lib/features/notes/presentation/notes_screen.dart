@@ -38,7 +38,10 @@ class NotesScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   const Text('Нет заметок', style: TextStyle(fontSize: 18, color: Colors.grey)),
                   const SizedBox(height: 8),
-                  const Text('Заметки появятся при чтении книг', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const Text(
+                    'Заметки появятся при чтении книг',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
                     onPressed: () => context.go('/library'),

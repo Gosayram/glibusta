@@ -84,6 +84,51 @@ class ReadingProgress {
   });
 }
 
+class ReadingProfile {
+  final String name;
+  final ReaderSettings settings;
+
+  const ReadingProfile({required this.name, required this.settings});
+
+  static const defaults = <ReadingProfile>[
+    ReadingProfile(
+      name: 'Стандартный',
+      settings: ReaderSettings(),
+    ),
+    ReadingProfile(
+      name: 'Комфортный',
+      settings: ReaderSettings(
+        fontSize: 20.0,
+        lineHeight: 1.8,
+        margin: 24.0,
+        paragraphSpacing: 12.0,
+        font: ReaderFont.merriweather,
+        theme: ReaderTheme.sepia,
+      ),
+    ),
+    ReadingProfile(
+      name: 'Компактный',
+      settings: ReaderSettings(
+        fontSize: 13.0,
+        lineHeight: 1.3,
+        margin: 8.0,
+        paragraphSpacing: 4.0,
+        letterSpacing: -0.3,
+      ),
+    ),
+    ReadingProfile(
+      name: 'Ночной',
+      settings: ReaderSettings(
+        fontSize: 18.0,
+        lineHeight: 1.6,
+        margin: 20.0,
+        paragraphSpacing: 10.0,
+        theme: ReaderTheme.oledBlack,
+      ),
+    ),
+  ];
+}
+
 abstract class BookParser {
   Future<String> parseFb2(Uint8List bytes);
   Future<String> parseEpub(Uint8List bytes);

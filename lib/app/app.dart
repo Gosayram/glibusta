@@ -6,6 +6,16 @@ import '../core/platform/lifecycle_service.dart';
 import 'router.dart';
 import 'theme.dart';
 
+final isObscuredProvider = NotifierProvider<IsObscuredNotifier, bool>(IsObscuredNotifier.new);
+
+class IsObscuredNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void obscure() => state = true;
+  void reveal() => state = false;
+}
+
 class GlibustaApp extends ConsumerStatefulWidget {
   const GlibustaApp({super.key});
 
@@ -28,7 +38,13 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     final service = ref.read(lifecycleServiceProvider);
     _lifecycleObserver = LifecycleObserver(service);
     service.setCallback(LifecycleEvent.pause, () {
-      ref.read(lifecycleServiceProvider);
+      ref.read(isObscuredProvider.notifier).obscure();
+    });
+    service.setCallback(LifecycleEvent.inactive, () {
+      ref.read(isObscuredProvider.notifier).obscure();
+    });
+    service.setCallback(LifecycleEvent.resume, () {
+      ref.read(isObscuredProvider.notifier).reveal();
     });
   }
 
@@ -62,12 +78,26 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    return MaterialApp.router(
-      title: 'Glibusta',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      routerConfig: router,
-      restorationScopeId: 'app',
+    final isObscured = ref.watch(isObscuredProvider);
+    return Stack(
+      children: [
+        MaterialApp.router(
+          title: 'Glibusta',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          routerConfig: router,
+          restorationScopeId: 'app',
+        ),
+        if (isObscured)
+          const Positioned.fill(
+            child: ColoredBox(
+              color: Colors.white,
+              child: Center(
+                child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

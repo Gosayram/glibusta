@@ -71,33 +71,35 @@ class BackupService {
         }
       }
 
-      final progressList = (parsed['readingProgress'] as List)
-          .cast<Map<String, dynamic>>();
-      final bookmarksList =
-          (parsed['bookmarks'] as List).cast<Map<String, dynamic>>();
-      final notesList =
-          (parsed['notes'] as List).cast<Map<String, dynamic>>();
-      final settingsMap =
-          parsed['settings'] as Map<String, dynamic>;
+      final progressList = (parsed['readingProgress'] as List).cast<Map<String, dynamic>>();
+      final bookmarksList = (parsed['bookmarks'] as List).cast<Map<String, dynamic>>();
+      final notesList = (parsed['notes'] as List).cast<Map<String, dynamic>>();
+      final settingsMap = parsed['settings'] as Map<String, dynamic>;
 
       await db.transaction(() async {
         await db.delete(db.readingProgress).go();
         for (final row in progressList) {
-          await db.into(db.readingProgress).insert(
+          await db
+              .into(db.readingProgress)
+              .insert(
                 _progressFromMap(row),
               );
         }
 
         await db.delete(db.bookmarks).go();
         for (final row in bookmarksList) {
-          await db.into(db.bookmarks).insert(
+          await db
+              .into(db.bookmarks)
+              .insert(
                 _bookmarkFromMap(row),
               );
         }
 
         await db.delete(db.notes).go();
         for (final row in notesList) {
-          await db.into(db.notes).insert(
+          await db
+              .into(db.notes)
+              .insert(
                 _noteFromMap(row),
               );
         }
@@ -145,9 +147,7 @@ class BackupService {
       currentPosition: Value((map['currentPosition'] as num?)?.toInt() ?? 0),
       totalPages: Value((map['totalPages'] as num?)?.toInt() ?? 0),
       lastRead: Value(
-        map['lastRead'] != null
-            ? DateTime.parse(map['lastRead'] as String)
-            : DateTime.now(),
+        map['lastRead'] != null ? DateTime.parse(map['lastRead'] as String) : DateTime.now(),
       ),
     );
   }
@@ -175,9 +175,7 @@ class BackupService {
       selectedText: Value(map['selectedText'] as String?),
       note: Value(map['note'] as String?),
       createdAt: Value(
-        map['createdAt'] != null
-            ? DateTime.parse(map['createdAt'] as String)
-            : DateTime.now(),
+        map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),
     );
   }
@@ -204,17 +202,12 @@ class BackupService {
       paragraphIndex: map['paragraphIndex'] as int,
       localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
       content: map['content'] as String,
-      highlightColor:
-          Value(map['highlightColor'] as String? ?? '#FFEB3B'),
+      highlightColor: Value(map['highlightColor'] as String? ?? '#FFEB3B'),
       createdAt: Value(
-        map['createdAt'] != null
-            ? DateTime.parse(map['createdAt'] as String)
-            : DateTime.now(),
+        map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),
       updatedAt: Value(
-        map['updatedAt'] != null
-            ? DateTime.parse(map['updatedAt'] as String)
-            : null,
+        map['updatedAt'] != null ? DateTime.parse(map['updatedAt'] as String) : null,
       ),
     );
   }

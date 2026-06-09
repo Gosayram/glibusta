@@ -42,7 +42,13 @@ class CatalogScreen extends ConsumerWidget {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
-              key: ValueKey(categoriesAsync.isLoading ? 'cat_loading' : categoriesAsync.hasError ? 'cat_error' : 'cat_data_${categoriesAsync.value?.length ?? 0}'),
+              key: ValueKey(
+                categoriesAsync.isLoading
+                    ? 'cat_loading'
+                    : categoriesAsync.hasError
+                    ? 'cat_error'
+                    : 'cat_data_${categoriesAsync.value?.length ?? 0}',
+              ),
               child: categoriesAsync.when(
                 data: (List<String> categories) => _buildCategories(context, categories),
                 loading: () => SizedBox(
@@ -77,7 +83,13 @@ class CatalogScreen extends ConsumerWidget {
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
-              key: ValueKey(popularAsync.isLoading ? 'pop_loading' : popularAsync.hasError ? 'pop_error' : 'pop_data_${popularAsync.value?.length ?? 0}'),
+              key: ValueKey(
+                popularAsync.isLoading
+                    ? 'pop_loading'
+                    : popularAsync.hasError
+                    ? 'pop_error'
+                    : 'pop_data_${popularAsync.value?.length ?? 0}',
+              ),
               child: popularAsync.when(
                 data: (List<Book> books) => _buildPopularBooks(context, ref, books),
                 loading: () => SizedBox(
@@ -298,64 +310,64 @@ class CatalogScreen extends ConsumerWidget {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Card(
-        margin: const EdgeInsets.only(right: 8),
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: book.coverUrl != null
-                      ? Image.network(
-                          book.coverUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Container(
+          margin: const EdgeInsets.only(right: 8),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: book.coverUrl != null
+                        ? Image.network(
+                            book.coverUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Container(
+                              color: Colors.grey[300],
+                              child: const Icon(Icons.book),
+                            ),
+                          )
+                        : Container(
                             color: Colors.grey[300],
                             child: const Icon(Icons.book),
                           ),
-                        )
-                      : Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.book),
-                        ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      book.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            // Download status indicator
-            if (isDownloaded == true)
-              const Positioned(
-                top: 0,
-                right: 0,
-                child: Icon(
-                  Icons.download_done,
-                  size: 16,
-                  color: Colors.green,
-                ),
-              )
-            else if (isDownloaded == false)
-              const Positioned(
-                top: 0,
-                right: 0,
-                child: Icon(
-                  Icons.cloud_download_outlined,
-                  size: 16,
-                  color: Colors.blue,
-                ),
+                ],
               ),
-          ],
+              // Download status indicator
+              if (isDownloaded == true)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.download_done,
+                    size: 16,
+                    color: Colors.green,
+                  ),
+                )
+              else if (isDownloaded == false)
+                const Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Icon(
+                    Icons.cloud_download_outlined,
+                    size: 16,
+                    color: Colors.blue,
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }

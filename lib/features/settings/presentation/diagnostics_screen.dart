@@ -93,12 +93,8 @@ class DiagnosticsScreen extends ConsumerWidget {
     final db = ref.read(databaseProvider);
     final allBooks = await (db.select(db.savedBooks)).get();
     final allDownloads = await (db.select(db.downloads)).get();
-    final fb2 = allDownloads
-        .where((d) => d.format.toLowerCase() == 'fb2')
-        .length;
-    final epub = allDownloads
-        .where((d) => d.format.toLowerCase() == 'epub')
-        .length;
+    final fb2 = allDownloads.where((d) => d.format.toLowerCase() == 'fb2').length;
+    final epub = allDownloads.where((d) => d.format.toLowerCase() == 'epub').length;
     String? lastError;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -117,7 +113,8 @@ class DiagnosticsScreen extends ConsumerWidget {
   }
 
   Future<void> _exportLogs(BuildContext context, DiagnosticsInfo info) async {
-    final report = 'Glibusta Diagnostics\n'
+    final report =
+        'Glibusta Diagnostics\n'
         'Version: ${info.appVersion}\n'
         'Books: ${info.totalBooks} (FB2: ${info.fb2Count}, EPUB: ${info.epubCount})\n'
         'DB Size: ${info.dbSize}\n'

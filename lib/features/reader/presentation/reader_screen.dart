@@ -71,6 +71,11 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(textAlign: align);
     _persist();
   }
+
+  void applyProfile(ReaderSettings profile) {
+    state = profile;
+    _persist();
+  }
 }
 
 @riverpod
@@ -136,9 +141,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   Future<int> _loadSavedChapterIndex() async {
     try {
       final db = ref.read(databaseProvider);
-      final row = await (db.select(db.readingProgress)
-            ..where((t) => t.bookId.equals(widget.bookId)))
-          .getSingleOrNull();
+      final row = await (db.select(
+        db.readingProgress,
+      )..where((t) => t.bookId.equals(widget.bookId))).getSingleOrNull();
       return row?.currentPosition ?? 0;
     } catch (_) {
       return 0;
@@ -373,6 +378,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
 
   List<Widget> _buildReaderActions(BuildContext context, ReaderSettings settings) {
     return [
+      _buildProfileMenu(settings),
       IconButton(
         icon: Icon(_getModeIcon(settings.mode)),
         tooltip: _getModeTooltip(settings.mode),
@@ -390,6 +396,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       _buildFontMenu(settings),
       _buildTextAlignMenu(settings),
     ];
+  }
+
+  Widget _buildProfileMenu(ReaderSettings settings) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.tune),
+      tooltip: 'Профиль чтения',
+      onSelected: (String profileName) {
+        final profile = ReadingProfile.defaults.firstWhere(
+          (p) => p.name == profileName,
+        );
+        ref.read(readerSettingsProvider.notifier).applyProfile(profile.settings);
+      },
+      itemBuilder: (BuildContext context) {
+        return ReadingProfile.defaults.map<PopupMenuItem<String>>((profile) {
+          return PopupMenuItem<String>(
+            value: profile.name,
+            child: Text(profile.name),
+          );
+        }).toList();
+      },
+    );
   }
 
   Widget _buildFontSizeMenu(ReaderSettings settings) {
@@ -525,13 +552,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             _currentChapterIndex = page;
             _currentPage = page;
           });
-          ref.read(readingProgressProvider.notifier).updateProgress(
-            ReadingProgress(
-              bookId: widget.bookId,
-              currentPosition: page,
-              lastRead: DateTime.now(),
-            ),
-          );
+          ref
+              .read(readingProgressProvider.notifier)
+              .updateProgress(
+                ReadingProgress(
+                  bookId: widget.bookId,
+                  currentPosition: page,
+                  lastRead: DateTime.now(),
+                ),
+              );
         },
         itemBuilder: (BuildContext context, int index) {
           if (!_isChapterVisible(index)) {
@@ -605,14 +634,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     if (event is! KeyDownEvent) return false;
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
       if (_currentChapterIndex > 0) {
-        _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        _pageController.previousPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
       final max = (_book?.chapters.length ?? 1) - 1;
       if (_currentChapterIndex < max) {
-        _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
       return true;
     }
@@ -648,52 +683,60 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             final max = (_book?.chapters.length ?? 1) - 1;
             if (x < width / 3) {
               if (_currentChapterIndex > 0) {
-                _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                _pageController.previousPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
               }
             } else if (x > width * 2 / 3) {
               if (_currentChapterIndex < max) {
-                _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
               }
             } else {
               final settings = ref.read(readerSettingsProvider);
-              ref.read(readerSettingsProvider.notifier).updateMode(
-                settings.mode == ReaderMode.focus ? ReaderMode.continuous : ReaderMode.focus,
-              );
+              ref
+                  .read(readerSettingsProvider.notifier)
+                  .updateMode(
+                    settings.mode == ReaderMode.focus ? ReaderMode.continuous : ReaderMode.focus,
+                  );
             }
           },
           child: SingleChildScrollView(
             padding: EdgeInsets.all(settings.margin),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (chapter.title.isNotEmpty)
-                Padding(
-                  padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-                  child: Text(
-                    chapter.title,
-                    style: _getReaderStyle(settings).copyWith(
-                      fontSize: settings.fontSize * 1.4,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: textAlign,
-                  ),
-                ),
-              ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
-              if (chapterIndex < _book!.chapters.length - 1)
-                Padding(
-                  padding: EdgeInsets.only(top: settings.paragraphSpacing * 3),
-                  child: Center(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (chapter.title.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
                     child: Text(
-                      '— ${_book!.chapters[chapterIndex + 1].title} —',
+                      chapter.title,
                       style: _getReaderStyle(settings).copyWith(
-                        color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                        fontSize: settings.fontSize * 1.4,
+                        fontWeight: FontWeight.bold,
                       ),
                       textAlign: textAlign,
                     ),
                   ),
-                ),
-            ],
-          ),
+                ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+                if (chapterIndex < _book!.chapters.length - 1)
+                  Padding(
+                    padding: EdgeInsets.only(top: settings.paragraphSpacing * 3),
+                    child: Center(
+                      child: Text(
+                        '— ${_book!.chapters[chapterIndex + 1].title} —',
+                        style: _getReaderStyle(settings).copyWith(
+                          color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                        ),
+                        textAlign: textAlign,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

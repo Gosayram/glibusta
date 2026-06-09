@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../core/services/content_safety_service.dart';
 import '../../auth/presentation/login_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -79,6 +80,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             value: Theme.of(context).brightness == Brightness.dark,
             onChanged: (_) {},
           ),
+          _SettingsTile(
+            icon: Icons.shield_outlined,
+            title: 'Фильтр контента',
+            subtitle: 'Настройка безопасности',
+            onTap: () => _showContentSafety(context),
+          ),
 
           const Divider(),
           const _SectionHeader(title: 'О приложении'),
@@ -100,6 +107,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/settings/diagnostics'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showContentSafety(BuildContext context) {
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Фильтр контента'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ContentSafetyLevel.values.map((level) {
+                return RadioListTile<ContentSafetyLevel>(
+                  title: Text(level.displayName),
+                  subtitle: Text(level.description),
+                  value: level,
+                  groupValue: ContentSafetyLevel.standard,
+                  onChanged: (ContentSafetyLevel? value) {
+                    if (value != null) {
+                      ContentSafetyService.save(value);
+                      Navigator.of(context).pop();
+                    }
+                  },
+                );
+              }).toList(),
+            ),
+          );
+        },
       ),
     );
   }

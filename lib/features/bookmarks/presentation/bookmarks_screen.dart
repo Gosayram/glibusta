@@ -38,7 +38,10 @@ class BookmarksScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   const Text('Нет закладок', style: TextStyle(fontSize: 18, color: Colors.grey)),
                   const SizedBox(height: 8),
-                  const Text('Закладки появятся при чтении книг', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const Text(
+                    'Закладки появятся при чтении книг',
+                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
                     onPressed: () => context.go('/library'),

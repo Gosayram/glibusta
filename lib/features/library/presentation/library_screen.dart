@@ -48,7 +48,13 @@ class LibraryScreen extends ConsumerWidget {
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: KeyedSubtree(
-            key: ValueKey(booksAsync.isLoading ? 'loading' : booksAsync.hasError ? 'error' : 'data_${booksAsync.value?.length ?? 0}'),
+            key: ValueKey(
+              booksAsync.isLoading
+                  ? 'loading'
+                  : booksAsync.hasError
+                  ? 'error'
+                  : 'data_${booksAsync.value?.length ?? 0}',
+            ),
             child: booksAsync.when(
               data: (List<Book> books) => _buildBooksGrid(context, ref, books),
               loading: () => Skeletonizer(
@@ -134,9 +140,11 @@ class LibraryScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             const Text('Библиотека пуста', style: TextStyle(fontSize: 18, color: Colors.grey)),
             const SizedBox(height: 8),
-            const Text('Найдите и скачайте книги, или импортируйте файлы',
+            const Text(
+              'Найдите и скачайте книги, или импортируйте файлы',
               style: TextStyle(color: Colors.grey, fontSize: 13),
-              textAlign: TextAlign.center),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 24),
             FilledButton.tonal(
               onPressed: () => context.go('/catalog'),
@@ -166,7 +174,7 @@ class LibraryScreen extends ConsumerWidget {
                 childAspectRatio: 0.75,
               ),
               itemCount: 6,
-              itemBuilder: (_, __) => const Card(
+              itemBuilder: (_, _) => const Card(
                 child: ListTile(
                   leading: Bone.circle(size: 48),
                   title: Bone.text(words: 3),

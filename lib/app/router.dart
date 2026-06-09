@@ -9,8 +9,8 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/search/presentation/search_screen.dart';
-import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/diagnostics_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {

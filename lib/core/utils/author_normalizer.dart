@@ -11,11 +11,7 @@ class AuthorNormalizer {
   static String _normalizeSingle(String author) {
     if (author.isEmpty) return '';
     if (author.contains(',')) {
-      final commaParts = author
-          .split(',')
-          .map((p) => p.trim())
-          .where((p) => p.isNotEmpty)
-          .toList();
+      final commaParts = author.split(',').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
       if (commaParts.length >= 2) {
         return '${commaParts[1]} ${commaParts[0]}';
       }
