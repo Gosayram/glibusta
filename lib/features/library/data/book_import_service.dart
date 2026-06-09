@@ -72,6 +72,7 @@ class BookImportService {
               sourceUrl: Value(filePath),
               contentHash: Value(contentHash),
               fileSize: Value(fileSize),
+              filePath: Value(targetPath),
             ),
           );
 

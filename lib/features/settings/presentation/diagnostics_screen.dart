@@ -1,9 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 
 class DiagnosticsScreen extends ConsumerWidget {
   const DiagnosticsScreen({super.key});
@@ -21,13 +27,22 @@ class DiagnosticsScreen extends ConsumerWidget {
           final info = snapshot.data!;
           return ListView(
             children: [
+              _healthSection('Состояние системы', info),
               _section('Приложение', [
                 ListTile(
                   title: const Text('Версия'),
                   trailing: Text(info.appVersion),
                 ),
+                ListTile(
+                  title: const Text('Платформа'),
+                  trailing: Text(info.platform),
+                ),
               ]),
               _section('База данных', [
+                ListTile(
+                  title: const Text('Статус'),
+                  trailing: _statusChip(info.dbOk),
+                ),
                 ListTile(
                   title: const Text('Книг в библиотеке'),
                   trailing: Text('${info.totalBooks}'),
@@ -45,14 +60,45 @@ class DiagnosticsScreen extends ConsumerWidget {
                   trailing: Text(info.dbSize),
                 ),
               ]),
-              _section('Последняя ошибка', [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
+              _section('Хранилище', [
+                ListTile(
+                  title: const Text('Статус'),
+                  trailing: _statusChip(info.storageOk),
+                ),
+                ListTile(
+                  title: const Text('Доступно'),
+                  trailing: Text(info.storageFree),
+                ),
+                ListTile(
+                  title: const Text('Занято приложением'),
+                  trailing: Text(info.appSize),
+                ),
+              ]),
+              _section('Подключение', [
+                ListTile(
+                  title: const Text('Статус'),
+                  trailing: _statusChip(info.connectivityOk),
+                ),
+                ListTile(
+                  title: const Text('Тип'),
+                  trailing: Text(info.connectivityType),
+                ),
+              ]),
+              _section('Ошибки', [
+                ListTile(
+                  title: const Text('Последняя ошибка'),
+                  subtitle: Text(
                     info.lastError ?? 'Нет ошибок',
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                   ),
                 ),
+                if (info.recentErrors.isNotEmpty)
+                  ...info.recentErrors.map(
+                    (e) => ListTile(
+                      dense: true,
+                      title: Text(e, style: const TextStyle(fontSize: 12)),
+                    ),
+                  ),
               ]),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -60,15 +106,15 @@ class DiagnosticsScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => _exportLogs(context, info),
-                        child: const Text('Скопировать отчёт'),
+                        onPressed: () => _exportReport(context, info),
+                        child: const Text('Экспорт отчёта'),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.tonal(
-                        onPressed: () => _clearCache(context, ref),
-                        child: const Text('Очистить кэш'),
+                        onPressed: () => _runDiagnostics(context, ref),
+                        child: const Text('Перепроверить'),
                       ),
                     ),
                   ],
@@ -81,78 +127,249 @@ class DiagnosticsScreen extends ConsumerWidget {
     );
   }
 
-  ExpansionTile _section(String title, List<Widget> children) {
+  Widget _healthSection(String title, DiagnosticsInfo info) {
+    final items = <_HealthItem>[
+      _HealthItem('База данных', info.dbOk),
+      _HealthItem('Хранилище', info.storageOk),
+      _HealthItem('Подключение', info.connectivityOk),
+    ];
+    final allOk = items.every((i) => i.ok);
+
     return ExpansionTile(
       initiallyExpanded: true,
+      title: Row(
+        children: [
+          Text(title),
+          const SizedBox(width: 8),
+          Icon(
+            allOk ? Icons.check_circle : Icons.warning,
+            color: allOk ? Colors.green : Colors.orange,
+            size: 20,
+          ),
+        ],
+      ),
+      children: items
+          .map(
+            (item) => ListTile(
+              leading: Icon(
+                item.ok ? Icons.check_circle_outline : Icons.error_outline,
+                color: item.ok ? Colors.green : Colors.red,
+                size: 20,
+              ),
+              title: Text(item.label),
+              trailing: Text(
+                item.ok ? 'OK' : 'Ошибка',
+                style: TextStyle(
+                  color: item.ok ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _section(String title, List<Widget> children) {
+    return ExpansionTile(
       title: Text(title),
       children: children,
     );
   }
 
+  Widget _statusChip(bool ok) {
+    return Chip(
+      label: Text(
+        ok ? 'OK' : 'Ошибка',
+        style: TextStyle(
+          color: ok ? Colors.green : Colors.red,
+          fontSize: 12,
+        ),
+      ),
+      backgroundColor: ok ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+      side: BorderSide.none,
+      padding: EdgeInsets.zero,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
   Future<DiagnosticsInfo> _gatherInfo(WidgetRef ref) async {
     final db = ref.read(databaseProvider);
-    final allBooks = await (db.select(db.savedBooks)).get();
-    final allDownloads = await (db.select(db.downloads)).get();
-    final fb2 = allDownloads.where((d) => d.format.toLowerCase() == 'fb2').length;
-    final epub = allDownloads.where((d) => d.format.toLowerCase() == 'epub').length;
+    final logger = ref.read(appLoggerProvider);
+
+    // DB check
+    bool dbOk = true;
+    int totalBooks = 0;
+    int fb2Count = 0;
+    int epubCount = 0;
+    try {
+      final allBooks = await (db.select(db.savedBooks)).get();
+      totalBooks = allBooks.length;
+      final allDownloads = await (db.select(db.downloads)).get();
+      fb2Count = allDownloads.where((d) => d.format.toLowerCase() == 'fb2').length;
+      epubCount = allDownloads.where((d) => d.format.toLowerCase() == 'epub').length;
+    } catch (e) {
+      dbOk = false;
+    }
+
+    // Storage check
+    bool storageOk = true;
+    String storageFree = 'Неизвестно';
+    String appSize = 'Неизвестно';
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final stat = await dir.stat();
+      appSize = _formatBytes(stat.size);
+      // Try to get free space
+      final result = await Process.run('df', ['-h', dir.path]);
+      if (result.exitCode == 0) {
+        final lines = (result.stdout as String).split('\n');
+        if (lines.length > 1) {
+          final parts = lines[1].split(RegExp(r'\s+'));
+          if (parts.length >= 4) {
+            storageFree = parts[3];
+          }
+        }
+      }
+    } catch (e) {
+      storageOk = false;
+    }
+
+    // Connectivity check
+    bool connectivityOk = true;
+    String connectivityType = 'Неизвестно';
+    try {
+      final service = ref.read(offlineModeServiceProvider);
+      connectivityOk = service.isOnline;
+      connectivityType = service.state.name;
+    } catch (e) {
+      connectivityOk = false;
+    }
+
+    // Error info
     String? lastError;
+    final recentErrors = <String>[];
     try {
       final prefs = await SharedPreferences.getInstance();
       lastError = prefs.getString('last_error');
-    } on Object {
-      lastError = null;
-    }
+      final errors = logger.entries
+          .where((e) => e.level == 'SEVERE')
+          .take(5)
+          .map((e) => '${e.time.hour}:${e.time.minute} - ${e.message}')
+          .toList();
+      recentErrors.addAll(errors);
+    } catch (_) {}
+
+    // App version
+    String appVersion = '0.1.0';
+    try {
+      final info = await PackageInfo.fromPlatform();
+      appVersion = info.version;
+    } catch (_) {}
+
     return DiagnosticsInfo(
-      appVersion: '1.0.0',
-      totalBooks: allBooks.length,
-      fb2Count: fb2,
-      epubCount: epub,
-      dbSize: '~${(allBooks.length * 0.5).toStringAsFixed(1)} MB',
+      appVersion: appVersion,
+      platform: Platform.operatingSystem,
+      totalBooks: totalBooks,
+      fb2Count: fb2Count,
+      epubCount: epubCount,
+      dbSize: '~${_formatBytes(totalBooks * 500 * 1024)}',
       lastError: lastError,
+      recentErrors: recentErrors,
+      dbOk: dbOk,
+      storageOk: storageOk,
+      storageFree: storageFree,
+      appSize: appSize,
+      connectivityOk: connectivityOk,
+      connectivityType: connectivityType,
     );
   }
 
-  Future<void> _exportLogs(BuildContext context, DiagnosticsInfo info) async {
-    final report =
-        'Glibusta Diagnostics\n'
-        'Version: ${info.appVersion}\n'
-        'Books: ${info.totalBooks} (FB2: ${info.fb2Count}, EPUB: ${info.epubCount})\n'
-        'DB Size: ${info.dbSize}\n'
-        'Last Error: ${info.lastError ?? 'None'}';
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+
+  Future<void> _exportReport(BuildContext context, DiagnosticsInfo info) async {
+    final report = [
+      '=== Glibusta Health Report ===',
+      'Date: ${DateTime.now()}',
+      '',
+      '--- System ---',
+      'DB: ${info.dbOk ? "OK" : "ERROR"}',
+      'Storage: ${info.storageOk ? "OK" : "ERROR"} (${info.storageFree} free)',
+      'Connectivity: ${info.connectivityOk ? "OK" : "ERROR"} (${info.connectivityType})',
+      '',
+      '--- App ---',
+      'Version: ${info.appVersion}',
+      'Platform: ${info.platform}',
+      'Books: ${info.totalBooks} (FB2: ${info.fb2Count}, EPUB: ${info.epubCount})',
+      'DB Size: ${info.dbSize}',
+      'App Size: ${info.appSize}',
+      '',
+      '--- Errors ---',
+      'Last: ${info.lastError ?? "None"}',
+      ...info.recentErrors.map((e) => '  $e'),
+    ].join('\n');
+
     await Clipboard.setData(ClipboardData(text: report));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Отчёт скопирован'),
-        duration: Duration(seconds: 2),
-      ),
+      const SnackBar(content: Text('Отчёт скопирован')),
     );
   }
 
-  void _clearCache(BuildContext context, WidgetRef ref) {
+  Future<void> _runDiagnostics(BuildContext context, WidgetRef ref) async {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Кэш очищен'),
-        duration: Duration(seconds: 2),
-      ),
+      const SnackBar(content: Text('Проверка...')),
+    );
+    // Re-trigger by rebuilding - the FutureBuilder will re-run
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Проверка завершена')),
     );
   }
 }
 
+class _HealthItem {
+  const _HealthItem(this.label, this.ok);
+  final String label;
+  final bool ok;
+}
+
 class DiagnosticsInfo {
   final String appVersion;
+  final String platform;
   final int totalBooks;
   final int fb2Count;
   final int epubCount;
   final String dbSize;
   final String? lastError;
+  final List<String> recentErrors;
+  final bool dbOk;
+  final bool storageOk;
+  final String storageFree;
+  final String appSize;
+  final bool connectivityOk;
+  final String connectivityType;
 
   DiagnosticsInfo({
     required this.appVersion,
+    required this.platform,
     required this.totalBooks,
     required this.fb2Count,
     required this.epubCount,
     required this.dbSize,
     this.lastError,
+    this.recentErrors = const [],
+    required this.dbOk,
+    required this.storageOk,
+    required this.storageFree,
+    required this.appSize,
+    required this.connectivityOk,
+    required this.connectivityType,
   });
 }

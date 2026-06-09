@@ -13,6 +13,7 @@ class SavedBooks extends Table {
   DateTimeColumn get addedAt => dateTime().clientDefault(DateTime.now)();
   TextColumn get contentHash => text().nullable()();
   IntColumn get fileSize => integer().nullable()();
+  TextColumn get filePath => text().withDefault(const Constant(''))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

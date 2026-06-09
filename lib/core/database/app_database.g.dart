@@ -139,6 +139,18 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _filePathMeta = const VerificationMeta(
+    'filePath',
+  );
+  @override
+  late final GeneratedColumn<String> filePath = GeneratedColumn<String>(
+    'file_path',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -153,6 +165,7 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     addedAt,
     contentHash,
     fileSize,
+    filePath,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -248,6 +261,12 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta),
       );
     }
+    if (data.containsKey('file_path')) {
+      context.handle(
+        _filePathMeta,
+        filePath.isAcceptableOrUnknown(data['file_path']!, _filePathMeta),
+      );
+    }
     return context;
   }
 
@@ -305,6 +324,10 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.int,
         data['${effectivePrefix}file_size'],
       ),
+      filePath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}file_path'],
+      )!,
     );
   }
 
@@ -327,6 +350,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final DateTime addedAt;
   final String? contentHash;
   final int? fileSize;
+  final String filePath;
   const SavedBook({
     required this.id,
     required this.title,
@@ -340,6 +364,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     required this.addedAt,
     this.contentHash,
     this.fileSize,
+    required this.filePath,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -370,6 +395,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || fileSize != null) {
       map['file_size'] = Variable<int>(fileSize);
     }
+    map['file_path'] = Variable<String>(filePath);
     return map;
   }
 
@@ -387,6 +413,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       addedAt: Value(addedAt),
       contentHash: contentHash == null && nullToAbsent ? const Value.absent() : Value(contentHash),
       fileSize: fileSize == null && nullToAbsent ? const Value.absent() : Value(fileSize),
+      filePath: Value(filePath),
     );
   }
 
@@ -408,6 +435,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       addedAt: serializer.fromJson<DateTime>(json['addedAt']),
       contentHash: serializer.fromJson<String?>(json['contentHash']),
       fileSize: serializer.fromJson<int?>(json['fileSize']),
+      filePath: serializer.fromJson<String>(json['filePath']),
     );
   }
   @override
@@ -426,6 +454,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'addedAt': serializer.toJson<DateTime>(addedAt),
       'contentHash': serializer.toJson<String?>(contentHash),
       'fileSize': serializer.toJson<int?>(fileSize),
+      'filePath': serializer.toJson<String>(filePath),
     };
   }
 
@@ -442,6 +471,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     DateTime? addedAt,
     Value<String?> contentHash = const Value.absent(),
     Value<int?> fileSize = const Value.absent(),
+    String? filePath,
   }) => SavedBook(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -455,6 +485,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     addedAt: addedAt ?? this.addedAt,
     contentHash: contentHash.present ? contentHash.value : this.contentHash,
     fileSize: fileSize.present ? fileSize.value : this.fileSize,
+    filePath: filePath ?? this.filePath,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
     return SavedBook(
@@ -470,6 +501,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
       contentHash: data.contentHash.present ? data.contentHash.value : this.contentHash,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      filePath: data.filePath.present ? data.filePath.value : this.filePath,
     );
   }
 
@@ -487,7 +519,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('sourceUrl: $sourceUrl, ')
           ..write('addedAt: $addedAt, ')
           ..write('contentHash: $contentHash, ')
-          ..write('fileSize: $fileSize')
+          ..write('fileSize: $fileSize, ')
+          ..write('filePath: $filePath')
           ..write(')'))
         .toString();
   }
@@ -506,6 +539,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     addedAt,
     contentHash,
     fileSize,
+    filePath,
   );
   @override
   bool operator ==(Object other) =>
@@ -522,7 +556,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.sourceUrl == this.sourceUrl &&
           other.addedAt == this.addedAt &&
           other.contentHash == this.contentHash &&
-          other.fileSize == this.fileSize);
+          other.fileSize == this.fileSize &&
+          other.filePath == this.filePath);
 }
 
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
@@ -538,6 +573,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<DateTime> addedAt;
   final Value<String?> contentHash;
   final Value<int?> fileSize;
+  final Value<String> filePath;
   final Value<int> rowid;
   const SavedBooksCompanion({
     this.id = const Value.absent(),
@@ -552,6 +588,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.addedAt = const Value.absent(),
     this.contentHash = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.filePath = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedBooksCompanion.insert({
@@ -567,6 +604,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.addedAt = const Value.absent(),
     this.contentHash = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.filePath = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -583,6 +621,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<DateTime>? addedAt,
     Expression<String>? contentHash,
     Expression<int>? fileSize,
+    Expression<String>? filePath,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -598,6 +637,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (addedAt != null) 'added_at': addedAt,
       if (contentHash != null) 'content_hash': contentHash,
       if (fileSize != null) 'file_size': fileSize,
+      if (filePath != null) 'file_path': filePath,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -615,6 +655,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<DateTime>? addedAt,
     Value<String?>? contentHash,
     Value<int?>? fileSize,
+    Value<String>? filePath,
     Value<int>? rowid,
   }) {
     return SavedBooksCompanion(
@@ -630,6 +671,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       addedAt: addedAt ?? this.addedAt,
       contentHash: contentHash ?? this.contentHash,
       fileSize: fileSize ?? this.fileSize,
+      filePath: filePath ?? this.filePath,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -673,6 +715,9 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     if (fileSize.present) {
       map['file_size'] = Variable<int>(fileSize.value);
     }
+    if (filePath.present) {
+      map['file_path'] = Variable<String>(filePath.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -694,6 +739,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('addedAt: $addedAt, ')
           ..write('contentHash: $contentHash, ')
           ..write('fileSize: $fileSize, ')
+          ..write('filePath: $filePath, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5421,6 +5467,7 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<DateTime> addedAt,
       Value<String?> contentHash,
       Value<int?> fileSize,
+      Value<String> filePath,
       Value<int> rowid,
     });
 typedef $$SavedBooksTableUpdateCompanionBuilder =
@@ -5437,6 +5484,7 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<DateTime> addedAt,
       Value<String?> contentHash,
       Value<int?> fileSize,
+      Value<String> filePath,
       Value<int> rowid,
     });
 
@@ -5505,6 +5553,11 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
 
   ColumnFilters<int> get fileSize => $composableBuilder(
     column: $table.fileSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get filePath => $composableBuilder(
+    column: $table.filePath,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5576,6 +5629,11 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     column: $table.fileSize,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get filePath => $composableBuilder(
+    column: $table.filePath,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -5627,6 +5685,9 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
 
   GeneratedColumn<int> get fileSize =>
       $composableBuilder(column: $table.fileSize, builder: (column) => column);
+
+  GeneratedColumn<String> get filePath =>
+      $composableBuilder(column: $table.filePath, builder: (column) => column);
 }
 
 class $$SavedBooksTableTableManager
@@ -5670,6 +5731,7 @@ class $$SavedBooksTableTableManager
                 Value<DateTime> addedAt = const Value.absent(),
                 Value<String?> contentHash = const Value.absent(),
                 Value<int?> fileSize = const Value.absent(),
+                Value<String> filePath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
                 id: id,
@@ -5684,6 +5746,7 @@ class $$SavedBooksTableTableManager
                 addedAt: addedAt,
                 contentHash: contentHash,
                 fileSize: fileSize,
+                filePath: filePath,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5700,6 +5763,7 @@ class $$SavedBooksTableTableManager
                 Value<DateTime> addedAt = const Value.absent(),
                 Value<String?> contentHash = const Value.absent(),
                 Value<int?> fileSize = const Value.absent(),
+                Value<String> filePath = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(
                 id: id,
@@ -5714,6 +5778,7 @@ class $$SavedBooksTableTableManager
                 addedAt: addedAt,
                 contentHash: contentHash,
                 fileSize: fileSize,
+                filePath: filePath,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>
