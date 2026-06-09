@@ -154,9 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             TextButton(
               onPressed: () {
                 unawaited(
-                  ref.read(authStateProvider.notifier).logout(
-                    ref.read(authRepositoryProvider),
-                  ),
+                  ref.read(authStateProvider.notifier).logout(),
                 );
                 Navigator.of(context).pop();
               },

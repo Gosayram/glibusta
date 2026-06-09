@@ -1,24 +1,19 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/http/dio_provider.dart';
+
+final flibustaApiClientProvider = Provider<FlibustaApiClient>((ref) {
+  final dio = ref.watch(dioProvider);
+  return FlibustaApiClient(dio);
+});
 
 class FlibustaApiClient {
   final Dio _dio;
-  final String baseUrl;
 
-  FlibustaApiClient({required this.baseUrl, Dio? dio})
-      : _dio = dio ?? Dio() {
-    _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 10);
-    _dio.options.receiveTimeout = const Duration(seconds: 30);
-    _dio.options.headers['User-Agent'] = 'Glibusta/0.1.0';
-    _dio.options.responseType = ResponseType.plain;
-    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      return HttpClient()
-        ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
-    };
-  }
+  FlibustaApiClient(this._dio);
+
+  Dio get dio => _dio;
 
   Future<SearchByNameResponse> searchBooksByName(
     String name, {
@@ -77,7 +72,7 @@ class FlibustaApiClient {
   }
 
   Future<String> getDownloadUrl(String bookId, String format) async {
-    return '$baseUrl/b/$bookId/download/$format';
+    return '${_dio.options.baseUrl}/b/$bookId/download/$format';
   }
 
   SearchByNameResponse _parseSearchByNameResponse(String html) {

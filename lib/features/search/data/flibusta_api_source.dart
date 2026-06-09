@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/config/app_settings.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
@@ -8,8 +7,7 @@ import '../domain/book_source.dart';
 import 'flibusta_api_client.dart';
 
 final flibustaApiSourceProvider = Provider<FlibustaApiSource>((ref) {
-  final settings = ref.watch(appSettingsProvider);
-  final client = FlibustaApiClient(baseUrl: settings.baseUrl);
+  final client = ref.watch(flibustaApiClientProvider);
   return FlibustaApiSource(client);
 });
 
@@ -37,7 +35,7 @@ class FlibustaApiSource extends BookSource {
         availableFormats: const [],
         source: BookSourceInfo(
           sourceId: 'flibusta-api',
-          sourceUrl: '${_client.baseUrl}/b/${item.id}',
+          sourceUrl: '${_client.dio.options.baseUrl}/b/${item.id}',
         ),
       )).toList();
 
@@ -57,6 +55,7 @@ class FlibustaApiSource extends BookSource {
   Future<BookDetails> getBookDetails(String bookId) async {
     try {
       final result = await _client.getBookDetails(bookId);
+      final baseUrl = _client.dio.options.baseUrl;
 
       final book = Book(
         id: result.id,
@@ -64,12 +63,12 @@ class FlibustaApiSource extends BookSource {
         authorIds: result.authors,
         genreIds: const [],
         description: result.description,
-        coverUrl: result.coverUrl != null ? '${_client.baseUrl}${result.coverUrl}' : null,
+        coverUrl: result.coverUrl != null ? '$baseUrl${result.coverUrl}' : null,
         publishDate: null,
         availableFormats: _parseFormats(result.formats),
         source: BookSourceInfo(
           sourceId: 'flibusta-api',
-          sourceUrl: '${_client.baseUrl}/b/$bookId',
+          sourceUrl: '$baseUrl/b/$bookId',
         ),
       );
 
@@ -77,7 +76,7 @@ class FlibustaApiSource extends BookSource {
         book: book,
         description: result.description,
         availableFormats: _parseFormats(result.formats),
-        downloadUrls: result.formats.map((f) => '${_client.baseUrl}/b/$bookId/download/$f').toList(),
+        downloadUrls: result.formats.map((f) => '$baseUrl/b/$bookId/download/$f').toList(),
       );
     } on Object catch (e) {
       throw Exception('Failed to get book details: $e');

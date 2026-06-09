@@ -1,38 +1,18 @@
-import 'dart:io' as io;
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class _HttpOverrides extends io.HttpOverrides {
-  @override
-  io.HttpClient createHttpClient(io.SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-  }
-}
+import 'dio_provider.dart';
+
+final httpClientProvider = Provider<HttpClient>((ref) {
+  final dio = ref.watch(dioProvider);
+  return HttpClient(dio);
+});
 
 class HttpClient {
-  final String baseUrl;
-  final List<String> mirrors;
   final Dio _dio;
   Map<String, String> _sessionCookies = {};
 
-  HttpClient({required this.baseUrl, this.mirrors = const []}) : _dio = Dio() {
-    _dio.options.baseUrl = baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 10);
-    _dio.options.receiveTimeout = const Duration(seconds: 30);
-    _dio.options.headers['User-Agent'] = 'Glibusta/0.1.0';
-    _dio.options.responseType = ResponseType.plain;
-    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      return io.HttpOverrides.current?.createHttpClient(null) ??
-          io.HttpClient()
-            ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-    };
-  }
-
-  static void enableSslBypass() {
-    io.HttpOverrides.global = _HttpOverrides();
-  }
+  HttpClient(this._dio);
 
   void setSessionCookies(Map<String, String> cookies) {
     _sessionCookies = Map.from(cookies);
@@ -45,6 +25,8 @@ class HttpClient {
   }
 
   Map<String, String> get sessionCookies => Map.from(_sessionCookies);
+
+  Dio get dio => _dio;
 
   Future<String> get(String url) async {
     try {
@@ -60,10 +42,9 @@ class HttpClient {
   }
 
   Future<String> getWithMirror(String path) async {
-    final urls = [
-      baseUrl,
-      ...mirrors,
-    ].map((base) => '$base${path.startsWith('/') ? path : '/$path'}').toList();
+    final settings = _dio.options;
+    final baseUrl = settings.baseUrl;
+    final urls = [baseUrl].map((base) => '$base${path.startsWith('/') ? path : '/$path'}').toList();
 
     HttpException? lastError;
     for (final url in urls) {

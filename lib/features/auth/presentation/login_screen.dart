@@ -160,7 +160,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     unawaited(
       ref.read(authStateProvider.notifier).login(
-        ref.read(authRepositoryProvider),
         _nameController.text.trim(),
         _passwordController.text,
         _persistent,

@@ -4,10 +4,8 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/config/app_settings.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
-import '../../../core/http/http_client.dart';
 import '../../../core/platform/file_system_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
@@ -17,11 +15,6 @@ final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
   final fileSystem = ref.watch(fileSystemServiceProvider);
   return DownloadRepositoryImpl(db, fileSystem);
-});
-
-final httpClientProvider = Provider<HttpClient>((ref) {
-  final settings = ref.watch(appSettingsProvider);
-  return HttpClient(baseUrl: settings.baseUrl);
 });
 
 class DownloadRepositoryImpl implements DownloadRepository {

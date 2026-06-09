@@ -8,16 +8,12 @@ import '../domain/book_source.dart';
 import 'flibusta_api_source.dart';
 import 'flibusta_source.dart';
 
-final compositeSourceProvider = Provider<CompositeBookSource>((ref) {
+final bookSourceProvider = Provider<BookSource>((ref) {
   final sources = <BookSource>[
     ref.watch(flibustaApiSourceProvider),
     ref.watch(flibustaSourceProvider),
   ];
   return CompositeBookSource(sources);
-});
-
-final bookSourceProvider = Provider<BookSource>((ref) {
-  return ref.watch(compositeSourceProvider);
 });
 
 class CompositeBookSource extends BookSource {

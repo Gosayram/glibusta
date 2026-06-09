@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:io' as io;
 
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import '../config/app_settings.dart';
+import '../http/dio_provider.dart';
 
 class UserSession {
   final String name;
@@ -112,23 +110,13 @@ class AuthException implements Exception {
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final settings = ref.watch(appSettingsProvider);
-  final dio = Dio(BaseOptions(
-    baseUrl: settings.baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 30),
-    headers: {'User-Agent': 'Glibusta/0.1.0'},
-    responseType: ResponseType.plain,
-  ));
-  (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-    return io.HttpClient()
-      ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-  };
+  final dio = ref.watch(dioProvider);
   return AuthRepository(dio);
 });
 
 final authStateProvider = StateNotifierProvider<AuthState, AuthStateData>((ref) {
-  return AuthState();
+  final repo = ref.watch(authRepositoryProvider);
+  return AuthState(repo);
 });
 
 class AuthStateData {
@@ -160,12 +148,14 @@ class AuthStateData {
 }
 
 class AuthState extends StateNotifier<AuthStateData> {
-  AuthState() : super(const AuthStateData());
+  final AuthRepository _repo;
 
-  Future<void> login(AuthRepository repo, String name, String password, bool persistent) async {
+  AuthState(this._repo) : super(const AuthStateData());
+
+  Future<void> login(String name, String password, bool persistent) async {
     state = state.copyWith(isLoading: true);
     try {
-      final session = await repo.login(name: name, password: password, persistent: persistent);
+      final session = await _repo.login(name: name, password: password, persistent: persistent);
       state = state.copyWith(isAuthenticated: true, session: session, isLoading: false);
     } on AuthException catch (e) {
       state = state.copyWith(error: e.message, isLoading: false);
@@ -174,9 +164,9 @@ class AuthState extends StateNotifier<AuthStateData> {
     }
   }
 
-  Future<void> logout(AuthRepository repo) async {
+  Future<void> logout() async {
     try {
-      await repo.logout();
+      await _repo.logout();
     } on Object catch (_) {}
     state = const AuthStateData();
   }
