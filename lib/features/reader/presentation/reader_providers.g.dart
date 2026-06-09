@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'reader_screen.dart';
+part of 'reader_providers.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -41,7 +41,7 @@ final class ReaderSettingsNotifierProvider
   }
 }
 
-String _$readerSettingsNotifierHash() => r'd8627581a2707b19fe31ac8870df437592036530';
+String _$readerSettingsNotifierHash() => r'99d3a41cec1888297de335c6549b7ba4a73bebc7';
 
 abstract class _$ReaderSettingsNotifier extends $Notifier<ReaderSettings> {
   ReaderSettings build();
