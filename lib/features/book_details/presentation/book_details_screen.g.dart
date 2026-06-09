@@ -13,12 +13,7 @@ part of 'book_details_screen.dart';
 final bookDetailsProvider = BookDetailsFamily._();
 
 final class BookDetailsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<BookDetails>,
-          BookDetails,
-          FutureOr<BookDetails>
-        >
+    extends $FunctionalProvider<AsyncValue<BookDetails>, BookDetails, FutureOr<BookDetails>>
     with $FutureModifier<BookDetails>, $FutureProvider<BookDetails> {
   BookDetailsProvider._({
     required BookDetailsFamily super.from,
@@ -77,8 +72,7 @@ final class BookDetailsFamily extends $Family
         isAutoDispose: true,
       );
 
-  BookDetailsProvider call(String bookId) =>
-      BookDetailsProvider._(argument: bookId, from: this);
+  BookDetailsProvider call(String bookId) => BookDetailsProvider._(argument: bookId, from: this);
 
   @override
   String toString() => r'bookDetailsProvider';

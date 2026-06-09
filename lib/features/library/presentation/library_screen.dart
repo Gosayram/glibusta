@@ -48,7 +48,6 @@ class LibraryScreen extends ConsumerWidget {
         child: booksAsync.when(
           data: (List<Book> books) => _buildBooksGrid(context, ref, books),
           loading: () => Skeletonizer(
-            enabled: true,
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -58,7 +57,7 @@ class LibraryScreen extends ConsumerWidget {
                 childAspectRatio: 0.75,
               ),
               itemCount: 6,
-              itemBuilder: (_, __) => const Card(
+              itemBuilder: (_, _) => const Card(
                 child: ListTile(
                   leading: Bone.circle(size: 48),
                   title: Bone.text(words: 3),
@@ -103,11 +102,13 @@ class LibraryScreen extends ConsumerWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(importResult.isSuccess
-                  ? 'Импортировано: ${importResult.title}'
-                  : importResult.isDuplicate
-                      ? 'Дубликат: ${importResult.title}'
-                      : 'Ошибка: ${importResult.error}'),
+              content: Text(
+                importResult.isSuccess
+                    ? 'Импортировано: ${importResult.title}'
+                    : importResult.isDuplicate
+                    ? 'Дубликат: ${importResult.title}'
+                    : 'Ошибка: ${importResult.error}',
+              ),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -141,9 +142,7 @@ class LibraryScreen extends ConsumerWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return Skeletonizer(
-            enabled: true,
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
@@ -151,8 +150,8 @@ class LibraryScreen extends ConsumerWidget {
                 childAspectRatio: 0.75,
               ),
               itemCount: 6,
-              itemBuilder: (_, __) => const Card(
-                child: ListTile(
+              itemBuilder: (_, _) => const Card(
+        _      child: ListTile(
                   leading: Bone.circle(size: 48),
                   title: Bone.text(words: 3),
                   subtitle: Bone.text(words: 2),
@@ -165,7 +164,7 @@ class LibraryScreen extends ConsumerWidget {
         final downloadedMap = snapshot.data!['downloaded'] as Map<String, bool>;
 
         return LayoutBuilder(
-          builder: (context, constraints) {
+          builder = (context, constraints) {
             final width = constraints.maxWidth;
 
             // Determine grid layout based on width

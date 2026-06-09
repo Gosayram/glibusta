@@ -12,8 +12,7 @@ part of 'dio_provider.dart';
 @ProviderFor(dio)
 final dioProvider = DioProvider._();
 
-final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
-    with $Provider<Dio> {
+final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio> with $Provider<Dio> {
   DioProvider._()
     : super(
         from: null,
@@ -30,8 +29,7 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
 
   @$internal
   @override
-  $ProviderElement<Dio> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<Dio> $createElement($ProviderPointer pointer) => $ProviderElement(pointer);
 
   @override
   Dio create(Ref ref) {

@@ -41,15 +41,14 @@ class CatalogScreen extends ConsumerWidget {
         children: [
           categoriesAsync.when(
             data: (List<String> categories) => _buildCategories(context, categories),
-            loading: () => const SizedBox(
+            loading: () => SizedBox(
               height: 100,
               child: Skeletonizer(
-                enabled: true,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: 5,
-                  itemBuilder: (_, __) => const Card(
+                  itemBuilder: (_, _) => const Card(
                     margin: EdgeInsets.only(right: 8),
                     child: SizedBox(
                       width: 100,
@@ -71,9 +70,27 @@ class CatalogScreen extends ConsumerWidget {
           const Divider(),
           popularAsync.when(
             data: (List<Book> books) => _buildPopularBooks(context, ref, books),
-            loading: () => const SizedBox(
+            loading: () => SizedBox(
               height: 200,
-              child: Center(child: CircularProgressIndicator()),
+              child: Skeletonizer(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 0.75,
+                  ),
+                  itemCount: 6,
+                  itemBuilder: (_, _) => const Card(
+                    child: ListTile(
+                      leading: Bone.circle(size: 48),
+                      title: Bone.text(words: 3),
+                      subtitle: Bone.text(words: 2),
+                    ),
+                  ),
+                ),
+              ),
             ),
             error: (Object e, _) => SizedBox(
               height: 200,
@@ -145,7 +162,37 @@ class CatalogScreen extends ConsumerWidget {
             future: _getDownloadStatusMap(ref, books),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return Skeletonizer(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 0.62,
+                    ),
+                    itemCount: 4,
+                    itemBuilder: (_, _) => const Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: Bone.square()),
+                          Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Bone.text(words: 3),
+                                SizedBox(height: 4),
+                                Bone.text(words: 2),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
               }
               final downloadedMap = snapshot.data ?? {};
 

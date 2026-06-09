@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../shared/models/book.dart';
 import 'search_controller.dart';
@@ -123,10 +124,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         itemCount: state.books.length + (state.hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == state.books.length) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(),
+            return const Skeletonizer(
+              child: Column(
+                children: [
+                  Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ListTile(
+                      leading: Bone.circle(size: 48),
+                      title: Bone.text(words: 3),
+                      subtitle: Bone.text(words: 2),
+                    ),
+                  ),
+                  Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ListTile(
+                      leading: Bone.circle(size: 48),
+                      title: Bone.text(words: 3),
+                      subtitle: Bone.text(words: 2),
+                    ),
+                  ),
+                  Card(
+                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ListTile(
+                      leading: Bone.circle(size: 48),
+                      title: Bone.text(words: 3),
+                      subtitle: Bone.text(words: 2),
+                    ),
+                  ),
+                ],
               ),
             );
           }

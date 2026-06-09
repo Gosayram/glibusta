@@ -60,7 +60,9 @@ class BookImportService {
       final targetPath = '$booksDir/${book.id}.$ext';
       await file.copy(targetPath);
 
-      await _database.into(_database.savedBooks).insertOnConflictUpdate(
+      await _database
+          .into(_database.savedBooks)
+          .insertOnConflictUpdate(
             SavedBooksCompanion.insert(
               id: book.id,
               title: book.title,
@@ -73,7 +75,9 @@ class BookImportService {
             ),
           );
 
-      await _database.into(_database.downloads).insertOnConflictUpdate(
+      await _database
+          .into(_database.downloads)
+          .insertOnConflictUpdate(
             DownloadsCompanion.insert(
               id: book.id,
               bookId: book.id,
@@ -111,9 +115,9 @@ class BookImportService {
   }
 
   Future<SavedBook?> _findByHash(String hash) async {
-    final rows = await (_database.select(_database.savedBooks)
-          ..where((t) => t.contentHash.equals(hash)))
-        .get();
+    final rows = await (_database.select(
+      _database.savedBooks,
+    )..where((t) => t.contentHash.equals(hash))).get();
     return rows.isNotEmpty ? rows.first : null;
   }
 
@@ -127,7 +131,7 @@ class BookImportService {
   }
 
   String _encodeList(List<String> items) {
-    return '[${items.map((i) => '"${i.replaceAll('"', '\\"')}"').join(',')}]';
+    return '[${items.map((i) => '"${i.replaceAll('"', r'\"')}"').join(',')}]';
   }
 }
 
