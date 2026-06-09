@@ -1,0 +1,11 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY test_results/flibusta-api/package*.json ./
+
+RUN npm install
+
+COPY test_results/flibusta-api/ .
+
+CMD ["npx", "ts-node", "test_api.ts"]

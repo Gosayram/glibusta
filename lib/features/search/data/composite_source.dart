@@ -5,10 +5,12 @@ import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
+import 'flibusta_api_source.dart';
 import 'flibusta_source.dart';
 
 final compositeSourceProvider = Provider<CompositeBookSource>((ref) {
   final sources = <BookSource>[
+    ref.watch(flibustaApiSourceProvider),
     ref.watch(flibustaSourceProvider),
   ];
   return CompositeBookSource(sources);
