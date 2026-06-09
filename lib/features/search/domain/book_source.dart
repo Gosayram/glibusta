@@ -35,11 +35,11 @@ class MockBookSource implements BookSource {
         description: null,
         coverUrl: null,
         publishDate: null,
-        availableFormats: const [],
+        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
         source: const BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
       ),
       description: 'Mock description',
-      availableFormats: const [],
+      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
       downloadUrls: const [],
     );
   }
