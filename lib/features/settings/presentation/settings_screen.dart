@@ -121,16 +121,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: ContentSafetyLevel.values.map((level) {
-                return RadioListTile<ContentSafetyLevel>(
+                return ListTile(
+                  leading: Icon(
+                    level == ContentSafetyLevel.standard
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    color: level == ContentSafetyLevel.standard
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                   title: Text(level.displayName),
                   subtitle: Text(level.description),
-                  value: level,
-                  groupValue: ContentSafetyLevel.standard,
-                  onChanged: (ContentSafetyLevel? value) {
-                    if (value != null) {
-                      ContentSafetyService.save(value);
-                      Navigator.of(context).pop();
-                    }
+                  onTap: () {
+                    unawaited(ContentSafetyService.save(level));
+                    Navigator.of(context).pop();
                   },
                 );
               }).toList(),

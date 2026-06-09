@@ -36,7 +36,7 @@ class ReaderSettingsPersistence {
           orElse: () => ReaderTextAlign.justify,
         ),
       );
-    } catch (_) {
+    } on Object catch (_) {
       return const ReaderSettings();
     }
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
@@ -62,10 +63,10 @@ class DownloadService {
     final result = await FileDownloader().download(
       task,
       onProgress: (progress) {
-        _updateProgress(bookId, progress);
+        unawaited(_updateProgress(bookId, progress));
       },
       onStatus: (status) {
-        _updateStatus(bookId, status);
+        unawaited(_updateStatus(bookId, status));
       },
     );
 

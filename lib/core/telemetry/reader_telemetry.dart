@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -53,7 +54,6 @@ class ReaderTelemetry {
 
   static const _sessionsKey = 'reading_sessions';
   static const _errorsKey = 'reader_errors';
-  static const _statsKey = 'reader_stats';
 
   ReadingSession? _currentSession;
 
@@ -92,7 +92,7 @@ class ReaderTelemetry {
     if (errors.length > 100) {
       errors.removeRange(0, errors.length - 100);
     }
-    _prefs.setStringList(_errorsKey, errors);
+    unawaited(_prefs.setStringList(_errorsKey, errors));
   }
 
   void recordOpen(String bookId) {
@@ -188,7 +188,7 @@ class ReaderTelemetry {
     if (raw.length > 500) {
       raw.removeRange(0, raw.length - 500);
     }
-    _prefs.setStringList(_sessionsKey, raw);
+    unawaited(_prefs.setStringList(_sessionsKey, raw));
   }
 
   String _serializeSession(ReadingSession s) {
@@ -207,7 +207,7 @@ class ReaderTelemetry {
         chaptersRead: int.tryParse(parts[4]) ?? 0,
         mode: parts[5],
       );
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }

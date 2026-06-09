@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -30,7 +32,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _initWindowManager();
+    unawaited(_initWindowManager());
     _initLifecycle();
   }
 
@@ -58,10 +60,12 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       backgroundColor: Colors.transparent,
       skipTaskbar: false,
     );
-    windowManager.waitUntilReadyToShow(windowOptions, () async {
-      await windowManager.show();
-      await windowManager.focus();
-    });
+    unawaited(
+      windowManager.waitUntilReadyToShow(windowOptions, () async {
+        await windowManager.show();
+        await windowManager.focus();
+      }),
+    );
   }
 
   @override
@@ -79,25 +83,28 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final isObscured = ref.watch(isObscuredProvider);
-    return Stack(
-      children: [
-        MaterialApp.router(
-          title: 'Glibusta',
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          routerConfig: router,
-          restorationScopeId: 'app',
-        ),
-        if (isObscured)
-          const Positioned.fill(
-            child: ColoredBox(
-              color: Colors.white,
-              child: Center(
-                child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+    return MaterialApp.router(
+      title: 'Glibusta',
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      routerConfig: router,
+      restorationScopeId: 'app',
+      builder: (context, child) {
+        if (!isObscured) return child ?? const SizedBox.shrink();
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Colors.white,
+                child: Center(
+                  child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+                ),
               ),
             ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

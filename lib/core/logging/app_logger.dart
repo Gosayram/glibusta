@@ -56,7 +56,7 @@ class AppLogger {
 
   final _RingBuffer<LogEntry> _ringBuffer;
   final _controller = StreamController<LogEntry>.broadcast();
-  final List<Function(LogEntry)> _listeners = [];
+  final List<void Function(LogEntry)> _listeners = [];
 
   Stream<LogEntry> get stream => _controller.stream;
   List<LogEntry> get entries => _ringBuffer.toList();
@@ -94,11 +94,11 @@ class AppLogger {
   void severe(String msg, {String? name, Object? error, StackTrace? st}) =>
       log('SEVERE', msg, loggerName: name, error: error, stackTrace: st);
 
-  void addListener(Function(LogEntry) listener) {
+  void addListener(void Function(LogEntry) listener) {
     _listeners.add(listener);
   }
 
-  void removeListener(Function(LogEntry) listener) {
+  void removeListener(void Function(LogEntry) listener) {
     _listeners.remove(listener);
   }
 
@@ -120,7 +120,7 @@ class AppLogger {
   }
 
   void dispose() {
-    _controller.close();
+    unawaited(_controller.close());
     _listeners.clear();
   }
 }

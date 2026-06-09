@@ -91,7 +91,7 @@ class BookImportService {
           );
 
       return ImportResult.success(book.title);
-    } catch (e) {
+    } on Object catch (e) {
       return ImportResult.failure('Ошибка при импорте: $e');
     }
   }

@@ -115,7 +115,7 @@ class CacheManager {
     final policy = CachePolicy.policies[type]!;
 
     if (_index.length > 200) {
-      _cleanupExpired();
+      unawaited(_cleanupExpired());
     }
 
     _index[key] = CachedEntry(

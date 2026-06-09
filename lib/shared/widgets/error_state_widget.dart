@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -57,7 +59,7 @@ class ErrorStateWidget extends StatelessWidget {
                 if (details != null)
                   OutlinedButton(
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: details!));
+                      unawaited(Clipboard.setData(ClipboardData(text: details!)));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Ошибка скопирована'),

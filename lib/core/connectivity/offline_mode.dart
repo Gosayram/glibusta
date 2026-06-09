@@ -9,14 +9,14 @@ enum ConnectivityState { online, offline, unknown }
 
 class OfflineModeService {
   OfflineModeService(this._logger) {
-    _init();
+    unawaited(_init());
   }
 
   final AppLogger _logger;
   final _controller = StreamController<ConnectivityState>.broadcast();
   ConnectivityState _state = ConnectivityState.unknown;
-  StreamSubscription? _subscription;
-  final List<Function(ConnectivityState)> _listeners = [];
+  StreamSubscription<List<ConnectivityResult>>? _subscription;
+  final List<void Function(ConnectivityState)> _listeners = [];
 
   ConnectivityState get state => _state;
   bool get isOnline => _state == ConnectivityState.online;
@@ -27,7 +27,7 @@ class OfflineModeService {
     try {
       final results = await Connectivity().checkConnectivity();
       _updateState(results);
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Connectivity check failed: $e', name: 'OfflineMode');
     }
 
@@ -53,11 +53,11 @@ class OfflineModeService {
     }
   }
 
-  void addListener(Function(ConnectivityState) listener) {
+  void addListener(void Function(ConnectivityState) listener) {
     _listeners.add(listener);
   }
 
-  void removeListener(Function(ConnectivityState) listener) {
+  void removeListener(void Function(ConnectivityState) listener) {
     _listeners.remove(listener);
   }
 
@@ -84,8 +84,8 @@ class OfflineModeService {
   }
 
   void dispose() {
-    _subscription?.cancel();
-    _controller.close();
+    unawaited(_subscription?.cancel());
+    unawaited(_controller.close());
     _listeners.clear();
   }
 }

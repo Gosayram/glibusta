@@ -80,17 +80,19 @@ class NotesScreen extends ConsumerWidget {
   }
 
   void _showNoteDialog(BuildContext context, WidgetRef ref, Note note) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Заметка'),
-        content: Text(note.content),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Закрыть'),
-          ),
-        ],
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Заметка'),
+          content: Text(note.content),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
       ),
     );
   }

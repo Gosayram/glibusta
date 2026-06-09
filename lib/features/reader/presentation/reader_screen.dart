@@ -26,15 +26,17 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   }
 
   void _loadFromPrefs() {
-    ReaderSettingsPersistence.load().then((settings) {
-      if (state == const ReaderSettings()) {
-        state = settings;
-      }
-    });
+    unawaited(
+      ReaderSettingsPersistence.load().then((settings) {
+        if (state == const ReaderSettings()) {
+          state = settings;
+        }
+      }),
+    );
   }
 
   void _persist() {
-    ReaderSettingsPersistence.save(state);
+    unawaited(ReaderSettingsPersistence.save(state));
   }
 
   void updateTheme(ReaderTheme theme) {
@@ -101,7 +103,6 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
   late final PageController _pageController;
-  int _currentPage = 0;
   int _currentChapterIndex = 0;
   NormalizedBook? _book;
   bool _isLoading = true;
@@ -113,7 +114,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
-    _loadBook();
+    unawaited(_loadBook());
     _progressTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveProgress());
   }
 
@@ -129,7 +130,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         _currentChapterIndex = savedChapter.clamp(0, book.chapters.length - 1);
       });
       _pageController = PageController(initialPage: _currentChapterIndex);
-    } catch (e) {
+    } on Object catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
@@ -145,7 +146,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         db.readingProgress,
       )..where((t) => t.bookId.equals(widget.bookId))).getSingleOrNull();
       return row?.currentPosition ?? 0;
-    } catch (_) {
+    } on Object catch (_) {
       return 0;
     }
   }
@@ -172,11 +173,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   void _saveProgress() {
     if (_book == null) return;
     final database = ref.read(databaseProvider);
-    database.upsertReadingProgress(
-      ReadingProgressCompanion.insert(
-        bookId: widget.bookId,
-        currentPosition: Value(_currentChapterIndex),
-        totalPages: Value(_book!.chapters.length),
+    unawaited(
+      database.upsertReadingProgress(
+        ReadingProgressCompanion.insert(
+          bookId: widget.bookId,
+          currentPosition: Value(_currentChapterIndex),
+          totalPages: Value(_book!.chapters.length),
+        ),
       ),
     );
   }
@@ -214,7 +217,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                       _isLoading = true;
                       _errorMessage = null;
                     });
-                    _loadBook();
+                    unawaited(_loadBook());
                   },
                   child: const Text('Повторить'),
                 ),
@@ -550,7 +553,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         onPageChanged: (int page) {
           setState(() {
             _currentChapterIndex = page;
-            _currentPage = page;
           });
           ref
               .read(readingProgressProvider.notifier)
@@ -634,9 +636,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     if (event is! KeyDownEvent) return false;
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
       if (_currentChapterIndex > 0) {
-        _pageController.previousPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+        unawaited(
+          _pageController.previousPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          ),
         );
       }
       return true;
@@ -644,9 +648,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
       final max = (_book?.chapters.length ?? 1) - 1;
       if (_currentChapterIndex < max) {
-        _pageController.nextPage(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+        unawaited(
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          ),
         );
       }
       return true;
@@ -683,16 +689,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             final max = (_book?.chapters.length ?? 1) - 1;
             if (x < width / 3) {
               if (_currentChapterIndex > 0) {
-                _pageController.previousPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
+                unawaited(
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
                 );
               }
             } else if (x > width * 2 / 3) {
               if (_currentChapterIndex < max) {
-                _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
+                unawaited(
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
                 );
               }
             } else {

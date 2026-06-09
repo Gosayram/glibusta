@@ -62,7 +62,7 @@ class _RetryInterceptor extends Interceptor {
     }
 
     final delay = Duration(seconds: 1 << retryCount);
-    await Future.delayed(delay);
+    await Future<void>.delayed(delay);
 
     final options = Options(
       method: err.requestOptions.method,
@@ -71,7 +71,7 @@ class _RetryInterceptor extends Interceptor {
     );
 
     try {
-      final response = await _dio.request(
+      final response = await _dio.request<dynamic>(
         err.requestOptions.path,
         data: err.requestOptions.data,
         queryParameters: err.requestOptions.queryParameters,

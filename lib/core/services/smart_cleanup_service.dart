@@ -67,7 +67,7 @@ class SmartCleanupService {
           }
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Temp cleanup failed: $e', name: 'Cleanup');
     }
     _logger.info('Cleaned $count temp files ($bytes bytes)', name: 'Cleanup');
@@ -92,7 +92,7 @@ class SmartCleanupService {
           }
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Cache cleanup failed: $e', name: 'Cleanup');
     }
     return count;
@@ -112,7 +112,7 @@ class SmartCleanupService {
           orphans.add(entity.path);
         }
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Orphan detection failed: $e', name: 'Cleanup');
     }
     return orphans;
@@ -144,7 +144,7 @@ class SmartCleanupService {
       }
 
       heavy.sort((a, b) => b.sizeBytes.compareTo(a.sizeBytes));
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Heavy book detection failed: $e', name: 'Cleanup');
     }
     return heavy.take(topN).toList();
@@ -173,7 +173,7 @@ class SmartCleanupService {
           }
         }
       }
-    } catch (_) {}
+    } on Object catch (_) {}
 
     _logger.info(
       'Cleanup complete: $tempCount temp, $cacheCount cache, ${orphans.length} orphans',

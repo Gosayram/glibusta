@@ -18,7 +18,7 @@ class ContentSafetyService {
       final prefs = await SharedPreferences.getInstance();
       final index = prefs.getInt(_key) ?? 0;
       return ContentSafetyLevel.values[index.clamp(0, ContentSafetyLevel.values.length - 1)];
-    } catch (_) {
+    } on Object catch (_) {
       return ContentSafetyLevel.standard;
     }
   }
@@ -27,7 +27,7 @@ class ContentSafetyService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_key, level.index);
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   static bool shouldFilter(ContentSafetyLevel level, List<String> tags) {

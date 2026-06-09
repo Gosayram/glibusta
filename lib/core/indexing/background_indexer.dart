@@ -73,7 +73,7 @@ class BackgroundIndexer {
           } else {
             _logger.warning('Book file missing: ${book.filePath}', name: 'Indexer');
           }
-        } catch (e) {
+        } on Object catch (e) {
           errors++;
           errorMessages.add('${book.id}: $e');
           _logger.warning('Index error for ${book.id}: $e', name: 'Indexer');
@@ -85,7 +85,7 @@ class BackgroundIndexer {
       }
 
       duplicates = await _findDuplicates();
-    } catch (e) {
+    } on Object catch (e) {
       _logger.severe('Full index failed: $e', name: 'Indexer');
       errors++;
       errorMessages.add('Full index: $e');
@@ -131,7 +131,7 @@ class BackgroundIndexer {
       if (book != null) {
         await _reindexBook(book);
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Failed to index book $bookId: $e', name: 'Indexer');
     }
   }
@@ -146,7 +146,7 @@ class BackgroundIndexer {
           _db.savedBooks,
         )..where((b) => b.id.equals(book.id))).write(SavedBooksCompanion(contentHash: Value(hash)));
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Reindex failed for ${book.id}: $e', name: 'Indexer');
     }
   }
@@ -183,7 +183,7 @@ class BackgroundIndexer {
           }
         }
       }
-    } catch (_) {}
+    } on Object catch (_) {}
     return totalSize;
   }
 
@@ -192,7 +192,7 @@ class BackgroundIndexer {
   }
 
   void dispose() {
-    _progressController.close();
+    unawaited(_progressController.close());
   }
 }
 

@@ -63,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
         final backupFile = File('${await _databasePath}.v${previousVersion ?? 0}.bak');
         await dbFile.copy(backupFile.path);
       }
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   static Future<String> get _databasePath async {

@@ -73,7 +73,7 @@ class RecoveryMode {
     // Check database
     try {
       await _db.customSelect('SELECT 1').get();
-    } catch (e) {
+    } on Object catch (e) {
       dbOk = false;
       lastError = 'Database error: $e';
       _logger.severe('DB check failed: $e', name: 'Recovery');
@@ -86,7 +86,7 @@ class RecoveryMode {
         storageOk = false;
         lastError = 'App directory missing';
       }
-    } catch (e) {
+    } on Object catch (e) {
       storageOk = false;
       lastError = 'Storage error: $e';
     }
@@ -99,7 +99,7 @@ class RecoveryMode {
         indexOk = false;
         lastError = 'Found ${corrupted.length} corrupted books';
       }
-    } catch (e) {
+    } on Object catch (e) {
       indexOk = false;
       lastError = 'Index check error: $e';
     }
@@ -107,7 +107,7 @@ class RecoveryMode {
     // Check orphan files
     try {
       orphanFiles.addAll(await _findOrphanFiles());
-    } catch (e) {
+    } on Object catch (e) {
       _logger.warning('Orphan check failed: $e', name: 'Recovery');
     }
 
@@ -155,7 +155,7 @@ class RecoveryMode {
       final books = await _db.select(_db.savedBooks).get();
       count = books.length;
       _logger.info('Index rebuilt: $count books', name: 'Recovery');
-    } catch (e) {
+    } on Object catch (e) {
       _logger.severe('Index rebuild failed: $e', name: 'Recovery');
     }
     return count;
@@ -166,7 +166,7 @@ class RecoveryMode {
     try {
       await _db.customStatement('VACUUM');
       _logger.info('Database repair complete', name: 'Recovery');
-    } catch (e) {
+    } on Object catch (e) {
       _logger.severe('DB repair failed: $e', name: 'Recovery');
     }
   }
@@ -186,7 +186,7 @@ class RecoveryMode {
           }
         }
       }
-    } catch (_) {}
+    } on Object catch (_) {}
     return orphans;
   }
 

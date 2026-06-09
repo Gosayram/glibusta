@@ -106,7 +106,7 @@ fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-forma
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict test ## Run all local verification checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

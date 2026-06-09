@@ -40,7 +40,7 @@ class UndoStack {
     try {
       await action.undo();
       return true;
-    } catch (e) {
+    } on Object catch (_) {
       return false;
     }
   }

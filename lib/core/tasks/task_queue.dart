@@ -190,34 +190,36 @@ class TaskQueue {
     task._status = TaskStatus.running;
     _controller.add(task);
 
-    task
-        .execute()
-        .then((_) {
-          task._status = TaskStatus.completed;
-          _runningCount--;
-          _controller.add(task);
-          _processNext();
-        })
-        .catchError((e, st) {
-          if (task.shouldRetry && task._retryCount < task.maxRetries) {
-            task._retryCount++;
-            task._status = TaskStatus.pending;
-            _runningCount--;
-            _pending.add(task);
-            _pending.sort((a, b) => _comparePriority(a.priority, b.priority));
-            _processNext();
-          } else {
-            task._status = TaskStatus.failed;
+    unawaited(
+      task
+          .execute()
+          .then((_) {
+            task._status = TaskStatus.completed;
             _runningCount--;
             _controller.add(task);
             _processNext();
-          }
-        });
+          })
+          .catchError((Object _, StackTrace _) {
+            if (task.shouldRetry && task._retryCount < task.maxRetries) {
+              task._retryCount++;
+              task._status = TaskStatus.pending;
+              _runningCount--;
+              _pending.add(task);
+              _pending.sort((a, b) => _comparePriority(a.priority, b.priority));
+              _processNext();
+            } else {
+              task._status = TaskStatus.failed;
+              _runningCount--;
+              _controller.add(task);
+              _processNext();
+            }
+          }),
+    );
   }
 
   void dispose() {
     cancelAll();
-    _controller.close();
+    unawaited(_controller.close());
   }
 
   static int _comparePriority(TaskPriority a, TaskPriority b) {

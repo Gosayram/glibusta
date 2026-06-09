@@ -88,7 +88,7 @@ class BookOpenService {
     try {
       final json = await cacheFile.readAsString();
       return NormalizedBook.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }

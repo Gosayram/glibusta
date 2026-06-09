@@ -91,11 +91,13 @@ class LibraryScreen extends ConsumerWidget {
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
     final service = ref.read(bookImportServiceProvider);
     for (final path in paths) {
-      service.importFile(path).then((result) {
-        if (result.isSuccess) {
-          ref.invalidate(libraryBooksProvider);
-        }
-      });
+      unawaited(
+        service.importFile(path).then((result) {
+          if (result.isSuccess) {
+            ref.invalidate(libraryBooksProvider);
+          }
+        }),
+      );
     }
   }
 

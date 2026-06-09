@@ -208,7 +208,7 @@ class DiagnosticsScreen extends ConsumerWidget {
       final allDownloads = await (db.select(db.downloads)).get();
       fb2Count = allDownloads.where((d) => d.format.toLowerCase() == 'fb2').length;
       epubCount = allDownloads.where((d) => d.format.toLowerCase() == 'epub').length;
-    } catch (e) {
+    } on Object catch (_) {
       dbOk = false;
     }
 
@@ -231,7 +231,7 @@ class DiagnosticsScreen extends ConsumerWidget {
           }
         }
       }
-    } catch (e) {
+    } on Object catch (_) {
       storageOk = false;
     }
 
@@ -242,7 +242,7 @@ class DiagnosticsScreen extends ConsumerWidget {
       final service = ref.read(offlineModeServiceProvider);
       connectivityOk = service.isOnline;
       connectivityType = service.state.name;
-    } catch (e) {
+    } on Object catch (_) {
       connectivityOk = false;
     }
 
@@ -258,14 +258,14 @@ class DiagnosticsScreen extends ConsumerWidget {
           .map((e) => '${e.time.hour}:${e.time.minute} - ${e.message}')
           .toList();
       recentErrors.addAll(errors);
-    } catch (_) {}
+    } on Object catch (_) {}
 
     // App version
     String appVersion = '0.1.0';
     try {
       final info = await PackageInfo.fromPlatform();
       appVersion = info.version;
-    } catch (_) {}
+    } on Object catch (_) {}
 
     return DiagnosticsInfo(
       appVersion: appVersion,
