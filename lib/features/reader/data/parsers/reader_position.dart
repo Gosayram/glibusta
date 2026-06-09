@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+@immutable
 class ReaderPosition {
   final String bookId;
   final int chapterIndex;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -85,7 +87,7 @@ class NotesScreen extends ConsumerWidget {
   void _deleteNote(WidgetRef ref, String id) {
     final database = ref.read(databaseProvider);
     final repository = NoteRepository(database);
-    repository.deleteNote(id);
+    unawaited(repository.deleteNote(id));
   }
 }
 

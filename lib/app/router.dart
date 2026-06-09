@@ -18,7 +18,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: <RouteBase>[
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
-          return ScaffoldWithNav(child: child);
+          return ShellWithNav(child: child);
         },
         routes: [
           GoRoute(

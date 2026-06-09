@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -67,7 +69,7 @@ class BookmarksScreen extends ConsumerWidget {
   void _deleteBookmark(WidgetRef ref, String id) {
     final database = ref.read(databaseProvider);
     final repository = BookmarkRepository(database);
-    repository.deleteBookmark(id);
+    unawaited(repository.deleteBookmark(id));
   }
 }
 

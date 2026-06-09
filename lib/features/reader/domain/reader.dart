@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 enum ReaderTheme { light, dark, sepia, oledBlack, paper }
 
-enum ReaderMode { paginated, continuous }
+enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
 
 enum ReaderFont {
   literata('Literata'),

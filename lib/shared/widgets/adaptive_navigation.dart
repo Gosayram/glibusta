@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/utils/app_breakpoints.dart';
+
 final showNavigationRailProvider = Provider<bool>((ref) => false);
 
 class AdaptiveNavigation extends ConsumerWidget {
@@ -60,30 +62,76 @@ class AdaptiveNavigation extends ConsumerWidget {
   }
 }
 
-class ScaffoldWithNav extends StatelessWidget {
+class MobileShell extends ConsumerWidget {
   final Widget child;
 
-  const ScaffoldWithNav({super.key, required this.child});
+  const MobileShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    final showRail = MediaQuery.sizeOf(context).width > 600;
-
-    if (showRail) {
-      return Scaffold(
-        body: Row(
-          children: [
-            const AdaptiveNavigation(),
-            const VerticalDivider(width: 1),
-            Expanded(child: child),
-          ],
-        ),
-      );
-    }
-
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: child,
       bottomNavigationBar: const AdaptiveNavigation(),
     );
+  }
+}
+
+class TabletShell extends ConsumerWidget {
+  final Widget child;
+
+  const TabletShell({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: Row(
+        children: [
+          const AdaptiveNavigation(),
+          const VerticalDivider(width: 1),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class DesktopShell extends ConsumerWidget {
+  final Widget child;
+
+  const DesktopShell({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: Row(
+        children: [
+          const AdaptiveNavigation(),
+          const VerticalDivider(width: 1),
+          Expanded(
+            flex: 3,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ShellWithNav extends StatelessWidget {
+  final Widget child;
+
+  const ShellWithNav({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+
+    if (width < AppBreakpoints.compact) {
+      return MobileShell(child: child);
+    } else if (width < AppBreakpoints.expanded) {
+      return TabletShell(child: child);
+    } else {
+      return DesktopShell(child: child);
+    }
   }
 }
