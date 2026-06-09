@@ -4,12 +4,23 @@ enum ReaderTheme { light, dark, sepia }
 
 enum ReaderMode { paginated, continuous }
 
+enum ReaderFont {
+  literata('Literata'),
+  merriweather('Merriweather'),
+  sourceSerif('Source Serif'),
+  robotoSerif('Roboto Serif');
+
+  const ReaderFont(this.displayName);
+  final String displayName;
+}
+
 class ReaderSettings {
   final ReaderTheme theme;
   final ReaderMode mode;
   final double fontSize;
   final double lineHeight;
   final double margin;
+  final ReaderFont font;
 
   const ReaderSettings({
     this.theme = ReaderTheme.light,
@@ -17,6 +28,7 @@ class ReaderSettings {
     this.fontSize = 16.0,
     this.lineHeight = 1.5,
     this.margin = 16.0,
+    this.font = ReaderFont.literata,
   });
 
   ReaderSettings copyWith({
@@ -25,6 +37,7 @@ class ReaderSettings {
     double? fontSize,
     double? lineHeight,
     double? margin,
+    ReaderFont? font,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -32,6 +45,7 @@ class ReaderSettings {
       fontSize: fontSize ?? this.fontSize,
       lineHeight: lineHeight ?? this.lineHeight,
       margin: margin ?? this.margin,
+      font: font ?? this.font,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -121,7 +122,7 @@ class BookDetailsScreen extends ConsumerWidget {
               ),
             ),
           ],
-        ),
+        ).animate().fadeIn(duration: 400.ms).slideX(begin: 0.1),
         const SizedBox(height: 24),
         if (details.availableFormats.isNotEmpty) ...[
           Text(
@@ -139,7 +140,7 @@ class BookDetailsScreen extends ConsumerWidget {
                 },
               );
             }).toList(),
-          ),
+          ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
           const SizedBox(height: 24),
         ],
         if (book.description != null || details.description != null) ...[
@@ -151,7 +152,7 @@ class BookDetailsScreen extends ConsumerWidget {
           Text(
             details.description ?? book.description ?? '',
             style: theme.textTheme.bodyMedium,
-          ),
+          ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
         ],
       ],
     );

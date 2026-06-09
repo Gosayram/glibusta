@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/widgets/reader_shortcuts.dart';
@@ -26,6 +27,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
 
   void updateMode(ReaderMode mode) {
     state = state.copyWith(mode: mode);
+  }
+
+  void updateFont(ReaderFont font) {
+    state = state.copyWith(font: font);
   }
 }
 
@@ -126,6 +131,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   }).toList();
                 },
               ),
+              PopupMenuButton<ReaderFont>(
+                icon: const Icon(Icons.font_download),
+                tooltip: 'Шрифт',
+                onSelected: (ReaderFont font) {
+                  ref.read(readerSettingsProvider.notifier).updateFont(font);
+                },
+                itemBuilder: (BuildContext context) {
+                  return ReaderFont.values.map<PopupMenuItem<ReaderFont>>((ReaderFont font) {
+                    return PopupMenuItem<ReaderFont>(
+                      value: font,
+                      child: Text(font.displayName),
+                    );
+                  }).toList();
+                },
+              ),
             ],
           ),
           body: PageView.builder(
@@ -188,18 +208,32 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     int index,
     ReaderSettings settings,
   ) {
+    final isDark = settings.theme == ReaderTheme.dark;
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(settings.margin),
       child: Text(
         'Страница ${index + 1}\n\n'
         'Загрузите книгу для чтения.\n\n'
-        'Здесь будет отображаться текст книги в формате ${settings.mode.name}.',
-        style: TextStyle(
-          fontSize: settings.fontSize,
-          height: settings.lineHeight,
-        ),
+        'Здесь будет отображаться текст книги в формате ${settings.mode.name}.\n\n'
+        'Шрифт: ${settings.font.displayName}',
+        style: _getReaderStyle(settings.font, isDark, settings.fontSize, settings.lineHeight),
       ),
     );
+  }
+
+  TextStyle _getReaderStyle(ReaderFont font, bool isDark, double fontSize, double lineHeight) {
+    final color = isDark ? Colors.white70 : Colors.black87;
+    switch (font) {
+      case ReaderFont.merriweather:
+        return GoogleFonts.merriweather(fontSize: fontSize, height: lineHeight, color: color);
+      case ReaderFont.sourceSerif:
+        return GoogleFonts.sourceSerif4(fontSize: fontSize, height: lineHeight, color: color);
+      case ReaderFont.robotoSerif:
+        return GoogleFonts.robotoSerif(fontSize: fontSize, height: lineHeight, color: color);
+      case ReaderFont.literata:
+        return GoogleFonts.literata(fontSize: fontSize, height: lineHeight, color: color);
+    }
   }
 
   void _cycleTheme(WidgetRef ref) {
