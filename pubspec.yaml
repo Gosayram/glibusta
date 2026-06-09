@@ -81,6 +81,7 @@ dependencies:
   sentry_flutter: ^9.0.0
 
   file: any
+  shared_preferences: ^2.5.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,21 +3,34 @@ import 'dart:typed_data';
 
 import 'package:xml/xml.dart';
 
+import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
 import 'normalized_book.dart';
 
 class Fb2Parser implements BookParser {
   @override
   Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
-    final document = XmlDocument.parse(String.fromCharCodes(bytes));
-    return _parseDocument(document);
+    try {
+      final document = XmlDocument.parse(String.fromCharCodes(bytes));
+      return _parseDocument(document);
+    } on XmlException catch (e) {
+      throw ParserFailure('Ошибка разбора FB2: ${e.message}');
+    } on FormatException catch (e) {
+      throw ParserFailure('Неверный формат FB2: ${e.message}');
+    } on Object catch (e) {
+      throw ParserFailure('Неожиданная ошибка при разборе FB2: $e');
+    }
   }
 
   @override
   Future<NormalizedBook> parseFile(String filePath) async {
-    final file = File(filePath);
-    final bytes = await file.readAsBytes();
-    return parse(bytes, fileName: filePath.split('/').last);
+    try {
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      return parse(bytes, fileName: filePath.split('/').last);
+    } on FileSystemException catch (e) {
+      throw ParserFailure('Не удалось прочитать файл FB2: ${e.message}');
+    }
   }
 
   NormalizedBook _parseDocument(XmlDocument document) {

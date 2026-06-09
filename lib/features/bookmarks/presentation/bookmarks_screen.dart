@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import '../data/bookmark_repository.dart';
 
 final bookmarksStreamProvider = StreamProvider.family<List<Bookmark>, String>((ref, bookId) {
@@ -61,7 +62,11 @@ class BookmarksScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Ошибка: $e')),
+        error: (e, _) => ErrorStateWidget(
+          message: 'Не удалось загрузить закладки',
+          details: e.toString(),
+          onRetry: () => ref.invalidate(bookmarksStreamProvider(bookId)),
+        ),
       ),
     );
   }

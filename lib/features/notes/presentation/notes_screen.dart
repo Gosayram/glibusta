@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import '../data/note_repository.dart';
 
 final notesStreamProvider = StreamProvider.family<List<Note>, String>((ref, bookId) {
@@ -63,7 +64,11 @@ class NotesScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Ошибка: $e')),
+        error: (e, _) => ErrorStateWidget(
+          message: 'Не удалось загрузить заметки',
+          details: e.toString(),
+          onRetry: () => ref.invalidate(notesStreamProvider(bookId)),
+        ),
       ),
     );
   }

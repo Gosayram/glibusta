@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import 'download_queue.dart';
 
 class DownloadsScreen extends ConsumerWidget {
@@ -59,7 +60,11 @@ class DownloadsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+        error: (Object e, _) => ErrorStateWidget(
+          message: 'Не удалось загрузить загрузки',
+          details: e.toString(),
+          onRetry: () => ref.invalidate(activeDownloadsProvider),
+        ),
       ),
     );
   }

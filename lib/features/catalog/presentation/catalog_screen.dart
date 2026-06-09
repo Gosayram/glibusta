@@ -6,6 +6,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import '../data/catalog_repository_impl.dart';
 
 part 'catalog_screen.g.dart';
@@ -45,7 +46,11 @@ class CatalogScreen extends ConsumerWidget {
             ),
             error: (Object e, _) => SizedBox(
               height: 100,
-              child: Center(child: Text('Ошибка: $e')),
+              child: ErrorStateWidget(
+                message: 'Не удалось загрузить категории',
+                details: e.toString(),
+                onRetry: () => ref.invalidate(categoriesProvider),
+              ),
             ),
           ),
           const Divider(),
@@ -57,7 +62,11 @@ class CatalogScreen extends ConsumerWidget {
             ),
             error: (Object e, _) => SizedBox(
               height: 200,
-              child: Center(child: Text('Ошибка: $e')),
+              child: ErrorStateWidget(
+                message: 'Не удалось загрузить популярные книги',
+                details: e.toString(),
+                onRetry: () => ref.invalidate(popularBooksProvider),
+              ),
             ),
           ),
         ],

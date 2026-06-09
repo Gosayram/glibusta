@@ -10,6 +10,7 @@ import '../../../core/database/tables.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import '../data/book_repository_impl.dart';
 
 part 'library_screen.g.dart';
@@ -37,7 +38,11 @@ class LibraryScreen extends ConsumerWidget {
         child: booksAsync.when(
           data: (List<Book> books) => _buildBooksGrid(context, ref, books),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+          error: (Object e, _) => ErrorStateWidget(
+            message: 'Не удалось загрузить библиотеку',
+            details: e.toString(),
+            onRetry: () => ref.invalidate(libraryBooksProvider),
+          ),
         ),
       ),
     );

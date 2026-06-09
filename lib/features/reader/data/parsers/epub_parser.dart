@@ -4,21 +4,32 @@ import 'dart:typed_data';
 import 'package:epubx/epubx.dart';
 import 'package:html/parser.dart' as html_parser;
 
+import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
 import 'normalized_book.dart';
 
 class EpubParser implements BookParser {
   @override
   Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
-    final epubBook = await EpubReader.readBook(bytes);
-    return _convertToNormalized(epubBook);
+    try {
+      final epubBook = await EpubReader.readBook(bytes);
+      return _convertToNormalized(epubBook);
+    } on FormatException catch (e) {
+      throw ParserFailure('Неверный формат EPUB: ${e.message}');
+    } on Object catch (e) {
+      throw ParserFailure('Неожиданная ошибка при разборе EPUB: $e');
+    }
   }
 
   @override
   Future<NormalizedBook> parseFile(String filePath) async {
-    final file = File(filePath);
-    final bytes = await file.readAsBytes();
-    return parse(bytes, fileName: filePath.split('/').last);
+    try {
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      return parse(bytes, fileName: filePath.split('/').last);
+    } on FileSystemException catch (e) {
+      throw ParserFailure('Не удалось прочитать файл EPUB: ${e.message}');
+    }
   }
 
   NormalizedBook _convertToNormalized(EpubBook epubBook) {

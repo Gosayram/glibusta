@@ -1,12 +1,18 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/database/app_database.dart';
+import '../../../core/database/tables.dart' hide ReadingProgress;
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
+import '../data/book_open_service.dart';
+import '../data/parsers/normalized_book.dart';
+import '../data/reader_settings_persistence.dart';
 import '../domain/reader.dart';
 
 part 'reader_screen.g.dart';
@@ -15,35 +21,55 @@ part 'reader_screen.g.dart';
 class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   @override
   ReaderSettings build() {
+    _loadFromPrefs();
     return const ReaderSettings();
+  }
+
+  void _loadFromPrefs() {
+    ReaderSettingsPersistence.load().then((settings) {
+      if (state == const ReaderSettings()) {
+        state = settings;
+      }
+    });
+  }
+
+  void _persist() {
+    ReaderSettingsPersistence.save(state);
   }
 
   void updateTheme(ReaderTheme theme) {
     state = state.copyWith(theme: theme);
+    _persist();
   }
 
   void updateFontSize(double fontSize) {
     state = state.copyWith(fontSize: fontSize);
+    _persist();
   }
 
   void updateMode(ReaderMode mode) {
     state = state.copyWith(mode: mode);
+    _persist();
   }
 
   void updateFont(ReaderFont font) {
     state = state.copyWith(font: font);
+    _persist();
   }
 
   void updateParagraphSpacing(double spacing) {
     state = state.copyWith(paragraphSpacing: spacing);
+    _persist();
   }
 
   void updateLetterSpacing(double spacing) {
     state = state.copyWith(letterSpacing: spacing);
+    _persist();
   }
 
   void updateTextAlign(ReaderTextAlign align) {
     state = state.copyWith(textAlign: align);
+    _persist();
   }
 }
 
@@ -68,26 +94,115 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> {
+class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
   late final PageController _pageController;
   int _currentPage = 0;
+  int _currentChapterIndex = 0;
+  NormalizedBook? _book;
+  bool _isLoading = true;
+  String? _errorMessage;
+  Timer? _progressTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pageController = PageController();
+    _loadBook();
+    _progressTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveProgress());
+  }
+
+  Future<void> _loadBook() async {
+    try {
+      final service = ref.read(bookOpenServiceProvider);
+      final book = await service.openBookWithCache(widget.bookId);
+      if (!mounted) return;
+      setState(() {
+        _book = book;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
+    }
   }
 
   @override
   void dispose() {
+    _saveProgress();
+    _progressTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _saveProgress();
+    }
+  }
+
+  void _saveProgress() {
+    if (_book == null) return;
+    final database = ref.read(databaseProvider);
+    database.upsertReadingProgress(
+      ReadingProgressCompanion.insert(
+        bookId: widget.bookId,
+        currentPosition: Value(_currentChapterIndex),
+        totalPages: Value(_book!.chapters.length),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final theme = _getThemeData(settings.theme);
+
+    if (_isLoading) {
+      return Theme(
+        data: theme,
+        child: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Theme(
+        data: theme,
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Читалка')),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(_errorMessage!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _errorMessage = null;
+                    });
+                    _loadBook();
+                  },
+                  child: const Text('Повторить'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Theme(
       data: theme,
@@ -383,11 +498,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Widget get _buildReaderBottomNav {
+    final chapterTitle = _book != null && _book!.chapters.isNotEmpty
+        ? _book!.chapters[_currentChapterIndex].title
+        : '';
     return BottomAppBar(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text('Стр. ${_currentPage + 1}'),
+          Expanded(
+            child: Text(
+              'Гл. ${_currentChapterIndex + 1}${chapterTitle.isNotEmpty ? ': $chapterTitle' : ''}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           Row(
             children: [
               IconButton(
@@ -434,7 +557,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     int index,
     ReaderSettings settings,
   ) {
-    final isDark = settings.theme == ReaderTheme.dark || settings.theme == ReaderTheme.oledBlack;
+    if (_book == null || _book!.chapters.isEmpty) {
+      return const Center(child: Text('Нет содержимого'));
+    }
+
+    final chapter = _book!.chapters[_currentChapterIndex];
     final textAlign = switch (settings.textAlign) {
       ReaderTextAlign.left => TextAlign.left,
       ReaderTextAlign.justify => TextAlign.justify,
@@ -444,15 +571,116 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(settings.margin),
-      child: Text(
-        'Страница ${index + 1}\n\n'
-        'Загрузите книгу для чтения.\n\n'
-        'Здесь будет отображаться текст книги в формате ${settings.mode.name}.\n\n'
-        'Шрифт: ${settings.font.displayName}',
-        style: _getReaderStyle(settings),
-        textAlign: textAlign,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (chapter.title.isNotEmpty)
+            Padding(
+              padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
+              child: Text(
+                chapter.title,
+                style: _getReaderStyle(settings).copyWith(
+                  fontSize: settings.fontSize * 1.4,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: textAlign,
+              ),
+            ),
+          ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+          if (_currentChapterIndex < _book!.chapters.length - 1)
+            Padding(
+              padding: EdgeInsets.only(top: settings.paragraphSpacing * 3),
+              child: Center(
+                child: FilledButton.tonal(
+                  onPressed: () {
+                    setState(() {
+                      _currentChapterIndex++;
+                      _currentPage = 0;
+                    });
+                    _pageController.jumpToPage(0);
+                  },
+                  child: Text('Следующая глава: ${_book!.chapters[_currentChapterIndex].title}'),
+                ),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  Widget _buildBlock(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
+    switch (block.type) {
+      case BlockType.heading:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing * 2,
+            bottom: settings.paragraphSpacing,
+          ),
+          child: Text(
+            block.text,
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 1.2,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.quote:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: _getReaderStyle(settings).color!.withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: Text(
+            block.text,
+            style: _getReaderStyle(settings).copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.separator:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          child: Center(child: Text('* * *', style: _getReaderStyle(settings))),
+        );
+      case BlockType.image:
+        if (block.imageUrl != null) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+            child: Center(
+              child: Icon(Icons.image, size: 64, color: _getReaderStyle(settings).color),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      case BlockType.footnote:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
+          child: Text(
+            block.text,
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 0.85,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.paragraph:
+        return Padding(
+          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+          child: Text(
+            block.text,
+            style: _getReaderStyle(settings),
+            textAlign: textAlign,
+          ),
+        );
+    }
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
