@@ -1,14 +1,14 @@
 import 'dart:typed_data';
 
-enum ReaderTheme { light, dark, sepia, oledBlack, paper }
+enum ReaderTheme { light, paper, sepia, dark, oled, bedtime }
 
 enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
 
 enum ReaderFont {
+  sourceSerif('Source Serif 4'),
   literata('Literata'),
-  merriweather('Merriweather'),
-  sourceSerif('Source Serif'),
-  robotoSerif('Roboto Serif');
+  robotoSerif('Roboto Serif'),
+  inter('Inter');
 
   const ReaderFont(this.displayName);
   final String displayName;
@@ -36,12 +36,12 @@ class ReaderSettings {
   final ReaderTextAlign textAlign;
 
   const ReaderSettings({
-    this.theme = ReaderTheme.light,
-    this.mode = ReaderMode.paginated,
-    this.fontSize = 16.0,
-    this.lineHeight = 1.5,
+    this.theme = ReaderTheme.dark,
+    this.mode = ReaderMode.continuous,
+    this.fontSize = 18.0,
+    this.lineHeight = 1.55,
     this.margin = 16.0,
-    this.font = ReaderFont.literata,
+    this.font = ReaderFont.sourceSerif,
     this.paragraphSpacing = 8.0,
     this.letterSpacing = 0.0,
     this.textAlign = ReaderTextAlign.justify,
@@ -99,17 +99,17 @@ class ReadingProfile {
       name: 'Комфортный',
       settings: ReaderSettings(
         fontSize: 20.0,
-        lineHeight: 1.8,
+        lineHeight: 1.7,
         margin: 24.0,
         paragraphSpacing: 12.0,
-        font: ReaderFont.merriweather,
+        font: ReaderFont.literata,
         theme: ReaderTheme.sepia,
       ),
     ),
     ReadingProfile(
       name: 'Компактный',
       settings: ReaderSettings(
-        fontSize: 13.0,
+        fontSize: 14.0,
         lineHeight: 1.3,
         margin: 8.0,
         paragraphSpacing: 4.0,
@@ -119,11 +119,8 @@ class ReadingProfile {
     ReadingProfile(
       name: 'Ночной',
       settings: ReaderSettings(
-        fontSize: 18.0,
-        lineHeight: 1.6,
         margin: 20.0,
         paragraphSpacing: 10.0,
-        theme: ReaderTheme.oledBlack,
       ),
     ),
   ];
