@@ -33,14 +33,40 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
     },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(savedBooks, savedBooks.contentHash);
+        await m.addColumn(savedBooks, savedBooks.fileSize);
+      }
+    },
+    beforeOpen: (details) async {
+      if (details.hadUpgrade) {
+        await _backupDatabase(details.versionBefore);
+      }
+    },
   );
+
+  Future<void> _backupDatabase(int? previousVersion) async {
+    try {
+      final dbFile = File(await _databasePath);
+      if (await dbFile.exists()) {
+        final backupFile = File('${await _databasePath}.v${previousVersion ?? 0}.bak');
+        await dbFile.copy(backupFile.path);
+      }
+    } catch (_) {}
+  }
+
+  static Future<String> get _databasePath async {
+    final dbFolder = await getApplicationDocumentsDirectory();
+    return p.join(dbFolder.path, 'glibusta', 'glibusta.db');
+  }
 
   // --- SavedBooks ---
   Future<List<SavedBook>> getAllBooks() async {

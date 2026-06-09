@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
@@ -42,7 +43,21 @@ class CatalogScreen extends ConsumerWidget {
             data: (List<String> categories) => _buildCategories(context, categories),
             loading: () => const SizedBox(
               height: 100,
-              child: Center(child: CircularProgressIndicator()),
+              child: Skeletonizer(
+                enabled: true,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: 5,
+                  itemBuilder: (_, __) => const Card(
+                    margin: EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                      width: 100,
+                      child: Center(child: Bone.text(words: 1)),
+                    ),
+                  ),
+                ),
+              ),
             ),
             error: (Object e, _) => SizedBox(
               height: 100,
@@ -179,7 +194,7 @@ class CatalogScreen extends ConsumerWidget {
                     return GridView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 220,
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,

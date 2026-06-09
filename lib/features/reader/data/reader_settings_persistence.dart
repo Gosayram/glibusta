@@ -43,16 +43,19 @@ class ReaderSettingsPersistence {
 
   static Future<void> save(ReaderSettings settings) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode({
-      'theme': settings.theme.name,
-      'mode': settings.mode.name,
-      'fontSize': settings.fontSize,
-      'lineHeight': settings.lineHeight,
-      'margin': settings.margin,
-      'font': settings.font.name,
-      'paragraphSpacing': settings.paragraphSpacing,
-      'letterSpacing': settings.letterSpacing,
-      'textAlign': settings.textAlign.name,
-    }));
+    await prefs.setString(
+      _key,
+      jsonEncode({
+        'theme': settings.theme.name,
+        'mode': settings.mode.name,
+        'fontSize': settings.fontSize,
+        'lineHeight': settings.lineHeight,
+        'margin': settings.margin,
+        'font': settings.font.name,
+        'paragraphSpacing': settings.paragraphSpacing,
+        'letterSpacing': settings.letterSpacing,
+        'textAlign': settings.textAlign.name,
+      }),
+    );
   }
 }

@@ -57,9 +57,9 @@ class BookOpenService {
   }
 
   Future<Download?> _findDownload(String bookId) async {
-    final rows = await (_database.select(_database.downloads)
-          ..where((d) => d.bookId.equals(bookId)))
-        .get();
+    final rows = await (_database.select(
+      _database.downloads,
+    )..where((d) => d.bookId.equals(bookId))).get();
     for (final row in rows) {
       if (row.status == DownloadStatusDb.completed) {
         return row;

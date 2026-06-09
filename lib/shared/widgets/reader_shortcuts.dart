@@ -40,17 +40,17 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
   void initState() {
     super.initState();
     _shortcuts = {
-      SingleActivator(LogicalKeyboardKey.arrowRight): NextPageIntent(),
-      SingleActivator(LogicalKeyboardKey.arrowLeft): PreviousPageIntent(),
-      SingleActivator(LogicalKeyboardKey.space): NextPageIntent(),
-      SingleActivator(LogicalKeyboardKey.add): IncreaseFontSizeIntent(),
-      SingleActivator(LogicalKeyboardKey.equal): IncreaseFontSizeIntent(),
-      SingleActivator(LogicalKeyboardKey.minus): DecreaseFontSizeIntent(),
-      SingleActivator(LogicalKeyboardKey.keyF, meta: true): SearchIntent(),
-      SingleActivator(LogicalKeyboardKey.keyB, meta: true): BookmarksIntent(),
-      SingleActivator(LogicalKeyboardKey.keyL, meta: true): LibraryIntent(),
-      SingleActivator(LogicalKeyboardKey.comma, meta: true): SettingsIntent(),
-      SingleActivator(LogicalKeyboardKey.escape): ClosePanelIntent(),
+      const SingleActivator(LogicalKeyboardKey.arrowRight): const NextPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft): const PreviousPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.space): const NextPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.add): const IncreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.equal): const IncreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.minus): const DecreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyF, meta: true): const SearchIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BookmarksIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const LibraryIntent(),
+      const SingleActivator(LogicalKeyboardKey.comma, meta: true): const SettingsIntent(),
+      const SingleActivator(LogicalKeyboardKey.escape): const ClosePanelIntent(),
     };
   }
 

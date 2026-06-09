@@ -56,7 +56,10 @@ class ErrorStateWidget extends StatelessWidget {
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: details!));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Ошибка скопирована'), duration: Duration(seconds: 2)),
+                        const SnackBar(
+                          content: Text('Ошибка скопирована'),
+                          duration: Duration(seconds: 2),
+                        ),
                       );
                     },
                     child: const Text('Скопировать ошибку'),

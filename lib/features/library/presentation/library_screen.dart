@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
@@ -11,6 +13,7 @@ import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 
 part 'library_screen.g.dart';
@@ -32,12 +35,38 @@ class LibraryScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Библиотека'),
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Импортировать книгу',
+            onPressed: () => _importBook(context, ref),
+          ),
+        ],
       ),
       body: BookDropZone(
         onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
         child: booksAsync.when(
           data: (List<Book> books) => _buildBooksGrid(context, ref, books),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => Skeletonizer(
+            enabled: true,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: 6,
+              itemBuilder: (_, __) => const Card(
+                child: ListTile(
+                  leading: Bone.circle(size: 48),
+                  title: Bone.text(words: 3),
+                  subtitle: Bone.text(words: 2),
+                ),
+              ),
+            ),
+          ),
           error: (Object e, _) => ErrorStateWidget(
             message: 'Не удалось загрузить библиотеку',
             details: e.toString(),
@@ -49,15 +78,43 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
-    // TODO: Implement actual book import logic
+    final service = ref.read(bookImportServiceProvider);
     for (final path in paths) {
-      // Check file extension and import book
-      if (path.toLowerCase().endsWith('.fb2') ||
-          path.toLowerCase().endsWith('.epub') ||
-          path.toLowerCase().endsWith('.txt')) {
-        // Import book via download service or parser
+      service.importFile(path).then((result) {
+        if (result.isSuccess) {
+          ref.invalidate(libraryBooksProvider);
+        }
+      });
+    }
+  }
+
+  Future<void> _importBook(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['fb2', 'epub'],
+      allowMultiple: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+
+    final service = ref.read(bookImportServiceProvider);
+    for (final file in result.files) {
+      if (file.path != null) {
+        final importResult = await service.importFile(file.path!);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(importResult.isSuccess
+                  ? 'Импортировано: ${importResult.title}'
+                  : importResult.isDuplicate
+                      ? 'Дубликат: ${importResult.title}'
+                      : 'Ошибка: ${importResult.error}'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       }
     }
+    ref.invalidate(libraryBooksProvider);
   }
 
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
@@ -83,7 +140,26 @@ class LibraryScreen extends ConsumerWidget {
       future: _getBookStatusData(ref, books),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return Skeletonizer(
+            enabled: true,
+            child: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: 6,
+              itemBuilder: (_, __) => const Card(
+                child: ListTile(
+                  leading: Bone.circle(size: 48),
+                  title: Bone.text(words: 3),
+                  subtitle: Bone.text(words: 2),
+                ),
+              ),
+            ),
+          );
         }
         final progressMap = snapshot.data!['progress'] as Map<String, double>;
         final downloadedMap = snapshot.data!['downloaded'] as Map<String, bool>;
@@ -118,9 +194,9 @@ class LibraryScreen extends ConsumerWidget {
 
     if (bookIds.isNotEmpty) {
       // Get reading progress for all books
-      final progressRows = await (database.select(database.readingProgress)
-              ..where((t) => t.bookId.isIn(bookIds)))
-          .get();
+      final progressRows = await (database.select(
+        database.readingProgress,
+      )..where((t) => t.bookId.isIn(bookIds))).get();
       for (final row in progressRows) {
         if (row.totalPages > 0) {
           progressMap[row.bookId] = row.currentPosition / row.totalPages;
@@ -130,9 +206,9 @@ class LibraryScreen extends ConsumerWidget {
       }
 
       // Get download status for all books
-      final downloadRows = await (database.select(database.downloads)
-              ..where((t) => t.bookId.isIn(bookIds)))
-          .get();
+      final downloadRows = await (database.select(
+        database.downloads,
+      )..where((t) => t.bookId.isIn(bookIds))).get();
       for (final row in downloadRows) {
         // Consider a book downloaded if status is completed
         downloadedMap[row.bookId] = row.status == DownloadStatusDb.completed;
@@ -320,11 +396,11 @@ class LibraryBookTile extends ConsumerWidget {
       case 'read':
         unawaited(context.push('/reader/${book.id}'));
       case 'download':
-        // TODO: Implement download
+      // TODO: Implement download
       case 'bookmark':
-        // TODO: Implement bookmark
+      // TODO: Implement bookmark
       case 'delete':
-        // TODO: Implement delete
+      // TODO: Implement delete
     }
   }
 }

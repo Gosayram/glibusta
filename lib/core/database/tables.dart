@@ -11,6 +11,8 @@ class SavedBooks extends Table {
   TextColumn get sourceId => text().nullable()();
   TextColumn get sourceUrl => text().nullable()();
   DateTimeColumn get addedAt => dateTime().clientDefault(DateTime.now)();
+  TextColumn get contentHash => text().nullable()();
+  IntColumn get fileSize => integer().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

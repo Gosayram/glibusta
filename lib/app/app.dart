@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/platform/lifecycle_service.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -13,17 +14,28 @@ class GlibustaApp extends ConsumerStatefulWidget {
 }
 
 class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingObserver {
+  late final LifecycleObserver _lifecycleObserver;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initWindowManager();
+    _initLifecycle();
+  }
+
+  void _initLifecycle() {
+    final service = ref.read(lifecycleServiceProvider);
+    _lifecycleObserver = LifecycleObserver(service);
+    service.setCallback(LifecycleEvent.pause, () {
+      ref.read(lifecycleServiceProvider);
+    });
   }
 
   Future<void> _initWindowManager() async {
     await windowManager.ensureInitialized();
 
-    WindowOptions windowOptions = const WindowOptions(
+    final WindowOptions windowOptions = const WindowOptions(
       size: Size(1200, 800),
       minimumSize: Size(900, 620),
       center: true,
@@ -44,21 +56,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.hidden:
-        _saveState();
-        break;
-      case AppLifecycleState.resumed:
-      case AppLifecycleState.inactive:
-        break;
-    }
-  }
-
-  void _saveState() {
-    // Persist reading progress, download states, etc.
-    // Handled by Drift auto-persistence in repositories
+    _lifecycleObserver.didChangeAppLifecycleState(state);
   }
 
   @override

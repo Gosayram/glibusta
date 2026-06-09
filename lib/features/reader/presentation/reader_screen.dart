@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../../core/database/tables.dart' hide ReadingProgress;
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../data/book_open_service.dart';
@@ -255,13 +254,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       appBar: settings.mode == ReaderMode.fullscreen
           ? null
           : (settings.mode == ReaderMode.focus
-              ? _buildFocusAppBar(context, settings)
-              : AppBar(
-                  title: Text('Читалка — ${widget.bookId}'),
-                  actions: _buildReaderActions(context, settings),
-                )),
+                ? _buildFocusAppBar(context, settings)
+                : AppBar(
+                    title: Text('Читалка — ${widget.bookId}'),
+                    actions: _buildReaderActions(context, settings),
+                  )),
       body: _buildReaderBody(context, settings),
-      bottomNavigationBar: settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
+      bottomNavigationBar:
+          settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
           ? null
           : _buildReaderBottomNav,
     );
@@ -275,17 +275,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       appBar: settings.mode == ReaderMode.fullscreen
           ? null
           : (settings.mode == ReaderMode.focus
-              ? _buildFocusAppBar(context, settings)
-              : AppBar(
-                  title: Text('Читалка — ${widget.bookId}'),
-                  actions: _buildReaderActions(context, settings),
-                )),
+                ? _buildFocusAppBar(context, settings)
+                : AppBar(
+                    title: Text('Читалка — ${widget.bookId}'),
+                    actions: _buildReaderActions(context, settings),
+                  )),
       body: Container(
         width: double.infinity,
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding.clamp(0.0, double.infinity)),
         child: _buildReaderBody(context, settings),
       ),
-      bottomNavigationBar: settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
+      bottomNavigationBar:
+          settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
           ? null
           : _buildReaderBottomNav,
     );
@@ -300,11 +301,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       appBar: settings.mode == ReaderMode.fullscreen
           ? null
           : (settings.mode == ReaderMode.focus
-              ? _buildFocusAppBar(context, settings)
-              : AppBar(
-                  title: Text('Читалка — ${widget.bookId}'),
-                  actions: _buildReaderActions(context, settings),
-                )),
+                ? _buildFocusAppBar(context, settings)
+                : AppBar(
+                    title: Text('Читалка — ${widget.bookId}'),
+                    actions: _buildReaderActions(context, settings),
+                  )),
       body: settings.mode == ReaderMode.fullscreen
           ? _buildFullscreenReaderLayout(context, settings)
           : Row(
@@ -313,7 +314,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   width: sidePanelWidth,
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   child: const Center(
-                    child: Text('Боковая панель\n(Главы/Закладки/Записки)', textAlign: TextAlign.center),
+                    child: Text(
+                      'Боковая панель\n(Главы/Закладки/Записки)',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
                 const VerticalDivider(width: 1),
@@ -321,7 +325,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   flex: 3,
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding.clamp(0.0, double.infinity)),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding.clamp(0.0, double.infinity),
+                    ),
                     child: settings.mode == ReaderMode.twoPage
                         ? _buildTwoPageReaderLayout(context, settings)
                         : _buildReaderBody(context, settings),
@@ -329,7 +335,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 ),
               ],
             ),
-      bottomNavigationBar: settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
+      bottomNavigationBar:
+          settings.mode == ReaderMode.fullscreen || settings.mode == ReaderMode.focus
           ? null
           : _buildReaderBottomNav,
     );
@@ -378,7 +385,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       },
       itemBuilder: (BuildContext context) {
         return [
-          12.0, 14.0, 16.0, 18.0, 20.0, 24.0, 28.0, 32.0,
+          12.0,
+          14.0,
+          16.0,
+          18.0,
+          20.0,
+          24.0,
+          28.0,
+          32.0,
         ].map<PopupMenuItem<double>>((double s) {
           return PopupMenuItem<double>(
             value: s,
@@ -474,15 +488,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     return SafeArea(
       top: settings.mode != ReaderMode.fullscreen,
       bottom: settings.mode != ReaderMode.fullscreen,
-      left: true,
-      right: true,
       child: PageView.builder(
         controller: _pageController,
         onPageChanged: (int page) {
           setState(() {
             _currentPage = page;
           });
-          ref.read(readingProgressProvider.notifier).updateProgress(
+          ref
+              .read(readingProgressProvider.notifier)
+              .updateProgress(
                 ReadingProgress(
                   bookId: widget.bookId,
                   currentPosition: page,

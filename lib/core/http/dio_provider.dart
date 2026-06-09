@@ -49,7 +49,7 @@ class _RetryInterceptor extends Interceptor {
   _RetryInterceptor({required this.maxRetries, required Dio dio}) : _dio = dio;
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     if (_shouldNotRetry(err)) {
       handler.next(err);
       return;
@@ -74,8 +74,8 @@ class _RetryInterceptor extends Interceptor {
       final response = await _dio.request(
         err.requestOptions.path,
         data: err.requestOptions.data,
-      queryParameters: err.requestOptions.queryParameters,
-      options: options,
+        queryParameters: err.requestOptions.queryParameters,
+        options: options,
       );
       handler.resolve(response);
     } on DioException catch (e) {
