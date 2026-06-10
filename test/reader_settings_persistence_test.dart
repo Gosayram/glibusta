@@ -19,7 +19,7 @@ void main() {
         expect(settings.fontSize, 18.0);
         expect(settings.lineHeight, 1.55);
         expect(settings.margin, 20.0);
-        expect(settings.font, ReaderFont.sourceSerif);
+        expect(settings.font, ReaderFont.literata);
         expect(settings.paragraphSpacing, 8.0);
         expect(settings.letterSpacing, 0.0);
         expect(settings.textAlign, ReaderTextAlign.left);
@@ -100,7 +100,7 @@ void main() {
         );
 
         final settings = await ReaderSettingsPersistence.load();
-        expect(settings.font, ReaderFont.sourceSerif); // fallback
+        expect(settings.font, ReaderFont.literata); // fallback
       });
     });
 
@@ -139,7 +139,7 @@ void main() {
           fontSize: 16.0,
           lineHeight: 1.3,
           margin: 8.0,
-          font: ReaderFont.robotoSerif,
+          font: ReaderFont.literata,
           paragraphSpacing: 4.0,
           letterSpacing: -0.3,
           textAlign: ReaderTextAlign.center,
@@ -156,7 +156,7 @@ void main() {
         expect(loaded.fontSize, 16.0);
         expect(loaded.lineHeight, 1.3);
         expect(loaded.margin, 8.0);
-        expect(loaded.font, ReaderFont.robotoSerif);
+        expect(loaded.font, ReaderFont.literata);
         expect(loaded.paragraphSpacing, 4.0);
         expect(loaded.letterSpacing, -0.3);
         expect(loaded.textAlign, ReaderTextAlign.center);

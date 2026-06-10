@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +24,9 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/library',
     onException: (context, state, router) {
-      debugPrint('Router exception at ${state.uri.path}: ${state.error}');
+      if (kDebugMode) {
+        debugPrint('Router exception at ${state.uri.path}: ${state.error}');
+      }
       if (state.uri.path != '/error') {
         final message = state.error?.toString() ?? 'Unknown router error';
         router.go('/error?message=${Uri.encodeComponent(message)}');

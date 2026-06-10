@@ -284,17 +284,12 @@ class ReaderContentBody extends StatelessWidget {
     final colors = ReaderColors.forTheme(settings.theme);
     final String fontFamily;
     switch (settings.font) {
-      case ReaderFont.sourceSerif:
-        fontFamily = 'SourceSerif4';
-        break;
-      case ReaderFont.literata:
-        fontFamily = 'Literata';
-        break;
-      case ReaderFont.robotoSerif:
-        fontFamily = 'RobotoSerif';
-        break;
       case ReaderFont.inter:
         fontFamily = 'Inter';
+        break;
+      case ReaderFont.literata:
+      default:
+        fontFamily = 'Literata';
         break;
     }
     return TextStyle(
@@ -547,17 +542,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final colors = ReaderColors.forTheme(settings.theme);
     final String fontFamily;
     switch (settings.font) {
-      case ReaderFont.sourceSerif:
-        fontFamily = 'SourceSerif4';
-        break;
-      case ReaderFont.literata:
-        fontFamily = 'Literata';
-        break;
-      case ReaderFont.robotoSerif:
-        fontFamily = 'RobotoSerif';
-        break;
       case ReaderFont.inter:
         fontFamily = 'Inter';
+        break;
+      case ReaderFont.literata:
+      default:
+        fontFamily = 'Literata';
         break;
     }
     return TextStyle(

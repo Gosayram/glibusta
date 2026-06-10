@@ -106,21 +106,9 @@ flutter:
         - asset: assets/fonts/InterVariable.ttf
         - asset: assets/fonts/InterVariable-Italic.ttf
           style: italic
-    - family: SourceSerif4
-      fonts:
-        - asset: assets/fonts/SourceSerif4-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/SourceSerif4-Bold.ttf
-          weight: 700
     - family: Literata
       fonts:
         - asset: assets/fonts/Literata-Regular.ttf
           weight: 400
         - asset: assets/fonts/Literata-Bold.ttf
-          weight: 700
-    - family: RobotoSerif
-      fonts:
-        - asset: assets/fonts/RobotoSerif-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/RobotoSerif-Bold.ttf
           weight: 700

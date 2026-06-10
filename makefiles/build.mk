@@ -12,12 +12,14 @@ ANDROID_AAB_SOURCE ?= $(BUILD_DIR)/app/outputs/bundle/release/app-release.aab
 MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 
 ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-release-signed.apk
+ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
 ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-release-signed.aab
 MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos-release.zip
 
 MACOS_CODESIGN_IDENTITY ?= -
 
 FLUTTER_BUILD_APK := $(FLUTTER) build apk --release
+FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi
 FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release
 
@@ -48,6 +50,17 @@ build-android-apk: require-flutter android-available sign-android prepare-artifa
 	cp "$(ANDROID_APK_SOURCE)" "$(ANDROID_APK_ARTIFACT)"
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
+.PHONY: build-android-apk-split
+build-android-apk-split: require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
+	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
+	$(FLUTTER_BUILD_APK_SPLIT)
+	@for abi in arm64-v8a armeabi-v7a x86_64 universal; do \
+		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
+		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-$$abi-release-signed.apk"; \
+		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
+	done
+	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
+
 .PHONY: build-android-aab
 build-android-aab: require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
 	@$(PRINT_STEP) "Building signed Android App Bundle $(APP_ARTIFACT_VERSION)"
@@ -57,7 +70,7 @@ build-android-aab: require-flutter android-available sign-android prepare-artifa
 	@$(PRINT_OK) "AAB: $(ANDROID_AAB_ARTIFACT)"
 
 .PHONY: build-android
-build-android: build-android-apk build-android-aab ## Build all signed Android artifacts
+build-android: build-android-apk build-android-apk-split build-android-aab ## Build all signed Android artifacts
 	@$(PRINT_OK) "Android artifacts completed"
 
 .PHONY: sign-macos
@@ -80,6 +93,11 @@ build-macos: require-flutter macos-available prepare-artifacts ## Build signed m
 .PHONY: build-all
 build-all: build-android build-macos ## Build signed release artifacts for all available platforms
 	@$(PRINT_OK) "Release artifacts are in $(DIST_DIR)"
+
+.PHONY: release
+release: check test build-all artifacts ## Full release pipeline: lint + test + build all artifacts
+	@$(PRINT_HEADER) "Release $(APP_ARTIFACT_VERSION) ready"
+	@$(PRINT_OK) "Artifacts in $(DIST_DIR)"
 
 .PHONY: artifacts
 artifacts: ## List generated release artifacts

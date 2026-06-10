@@ -19,9 +19,7 @@ enum AutoThemeMode {
 }
 
 enum ReaderFont {
-  sourceSerif('Source Serif 4'),
   literata('Literata'),
-  robotoSerif('Roboto Serif'),
   inter('Inter');
 
   const ReaderFont(this.displayName);
@@ -60,7 +58,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(18.0) double fontSize,
     @Default(1.55) double lineHeight,
     @Default(20.0) double margin,
-    @Default(ReaderFont.sourceSerif) ReaderFont font,
+    @Default(ReaderFont.literata) ReaderFont font,
     @Default(8.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
     @Default(ReaderTextAlign.left) ReaderTextAlign textAlign,

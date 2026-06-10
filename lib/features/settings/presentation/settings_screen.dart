@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -206,7 +207,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final backupService = BackupService(db: db, appVersion: '0.1.0+1');
       final json = await backupService.exportData();
       // TODO: Use file picker or share to save the JSON
-      debugPrint('Exported data: ${json.length} bytes');
+      if (kDebugMode) {
+        debugPrint('Exported data: ${json.length} bytes');
+      }
 
       if (!context.mounted) return;
 

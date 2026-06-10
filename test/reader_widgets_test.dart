@@ -65,7 +65,7 @@ void main() {
       expect(find.text('Aa'), findsNWidgets(7));
     });
 
-    testWidgets('renders all 4 font chips', (tester) async {
+    testWidgets('renders all 2 font chips', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
@@ -73,9 +73,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Source Serif 4'), findsOneWidget);
       expect(find.text('Literata'), findsOneWidget);
-      expect(find.text('Roboto Serif'), findsOneWidget);
       expect(find.text('Inter'), findsOneWidget);
     });
 

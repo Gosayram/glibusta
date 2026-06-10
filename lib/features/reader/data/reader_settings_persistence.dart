@@ -27,7 +27,7 @@ class ReaderSettingsPersistence {
         margin: (map['margin'] as num?)?.toDouble() ?? 16.0,
         font: ReaderFont.values.firstWhere(
           (e) => e.name == map['font'],
-          orElse: () => ReaderFont.sourceSerif,
+          orElse: () => ReaderFont.literata,
         ),
         paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 8.0,
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,

@@ -115,12 +115,8 @@ class AppTypography {
 
   static String _mapReaderFont(String fontFamily) {
     switch (fontFamily) {
-      case 'Merriweather':
-      case 'Source Serif 4':
-      case 'Source Serif':
-        return 'SourceSerif4';
-      case 'Roboto Serif':
-        return 'RobotoSerif';
+      case 'Inter':
+        return 'Inter';
       case 'Literata':
       default:
         return 'Literata';
@@ -129,8 +125,6 @@ class AppTypography {
 
   static const List<String> availableReaderFonts = [
     'Literata',
-    'Source Serif 4',
-    'Roboto Serif',
     'Inter',
   ];
 }
