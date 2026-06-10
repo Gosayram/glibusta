@@ -279,6 +279,23 @@ class ReaderController {
     }
   }
 
+  void handleDoubleTap() {
+    final settings = _ref.read(readerSettingsProvider);
+    switch (settings.doubleTapAction) {
+      case DoubleTapAction.toggleUI:
+        toggleUi();
+        break;
+      case DoubleTapAction.addBookmark:
+        // TODO: Add bookmark
+        break;
+      case DoubleTapAction.toggleFullscreen:
+        // Toggle fullscreen mode would require app-level handling
+        break;
+      case DoubleTapAction.disabled:
+        break;
+    }
+  }
+
   void jumpToProgress(double progress) {
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;

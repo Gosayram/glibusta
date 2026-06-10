@@ -28,6 +28,8 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
   late final ReaderController _ctrl;
+  double _dragStartBrightness = 0.0;
+  double _dragStartY = 0.0;
 
   @override
   void initState() {
@@ -36,6 +38,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ReaderController(widget.bookId, ref);
     unawaited(_ctrl.loadBook());
+  }
+
+  void _handleVerticalDragStart(DragStartDetails details) {
+    final settings = ref.read(readerSettingsProvider);
+    if (!settings.verticalSwipeBrightness) return;
+    _dragStartBrightness = settings.brightness;
+    _dragStartY = details.globalPosition.dy;
+  }
+
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    final settings = ref.read(readerSettingsProvider);
+    if (!settings.verticalSwipeBrightness) return;
+    final deltaY = details.globalPosition.dy - _dragStartY;
+    final brightnessChange = -deltaY / 500.0;
+    final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
+    ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    // Nothing needed
   }
 
   @override
@@ -153,11 +175,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       body: Stack(
         children: [
           if (readerState.book != null)
-            ReaderContentBody(
-              book: readerState.book!,
-              settings: settings,
-              scrollController: _ctrl.scrollController,
-              onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+            GestureDetector(
+              onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
+              onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
+              onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
+              onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+              behavior: HitTestBehavior.translucent,
+              child: ReaderContentBody(
+                book: readerState.book!,
+                settings: settings,
+                scrollController: _ctrl.scrollController,
+                onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+              ),
             ),
           _buildWarmthOverlay(settings),
           _buildBrightnessOverlay(settings),
@@ -220,11 +249,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: readerState.book != null
-                ? ReaderContentBody(
-                    book: readerState.book!,
-                    settings: settings,
-                    scrollController: _ctrl.scrollController,
-                    onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                ? GestureDetector(
+                    onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
+                    onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
+                    onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
+                    onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+                    behavior: HitTestBehavior.translucent,
+                    child: ReaderContentBody(
+                      book: readerState.book!,
+                      settings: settings,
+                      scrollController: _ctrl.scrollController,
+                      onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                    ),
                   )
                 : const SizedBox.shrink(),
           ),
@@ -304,13 +340,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   ),
                   child: readerState.book != null
                       ? SelectionAreaWrapper(
-                          child: ReaderContentBody(
-                            book: readerState.book!,
-                            settings: settings,
-                            scrollController: _ctrl.scrollController,
-                            onTap: (details) => _ctrl.handleTap(
-                              details,
-                              MediaQuery.sizeOf(context).width,
+                          child: GestureDetector(
+                            onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
+                            onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
+                            onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
+                            onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+                            behavior: HitTestBehavior.translucent,
+                            child: ReaderContentBody(
+                              book: readerState.book!,
+                              settings: settings,
+                              scrollController: _ctrl.scrollController,
+                              onTap: (details) => _ctrl.handleTap(
+                                details,
+                                MediaQuery.sizeOf(context).width,
+                              ),
                             ),
                           ),
                         )

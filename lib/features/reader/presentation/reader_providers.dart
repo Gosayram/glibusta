@@ -134,6 +134,36 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
+  void updatePageTurnAnimation(PageTurnAnimation animation) {
+    state = state.copyWith(pageTurnAnimation: animation);
+    _persist();
+  }
+
+  void updateTextDirection(TextDirection direction) {
+    state = state.copyWith(textDirection: direction);
+    _persist();
+  }
+
+  void updateReaderWidth(double width) {
+    state = state.copyWith(readerWidth: width);
+    _persist();
+  }
+
+  void updateVerticalSwipeBrightness(bool enabled) {
+    state = state.copyWith(verticalSwipeBrightness: enabled);
+    _persist();
+  }
+
+  void updateDoubleTapAction(DoubleTapAction action) {
+    state = state.copyWith(doubleTapAction: action);
+    _persist();
+  }
+
+  void updateLongPressAction(LongPressAction action) {
+    state = state.copyWith(longPressAction: action);
+    _persist();
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
     _persist();

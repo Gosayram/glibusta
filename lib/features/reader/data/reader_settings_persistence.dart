@@ -59,6 +59,24 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['tapZoneLayout'],
           orElse: () => TapZoneLayout.third,
         ),
+        pageTurnAnimation: PageTurnAnimation.values.firstWhere(
+          (e) => e.name == map['pageTurnAnimation'],
+          orElse: () => PageTurnAnimation.slide,
+        ),
+        textDirection: TextDirection.values.firstWhere(
+          (e) => e.name == map['textDirection'],
+          orElse: () => TextDirection.auto,
+        ),
+        readerWidth: (map['readerWidth'] as num?)?.toDouble() ?? 820.0,
+        verticalSwipeBrightness: map['verticalSwipeBrightness'] as bool? ?? true,
+        doubleTapAction: DoubleTapAction.values.firstWhere(
+          (e) => e.name == map['doubleTapAction'],
+          orElse: () => DoubleTapAction.toggleUI,
+        ),
+        longPressAction: LongPressAction.values.firstWhere(
+          (e) => e.name == map['longPressAction'],
+          orElse: () => LongPressAction.selectText,
+        ),
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -91,6 +109,12 @@ class ReaderSettingsPersistence {
         'paragraphFirstLineIndent': settings.paragraphFirstLineIndent,
         'hyphenation': settings.hyphenation,
         'tapZoneLayout': settings.tapZoneLayout.name,
+        'pageTurnAnimation': settings.pageTurnAnimation.name,
+        'textDirection': settings.textDirection.name,
+        'readerWidth': settings.readerWidth,
+        'verticalSwipeBrightness': settings.verticalSwipeBrightness,
+        'doubleTapAction': settings.doubleTapAction.name,
+        'longPressAction': settings.longPressAction.name,
       }),
     );
   }

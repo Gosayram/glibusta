@@ -40,6 +40,14 @@ enum BottomBarContent { percent, page, chapter, time, none }
 
 enum TapZoneLayout { third, quarter, edge }
 
+enum PageTurnAnimation { none, slide, fade, curl }
+
+enum TextDirection { ltr, rtl, auto }
+
+enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, disabled }
+
+enum LongPressAction { selectText, addBookmark, openMenu, disabled }
+
 class ReaderSettings {
   final ReaderTheme theme;
   final ReaderMode mode;
@@ -62,6 +70,12 @@ class ReaderSettings {
   final double paragraphFirstLineIndent;
   final bool hyphenation;
   final TapZoneLayout tapZoneLayout;
+  final PageTurnAnimation pageTurnAnimation;
+  final TextDirection textDirection;
+  final double readerWidth;
+  final bool verticalSwipeBrightness;
+  final DoubleTapAction doubleTapAction;
+  final LongPressAction longPressAction;
 
   const ReaderSettings({
     this.theme = ReaderTheme.dark,
@@ -85,6 +99,12 @@ class ReaderSettings {
     this.paragraphFirstLineIndent = 0.0,
     this.hyphenation = true,
     this.tapZoneLayout = TapZoneLayout.third,
+    this.pageTurnAnimation = PageTurnAnimation.slide,
+    this.textDirection = TextDirection.auto,
+    this.readerWidth = 820.0,
+    this.verticalSwipeBrightness = true,
+    this.doubleTapAction = DoubleTapAction.toggleUI,
+    this.longPressAction = LongPressAction.selectText,
   });
 
   ReaderSettings copyWith({
@@ -109,6 +129,12 @@ class ReaderSettings {
     double? paragraphFirstLineIndent,
     bool? hyphenation,
     TapZoneLayout? tapZoneLayout,
+    PageTurnAnimation? pageTurnAnimation,
+    TextDirection? textDirection,
+    double? readerWidth,
+    bool? verticalSwipeBrightness,
+    DoubleTapAction? doubleTapAction,
+    LongPressAction? longPressAction,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -132,6 +158,12 @@ class ReaderSettings {
       paragraphFirstLineIndent: paragraphFirstLineIndent ?? this.paragraphFirstLineIndent,
       hyphenation: hyphenation ?? this.hyphenation,
       tapZoneLayout: tapZoneLayout ?? this.tapZoneLayout,
+      pageTurnAnimation: pageTurnAnimation ?? this.pageTurnAnimation,
+      textDirection: textDirection ?? this.textDirection,
+      readerWidth: readerWidth ?? this.readerWidth,
+      verticalSwipeBrightness: verticalSwipeBrightness ?? this.verticalSwipeBrightness,
+      doubleTapAction: doubleTapAction ?? this.doubleTapAction,
+      longPressAction: longPressAction ?? this.longPressAction,
     );
   }
 }

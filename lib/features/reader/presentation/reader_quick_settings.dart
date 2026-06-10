@@ -119,6 +119,39 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
               const Text('Зоны касания', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               _buildTapZoneRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Анимация страниц', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildPageTurnAnimationRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Направление текста', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildTextDirectionRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Ширина читателя', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildReaderWidthRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              _buildToggleRow(
+                'Вертикальный свайп для яркости',
+                Icons.swipe_up,
+                settings.verticalSwipeBrightness,
+                (v) => notifier.updateVerticalSwipeBrightness(v),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Двойной тап', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildDoubleTapActionRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Долгое нажатие', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildLongPressActionRow(settings, notifier),
               const SizedBox(height: 16),
             ],
           ),
@@ -475,6 +508,125 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
           label: Text(labels[v]!),
           selected: settings.tapZoneLayout == v,
           onSelected: (_) => notifier.updateTapZoneLayout(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildPageTurnAnimationRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      PageTurnAnimation.none: 'Нет',
+      PageTurnAnimation.slide: 'Слайд',
+      PageTurnAnimation.fade: 'Затухание',
+      PageTurnAnimation.curl: 'Свертывание',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: PageTurnAnimation.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.pageTurnAnimation == v,
+          onSelected: (_) => notifier.updatePageTurnAnimation(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildTextDirectionRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      TextDirection.ltr: 'LTR',
+      TextDirection.rtl: 'RTL',
+      TextDirection.auto: 'Авто',
+    };
+    return Wrap(
+      spacing: 8,
+      children: TextDirection.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.textDirection == v,
+          onSelected: (_) => notifier.updateTextDirection(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildReaderWidthRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Row(
+      children: [
+        const Icon(Icons.drag_handle, size: 20),
+        Expanded(
+          child: Slider(
+            value: settings.readerWidth,
+            min: 600,
+            max: 1000,
+            divisions: 20,
+            label: '${settings.readerWidth.round()}px',
+            onChanged: (v) => notifier.updateReaderWidth(v),
+          ),
+        ),
+        SizedBox(
+          width: 50,
+          child: Text(
+            '${settings.readerWidth.round()}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildDoubleTapActionRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      DoubleTapAction.toggleUI: 'Скрыть/показать UI',
+      DoubleTapAction.addBookmark: 'Добавить закладку',
+      DoubleTapAction.toggleFullscreen: 'Полноэкранный режим',
+      DoubleTapAction.disabled: 'Выкл',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: DoubleTapAction.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.doubleTapAction == v,
+          onSelected: (_) => notifier.updateDoubleTapAction(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildLongPressActionRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      LongPressAction.selectText: 'Выделить текст',
+      LongPressAction.addBookmark: 'Добавить закладку',
+      LongPressAction.openMenu: 'Открыть меню',
+      LongPressAction.disabled: 'Выкл',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: LongPressAction.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.longPressAction == v,
+          onSelected: (_) => notifier.updateLongPressAction(v),
         );
       }).toList(),
     );

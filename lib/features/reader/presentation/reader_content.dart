@@ -241,7 +241,7 @@ class _PaginatedContentBody extends StatefulWidget {
 
 class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
-  static const double _pageScrollFraction = 0.85;
+  int _currentPage = 0;
 
   @override
   void initState() {
@@ -255,77 +255,132 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     super.dispose();
   }
 
+  Widget _buildPage(int index) {
+    return SafeArea(
+      key: ValueKey(index),
+      top: false,
+      bottom: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(widget.settings.margin),
+        child: _buildChapterContent(index),
+      ),
+    );
+  }
+
+  Widget _buildTwoPage(int index) {
+    final leftIndex = index * 2;
+    final rightIndex = index * 2 + 1;
+    return Row(
+      children: [
+        Expanded(
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(widget.settings.margin),
+              child: _buildChapterContent(leftIndex),
+            ),
+          ),
+        ),
+        Container(
+          width: 1,
+          color: ReaderColors.forTheme(widget.settings.theme)
+              .text
+              .withValues(alpha: 0.1),
+        ),
+        Expanded(
+          child: rightIndex < widget.book.chapters.length
+              ? SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(widget.settings.margin),
+                    child: _buildChapterContent(rightIndex),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
     final screenWidth = MediaQuery.sizeOf(context).width;
     final useTwoPageLayout = isTwoPage && screenWidth > 600;
+    final pageCount = useTwoPageLayout
+        ? ((widget.book.chapters.length + 1) ~/ 2)
+        : widget.book.chapters.length;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTapUp: widget.onTap,
-      child: PageView.builder(
-        controller: _pageController,
-        physics: const BouncingScrollPhysics(),
-        itemCount: useTwoPageLayout
-            ? ((widget.book.chapters.length + 1) ~/ 2)
-            : widget.book.chapters.length,
-        itemBuilder: (context, index) {
-          if (useTwoPageLayout) {
-            final leftIndex = index * 2;
-            final rightIndex = index * 2 + 1;
-            return Row(
-              children: [
-                Expanded(
-                  child: SafeArea(
-                    top: false,
-                    bottom: false,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(widget.settings.margin),
-                      child: _buildChapterContent(leftIndex),
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  color: ReaderColors.forTheme(widget.settings.theme)
-                      .text
-                      .withValues(alpha: 0.1),
-                ),
-                Expanded(
-                  child: rightIndex < widget.book.chapters.length
-                      ? SafeArea(
-                          top: false,
-                          bottom: false,
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.all(widget.settings.margin),
-                            child: _buildChapterContent(rightIndex),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            );
-          }
+    switch (widget.settings.pageTurnAnimation) {
+      case PageTurnAnimation.none:
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTap,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: pageCount,
+            itemBuilder: (context, index) {
+              return useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index);
+            },
+          ),
+        );
 
-          return AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            switchInCurve: Curves.easeInOut,
-            switchOutCurve: Curves.easeInOut,
-            child: SafeArea(
-              key: ValueKey(index),
-              top: false,
-              bottom: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(widget.settings.margin),
-                child: _buildChapterContent(index),
-              ),
-            ),
-          );
-        },
-      ),
-    );
+      case PageTurnAnimation.fade:
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTap,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            itemCount: pageCount,
+            itemBuilder: (context, index) {
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index),
+              );
+            },
+          ),
+        );
+
+      case PageTurnAnimation.curl:
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTap,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            itemCount: pageCount,
+            itemBuilder: (context, index) {
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                switchInCurve: Curves.easeInOut,
+                switchOutCurve: Curves.easeInOut,
+                child: useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index),
+              );
+            },
+          ),
+        );
+
+      case PageTurnAnimation.slide:
+      default:
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTap,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: const BouncingScrollPhysics(),
+            itemCount: pageCount,
+            itemBuilder: (context, index) {
+              return useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index);
+            },
+          ),
+        );
+    }
   }
+}
 
   Widget _buildChapterContent(int chapterIndex) {
     final book = widget.book;
