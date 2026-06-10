@@ -31,20 +31,24 @@ class HttpClient {
 
   Dio get dio => _dio;
 
-  Future<String> get(String url) async {
+  Future<String> get(String url, {CancelToken? cancelToken}) async {
     try {
-      final response = await _dio.get<String>(url);
+      final response = await _dio.get<String>(url, cancelToken: cancelToken);
       return response.data ?? '';
     } on DioException catch (e) {
-      throw HttpException(
-        message: e.message ?? 'Request failed',
-        statusCode: e.response?.statusCode,
-        url: url,
-      );
+      throw _dioExceptionToHttpException(e, url);
     }
   }
 
-  Future<String> getWithMirror(String path) async {
+  HttpException _dioExceptionToHttpException(DioException e, String url) {
+    return HttpException(
+      message: e.message ?? 'Request failed',
+      statusCode: e.response?.statusCode,
+      url: url,
+    );
+  }
+
+  Future<String> getWithMirror(String path, {CancelToken? cancelToken}) async {
     final settings = _dio.options;
     final baseUrl = settings.baseUrl;
     final urls = [baseUrl].map((base) => '$base${path.startsWith('/') ? path : '/$path'}').toList();
@@ -52,9 +56,10 @@ class HttpClient {
     HttpException? lastError;
     for (final url in urls) {
       try {
-        return await get(url);
-      } on HttpException catch (e) {
-        lastError = e;
+        return await get(url, cancelToken: cancelToken);
+      } on DioException catch (e) {
+        if (e.type == DioExceptionType.cancel) rethrow;
+        lastError = _dioExceptionToHttpException(e, url);
         continue;
       }
     }

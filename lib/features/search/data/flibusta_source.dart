@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:html/dom.dart' show Document, Element;
 import 'package:html/parser.dart' show parse;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -23,9 +24,9 @@ class FlibustaHtmlSource extends BookSource {
   FlibustaHtmlSource(this.client) : sourceId = Uri.parse(client.dio.options.baseUrl).host;
 
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     final searchUrl = _buildSearchUrl(query);
-    final html = await client.getWithMirror(searchUrl);
+    final html = await client.getWithMirror(searchUrl, cancelToken: cancelToken);
     return _parseSearchResults(html, query);
   }
 

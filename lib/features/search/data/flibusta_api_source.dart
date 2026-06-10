@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../shared/models/book.dart';
@@ -20,7 +21,7 @@ class FlibustaApiSource extends BookSource {
   FlibustaApiSource(this._client);
 
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     if (query.hasFilters) {
       return SearchResultPage(
         books: const [],
@@ -35,6 +36,7 @@ class FlibustaApiSource extends BookSource {
       final result = await _client.searchBooksByNameOpds(
         query.query,
         page: query.page,
+        cancelToken: cancelToken,
       );
 
       final books = result.books

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/utils/app_breakpoints.dart';
 import 'package:glibusta/core/utils/platform_detector.dart';
@@ -53,7 +54,9 @@ void main() {
     );
     addTearDown(router.dispose);
 
-    return MaterialApp.router(routerConfig: router);
+    return ProviderScope(
+      child: MaterialApp.router(routerConfig: router),
+    );
   }
 
   group('AdaptiveNavigation', () {

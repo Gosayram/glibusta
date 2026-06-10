@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:async/async.dart';
+import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -14,11 +14,14 @@ part 'search_controller.g.dart';
 
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
-  CancelableOperation<SearchResultPage>? _currentSearch;
+  CancelToken? _currentToken;
 
   @override
   SearchState build() {
-    ref.onDispose(() => unawaited(_currentSearch?.cancel()));
+    ref.onDispose(() {
+      _currentToken?.cancel();
+      _currentToken = null;
+    });
     return const SearchState();
   }
 
@@ -31,7 +34,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       return;
     }
 
-    unawaited(_currentSearch?.cancel());
+    _currentToken?.cancel();
+    _currentToken = CancelToken();
     state = state.copyWith(
       isLoading: true,
       lastQuery: normalized,
@@ -42,10 +46,9 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       query: normalized,
       filters: state.filters,
     );
-    _currentSearch = CancelableOperation.fromFuture(_source.searchBooks(searchQuery));
 
     try {
-      final result = await _currentSearch!.value;
+      final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
       if (!ref.mounted) return;
       unawaited(_rememberSearch(normalized));
       state = state.copyWith(
@@ -71,10 +74,11 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       page: state.currentPage + 1,
       filters: state.filters,
     );
-    _currentSearch = CancelableOperation.fromFuture(_source.searchBooks(searchQuery));
+    _currentToken?.cancel();
+    _currentToken = CancelToken();
 
     try {
-      final result = await _currentSearch!.value;
+      final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
       if (!ref.mounted) return;
       state = state.copyWith(
         books: [...state.books, ...result.books],
@@ -148,7 +152,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
   }
 
   void clearResults() {
-    unawaited(_currentSearch?.cancel());
+    _currentToken?.cancel();
+    _currentToken = null;
     state = state.copyWith(
       books: const [],
       isLoading: false,

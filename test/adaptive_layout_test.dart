@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/widgets/adaptive_navigation.dart';
@@ -56,7 +57,9 @@ void main() {
       ],
     );
     addTearDown(router.dispose);
-    return MaterialApp.router(routerConfig: router);
+    return ProviderScope(
+      child: MaterialApp.router(routerConfig: router),
+    );
   }
 
   // ─── Small Android (360x640) ──────────────────────────
@@ -186,7 +189,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Book 0'));
@@ -232,7 +239,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(TabletShell), findsOneWidget);
@@ -350,7 +361,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(TabletShell), findsOneWidget);
@@ -375,7 +390,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(MobileShell), findsOneWidget);
@@ -400,7 +419,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(TabletShell), findsOneWidget);
@@ -425,7 +448,11 @@ void main() {
       );
       addTearDown(router.dispose);
 
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.byType(DesktopShell), findsOneWidget);

@@ -1,9 +1,11 @@
+import 'package:dio/dio.dart';
+
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 
 abstract class BookSource {
-  Future<SearchResultPage> searchBooks(SearchQuery query);
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken});
 
   Future<BookDetails> getBookDetails(String bookId);
 
@@ -14,7 +16,7 @@ abstract class BookSource {
 
 class MockBookSource implements BookSource {
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     return SearchResultPage(
       books: const [],
       totalCount: 0,

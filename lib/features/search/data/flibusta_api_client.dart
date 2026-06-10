@@ -32,10 +32,11 @@ class FlibustaApiClient {
     String name, {
     int page = 0,
     int limit = 20,
+    CancelToken? cancelToken,
   }) async {
     final url =
         'opds/opensearch?searchTerm=${Uri.encodeComponent(name)}&searchType=books&pageNumber=$page';
-    final response = await _dio.get<String>(url);
+    final response = await _dio.get<String>(url, cancelToken: cancelToken);
     return _parseOpdsSearchResponse(response.data ?? '');
   }
 

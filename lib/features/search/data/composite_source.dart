@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/failures.dart';
@@ -25,11 +26,11 @@ class CompositeBookSource extends BookSource {
   CompositeBookSource(this.sources);
 
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     final errors = <AppFailure>[];
     for (final source in sources) {
       try {
-        final result = await source.searchBooks(query);
+        final result = await source.searchBooks(query, cancelToken: cancelToken);
         if (result.books.isNotEmpty) return result;
       } on AppFailure catch (e) {
         errors.add(e);
