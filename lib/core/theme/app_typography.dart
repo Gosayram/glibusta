@@ -51,7 +51,7 @@ class AppTypography {
   }
 
   static TextStyle titleSmall({required bool isDark}) {
-    return _inter(isDark: isDark, fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1);
+    return _inter(isDark: isDark, fontWeight: FontWeight.w500, letterSpacing: 0.1);
   }
 
   static TextStyle bodyLarge({required bool isDark}) {
@@ -59,7 +59,7 @@ class AppTypography {
   }
 
   static TextStyle bodyMedium({required bool isDark}) {
-    return _inter(isDark: isDark, fontSize: 14, letterSpacing: 0.25);
+    return _inter(isDark: isDark, letterSpacing: 0.25);
   }
 
   static TextStyle bodySmall({required bool isDark}) {

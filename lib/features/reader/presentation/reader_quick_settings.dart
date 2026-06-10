@@ -380,7 +380,6 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
           child: Slider(
             value: settings.brightness,
             min: 0.2,
-            max: 1.0,
             divisions: 8,
             label: '${(settings.brightness * 100).round()}%',
             onChanged: (v) => notifier.updateBrightness(v),
@@ -401,8 +400,6 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
         Expanded(
           child: Slider(
             value: settings.warmth,
-            min: 0.0,
-            max: 1.0,
             divisions: 10,
             label: '${(settings.warmth * 100).round()}%',
             onChanged: (v) => notifier.updateWarmth(v),
@@ -541,13 +538,13 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     ReaderSettingsNotifier notifier,
   ) {
     const labels = {
-      TextDirection.ltr: 'LTR',
-      TextDirection.rtl: 'RTL',
-      TextDirection.auto: 'Авто',
+      ReaderTextDirection.ltr: 'LTR',
+      ReaderTextDirection.rtl: 'RTL',
+      ReaderTextDirection.auto: 'Авто',
     };
     return Wrap(
       spacing: 8,
-      children: TextDirection.values.map((v) {
+      children: ReaderTextDirection.values.map((v) {
         return ChoiceChip(
           label: Text(labels[v]!),
           selected: settings.textDirection == v,

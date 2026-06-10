@@ -93,7 +93,10 @@ class ReadingHeatmap extends StatelessWidget {
         const SizedBox(height: 8),
         Row(
           children: [
-            Text('Меньше', style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+            Text(
+              'Меньше',
+              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(width: 4),
             for (int i = 0; i <= 4; i++)
               Container(
@@ -106,7 +109,10 @@ class ReadingHeatmap extends StatelessWidget {
                 ),
               ),
             const SizedBox(width: 4),
-            Text('Больше', style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant)),
+            Text(
+              'Больше',
+              style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       ],
@@ -133,7 +139,20 @@ class ReadingHeatmap extends StatelessWidget {
   }
 
   String _monthLabel(DateTime date) {
-    const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    const months = [
+      'Янв',
+      'Фев',
+      'Мар',
+      'Апр',
+      'Май',
+      'Июн',
+      'Июл',
+      'Авг',
+      'Сен',
+      'Окт',
+      'Ноя',
+      'Дек',
+    ];
     return months[date.month - 1];
   }
 

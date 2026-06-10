@@ -63,9 +63,9 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['pageTurnAnimation'],
           orElse: () => PageTurnAnimation.slide,
         ),
-        textDirection: TextDirection.values.firstWhere(
+        textDirection: ReaderTextDirection.values.firstWhere(
           (e) => e.name == map['textDirection'],
-          orElse: () => TextDirection.auto,
+          orElse: () => ReaderTextDirection.auto,
         ),
         readerWidth: (map['readerWidth'] as num?)?.toDouble() ?? 820.0,
         verticalSwipeBrightness: map['verticalSwipeBrightness'] as bool? ?? true,

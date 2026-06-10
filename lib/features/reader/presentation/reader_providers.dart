@@ -139,7 +139,7 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
-  void updateTextDirection(TextDirection direction) {
+  void updateTextDirection(ReaderTextDirection direction) {
     state = state.copyWith(textDirection: direction);
     _persist();
   }

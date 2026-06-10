@@ -42,7 +42,7 @@ enum TapZoneLayout { third, quarter, edge }
 
 enum PageTurnAnimation { none, slide, fade, curl }
 
-enum TextDirection { ltr, rtl, auto }
+enum ReaderTextDirection { ltr, rtl, auto }
 
 enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, disabled }
 
@@ -71,7 +71,7 @@ class ReaderSettings {
   final bool hyphenation;
   final TapZoneLayout tapZoneLayout;
   final PageTurnAnimation pageTurnAnimation;
-  final TextDirection textDirection;
+  final ReaderTextDirection textDirection;
   final double readerWidth;
   final bool verticalSwipeBrightness;
   final DoubleTapAction doubleTapAction;
@@ -100,7 +100,7 @@ class ReaderSettings {
     this.hyphenation = true,
     this.tapZoneLayout = TapZoneLayout.third,
     this.pageTurnAnimation = PageTurnAnimation.slide,
-    this.textDirection = TextDirection.auto,
+    this.textDirection = ReaderTextDirection.auto,
     this.readerWidth = 820.0,
     this.verticalSwipeBrightness = true,
     this.doubleTapAction = DoubleTapAction.toggleUI,
@@ -130,7 +130,7 @@ class ReaderSettings {
     bool? hyphenation,
     TapZoneLayout? tapZoneLayout,
     PageTurnAnimation? pageTurnAnimation,
-    TextDirection? textDirection,
+    ReaderTextDirection? textDirection,
     double? readerWidth,
     bool? verticalSwipeBrightness,
     DoubleTapAction? doubleTapAction,

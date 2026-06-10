@@ -12,8 +12,7 @@ part of 'http_client.dart';
 @ProviderFor(httpClient)
 final httpClientProvider = HttpClientProvider._();
 
-final class HttpClientProvider
-    extends $FunctionalProvider<HttpClient, HttpClient, HttpClient>
+final class HttpClientProvider extends $FunctionalProvider<HttpClient, HttpClient, HttpClient>
     with $Provider<HttpClient> {
   HttpClientProvider._()
     : super(

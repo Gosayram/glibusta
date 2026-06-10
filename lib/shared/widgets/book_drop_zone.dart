@@ -31,10 +31,7 @@ class BookDropZone extends ConsumerWidget {
     );
     if (result == null || result.files.isEmpty) return;
 
-    final paths = result.files
-        .where((f) => f.path != null)
-        .map((f) => f.path!)
-        .toList();
+    final paths = result.files.where((f) => f.path != null).map((f) => f.path!).toList();
     if (paths.isNotEmpty) {
       onBooksDropped(paths);
     }

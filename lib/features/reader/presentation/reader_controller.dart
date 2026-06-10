@@ -296,6 +296,42 @@ class ReaderController {
     }
   }
 
+  void handleLongPress() {
+    final settings = _ref.read(readerSettingsProvider);
+    switch (settings.longPressAction) {
+      case LongPressAction.selectText:
+        break;
+      case LongPressAction.addBookmark:
+        _addBookmarkAtCurrentChapter();
+        break;
+      case LongPressAction.openMenu:
+        toggleUi();
+        break;
+      case LongPressAction.disabled:
+        break;
+    }
+  }
+
+  void _addBookmarkAtCurrentChapter() {
+    if (_state.book == null) return;
+    final database = _ref.read(databaseProvider);
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    unawaited(
+      database
+          .into(database.bookmarks)
+          .insertOnConflictUpdate(
+            Bookmark(
+              id: id,
+              bookId: _bookId,
+              chapterIndex: _state.currentChapterIndex,
+              paragraphIndex: 0,
+              localOffset: _state.scrollProgress * 100.0,
+              createdAt: DateTime.now(),
+            ),
+          ),
+    );
+  }
+
   void jumpToProgress(double progress) {
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;

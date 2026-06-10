@@ -112,10 +112,12 @@ Future<ReadingStats> readingStats(Ref ref) async {
   final heatmapData = <DayReading>[];
   for (int i = 111; i >= 0; i--) {
     final day = todayStart.subtract(Duration(days: i));
-    heatmapData.add(DayReading(
-      date: day,
-      minutes: dailyMinutes[day] ?? 0,
-    ));
+    heatmapData.add(
+      DayReading(
+        date: day,
+        minutes: dailyMinutes[day] ?? 0,
+      ),
+    );
   }
 
   return ReadingStats(

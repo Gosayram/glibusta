@@ -20,8 +20,7 @@ class ReaderContentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (settings.mode == ReaderMode.paginated ||
-        settings.mode == ReaderMode.twoPage) {
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
         book: book,
         settings: settings,
@@ -29,14 +28,14 @@ class ReaderContentBody extends StatelessWidget {
       );
     }
 
-    final isFocus = settings.mode == ReaderMode.focus ||
-        settings.mode == ReaderMode.fullscreen;
+    final isFocus = settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
     final effectiveMargin = isFocus
         ? EdgeInsets.symmetric(
             horizontal: settings.margin * 1.5,
             vertical: settings.margin,
           )
         : EdgeInsets.all(settings.margin);
+    final textDirection = _effectiveTextDirection(context, settings);
 
     return SafeArea(
       top: false,
@@ -44,31 +43,34 @@ class ReaderContentBody extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTapUp: onTap,
-        child: SingleChildScrollView(
-          controller: scrollController,
-          padding: effectiveMargin,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (int i = 0; i < book.chapters.length; i++) ...[
-                _buildChapterContent(i, settings),
-                if (i < book.chapters.length - 1)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: settings.paragraphSpacing * 3,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '— ${book.chapters[i + 1].title} —',
-                        style: _getReaderStyle(settings).copyWith(
-                          color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+        child: Directionality(
+          textDirection: textDirection,
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: effectiveMargin,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int i = 0; i < book.chapters.length; i++) ...[
+                  _buildChapterContent(i, settings),
+                  if (i < book.chapters.length - 1)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: settings.paragraphSpacing * 3,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '— ${book.chapters[i + 1].title} —',
+                          style: _getReaderStyle(settings).copyWith(
+                            color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
-                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -194,6 +196,20 @@ class ReaderContentBody extends StatelessWidget {
             ),
           ),
         );
+    }
+  }
+
+  static TextDirection _effectiveTextDirection(
+    BuildContext context,
+    ReaderSettings settings,
+  ) {
+    switch (settings.textDirection) {
+      case ReaderTextDirection.ltr:
+        return TextDirection.ltr;
+      case ReaderTextDirection.rtl:
+        return TextDirection.rtl;
+      case ReaderTextDirection.auto:
+        return Directionality.of(context);
     }
   }
 
@@ -376,6 +392,17 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
   }
 
+  TextDirection _effectiveTextDirection(BuildContext context) {
+    switch (widget.settings.textDirection) {
+      case ReaderTextDirection.ltr:
+        return TextDirection.ltr;
+      case ReaderTextDirection.rtl:
+        return TextDirection.rtl;
+      case ReaderTextDirection.auto:
+        return Directionality.of(context);
+    }
+  }
+
   TextStyle _getReaderStyle(ReaderSettings settings) {
     final colors = ReaderColors.forTheme(settings.theme);
     final String fontFamily;
@@ -402,52 +429,56 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     );
   }
 
-  Widget _buildPage(int index) {
+  Widget _buildPage(int index, BuildContext context) {
     return SafeArea(
       key: ValueKey(index),
       top: false,
       bottom: false,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(widget.settings.margin),
-        child: _buildChapterContent(index),
+      child: Directionality(
+        textDirection: _effectiveTextDirection(context),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(widget.settings.margin),
+          child: _buildChapterContent(index),
+        ),
       ),
     );
   }
 
-  Widget _buildTwoPage(int index) {
+  Widget _buildTwoPage(int index, BuildContext context) {
     final leftIndex = index * 2;
     final rightIndex = index * 2 + 1;
-    return Row(
-      children: [
-        Expanded(
-          child: SafeArea(
-            top: false,
-            bottom: false,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.all(widget.settings.margin),
-              child: _buildChapterContent(leftIndex),
+    return Directionality(
+      textDirection: _effectiveTextDirection(context),
+      child: Row(
+        children: [
+          Expanded(
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(widget.settings.margin),
+                child: _buildChapterContent(leftIndex),
+              ),
             ),
           ),
-        ),
-        Container(
-          width: 1,
-          color: ReaderColors.forTheme(widget.settings.theme)
-              .text
-              .withValues(alpha: 0.1),
-        ),
-        Expanded(
-          child: rightIndex < widget.book.chapters.length
-              ? SafeArea(
-                  top: false,
-                  bottom: false,
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.all(widget.settings.margin),
-                    child: _buildChapterContent(rightIndex),
-                  ),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
+          Container(
+            width: 1,
+            color: ReaderColors.forTheme(widget.settings.theme).text.withValues(alpha: 0.1),
+          ),
+          Expanded(
+            child: rightIndex < widget.book.chapters.length
+                ? SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(widget.settings.margin),
+                      child: _buildChapterContent(rightIndex),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -470,7 +501,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: pageCount,
             itemBuilder: (context, index) {
-              return useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index);
+              return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);
             },
           ),
         );
@@ -486,7 +517,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             itemBuilder: (context, index) {
               return AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                child: useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index),
+                child: useTwoPageLayout
+                    ? _buildTwoPage(index, context)
+                    : _buildPage(index, context),
               );
             },
           ),
@@ -505,7 +538,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                 duration: const Duration(milliseconds: 400),
                 switchInCurve: Curves.easeInOut,
                 switchOutCurve: Curves.easeInOut,
-                child: useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index),
+                child: useTwoPageLayout
+                    ? _buildTwoPage(index, context)
+                    : _buildPage(index, context),
               );
             },
           ),
@@ -520,149 +555,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             physics: const BouncingScrollPhysics(),
             itemCount: pageCount,
             itemBuilder: (context, index) {
-              return useTwoPageLayout ? _buildTwoPage(index) : _buildPage(index);
+              return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);
             },
           ),
         );
     }
-  }
-}
-
-  Widget _buildChapterContent(int chapterIndex) {
-    final book = widget.book;
-    final settings = widget.settings;
-    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
-      return const SizedBox.shrink();
-    }
-
-    final chapter = book.chapters[chapterIndex];
-    final textAlign = switch (settings.textAlign) {
-      ReaderTextAlign.left => TextAlign.left,
-      ReaderTextAlign.justify => TextAlign.justify,
-      ReaderTextAlign.center => TextAlign.center,
-      ReaderTextAlign.right => TextAlign.right,
-    };
-
-    final style = _getReaderStyle(settings);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (chapter.title.isNotEmpty)
-          Padding(
-            padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: Text(
-              chapter.title,
-              style: style.copyWith(
-                fontSize: settings.fontSize * 1.4,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: textAlign,
-            ),
-          ),
-        ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
-      ],
-    );
-  }
-
-  Widget _buildBlock(ReaderBlock block, TextAlign textAlign) {
-    final settings = widget.settings;
-    final style = _getReaderStyle(settings);
-
-    switch (block.type) {
-      case BlockType.heading:
-        return Padding(
-          padding: EdgeInsets.only(
-            top: settings.paragraphSpacing * 2,
-            bottom: settings.paragraphSpacing,
-          ),
-          child: Text(
-            block.text,
-            style: style.copyWith(
-              fontSize: settings.fontSize * 1.2,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: textAlign,
-          ),
-        );
-      case BlockType.quote:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: style.color!.withValues(alpha: 0.3),
-                width: 3,
-              ),
-            ),
-          ),
-          child: Text(
-            block.text,
-            style: style.copyWith(fontStyle: FontStyle.italic),
-            textAlign: textAlign,
-          ),
-        );
-      case BlockType.separator:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-          child: Center(child: Text('* * *', style: style)),
-        );
-      case BlockType.image:
-        if (block.imageUrl != null) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-            child: Center(
-              child: Icon(Icons.image, size: 64, color: style.color),
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      case BlockType.footnote:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
-          child: Text(
-            block.text,
-            style: style.copyWith(fontSize: settings.fontSize * 0.85),
-            textAlign: textAlign,
-          ),
-        );
-      case BlockType.paragraph:
-        final indent = settings.paragraphFirstLineIndent > 0
-            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-            : EdgeInsets.zero;
-        return Padding(
-          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: Padding(
-            padding: indent,
-            child: Text(block.text, style: style, textAlign: textAlign),
-          ),
-        );
-    }
-  }
-
-  TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors = ReaderColors.forTheme(settings.theme);
-    final String fontFamily;
-    switch (settings.font) {
-      case ReaderFont.sourceSerif:
-        fontFamily = 'SourceSerif4';
-        break;
-      case ReaderFont.literata:
-        fontFamily = 'Literata';
-        break;
-      case ReaderFont.robotoSerif:
-        fontFamily = 'RobotoSerif';
-        break;
-      case ReaderFont.inter:
-        fontFamily = 'Inter';
-        break;
-    }
-    return TextStyle(
-      fontFamily: fontFamily,
-      fontSize: settings.fontSize,
-      height: settings.lineHeight,
-      color: colors.text,
-      letterSpacing: settings.letterSpacing,
-    );
   }
 }

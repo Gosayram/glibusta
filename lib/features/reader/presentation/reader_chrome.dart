@@ -147,7 +147,7 @@ class ReaderBottomBar extends StatelessWidget {
         final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
         final hours = remainingMinutes ~/ 60;
         final mins = remainingMinutes % 60;
-        return hours > 0 ? '~${hours}ч ${mins}м' : '~${mins}м';
+        return hours > 0 ? '~$hoursч $minsм' : '~$minsм';
       case BottomBarContent.none:
         return '';
     }
@@ -159,7 +159,7 @@ class ReaderBottomBar extends StatelessWidget {
         final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
         final hours = remainingMinutes ~/ 60;
         final mins = remainingMinutes % 60;
-        return hours > 0 ? '~${hours}ч ${mins}м' : '~${mins}м';
+        return hours > 0 ? '~$hoursч $minsм' : '~$minsм';
       case BottomBarContent.page:
         return 'Глава ${currentChapterIndex + 1} из $totalChapters';
       case BottomBarContent.chapter:

@@ -9,7 +9,6 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/book_cover_image.dart';
-import '../../library/data/book_repository_impl.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_details_repository_impl.dart';
@@ -19,7 +18,10 @@ final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, boo
   return repository.getBookDetails(bookId);
 });
 
-final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((ref, bookId) async {
+final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((
+  ref,
+  bookId,
+) async {
   final db = ref.watch(databaseProvider);
   return db.getReadingProgress(bookId);
 });
@@ -97,7 +99,9 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
             slivers: [
               SliverPadding(
                 padding: const EdgeInsets.all(16),
-                sliver: SliverToBoxAdapter(child: _BookHeader(book: book, details: widget.details)),
+                sliver: SliverToBoxAdapter(
+                  child: _BookHeader(book: book, details: widget.details),
+                ),
               ),
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -148,7 +152,7 @@ class _BookHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
@@ -282,7 +286,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
+    return ColoredBox(
       color: theme.colorScheme.surface,
       child: TabBar(
         controller: tabController,
@@ -385,7 +389,10 @@ class _BookmarksTab extends ConsumerWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
-            child: Text('Нет закладок', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+            child: Text(
+              'Нет закладок',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
           );
         }
         return ListView.builder(

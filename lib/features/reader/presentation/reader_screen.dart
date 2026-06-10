@@ -176,10 +176,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         children: [
           if (readerState.book != null)
             GestureDetector(
-              onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
-              onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
+              onVerticalDragStart: settings.verticalSwipeBrightness
+                  ? _handleVerticalDragStart
+                  : null,
+              onVerticalDragUpdate: settings.verticalSwipeBrightness
+                  ? _handleVerticalDragUpdate
+                  : null,
               onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-              onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+              onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+                  ? _ctrl.handleDoubleTap
+                  : null,
+              onLongPress: settings.longPressAction != LongPressAction.disabled
+                  ? _ctrl.handleLongPress
+                  : null,
               behavior: HitTestBehavior.translucent,
               child: ReaderContentBody(
                 book: readerState.book!,
@@ -250,16 +259,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: readerState.book != null
                 ? GestureDetector(
-                    onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
-                    onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
-                    onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-                    onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+                    onVerticalDragStart: settings.verticalSwipeBrightness
+                        ? _handleVerticalDragStart
+                        : null,
+                    onVerticalDragUpdate: settings.verticalSwipeBrightness
+                        ? _handleVerticalDragUpdate
+                        : null,
+                    onVerticalDragEnd: settings.verticalSwipeBrightness
+                        ? _handleVerticalDragEnd
+                        : null,
+                    onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+                        ? _ctrl.handleDoubleTap
+                        : null,
                     behavior: HitTestBehavior.translucent,
                     child: ReaderContentBody(
                       book: readerState.book!,
                       settings: settings,
                       scrollController: _ctrl.scrollController,
-                      onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                      onTap: (details) =>
+                          _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -329,7 +347,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               width: sidePanelWidth,
             ),
           const VerticalDivider(width: 1),
-            Expanded(
+          Expanded(
             flex: 3,
             child: Stack(
               children: [
@@ -341,10 +359,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   child: readerState.book != null
                       ? SelectionAreaWrapper(
                           child: GestureDetector(
-                            onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
-                            onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
-                            onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-                            onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled ? _ctrl.handleDoubleTap : null,
+                            onVerticalDragStart: settings.verticalSwipeBrightness
+                                ? _handleVerticalDragStart
+                                : null,
+                            onVerticalDragUpdate: settings.verticalSwipeBrightness
+                                ? _handleVerticalDragUpdate
+                                : null,
+                            onVerticalDragEnd: settings.verticalSwipeBrightness
+                                ? _handleVerticalDragEnd
+                                : null,
+                            onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+                                ? _ctrl.handleDoubleTap
+                                : null,
                             behavior: HitTestBehavior.translucent,
                             child: ReaderContentBody(
                               book: readerState.book!,
@@ -443,8 +469,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   }
 
   bool _isDistractionFree(ReaderSettings settings) {
-    return settings.mode == ReaderMode.focus ||
-        settings.mode == ReaderMode.fullscreen;
+    return settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
   }
 
   bool _shouldShowChrome(ReaderSettings settings, ReaderState readerState) {

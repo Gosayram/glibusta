@@ -25,10 +25,12 @@ class CommandPalette extends ConsumerStatefulWidget {
   const CommandPalette({super.key});
 
   static void show(BuildContext context) {
-    unawaited(showDialog<void>(
-      context: context,
-      builder: (_) => const CommandPalette(),
-    ));
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (_) => const CommandPalette(),
+      ),
+    );
   }
 
   @override
@@ -118,8 +120,7 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
 
     return actions.where((a) {
       final q = _query.toLowerCase();
-      return a.label.toLowerCase().contains(q) ||
-          (a.subtitle?.toLowerCase().contains(q) ?? false);
+      return a.label.toLowerCase().contains(q) || (a.subtitle?.toLowerCase().contains(q) ?? false);
     }).toList();
   }
 
@@ -226,7 +227,9 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
                                 ),
                                 subtitle: action.subtitle != null ? Text(action.subtitle!) : null,
                                 selected: isSelected,
-                                selectedTileColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                selectedTileColor: theme.colorScheme.primaryContainer.withValues(
+                                  alpha: 0.3,
+                                ),
                                 onTap: () {
                                   action.onExecute();
                                   Navigator.of(context).pop();

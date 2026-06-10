@@ -44,11 +44,11 @@ class ContinueReadingCard extends StatelessWidget {
                       child: SizedBox(
                         width: 70,
                         height: 100,
-                    child: BookCoverImage(
-                      book: info.book,
-                      width: 70,
-                      height: 100,
-                    ),
+                        child: BookCoverImage(
+                          book: info.book,
+                          width: 70,
+                          height: 100,
+                        ),
                       ),
                     ),
                   ),
