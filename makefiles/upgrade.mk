@@ -10,6 +10,11 @@ upgrade-check-dart: require-flutter ## Show available Flutter/Dart package upgra
 	@$(PRINT_STEP) "Checking Flutter/Dart package upgrades"
 	$(PUB_OUTDATED) || true
 
+.PHONY: versions
+versions: require-flutter require-python ## Show current vs latest versions of all dependencies
+	@$(PRINT_STEP) "Checking available versions (including prereleases)"
+	@$(FLUTTER) pub outdated --json 2>/dev/null | $(PYTHON) $(SCRIPTS_DIR)/version_report.py
+
 .PHONY: upgrade-check-node
 upgrade-check-node: require-nvm ## Show available npm package upgrades
 	@$(PRINT_STEP) "Checking npm package upgrades"
