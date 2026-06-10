@@ -163,13 +163,20 @@ class _NotesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.note_add_outlined, size: 48, color: Colors.grey),
-          SizedBox(height: 12),
-          Text('Нет заметок', style: TextStyle(color: Colors.grey)),
+          Icon(
+            Icons.note_add_outlined,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Нет заметок',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
         ],
       ),
     );
@@ -181,13 +188,20 @@ class _BookmarksTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bookmark_border, size: 48, color: Colors.grey),
-          SizedBox(height: 12),
-          Text('Нет закладок', style: TextStyle(color: Colors.grey)),
+          Icon(
+            Icons.bookmark_border,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Нет закладок',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          ),
         ],
       ),
     );

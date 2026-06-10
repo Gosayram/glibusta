@@ -43,8 +43,11 @@ class HomeScreen extends ConsumerWidget {
                   child: continueReadingAsync.when(
                     data: (books) {
                       if (books.isEmpty) {
-                        return const Center(
-                          child: Text('Начните читать книгу', style: TextStyle(color: Colors.grey)),
+                        return Center(
+                          child: Text(
+                            'Начните читать книгу',
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
                         );
                       }
                       return ListView.builder(
@@ -74,8 +77,11 @@ class HomeScreen extends ConsumerWidget {
                   child: booksAsync.when(
                     data: (books) {
                       if (books.isEmpty) {
-                        return const Center(
-                          child: Text('Библиотека пуста', style: TextStyle(color: Colors.grey)),
+                        return Center(
+                          child: Text(
+                            'Библиотека пуста',
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
                         );
                       }
                       final recent = books.length > 5 ? books.sublist(0, 5) : books;

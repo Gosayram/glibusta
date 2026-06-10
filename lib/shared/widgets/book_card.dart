@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../models/book.dart';
 import 'book_cover_image.dart';
 
@@ -55,7 +56,7 @@ class BookCard extends StatelessWidget {
                           child: Icon(
                             Icons.download_done,
                             size: 16,
-                            color: Colors.green,
+                            color: AppColors.success,
                           ),
                         )
                       else if (isDownloaded == false)
@@ -65,7 +66,7 @@ class BookCard extends StatelessWidget {
                           child: Icon(
                             Icons.cloud_download_outlined,
                             size: 16,
-                            color: Colors.blue,
+                            color: AppColors.info,
                           ),
                         ),
                       if (progress != null && progress! > 0)

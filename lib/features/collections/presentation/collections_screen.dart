@@ -10,17 +10,24 @@ class CollectionsScreen extends StatelessWidget {
         title: const Text('Коллекции'),
         automaticallyImplyLeading: false,
       ),
-      body: const Center(
+      body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.collections_bookmark_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('Коллекции', style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
+            Icon(
+              Icons.collections_bookmark_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Коллекции',
+              style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
             Text(
               'Создавайте коллекции для организации книг',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
               textAlign: TextAlign.center,
             ),
           ],

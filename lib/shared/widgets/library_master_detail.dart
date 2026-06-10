@@ -48,8 +48,11 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
 
   Widget _buildBookList(BuildContext context) {
     if (widget.books.isEmpty) {
-      return const Center(
-        child: Text('Библиотека пуста', style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text(
+          'Библиотека пуста',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
       );
     }
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+import '../theme/app_duration.dart';
+
 abstract interface class AppMessenger {
   void showSuccess(String message);
   void showError(String message);
@@ -19,8 +22,8 @@ class ScaffoldMessengerService implements AppMessenger {
     _messenger?.showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
+        backgroundColor: AppColors.success,
+        duration: AppDuration.snackbarShort,
       ),
     );
   }
@@ -30,8 +33,8 @@ class ScaffoldMessengerService implements AppMessenger {
     _messenger?.showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
+        backgroundColor: AppColors.error,
+        duration: AppDuration.snackbarNormal,
       ),
     );
   }

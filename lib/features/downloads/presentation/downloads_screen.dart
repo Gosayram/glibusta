@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import 'download_queue.dart';
@@ -43,13 +44,26 @@ class DownloadsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.download_done, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.download_done,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
-                  const Text('Нет загрузок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text(
+                    'Нет загрузок',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Скачайте книги из каталога',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
@@ -100,7 +114,7 @@ class DownloadTile extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(_statusIcon(task.status), size: 20, color: _statusColor(task.status)),
+                Icon(_statusIcon(task.status), size: 20, color: _statusColor(context, task.status)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -172,14 +186,14 @@ class DownloadTile extends ConsumerWidget {
     };
   }
 
-  Color _statusColor(DownloadStatus status) {
+  Color _statusColor(BuildContext context, DownloadStatus status) {
     return switch (status) {
-      DownloadStatus.queued => Colors.orange,
-      DownloadStatus.running => Colors.blue,
-      DownloadStatus.paused => Colors.amber,
-      DownloadStatus.completed => Colors.green,
-      DownloadStatus.failed => Colors.red,
-      DownloadStatus.canceled => Colors.grey,
+      DownloadStatus.queued => AppColors.warning,
+      DownloadStatus.running => AppColors.info,
+      DownloadStatus.paused => AppColors.warning,
+      DownloadStatus.completed => AppColors.success,
+      DownloadStatus.failed => AppColors.error,
+      DownloadStatus.canceled => Theme.of(context).colorScheme.outline,
     };
   }
 

@@ -138,13 +138,20 @@ class LibraryScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.library_books_outlined, size: 64, color: Colors.grey),
+            Icon(
+              Icons.library_books_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
-            const Text('Библиотека пуста', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            Text(
+              'Библиотека пуста',
+              style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Найдите и скачайте книги, или импортируйте файлы',
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),

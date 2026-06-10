@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
@@ -64,7 +65,7 @@ class ReaderController {
   final String _bookId;
   final WidgetRef _ref;
   final _autoThemeService = AutoThemeService();
-  final _progressDebouncer = Debouncer(delay: const Duration(seconds: 5));
+  final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -113,7 +114,7 @@ class ReaderController {
       );
       _scrollController = ScrollController()..addListener(_onScroll);
       _autoThemeTimer = Timer.periodic(
-        const Duration(minutes: 1),
+        AppDuration.autoThemeCheck,
         (_) => _checkAutoTheme(),
       );
       _startHideTimer();
@@ -162,7 +163,7 @@ class ReaderController {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 3), () {
+    _hideTimer = Timer(AppDuration.readerHideDelay, () {
       if (!_state.isBottomSheetOpen) {
         _updateState(_state.copyWith(uiVisible: false));
       }

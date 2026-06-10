@@ -34,13 +34,26 @@ class BookmarksScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.bookmark_border, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.bookmark_border,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
-                  const Text('Нет закладок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text(
+                    'Нет закладок',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Закладки появятся при чтении книг',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
@@ -102,10 +115,10 @@ class BookmarkTile extends StatelessWidget {
       key: Key(bookmark.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Colors.red,
+        color: Theme.of(context).colorScheme.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
       ),
       onDismissed: (_) => onDelete?.call(),
       child: ListTile(

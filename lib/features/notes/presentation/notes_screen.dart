@@ -34,13 +34,26 @@ class NotesScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.note_alt_outlined, size: 64, color: Colors.grey),
+                  Icon(
+                    Icons.note_alt_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(height: 16),
-                  const Text('Нет заметок', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text(
+                    'Нет заметок',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Заметки появятся при чтении книг',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
@@ -122,10 +135,10 @@ class NoteTile extends StatelessWidget {
       key: Key(note.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Colors.red,
+        color: Theme.of(context).colorScheme.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
       ),
       onDismissed: (_) => onDelete?.call(),
       child: ListTile(

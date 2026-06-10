@@ -130,11 +130,15 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
             return Stack(
               children: [
                 child ?? const SizedBox.shrink(),
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     child: Center(
-                      child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+                      child: Icon(
+                        Icons.menu_book,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),

@@ -5,6 +5,7 @@ import 'package:dio/io.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
+import '../theme/app_duration.dart';
 import 'app_interceptors.dart';
 
 part 'dio_provider.g.dart';
@@ -27,8 +28,8 @@ Dio dio(Ref ref) {
   final dio = Dio(
     BaseOptions(
       baseUrl: settings.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
+      connectTimeout: AppDuration.httpConnect,
+      receiveTimeout: AppDuration.httpReceive,
       headers: {
         'User-Agent': 'Glibusta/0.1.0',
       },

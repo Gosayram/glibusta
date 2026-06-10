@@ -101,13 +101,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildResults(BuildContext context, SearchState state) {
     if (state.books.isEmpty && !state.isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('Начните поиск', style: TextStyle(color: Colors.grey)),
+            Icon(Icons.search, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(
+              'Начните поиск',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       );
