@@ -26,44 +26,42 @@ Flibusta-compatible sources.
 - [Developer Tooling](#developer-tooling)
 - [Build Artifacts](#build-artifacts)
 - [Project Layout](#project-layout)
-- [Roadmap](#roadmap)
 - [License](#license)
 
 ## Status
 
-Glibusta is under active development. The repository already contains the application shell,
-navigation, search/parser work, local tooling, signing helpers, and release artifact targets. Some
-product features are still being implemented.
-
-| Area               | Status          |
-| ------------------ | --------------- |
-| Android app shell  | In progress     |
-| macOS app shell    | In progress     |
-| Search/parsing     | In progress     |
-| Offline library    | In progress     |
-| Reader             | MVP/in progress |
-| Downloads          | In progress     |
-| Release automation | In progress     |
+| Area               | Status |
+| ------------------ | ------ |
+| Android app shell  | ✅     |
+| macOS app shell    | ✅     |
+| Search/parsing     | ✅     |
+| Offline library    | ✅     |
+| Reader             | ✅     |
+| Downloads          | ✅     |
+| Release automation | ✅     |
+| CI                 | ✅     |
 
 ## Features
 
 - Search books across Flibusta-compatible mirrors.
-- Parse book metadata and available formats from HTML fixtures/pages.
-- Organize books in a local library.
-- Download books in common formats such as FB2, EPUB, TXT, and ZIP.
-- Read books in-app with reader settings and theming.
-- Build signed Android artifacts and signed macOS release archives.
+- Parse book metadata and available formats from HTML/OPDS.
+- Organize books in a local library with collections, pinned books, and smart collections.
+- Download books in common formats (FB2, EPUB, TXT, ZIP).
+- Read books in-app with reader settings, theming, and annotations.
+- Built-in comments system for books.
+- Health diagnostics with device info, server probe, and exportable reports.
+- Build signed Android APK/AAB and macOS release archives.
 
 ## Platforms
 
-| Platform | Repository support | Notes                                                              |
-| -------- | :----------------: | ------------------------------------------------------------------ |
-| Android  |         ✅         | Primary mobile target. Signed APK/AAB build targets are available. |
-| macOS    |         ✅         | Desktop target. Release zip target is available.                   |
-| iOS      |      Planned       | Platform directory is not currently present.                       |
-| Linux    |      Planned       | Platform directory is not currently present.                       |
-| Windows  |      Planned       | Platform directory is not currently present.                       |
-| Web      |      Planned       | Platform directory is not currently present.                       |
+| Platform | Support | Notes                                         |
+| -------- | :-----: | --------------------------------------------- |
+| Android  |   ✅    | Primary mobile target. Signed APK/AAB builds. |
+| macOS    |   ✅    | Desktop target. Signed release zip.           |
+| iOS      | Planned |                                               |
+| Linux    | Planned |                                               |
+| Windows  | Planned |                                               |
+| Web      | Planned |                                               |
 
 ## Tech Stack
 
@@ -74,9 +72,9 @@ product features are still being implemented.
 | Navigation       | Go Router                                                    |
 | HTTP             | Dio                                                          |
 | Local storage    | Drift SQLite                                                 |
-| Parsing          | `package:html`                                               |
+| Reader           | EPUB, FB2 parsers                                            |
 | Quality          | `flutter_lints`, `riverpod_lint`, Ruff, ShellCheck, Prettier |
-| Build automation | Makefile modules under `makefiles/`                          |
+| Build            | Makefile modules under `makefiles/`                          |
 
 ## Quick Start
 
@@ -87,27 +85,41 @@ make get
 flutter run
 ```
 
-`make bootstrap` first checks the local environment, then asks for `yes` or `y` before installing or
-creating missing project-local tools.
+`make bootstrap` first checks the local environment, then asks for `yes` or `y` before installing
+or creating missing project-local tools.
 
-> [!TIP] Run `make help` to see every available target. The help output includes the current version
-> from `pubspec.yaml`.
+> [!TIP]
+> Run `make help` to see every available target. The help output includes the current version from
+> `pubspec.yaml`.
 
 ## Developer Tooling
 
 The Makefile is split into modules under `makefiles/` and is the preferred entry point for local
 workflows.
 
-| Command                | Purpose                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `make help`            | Show dynamic help with the current app version.                                 |
-| `make bootstrap-check` | Check required tools without changing the machine.                              |
-| `make bootstrap`       | Check tools, ask for confirmation, then install/setup supported missing pieces. |
-| `make fix-all`         | Run automatic formatters and safe fixes.                                        |
-| `make check-all`       | Run formatting checks, linters, analyzer, and tests.                            |
-| `make shellcheck`      | Check shell scripts in `scripts/`.                                              |
-| `make ruff-check`      | Lint Python scripts in `scripts/`.                                              |
-| `make prettier-check`  | Check Markdown/YAML/JSON formatting.                                            |
+| Command                | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `make help`            | Show dynamic help with the current app version.           |
+| `make bootstrap-check` | Check required tools without changing the machine.        |
+| `make bootstrap`       | Check tools, then install/setup supported missing pieces. |
+| `make versions`        | Show current vs latest versions of all dependencies.      |
+| `make fix-all`         | Run automatic formatters and safe fixes.                  |
+| `make check-all`       | Run formatting checks, linters, analyzer, and tests.      |
+| `make shellcheck`      | Check shell scripts in `scripts/`.                        |
+| `make ruff-check`      | Lint Python scripts in `scripts/`.                        |
+| `make prettier-check`  | Check Markdown/YAML/JSON formatting.                      |
+
+### Version Management
+
+```bash
+make versions          # Show available updates
+make bump              # Bump PATCH:  0.1.0+3 → 0.1.1+0
+make bump-minor        # Bump MINOR:  0.1.0+3 → 0.2.0+0
+make bump-major        # Bump MAJOR:  0.1.0+3 → 1.0.0+0
+```
+
+Follows [Semantic Versioning 2.0.0](https://semver.org/). Build number (`+N`) resets to `0` on each
+bump. `make release` auto-bumps before building.
 
 ### Quality Gates
 
@@ -116,30 +128,29 @@ make fix-all
 make check-all
 ```
 
-`fix-all` currently runs Flutter/Dart dependency setup, Node dependency setup, Dart formatting,
+`fix-all` runs Flutter/Dart dependency setup, Node dependency setup, Dart formatting,
 `dart fix --apply`, Prettier, Ruff formatting, and Ruff fixes.
 
-`check-all` currently runs Dart format check, Prettier check, Ruff check, ShellCheck,
-`flutter analyze`, and `flutter test`.
+`check-all` runs Dart format check, Prettier check, Ruff check, ShellCheck, `flutter analyze`,
+and `flutter test`.
 
 ## Build Artifacts
 
 Release artifacts are copied into `dist/releases/` with names based on the version in
 `pubspec.yaml`.
 
-| Command                  | Output                                                        |
-| ------------------------ | ------------------------------------------------------------- |
-| `make build-android-apk` | `dist/releases/glibusta-<version>-android-release-signed.apk` |
-| `make build-android-aab` | `dist/releases/glibusta-<version>-android-release-signed.aab` |
-| `make build-android`     | APK and AAB                                                   |
-| `make build-macos`       | `dist/releases/glibusta-<version>-macos-release.zip`          |
-| `make build-all`         | All currently available platform artifacts                    |
-| `make artifacts`         | List generated release artifacts                              |
+| Command                        | Output                                                |
+| ------------------------------ | ----------------------------------------------------- |
+| `make build-android-apk-split` | Per-ABI APKs (arm64, armv7, x86_64, universal)        |
+| `make build-android-apk`       | Universal APK                                         |
+| `make build-android-aab`       | Android App Bundle                                    |
+| `make build-macos`             | macOS release zip                                     |
+| `make build-all`               | All platform artifacts                                |
+| `make release`                 | Full pipeline: lint → test → bump → build → artifacts |
 
-Android release signing uses `.key-generate.conf`, `scripts/signing.sh`, and
-`android/key.properties`.
+Android release signing uses `.signing/release.keystore` and `android/key.properties`.
 
-macOS signing defaults to ad-hoc signing:
+macOS signing defaults to ad-hoc:
 
 ```bash
 make build-macos
@@ -148,34 +159,23 @@ make build-macos
 To use a Developer ID identity:
 
 ```bash
-make build-macos MACOS_CODESIGN_IDENTITY="Developer ID Application: Example Name"
+make build-macos MACOS_CODESIGN_IDENTITY="Developer ID Application: Name"
 ```
 
 ## Project Layout
 
 ```text
 lib/
-  app/                 # Router and application shell
-  core/                # Database, HTTP, platform services, shared config
-  features/            # Feature-first modules
-  l10n/                # Localization ARB files
-  shared/              # Shared models and widgets
-makefiles/             # Modular Makefile targets
-scripts/               # Signing, icon generation, bootstrap, helper scripts
-test/                  # Unit and widget tests
+  app/                  # Router and application shell
+  core/                 # Database, HTTP, platform services, config
+  features/             # Feature-first modules
+  l10n/                 # Localization ARB files
+  shared/               # Shared models and widgets
+makefiles/              # Modular Makefile targets
+scripts/                # Signing, bootstrap, version bump, diagnostics
+hack/                   # Python API exploration scripts
+test/                   # Unit and widget tests
 ```
-
-## Roadmap
-
-Tracked locally in `.rechange-docs.md`.
-
-- [ ] Stabilize `flutter analyze` and `flutter test`.
-- [ ] Finish Drift-backed offline library.
-- [ ] Harden parser fixtures and mirror fallback.
-- [ ] Complete reader MVP.
-- [ ] Complete download queue controls and persistence.
-- [ ] Add CI for `make check-all`.
-- [ ] Expand platform support beyond Android and macOS.
 
 ## License
 

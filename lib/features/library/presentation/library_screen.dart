@@ -262,7 +262,7 @@ class LibraryScreen extends ConsumerWidget {
         ),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: _buildBookSliver(context, ref, unpinnedBooks.isNotEmpty ? unpinnedBooks : books),
+          sliver: _buildBookSliver(context, ref, unpinnedBooks),
         ),
       ],
     );

@@ -98,6 +98,8 @@ class TaskQueue {
   final Map<String, Task> _allTasks = {};
   int _runningCount = 0;
   bool _paused = false;
+  bool _disposed = false;
+  int _generation = 0;
   final _controller = StreamController<Task>.broadcast();
 
   Stream<Task> get taskStream => _controller.stream;
@@ -144,6 +146,7 @@ class TaskQueue {
   }
 
   void cancelAll() {
+    _generation++;
     for (final task in _allTasks.values) {
       task.cancel();
     }
@@ -172,7 +175,7 @@ class TaskQueue {
   }
 
   void _processNext() {
-    if (_paused) return;
+    if (_paused || _disposed) return;
     if (_runningCount >= maxConcurrent) return;
     if (_pending.isEmpty) return;
 
@@ -188,18 +191,21 @@ class TaskQueue {
     _pending.removeAt(0);
     _runningCount++;
     task._status = TaskStatus.running;
-    _controller.add(task);
+    if (!_controller.isClosed) _controller.add(task);
 
+    final gen = _generation;
     unawaited(
       task
           .execute()
           .then((_) {
+            if (_generation != gen || _disposed) return;
             task._status = TaskStatus.completed;
             _runningCount--;
-            _controller.add(task);
+            if (!_controller.isClosed) _controller.add(task);
             _processNext();
           })
           .catchError((Object _, StackTrace _) {
+            if (_generation != gen || _disposed) return;
             if (task.shouldRetry && task._retryCount < task.maxRetries) {
               task._retryCount++;
               task._status = TaskStatus.pending;
@@ -210,7 +216,7 @@ class TaskQueue {
             } else {
               task._status = TaskStatus.failed;
               _runningCount--;
-              _controller.add(task);
+              if (!_controller.isClosed) _controller.add(task);
               _processNext();
             }
           }),
@@ -218,6 +224,7 @@ class TaskQueue {
   }
 
   void dispose() {
+    _disposed = true;
     cancelAll();
     unawaited(_controller.close());
   }

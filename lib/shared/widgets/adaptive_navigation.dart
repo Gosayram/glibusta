@@ -48,8 +48,16 @@ class AdaptiveNavigation extends StatelessWidget {
 
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    final idx = routes.indexOf(location);
-    return idx >= 0 ? idx : 0;
+    int bestIdx = 0;
+    int bestLen = 0;
+    for (var i = 0; i < routes.length; i++) {
+      final r = routes[i];
+      if (location == r || (location.startsWith(r) && r.length > bestLen)) {
+        bestIdx = i;
+        bestLen = r.length;
+      }
+    }
+    return bestIdx;
   }
 
   void _onTap(BuildContext context, int index) => context.go(routes[index]);
@@ -260,7 +268,7 @@ class MacOSShell extends ConsumerWidget {
       );
       return;
     }
-    unawaited(context.push('/library'));
+    unawaited(context.push('/library', extra: epubPaths));
   }
 }
 

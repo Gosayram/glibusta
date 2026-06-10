@@ -13,6 +13,8 @@ abstract interface class AppFileStorage {
   Future<Directory> coversDir();
 }
 
+String _sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|.]'), '_');
+
 class AppFileStorageImpl implements AppFileStorage {
   @override
   Future<Directory> booksDir() async {
@@ -33,13 +35,13 @@ class AppFileStorageImpl implements AppFileStorage {
   @override
   Future<File> bookFile(String bookId, BookFormat format) async {
     final dir = await booksDir();
-    return File(p.join(dir.path, '$bookId.${format.name}'));
+    return File(p.join(dir.path, '${_sanitizeId(bookId)}.${format.name}'));
   }
 
   @override
   Future<File> coverFile(String bookId) async {
     final dir = await coversDir();
-    return File(p.join(dir.path, '$bookId.jpg'));
+    return File(p.join(dir.path, '${_sanitizeId(bookId)}.jpg'));
   }
 
   @override

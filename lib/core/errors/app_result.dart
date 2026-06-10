@@ -23,7 +23,7 @@ sealed class AppResult<T> {
     };
   }
 
-  AppResult<T> flatMap(AppResult<T> Function(T value) transform) {
+  AppResult<R> flatMap<R>(AppResult<R> Function(T value) transform) {
     return switch (this) {
       Success(:final value) => transform(value),
       Failure(:final failure) => Failure(failure),
@@ -49,7 +49,7 @@ Future<AppResult<T>> guardFuture<T>(Future<T> Function() operation) async {
     return Success(result);
   } on AppFailure catch (e) {
     return Failure(e);
-  } on Object catch (e) {
-    return Failure(UnknownFailure(e.toString()));
+  } on Object catch (e, st) {
+    return Failure(UnknownFailure(e.toString(), st));
   }
 }

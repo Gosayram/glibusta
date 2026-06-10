@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
@@ -7,7 +9,7 @@ abstract interface class AppMessenger {
   void showSuccess(String message);
   void showError(String message);
   void showInfo(String message);
-  void showUndo(String message, VoidCallback onUndo);
+  void showUndo(String message, Future<void> Function() onUndo, {String undoLabel = 'Отменить'});
 }
 
 class ScaffoldMessengerService implements AppMessenger {
@@ -47,13 +49,13 @@ class ScaffoldMessengerService implements AppMessenger {
   }
 
   @override
-  void showUndo(String message, VoidCallback onUndo) {
+  void showUndo(String message, Future<void> Function() onUndo, {String undoLabel = 'Отменить'}) {
     _messenger?.showSnackBar(
       SnackBar(
         content: Text(message),
         action: SnackBarAction(
-          label: 'Отменить',
-          onPressed: onUndo,
+          label: undoLabel,
+          onPressed: () => unawaited(onUndo()),
         ),
       ),
     );

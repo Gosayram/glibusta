@@ -24,22 +24,24 @@ class AuthInterceptor extends Interceptor {
 }
 
 class LoggingInterceptor extends Interceptor {
+  static Uri _redactedUri(Uri uri) => uri.replace(query: '');
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    _log.info('→ ${options.method} ${options.uri}');
+    _log.info('→ ${options.method} ${_redactedUri(options.uri)}');
     handler.next(options);
   }
 
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
-    _log.info('← ${response.statusCode} ${response.requestOptions.uri}');
+    _log.info('← ${response.statusCode} ${_redactedUri(response.requestOptions.uri)}');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     _log.severe(
-      '✗ ${err.requestOptions.method} ${err.requestOptions.uri} '
+      '✗ ${err.requestOptions.method} ${_redactedUri(err.requestOptions.uri)} '
       '${err.response?.statusCode} ${err.message}',
     );
     handler.next(err);

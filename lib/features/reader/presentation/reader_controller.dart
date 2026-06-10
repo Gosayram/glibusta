@@ -96,10 +96,12 @@ class ReaderController {
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
   ReaderState _state = ReaderState();
+  final _stateController = StreamController<ReaderState>.broadcast();
   bool _disposed = false;
   bool _fullscreenEnabled = false;
 
   ReaderState get state => _state;
+  Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
     _disposed = true;
@@ -111,6 +113,7 @@ class ReaderController {
     disableFullscreen();
     saveProgress();
     unawaited(WakelockPlus.disable());
+    unawaited(_stateController.close());
   }
 
   void _applyWakeLock() {
@@ -137,6 +140,7 @@ class ReaderController {
   void _updateState(ReaderState newState) {
     if (_disposed) return;
     _state = newState;
+    if (!_stateController.isClosed) _stateController.add(newState);
   }
 
   Future<void> loadBook() async {
@@ -522,9 +526,10 @@ class ReaderController {
       return;
     }
     if (_scrollController == null || !_scrollController!.hasClients) return;
+    final chapterCount = _state.book!.chapters.length;
     final progress = clamped.progressPercent > 0
         ? clamped.progressPercent
-        : clamped.chapterIndex / (_state.book!.chapters.length - 1);
+        : (chapterCount > 1 ? clamped.chapterIndex / (chapterCount - 1) : 0.0);
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
       _scrollController!.animateTo(

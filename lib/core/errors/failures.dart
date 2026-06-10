@@ -1,7 +1,8 @@
 sealed class AppFailure {
   final String? message;
+  final StackTrace? stackTrace;
 
-  const AppFailure([this.message]);
+  const AppFailure([this.message, this.stackTrace]);
 
   @override
   String toString() => '$runtimeType: ${message ?? 'Unknown error'}';
@@ -44,5 +45,5 @@ final class CancelledFailure extends AppFailure {
 }
 
 final class UnknownFailure extends AppFailure {
-  const UnknownFailure([super.message]);
+  const UnknownFailure([super.message, super.stackTrace]);
 }

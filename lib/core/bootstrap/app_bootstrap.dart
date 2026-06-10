@@ -56,7 +56,7 @@ class AppBootstrap {
       await SentryFlutter.init(
         (options) {
           options.dsn = dsn;
-          options.tracesSampleRate = 1.0;
+          options.tracesSampleRate = kReleaseMode ? 0.1 : 1.0;
         },
         appRunner: appRunner,
       );

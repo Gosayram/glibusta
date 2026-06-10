@@ -6,9 +6,9 @@ import '../domain/reader.dart';
 import 'reader_providers.dart';
 
 class ReaderQuickSettingsSheet extends ConsumerWidget {
-  const ReaderQuickSettingsSheet({super.key, required this.onDismiss});
+  const ReaderQuickSettingsSheet({super.key, this.onDismiss});
 
-  final VoidCallback onDismiss;
+  final VoidCallback? onDismiss;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

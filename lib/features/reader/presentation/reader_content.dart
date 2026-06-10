@@ -167,7 +167,7 @@ class ReaderContentBody extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
-                color: _getReaderStyle(settings).color!.withValues(alpha: 0.3),
+                color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.3),
                 width: 3,
               ),
             ),
@@ -429,7 +429,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           decoration: BoxDecoration(
             border: Border(
               left: BorderSide(
-                color: style.color!.withValues(alpha: 0.3),
+                color: (style.color ?? Colors.black).withValues(alpha: 0.3),
                 width: 3,
               ),
             ),

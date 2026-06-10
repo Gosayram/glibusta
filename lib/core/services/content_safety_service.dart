@@ -17,7 +17,8 @@ class ContentSafetyService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final index = prefs.getInt(_key) ?? 0;
-      return ContentSafetyLevel.values[index.clamp(0, ContentSafetyLevel.values.length - 1)];
+      final safeIndex = index.clamp(0, ContentSafetyLevel.values.length - 1);
+      return ContentSafetyLevel.values[safeIndex];
     } on Object catch (_) {
       return ContentSafetyLevel.standard;
     }

@@ -50,6 +50,7 @@ Future<List<Book>> pinnedBooksList(Ref ref) async {
 
   final repository = ref.watch(bookRepositoryProvider);
   final allBooks = await repository.getAllBooks();
+  if (allBooks.isEmpty) return [];
 
   final pinnedBooksList = <Book>[];
   for (final id in pinnedIds) {
