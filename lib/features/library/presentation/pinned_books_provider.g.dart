@@ -46,7 +46,7 @@ abstract class _$PinnedBooks extends $Notifier<List<String>> {
   List<String> build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<List<String>, List<String>>;
     final element =
         ref.element
@@ -56,7 +56,7 @@ abstract class _$PinnedBooks extends $Notifier<List<String>> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }
 
@@ -91,4 +91,4 @@ final class PinnedBooksListProvider
   }
 }
 
-String _$pinnedBooksListHash() => r'7627aa023314221941a58a9b5a7cb1fae860aaaf';
+String _$pinnedBooksListHash() => r'137a6c23780b76c0ce23540098d118b525924adb';

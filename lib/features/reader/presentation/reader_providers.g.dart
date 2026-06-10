@@ -47,7 +47,7 @@ abstract class _$ReaderSettingsNotifier extends $Notifier<ReaderSettings> {
   ReaderSettings build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<ReaderSettings, ReaderSettings>;
     final element =
         ref.element
@@ -57,7 +57,7 @@ abstract class _$ReaderSettingsNotifier extends $Notifier<ReaderSettings> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }
 
@@ -99,7 +99,7 @@ abstract class _$ReadingProgressNotifier extends $Notifier<ReadingProgress?> {
   ReadingProgress? build();
   @$mustCallSuper
   @override
-  void runBuild() {
+  WhenComplete runBuild() {
     final ref = this.ref as $Ref<ReadingProgress?, ReadingProgress?>;
     final element =
         ref.element
@@ -109,6 +109,6 @@ abstract class _$ReadingProgressNotifier extends $Notifier<ReadingProgress?> {
               Object?,
               Object?
             >;
-    element.handleCreate(ref, build);
+    return element.handleCreate(ref, build);
   }
 }

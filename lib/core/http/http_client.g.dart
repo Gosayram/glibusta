@@ -47,4 +47,4 @@ final class HttpClientProvider extends $FunctionalProvider<HttpClient, HttpClien
   }
 }
 
-String _$httpClientHash() => r'42c10e4e047b0596f5a8d058fd4824ac6d498bc3';
+String _$httpClientHash() => r'0e0e0df505ff384672c36466ff0091ca7dfac31f';
