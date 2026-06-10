@@ -24,7 +24,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appSettingsControllerProvider);
-    final authState = ref.watch(authStateProvider);
+    final authData = ref.watch(authStateProvider).value;
+    final isAuthenticated = authData?.isAuthenticated ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -34,10 +35,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         children: [
           const _SectionHeader(title: 'Аккаунт'),
-          if (authState.isAuthenticated)
+          if (isAuthenticated)
             _SettingsTile(
               icon: Icons.person,
-              title: authState.session?.name ?? 'Пользователь',
+              title: authData?.session?.name ?? 'Пользователь',
               subtitle: 'Нажмите, чтобы выйти',
               onTap: () => _logout(context, ref),
             )

@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../http/dio_provider.dart';
 
 part 'auth_repository.g.dart';
+
+const _kSessionNameKey = 'auth_session_name';
+const _kSessionMailKey = 'auth_session_mail';
+const _kSessionCookiesKey = 'auth_session_cookies';
 
 class UserSession {
   final String name;
@@ -18,6 +24,18 @@ class UserSession {
     this.mail,
     this.cookies = const {},
   });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'mail': mail,
+    'cookies': cookies,
+  };
+
+  factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
+    name: json['name'] as String,
+    mail: json['mail'] as String?,
+    cookies: Map<String, String>.from(json['cookies'] as Map? ?? {}),
+  );
 }
 
 class AuthRepository {
@@ -119,13 +137,28 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 @riverpod
 class AuthStateNotifier extends _$AuthStateNotifier {
   @override
-  AuthStateData build() {
-    return const AuthStateData();
+  Future<AuthStateData> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString(_kSessionNameKey);
+    if (name == null || name.isEmpty) {
+      return const AuthStateData();
+    }
+    final mail = prefs.getString(_kSessionMailKey);
+    final cookiesRaw = prefs.getString(_kSessionCookiesKey);
+    final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
+        ? Map<String, String>.from(
+            Uri.splitQueryString(cookiesRaw),
+          )
+        : <String, String>{};
+    return AuthStateData(
+      isAuthenticated: true,
+      session: UserSession(name: name, mail: mail, cookies: cookies),
+    );
   }
 
   Future<void> login(String name, String password, bool persistent) async {
-    state = state.copyWith(isLoading: true);
-    try {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
       final session = await ref
           .read(authRepositoryProvider)
           .login(
@@ -133,23 +166,44 @@ class AuthStateNotifier extends _$AuthStateNotifier {
             password: password,
             persistent: persistent,
           );
-      state = state.copyWith(isAuthenticated: true, session: session, isLoading: false);
-    } on AuthException catch (e) {
-      state = state.copyWith(error: e.message, isLoading: false);
-    } on Object catch (_) {
-      state = state.copyWith(error: 'Connection error', isLoading: false);
-    }
+      await _saveSession(session);
+      return AuthStateData(
+        isAuthenticated: true,
+        session: session,
+      );
+    });
   }
 
   Future<void> logout() async {
     try {
       await ref.read(authRepositoryProvider).logout();
     } on Object catch (_) {}
-    state = const AuthStateData();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kSessionNameKey);
+    await prefs.remove(_kSessionMailKey);
+    await prefs.remove(_kSessionCookiesKey);
+    state = const AsyncValue.data(AuthStateData());
   }
 
   void clearError() {
-    state = state.copyWith(clearError: true);
+    final current = state.value;
+    if (current != null) {
+      state = AsyncValue.data(current.copyWith(clearError: true));
+    }
+  }
+
+  Future<void> _saveSession(UserSession session) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kSessionNameKey, session.name);
+    if (session.mail != null) {
+      await prefs.setString(_kSessionMailKey, session.mail!);
+    }
+    if (session.cookies.isNotEmpty) {
+      final encoded = session.cookies.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      await prefs.setString(_kSessionCookiesKey, encoded);
+    }
   }
 }
 
@@ -170,14 +224,14 @@ class AuthStateData {
     bool? isAuthenticated,
     UserSession? session,
     String? error,
-    bool? isLoading,
+    bool isLoading = false,
     bool clearError = false,
   }) {
     return AuthStateData(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       session: session ?? this.session,
       error: clearError ? null : (error ?? this.error),
-      isLoading: isLoading ?? this.isLoading,
+      isLoading: isLoading,
     );
   }
 }

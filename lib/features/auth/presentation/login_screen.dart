@@ -30,18 +30,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
+    final authAsync = ref.watch(authStateProvider);
+    final authData = authAsync.value;
 
-    ref.listen<AuthStateData>(authStateProvider, (prev, next) {
-      if (next.isAuthenticated && mounted) {
+    ref.listen(authStateProvider, (prev, next) {
+      final data = next.value;
+      if (data != null && data.isAuthenticated && mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Вход выполнен успешно')),
         );
       }
-      if (next.error != null && mounted) {
+      if (data != null && data.error != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!)),
+          SnackBar(content: Text(data.error!)),
         );
         ref.read(authStateProvider.notifier).clearError();
       }
@@ -127,8 +129,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                      onPressed: authState.isLoading ? null : _login,
-                      child: authState.isLoading
+                    onPressed: authAsync.isLoading ? null : _login,
+                    child: authAsync.isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,

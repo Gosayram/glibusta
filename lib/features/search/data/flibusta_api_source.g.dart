@@ -13,7 +13,12 @@ part of 'flibusta_api_source.dart';
 final flibustaApiSourceProvider = FlibustaApiSourceProvider._();
 
 final class FlibustaApiSourceProvider
-    extends $FunctionalProvider<FlibustaApiSource, FlibustaApiSource, FlibustaApiSource>
+    extends
+        $FunctionalProvider<
+          FlibustaApiSource,
+          FlibustaApiSource,
+          FlibustaApiSource
+        >
     with $Provider<FlibustaApiSource> {
   FlibustaApiSourceProvider._()
     : super(

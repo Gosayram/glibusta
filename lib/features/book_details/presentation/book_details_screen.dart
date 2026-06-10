@@ -5,12 +5,14 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
+import '../data/book_comments_service.dart';
 import '../data/book_details_repository_impl.dart';
 
 final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
@@ -77,7 +79,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -133,6 +135,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
                     _ChaptersTab(bookId: widget.bookId),
                     _BookmarksTab(bookId: widget.bookId),
                     _QuotesTab(bookId: widget.bookId),
+                    _CommentsTab(bookId: widget.bookId),
                   ],
                 ),
               ),
@@ -373,6 +376,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
           Tab(text: 'Главы'),
           Tab(text: 'Закладки'),
           Tab(text: 'Цитаты'),
+          Tab(text: 'Комментарии'),
         ],
         labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         unselectedLabelStyle: theme.textTheme.labelMedium,
@@ -562,6 +566,214 @@ class _QuotesTab extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _CommentsTab extends ConsumerStatefulWidget {
+  final String bookId;
+
+  const _CommentsTab({required this.bookId});
+
+  @override
+  ConsumerState<_CommentsTab> createState() => _CommentsTabState();
+}
+
+class _CommentsTabState extends ConsumerState<_CommentsTab> {
+  final _commentController = TextEditingController();
+  bool _isPosting = false;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final commentsService = ref.read(bookCommentsServiceProvider);
+    final authData = ref.watch(auth.authStateProvider).value;
+    final isAuthenticated = authData?.isAuthenticated ?? false;
+
+    return FutureBuilder<List<BookComment>>(
+      future: commentsService.getComments(widget.bookId),
+      builder: (context, snapshot) {
+        final comments = snapshot.data ?? [];
+
+        return Column(
+          children: [
+            Expanded(
+              child: comments.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Нет комментариев',
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: comments.length,
+                      itemBuilder: (context, index) {
+                        final comment = comments[index];
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.person, size: 16, color: theme.colorScheme.primary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      comment.author,
+                                      style: theme.textTheme.labelMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                    if (comment.createdAt != null) ...[
+                                      const Spacer(),
+                                      Text(
+                                        _formatDate(comment.createdAt!),
+                                        style: theme.textTheme.labelSmall?.copyWith(
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(comment.text, style: theme.textTheme.bodyMedium),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: !isAuthenticated
+                    ? Row(
+                        children: [
+                          Icon(Icons.lock_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Войдите, чтобы оставить комментарий',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const _LoginPlaceholder(),
+                              ),
+                            ),
+                            child: const Text('Войти'),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _commentController,
+                              decoration: const InputDecoration(
+                                hintText: 'Комментарий...',
+                                border: OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              maxLines: null,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (_) => _postComment(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                            onPressed: _isPosting ? null : _postComment,
+                            icon: _isPosting
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.send, size: 18),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _postComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    final authState = ref.read(auth.authStateProvider).value as auth.AuthStateData?;
+    if (authState?.session == null) return;
+
+    setState(() => _isPosting = true);
+    try {
+      final service = ref.read(bookCommentsServiceProvider);
+      final cookies = authState!.session!.cookies;
+      final success = await service.postComment(
+        bookId: widget.bookId,
+        body: text,
+        cookies: cookies,
+      );
+      if (success && mounted) {
+        _commentController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Комментарий отправлен')),
+        );
+        setState(() {});
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось отправить комментарий')),
+        );
+      }
+    } on Object catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка отправки')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPosting = false);
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    return '${dt.day}.${dt.month}.${dt.year}';
+  }
+}
+
+class _LoginPlaceholder extends StatelessWidget {
+  const _LoginPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Вход')),
+      body: const Center(
+        child: Text('Откройте Настройки → Вход для авторизации'),
+      ),
     );
   }
 }

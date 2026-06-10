@@ -1,12 +1,25 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
+
+import '../auth/auth_repository.dart';
 
 final _log = Logger('AppInterceptors');
 
 class AuthInterceptor extends Interceptor {
+  final Ref _ref;
+
+  AuthInterceptor(this._ref);
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // Placeholder for auth token injection
+    final authState = _ref.read(authStateProvider);
+    final session = authState.value?.session;
+    if (session != null && session.cookies.isNotEmpty) {
+      final cookieHeader =
+          session.cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      options.headers['Cookie'] = cookieHeader;
+    }
     handler.next(options);
   }
 }
