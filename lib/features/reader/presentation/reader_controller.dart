@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/debouncer.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/parsers/normalized_book.dart';
@@ -63,7 +64,7 @@ class ReaderController {
   final String _bookId;
   final WidgetRef _ref;
   final _autoThemeService = AutoThemeService();
-  Timer? _progressTimer;
+  final _progressDebouncer = Debouncer(delay: const Duration(seconds: 5));
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -74,7 +75,7 @@ class ReaderController {
 
   void dispose() {
     _disposed = true;
-    _progressTimer?.cancel();
+    _progressDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
@@ -111,10 +112,6 @@ class ReaderController {
         ),
       );
       _scrollController = ScrollController()..addListener(_onScroll);
-      _progressTimer = Timer.periodic(
-        const Duration(seconds: 5),
-        (_) => saveProgress(),
-      );
       _autoThemeTimer = Timer.periodic(
         const Duration(minutes: 1),
         (_) => _checkAutoTheme(),
@@ -138,6 +135,7 @@ class ReaderController {
       final progress = _scrollController!.offset / maxScroll;
       _updateState(_state.copyWith(scrollProgress: progress.clamp(0.0, 1.0)));
       _updateChapterFromScroll();
+      _progressDebouncer.call(saveProgress);
     }
   }
 

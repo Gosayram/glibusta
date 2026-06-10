@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/book.dart';
+import 'book_cover_image.dart';
 
 class BookCard extends StatelessWidget {
   final Book book;
@@ -46,13 +47,7 @@ class BookCard extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      book.coverUrl != null
-                          ? Image.network(
-                              book.coverUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => _buildPlaceholder(theme),
-                            )
-                          : _buildPlaceholder(theme),
+                      BookCoverImage(book: book),
                       if (isDownloaded == true)
                         const Positioned(
                           top: 4,
@@ -144,19 +139,6 @@ class BookCard extends StatelessWidget {
       ).then((callback) {
         callback?.call();
       }),
-    );
-  }
-
-  Widget _buildPlaceholder(ThemeData theme) {
-    return ColoredBox(
-      color: theme.colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Icon(
-          Icons.book,
-          size: 32,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
     );
   }
 }

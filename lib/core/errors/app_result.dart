@@ -1,4 +1,4 @@
-import 'app_failure.dart';
+import 'failures.dart';
 
 sealed class AppResult<T> {
   const AppResult();
@@ -50,6 +50,6 @@ Future<AppResult<T>> guardFuture<T>(Future<T> Function() operation) async {
   } on AppFailure catch (e) {
     return Failure(e);
   } on Object catch (e) {
-    return Failure(UnknownFailure(message: e.toString()));
+    return Failure(UnknownFailure(e.toString()));
   }
 }

@@ -1,7 +1,7 @@
 import 'dart:isolate';
 
-import '../errors/app_failure.dart';
 import '../errors/app_result.dart';
+import '../errors/failures.dart';
 
 Future<AppResult<T>> runInIsolate<T>(T Function() computation) async {
   try {

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
+import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
@@ -292,13 +293,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                     horizontal: horizontalPadding.clamp(0.0, double.infinity),
                   ),
                   child: readerState.book != null
-                      ? ReaderContentBody(
-                          book: readerState.book!,
-                          settings: settings,
-                          scrollController: _ctrl.scrollController,
-                          onTap: (details) => _ctrl.handleTap(
-                            details,
-                            MediaQuery.sizeOf(context).width,
+                      ? SelectionAreaWrapper(
+                          child: ReaderContentBody(
+                            book: readerState.book!,
+                            settings: settings,
+                            scrollController: _ctrl.scrollController,
+                            onTap: (details) => _ctrl.handleTap(
+                              details,
+                              MediaQuery.sizeOf(context).width,
+                            ),
                           ),
                         )
                       : const SizedBox.shrink(),

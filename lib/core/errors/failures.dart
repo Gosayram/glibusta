@@ -11,6 +11,10 @@ final class NetworkFailure extends AppFailure {
   const NetworkFailure([super.message]);
 }
 
+final class NotFoundFailure extends AppFailure {
+  const NotFoundFailure([super.message]);
+}
+
 final class SourceUnavailableFailure extends AppFailure {
   const SourceUnavailableFailure([super.message]);
 }
@@ -19,12 +23,20 @@ final class ParserFailure extends AppFailure {
   const ParserFailure([super.message]);
 }
 
+final class ParseFailure extends AppFailure {
+  const ParseFailure({String? message}) : super(message);
+}
+
 final class DownloadFailure extends AppFailure {
   const DownloadFailure([super.message]);
 }
 
 final class StorageFailure extends AppFailure {
   const StorageFailure([super.message]);
+}
+
+final class AuthFailure extends AppFailure {
+  const AuthFailure([super.message]);
 }
 
 final class CancelledFailure extends AppFailure {
