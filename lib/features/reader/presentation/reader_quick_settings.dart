@@ -152,6 +152,14 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
               const Text('Долгое нажатие', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               _buildLongPressActionRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              _buildToggleRow(
+                'Восстанавливать позицию',
+                Icons.restore,
+                settings.restoreLastPosition,
+                (v) => notifier.updateRestoreLastPosition(v),
+              ),
               const SizedBox(height: 16),
             ],
           ),

@@ -77,6 +77,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['longPressAction'],
           orElse: () => LongPressAction.selectText,
         ),
+        restoreLastPosition: map['restoreLastPosition'] as bool? ?? true,
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -115,6 +116,7 @@ class ReaderSettingsPersistence {
         'verticalSwipeBrightness': settings.verticalSwipeBrightness,
         'doubleTapAction': settings.doubleTapAction.name,
         'longPressAction': settings.longPressAction.name,
+        'restoreLastPosition': settings.restoreLastPosition,
       }),
     );
   }

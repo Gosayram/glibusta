@@ -164,6 +164,11 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
+  void updateRestoreLastPosition(bool restore) {
+    state = state.copyWith(restoreLastPosition: restore);
+    _persist();
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
     _persist();

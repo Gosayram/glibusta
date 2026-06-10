@@ -76,6 +76,7 @@ class ReaderSettings {
   final bool verticalSwipeBrightness;
   final DoubleTapAction doubleTapAction;
   final LongPressAction longPressAction;
+  final bool restoreLastPosition;
 
   const ReaderSettings({
     this.theme = ReaderTheme.dark,
@@ -105,6 +106,7 @@ class ReaderSettings {
     this.verticalSwipeBrightness = true,
     this.doubleTapAction = DoubleTapAction.toggleUI,
     this.longPressAction = LongPressAction.selectText,
+    this.restoreLastPosition = true,
   });
 
   ReaderSettings copyWith({
@@ -135,6 +137,7 @@ class ReaderSettings {
     bool? verticalSwipeBrightness,
     DoubleTapAction? doubleTapAction,
     LongPressAction? longPressAction,
+    bool? restoreLastPosition,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -164,6 +167,7 @@ class ReaderSettings {
       verticalSwipeBrightness: verticalSwipeBrightness ?? this.verticalSwipeBrightness,
       doubleTapAction: doubleTapAction ?? this.doubleTapAction,
       longPressAction: longPressAction ?? this.longPressAction,
+      restoreLastPosition: restoreLastPosition ?? this.restoreLastPosition,
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/parsers/normalized_book.dart';
@@ -11,12 +13,16 @@ class ReaderContentBody extends StatelessWidget {
     required this.settings,
     required this.scrollController,
     required this.onTap,
+    this.initialProgress = 0.0,
+    this.initialPage = 0,
   });
 
   final NormalizedBook book;
   final ReaderSettings settings;
   final ScrollController scrollController;
   final GestureTapUpCallback onTap;
+  final double initialProgress;
+  final int initialPage;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +31,7 @@ class ReaderContentBody extends StatelessWidget {
         book: book,
         settings: settings,
         onTap: onTap,
+        initialPage: initialPage,
       );
     }
 
@@ -36,6 +43,22 @@ class ReaderContentBody extends StatelessWidget {
           )
         : EdgeInsets.all(settings.margin);
     final textDirection = _effectiveTextDirection(context, settings);
+
+    if (initialProgress > 0 && scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!scrollController.hasClients) return;
+        final maxScroll = scrollController.position.maxScrollExtent;
+        if (maxScroll > 0) {
+          unawaited(
+            scrollController.animateTo(
+              (initialProgress * maxScroll).clamp(0.0, maxScroll),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+            ),
+          );
+        }
+      });
+    }
 
     return SafeArea(
       top: false,
@@ -245,11 +268,13 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.book,
     required this.settings,
     required this.onTap,
+    required this.initialPage,
   });
 
   final NormalizedBook book;
   final ReaderSettings settings;
   final GestureTapUpCallback onTap;
+  final int initialPage;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -257,6 +282,8 @@ class _PaginatedContentBody extends StatefulWidget {
 
 class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
+  bool _didRestoreInitialPage = false;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -266,6 +293,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   @override
   void dispose() {
+    _disposed = true;
     _pageController.dispose();
     super.dispose();
   }
@@ -490,6 +518,23 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final pageCount = useTwoPageLayout
         ? ((widget.book.chapters.length + 1) ~/ 2)
         : widget.book.chapters.length;
+    if (!_didRestoreInitialPage && widget.initialPage > 0 && pageCount > 0) {
+      final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
+        0,
+        pageCount - 1,
+      );
+      _didRestoreInitialPage = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_disposed || !_pageController.hasClients) return;
+        unawaited(
+          _pageController.animateToPage(
+            targetPage,
+            duration: Duration.zero,
+            curve: Curves.easeInOut,
+          ),
+        );
+      });
+    }
 
     switch (widget.settings.pageTurnAnimation) {
       case PageTurnAnimation.none:

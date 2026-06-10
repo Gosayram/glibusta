@@ -30,6 +30,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   late final ReaderController _ctrl;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
+  bool _fullscreenMode = false;
 
   @override
   void initState() {
@@ -65,6 +66,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _ctrl.dispose();
+    _ctrl.disableFullscreen();
     super.dispose();
   }
 
@@ -94,6 +96,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   Widget build(BuildContext context) {
     final readerState = _ctrl.state;
     final settings = ref.watch(readerSettingsProvider);
+    final fullscreenMode = settings.mode == ReaderMode.fullscreen;
+    if (fullscreenMode != _fullscreenMode) {
+      _fullscreenMode = fullscreenMode;
+      if (fullscreenMode) {
+        _ctrl.enableFullscreen();
+      } else {
+        _ctrl.disableFullscreen();
+      }
+    }
     final resolvedTheme = _resolveTheme(settings);
     final theme = _getThemeData(resolvedTheme);
 
@@ -195,6 +206,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 settings: settings,
                 scrollController: _ctrl.scrollController,
                 onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                initialProgress: readerState.scrollProgress,
+                initialPage: readerState.currentChapterIndex,
               ),
             ),
           _buildWarmthOverlay(settings),
@@ -246,9 +259,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     ReaderState readerState,
     ReaderSettings settings,
   ) {
-    const maxWidth = 720.0;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final horizontalPadding = ((screenWidth - maxWidth) / 2).clamp(32.0, 48.0);
+    final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
+    final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
+    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
@@ -271,6 +285,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                     onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
                         ? _ctrl.handleDoubleTap
                         : null,
+                    onLongPress: settings.longPressAction != LongPressAction.disabled
+                        ? _ctrl.handleLongPress
+                        : null,
                     behavior: HitTestBehavior.translucent,
                     child: ReaderContentBody(
                       book: readerState.book!,
@@ -278,6 +295,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                       scrollController: _ctrl.scrollController,
                       onTap: (details) =>
                           _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                      initialProgress: readerState.scrollProgress,
+                      initialPage: readerState.currentChapterIndex,
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -331,9 +350,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     ReaderState readerState,
     ReaderSettings settings,
   ) {
-    const maxWidth = 820.0;
-    final horizontalPadding = (MediaQuery.sizeOf(context).width - maxWidth) / 2;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     const sidePanelWidth = 250.0;
+    final availableWidth = screenWidth - sidePanelWidth - 1.0;
+    final maxContentWidth = (availableWidth - 32.0).clamp(600.0, availableWidth);
+    final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
+    final horizontalPadding = ((availableWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
@@ -352,9 +374,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             child: Stack(
               children: [
                 Container(
-                  width: double.infinity,
+                  width: effectiveWidth,
                   padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding.clamp(0.0, double.infinity),
+                    horizontal: horizontalPadding,
                   ),
                   child: readerState.book != null
                       ? SelectionAreaWrapper(
@@ -371,6 +393,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                             onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
                                 ? _ctrl.handleDoubleTap
                                 : null,
+                            onLongPress: settings.longPressAction != LongPressAction.disabled
+                                ? _ctrl.handleLongPress
+                                : null,
                             behavior: HitTestBehavior.translucent,
                             child: ReaderContentBody(
                               book: readerState.book!,
@@ -380,6 +405,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                                 details,
                                 MediaQuery.sizeOf(context).width,
                               ),
+                              initialProgress: readerState.scrollProgress,
+                              initialPage: readerState.currentChapterIndex,
                             ),
                           ),
                         )

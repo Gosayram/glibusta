@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -71,6 +72,7 @@ class ReaderController {
   ScrollController? _scrollController;
   ReaderState _state = const ReaderState();
   bool _disposed = false;
+  bool _fullscreenEnabled = false;
 
   ReaderState get state => _state;
 
@@ -81,6 +83,7 @@ class ReaderController {
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
+    disableFullscreen();
     saveProgress();
     unawaited(WakelockPlus.disable());
   }
@@ -92,6 +95,18 @@ class ReaderController {
     } else {
       unawaited(WakelockPlus.disable());
     }
+  }
+
+  void enableFullscreen() {
+    if (_fullscreenEnabled) return;
+    _fullscreenEnabled = true;
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+  }
+
+  void disableFullscreen() {
+    if (!_fullscreenEnabled) return;
+    _fullscreenEnabled = false;
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   }
 
   void _updateState(ReaderState newState) {
@@ -122,6 +137,10 @@ class ReaderController {
         ),
       );
       _scrollController = ScrollController()..addListener(_onScroll);
+      final settings = _ref.read(readerSettingsProvider);
+      if (settings.restoreLastPosition && savedChapter > 0) {
+        _restoreSavedChapter(savedChapter);
+      }
       _autoThemeTimer = Timer.periodic(
         AppDuration.autoThemeCheck,
         (_) => _checkAutoTheme(),
@@ -218,6 +237,28 @@ class ReaderController {
     }
   }
 
+  void _restoreSavedChapter(int chapterIndex) {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+      return;
+    }
+    if (_scrollController == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+      final maxScroll = _scrollController!.position.maxScrollExtent;
+      if (maxScroll <= 0) return;
+      final chapterCount = _state.book?.chapters.length ?? 1;
+      final progress = chapterCount <= 1 ? 0.0 : chapterIndex / (chapterCount - 1);
+      unawaited(
+        _scrollController!.animateTo(
+          (progress * maxScroll).clamp(0.0, maxScroll),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        ),
+      );
+    });
+  }
+
   void saveProgress() {
     if (_state.book == null) return;
     final database = _ref.read(databaseProvider);
@@ -289,7 +330,11 @@ class ReaderController {
         // TODO: Add bookmark
         break;
       case DoubleTapAction.toggleFullscreen:
-        // Toggle fullscreen mode would require app-level handling
+        final notifier = _ref.read(readerSettingsProvider.notifier);
+        final currentMode = _ref.read(readerSettingsProvider).mode;
+        notifier.updateMode(
+          currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
+        );
         break;
       case DoubleTapAction.disabled:
         break;
