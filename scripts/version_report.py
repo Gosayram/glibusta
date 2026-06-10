@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Parse flutter pub outdated --json and print a formatted version report."""
-
 from __future__ import annotations
 
 import json
@@ -19,7 +18,6 @@ def main() -> int:
         print("  All dependencies are up to date!")
         return 0
 
-    # Separate direct + dev from transitive
     direct = [p for p in packages if p.get("kind") in ("direct", "dev")]
     transitive = [p for p in packages if p.get("kind") == "transitive"]
 
