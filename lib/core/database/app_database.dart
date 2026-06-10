@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +48,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 3) {
         await m.addColumn(savedBooks, savedBooks.filePath);
+      }
+      if (from < 4) {
+        await m.createTable(readingSessions);
       }
     },
     beforeOpen: (details) async {
@@ -179,6 +182,56 @@ class AppDatabase extends _$AppDatabase {
     return query.watch().map(
       (rows) => rows.map((row) => row.readTable(savedBooks)).toList(),
     );
+  }
+
+  // --- Reading Sessions ---
+  Future<int> startSession(String bookId) {
+    return into(readingSessions).insert(
+      ReadingSessionsCompanion.insert(bookId: bookId),
+    );
+  }
+
+  Future<void> endSession(int sessionId, {int chaptersRead = 0}) {
+    return (update(readingSessions)..where((t) => t.id.equals(sessionId))).write(
+      ReadingSessionsCompanion(
+        endedAt: Value(DateTime.now()),
+        chaptersRead: Value(chaptersRead),
+      ),
+    );
+  }
+
+  Future<List<ReadingSession>> getSessionsForDateRange(DateTime start, DateTime end) {
+    return (select(readingSessions)
+          ..where((t) => t.startedAt.isBetweenValues(start, end))
+          ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]))
+        .get();
+  }
+
+  Future<Map<DateTime, int>> getDailyReadingMinutes(int days) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+
+    final sessions = await getSessionsForDateRange(start, now);
+    final dailyMinutes = <DateTime, int>{};
+
+    for (final session in sessions) {
+      final day = DateTime(session.startedAt.year, session.startedAt.month, session.startedAt.day);
+      final end = session.endedAt ?? DateTime.now();
+      final minutes = end.difference(session.startedAt).inMinutes;
+      dailyMinutes[day] = (dailyMinutes[day] ?? 0) + minutes;
+    }
+
+    return dailyMinutes;
+  }
+
+  // --- Bookmarks ---
+  Future<List<Bookmark>> getBookmarksForBook(String bookId) {
+    return (select(bookmarks)..where((t) => t.bookId.equals(bookId))).get();
+  }
+
+  // --- Quotes ---
+  Future<List<Quote>> getQuotesForBook(String bookId) {
+    return (select(quotes)..where((t) => t.bookId.equals(bookId))).get();
   }
 }
 

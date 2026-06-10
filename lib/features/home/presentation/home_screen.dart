@@ -9,6 +9,8 @@ import '../../../shared/widgets/book_card.dart';
 import '../../library/data/book_repository_impl.dart';
 import 'continue_reading_card.dart';
 import 'continue_reading_provider.dart';
+import 'reading_heatmap.dart';
+import 'reading_stats_provider.dart';
 
 part 'home_screen.g.dart';
 
@@ -82,7 +84,11 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Recent books section
+                // Reading stats section
+                const _SectionHeader(title: 'Статистика чтения'),
+                const SizedBox(height: 8),
+                const _ReadingStatsSection(),
+                const SizedBox(height: 24),
                 const _SectionHeader(title: 'Недавно добавленные'),
                 const SizedBox(height: 8),
                 SizedBox(
@@ -203,6 +209,130 @@ class _QuickAction extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
+    );
+  }
+}
+
+class _ReadingStatsSection extends ConsumerWidget {
+  const _ReadingStatsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(readingStatsProvider);
+    final theme = Theme.of(context);
+
+    return statsAsync.when(
+      data: (stats) {
+        if (stats.totalMinutes == 0 && stats.currentStreak == 0) {
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.local_fire_department_outlined,
+                    size: 40,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Начните читать, чтобы увидеть статистику',
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Stats row
+                Row(
+                  children: [
+                    _StatChip(
+                      icon: Icons.local_fire_department,
+                      label: stats.streakText,
+                      color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(width: 8),
+                    _StatChip(
+                      icon: Icons.today,
+                      label: stats.todayText,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _StatChip(
+                  icon: Icons.calendar_month,
+                  label: stats.monthText,
+                  color: theme.colorScheme.tertiary,
+                ),
+                const SizedBox(height: 16),
+                // Heatmap
+                ReadingHeatmap(data: stats.heatmapData),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

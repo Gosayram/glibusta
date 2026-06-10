@@ -10,11 +10,13 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
+import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
+import 'library_view_mode_provider.dart';
 import 'pinned_books_provider.dart';
 
 part 'library_screen.g.dart';
@@ -37,6 +39,11 @@ class LibraryScreen extends ConsumerWidget {
         title: const Text('Библиотека'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: Icon(_viewModeIcon(ref.watch(libraryViewModeProvider))),
+            tooltip: 'Вид',
+            onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Импортировать книгу',
@@ -87,6 +94,17 @@ class LibraryScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  IconData _viewModeIcon(LibraryViewMode mode) {
+    switch (mode) {
+      case LibraryViewMode.grid:
+        return Icons.grid_view;
+      case LibraryViewMode.list:
+        return Icons.view_list;
+      case LibraryViewMode.compact:
+        return Icons.view_compact;
+    }
   }
 
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
@@ -243,28 +261,73 @@ class LibraryScreen extends ConsumerWidget {
         ),
         SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 180,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.62,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final book = unpinnedBooks.isNotEmpty ? unpinnedBooks[index] : books[index];
-                return BookCard(
-                  book: book,
-                  onTap: () => unawaited(context.push('/reader/${book.id}')),
-                  onLongPress: () => _showBookMenu(context, ref, book),
-                );
-              },
-              childCount: unpinnedBooks.isNotEmpty ? unpinnedBooks.length : books.length,
-            ),
-          ),
+          sliver: _buildBookSliver(context, ref, unpinnedBooks.isNotEmpty ? unpinnedBooks : books),
         ),
       ],
     );
+  }
+
+  Widget _buildBookSliver(BuildContext context, WidgetRef ref, List<Book> books) {
+    final viewMode = ref.watch(libraryViewModeProvider);
+    switch (viewMode) {
+      case LibraryViewMode.grid:
+        return SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 180,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.62,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => BookCard(
+              book: books[index],
+              onTap: () => unawaited(context.push('/reader/${books[index].id}')),
+              onLongPress: () => _showBookMenu(context, ref, books[index]),
+            ),
+            childCount: books.length,
+          ),
+        );
+      case LibraryViewMode.list:
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final book = books[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: SizedBox(
+                    width: 48,
+                    height: 68,
+                    child: BookCoverImage(book: book),
+                  ),
+                  title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  subtitle: book.authorIds.isNotEmpty ? Text(book.authorIds.join(', ')) : null,
+                  onTap: () => unawaited(context.push('/reader/${book.id}')),
+                  onLongPress: () => _showBookMenu(context, ref, book),
+                ),
+              );
+            },
+            childCount: books.length,
+          ),
+        );
+      case LibraryViewMode.compact:
+        return SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 120,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.55,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => BookCard(
+              book: books[index],
+              onTap: () => unawaited(context.push('/reader/${books[index].id}')),
+              onLongPress: () => _showBookMenu(context, ref, books[index]),
+            ),
+            childCount: books.length,
+          ),
+        );
+    }
   }
 
   void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
