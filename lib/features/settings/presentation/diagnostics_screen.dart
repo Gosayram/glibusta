@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
@@ -249,6 +250,17 @@ class DiagnosticsScreen extends ConsumerWidget {
     final db = ref.read(databaseProvider);
     final logger = ref.read(appLoggerProvider);
 
+    // Capture MediaQuery values before any async gaps
+    final mq = MediaQuery.of(context);
+    final screenWidth = mq.size.width;
+    final screenHeight = mq.size.height;
+    final pixelRatio = mq.devicePixelRatio;
+    final orientation = mq.orientation.name;
+    final brightness = mq.platformBrightness.name;
+    final textScale = mq.textScaler.scale(14).toStringAsFixed(1);
+    final padding = mq.padding;
+    final viewInsets = mq.viewInsets;
+
     // DB check
     bool dbOk = true;
     int totalBooks = 0;
@@ -287,15 +299,21 @@ class DiagnosticsScreen extends ConsumerWidget {
       storageOk = false;
     }
 
-    // Connectivity check
+    // Connectivity check — probe actual server reachability
     bool connectivityOk = true;
     String connectivityType = 'Неизвестно';
     try {
       final service = ref.read(offlineModeServiceProvider);
-      connectivityOk = service.isOnline;
       connectivityType = service.state.name;
+      // Probe the actual server, not just network interface
+      final settings = ref.read(appSettingsControllerProvider);
+      connectivityOk = await OfflineModeService.probeServer(settings.baseUrl);
+      if (!connectivityOk) {
+        connectivityType = 'Сервер недоступен';
+      }
     } on Object catch (_) {
       connectivityOk = false;
+      connectivityType = 'Ошибка';
     }
 
     // Error info
@@ -348,17 +366,6 @@ class DiagnosticsScreen extends ConsumerWidget {
         deviceOS = 'macOS ${mac.osRelease}';
       }
     } on Object catch (_) {}
-
-    // Screen info from MediaQuery
-    final mq = MediaQuery.of(context);
-    final screenWidth = mq.size.width;
-    final screenHeight = mq.size.height;
-    final pixelRatio = mq.devicePixelRatio;
-    final orientation = mq.orientation.name;
-    final brightness = mq.platformBrightness.name;
-    final textScale = mq.textScaler.scale(14).toStringAsFixed(1);
-    final padding = mq.padding;
-    final viewInsets = mq.viewInsets;
 
     return DiagnosticsInfo(
       appVersion: appVersion,

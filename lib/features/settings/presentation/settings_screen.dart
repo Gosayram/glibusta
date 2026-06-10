@@ -282,7 +282,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(content: Text('Ошибка: ${result.error}')),
         );
       }
-    } catch (e) {
+    } on Object catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка импорта: $e')),

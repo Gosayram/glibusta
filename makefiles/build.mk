@@ -2,8 +2,8 @@ ifndef BUILD_MK
 BUILD_MK := 1
 
 APP_NAME ?= glibusta
-APP_VERSION := $(shell $(PYTHON) $(PUBSPEC_VALUE_SCRIPT) version 2>/dev/null || printf "0.0.0+0")
-APP_ARTIFACT_VERSION := $(subst +,_,$(APP_VERSION))
+APP_VERSION = $(shell $(PYTHON) $(PUBSPEC_VALUE_SCRIPT) version 2>/dev/null || printf "0.0.0+0")
+APP_ARTIFACT_VERSION = $(subst +,_,$(APP_VERSION))
 
 DIST_DIR ?= dist/releases
 BUILD_DIR ?= build
@@ -24,6 +24,24 @@ FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release
 
 ##@ Build
+
+.PHONY: bump
+bump: require-python ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
+	@$(PRINT_STEP) "Bumping patch version"
+	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py); \
+	echo "  $$NEW_VER"
+
+.PHONY: bump-minor
+bump-minor: require-python ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
+	@$(PRINT_STEP) "Bumping minor version"
+	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --minor); \
+	echo "  $$NEW_VER"
+
+.PHONY: bump-major
+bump-major: require-python ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
+	@$(PRINT_STEP) "Bumping major version"
+	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --major); \
+	echo "  $$NEW_VER"
 
 .PHONY: clean-artifacts
 clean-artifacts: ## Remove generated release artifacts
@@ -95,7 +113,7 @@ build-all: build-android build-macos ## Build signed release artifacts for all a
 	@$(PRINT_OK) "Release artifacts are in $(DIST_DIR)"
 
 .PHONY: release
-release: check test build-all artifacts ## Full release pipeline: lint + test + build all artifacts
+release: check test bump build-all artifacts ## Full release pipeline: lint + test + bump + build all artifacts
 	@$(PRINT_HEADER) "Release $(APP_ARTIFACT_VERSION) ready"
 	@$(PRINT_OK) "Artifacts in $(DIST_DIR)"
 

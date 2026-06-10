@@ -151,44 +151,46 @@ class BookCard extends StatelessWidget {
   }
 
   void _showStatusMenu(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                book.title,
-                style: Theme.of(context).textTheme.titleMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const Divider(height: 1),
-            ...ReadingStatus.values
-                .where((s) => s != ReadingStatus.none)
-                .map(
-                  (status) => ListTile(
-                    leading: Icon(
-                      _statusIcon(status),
-                      color: book.readingStatus == status
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                    title: Text(status.label),
-                    trailing: book.readingStatus == status
-                        ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _updateReadingStatus(context, status);
-                    },
-                  ),
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  book.title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-            const SizedBox(height: 8),
-          ],
+              ),
+              const Divider(height: 1),
+              ...ReadingStatus.values
+                  .where((s) => s != ReadingStatus.none)
+                  .map(
+                    (status) => ListTile(
+                      leading: Icon(
+                        _statusIcon(status),
+                        color: book.readingStatus == status
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
+                      ),
+                      title: Text(status.label),
+                      trailing: book.readingStatus == status
+                          ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                          : null,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _updateReadingStatus(context, status);
+                      },
+                    ),
+                  ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -285,7 +287,6 @@ class _StatusBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.9),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, size: 14, color: Colors.white),
     );
   }
 }

@@ -22,7 +22,7 @@ class FlibustaApiSource extends BookSource {
 
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
-    if (query.hasFilters || query.query.isEmpty) {
+    if (query.hasFilters) {
       return SearchResultPage(
         books: const [],
         totalCount: 0,

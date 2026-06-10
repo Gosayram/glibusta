@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../config/app_settings.dart';
 import 'dio_provider.dart';
 
 part 'http_client.g.dart';
@@ -8,14 +9,17 @@ part 'http_client.g.dart';
 @riverpod
 HttpClient httpClient(Ref ref) {
   final dio = ref.watch(dioProvider);
-  return HttpClient(dio);
+  final settings = ref.watch(appSettingsControllerProvider);
+  return HttpClient(dio, mirrors: [settings.baseUrl, ...settings.mirrors]);
 }
 
 class HttpClient {
   final Dio _dio;
+  final List<String> _mirrors;
   Map<String, String> _sessionCookies = {};
 
-  HttpClient(this._dio);
+  HttpClient(this._dio, {List<String> mirrors = const []})
+    : _mirrors = mirrors.isEmpty ? [_dio.options.baseUrl] : mirrors;
 
   void setSessionCookies(Map<String, String> cookies) {
     _sessionCookies = Map.from(cookies);
@@ -49,13 +53,14 @@ class HttpClient {
   }
 
   Future<String> getWithMirror(String path, {CancelToken? cancelToken}) async {
-    final settings = _dio.options;
-    final baseUrl = settings.baseUrl;
-    final normalizedBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    final urls = [normalizedBase].map((base) => '$base$normalizedPath').toList();
+    final seen = <String>{};
+    final urls = <String>[];
+    for (final raw in _mirrors) {
+      final base = raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
+      final url = '$base$normalizedPath';
+      if (seen.add(url)) urls.add(url);
+    }
 
     HttpException? lastError;
     for (final url in urls) {

@@ -16,12 +16,8 @@ class EpubParser implements BookParser {
       return _convertToNormalized(epubBook);
     } on FormatException catch (e) {
       throw ParserFailure('Неверный формат EPUB: ${e.message}');
-    } on RangeError catch (e) {
-      throw ParserFailure('Повреждённый EPUB файл: ${e.message}');
-    } on StateError catch (e) {
-      throw ParserFailure('Ошибка структуры EPUB: ${e.message}');
     } on Object catch (e) {
-      throw ParserFailure('Неожиданная ошибка при разборе EPUB: $e');
+      throw ParserFailure('Ошибка при разборе EPUB: $e');
     }
   }
 

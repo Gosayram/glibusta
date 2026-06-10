@@ -131,7 +131,7 @@ class FontDownloadService {
         await file.delete();
         return null;
       }
-    } catch (e) {
+    } on Object catch (e) {
       _logger.severe('Failed to download font ${font.name}: $e');
       return null;
     }
@@ -146,7 +146,7 @@ class FontDownloadService {
       }
       await _removeDownloaded(font.id);
       _logger.info('Font deleted: ${font.name}');
-    } catch (e) {
+    } on Object catch (e) {
       _logger.severe('Failed to delete font ${font.name}: $e');
     }
   }
