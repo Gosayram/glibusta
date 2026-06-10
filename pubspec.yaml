@@ -45,9 +45,8 @@ dependencies:
   background_downloader: ^9.5.5
 
   # Reader formats
-  epubx: 4.0.0
-  xml: ^6.6.1
   pdfrx: ^2.4.3
+  xml: ^6.6.1
 
   # Utilities
   async: ^2.13.0
@@ -114,7 +113,3 @@ flutter:
           weight: 400
         - asset: assets/fonts/Literata-Bold.ttf
           weight: 700
-
-dependency_overrides:
-  image: ^4.5.4
-  archive: ^4.0.7
