@@ -67,6 +67,17 @@ class ContinueReadingCard extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (info.book.displayAuthor.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              info.book.displayAuthor,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             info.chapterText,

@@ -1,0 +1,341 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/error_state_widget.dart';
+import '../../bookmarks/data/bookmark_repository.dart';
+import '../../notes/data/note_repository.dart';
+import '../../quotes/data/quote_repository.dart';
+
+enum AnnotationType { bookmarks, notes, quotes }
+
+class AnnotationData {
+  final List<Bookmark> bookmarks;
+  final List<Note> notes;
+  final List<Quote> quotes;
+
+  const AnnotationData({
+    required this.bookmarks,
+    required this.notes,
+    required this.quotes,
+  });
+}
+
+final allAnnotationsProvider = FutureProvider.family<AnnotationData, String?>((ref, bookId) async {
+  final db = ref.watch(databaseProvider);
+
+  final bookmarkRepo = BookmarkRepository(db);
+  final noteRepo = NoteRepository(db);
+  final quoteRepo = QuoteRepository(db);
+
+  final List<Bookmark> bookmarks;
+  final List<Note> notes;
+  final List<Quote> quotes;
+
+  if (bookId != null) {
+    bookmarks = await bookmarkRepo.getAllBookmarks(bookId);
+    notes = await noteRepo.getAllNotes(bookId);
+    quotes = await quoteRepo.getAllQuotes(bookId);
+  } else {
+    bookmarks = await db.select(db.bookmarks).get();
+    notes = await db.select(db.notes).get();
+    quotes = await db.select(db.quotes).get();
+  }
+
+  return AnnotationData(
+    bookmarks: bookmarks,
+    notes: notes,
+    quotes: quotes,
+  );
+});
+
+class AnnotationsScreen extends ConsumerStatefulWidget {
+  final String? bookId;
+
+  const AnnotationsScreen({super.key, this.bookId});
+
+  @override
+  ConsumerState<AnnotationsScreen> createState() => _AnnotationsScreenState();
+}
+
+class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final annotationsAsync = ref.watch(allAnnotationsProvider(widget.bookId));
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Аннотации'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.bookmark_border), text: 'Закладки'),
+            Tab(icon: Icon(Icons.note_alt_outlined), text: 'Заметки'),
+            Tab(icon: Icon(Icons.format_quote), text: 'Цитаты'),
+          ],
+        ),
+      ),
+      body: annotationsAsync.when(
+        data: (data) {
+          return TabBarView(
+            controller: _tabController,
+            children: [
+              _BookmarkList(bookmarks: data.bookmarks),
+              _NoteList(notes: data.notes),
+              _QuoteList(quotes: data.quotes),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => ErrorStateWidget(
+          message: 'Не удалось загрузить аннотации',
+          details: e.toString(),
+          onRetry: () => ref.invalidate(allAnnotationsProvider(widget.bookId)),
+        ),
+      ),
+    );
+  }
+}
+
+class _BookmarkList extends ConsumerWidget {
+  final List<Bookmark> bookmarks;
+
+  const _BookmarkList({required this.bookmarks});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (bookmarks.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.bookmark_border,
+        message: 'Нет закладок',
+        hint: 'Создавайте закладки при чтении',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: bookmarks.length,
+      itemBuilder: (context, index) {
+        final bookmark = bookmarks[index];
+        return Dismissible(
+          key: Key(bookmark.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: Theme.of(context).colorScheme.error,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
+          ),
+          onDismissed: (_) {
+            final db = ref.read(databaseProvider);
+            unawaited(BookmarkRepository(db).deleteBookmark(bookmark.id));
+          },
+          child: ListTile(
+            leading: const Icon(Icons.bookmark),
+            title: bookmark.selectedText != null
+                ? Text(
+                    bookmark.selectedText!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : Text('Стр. ${bookmark.chapterIndex + 1}'),
+            subtitle: Text(
+              'Абзац ${bookmark.paragraphIndex + 1}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: () => context.push('/reader/${bookmark.bookId}'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NoteList extends ConsumerWidget {
+  final List<Note> notes;
+
+  const _NoteList({required this.notes});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (notes.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.note_alt_outlined,
+        message: 'Нет заметок',
+        hint: 'Создавайте заметки при чтении',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: notes.length,
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return Dismissible(
+          key: Key(note.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: Theme.of(context).colorScheme.error,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
+          ),
+          onDismissed: (_) {
+            final db = ref.read(databaseProvider);
+            unawaited(NoteRepository(db).deleteNote(note.id));
+          },
+          child: ListTile(
+            leading: Icon(
+              Icons.note,
+              color: Color(int.parse('0xFF${note.highlightColor.substring(1)}')),
+            ),
+            title: Text(
+              note.content,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              'Стр. ${note.chapterIndex + 1}, абзац ${note.paragraphIndex + 1}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            onTap: () => context.push('/reader/${note.bookId}'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _QuoteList extends ConsumerWidget {
+  final List<Quote> quotes;
+
+  const _QuoteList({required this.quotes});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (quotes.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.format_quote,
+        message: 'Нет цитат',
+        hint: 'Выделяйте текст при чтении',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: quotes.length,
+      itemBuilder: (context, index) {
+        final quote = quotes[index];
+        return Dismissible(
+          key: Key(quote.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: Theme.of(context).colorScheme.error,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 16),
+            child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
+          ),
+          onDismissed: (_) {
+            final db = ref.read(databaseProvider);
+            unawaited(QuoteRepository(db).deleteQuote(quote.id));
+          },
+          child: ListTile(
+            leading: const Icon(Icons.format_quote),
+            title: Text(
+              quote.selectedText,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(
+                  'Стр. ${quote.chapterIndex + 1}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (quote.note != null && quote.note!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    quote.note!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            onTap: () => context.push('/reader/${quote.bookId}'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final String hint;
+
+  const _EmptyState({
+    required this.icon,
+    required this.message,
+    required this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hint,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

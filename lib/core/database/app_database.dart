@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -34,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,6 +59,9 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(readingProgress, readingProgress.localOffset);
         await m.addColumn(readingProgress, readingProgress.progressPercent);
         await m.addColumn(readingProgress, readingProgress.updatedAt);
+      }
+      if (from < 6) {
+        await m.addColumn(savedBooks, savedBooks.readingStatus);
       }
     },
     beforeOpen: (details) async {
@@ -97,6 +101,12 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> deleteBook(String id) {
     return (delete(savedBooks)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<int> updateReadingStatus(String bookId, String status) {
+    return (update(savedBooks)..where((t) => t.id.equals(bookId))).write(
+      SavedBooksCompanion(readingStatus: Value(status)),
+    );
   }
 
   // --- Authors ---
@@ -229,6 +239,100 @@ class AppDatabase extends _$AppDatabase {
     }
 
     return dailyMinutes;
+  }
+
+  // --- Authors (resolve) ---
+  Future<Map<String, String>> getAuthorNamesByIds(List<String> ids) async {
+    if (ids.isEmpty) return {};
+    final query = select(authors)..where((t) => t.id.isIn(ids));
+    final rows = await query.get();
+    return {for (final row in rows) row.id: row.name};
+  }
+
+  Future<List<Author>> getAuthorsForBook(String bookId) async {
+    final book = await getBookById(bookId);
+    if (book == null) return [];
+    final ids = book.authorIds.isNotEmpty
+        ? List<String>.from(jsonDecode(book.authorIds) as List<dynamic>)
+        : <String>[];
+    if (ids.isEmpty) return [];
+    return (select(authors)..where((t) => t.id.isIn(ids))).get();
+  }
+
+  // --- Series ---
+  Future<List<Sery>> getAllSeries() async {
+    return select(series).get();
+  }
+
+  Future<Sery?> getSeriesById(String id) async {
+    return (select(series)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<int> insertSeries(SeriesCompanion entry) {
+    return into(series).insertOnConflictUpdate(entry);
+  }
+
+  Future<List<BookSery>> getBookSeriesForBook(String bookId) async {
+    return (select(bookSeries)..where((t) => t.bookId.equals(bookId))).get();
+  }
+
+  Future<List<Sery>> getSeriesForBook(String bookId) async {
+    final bsRows = await getBookSeriesForBook(bookId);
+    if (bsRows.isEmpty) return [];
+    final seriesIds = bsRows.map((r) => r.seriesId).toList();
+    return (select(series)..where((t) => t.id.isIn(seriesIds))).get();
+  }
+
+  Future<List<BookSery>> getBooksInSeries(String seriesId) async {
+    return (select(bookSeries)..where((t) => t.seriesId.equals(seriesId)))
+      .get();
+  }
+
+  // --- Collections ---
+  Future<List<Collection>> getAllCollections() async {
+    return select(collections).get();
+  }
+
+  Future<Collection?> getCollectionById(String id) async {
+    return (select(collections)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<int> insertCollection(CollectionsCompanion entry) {
+    return into(collections).insertOnConflictUpdate(entry);
+  }
+
+  Future<int> deleteCollection(String id) async {
+    return (delete(collections)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<List<BookCollection>> getBookCollectionsForBook(String bookId) async {
+    return (select(bookCollections)..where((t) => t.bookId.equals(bookId))).get();
+  }
+
+  Future<List<Collection>> getCollectionsForBook(String bookId) async {
+    final bcRows = await getBookCollectionsForBook(bookId);
+    if (bcRows.isEmpty) return [];
+    final colIds = bcRows.map((r) => r.collectionId).toList();
+    return (select(collections)..where((t) => t.id.isIn(colIds))).get();
+  }
+
+  Future<void> addBookToCollection(String bookId, String collectionId) async {
+    await into(bookCollections).insertOnConflictUpdate(
+      BookCollectionsCompanion.insert(bookId: bookId, collectionId: collectionId),
+    );
+  }
+
+  Future<void> removeBookFromCollection(String bookId, String collectionId) async {
+    await (delete(bookCollections)
+      ..where((t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId))).go();
+  }
+
+  Future<List<SavedBook>> getBooksInCollection(String collectionId) async {
+    final bcRows = await (select(bookCollections)
+      ..where((t) => t.collectionId.equals(collectionId))).get();
+    if (bcRows.isEmpty) return [];
+    final bookIds = bcRows.map((r) => r.bookId).toList();
+    return (select(savedBooks)..where((t) => t.id.isIn(bookIds))).get();
   }
 
   // --- Bookmarks ---

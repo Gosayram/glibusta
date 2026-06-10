@@ -219,7 +219,7 @@ final readerTelemetryProvider = Provider<ReaderTelemetry>((ref) {
   throw UnimplementedError('Override in main');
 });
 
-final readingStatsProvider = FutureProvider<Map<String, BookStats>>((ref) async {
+final bookStatsProvider = FutureProvider<Map<String, BookStats>>((ref) async {
   final telemetry = ref.watch(readerTelemetryProvider);
   return telemetry.getAllStats();
 });

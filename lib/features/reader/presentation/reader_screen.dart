@@ -16,7 +16,9 @@ import 'reader_controller.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
+import 'reader_selection_toolbar.dart';
 import 'reader_side_panel.dart';
+import 'table_of_contents_sheet.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({super.key, required this.bookId});
@@ -33,6 +35,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _fullscreenMode = false;
+  String? _selectedText;
+
+  Future<void> _checkForSelectedText() async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (mounted && data?.text != null && data!.text!.isNotEmpty && data.text != _selectedText) {
+      setState(() => _selectedText = data.text);
+    }
+  }
 
   @override
   void initState() {
@@ -261,30 +273,37 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       body: Stack(
         children: [
           if (readerState.book != null)
-            GestureDetector(
-              onVerticalDragStart: settings.verticalSwipeBrightness
-                  ? _handleVerticalDragStart
-                  : null,
-              onVerticalDragUpdate: settings.verticalSwipeBrightness
-                  ? _handleVerticalDragUpdate
-                  : null,
-              onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-              onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
-                  ? _ctrl.handleDoubleTap
-                  : null,
-              onLongPress: settings.longPressAction != LongPressAction.disabled
-                  ? _ctrl.handleLongPress
-                  : null,
-              behavior: HitTestBehavior.translucent,
-              child: RepaintBoundary(
-                child: ReaderContentBody(
-                  book: readerState.book!,
-                  settings: settings,
-                  scrollController: _ctrl.scrollController,
-                  onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
-                  initialProgress: readerState.scrollProgress,
-                  initialPage: readerState.currentPosition.chapterIndex,
-                  highlightQuery: readerState.highlightedQuery,
+            SelectionAreaWrapper(
+              child: GestureDetector(
+                onVerticalDragStart: settings.verticalSwipeBrightness
+                    ? _handleVerticalDragStart
+                    : null,
+                onVerticalDragUpdate: settings.verticalSwipeBrightness
+                    ? _handleVerticalDragUpdate
+                    : null,
+                onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
+                onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+                    ? _ctrl.handleDoubleTap
+                    : null,
+                onLongPress: settings.longPressAction != LongPressAction.disabled
+                    ? () {
+                        _ctrl.handleLongPress();
+                        if (settings.longPressAction == LongPressAction.selectText) {
+                          unawaited(_checkForSelectedText());
+                        }
+                      }
+                    : null,
+                behavior: HitTestBehavior.translucent,
+                child: RepaintBoundary(
+                  child: ReaderContentBody(
+                    book: readerState.book!,
+                    settings: settings,
+                    scrollController: _ctrl.scrollController,
+                    onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                    initialProgress: readerState.scrollProgress,
+                    initialPage: readerState.currentPosition.chapterIndex,
+                    highlightQuery: readerState.highlightedQuery,
+                  ),
                 ),
               ),
             ),
@@ -312,7 +331,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
                 onSearch: () => _ctrl.toggleSearch(),
-                onMore: () {},
+                onMore: readerState.book != null
+                    ? () => TableOfContentsSheet.show(
+                          context,
+                          book: readerState.book!,
+                          currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          onJumpToPosition: _ctrl.jumpToPosition,
+                        )
+                    : () {},
               ),
             ),
             Positioned(
@@ -344,6 +370,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 theme: settings.theme,
               ),
             ),
+          if (_selectedText != null && _selectedText!.isNotEmpty && readerState.book != null)
+            Positioned(
+              bottom: 80,
+              left: 24,
+              right: 24,
+              child: ReaderSelectionToolbar(
+                bookId: widget.bookId,
+                chapterIndex: readerState.currentPosition.chapterIndex,
+                paragraphIndex: readerState.currentPosition.paragraphIndex,
+                onDismiss: () => setState(() => _selectedText = null),
+              ),
+            ),
         ],
       ),
     );
@@ -367,33 +405,40 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: readerState.book != null
-                ? GestureDetector(
-                    onVerticalDragStart: settings.verticalSwipeBrightness
-                        ? _handleVerticalDragStart
-                        : null,
-                    onVerticalDragUpdate: settings.verticalSwipeBrightness
-                        ? _handleVerticalDragUpdate
-                        : null,
-                    onVerticalDragEnd: settings.verticalSwipeBrightness
-                        ? _handleVerticalDragEnd
-                        : null,
-                    onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
-                        ? _ctrl.handleDoubleTap
-                        : null,
-                    onLongPress: settings.longPressAction != LongPressAction.disabled
-                        ? _ctrl.handleLongPress
-                        : null,
-                    behavior: HitTestBehavior.translucent,
-                    child: RepaintBoundary(
-                      child: ReaderContentBody(
-                        book: readerState.book!,
-                        settings: settings,
-                        scrollController: _ctrl.scrollController,
-                        onTap: (details) =>
-                            _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
-                        initialProgress: readerState.scrollProgress,
-                        initialPage: readerState.currentPosition.chapterIndex,
-                        highlightQuery: readerState.highlightedQuery,
+                ? SelectionAreaWrapper(
+                    child: GestureDetector(
+                      onVerticalDragStart: settings.verticalSwipeBrightness
+                          ? _handleVerticalDragStart
+                          : null,
+                      onVerticalDragUpdate: settings.verticalSwipeBrightness
+                          ? _handleVerticalDragUpdate
+                          : null,
+                      onVerticalDragEnd: settings.verticalSwipeBrightness
+                          ? _handleVerticalDragEnd
+                          : null,
+                      onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+                          ? _ctrl.handleDoubleTap
+                          : null,
+                      onLongPress: settings.longPressAction != LongPressAction.disabled
+                          ? () {
+                              _ctrl.handleLongPress();
+                              if (settings.longPressAction == LongPressAction.selectText) {
+                                unawaited(_checkForSelectedText());
+                              }
+                            }
+                          : null,
+                      behavior: HitTestBehavior.translucent,
+                      child: RepaintBoundary(
+                        child: ReaderContentBody(
+                          book: readerState.book!,
+                          settings: settings,
+                          scrollController: _ctrl.scrollController,
+                          onTap: (details) =>
+                              _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                          initialProgress: readerState.scrollProgress,
+                          initialPage: readerState.currentPosition.chapterIndex,
+                          highlightQuery: readerState.highlightedQuery,
+                        ),
                       ),
                     ),
                   )
@@ -423,7 +468,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
                 onSearch: () => _ctrl.toggleSearch(),
-                onMore: () {},
+                onMore: readerState.book != null
+                    ? () => TableOfContentsSheet.show(
+                          context,
+                          book: readerState.book!,
+                          currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          onJumpToPosition: _ctrl.jumpToPosition,
+                        )
+                    : () {},
               ),
             ),
             Positioned(
@@ -453,6 +505,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 },
                 onDismiss: () => _ctrl.closeSearch(),
                 theme: settings.theme,
+              ),
+            ),
+          if (_selectedText != null && _selectedText!.isNotEmpty && readerState.book != null)
+            Positioned(
+              bottom: 80,
+              left: 24,
+              right: 24,
+              child: ReaderSelectionToolbar(
+                bookId: widget.bookId,
+                chapterIndex: readerState.currentPosition.chapterIndex,
+                paragraphIndex: readerState.currentPosition.paragraphIndex,
+                onDismiss: () => setState(() => _selectedText = null),
               ),
             ),
         ],
@@ -494,7 +558,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   padding: EdgeInsets.symmetric(
                     horizontal: horizontalPadding,
                   ),
-                  child: readerState.book != null
+                   child: readerState.book != null
                       ? SelectionAreaWrapper(
                           child: GestureDetector(
                             onVerticalDragStart: settings.verticalSwipeBrightness
@@ -510,7 +574,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                 ? _ctrl.handleDoubleTap
                                 : null,
                             onLongPress: settings.longPressAction != LongPressAction.disabled
-                                ? _ctrl.handleLongPress
+                                ? () {
+                                    _ctrl.handleLongPress();
+                                    if (settings.longPressAction == LongPressAction.selectText) {
+                                      unawaited(_checkForSelectedText());
+                                    }
+                                  }
                                 : null,
                             behavior: HitTestBehavior.translucent,
                             child: RepaintBoundary(
@@ -555,7 +624,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       onBack: () => Navigator.of(context).pop(),
                       onSettings: () => _showQuickSettings(context),
                       onSearch: () => _ctrl.toggleSearch(),
-                      onMore: () {},
+                      onMore: readerState.book != null
+                          ? () => TableOfContentsSheet.show(
+                                context,
+                                book: readerState.book!,
+                                currentChapterIndex: readerState.currentPosition.chapterIndex,
+                                onJumpToPosition: _ctrl.jumpToPosition,
+                              )
+                          : () {},
                     ),
                   ),
                   Positioned(
@@ -584,6 +660,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       },
                       onDismiss: () => _ctrl.closeSearch(),
                       theme: settings.theme,
+                    ),
+                  ),
+                if (_selectedText != null && _selectedText!.isNotEmpty && readerState.book != null)
+                  Positioned(
+                    bottom: 80,
+                    left: 24,
+                    right: 24,
+                    child: ReaderSelectionToolbar(
+                      bookId: widget.bookId,
+                      chapterIndex: readerState.currentPosition.chapterIndex,
+                      paragraphIndex: readerState.currentPosition.paragraphIndex,
+                      onDismiss: () => setState(() => _selectedText = null),
                     ),
                   ),
               ],

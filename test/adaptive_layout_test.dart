@@ -122,7 +122,7 @@ void main() {
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
       expect(delegate.maxCrossAxisExtent, 180);
-      expect(delegate.childAspectRatio, 0.62);
+      expect(delegate.childAspectRatio, 0.58);
     });
   });
 

@@ -10,6 +10,8 @@ class ImportResult {
   final int progressImported;
   final int bookmarksImported;
   final int notesImported;
+  final int quotesImported;
+  final int collectionsImported;
   final String? error;
 
   const ImportResult({
@@ -17,6 +19,8 @@ class ImportResult {
     this.progressImported = 0,
     this.bookmarksImported = 0,
     this.notesImported = 0,
+    this.quotesImported = 0,
+    this.collectionsImported = 0,
     this.error,
   });
 }
@@ -26,6 +30,9 @@ class BackupService {
   final String appVersion;
 
   static const _settingsKey = 'reader_settings';
+  static const _pinnedBooksKey = 'pinned_book_ids';
+  static const _readingGoalMinutesKey = 'reading_goal_daily_minutes';
+  static const _readingGoalEnabledKey = 'reading_goal_enabled';
 
   BackupService({required this.db, required this.appVersion});
 
@@ -33,6 +40,8 @@ class BackupService {
     final progress = await db.select(db.readingProgress).get();
     final bookmarks = await db.select(db.bookmarks).get();
     final notes = await db.select(db.notes).get();
+    final quotes = await db.select(db.quotes).get();
+    final collections = await db.select(db.collections).get();
 
     final prefs = await SharedPreferences.getInstance();
     final settingsJson = prefs.getString(_settingsKey);
@@ -41,13 +50,24 @@ class BackupService {
       settings = jsonDecode(settingsJson) as Map<String, dynamic>;
     }
 
+    final pinnedIds = prefs.getStringList(_pinnedBooksKey) ?? [];
+    final goalMinutes = prefs.getInt(_readingGoalMinutesKey) ?? 30;
+    final goalEnabled = prefs.getBool(_readingGoalEnabledKey) ?? false;
+
     final data = {
-      'version': '1.0',
+      'version': '2.0',
       'appVersion': appVersion,
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'readingProgress': progress.map(_progressToMap).toList(),
       'bookmarks': bookmarks.map(_bookmarkToMap).toList(),
       'notes': notes.map(_noteToMap).toList(),
+      'quotes': quotes.map(_quoteToMap).toList(),
+      'collections': collections.map(_collectionToMap).toList(),
+      'pinnedBooks': pinnedIds,
+      'readingGoal': {
+        'dailyMinutes': goalMinutes,
+        'isEnabled': goalEnabled,
+      },
       'settings': settings,
     };
 
@@ -58,61 +78,59 @@ class BackupService {
     try {
       final parsed = jsonDecode(json) as Map<String, dynamic>;
 
-      final requiredKeys = [
-        'version',
-        'readingProgress',
-        'bookmarks',
-        'notes',
-        'settings',
-      ];
-      for (final key in requiredKeys) {
-        if (!parsed.containsKey(key)) {
-          return ImportResult(success: false, error: 'Missing key: $key');
-        }
-      }
-
-      final progressList = (parsed['readingProgress'] as List).cast<Map<String, dynamic>>();
-      final bookmarksList = (parsed['bookmarks'] as List).cast<Map<String, dynamic>>();
-      final notesList = (parsed['notes'] as List).cast<Map<String, dynamic>>();
-      final settingsMap = parsed['settings'] as Map<String, dynamic>;
+      final progressList = (parsed['readingProgress'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final bookmarksList = (parsed['bookmarks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final notesList = (parsed['notes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final quotesList = (parsed['quotes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final collectionsList = (parsed['collections'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final pinnedIds = (parsed['pinnedBooks'] as List?)?.cast<String>() ?? [];
+      final goalMap = parsed['readingGoal'] as Map<String, dynamic>?;
+      final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
 
       await db.transaction(() async {
         await db.delete(db.readingProgress).go();
         for (final row in progressList) {
-          await db
-              .into(db.readingProgress)
-              .insert(
-                _progressFromMap(row),
-              );
+          await db.into(db.readingProgress).insert(_progressFromMap(row));
         }
 
         await db.delete(db.bookmarks).go();
         for (final row in bookmarksList) {
-          await db
-              .into(db.bookmarks)
-              .insert(
-                _bookmarkFromMap(row),
-              );
+          await db.into(db.bookmarks).insert(_bookmarkFromMap(row));
         }
 
         await db.delete(db.notes).go();
         for (final row in notesList) {
-          await db
-              .into(db.notes)
-              .insert(
-                _noteFromMap(row),
-              );
+          await db.into(db.notes).insert(_noteFromMap(row));
+        }
+
+        await db.delete(db.quotes).go();
+        for (final row in quotesList) {
+          await db.into(db.quotes).insert(_quoteFromMap(row));
+        }
+
+        await db.delete(db.collections).go();
+        for (final row in collectionsList) {
+          await db.into(db.collections).insert(_collectionFromMap(row));
         }
       });
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_settingsKey, jsonEncode(settingsMap));
+      if (settingsMap.isNotEmpty) {
+        await prefs.setString(_settingsKey, jsonEncode(settingsMap));
+      }
+      await prefs.setStringList(_pinnedBooksKey, pinnedIds);
+      if (goalMap != null) {
+        await prefs.setInt(_readingGoalMinutesKey, goalMap['dailyMinutes'] as int? ?? 30);
+        await prefs.setBool(_readingGoalEnabledKey, goalMap['isEnabled'] as bool? ?? false);
+      }
 
       return ImportResult(
         success: true,
         progressImported: progressList.length,
         bookmarksImported: bookmarksList.length,
         notesImported: notesList.length,
+        quotesImported: quotesList.length,
+        collectionsImported: collectionsList.length,
       );
     } on FormatException catch (e) {
       return ImportResult(success: false, error: 'Invalid JSON: ${e.message}');
@@ -126,10 +144,15 @@ class BackupService {
       await db.delete(db.readingProgress).go();
       await db.delete(db.bookmarks).go();
       await db.delete(db.notes).go();
+      await db.delete(db.quotes).go();
+      await db.delete(db.collections).go();
     });
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_settingsKey);
+    await prefs.remove(_pinnedBooksKey);
+    await prefs.remove(_readingGoalMinutesKey);
+    await prefs.remove(_readingGoalEnabledKey);
   }
 
   Map<String, dynamic> _progressToMap(ReadingProgressData row) {
@@ -221,6 +244,56 @@ class BackupService {
       ),
       updatedAt: Value(
         map['updatedAt'] != null ? DateTime.parse(map['updatedAt'] as String) : null,
+      ),
+    );
+  }
+
+  Map<String, dynamic> _quoteToMap(Quote row) {
+    return {
+      'id': row.id,
+      'bookId': row.bookId,
+      'chapterIndex': row.chapterIndex,
+      'paragraphIndex': row.paragraphIndex,
+      'selectedText': row.selectedText,
+      'beforeContext': row.beforeContext,
+      'afterContext': row.afterContext,
+      'note': row.note,
+      'createdAt': row.createdAt.toIso8601String(),
+    };
+  }
+
+  QuotesCompanion _quoteFromMap(Map<String, dynamic> map) {
+    return QuotesCompanion.insert(
+      id: map['id'] as String,
+      bookId: map['bookId'] as String,
+      chapterIndex: map['chapterIndex'] as int,
+      paragraphIndex: map['paragraphIndex'] as int,
+      selectedText: map['selectedText'] as String,
+      beforeContext: Value(map['beforeContext'] as String?),
+      afterContext: Value(map['afterContext'] as String?),
+      note: Value(map['note'] as String?),
+      createdAt: Value(
+        map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _collectionToMap(Collection row) {
+    return {
+      'id': row.id,
+      'name': row.name,
+      'bookIds': row.bookIds,
+      'createdAt': row.createdAt.toIso8601String(),
+    };
+  }
+
+  CollectionsCompanion _collectionFromMap(Map<String, dynamic> map) {
+    return CollectionsCompanion.insert(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      bookIds: Value(map['bookIds'] as String? ?? '[]'),
+      createdAt: Value(
+        map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),
     );
   }

@@ -6,7 +6,10 @@ import '../../core/platform/app_platform.dart';
 class SelectionAreaWrapper extends ConsumerWidget {
   final Widget child;
 
-  const SelectionAreaWrapper({super.key, required this.child});
+  const SelectionAreaWrapper({
+    super.key,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

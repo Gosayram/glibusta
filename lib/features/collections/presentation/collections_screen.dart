@@ -1,75 +1,318 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/book_card.dart';
 import 'smart_collections_provider.dart';
 
-class CollectionsScreen extends ConsumerWidget {
+final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
+  final db = ref.watch(databaseProvider);
+  return db.getAllCollections();
+});
+
+class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final collectionsAsync = ref.watch(smartCollectionsProvider);
+  ConsumerState<CollectionsScreen> createState() => _CollectionsScreenState();
+}
+
+class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final smartAsync = ref.watch(smartCollectionsProvider);
+    final userAsync = ref.watch(userCollectionsProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Коллекции'),
         automaticallyImplyLeading: false,
       ),
-      body: collectionsAsync.when(
-        data: (collections) {
-          final nonEmpty = collections.where((c) => !c.isEmpty).toList();
-          if (nonEmpty.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateDialog(context),
+        child: const Icon(Icons.add),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // User collections section
+          userAsync.when(
+            data: (List<Collection> userCollections) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.collections_bookmark_outlined,
-                    size: 64,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Нет книг в библиотеке',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Мои коллекции',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (userCollections.isNotEmpty)
+                        Text(
+                          '${userCollections.length}',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Добавьте книги, чтобы увидеть автоматические коллекции',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 13,
+                  if (userCollections.isEmpty)
+                    Card(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _showCreateDialog(context),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.add_circle_outline,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Создать коллекцию',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...userCollections.map(
+                      (col) => _UserCollectionTile(
+                        collection: col,
+                        onDelete: () => _deleteCollection(col.id),
+                        onRename: () => _showRenameDialog(col),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
+                  const SizedBox(height: 24),
                 ],
-              ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: nonEmpty.length,
-            itemBuilder: (context, index) {
-              final collection = nonEmpty[index];
-              return _SmartCollectionSection(
-                collection: collection,
-                onBookTap: (bookId) => unawaited(context.push('/reader/$bookId')),
               );
             },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('Ошибка: $e'),
+            loading: () => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
+          ),
+          // Smart collections section
+          Text(
+            'Автоматические',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          smartAsync.when(
+            data: (collections) {
+              final nonEmpty = collections.where((c) => !c.isEmpty).toList();
+              if (nonEmpty.isEmpty) {
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.collections_bookmark_outlined,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Добавьте книги, чтобы увидеть автоматические коллекции',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                children: nonEmpty.map(
+                  (collection) => _SmartCollectionSection(
+                    collection: collection,
+                    onBookTap: (bookId) => unawaited(context.push('/reader/$bookId')),
+                  ),
+                ).toList(),
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Ошибка: $e')),
+          ),
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showCreateDialog(BuildContext context) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Новая коллекция'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Название коллекции',
+            border: OutlineInputBorder(),
+          ),
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && context.mounted) {
+      final db = ref.read(databaseProvider);
+      await db.insertCollection(
+        CollectionsCompanion.insert(
+          id: const Uuid().v4(),
+          name: result,
+        ),
+      );
+      ref.invalidate(userCollectionsProvider);
+    }
+  }
+
+  Future<void> _showRenameDialog(Collection collection) async {
+    final controller = TextEditingController(text: collection.name);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Переименовать коллекцию'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Название',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && context.mounted) {
+      final db = ref.read(databaseProvider);
+      await (db.update(db.collections)..where((t) => t.id.equals(collection.id))).write(
+        CollectionsCompanion(name: Value(result)),
+      );
+      ref.invalidate(userCollectionsProvider);
+    }
+  }
+
+  Future<void> _deleteCollection(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Удалить коллекцию?'),
+        content: const Text('Книги не будут удалены.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final db = ref.read(databaseProvider);
+      await db.deleteCollection(id);
+      ref.invalidate(userCollectionsProvider);
+    }
+  }
+}
+
+class _UserCollectionTile extends StatelessWidget {
+  final Collection collection;
+  final VoidCallback onDelete;
+  final VoidCallback onRename;
+
+  const _UserCollectionTile({
+    required this.collection,
+    required this.onDelete,
+    required this.onRename,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bookIds = collection.bookIds.isNotEmpty
+        ? (jsonDecode(collection.bookIds) as List<dynamic>).length
+        : 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(
+          Icons.folder,
+          color: theme.colorScheme.primary,
+        ),
+        title: Text(
+          collection.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          '$bookIds ${bookIds == 1 ? 'книга' : bookIds < 5 ? 'книги' : 'книг'}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'rename') onRename();
+            if (value == 'delete') onDelete();
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'rename', child: Text('Переименовать')),
+            const PopupMenuItem(value: 'delete', child: Text('Удалить')),
+          ],
+        ),
+        onTap: () => context.go('/collections'),
       ),
     );
   }
@@ -91,6 +334,7 @@ class _SmartCollectionSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 8),
         Row(
           children: [
             Icon(
@@ -101,7 +345,7 @@ class _SmartCollectionSection extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               collection.type.label,
-              style: theme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -140,7 +384,7 @@ class _SmartCollectionSection extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
       ],
     );
   }

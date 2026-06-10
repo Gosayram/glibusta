@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
 import '../../auth/presentation/login_screen.dart';
 
@@ -85,6 +87,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Фильтр контента',
             subtitle: 'Настройка безопасности',
             onTap: () => _showContentSafety(context),
+          ),
+          _SettingsTile(
+            icon: Icons.font_download,
+            title: 'Шрифты',
+            subtitle: 'Скачать дополнительные шрифты',
+            onTap: () => context.push('/settings/fonts'),
+          ),
+
+          const Divider(),
+          const _SectionHeader(title: 'Данные'),
+          _SettingsTile(
+            icon: Icons.upload_file,
+            title: 'Экспорт данных',
+            subtitle: 'Сохранить закладки, заметки, цитаты, коллекции',
+            onTap: () => _exportData(context),
+          ),
+          _SettingsTile(
+            icon: Icons.download,
+            title: 'Импорт данных',
+            subtitle: 'Восстановить из файла резервной копии',
+            onTap: () => _importData(context),
           ),
 
           const Divider(),
@@ -175,6 +198,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _exportData(BuildContext context) async {
+    try {
+      final db = ref.read(databaseProvider);
+      final backupService = BackupService(db: db, appVersion: '0.1.0+1');
+      final json = await backupService.exportData();
+      // TODO: Use file picker or share to save the JSON
+      debugPrint('Exported data: ${json.length} bytes');
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Данные экспортированы')),
+      );
+    } on Exception catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка экспорта: $e')),
+      );
+    }
+  }
+
+  Future<void> _importData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Импорт данных'),
+        content: const Text(
+          'Внимание! Текущие данные будут заменены импортированными. '
+          'Это действие нельзя отменить.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Импортировать'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      final db = ref.read(databaseProvider);
+      final backupService = BackupService(db: db, appVersion: '0.1.0+1');
+      final result = await backupService.importData('');
+
+      if (!context.mounted) return;
+
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Импортировано: ${result.progressImported} прогрессов, '
+              '${result.bookmarksImported} закладок, '
+              '${result.notesImported} заметок, '
+              '${result.quotesImported} цитат',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: ${result.error}')),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка импорта: $e')),
+      );
+    }
   }
 
   void _login(BuildContext context) {

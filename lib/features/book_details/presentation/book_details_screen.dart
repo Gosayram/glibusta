@@ -115,6 +115,12 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
                   }(),
                 ),
               ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: _SeriesInfoSection(bookId: widget.bookId),
+                ),
+              ),
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _TabBarDelegate(tabController: _tabController, theme: theme),
@@ -187,7 +193,7 @@ class _BookHeader extends StatelessWidget {
               if (book.authorIds.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  book.authorIds.join(', '),
+                  book.displayAuthor.isNotEmpty ? book.displayAuthor : book.authorIds.join(', '),
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w500,
@@ -274,6 +280,74 @@ class _ReadingProgressIndicator extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SeriesInfoSection extends ConsumerWidget {
+  final String bookId;
+
+  const _SeriesInfoSection({required this.bookId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final db = ref.read<AppDatabase>(databaseProvider);
+
+    return FutureBuilder<List<Sery>>(
+      future: db.getSeriesForBook(bookId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final seriesList = snapshot.data!;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final s in seriesList)
+                Card(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => context.push('/series/${s.id}'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.collections_bookmark, size: 20, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  s.name,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Серия',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

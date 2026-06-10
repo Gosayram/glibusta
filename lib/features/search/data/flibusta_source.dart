@@ -119,6 +119,7 @@ class FlibustaHtmlSource extends BookSource {
       id: id,
       title: title,
       authorIds: authorIds,
+      authorNames: authorNames,
       genreIds: const [],
       description: description,
       coverUrl: coverUrl,

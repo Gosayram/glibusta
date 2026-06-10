@@ -14,6 +14,7 @@ class SavedBooks extends Table {
   TextColumn get contentHash => text().nullable()();
   IntColumn get fileSize => integer().nullable()();
   TextColumn get filePath => text().withDefault(const Constant(''))();
+  TextColumn get readingStatus => text().withDefault(const Constant('none'))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

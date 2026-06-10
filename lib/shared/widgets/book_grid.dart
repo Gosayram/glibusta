@@ -40,7 +40,7 @@ class BookGrid extends StatelessWidget {
         maxCrossAxisExtent: 180,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 0.62,
+        childAspectRatio: 0.58,
       ),
       itemCount: books.length,
       itemBuilder: (context, index) {

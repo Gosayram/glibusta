@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/quotes/presentation/quotes_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
+import '../features/reading_stats/presentation/reading_stats_screen.dart';
 import '../features/search/presentation/search_screen.dart';
+import '../features/series/presentation/series_detail_screen.dart';
+import '../features/series/presentation/series_screen.dart';
 import '../features/settings/presentation/diagnostics_screen.dart';
+import '../features/settings/presentation/font_download_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 
@@ -68,9 +74,29 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
           ),
           GoRoute(
+            path: '/annotations',
+            name: 'annotations',
+            builder: (BuildContext context, GoRouterState state) => const AnnotationsScreen(),
+          ),
+          GoRoute(
+            path: '/stats',
+            name: 'stats',
+            builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
+          ),
+          GoRoute(
             path: '/settings/diagnostics',
             name: 'diagnostics',
             builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/fonts',
+            name: 'fonts',
+            builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
+          ),
+          GoRoute(
+            path: '/series',
+            name: 'series',
+            builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
           ),
           GoRoute(
             path: '/404',
@@ -99,6 +125,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return ReaderScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/series/:seriesId',
+        name: 'seriesDetail',
+        builder: (BuildContext context, GoRouterState state) {
+          final seriesId = state.pathParameters['seriesId']!;
+          return SeriesDetailScreen(seriesId: seriesId);
+        },
+      ),
+      GoRoute(
+        path: '/quotes/:bookId',
+        name: 'quotes',
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return QuotesScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/annotations/book/:bookId',
+        name: 'bookAnnotations',
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return AnnotationsScreen(bookId: bookId);
         },
       ),
     ],

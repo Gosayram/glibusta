@@ -80,6 +80,7 @@ class FlibustaApiSource extends BookSource {
         id: result.id,
         title: result.title,
         authorIds: result.authors,
+        authorNames: result.authors,
         genreIds: const [],
         description: result.description,
         coverUrl: result.coverUrl != null ? '$baseUrl${result.coverUrl}' : null,

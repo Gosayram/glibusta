@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/database/app_database.dart';
 import '../../core/theme/app_colors.dart';
+import '../../features/library/presentation/library_screen.dart';
 import '../models/book.dart';
 import 'book_cover_image.dart';
 
@@ -26,16 +29,20 @@ class BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final author = book.displayAuthor;
+    final format = book.availableFormats.isNotEmpty
+        ? book.availableFormats.first.name.toUpperCase()
+        : null;
 
     return RepaintBoundary(
       child: Semantics(
-        label: 'Книга: ${book.title}',
+        label: 'Книга: ${book.title}${author.isNotEmpty ? ', $author' : ''}',
         button: true,
         child: MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onTap: onTap ?? () => context.push('/book/${book.id}'),
-            onLongPress: onLongPress,
+            onLongPress: onLongPress ?? () => _showStatusMenu(context),
             onSecondaryTapDown: (details) => _showContextMenu(
               context,
               details.globalPosition,
@@ -50,6 +57,12 @@ class BookCard extends StatelessWidget {
                       fit: StackFit.expand,
                       children: [
                         BookCoverImage(book: book),
+                        if (book.readingStatus != ReadingStatus.none)
+                          Positioned(
+                            top: 4,
+                            left: 4,
+                            child: _StatusBadge(status: book.readingStatus),
+                          ),
                         if (isDownloaded == true)
                           const Positioned(
                             top: 4,
@@ -88,7 +101,7 @@ class BookCard extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                     child: Text(
                       book.title,
                       maxLines: 2,
@@ -98,10 +111,82 @@ class BookCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (author.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
+                      child: Text(
+                        author,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  if (format != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          format,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSecondaryContainer,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showStatusMenu(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                book.title,
+                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const Divider(height: 1),
+            ...ReadingStatus.values.where((s) => s != ReadingStatus.none).map(
+              (status) => ListTile(
+                leading: Icon(
+                  _statusIcon(status),
+                  color: book.readingStatus == status
+                      ? Theme.of(context).colorScheme.primary
+                      : null,
+                ),
+                title: Text(status.label),
+                trailing: book.readingStatus == status
+                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    : null,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _updateReadingStatus(context, status);
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
@@ -127,6 +212,15 @@ class BookCard extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
         ),
       ),
+      PopupMenuItem<VoidCallback>(
+        value: () => _showStatusMenu(context),
+        child: ListTile(
+          leading: Icon(_statusIcon(book.readingStatus)),
+          title: const Text('Статус'),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
     ];
 
     unawaited(
@@ -142,6 +236,54 @@ class BookCard extends StatelessWidget {
       ).then((callback) {
         callback?.call();
       }),
+    );
+  }
+
+  void _updateReadingStatus(BuildContext context, ReadingStatus status) {
+    final container = ProviderScope.containerOf(context);
+    final db = container.read(databaseProvider);
+    unawaited(db.updateReadingStatus(book.id, status.name));
+    container.invalidate(libraryBooksProvider);
+  }
+
+  IconData _statusIcon(ReadingStatus status) {
+    switch (status) {
+      case ReadingStatus.none:
+        return Icons.remove_circle_outline;
+      case ReadingStatus.wantToRead:
+        return Icons.bookmark_border;
+      case ReadingStatus.reading:
+        return Icons.auto_stories;
+      case ReadingStatus.finished:
+        return Icons.check_circle_outline;
+      case ReadingStatus.dropped:
+        return Icons.cancel_outlined;
+    }
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final ReadingStatus status;
+
+  const _StatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (status) {
+      ReadingStatus.wantToRead => (Icons.bookmark_border, Colors.blue),
+      ReadingStatus.reading => (Icons.auto_stories, Colors.green),
+      ReadingStatus.finished => (Icons.check_circle_outline, Colors.purple),
+      ReadingStatus.dropped => (Icons.cancel_outlined, Colors.grey),
+      ReadingStatus.none => (Icons.remove_circle_outline, Colors.transparent),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.9),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 14, color: Colors.white),
     );
   }
 }

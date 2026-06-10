@@ -1,24 +1,29 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../library/data/book_repository_impl.dart';
+import '../../library/presentation/pinned_books_provider.dart';
 import 'continue_reading_card.dart';
 import 'continue_reading_provider.dart';
 import 'reading_heatmap.dart';
 import 'reading_stats_provider.dart';
 
-part 'home_screen.g.dart';
-
-@riverpod
-Future<List<Book>> recentBooks(Ref ref) async {
+final recentBooksProvider = FutureProvider<List<Book>>((ref) async {
   final repository = ref.watch(bookRepositoryProvider);
   return repository.getAllBooks();
-}
+});
+
+final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
+  final db = ref.watch(databaseProvider);
+  return db.getAllCollections();
+});
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -27,6 +32,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final continueReadingAsync = ref.watch(continueReadingInfosProvider);
     final booksAsync = ref.watch(recentBooksProvider);
+    final pinnedAsync = ref.watch(pinnedBooksListProvider);
+    final collectionsAsync = ref.watch(userCollectionsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -91,12 +98,73 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 const _ReadingStatsSection(),
                 const SizedBox(height: 24),
+                // Pinned books section
+                pinnedAsync.when(
+                  data: (List<Book> pinnedBooks) {
+                    if (pinnedBooks.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _SectionHeader(title: 'Закреплённые'),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 160,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: pinnedBooks.length,
+                            itemBuilder: (context, index) {
+                              final book = pinnedBooks[index];
+                              return SizedBox(
+                                width: 120,
+                                child: BookCard(
+                                  key: ValueKey(book.id),
+                                  book: book,
+                                  onTap: () => context.push('/book/${book.id}'),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
+                // Collections section
+                collectionsAsync.when(
+                  data: (List<Collection> collections) {
+                    if (collections.isEmpty) return const SizedBox.shrink();
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const _SectionHeader(title: 'Коллекции'),
+                            TextButton(
+                              onPressed: () => context.go('/collections'),
+                              child: const Text('Все'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        for (final col in collections.take(3))
+                          _CollectionTile(collection: col),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                ),
                 const _SectionHeader(title: 'Недавно добавленные'),
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 160,
                   child: booksAsync.when(
-                    data: (books) {
+                    data: (List<Book> books) {
                       if (books.isEmpty) {
                         return Center(
                           child: Text(
@@ -135,6 +203,11 @@ class HomeScreen extends ConsumerWidget {
                       icon: Icons.download,
                       label: 'Загрузки',
                       onTap: () => context.go('/downloads'),
+                    ),
+                    _QuickAction(
+                      icon: Icons.collections_bookmark,
+                      label: 'Серии',
+                      onTap: () => context.go('/series'),
                     ),
                     _QuickAction(
                       icon: Icons.bookmark,
@@ -335,6 +408,43 @@ class _StatChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CollectionTile extends StatelessWidget {
+  final Collection collection;
+
+  const _CollectionTile({required this.collection});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bookIds = collection.bookIds.isNotEmpty
+        ? (jsonDecode(collection.bookIds) as List<dynamic>).length
+        : 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(
+          Icons.folder,
+          color: theme.colorScheme.primary,
+        ),
+        title: Text(
+          collection.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          '$bookIds ${bookIds == 1 ? 'книга' : bookIds < 5 ? 'книги' : 'книг'}',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+        onTap: () => context.go('/collections'),
       ),
     );
   }

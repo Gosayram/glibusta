@@ -20,20 +20,21 @@ class BookRepositoryImpl implements BookRepository {
   @override
   Future<List<Book>> getAllBooks() async {
     final rows = await _db.getAllBooks();
-    return rows.map(_rowToBook).toList();
+    return _resolveAuthors(rows);
   }
 
   @override
   Future<List<Book>> getBooksWithProgress() async {
     final rows = await _db.getBooksWithProgress();
-    return rows.map(_rowToBook).toList();
+    return _resolveAuthors(rows);
   }
 
   @override
   Future<Book?> getBookById(String id) async {
     final row = await _db.getBookById(id);
     if (row == null) return null;
-    return _rowToBook(row);
+    final books = await _resolveAuthors([row]);
+    return books.first;
   }
 
   @override
@@ -64,18 +65,40 @@ class BookRepositoryImpl implements BookRepository {
     return book != null;
   }
 
-  Book _rowToBook(SavedBook row) {
+  Future<List<Book>> _resolveAuthors(List<SavedBook> rows) async {
+    final allAuthorIds = <String>{};
+    for (final row in rows) {
+      if (row.authorIds.isNotEmpty) {
+        final ids = List<String>.from(jsonDecode(row.authorIds) as List<dynamic>);
+        allAuthorIds.addAll(ids);
+      }
+    }
+    final nameMap = await _db.getAuthorNamesByIds(allAuthorIds.toList());
+    return rows.map((row) => _rowToBook(row, nameMap)).toList();
+  }
+
+  Book _rowToBook(SavedBook row, [Map<String, String>? authorNames]) {
     final authorIds = row.authorIds.isNotEmpty
         ? List<String>.from(jsonDecode(row.authorIds) as List<dynamic>)
         : <String>[];
     final genreIds = row.genreIds.isNotEmpty
         ? List<String>.from(jsonDecode(row.genreIds) as List<dynamic>)
         : <String>[];
+    final names = authorNames != null
+        ? authorIds.map((id) => authorNames[id]).whereType<String>().toList()
+        : <String>[];
+
+    final statusStr = row.readingStatus;
+    final readingStatus = ReadingStatus.values.firstWhere(
+      (e) => e.name == statusStr,
+      orElse: () => ReadingStatus.none,
+    );
 
     return Book(
       id: row.id,
       title: row.title,
       authorIds: authorIds,
+      authorNames: names,
       genreIds: genreIds,
       description: row.description,
       coverUrl: row.coverUrl,
@@ -85,6 +108,7 @@ class BookRepositoryImpl implements BookRepository {
         sourceId: row.sourceId ?? '',
         sourceUrl: row.sourceUrl ?? '',
       ),
+      readingStatus: readingStatus,
     );
   }
 }

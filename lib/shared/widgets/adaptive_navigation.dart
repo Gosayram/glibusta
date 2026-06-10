@@ -90,6 +90,8 @@ class SidebarNavigation extends StatelessWidget {
     _SidebarItem(icon: Icons.search, label: 'Поиск', route: '/search'),
     _SidebarItem(icon: Icons.download, label: 'Загрузки', route: '/downloads'),
     _SidebarItem(icon: Icons.collections_bookmark, label: 'Коллекции', route: '/collections'),
+    _SidebarItem(icon: Icons.sticky_note_2_outlined, label: 'Аннотации', route: '/annotations'),
+    _SidebarItem(icon: Icons.bar_chart, label: 'Статистика', route: '/stats'),
     _SidebarItem(icon: Icons.settings, label: 'Настройки', route: '/settings'),
   ];
 
