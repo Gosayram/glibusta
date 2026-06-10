@@ -170,7 +170,9 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  Row(
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
                     children: [
                       FilledButton.icon(
                         onPressed: () {
@@ -179,7 +181,6 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
                         icon: const Icon(Icons.play_arrow),
                         label: const Text('Читать'),
                       ),
-                      const SizedBox(width: 12),
                       OutlinedButton.icon(
                         onPressed: () {
                           unawaited(context.push('/book/${book.id}'));

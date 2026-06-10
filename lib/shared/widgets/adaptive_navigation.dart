@@ -1,11 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/app_breakpoints.dart';
 import '../../core/utils/platform_detector.dart';
+import '../models/book.dart';
 import 'book_drop_zone.dart';
+import 'macos_right_panel.dart';
 
 class AdaptiveNavigation extends StatelessWidget {
   const AdaptiveNavigation({super.key});
@@ -221,12 +224,14 @@ class DesktopShell extends StatelessWidget {
 }
 
 /// macOS-style shell with sidebar
-class MacOSShell extends StatelessWidget {
+class MacOSShell extends ConsumerWidget {
   const MacOSShell({super.key, required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Book? selectedBook = ref.watch(selectedBookForPanelProvider);
+
     return Scaffold(
       body: BookDropZone(
         onBooksDropped: (paths) => _handleDrop(context, paths),
@@ -235,6 +240,10 @@ class MacOSShell extends StatelessWidget {
             const SidebarNavigation(),
             const VerticalDivider(width: 1),
             Expanded(child: child),
+            if (selectedBook != null) ...[
+              const VerticalDivider(width: 1),
+              const MacOSRightPanel(),
+            ],
           ],
         ),
       ),
