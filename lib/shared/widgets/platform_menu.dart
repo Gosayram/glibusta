@@ -53,12 +53,12 @@ class PlatformMenuWidget extends ConsumerWidget implements PreferredSizeWidget {
           label: 'Вид',
           menus: [
             PlatformMenuItem(
-              label: 'Главная',
+              label: 'Библиотека',
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.digit1,
                 meta: true,
               ),
-              onSelected: () => context.go('/'),
+              onSelected: () => context.go('/library'),
             ),
             PlatformMenuItem(
               label: 'Библиотека',

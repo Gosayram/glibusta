@@ -118,7 +118,7 @@ void main() {
       expect(find.byType(NavigationBar), findsNothing);
     });
 
-    testWidgets('renders all 6 navigation labels', (tester) async {
+    testWidgets('renders all 4 navigation labels', (tester) async {
       setScreenSize(tester, 400, 600);
 
       await tester.pumpWidget(
@@ -131,10 +131,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Главная'), findsOneWidget);
-      expect(find.text('Каталог'), findsOneWidget);
-      expect(find.text('Поиск'), findsOneWidget);
       expect(find.text('Библиотека'), findsOneWidget);
+      expect(find.text('Поиск'), findsOneWidget);
       expect(find.text('Загрузки'), findsOneWidget);
       expect(find.text('Настройки'), findsOneWidget);
     });
@@ -324,6 +322,7 @@ void main() {
       expect(find.text('Библиотека'), findsOneWidget);
       expect(find.text('Поиск'), findsOneWidget);
       expect(find.text('Загрузки'), findsOneWidget);
+      expect(find.text('Коллекции'), findsOneWidget);
       expect(find.text('Настройки'), findsOneWidget);
     });
 
@@ -351,19 +350,31 @@ void main() {
     testWidgets('highlights selected route', (tester) async {
       setScreenSize(tester, 1200, 600);
 
-      await tester.pumpWidget(
-        wrapWithRouter(
-          child: const Scaffold(
-            body: Row(
-              children: [
-                SidebarNavigation(),
-                VerticalDivider(width: 1),
-                Expanded(child: SizedBox.shrink()),
-              ],
+      final router = GoRouter(
+        initialLocation: '/library',
+        routes: [
+          GoRoute(
+            path: '/library',
+            builder: (_, _) => const Scaffold(
+              body: Row(
+                children: [
+                  SidebarNavigation(),
+                  VerticalDivider(width: 1),
+                  Expanded(child: SizedBox.shrink()),
+                ],
+              ),
             ),
           ),
-        ),
+          GoRoute(
+            path: '/search',
+            builder: (_, _) => const Scaffold(body: Text('Search')),
+          ),
+        ],
       );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
       await tester.pumpAndSettle();
 
       final homeTile = tester.widget<ListTile>(

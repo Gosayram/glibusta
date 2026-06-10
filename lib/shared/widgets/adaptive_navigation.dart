@@ -10,20 +10,35 @@ import 'book_drop_zone.dart';
 class AdaptiveNavigation extends StatelessWidget {
   const AdaptiveNavigation({super.key});
 
-  static const List<NavigationDestination> destinations = [
-    NavigationDestination(icon: Icon(Icons.home), label: 'Главная'),
-    NavigationDestination(icon: Icon(Icons.explore), label: 'Каталог'),
-    NavigationDestination(icon: Icon(Icons.search), label: 'Поиск'),
+  static const List<NavigationDestination> compactDestinations = [
     NavigationDestination(icon: Icon(Icons.library_books), label: 'Библиотека'),
+    NavigationDestination(icon: Icon(Icons.search), label: 'Поиск'),
     NavigationDestination(icon: Icon(Icons.download), label: 'Загрузки'),
     NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
   ];
 
+  static const List<NavigationRailDestination> expandedDestinations = [
+    NavigationRailDestination(
+      icon: Icon(Icons.library_books),
+      label: Text('Библиотека'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.search),
+      label: Text('Поиск'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.download),
+      label: Text('Загрузки'),
+    ),
+    NavigationRailDestination(
+      icon: Icon(Icons.settings),
+      label: Text('Настройки'),
+    ),
+  ];
+
   static const List<String> routes = [
-    '/',
-    '/catalog',
-    '/search',
     '/library',
+    '/search',
     '/downloads',
     '/settings',
   ];
@@ -50,14 +65,7 @@ class AdaptiveNavigation extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: 8),
           child: Icon(Icons.menu_book, size: 28),
         ),
-        destinations: destinations
-            .map(
-              (d) => NavigationRailDestination(
-                icon: d.icon,
-                label: Text(d.label),
-              ),
-            )
-            .toList(),
+        destinations: expandedDestinations,
       );
     }
 
@@ -65,7 +73,7 @@ class AdaptiveNavigation extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: (i) => _onTap(context, i),
       animationDuration: const Duration(milliseconds: 300),
-      destinations: destinations,
+      destinations: compactDestinations,
     );
   }
 }
@@ -75,9 +83,10 @@ class SidebarNavigation extends StatelessWidget {
   const SidebarNavigation({super.key});
 
   static const List<_SidebarItem> _items = [
-    _SidebarItem(icon: Icons.home, label: 'Библиотека', route: '/'),
+    _SidebarItem(icon: Icons.library_books, label: 'Библиотека', route: '/library'),
     _SidebarItem(icon: Icons.search, label: 'Поиск', route: '/search'),
     _SidebarItem(icon: Icons.download, label: 'Загрузки', route: '/downloads'),
+    _SidebarItem(icon: Icons.collections_bookmark, label: 'Коллекции', route: '/collections'),
     _SidebarItem(icon: Icons.settings, label: 'Настройки', route: '/settings'),
   ];
 

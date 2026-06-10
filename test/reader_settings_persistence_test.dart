@@ -18,7 +18,7 @@ void main() {
         expect(settings.mode, ReaderMode.continuous);
         expect(settings.fontSize, 18.0);
         expect(settings.lineHeight, 1.55);
-        expect(settings.margin, 16.0);
+        expect(settings.margin, 20.0);
         expect(settings.font, ReaderFont.sourceSerif);
         expect(settings.paragraphSpacing, 8.0);
         expect(settings.letterSpacing, 0.0);

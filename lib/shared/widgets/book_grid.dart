@@ -37,9 +37,9 @@ class BookGrid extends StatelessWidget {
       physics: physics,
       scrollDirection: scrollDirection,
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 210,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
+        maxCrossAxisExtent: 180,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
         childAspectRatio: 0.62,
       ),
       itemCount: books.length,

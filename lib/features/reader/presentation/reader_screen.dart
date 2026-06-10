@@ -377,7 +377,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     ReaderSettings settings,
   ) {
     const maxWidth = 720.0;
-    final horizontalPadding = (MediaQuery.sizeOf(context).width - maxWidth) / 2;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = ((screenWidth - maxWidth) / 2).clamp(32.0, 48.0);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
@@ -386,7 +387,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding.clamp(0.0, double.infinity),
+              horizontal: horizontalPadding,
             ),
             child: _book != null
                 ? ReaderContentBody(

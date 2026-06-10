@@ -57,103 +57,146 @@ class BookDetailsScreen extends ConsumerWidget {
     final book = details.book;
     final theme = Theme.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (book.coverUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  book.coverUrl!,
-                  width: 120,
-                  height: 180,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 120,
-                    height: 180,
-                    color: theme.colorScheme.primaryContainer,
-                    child: const Icon(Icons.book, size: 48),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: 120,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.book,
-                  size: 48,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    book.title,
-                    style: theme.textTheme.headlineSmall,
-                  ),
-                  if (book.authorIds.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      book.authorIds.join(', '),
-                      style: theme.textTheme.bodyLarge,
-                    ),
-                  ],
-                  if (book.publishDate != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      book.publishDate!.year.toString(),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                  if (book.coverUrl != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        book.coverUrl!,
+                        width: 120,
+                        height: 180,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 120,
+                          height: 180,
+                          color: theme.colorScheme.primaryContainer,
+                          child: const Icon(Icons.book, size: 48),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 120,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.book,
+                        size: 48,
+                        color: theme.colorScheme.onPrimaryContainer,
                       ),
                     ),
-                  ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          book.title,
+                          style: theme.textTheme.headlineSmall,
+                        ),
+                        if (book.authorIds.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            book.authorIds.join(', '),
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                        ],
+                        if (book.publishDate != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            book.publishDate!.year.toString(),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
-              ),
+              ).animate().fadeIn(duration: 400.ms).slideX(begin: 0.1),
+              const SizedBox(height: 24),
+              if (details.availableFormats.isNotEmpty) ...[
+                Text(
+                  'Доступные форматы',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: details.availableFormats.map((format) {
+                    return ActionChip(
+                      label: Text(format.name.toUpperCase()),
+                      onPressed: () {
+                        unawaited(_downloadBook(context, ref, book, format));
+                      },
+                    );
+                  }).toList(),
+                ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+                const SizedBox(height: 24),
+              ],
+              if (book.description != null || details.description != null) ...[
+                Text(
+                  'Описание',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  details.description ?? book.description ?? '',
+                  style: theme.textTheme.bodyMedium,
+                ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
+              ],
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              top: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
-          ],
-        ).animate().fadeIn(duration: 400.ms).slideX(begin: 0.1),
-        const SizedBox(height: 24),
-        if (details.availableFormats.isNotEmpty) ...[
-          Text(
-            'Доступные форматы',
-            style: theme.textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: details.availableFormats.map((format) {
-              return ActionChip(
-                label: Text(format.name.toUpperCase()),
-                onPressed: () {
-                  unawaited(_downloadBook(context, ref, book, format));
-                },
-              );
-            }).toList(),
-          ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
-          const SizedBox(height: 24),
-        ],
-        if (book.description != null || details.description != null) ...[
-          Text(
-            'Описание',
-            style: theme.textTheme.titleMedium,
+          child: SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      unawaited(context.push('/reader/${book.id}'));
+                    },
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Читать'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: details.availableFormats.isNotEmpty
+                      ? () {
+                          unawaited(
+                            _downloadBook(context, ref, book, details.availableFormats.first),
+                          );
+                        }
+                      : null,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Скачать'),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            details.description ?? book.description ?? '',
-            style: theme.textTheme.bodyMedium,
-          ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
-        ],
+        ),
       ],
     );
   }

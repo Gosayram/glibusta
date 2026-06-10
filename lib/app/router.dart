@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
+import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
-import '../features/home/presentation/home_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/search/presentation/search_screen.dart';
@@ -15,7 +15,7 @@ import '../shared/widgets/adaptive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/library',
     routes: <RouteBase>[
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
@@ -25,7 +25,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/',
             name: 'home',
-            builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
+            redirect: (_, state) {
+              if (state.uri.path == '/') return '/library';
+              return null;
+            },
+          ),
+          GoRoute(
+            path: '/library',
+            name: 'library',
+            builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
           ),
           GoRoute(
             path: '/catalog',
@@ -38,14 +46,14 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
           ),
           GoRoute(
-            path: '/library',
-            name: 'library',
-            builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
-          ),
-          GoRoute(
             path: '/downloads',
             name: 'downloads',
             builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
+          ),
+          GoRoute(
+            path: '/collections',
+            name: 'collections',
+            builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
           ),
           GoRoute(
             path: '/settings',

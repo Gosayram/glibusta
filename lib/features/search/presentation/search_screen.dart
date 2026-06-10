@@ -128,9 +128,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ? GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 210,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
+                maxCrossAxisExtent: 180,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
                 childAspectRatio: 0.62,
               ),
               itemCount: state.books.length + (state.hasMore ? 1 : 0),

@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../../shared/widgets/library_master_detail.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 
@@ -160,12 +162,17 @@ class LibraryScreen extends ConsumerWidget {
       );
     }
 
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= AppBreakpoints.compact) {
+      return LibraryMasterDetail(books: books);
+    }
+
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 210,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
+        maxCrossAxisExtent: 180,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
         childAspectRatio: 0.62,
       ),
       itemCount: books.length,

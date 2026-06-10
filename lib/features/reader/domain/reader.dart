@@ -53,7 +53,7 @@ class ReaderSettings {
     this.mode = ReaderMode.continuous,
     this.fontSize = 18.0,
     this.lineHeight = 1.55,
-    this.margin = 16.0,
+    this.margin = 20.0,
     this.font = ReaderFont.sourceSerif,
     this.paragraphSpacing = 8.0,
     this.letterSpacing = 0.0,
@@ -141,7 +141,6 @@ class ReadingProfile {
     ReadingProfile(
       name: 'Ночной',
       settings: ReaderSettings(
-        margin: 20.0,
         paragraphSpacing: 10.0,
       ),
     ),
