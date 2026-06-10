@@ -15,6 +15,7 @@ import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
+import 'pinned_books_provider.dart';
 
 part 'library_screen.g.dart';
 
@@ -174,27 +175,102 @@ class LibraryScreen extends ConsumerWidget {
       return LibraryMasterDetail(books: books);
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.62,
-      ),
-      itemCount: books.length,
-      itemBuilder: (context, index) {
-        final book = books[index];
-        return BookCard(
-          book: book,
-          onTap: () => unawaited(context.push('/reader/${book.id}')),
-          onLongPress: () => _showBookMenu(context, ref, book),
-        );
-      },
+    final pinnedIds = ref.watch(pinnedBooksProvider);
+    final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
+    final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
+
+    return CustomScrollView(
+      slivers: [
+        // Pinned section
+        if (pinnedBooksList.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.push_pin,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Закреплённые',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 180,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.62,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final book = pinnedBooksList[index];
+                  return BookCard(
+                    book: book,
+                    onTap: () => unawaited(context.push('/reader/${book.id}')),
+                    onLongPress: () => _showBookMenu(context, ref, book),
+                  );
+                },
+                childCount: pinnedBooksList.length,
+              ),
+            ),
+          ),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
+        ],
+        // All books section
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              pinnedBooksList.isNotEmpty ? 'Все книги' : '',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.62,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final book = unpinnedBooks.isNotEmpty ? unpinnedBooks[index] : books[index];
+                return BookCard(
+                  book: book,
+                  onTap: () => unawaited(context.push('/reader/${book.id}')),
+                  onLongPress: () => _showBookMenu(context, ref, book),
+                );
+              },
+              childCount: unpinnedBooks.isNotEmpty ? unpinnedBooks.length : books.length,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
+    final pinnedState = ref.read(pinnedBooksProvider.notifier);
+    final isPinned = pinnedState.isPinned(book.id);
+
     unawaited(
       showModalBottomSheet<void>(
         context: context,
@@ -211,9 +287,13 @@ class LibraryScreen extends ConsumerWidget {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.download),
-                title: const Text('Скачать'),
-                onTap: () => Navigator.pop(ctx),
+                leading: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+                title: Text(isPinned ? 'Открепить' : 'Закрепить'),
+                subtitle: isPinned ? null : const Text('Максимум 5 книг'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(pinnedState.toggle(book.id));
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.bookmark_add),

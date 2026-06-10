@@ -25,6 +25,7 @@ part 'app_database.g.dart';
     SearchHistory,
     Collections,
     BookCollections,
+    ReadingSessions,
   ],
 )
 class AppDatabase extends _$AppDatabase {

@@ -9,25 +9,30 @@ part of 'home_screen.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(continueReadingBooks)
-final continueReadingBooksProvider = ContinueReadingBooksProvider._();
+@ProviderFor(recentBooks)
+final recentBooksProvider = RecentBooksProvider._();
 
-final class ContinueReadingBooksProvider
-    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
+final class RecentBooksProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Book>>,
+          List<Book>,
+          FutureOr<List<Book>>
+        >
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
-  ContinueReadingBooksProvider._()
+  RecentBooksProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'continueReadingBooksProvider',
+        name: r'recentBooksProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$continueReadingBooksHash();
+  String debugGetCreateSourceHash() => _$recentBooksHash();
 
   @$internal
   @override
@@ -36,8 +41,8 @@ final class ContinueReadingBooksProvider
 
   @override
   FutureOr<List<Book>> create(Ref ref) {
-    return continueReadingBooks(ref);
+    return recentBooks(ref);
   }
 }
 
-String _$continueReadingBooksHash() => r'a75f223543935e098dbc3140296c94d2c0a1355e';
+String _$recentBooksHash() => r'fa000bfdee78b95b995a10295da22f08366447cd';

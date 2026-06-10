@@ -156,3 +156,11 @@ class BookCollections extends Table {
   @override
   Set<Column<Object>> get primaryKey => {bookId, collectionId};
 }
+
+class ReadingSessions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get bookId => text()();
+  DateTimeColumn get startedAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get endedAt => dateTime().nullable()();
+  IntColumn get chaptersRead => integer().withDefault(const Constant(0))();
+}

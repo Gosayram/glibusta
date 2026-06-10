@@ -4,7 +4,6 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:window_manager/window_manager.dart';
 
 import '../core/platform/lifecycle_service.dart';
 import '../core/utils/platform_detector.dart';
@@ -40,9 +39,6 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   void _initPlatform() {
-    if (PlatformDetector.isDesktop) {
-      unawaited(_initWindowManager());
-    }
     if (PlatformDetector.isAndroid) {
       _initAndroidEdgeToEdge();
     }
@@ -74,24 +70,6 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     });
   }
 
-  Future<void> _initWindowManager() async {
-    await windowManager.ensureInitialized();
-
-    const windowOptions = WindowOptions(
-      size: Size(1200, 800),
-      minimumSize: Size(900, 620),
-      center: true,
-      backgroundColor: Colors.transparent,
-      skipTaskbar: false,
-    );
-    unawaited(
-      windowManager.waitUntilReadyToShow(windowOptions, () async {
-        await windowManager.show();
-        await windowManager.focus();
-      }),
-    );
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -107,6 +85,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final isObscured = ref.watch(isObscuredProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return DynamicColorBuilder(
       builder: (ColorScheme? dynamicLight, ColorScheme? dynamicDark) {
         final lightTheme = dynamicLight != null
@@ -123,6 +102,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
           title: 'Glibusta',
           theme: lightTheme,
           darkTheme: darkTheme,
+          themeMode: themeMode,
           routerConfig: router,
           restorationScopeId: 'app',
           builder: (context, child) {

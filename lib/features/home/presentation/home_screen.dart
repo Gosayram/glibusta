@@ -7,14 +7,15 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../library/data/book_repository_impl.dart';
-import '../../library/presentation/library_screen.dart';
+import 'continue_reading_card.dart';
+import 'continue_reading_provider.dart';
 
 part 'home_screen.g.dart';
 
 @riverpod
-Future<List<Book>> continueReadingBooks(Ref ref) async {
+Future<List<Book>> recentBooks(Ref ref) async {
   final repository = ref.watch(bookRepositoryProvider);
-  return repository.getBooksWithProgress();
+  return repository.getAllBooks();
 }
 
 class HomeScreen extends ConsumerWidget {
@@ -22,8 +23,8 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final continueReadingAsync = ref.watch(continueReadingBooksProvider);
-    final booksAsync = ref.watch(libraryBooksProvider);
+    final continueReadingAsync = ref.watch(continueReadingInfosProvider);
+    final booksAsync = ref.watch(recentBooksProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -36,31 +37,42 @@ class HomeScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                // Smart Continue Reading section
                 const _SectionHeader(title: 'Продолжить чтение'),
                 const SizedBox(height: 8),
                 SizedBox(
-                  height: 200,
+                  height: 180,
                   child: continueReadingAsync.when(
-                    data: (books) {
-                      if (books.isEmpty) {
+                    data: (infos) {
+                      if (infos.isEmpty) {
                         return Center(
-                          child: Text(
-                            'Начните читать книгу',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.menu_book_outlined,
+                                size: 48,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Начните читать книгу',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       }
                       return ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        itemCount: books.length,
+                        itemCount: infos.length,
                         itemBuilder: (context, index) {
-                          final book = books[index];
-                          return SizedBox(
-                            width: 140,
-                            child: BookCard(
-                              book: book,
-                              onTap: () => context.push('/reader/${book.id}'),
-                            ),
+                          final info = infos[index];
+                          return ContinueReadingCard(
+                            info: info,
+                            onTap: () => context.push('/reader/${info.book.id}'),
                           );
                         },
                       );
@@ -70,6 +82,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
+                // Recent books section
                 const _SectionHeader(title: 'Недавно добавленные'),
                 const SizedBox(height: 8),
                 SizedBox(

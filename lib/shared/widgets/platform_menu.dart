@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'command_palette.dart';
+
 class PlatformMenuWidget extends ConsumerWidget implements PreferredSizeWidget {
   const PlatformMenuWidget({super.key});
 
@@ -47,19 +49,16 @@ class PlatformMenuWidget extends ConsumerWidget implements PreferredSizeWidget {
               shortcut: const SingleActivator(LogicalKeyboardKey.keyF, meta: true),
               onSelected: () => context.go('/search'),
             ),
+            PlatformMenuItem(
+              label: 'Палитра команд...',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyK, meta: true),
+              onSelected: () => CommandPalette.show(context),
+            ),
           ],
         ),
         PlatformMenu(
           label: 'Вид',
           menus: [
-            PlatformMenuItem(
-              label: 'Библиотека',
-              shortcut: const SingleActivator(
-                LogicalKeyboardKey.digit1,
-                meta: true,
-              ),
-              onSelected: () => context.go('/library'),
-            ),
             PlatformMenuItem(
               label: 'Библиотека',
               shortcut: const SingleActivator(

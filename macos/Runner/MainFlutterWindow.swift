@@ -4,9 +4,25 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
-    let windowFrame = self.frame
+
+    // Configure window
     self.contentViewController = flutterViewController
-    self.setFrame(windowFrame, display: true)
+    self.titlebarAppearsTransparent = true
+    self.titleVisibility = .hidden
+    self.styleMask.insert(.fullSizeContentView)
+
+    // Set default and minimum sizes
+    let defaultSize = NSSize(width: 1200, height: 800)
+    let minSize = NSSize(width: 900, height: 620)
+    self.minSize = minSize
+    self.setContentSize(defaultSize)
+
+    // Center window on screen
+    self.center()
+
+    // Style
+    self.isMovableByWindowBackground = true
+    self.backgroundColor = NSColor.windowBackgroundColor
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
