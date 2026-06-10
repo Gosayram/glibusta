@@ -39,6 +39,8 @@ class FlibustaApiSource extends BookSource {
         cancelToken: cancelToken,
       );
 
+      final rawBase = _client.dio.options.baseUrl;
+      final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
       final books = result.books
           .map(
             (item) => Book(
@@ -52,7 +54,7 @@ class FlibustaApiSource extends BookSource {
               availableFormats: const [],
               source: BookSourceInfo(
                 sourceId: 'flibusta-api',
-                sourceUrl: '${_client.dio.options.baseUrl}/b/${item.id}',
+                sourceUrl: '$base/b/${item.id}',
               ),
             ),
           )
@@ -75,6 +77,7 @@ class FlibustaApiSource extends BookSource {
     try {
       final result = await _client.getBookDetails(bookId);
       final baseUrl = _client.dio.options.baseUrl;
+      final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
 
       final book = Book(
         id: result.id,
@@ -83,12 +86,12 @@ class FlibustaApiSource extends BookSource {
         authorNames: result.authors,
         genreIds: const [],
         description: result.description,
-        coverUrl: result.coverUrl != null ? '$baseUrl${result.coverUrl}' : null,
+        coverUrl: result.coverUrl != null ? '$normalizedBase${result.coverUrl}' : null,
         publishDate: null,
         availableFormats: _parseFormats(result.formats),
         source: BookSourceInfo(
           sourceId: 'flibusta-api',
-          sourceUrl: '$baseUrl/b/$bookId',
+          sourceUrl: '$normalizedBase/b/$bookId',
         ),
       );
 
@@ -96,7 +99,7 @@ class FlibustaApiSource extends BookSource {
         book: book,
         description: result.description,
         availableFormats: _parseFormats(result.formats),
-        downloadUrls: result.formats.map((f) => '$baseUrl/b/$bookId/download/$f').toList(),
+        downloadUrls: result.formats.map((f) => '$normalizedBase/b/$bookId/download/$f').toList(),
       );
     } on Object catch (e) {
       throw Exception('Failed to get book details: $e');

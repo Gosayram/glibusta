@@ -44,7 +44,9 @@ class FlibustaHtmlSource extends BookSource {
 
   @override
   Future<String> getDownloadUrl(String bookId, BookFormat format) async {
-    return '${client.dio.options.baseUrl}/b/$bookId/download/${format.name}';
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+    return '$base/b/$bookId/download/${format.name}';
   }
 
   String _buildSearchUrl(SearchQuery query) {
@@ -115,6 +117,8 @@ class FlibustaHtmlSource extends BookSource {
     final coverUrl = _extractCoverUrl(element);
     final description = _extractDescription(element);
 
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
     return Book(
       id: id,
       title: title,
@@ -125,7 +129,7 @@ class FlibustaHtmlSource extends BookSource {
       coverUrl: coverUrl,
       publishDate: null,
       availableFormats: formats,
-      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '${client.dio.options.baseUrl}/b/$id'),
+      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$id'),
     );
   }
 
@@ -180,6 +184,9 @@ class FlibustaHtmlSource extends BookSource {
     );
     final coverUrl = coverImg?.attributes['src'];
 
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+
     return BookDetails(
       book: Book(
         id: bookId,
@@ -192,7 +199,7 @@ class FlibustaHtmlSource extends BookSource {
         availableFormats: formats,
         source: BookSourceInfo(
           sourceId: sourceId,
-          sourceUrl: '${client.dio.options.baseUrl}/b/$bookId',
+          sourceUrl: '$base/b/$bookId',
         ),
       ),
       description: description,

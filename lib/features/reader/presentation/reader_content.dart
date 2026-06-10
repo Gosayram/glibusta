@@ -288,7 +288,6 @@ class ReaderContentBody extends StatelessWidget {
         fontFamily = 'Inter';
         break;
       case ReaderFont.literata:
-      default:
         fontFamily = 'Literata';
         break;
     }
@@ -546,7 +545,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         fontFamily = 'Inter';
         break;
       case ReaderFont.literata:
-      default:
         fontFamily = 'Literata';
         break;
     }

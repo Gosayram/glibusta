@@ -3,7 +3,7 @@ BUILD_MK := 1
 
 APP_NAME ?= glibusta
 APP_VERSION := $(shell $(PYTHON) $(PUBSPEC_VALUE_SCRIPT) version 2>/dev/null || printf "0.0.0+0")
-APP_ARTIFACT_VERSION := $(APP_VERSION)
+APP_ARTIFACT_VERSION := $(subst +,_,$(APP_VERSION))
 
 DIST_DIR ?= dist/releases
 BUILD_DIR ?= build
@@ -11,10 +11,10 @@ ANDROID_APK_SOURCE ?= $(BUILD_DIR)/app/outputs/flutter-apk/app-release.apk
 ANDROID_AAB_SOURCE ?= $(BUILD_DIR)/app/outputs/bundle/release/app-release.aab
 MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 
-ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-release-signed.apk
+ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).apk
 ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
-ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-release-signed.aab
-MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos-release.zip
+ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).aab
+MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.zip
 
 MACOS_CODESIGN_IDENTITY ?= -
 
@@ -56,7 +56,7 @@ build-android-apk-split: require-flutter android-available sign-android prepare-
 	$(FLUTTER_BUILD_APK_SPLIT)
 	@for abi in arm64-v8a armeabi-v7a x86_64 universal; do \
 		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
-		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-android-$$abi-release-signed.apk"; \
+		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
 		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
 	done
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"

@@ -77,7 +77,9 @@ class FlibustaApiClient {
   }
 
   Future<String> getDownloadUrl(String bookId, String format) async {
-    return '${_dio.options.baseUrl}/b/$bookId/download/$format';
+    final base = _dio.options.baseUrl;
+    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    return '$normalizedBase/b/$bookId/download/$format';
   }
 
   SearchByNameResponse _parseSearchByNameResponse(String html) {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
 import '../../../core/database/app_database.dart';
@@ -81,7 +82,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: const Text('Тёмная тема'),
             subtitle: const Text('Использовать тёмную тему'),
             value: Theme.of(context).brightness == Brightness.dark,
-            onChanged: (_) {},
+            onChanged: (value) {
+              ref.read(themeModeProvider.notifier).setMode(
+                    value ? ThemeMode.dark : ThemeMode.light,
+                  );
+            },
           ),
           _SettingsTile(
             icon: Icons.shield_outlined,
