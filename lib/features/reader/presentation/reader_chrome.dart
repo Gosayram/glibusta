@@ -10,12 +10,16 @@ class ReaderTopBar extends StatelessWidget {
     required this.bookTitle,
     required this.onBack,
     required this.onSettings,
+    this.onSearch,
+    this.onMore,
   });
 
   final ReaderSettings settings;
   final String bookTitle;
   final VoidCallback onBack;
   final VoidCallback onSettings;
+  final VoidCallback? onSearch;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +41,9 @@ class ReaderTopBar extends StatelessWidget {
         child: Row(
           children: [
             IconButton(
-              icon: Icon(Icons.arrow_back, color: colors.text),
+              icon: const Icon(Icons.arrow_back),
+              color: colors.text,
+              tooltip: 'Назад',
               onPressed: onBack,
             ),
             Expanded(
@@ -45,12 +51,25 @@ class ReaderTopBar extends StatelessWidget {
                 bookTitle,
                 style: TextStyle(color: colors.text, fontSize: 14),
                 overflow: TextOverflow.ellipsis,
+                semanticsLabel: 'Книга: $bookTitle',
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.search),
+              color: colors.text,
+              tooltip: 'Поиск по книге',
+              onPressed: onSearch ?? () {},
             ),
             IconButton(
               icon: Icon(Icons.tune, color: colors.text),
               tooltip: 'Настройки чтения',
               onPressed: onSettings,
+            ),
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              color: colors.text,
+              tooltip: 'Ещё',
+              onPressed: onMore,
             ),
           ],
         ),

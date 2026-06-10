@@ -79,8 +79,13 @@ enum DownloadStatusDb { queued, running, paused, completed, failed, canceled }
 class ReadingProgress extends Table {
   TextColumn get bookId => text()();
   IntColumn get currentPosition => integer().withDefault(const Constant(0))();
+  IntColumn get chapterIndex => integer().withDefault(const Constant(0))();
+  IntColumn get paragraphIndex => integer().withDefault(const Constant(0))();
+  RealColumn get localOffset => real().withDefault(const Constant(0.0))();
+  RealColumn get progressPercent => real().withDefault(const Constant(0.0))();
   IntColumn get totalPages => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastRead => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
 
   @override
   Set<Column<Object>> get primaryKey => {bookId};

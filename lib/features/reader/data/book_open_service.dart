@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
@@ -53,7 +54,28 @@ class BookOpenService {
       throw BookOpenException('Формат не поддерживается: $format');
     }
 
-    return parser.parseFile(filePath);
+    return _parseInIsolate(format, filePath);
+  }
+
+  Future<NormalizedBook> _parseInIsolate(String format, String filePath) async {
+    try {
+      return await Isolate.run<NormalizedBook>(() async {
+        switch (format) {
+          case 'epub':
+            return EpubParser().parseFile(filePath);
+          case 'fb2':
+            return Fb2Parser().parseFile(filePath);
+          default:
+            throw BookOpenException('Формат не поддерживается: $format');
+        }
+      });
+    } on Object catch (_) {
+      final parser = _parsers[format];
+      if (parser == null) {
+        throw BookOpenException('Формат не поддерживается: $format');
+      }
+      return parser.parseFile(filePath);
+    }
   }
 
   Future<Download?> _findDownload(String bookId) async {

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-enum ReaderTheme { light, paper, sepia, dark, oled, bedtime }
+enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
 enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
 
@@ -79,7 +79,7 @@ class ReaderSettings {
   final bool restoreLastPosition;
 
   const ReaderSettings({
-    this.theme = ReaderTheme.dark,
+    this.theme = ReaderTheme.system,
     this.mode = ReaderMode.continuous,
     this.fontSize = 18.0,
     this.lineHeight = 1.55,
@@ -87,15 +87,15 @@ class ReaderSettings {
     this.font = ReaderFont.sourceSerif,
     this.paragraphSpacing = 8.0,
     this.letterSpacing = 0.0,
-    this.textAlign = ReaderTextAlign.justify,
+    this.textAlign = ReaderTextAlign.left,
     this.autoThemeMode = AutoThemeMode.off,
     this.customDayHour = 7,
     this.customNightHour = 20,
     this.brightness = 1.0,
     this.warmth = 0.0,
-    this.keepScreenAwake = false,
+    this.keepScreenAwake = true,
     this.autoHideDelay = 3,
-    this.progressBarPosition = ProgressBarPosition.bottom,
+    this.progressBarPosition = ProgressBarPosition.top,
     this.bottomBarContent = BottomBarContent.percent,
     this.paragraphFirstLineIndent = 0.0,
     this.hyphenation = true,
@@ -172,16 +172,81 @@ class ReaderSettings {
   }
 }
 
-class ReadingProgress {
+class ReaderPosition {
+  static final initial = ReaderPosition(
+    bookId: '',
+    chapterIndex: 0,
+    paragraphIndex: 0,
+    updatedAt: DateTime(2000),
+  );
+
   final String bookId;
-  final int currentPosition;
+  final int chapterIndex;
+  final int paragraphIndex;
+  final double localOffset;
+  final double progressPercent;
+  final DateTime updatedAt;
+
+  const ReaderPosition({
+    required this.bookId,
+    required this.chapterIndex,
+    required this.paragraphIndex,
+    this.localOffset = 0.0,
+    this.progressPercent = 0.0,
+    required this.updatedAt,
+  });
+
+  int get currentPosition => chapterIndex;
+
+  ReaderPosition copyWith({
+    String? bookId,
+    int? chapterIndex,
+    int? paragraphIndex,
+    double? localOffset,
+    double? progressPercent,
+    DateTime? updatedAt,
+  }) {
+    return ReaderPosition(
+      bookId: bookId ?? this.bookId,
+      chapterIndex: chapterIndex ?? this.chapterIndex,
+      paragraphIndex: paragraphIndex ?? this.paragraphIndex,
+      localOffset: localOffset ?? this.localOffset,
+      progressPercent: progressPercent ?? this.progressPercent,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  ReaderPosition clamp({required int chapterCount}) {
+    final lastChapter = chapterCount <= 1 ? 0 : chapterCount - 1;
+    return ReaderPosition(
+      bookId: bookId,
+      chapterIndex: chapterIndex.clamp(0, lastChapter),
+      paragraphIndex: paragraphIndex < 0 ? 0 : paragraphIndex,
+      localOffset: localOffset.clamp(0.0, 100.0),
+      progressPercent: progressPercent.clamp(0.0, 1.0),
+      updatedAt: updatedAt,
+    );
+  }
+}
+
+class ReadingProgress {
+  final ReaderPosition position;
+  final int totalPages;
   final DateTime lastRead;
 
   const ReadingProgress({
-    required this.bookId,
-    required this.currentPosition,
+    required this.position,
+    required this.totalPages,
     required this.lastRead,
   });
+
+  factory ReadingProgress.fromPosition(ReaderPosition position, {required int totalPages}) {
+    return ReadingProgress(
+      position: position,
+      totalPages: totalPages,
+      lastRead: position.updatedAt,
+    );
+  }
 }
 
 class ReadingProfile {

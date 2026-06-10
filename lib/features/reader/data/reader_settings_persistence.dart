@@ -16,7 +16,7 @@ class ReaderSettingsPersistence {
       return ReaderSettings(
         theme: ReaderTheme.values.firstWhere(
           (e) => e.name == map['theme'],
-          orElse: () => ReaderTheme.dark,
+          orElse: () => ReaderTheme.system,
         ),
         mode: ReaderMode.values.firstWhere(
           (e) => e.name == map['mode'],
@@ -33,7 +33,7 @@ class ReaderSettingsPersistence {
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(
           (e) => e.name == map['textAlign'],
-          orElse: () => ReaderTextAlign.justify,
+          orElse: () => ReaderTextAlign.left,
         ),
         autoThemeMode: AutoThemeMode.values.firstWhere(
           (e) => e.name == map['autoThemeMode'],
@@ -43,11 +43,11 @@ class ReaderSettingsPersistence {
         customNightHour: (map['customNightHour'] as num?)?.toInt() ?? 20,
         brightness: (map['brightness'] as num?)?.toDouble() ?? 1.0,
         warmth: (map['warmth'] as num?)?.toDouble() ?? 0.0,
-        keepScreenAwake: map['keepScreenAwake'] as bool? ?? false,
+        keepScreenAwake: map['keepScreenAwake'] as bool? ?? true,
         autoHideDelay: (map['autoHideDelay'] as num?)?.toInt() ?? 3,
         progressBarPosition: ProgressBarPosition.values.firstWhere(
           (e) => e.name == map['progressBarPosition'],
-          orElse: () => ProgressBarPosition.bottom,
+          orElse: () => ProgressBarPosition.top,
         ),
         bottomBarContent: BottomBarContent.values.firstWhere(
           (e) => e.name == map['bottomBarContent'],

@@ -68,22 +68,25 @@ class ReaderContentBody extends StatelessWidget {
         onTapUp: onTap,
         child: Directionality(
           textDirection: textDirection,
-          child: SingleChildScrollView(
+          child: ListView.builder(
             controller: scrollController,
             padding: effectiveMargin,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (int i = 0; i < book.chapters.length; i++) ...[
-                  _buildChapterContent(i, settings),
-                  if (i < book.chapters.length - 1)
+            itemCount: book.chapters.length,
+            itemBuilder: (context, index) {
+              final isLast = index == book.chapters.length - 1;
+              return Column(
+                key: ValueKey('chapter-$index'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildChapterContent(index, settings),
+                  if (!isLast)
                     Padding(
                       padding: EdgeInsets.symmetric(
                         vertical: settings.paragraphSpacing * 3,
                       ),
                       child: Center(
                         child: Text(
-                          '— ${book.chapters[i + 1].title} —',
+                          '— ${book.chapters[index + 1].title} —',
                           style: _getReaderStyle(settings).copyWith(
                             color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
                           ),
@@ -92,8 +95,8 @@ class ReaderContentBody extends StatelessWidget {
                       ),
                     ),
                 ],
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -289,6 +292,34 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   void initState() {
     super.initState();
     _pageController = PageController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PaginatedContentBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialPage != oldWidget.initialPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_disposed || !_pageController.hasClients) return;
+        final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final useTwoPageLayout = isTwoPage && screenWidth > 600;
+        final pageCount = useTwoPageLayout
+            ? ((widget.book.chapters.length + 1) ~/ 2)
+            : widget.book.chapters.length;
+        if (pageCount == 0) return;
+        final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
+          0,
+          pageCount - 1,
+        );
+        unawaited(
+          _pageController.animateToPage(
+            targetPage,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          ),
+        );
+      });
+    }
   }
 
   @override

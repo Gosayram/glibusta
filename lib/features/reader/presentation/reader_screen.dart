@@ -207,7 +207,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 scrollController: _ctrl.scrollController,
                 onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
                 initialProgress: readerState.scrollProgress,
-                initialPage: readerState.currentChapterIndex,
+                initialPage: readerState.currentPosition.chapterIndex,
               ),
             ),
           _buildWarmthOverlay(settings),
@@ -233,6 +233,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 bookTitle: readerState.book?.title ?? '',
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
+                onSearch: () {},
+                onMore: () {},
               ),
             ),
             Positioned(
@@ -241,7 +243,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               right: 0,
               child: ReaderBottomBar(
                 settings: settings,
-                currentChapterIndex: readerState.currentChapterIndex,
+                currentChapterIndex: readerState.currentPosition.chapterIndex,
                 totalChapters: readerState.book?.chapters.length ?? 0,
                 scrollProgress: readerState.scrollProgress,
                 estimatedMinutesLeft: readerState.estimatedMinutesLeft,
@@ -296,7 +298,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                       onTap: (details) =>
                           _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
                       initialProgress: readerState.scrollProgress,
-                      initialPage: readerState.currentChapterIndex,
+                      initialPage: readerState.currentPosition.chapterIndex,
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -324,6 +326,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 bookTitle: readerState.book?.title ?? '',
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
+                onSearch: () {},
+                onMore: () {},
               ),
             ),
             Positioned(
@@ -332,7 +336,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               right: 0,
               child: ReaderBottomBar(
                 settings: settings,
-                currentChapterIndex: readerState.currentChapterIndex,
+                currentChapterIndex: readerState.currentPosition.chapterIndex,
                 totalChapters: readerState.book?.chapters.length ?? 0,
                 scrollProgress: readerState.scrollProgress,
                 estimatedMinutesLeft: readerState.estimatedMinutesLeft,
@@ -364,9 +368,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
           if (readerState.book != null)
             ReaderSidePanel(
               book: readerState.book!,
-              currentChapterIndex: readerState.currentChapterIndex,
+              currentChapterIndex: readerState.currentPosition.chapterIndex,
               scrollController: _ctrl.scrollController,
               width: sidePanelWidth,
+              onJumpToPosition: _ctrl.jumpToPosition,
             ),
           const VerticalDivider(width: 1),
           Expanded(
@@ -406,7 +411,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                                 MediaQuery.sizeOf(context).width,
                               ),
                               initialProgress: readerState.scrollProgress,
-                              initialPage: readerState.currentChapterIndex,
+                              initialPage: readerState.currentPosition.chapterIndex,
                             ),
                           ),
                         )
@@ -435,6 +440,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                       bookTitle: readerState.book?.title ?? '',
                       onBack: () => Navigator.of(context).pop(),
                       onSettings: () => _showQuickSettings(context),
+                      onSearch: () {},
+                      onMore: () {},
                     ),
                   ),
                   Positioned(
@@ -443,7 +450,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                     right: 0,
                     child: ReaderBottomBar(
                       settings: settings,
-                      currentChapterIndex: readerState.currentChapterIndex,
+                      currentChapterIndex: readerState.currentPosition.chapterIndex,
                       totalChapters: readerState.book?.chapters.length ?? 0,
                       scrollProgress: readerState.scrollProgress,
                       estimatedMinutesLeft: readerState.estimatedMinutesLeft,
@@ -459,11 +466,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   }
 
   ReaderTheme _resolveTheme(ReaderSettings settings) {
-    if (settings.autoThemeMode == AutoThemeMode.off) return settings.theme;
-    return AutoThemeService().resolveTheme(
-      settings.autoThemeMode,
-      settings.theme,
-    );
+    if (settings.autoThemeMode != AutoThemeMode.off) {
+      return AutoThemeService().resolveTheme(
+        settings.autoThemeMode,
+        settings.theme,
+      );
+    }
+    if (settings.theme == ReaderTheme.system) {
+      return MediaQuery.platformBrightnessOf(context) == Brightness.dark
+          ? ReaderTheme.dark
+          : ReaderTheme.light;
+    }
+    return settings.theme;
   }
 
   ThemeData _getThemeData(ReaderTheme theme) {

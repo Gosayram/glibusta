@@ -20,28 +20,29 @@ class ReaderState {
   final NormalizedBook? book;
   final bool isLoading;
   final String? errorMessage;
-  final int currentChapterIndex;
+  final ReaderPosition currentPosition;
   final bool uiVisible;
   final bool isBottomSheetOpen;
   final double scrollProgress;
   final int estimatedMinutesLeft;
 
-  const ReaderState({
+  // ignore: prefer_const_constructors_in_immutables
+  ReaderState({
     this.book,
     this.isLoading = true,
     this.errorMessage,
-    this.currentChapterIndex = 0,
+    ReaderPosition? currentPosition,
     this.uiVisible = true,
     this.isBottomSheetOpen = false,
     this.scrollProgress = 0.0,
     this.estimatedMinutesLeft = 0,
-  });
+  }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   ReaderState copyWith({
     NormalizedBook? book,
     bool? isLoading,
     String? errorMessage,
-    int? currentChapterIndex,
+    ReaderPosition? currentPosition,
     bool? uiVisible,
     bool? isBottomSheetOpen,
     double? scrollProgress,
@@ -51,7 +52,7 @@ class ReaderState {
       book: book ?? this.book,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
-      currentChapterIndex: currentChapterIndex ?? this.currentChapterIndex,
+      currentPosition: currentPosition ?? this.currentPosition,
       uiVisible: uiVisible ?? this.uiVisible,
       isBottomSheetOpen: isBottomSheetOpen ?? this.isBottomSheetOpen,
       scrollProgress: scrollProgress ?? this.scrollProgress,
@@ -70,7 +71,7 @@ class ReaderController {
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
-  ReaderState _state = const ReaderState();
+  ReaderState _state = ReaderState();
   bool _disposed = false;
   bool _fullscreenEnabled = false;
 
@@ -119,7 +120,7 @@ class ReaderController {
     try {
       final service = _ref.read(bookOpenServiceProvider);
       final book = await service.openBookWithCache(_bookId);
-      final savedChapter = await _loadSavedChapterIndex();
+      final savedPosition = await _loadSavedPosition(book.chapters.length);
       final totalWords = book.chapters.fold<int>(0, (sum, ch) {
         final chapterWords = ch.blocks.fold<int>(
           0,
@@ -132,14 +133,14 @@ class ReaderController {
         _state.copyWith(
           book: book,
           isLoading: false,
-          currentChapterIndex: savedChapter.clamp(0, book.chapters.length - 1),
+          currentPosition: savedPosition.clamp(chapterCount: book.chapters.length),
           estimatedMinutesLeft: (totalWords / wordsPerMinute).ceil(),
         ),
       );
       _scrollController = ScrollController()..addListener(_onScroll);
       final settings = _ref.read(readerSettingsProvider);
-      if (settings.restoreLastPosition && savedChapter > 0) {
-        _restoreSavedChapter(savedChapter);
+      if (settings.restoreLastPosition && savedPosition.progressPercent > 0) {
+        _restoreSavedPosition(savedPosition);
       }
       _autoThemeTimer = Timer.periodic(
         AppDuration.autoThemeCheck,
@@ -162,31 +163,52 @@ class ReaderController {
     final maxScroll = _scrollController!.position.maxScrollExtent;
     if (maxScroll > 0) {
       final progress = _scrollController!.offset / maxScroll;
-      _updateState(_state.copyWith(scrollProgress: progress.clamp(0.0, 1.0)));
-      _updateChapterFromScroll();
+      final boundedProgress = progress.clamp(0.0, 1.0);
+      _updateState(_state.copyWith(scrollProgress: boundedProgress));
+      _updatePositionFromScroll(boundedProgress);
       _progressDebouncer.call(saveProgress);
     }
   }
 
-  void _updateChapterFromScroll() {
+  void _updatePositionFromScroll(double progress) {
     if (_state.book == null || _state.book!.chapters.isEmpty) return;
-    final chapterCount = _state.book!.chapters.length;
-    final estimatedChapter = (_state.scrollProgress * chapterCount).floor().clamp(
-      0,
-      chapterCount - 1,
-    );
-    if (estimatedChapter != _state.currentChapterIndex) {
-      _updateState(_state.copyWith(currentChapterIndex: estimatedChapter));
-      _ref
-          .read(readingProgressProvider.notifier)
-          .updateProgress(
-            ReadingProgress(
-              bookId: _bookId,
-              currentPosition: estimatedChapter,
-              lastRead: DateTime.now(),
-            ),
-          );
+    final position = _positionFromProgress(progress);
+    if (position.chapterIndex == _state.currentPosition.chapterIndex &&
+        position.paragraphIndex == _state.currentPosition.paragraphIndex &&
+        (position.localOffset - _state.currentPosition.localOffset).abs() < 0.5) {
+      return;
     }
+    _updateState(_state.copyWith(currentPosition: position));
+    _ref
+        .read(readingProgressProvider.notifier)
+        .updateProgress(
+          ReadingProgress.fromPosition(position, totalPages: _state.book!.chapters.length),
+        );
+  }
+
+  ReaderPosition _positionFromProgress(double progress) {
+    final book = _state.book!;
+    if (book.chapters.isEmpty) {
+      return ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: 0,
+        paragraphIndex: 0,
+        updatedAt: DateTime.now(),
+      );
+    }
+    final lastChapter = book.chapters.length - 1;
+    final chapterIndex = (progress * lastChapter).round().clamp(0, lastChapter);
+    final chapter = book.chapters[chapterIndex];
+    final lastParagraph = chapter.blocks.isEmpty ? 0 : chapter.blocks.length - 1;
+    final paragraphIndex = (progress * lastParagraph).round().clamp(0, lastParagraph);
+    return ReaderPosition(
+      bookId: _bookId,
+      chapterIndex: chapterIndex,
+      paragraphIndex: paragraphIndex,
+      localOffset: progress * 100.0,
+      progressPercent: progress,
+      updatedAt: DateTime.now(),
+    );
   }
 
   void _startHideTimer() {
@@ -225,21 +247,45 @@ class ReaderController {
     }
   }
 
-  Future<int> _loadSavedChapterIndex() async {
+  Future<ReaderPosition> _loadSavedPosition(int chapterCount) async {
     try {
       final db = _ref.read(databaseProvider);
       final row = await (db.select(
         db.readingProgress,
       )..where((t) => t.bookId.equals(_bookId))).getSingleOrNull();
-      return row?.currentPosition ?? 0;
+      if (row == null) {
+        return ReaderPosition(
+          bookId: _bookId,
+          chapterIndex: 0,
+          paragraphIndex: 0,
+          updatedAt: DateTime.now(),
+        );
+      }
+      final progressPercent = row.progressPercent <= 0 && row.totalPages > 0
+          ? row.chapterIndex / row.totalPages
+          : row.progressPercent;
+      return ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: row.chapterIndex,
+        paragraphIndex: row.paragraphIndex,
+        localOffset: row.localOffset,
+        progressPercent: progressPercent.clamp(0.0, 1.0),
+        updatedAt: row.updatedAt,
+      ).clamp(chapterCount: chapterCount);
     } on Object catch (_) {
-      return 0;
+      return ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: 0,
+        paragraphIndex: 0,
+        updatedAt: DateTime.now(),
+      );
     }
   }
 
-  void _restoreSavedChapter(int chapterIndex) {
+  void _restoreSavedPosition(ReaderPosition position) {
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+      _updateState(_state.copyWith(currentPosition: position));
       return;
     }
     if (_scrollController == null) return;
@@ -247,11 +293,9 @@ class ReaderController {
       if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
       final maxScroll = _scrollController!.position.maxScrollExtent;
       if (maxScroll <= 0) return;
-      final chapterCount = _state.book?.chapters.length ?? 1;
-      final progress = chapterCount <= 1 ? 0.0 : chapterIndex / (chapterCount - 1);
       unawaited(
         _scrollController!.animateTo(
-          (progress * maxScroll).clamp(0.0, maxScroll),
+          (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeInOut,
         ),
@@ -262,18 +306,42 @@ class ReaderController {
   void saveProgress() {
     if (_state.book == null) return;
     final database = _ref.read(databaseProvider);
+    final position = _state.currentPosition.copyWith(
+      bookId: _bookId,
+      updatedAt: DateTime.now(),
+    );
     unawaited(
       database.upsertReadingProgress(
         ReadingProgressCompanion.insert(
           bookId: _bookId,
-          currentPosition: Value(_state.currentChapterIndex),
+          currentPosition: Value(position.chapterIndex),
+          chapterIndex: Value(position.chapterIndex),
+          paragraphIndex: Value(position.paragraphIndex),
+          localOffset: Value(position.localOffset),
+          progressPercent: Value(position.progressPercent),
           totalPages: Value(_state.book!.chapters.length),
+          lastRead: Value(position.updatedAt),
+          updatedAt: Value(position.updatedAt),
         ),
       ),
     );
   }
 
   void scrollToNext() {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+      final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
+        0,
+        (_state.book?.chapters.length ?? 1) - 1,
+      );
+      _updateState(
+        _state.copyWith(
+          currentPosition: _state.currentPosition.copyWith(chapterIndex: nextChapter),
+        ),
+      );
+      return;
+    }
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     final currentScroll = _scrollController!.offset;
@@ -289,6 +357,20 @@ class ReaderController {
   }
 
   void scrollToPrevious() {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+      final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
+        0,
+        (_state.book?.chapters.length ?? 1) - 1,
+      );
+      _updateState(
+        _state.copyWith(
+          currentPosition: _state.currentPosition.copyWith(chapterIndex: previousChapter),
+        ),
+      );
+      return;
+    }
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final currentScroll = _scrollController!.offset;
     final viewportHeight = _scrollController!.position.viewportDimension;
@@ -347,7 +429,7 @@ class ReaderController {
       case LongPressAction.selectText:
         break;
       case LongPressAction.addBookmark:
-        _addBookmarkAtCurrentChapter();
+        addBookmark();
         break;
       case LongPressAction.openMenu:
         toggleUi();
@@ -357,8 +439,9 @@ class ReaderController {
     }
   }
 
-  void _addBookmarkAtCurrentChapter() {
+  void addBookmark() {
     if (_state.book == null) return;
+    final position = _state.currentPosition.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     final database = _ref.read(databaseProvider);
     final id = DateTime.now().microsecondsSinceEpoch.toString();
     unawaited(
@@ -368,21 +451,49 @@ class ReaderController {
             Bookmark(
               id: id,
               bookId: _bookId,
-              chapterIndex: _state.currentChapterIndex,
-              paragraphIndex: 0,
-              localOffset: _state.scrollProgress * 100.0,
-              createdAt: DateTime.now(),
+              chapterIndex: position.chapterIndex,
+              paragraphIndex: position.paragraphIndex,
+              localOffset: position.localOffset / 100.0,
+              createdAt: position.updatedAt,
             ),
           ),
     );
   }
 
-  void jumpToProgress(double progress) {
+  void jumpToPosition(ReaderPosition position) {
+    if (_state.book == null || _state.book!.chapters.isEmpty) return;
+    final clamped = position.clamp(chapterCount: _state.book!.chapters.length);
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+      _updateState(_state.copyWith(currentPosition: clamped));
+      return;
+    }
     if (_scrollController == null || !_scrollController!.hasClients) return;
+    final progress = clamped.progressPercent > 0
+        ? clamped.progressPercent
+        : clamped.chapterIndex / (_state.book!.chapters.length - 1);
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
       _scrollController!.animateTo(
         (progress * maxScroll).clamp(0.0, maxScroll),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  void jumpToProgress(double progress) {
+    final bounded = progress.clamp(0.0, 1.0);
+    _updateState(
+      _state.copyWith(currentPosition: _positionFromProgress(bounded), scrollProgress: bounded),
+    );
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) return;
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    final maxScroll = _scrollController!.position.maxScrollExtent;
+    unawaited(
+      _scrollController!.animateTo(
+        (bounded * maxScroll).clamp(0.0, maxScroll),
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
       ),

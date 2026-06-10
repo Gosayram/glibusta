@@ -2557,6 +2557,54 @@ class $ReadingProgressTable extends ReadingProgress
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _chapterIndexMeta = const VerificationMeta(
+    'chapterIndex',
+  );
+  @override
+  late final GeneratedColumn<int> chapterIndex = GeneratedColumn<int>(
+    'chapter_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _paragraphIndexMeta = const VerificationMeta(
+    'paragraphIndex',
+  );
+  @override
+  late final GeneratedColumn<int> paragraphIndex = GeneratedColumn<int>(
+    'paragraph_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _localOffsetMeta = const VerificationMeta(
+    'localOffset',
+  );
+  @override
+  late final GeneratedColumn<double> localOffset = GeneratedColumn<double>(
+    'local_offset',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _progressPercentMeta = const VerificationMeta(
+    'progressPercent',
+  );
+  @override
+  late final GeneratedColumn<double> progressPercent = GeneratedColumn<double>(
+    'progress_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
   static const VerificationMeta _totalPagesMeta = const VerificationMeta(
     'totalPages',
   );
@@ -2581,12 +2629,29 @@ class $ReadingProgressTable extends ReadingProgress
     requiredDuringInsert: false,
     clientDefault: DateTime.now,
   );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: DateTime.now,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     bookId,
     currentPosition,
+    chapterIndex,
+    paragraphIndex,
+    localOffset,
+    progressPercent,
     totalPages,
     lastRead,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2617,6 +2682,42 @@ class $ReadingProgressTable extends ReadingProgress
         ),
       );
     }
+    if (data.containsKey('chapter_index')) {
+      context.handle(
+        _chapterIndexMeta,
+        chapterIndex.isAcceptableOrUnknown(
+          data['chapter_index']!,
+          _chapterIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('paragraph_index')) {
+      context.handle(
+        _paragraphIndexMeta,
+        paragraphIndex.isAcceptableOrUnknown(
+          data['paragraph_index']!,
+          _paragraphIndexMeta,
+        ),
+      );
+    }
+    if (data.containsKey('local_offset')) {
+      context.handle(
+        _localOffsetMeta,
+        localOffset.isAcceptableOrUnknown(
+          data['local_offset']!,
+          _localOffsetMeta,
+        ),
+      );
+    }
+    if (data.containsKey('progress_percent')) {
+      context.handle(
+        _progressPercentMeta,
+        progressPercent.isAcceptableOrUnknown(
+          data['progress_percent']!,
+          _progressPercentMeta,
+        ),
+      );
+    }
     if (data.containsKey('total_pages')) {
       context.handle(
         _totalPagesMeta,
@@ -2627,6 +2728,12 @@ class $ReadingProgressTable extends ReadingProgress
       context.handle(
         _lastReadMeta,
         lastRead.isAcceptableOrUnknown(data['last_read']!, _lastReadMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
       );
     }
     return context;
@@ -2646,6 +2753,22 @@ class $ReadingProgressTable extends ReadingProgress
         DriftSqlType.int,
         data['${effectivePrefix}current_position'],
       )!,
+      chapterIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}chapter_index'],
+      )!,
+      paragraphIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paragraph_index'],
+      )!,
+      localOffset: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}local_offset'],
+      )!,
+      progressPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}progress_percent'],
+      )!,
       totalPages: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}total_pages'],
@@ -2653,6 +2776,10 @@ class $ReadingProgressTable extends ReadingProgress
       lastRead: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_read'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
       )!,
     );
   }
@@ -2666,21 +2793,36 @@ class $ReadingProgressTable extends ReadingProgress
 class ReadingProgressData extends DataClass implements Insertable<ReadingProgressData> {
   final String bookId;
   final int currentPosition;
+  final int chapterIndex;
+  final int paragraphIndex;
+  final double localOffset;
+  final double progressPercent;
   final int totalPages;
   final DateTime lastRead;
+  final DateTime updatedAt;
   const ReadingProgressData({
     required this.bookId,
     required this.currentPosition,
+    required this.chapterIndex,
+    required this.paragraphIndex,
+    required this.localOffset,
+    required this.progressPercent,
     required this.totalPages,
     required this.lastRead,
+    required this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['book_id'] = Variable<String>(bookId);
     map['current_position'] = Variable<int>(currentPosition);
+    map['chapter_index'] = Variable<int>(chapterIndex);
+    map['paragraph_index'] = Variable<int>(paragraphIndex);
+    map['local_offset'] = Variable<double>(localOffset);
+    map['progress_percent'] = Variable<double>(progressPercent);
     map['total_pages'] = Variable<int>(totalPages);
     map['last_read'] = Variable<DateTime>(lastRead);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
 
@@ -2688,8 +2830,13 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
     return ReadingProgressCompanion(
       bookId: Value(bookId),
       currentPosition: Value(currentPosition),
+      chapterIndex: Value(chapterIndex),
+      paragraphIndex: Value(paragraphIndex),
+      localOffset: Value(localOffset),
+      progressPercent: Value(progressPercent),
       totalPages: Value(totalPages),
       lastRead: Value(lastRead),
+      updatedAt: Value(updatedAt),
     );
   }
 
@@ -2701,8 +2848,13 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
     return ReadingProgressData(
       bookId: serializer.fromJson<String>(json['bookId']),
       currentPosition: serializer.fromJson<int>(json['currentPosition']),
+      chapterIndex: serializer.fromJson<int>(json['chapterIndex']),
+      paragraphIndex: serializer.fromJson<int>(json['paragraphIndex']),
+      localOffset: serializer.fromJson<double>(json['localOffset']),
+      progressPercent: serializer.fromJson<double>(json['progressPercent']),
       totalPages: serializer.fromJson<int>(json['totalPages']),
       lastRead: serializer.fromJson<DateTime>(json['lastRead']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
   @override
@@ -2711,21 +2863,36 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
     return <String, dynamic>{
       'bookId': serializer.toJson<String>(bookId),
       'currentPosition': serializer.toJson<int>(currentPosition),
+      'chapterIndex': serializer.toJson<int>(chapterIndex),
+      'paragraphIndex': serializer.toJson<int>(paragraphIndex),
+      'localOffset': serializer.toJson<double>(localOffset),
+      'progressPercent': serializer.toJson<double>(progressPercent),
       'totalPages': serializer.toJson<int>(totalPages),
       'lastRead': serializer.toJson<DateTime>(lastRead),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
 
   ReadingProgressData copyWith({
     String? bookId,
     int? currentPosition,
+    int? chapterIndex,
+    int? paragraphIndex,
+    double? localOffset,
+    double? progressPercent,
     int? totalPages,
     DateTime? lastRead,
+    DateTime? updatedAt,
   }) => ReadingProgressData(
     bookId: bookId ?? this.bookId,
     currentPosition: currentPosition ?? this.currentPosition,
+    chapterIndex: chapterIndex ?? this.chapterIndex,
+    paragraphIndex: paragraphIndex ?? this.paragraphIndex,
+    localOffset: localOffset ?? this.localOffset,
+    progressPercent: progressPercent ?? this.progressPercent,
     totalPages: totalPages ?? this.totalPages,
     lastRead: lastRead ?? this.lastRead,
+    updatedAt: updatedAt ?? this.updatedAt,
   );
   ReadingProgressData copyWithCompanion(ReadingProgressCompanion data) {
     return ReadingProgressData(
@@ -2733,8 +2900,15 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
       currentPosition: data.currentPosition.present
           ? data.currentPosition.value
           : this.currentPosition,
+      chapterIndex: data.chapterIndex.present ? data.chapterIndex.value : this.chapterIndex,
+      paragraphIndex: data.paragraphIndex.present ? data.paragraphIndex.value : this.paragraphIndex,
+      localOffset: data.localOffset.present ? data.localOffset.value : this.localOffset,
+      progressPercent: data.progressPercent.present
+          ? data.progressPercent.value
+          : this.progressPercent,
       totalPages: data.totalPages.present ? data.totalPages.value : this.totalPages,
       lastRead: data.lastRead.present ? data.lastRead.value : this.lastRead,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -2743,56 +2917,101 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
     return (StringBuffer('ReadingProgressData(')
           ..write('bookId: $bookId, ')
           ..write('currentPosition: $currentPosition, ')
+          ..write('chapterIndex: $chapterIndex, ')
+          ..write('paragraphIndex: $paragraphIndex, ')
+          ..write('localOffset: $localOffset, ')
+          ..write('progressPercent: $progressPercent, ')
           ..write('totalPages: $totalPages, ')
-          ..write('lastRead: $lastRead')
+          ..write('lastRead: $lastRead, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(bookId, currentPosition, totalPages, lastRead);
+  int get hashCode => Object.hash(
+    bookId,
+    currentPosition,
+    chapterIndex,
+    paragraphIndex,
+    localOffset,
+    progressPercent,
+    totalPages,
+    lastRead,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ReadingProgressData &&
           other.bookId == this.bookId &&
           other.currentPosition == this.currentPosition &&
+          other.chapterIndex == this.chapterIndex &&
+          other.paragraphIndex == this.paragraphIndex &&
+          other.localOffset == this.localOffset &&
+          other.progressPercent == this.progressPercent &&
           other.totalPages == this.totalPages &&
-          other.lastRead == this.lastRead);
+          other.lastRead == this.lastRead &&
+          other.updatedAt == this.updatedAt);
 }
 
 class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   final Value<String> bookId;
   final Value<int> currentPosition;
+  final Value<int> chapterIndex;
+  final Value<int> paragraphIndex;
+  final Value<double> localOffset;
+  final Value<double> progressPercent;
   final Value<int> totalPages;
   final Value<DateTime> lastRead;
+  final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ReadingProgressCompanion({
     this.bookId = const Value.absent(),
     this.currentPosition = const Value.absent(),
+    this.chapterIndex = const Value.absent(),
+    this.paragraphIndex = const Value.absent(),
+    this.localOffset = const Value.absent(),
+    this.progressPercent = const Value.absent(),
     this.totalPages = const Value.absent(),
     this.lastRead = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ReadingProgressCompanion.insert({
     required String bookId,
     this.currentPosition = const Value.absent(),
+    this.chapterIndex = const Value.absent(),
+    this.paragraphIndex = const Value.absent(),
+    this.localOffset = const Value.absent(),
+    this.progressPercent = const Value.absent(),
     this.totalPages = const Value.absent(),
     this.lastRead = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId);
   static Insertable<ReadingProgressData> custom({
     Expression<String>? bookId,
     Expression<int>? currentPosition,
+    Expression<int>? chapterIndex,
+    Expression<int>? paragraphIndex,
+    Expression<double>? localOffset,
+    Expression<double>? progressPercent,
     Expression<int>? totalPages,
     Expression<DateTime>? lastRead,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (bookId != null) 'book_id': bookId,
       if (currentPosition != null) 'current_position': currentPosition,
+      if (chapterIndex != null) 'chapter_index': chapterIndex,
+      if (paragraphIndex != null) 'paragraph_index': paragraphIndex,
+      if (localOffset != null) 'local_offset': localOffset,
+      if (progressPercent != null) 'progress_percent': progressPercent,
       if (totalPages != null) 'total_pages': totalPages,
       if (lastRead != null) 'last_read': lastRead,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2800,15 +3019,25 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   ReadingProgressCompanion copyWith({
     Value<String>? bookId,
     Value<int>? currentPosition,
+    Value<int>? chapterIndex,
+    Value<int>? paragraphIndex,
+    Value<double>? localOffset,
+    Value<double>? progressPercent,
     Value<int>? totalPages,
     Value<DateTime>? lastRead,
+    Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
     return ReadingProgressCompanion(
       bookId: bookId ?? this.bookId,
       currentPosition: currentPosition ?? this.currentPosition,
+      chapterIndex: chapterIndex ?? this.chapterIndex,
+      paragraphIndex: paragraphIndex ?? this.paragraphIndex,
+      localOffset: localOffset ?? this.localOffset,
+      progressPercent: progressPercent ?? this.progressPercent,
       totalPages: totalPages ?? this.totalPages,
       lastRead: lastRead ?? this.lastRead,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2822,11 +3051,26 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     if (currentPosition.present) {
       map['current_position'] = Variable<int>(currentPosition.value);
     }
+    if (chapterIndex.present) {
+      map['chapter_index'] = Variable<int>(chapterIndex.value);
+    }
+    if (paragraphIndex.present) {
+      map['paragraph_index'] = Variable<int>(paragraphIndex.value);
+    }
+    if (localOffset.present) {
+      map['local_offset'] = Variable<double>(localOffset.value);
+    }
+    if (progressPercent.present) {
+      map['progress_percent'] = Variable<double>(progressPercent.value);
+    }
     if (totalPages.present) {
       map['total_pages'] = Variable<int>(totalPages.value);
     }
     if (lastRead.present) {
       map['last_read'] = Variable<DateTime>(lastRead.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -2839,8 +3083,13 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
     return (StringBuffer('ReadingProgressCompanion(')
           ..write('bookId: $bookId, ')
           ..write('currentPosition: $currentPosition, ')
+          ..write('chapterIndex: $chapterIndex, ')
+          ..write('paragraphIndex: $paragraphIndex, ')
+          ..write('localOffset: $localOffset, ')
+          ..write('progressPercent: $progressPercent, ')
           ..write('totalPages: $totalPages, ')
           ..write('lastRead: $lastRead, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7111,16 +7360,26 @@ typedef $$ReadingProgressTableCreateCompanionBuilder =
     ReadingProgressCompanion Function({
       required String bookId,
       Value<int> currentPosition,
+      Value<int> chapterIndex,
+      Value<int> paragraphIndex,
+      Value<double> localOffset,
+      Value<double> progressPercent,
       Value<int> totalPages,
       Value<DateTime> lastRead,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 typedef $$ReadingProgressTableUpdateCompanionBuilder =
     ReadingProgressCompanion Function({
       Value<String> bookId,
       Value<int> currentPosition,
+      Value<int> chapterIndex,
+      Value<int> paragraphIndex,
+      Value<double> localOffset,
+      Value<double> progressPercent,
       Value<int> totalPages,
       Value<DateTime> lastRead,
+      Value<DateTime> updatedAt,
       Value<int> rowid,
     });
 
@@ -7142,6 +7401,26 @@ class $$ReadingProgressTableFilterComposer extends Composer<_$AppDatabase, $Read
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get chapterIndex => $composableBuilder(
+    column: $table.chapterIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paragraphIndex => $composableBuilder(
+    column: $table.paragraphIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get localOffset => $composableBuilder(
+    column: $table.localOffset,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get progressPercent => $composableBuilder(
+    column: $table.progressPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get totalPages => $composableBuilder(
     column: $table.totalPages,
     builder: (column) => ColumnFilters(column),
@@ -7149,6 +7428,11 @@ class $$ReadingProgressTableFilterComposer extends Composer<_$AppDatabase, $Read
 
   ColumnFilters<DateTime> get lastRead => $composableBuilder(
     column: $table.lastRead,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7172,6 +7456,26 @@ class $$ReadingProgressTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get chapterIndex => $composableBuilder(
+    column: $table.chapterIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paragraphIndex => $composableBuilder(
+    column: $table.paragraphIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get localOffset => $composableBuilder(
+    column: $table.localOffset,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get progressPercent => $composableBuilder(
+    column: $table.progressPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get totalPages => $composableBuilder(
     column: $table.totalPages,
     builder: (column) => ColumnOrderings(column),
@@ -7179,6 +7483,11 @@ class $$ReadingProgressTableOrderingComposer
 
   ColumnOrderings<DateTime> get lastRead => $composableBuilder(
     column: $table.lastRead,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -7200,6 +7509,26 @@ class $$ReadingProgressTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<int> get chapterIndex => $composableBuilder(
+    column: $table.chapterIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paragraphIndex => $composableBuilder(
+    column: $table.paragraphIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get localOffset => $composableBuilder(
+    column: $table.localOffset,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get progressPercent => $composableBuilder(
+    column: $table.progressPercent,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get totalPages => $composableBuilder(
     column: $table.totalPages,
     builder: (column) => column,
@@ -7207,6 +7536,9 @@ class $$ReadingProgressTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastRead =>
       $composableBuilder(column: $table.lastRead, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
 class $$ReadingProgressTableTableManager
@@ -7244,28 +7576,48 @@ class $$ReadingProgressTableTableManager
               ({
                 Value<String> bookId = const Value.absent(),
                 Value<int> currentPosition = const Value.absent(),
+                Value<int> chapterIndex = const Value.absent(),
+                Value<int> paragraphIndex = const Value.absent(),
+                Value<double> localOffset = const Value.absent(),
+                Value<double> progressPercent = const Value.absent(),
                 Value<int> totalPages = const Value.absent(),
                 Value<DateTime> lastRead = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingProgressCompanion(
                 bookId: bookId,
                 currentPosition: currentPosition,
+                chapterIndex: chapterIndex,
+                paragraphIndex: paragraphIndex,
+                localOffset: localOffset,
+                progressPercent: progressPercent,
                 totalPages: totalPages,
                 lastRead: lastRead,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String bookId,
                 Value<int> currentPosition = const Value.absent(),
+                Value<int> chapterIndex = const Value.absent(),
+                Value<int> paragraphIndex = const Value.absent(),
+                Value<double> localOffset = const Value.absent(),
+                Value<double> progressPercent = const Value.absent(),
                 Value<int> totalPages = const Value.absent(),
                 Value<DateTime> lastRead = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingProgressCompanion.insert(
                 bookId: bookId,
                 currentPosition: currentPosition,
+                chapterIndex: chapterIndex,
+                paragraphIndex: paragraphIndex,
+                localOffset: localOffset,
+                progressPercent: progressPercent,
                 totalPages: totalPages,
                 lastRead: lastRead,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>

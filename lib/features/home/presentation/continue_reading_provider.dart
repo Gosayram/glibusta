@@ -64,7 +64,9 @@ Future<List<ContinueReadingInfo>> continueReadingInfos(Ref ref) async {
 
     final cachedBook = await bookOpenService.getCachedBook(book.id);
     final int totalChapters = cachedBook?.chapters.length ?? 0;
-    final int currentChapter = progress.currentPosition;
+    final int currentChapter = progress.chapterIndex == 0
+        ? progress.currentPosition
+        : progress.chapterIndex;
     final DateTime lastRead = progress.lastRead;
 
     String? chapterName;
@@ -76,7 +78,9 @@ Future<List<ContinueReadingInfo>> continueReadingInfos(Ref ref) async {
     final int estimatedMinutesLeft = (chaptersLeft * 2).clamp(0, 9999);
 
     final double progressPercent = totalChapters > 0
-        ? (currentChapter / totalChapters).clamp(0.0, 1.0)
+        ? progress.progressPercent > 0
+              ? progress.progressPercent
+              : (currentChapter / totalChapters).clamp(0.0, 1.0)
         : 0.0;
 
     infos.add(

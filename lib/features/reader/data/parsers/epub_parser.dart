@@ -33,45 +33,127 @@ class EpubParser implements BookParser {
   }
 
   NormalizedBook _convertToNormalized(EpubBook epubBook) {
-    final chapters = <ReaderBlock>[];
-    int blockIndex = 0;
-
+    final chapters = <ReaderChapter>[];
     if (epubBook.Chapters != null) {
+      var chapterIndex = 0;
       for (final chapter in epubBook.Chapters!) {
-        if (chapter.HtmlContent != null) {
-          final doc = html_parser.parse(chapter.HtmlContent!);
-          final paragraphs = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
-
-          for (final para in paragraphs) {
-            final text = para.text.trim();
-            if (text.isNotEmpty) {
-              chapters.add(
-                ReaderBlock(
-                  index: blockIndex++,
-                  text: text,
-                  type: _getBlockType(para.localName),
-                ),
-              );
-            }
-          }
-        }
+        chapters.addAll(_convertChapter(chapter, ref: chapterIndex++));
       }
+    }
+
+    final metadata = <String, dynamic>{
+      'coverImage': epubBook.CoverImage != null,
+    };
+    if (epubBook.Schema?.Package?.Metadata != null) {
+      final meta = epubBook.Schema!.Package!.Metadata!;
+      metadata.addAll({
+        'description': meta.Description,
+        'publishers': meta.Publishers,
+        'languages': meta.Languages,
+        'subjects': meta.Subjects,
+        'rights': meta.Rights,
+      });
     }
 
     return NormalizedBook(
       id: epubBook.Title ?? 'unknown',
       title: epubBook.Title ?? 'Unknown Title',
-      authors: epubBook.Author != null ? [epubBook.Author!] : [],
+      authors: _authorsFromEpub(epubBook),
+      description: epubBook.Schema?.Package?.Metadata?.Description,
       coverUrl: epubBook.CoverImage != null ? 'embedded' : null,
-      chapters: [
-        ReaderChapter(
-          index: 0,
-          title: 'Main Content',
-          blocks: chapters,
-        ),
-      ],
-      metadata: {},
+      chapters: chapters.isEmpty
+          ? [
+              const ReaderChapter(
+                index: 0,
+                title: 'Main Content',
+                blocks: [],
+              ),
+            ]
+          : chapters,
+      metadata: metadata,
     );
+  }
+
+  List<ReaderChapter> _convertChapter(EpubChapter chapter, {required int ref}) {
+    final result = <ReaderChapter>[];
+    final title = chapter.Title?.trim().isNotEmpty == true
+        ? chapter.Title!.trim()
+        : 'Chapter ${ref + 1}';
+    result.add(
+      ReaderChapter(
+        index: ref,
+        title: title,
+        blocks: _convertBlocks(chapter.HtmlContent),
+      ),
+    );
+
+    if (chapter.SubChapters != null) {
+      var subIndex = 1;
+      for (final subChapter in chapter.SubChapters!) {
+        final nestedTitle = subChapter.Title?.trim().isNotEmpty == true
+            ? '$title — ${subChapter.Title!.trim()}'
+            : '$title.$subIndex';
+        result.add(
+          ReaderChapter(
+            index: result.length,
+            title: nestedTitle,
+            blocks: _convertBlocks(subChapter.HtmlContent),
+          ),
+        );
+        subIndex++;
+      }
+    }
+
+    return result;
+  }
+
+  List<ReaderBlock> _convertBlocks(String? htmlContent) {
+    if (htmlContent == null || htmlContent.trim().isEmpty) return const [];
+    final doc = html_parser.parse(htmlContent);
+    final nodes = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, img, blockquote');
+    final blocks = <ReaderBlock>[];
+    for (final node in nodes) {
+      final text = node.text.trim();
+      if (node.localName == 'img') {
+        final src = node.attributes['src'] ?? node.attributes['data-src'];
+        if (src != null) {
+          blocks.add(
+            ReaderBlock(
+              index: blocks.length,
+              text: '',
+              type: BlockType.image,
+              imageUrl: src,
+            ),
+          );
+        }
+        continue;
+      }
+      if (text.isNotEmpty) {
+        blocks.add(
+          ReaderBlock(
+            index: blocks.length,
+            text: text,
+            type: _getBlockType(node.localName),
+          ),
+        );
+      }
+    }
+    return blocks;
+  }
+
+  List<String> _authorsFromEpub(EpubBook epubBook) {
+    if (epubBook.AuthorList != null && epubBook.AuthorList!.isNotEmpty) {
+      return epubBook.AuthorList!.whereType<String>().where((a) => a.trim().isNotEmpty).toList();
+    }
+    if (epubBook.Author != null && epubBook.Author!.trim().isNotEmpty) {
+      return [epubBook.Author!];
+    }
+    return epubBook.Schema?.Package?.Metadata?.Creators
+            ?.map((creator) => creator.Creator)
+            .whereType<String>()
+            .where((creator) => creator.trim().isNotEmpty)
+            .toList() ??
+        [];
   }
 
   BlockType _getBlockType(String? tagName) {

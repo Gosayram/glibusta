@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -51,6 +51,13 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.createTable(readingSessions);
+      }
+      if (from < 5) {
+        await m.addColumn(readingProgress, readingProgress.chapterIndex);
+        await m.addColumn(readingProgress, readingProgress.paragraphIndex);
+        await m.addColumn(readingProgress, readingProgress.localOffset);
+        await m.addColumn(readingProgress, readingProgress.progressPercent);
+        await m.addColumn(readingProgress, readingProgress.updatedAt);
       }
     },
     beforeOpen: (details) async {

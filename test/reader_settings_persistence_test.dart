@@ -14,7 +14,7 @@ void main() {
     group('load', () {
       test('returns default settings when no saved data exists', () async {
         final settings = await ReaderSettingsPersistence.load();
-        expect(settings.theme, ReaderTheme.dark);
+        expect(settings.theme, ReaderTheme.system);
         expect(settings.mode, ReaderMode.continuous);
         expect(settings.fontSize, 18.0);
         expect(settings.lineHeight, 1.55);
@@ -22,7 +22,7 @@ void main() {
         expect(settings.font, ReaderFont.sourceSerif);
         expect(settings.paragraphSpacing, 8.0);
         expect(settings.letterSpacing, 0.0);
-        expect(settings.textAlign, ReaderTextAlign.justify);
+        expect(settings.textAlign, ReaderTextAlign.left);
         expect(settings.autoThemeMode, AutoThemeMode.off);
         expect(settings.customDayHour, 7);
         expect(settings.customNightHour, 20);
@@ -38,7 +38,6 @@ void main() {
           font: ReaderFont.literata,
           paragraphSpacing: 12.0,
           letterSpacing: 0.5,
-          textAlign: ReaderTextAlign.left,
           autoThemeMode: AutoThemeMode.sunset,
           customDayHour: 8,
           customNightHour: 21,
@@ -65,7 +64,7 @@ void main() {
         await prefs.setString('reader_settings', 'not valid json {{{');
 
         final settings = await ReaderSettingsPersistence.load();
-        expect(settings.theme, ReaderTheme.dark);
+        expect(settings.theme, ReaderTheme.system);
         expect(settings.fontSize, 18.0);
       });
 
@@ -90,7 +89,7 @@ void main() {
         );
 
         final settings = await ReaderSettingsPersistence.load();
-        expect(settings.theme, ReaderTheme.dark); // fallback
+        expect(settings.theme, ReaderTheme.system); // fallback
       });
 
       test('handles unknown font name gracefully', () async {

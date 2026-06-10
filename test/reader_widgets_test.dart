@@ -54,7 +54,7 @@ void main() {
       expect(find.text('Режим'), findsOneWidget);
     });
 
-    testWidgets('renders all 6 theme swatches', (tester) async {
+    testWidgets('renders all 7 theme swatches', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
@@ -62,7 +62,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Aa'), findsNWidgets(6));
+      expect(find.text('Aa'), findsNWidgets(7));
     });
 
     testWidgets('renders all 4 font chips', (tester) async {

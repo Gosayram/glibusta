@@ -17,7 +17,7 @@ class ReaderColors {
 
   static ReaderColors forTheme(ReaderTheme theme) {
     return switch (theme) {
-      ReaderTheme.light => _light,
+      ReaderTheme.system || ReaderTheme.light => _light,
       ReaderTheme.paper => _paper,
       ReaderTheme.sepia => _sepia,
       ReaderTheme.dark => _dark,
@@ -28,7 +28,7 @@ class ReaderColors {
 
   static Color progressColor(ReaderTheme theme) {
     return switch (theme) {
-      ReaderTheme.light => Colors.blue.shade700,
+      ReaderTheme.system || ReaderTheme.light => Colors.blue.shade700,
       ReaderTheme.paper => const Color(0xFF5B4636),
       ReaderTheme.sepia => const Color(0xFF5B4636),
       ReaderTheme.dark => Colors.blue.shade300,

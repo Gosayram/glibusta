@@ -136,19 +136,32 @@ class BackupService {
     return {
       'bookId': row.bookId,
       'currentPosition': row.currentPosition,
+      'chapterIndex': row.chapterIndex,
+      'paragraphIndex': row.paragraphIndex,
+      'localOffset': row.localOffset,
+      'progressPercent': row.progressPercent,
       'totalPages': row.totalPages,
       'lastRead': row.lastRead.toIso8601String(),
+      'updatedAt': row.updatedAt.toIso8601String(),
     };
   }
 
   ReadingProgressCompanion _progressFromMap(Map<String, dynamic> map) {
+    final updatedAt = map['updatedAt'] != null
+        ? DateTime.parse(map['updatedAt'] as String)
+        : (map['lastRead'] != null ? DateTime.parse(map['lastRead'] as String) : DateTime.now());
     return ReadingProgressCompanion.insert(
       bookId: map['bookId'] as String,
       currentPosition: Value((map['currentPosition'] as num?)?.toInt() ?? 0),
+      chapterIndex: Value((map['chapterIndex'] as num?)?.toInt() ?? 0),
+      paragraphIndex: Value((map['paragraphIndex'] as num?)?.toInt() ?? 0),
+      localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
+      progressPercent: Value((map['progressPercent'] as num?)?.toDouble() ?? 0.0),
       totalPages: Value((map['totalPages'] as num?)?.toInt() ?? 0),
       lastRead: Value(
         map['lastRead'] != null ? DateTime.parse(map['lastRead'] as String) : DateTime.now(),
       ),
+      updatedAt: Value(updatedAt),
     );
   }
 
