@@ -24,10 +24,9 @@ class BookDropZone extends ConsumerWidget {
   }
 
   Future<void> _showImportDialog(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['fb2', 'epub', 'txt'],
-      allowMultiple: true,
     );
     if (result == null || result.files.isEmpty) return;
 

@@ -121,10 +121,9 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   Future<void> _importBook(BuildContext context, WidgetRef ref) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['fb2', 'epub'],
-      allowMultiple: true,
     );
     if (result == null || result.files.isEmpty) return;
 
