@@ -25,6 +25,15 @@ class FlibustaHtmlSource extends BookSource {
 
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
+    if (query.query.isEmpty) {
+      return SearchResultPage(
+        books: const [],
+        totalCount: 0,
+        currentPage: query.page,
+        totalPages: 0,
+        hasNextPage: false,
+      );
+    }
     final searchUrl = _buildSearchUrl(query);
     final html = await client.getWithMirror(searchUrl, cancelToken: cancelToken);
     return _parseSearchResults(html, query);

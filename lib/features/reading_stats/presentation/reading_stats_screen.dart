@@ -342,9 +342,7 @@ class _GoalCard extends ConsumerWidget {
                     children: [
                       Icon(
                         isMet ? Icons.flag : Icons.flag_outlined,
-                        color: isMet
-                            ? Colors.green
-                            : Theme.of(context).colorScheme.primary,
+                        color: isMet ? Colors.green : Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Text(

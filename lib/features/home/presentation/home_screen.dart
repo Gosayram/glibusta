@@ -150,8 +150,7 @@ class HomeScreen extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        for (final col in collections.take(3))
-                          _CollectionTile(collection: col),
+                        for (final col in collections.take(3)) _CollectionTile(collection: col),
                         const SizedBox(height: 24),
                       ],
                     );
@@ -438,7 +437,11 @@ class _CollectionTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '$bookIds ${bookIds == 1 ? 'книга' : bookIds < 5 ? 'книги' : 'книг'}',
+          '$bookIds ${bookIds == 1
+              ? 'книга'
+              : bookIds < 5
+              ? 'книги'
+              : 'книг'}',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

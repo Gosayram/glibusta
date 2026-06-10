@@ -333,11 +333,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onSearch: () => _ctrl.toggleSearch(),
                 onMore: readerState.book != null
                     ? () => TableOfContentsSheet.show(
-                          context,
-                          book: readerState.book!,
-                          currentChapterIndex: readerState.currentPosition.chapterIndex,
-                          onJumpToPosition: _ctrl.jumpToPosition,
-                        )
+                        context,
+                        book: readerState.book!,
+                        currentChapterIndex: readerState.currentPosition.chapterIndex,
+                        onJumpToPosition: _ctrl.jumpToPosition,
+                      )
                     : () {},
               ),
             ),
@@ -470,11 +470,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onSearch: () => _ctrl.toggleSearch(),
                 onMore: readerState.book != null
                     ? () => TableOfContentsSheet.show(
-                          context,
-                          book: readerState.book!,
-                          currentChapterIndex: readerState.currentPosition.chapterIndex,
-                          onJumpToPosition: _ctrl.jumpToPosition,
-                        )
+                        context,
+                        book: readerState.book!,
+                        currentChapterIndex: readerState.currentPosition.chapterIndex,
+                        onJumpToPosition: _ctrl.jumpToPosition,
+                      )
                     : () {},
               ),
             ),
@@ -558,7 +558,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   padding: EdgeInsets.symmetric(
                     horizontal: horizontalPadding,
                   ),
-                   child: readerState.book != null
+                  child: readerState.book != null
                       ? SelectionAreaWrapper(
                           child: GestureDetector(
                             onVerticalDragStart: settings.verticalSwipeBrightness
@@ -626,11 +626,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       onSearch: () => _ctrl.toggleSearch(),
                       onMore: readerState.book != null
                           ? () => TableOfContentsSheet.show(
-                                context,
-                                book: readerState.book!,
-                                currentChapterIndex: readerState.currentPosition.chapterIndex,
-                                onJumpToPosition: _ctrl.jumpToPosition,
-                              )
+                              context,
+                              book: readerState.book!,
+                              currentChapterIndex: readerState.currentPosition.chapterIndex,
+                              onJumpToPosition: _ctrl.jumpToPosition,
+                            )
                           : () {},
                     ),
                   ),

@@ -16,6 +16,10 @@ class EpubParser implements BookParser {
       return _convertToNormalized(epubBook);
     } on FormatException catch (e) {
       throw ParserFailure('Неверный формат EPUB: ${e.message}');
+    } on RangeError catch (e) {
+      throw ParserFailure('Повреждённый EPUB файл: ${e.message}');
+    } on StateError catch (e) {
+      throw ParserFailure('Ошибка структуры EPUB: ${e.message}');
     } on Object catch (e) {
       throw ParserFailure('Неожиданная ошибка при разборе EPUB: $e');
     }
@@ -25,7 +29,13 @@ class EpubParser implements BookParser {
   Future<NormalizedBook> parseFile(String filePath) async {
     try {
       final file = File(filePath);
+      if (!await file.exists()) {
+        throw ParserFailure('Файл не найден: $filePath');
+      }
       final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw ParserFailure('Файл пуст: $filePath');
+      }
       return parse(bytes, fileName: filePath.split('/').last);
     } on FileSystemException catch (e) {
       throw ParserFailure('Не удалось прочитать файл EPUB: ${e.message}');
@@ -34,7 +44,7 @@ class EpubParser implements BookParser {
 
   NormalizedBook _convertToNormalized(EpubBook epubBook) {
     final chapters = <ReaderChapter>[];
-    if (epubBook.Chapters != null) {
+    if (epubBook.Chapters != null && epubBook.Chapters!.isNotEmpty) {
       var chapterIndex = 0;
       for (final chapter in epubBook.Chapters!) {
         chapters.addAll(_convertChapter(chapter, ref: chapterIndex++));
@@ -110,13 +120,12 @@ class EpubParser implements BookParser {
   List<ReaderBlock> _convertBlocks(String? htmlContent) {
     if (htmlContent == null || htmlContent.trim().isEmpty) return const [];
     final doc = html_parser.parse(htmlContent);
-    final nodes = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, img, blockquote');
+    final nodes = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, img, blockquote, div, li');
     final blocks = <ReaderBlock>[];
     for (final node in nodes) {
-      final text = node.text.trim();
       if (node.localName == 'img') {
         final src = node.attributes['src'] ?? node.attributes['data-src'];
-        if (src != null) {
+        if (src != null && src.isNotEmpty) {
           blocks.add(
             ReaderBlock(
               index: blocks.length,
@@ -128,6 +137,7 @@ class EpubParser implements BookParser {
         }
         continue;
       }
+      final text = node.text.trim();
       if (text.isNotEmpty) {
         blocks.add(
           ReaderBlock(

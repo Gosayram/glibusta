@@ -96,15 +96,17 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   Future<void> _addBookmark(BuildContext context) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
     final db = ref.read(databaseProvider);
-    await db.into(db.bookmarks).insert(
-      BookmarksCompanion.insert(
-        id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
-        bookId: widget.bookId,
-        chapterIndex: widget.chapterIndex,
-        paragraphIndex: widget.paragraphIndex,
-        selectedText: Value(_selectedText),
-      ),
-    );
+    await db
+        .into(db.bookmarks)
+        .insert(
+          BookmarksCompanion.insert(
+            id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+            bookId: widget.bookId,
+            chapterIndex: widget.chapterIndex,
+            paragraphIndex: widget.paragraphIndex,
+            selectedText: Value(_selectedText),
+          ),
+        );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -137,7 +139,9 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 ),
                 child: Text(
                   _selectedText!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -168,15 +172,17 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
     if (result != null && context.mounted) {
       final db = ref.read(databaseProvider);
-      await db.into(db.notes).insert(
-        NotesCompanion.insert(
-          id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
-          bookId: widget.bookId,
-          chapterIndex: widget.chapterIndex,
-          paragraphIndex: widget.paragraphIndex,
-          content: result,
-        ),
-      );
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+              bookId: widget.bookId,
+              chapterIndex: widget.chapterIndex,
+              paragraphIndex: widget.paragraphIndex,
+              content: result,
+            ),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -214,7 +220,9 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               ),
               child: Text(
                 _selectedText!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
               ),
             ),
             TextField(
@@ -243,16 +251,18 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
     if (result != null && context.mounted) {
       final db = ref.read(databaseProvider);
-      await db.into(db.quotes).insert(
-        QuotesCompanion.insert(
-          id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
-          bookId: widget.bookId,
-          chapterIndex: widget.chapterIndex,
-          paragraphIndex: widget.paragraphIndex,
-          selectedText: _selectedText!,
-          note: result.isNotEmpty ? Value(result) : const Value.absent(),
-        ),
-      );
+      await db
+          .into(db.quotes)
+          .insert(
+            QuotesCompanion.insert(
+              id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+              bookId: widget.bookId,
+              chapterIndex: widget.chapterIndex,
+              paragraphIndex: widget.paragraphIndex,
+              selectedText: _selectedText!,
+              note: result.isNotEmpty ? Value(result) : const Value.absent(),
+            ),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

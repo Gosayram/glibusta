@@ -179,7 +179,6 @@ class ReadingProfile {
         lineHeight: 1.7,
         margin: 24.0,
         paragraphSpacing: 12.0,
-        font: ReaderFont.literata,
         theme: ReaderTheme.sepia,
       ),
     ),

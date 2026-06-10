@@ -22,7 +22,7 @@ class FlibustaApiSource extends BookSource {
 
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
-    if (query.hasFilters) {
+    if (query.hasFilters || query.query.isEmpty) {
       return SearchResultPage(
         books: const [],
         totalCount: 0,
@@ -77,7 +77,9 @@ class FlibustaApiSource extends BookSource {
     try {
       final result = await _client.getBookDetails(bookId);
       final baseUrl = _client.dio.options.baseUrl;
-      final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+      final normalizedBase = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
 
       final book = Book(
         id: result.id,

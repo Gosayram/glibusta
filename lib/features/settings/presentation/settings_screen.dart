@@ -83,7 +83,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: const Text('Использовать тёмную тему'),
             value: Theme.of(context).brightness == Brightness.dark,
             onChanged: (value) {
-              ref.read(themeModeProvider.notifier).setMode(
+              ref
+                  .read(themeModeProvider.notifier)
+                  .setMode(
                     value ? ThemeMode.dark : ThemeMode.light,
                   );
             },
@@ -363,18 +365,52 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     AppSettings settings,
   ) {
     final controller = TextEditingController(
-      text: settings.mirrors.join('\n'),
+      text: settings.customMirrors.join('\n'),
     );
     unawaited(
       showDialog<void>(
         context: context,
         builder: (BuildContext context) => AlertDialog(
-          title: const Text('Зеркала (по одному на строку)'),
-          content: TextField(
-            controller: controller,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'https://mirror1.example.com\nhttps://mirror2.example.com',
+          title: const Text('Зеркала'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (settings.defaultMirrors.isNotEmpty) ...[
+                  const Text(
+                    'Зеркала из конфигурации (только чтение):',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: settings.defaultMirrors.map((m) {
+                      return Chip(
+                        avatar: const Icon(Icons.lock, size: 16),
+                        label: Text(m, style: const TextStyle(fontSize: 12)),
+                        visualDensity: VisualDensity.compact,
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                const Text(
+                  'Пользовательские зеркала (по одному на строку):',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: controller,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'https://mirror1.example.com\nhttps://mirror2.example.com',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -389,7 +425,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     .map((String l) => l.trim())
                     .where((String l) => l.isNotEmpty)
                     .toList();
-                ref.read(appSettingsControllerProvider.notifier).updateMirrors(mirrors);
+                ref.read(appSettingsControllerProvider.notifier).updateCustomMirrors(mirrors);
                 Navigator.of(context).pop();
               },
               child: const Text('Сохранить'),

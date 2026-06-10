@@ -125,7 +125,9 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                       children: [
                         Icon(
                           Icons.collections_bookmark_outlined,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -142,12 +144,14 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                 );
               }
               return Column(
-                children: nonEmpty.map(
-                  (collection) => _SmartCollectionSection(
-                    collection: collection,
-                    onBookTap: (bookId) => unawaited(context.push('/reader/$bookId')),
-                  ),
-                ).toList(),
+                children: nonEmpty
+                    .map(
+                      (collection) => _SmartCollectionSection(
+                        collection: collection,
+                        onBookTap: (bookId) => unawaited(context.push('/reader/$bookId')),
+                      ),
+                    )
+                    .toList(),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -297,7 +301,11 @@ class _UserCollectionTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '$bookIds ${bookIds == 1 ? 'книга' : bookIds < 5 ? 'книги' : 'книг'}',
+          '$bookIds ${bookIds == 1
+              ? 'книга'
+              : bookIds < 5
+              ? 'книги'
+              : 'книг'}',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

@@ -7,14 +7,18 @@ part 'app_settings.g.dart';
 @immutable
 class AppSettings {
   final String baseUrl;
-  final List<String> mirrors;
+  final List<String> defaultMirrors;
+  final List<String> customMirrors;
   final Duration requestTimeout;
   final int maxConcurrentDownloads;
   final bool enableLogging;
 
+  List<String> get mirrors => [...defaultMirrors, ...customMirrors];
+
   const AppSettings({
     required this.baseUrl,
-    this.mirrors = const [],
+    this.defaultMirrors = const [],
+    this.customMirrors = const [],
     this.requestTimeout = const Duration(seconds: 30),
     this.maxConcurrentDownloads = 3,
     this.enableLogging = false,
@@ -29,20 +33,22 @@ class AppSettings {
 
     return AppSettings(
       baseUrl: baseUrl,
-      mirrors: mirrors,
+      defaultMirrors: mirrors,
       maxConcurrentDownloads: maxConcurrentDownloads,
     );
   }
 
   AppSettings copyWith({
     String? baseUrl,
-    List<String>? mirrors,
+    List<String>? defaultMirrors,
+    List<String>? customMirrors,
     Duration? requestTimeout,
     int? maxConcurrentDownloads,
     bool? enableLogging,
   }) => AppSettings(
     baseUrl: baseUrl ?? this.baseUrl,
-    mirrors: mirrors ?? this.mirrors,
+    defaultMirrors: defaultMirrors ?? this.defaultMirrors,
+    customMirrors: customMirrors ?? this.customMirrors,
     requestTimeout: requestTimeout ?? this.requestTimeout,
     maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
     enableLogging: enableLogging ?? this.enableLogging,
@@ -60,8 +66,8 @@ class AppSettingsController extends _$AppSettingsController {
     state = state.copyWith(baseUrl: baseUrl);
   }
 
-  void updateMirrors(List<String> mirrors) {
-    state = state.copyWith(mirrors: mirrors);
+  void updateCustomMirrors(List<String> customMirrors) {
+    state = state.copyWith(customMirrors: customMirrors);
   }
 
   void updateMaxConcurrentDownloads(int maxConcurrentDownloads) {

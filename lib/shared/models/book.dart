@@ -38,8 +38,8 @@ class Book {
   String get displayAuthor => authorNames.isNotEmpty
       ? authorNames.join(', ')
       : authorIds.isNotEmpty
-          ? authorIds.first
-          : '';
+      ? authorIds.first
+      : '';
 
   String get readingStatusLabel {
     switch (readingStatus) {

@@ -167,24 +167,26 @@ class BookCard extends StatelessWidget {
               ),
             ),
             const Divider(height: 1),
-            ...ReadingStatus.values.where((s) => s != ReadingStatus.none).map(
-              (status) => ListTile(
-                leading: Icon(
-                  _statusIcon(status),
-                  color: book.readingStatus == status
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+            ...ReadingStatus.values
+                .where((s) => s != ReadingStatus.none)
+                .map(
+                  (status) => ListTile(
+                    leading: Icon(
+                      _statusIcon(status),
+                      color: book.readingStatus == status
+                          ? Theme.of(context).colorScheme.primary
+                          : null,
+                    ),
+                    title: Text(status.label),
+                    trailing: book.readingStatus == status
+                        ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                        : null,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _updateReadingStatus(context, status);
+                    },
+                  ),
                 ),
-                title: Text(status.label),
-                trailing: book.readingStatus == status
-                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
-                    : null,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _updateReadingStatus(context, status);
-                },
-              ),
-            ),
             const SizedBox(height: 8),
           ],
         ),

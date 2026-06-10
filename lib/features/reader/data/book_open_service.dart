@@ -49,6 +49,11 @@ class BookOpenService {
       throw BookOpenFailure('Файл не найден: $filePath');
     }
 
+    final fileSize = await file.length();
+    if (fileSize == 0) {
+      throw BookOpenFailure('Файл пуст: $filePath');
+    }
+
     final format = download.format.toLowerCase();
     final parser = _parsers[format];
     if (parser == null) {

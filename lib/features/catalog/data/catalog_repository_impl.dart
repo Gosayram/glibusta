@@ -30,22 +30,34 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getPopularBooks() async {
-    final query = const SearchQuery(query: 'популярные', page: 1);
-    final result = await _source.searchBooks(query);
-    return result.books;
+    final query = const SearchQuery(query: '');
+    try {
+      final result = await _source.searchBooks(query);
+      return result.books;
+    } on Object catch (_) {
+      return const [];
+    }
   }
 
   @override
   Future<List<Book>> getRecentBooks() async {
-    final query = const SearchQuery(query: 'новые', page: 1);
-    final result = await _source.searchBooks(query);
-    return result.books;
+    final query = const SearchQuery(query: '');
+    try {
+      final result = await _source.searchBooks(query);
+      return result.books;
+    } on Object catch (_) {
+      return const [];
+    }
   }
 
   @override
   Future<List<Book>> getBooksByCategory(String category) async {
-    final query = SearchQuery(query: category, page: 1);
-    final result = await _source.searchBooks(query);
-    return result.books;
+    final query = SearchQuery(query: category);
+    try {
+      final result = await _source.searchBooks(query);
+      return result.books;
+    } on Object catch (_) {
+      return const [];
+    }
   }
 }

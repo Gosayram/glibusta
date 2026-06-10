@@ -8,8 +8,7 @@
 Cross-platform Flutter application for searching, reading, downloading, and organizing books from
 Flibusta-compatible sources.
 
-> [!WARNING]
-> **Disclaimer**
+> [!WARNING] **Disclaimer**
 >
 > - This project is developed for **educational and informational purposes only**.
 > - The authors are **not affiliated with, endorsed by, or connected to Flibusta or any of its

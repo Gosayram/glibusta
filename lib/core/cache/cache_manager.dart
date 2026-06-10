@@ -108,10 +108,16 @@ class CacheManager {
     required CacheType type,
     required String filePath,
   }) async {
-    final file = File(filePath);
-    if (!await file.exists()) return;
+    final sourceFile = File(filePath);
+    if (!await sourceFile.exists()) return;
 
-    final stat = await file.stat();
+    final typeDir = Directory('${_cacheDir.path}/${type.name}');
+    await typeDir.create(recursive: true);
+    final cachedPath = '${typeDir.path}/$key';
+    final cachedFile = File(cachedPath);
+    await sourceFile.copy(cachedPath);
+
+    final stat = await cachedFile.stat();
     final policy = CachePolicy.policies[type]!;
 
     if (_index.length > 200) {
@@ -121,7 +127,7 @@ class CacheManager {
     _index[key] = CachedEntry(
       key: key,
       type: type,
-      filePath: filePath,
+      filePath: cachedPath,
       sizeBytes: stat.size,
     );
 

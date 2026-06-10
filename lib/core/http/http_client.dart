@@ -51,7 +51,9 @@ class HttpClient {
   Future<String> getWithMirror(String path, {CancelToken? cancelToken}) async {
     final settings = _dio.options;
     final baseUrl = settings.baseUrl;
-    final normalizedBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     final urls = [normalizedBase].map((base) => '$base$normalizedPath').toList();
 

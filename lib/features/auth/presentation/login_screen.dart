@@ -141,7 +141,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextButton(
                     onPressed: () async {
                       final baseUrl = ref.read(appSettingsControllerProvider).baseUrl;
-                      final base = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+                      final base = baseUrl.endsWith('/')
+                          ? baseUrl.substring(0, baseUrl.length - 1)
+                          : baseUrl;
                       final uri = Uri.parse('$base/user/register');
                       if (await canLaunchUrl(uri)) {
                         await launchUrl(uri, mode: LaunchMode.externalApplication);

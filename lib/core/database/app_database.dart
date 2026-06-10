@@ -284,8 +284,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<List<BookSery>> getBooksInSeries(String seriesId) async {
-    return (select(bookSeries)..where((t) => t.seriesId.equals(seriesId)))
-      .get();
+    return (select(bookSeries)..where((t) => t.seriesId.equals(seriesId))).get();
   }
 
   // --- Collections ---
@@ -323,13 +322,15 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> removeBookFromCollection(String bookId, String collectionId) async {
-    await (delete(bookCollections)
-      ..where((t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId))).go();
+    await (delete(
+      bookCollections,
+    )..where((t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId))).go();
   }
 
   Future<List<SavedBook>> getBooksInCollection(String collectionId) async {
-    final bcRows = await (select(bookCollections)
-      ..where((t) => t.collectionId.equals(collectionId))).get();
+    final bcRows = await (select(
+      bookCollections,
+    )..where((t) => t.collectionId.equals(collectionId))).get();
     if (bcRows.isEmpty) return [];
     final bookIds = bcRows.map((r) => r.bookId).toList();
     return (select(savedBooks)..where((t) => t.id.isIn(bookIds))).get();

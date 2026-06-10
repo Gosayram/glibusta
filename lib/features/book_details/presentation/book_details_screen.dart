@@ -315,7 +315,11 @@ class _SeriesInfoSection extends ConsumerWidget {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          Icon(Icons.collections_bookmark, size: 20, color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.collections_bookmark,
+                            size: 20,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
