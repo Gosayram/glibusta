@@ -12,8 +12,7 @@ part of 'app.dart';
 @ProviderFor(IsObscuredNotifier)
 final isObscuredProvider = IsObscuredNotifierProvider._();
 
-final class IsObscuredNotifierProvider
-    extends $NotifierProvider<IsObscuredNotifier, bool> {
+final class IsObscuredNotifierProvider extends $NotifierProvider<IsObscuredNotifier, bool> {
   IsObscuredNotifierProvider._()
     : super(
         from: null,
@@ -41,8 +40,7 @@ final class IsObscuredNotifierProvider
   }
 }
 
-String _$isObscuredNotifierHash() =>
-    r'cb5aa3a9ed32a591bf2ef66dbc617dbff655a215';
+String _$isObscuredNotifierHash() => r'cb5aa3a9ed32a591bf2ef66dbc617dbff655a215';
 
 abstract class _$IsObscuredNotifier extends $Notifier<bool> {
   bool build();
@@ -51,13 +49,7 @@ abstract class _$IsObscuredNotifier extends $Notifier<bool> {
   WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
-              Object?,
-              Object?
-            >;
+        ref.element as $ClassProviderElement<AnyNotifier<bool, bool>, bool, Object?, Object?>;
     return element.handleCreate(ref, build);
   }
 }

@@ -6,9 +6,13 @@ import 'package:html/parser.dart' as html_parser;
 
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
+import 'format_detector.dart';
 import 'normalized_book.dart';
 
 class EpubParser implements BookParser {
+  @override
+  bool supports(BookFormat format) => format == BookFormat.epub;
+
   @override
   Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
     try {

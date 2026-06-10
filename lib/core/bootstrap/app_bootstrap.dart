@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 class AppBootstrap {
@@ -11,6 +12,7 @@ class AppBootstrap {
 
   static Future<void> init() async {
     await dotenv.load();
+    pdfrxFlutterInitialize();
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();

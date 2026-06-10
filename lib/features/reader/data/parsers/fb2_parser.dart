@@ -5,9 +5,13 @@ import 'package:xml/xml.dart';
 
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
+import 'format_detector.dart';
 import 'normalized_book.dart';
 
 class Fb2Parser implements BookParser {
+  @override
+  bool supports(BookFormat format) => format == BookFormat.fb2;
+
   @override
   Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
     try {

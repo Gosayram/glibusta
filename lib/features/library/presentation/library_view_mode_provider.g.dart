@@ -41,8 +41,7 @@ final class LibraryViewModeNotifierProvider
   }
 }
 
-String _$libraryViewModeNotifierHash() =>
-    r'83b2f79a9393e111b741a6ea377cff6a1f014b00';
+String _$libraryViewModeNotifierHash() => r'83b2f79a9393e111b741a6ea377cff6a1f014b00';
 
 abstract class _$LibraryViewModeNotifier extends $Notifier<LibraryViewMode> {
   LibraryViewMode build();

@@ -8,10 +8,12 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
-import '../data/parsers/book_parser.dart';
-import '../data/parsers/epub_parser.dart';
-import '../data/parsers/fb2_parser.dart';
-import '../data/parsers/normalized_book.dart';
+import 'parsers/book_parser.dart';
+import 'parsers/epub_parser.dart';
+import 'parsers/fb2_parser.dart';
+import 'parsers/format_detector.dart';
+import 'parsers/normalized_book.dart';
+import 'parsers/txt_parser.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final database = ref.watch(databaseProvider);
@@ -28,9 +30,10 @@ class BookOpenService {
 
   BookOpenService(this._database);
 
-  final Map<String, BookParser> _parsers = {
-    'fb2': Fb2Parser(),
-    'epub': EpubParser(),
+  static final Map<BookFormat, BookParser> _parsers = {
+    BookFormat.epub: EpubParser(),
+    BookFormat.fb2: Fb2Parser(),
+    BookFormat.txt: TxtBookParser(),
   };
 
   Future<NormalizedBook> openBook(String bookId) async {
@@ -54,31 +57,33 @@ class BookOpenService {
       throw BookOpenFailure('Файл пуст: $filePath');
     }
 
-    final format = download.format.toLowerCase();
-    final parser = _parsers[format];
-    if (parser == null) {
-      throw BookOpenFailure('Формат не поддерживается: $format');
+    final format = detectBookFormat(filePath);
+    if (format == BookFormat.unknown) {
+      throw BookOpenFailure('Формат не поддерживается: ${download.format}');
+    }
+
+    if (format == BookFormat.pdf) {
+      throw const BookOpenFailure('PDF открывается отдельным просмотрщиком');
     }
 
     return _parseInIsolate(format, filePath);
   }
 
-  Future<NormalizedBook> _parseInIsolate(String format, String filePath) async {
+  Future<NormalizedBook> _parseInIsolate(BookFormat bookFormat, String filePath) async {
     try {
-      return await Isolate.run<NormalizedBook>(() async {
-        switch (format) {
-          case 'epub':
-            return EpubParser().parseFile(filePath);
-          case 'fb2':
-            return Fb2Parser().parseFile(filePath);
-          default:
-            throw BookOpenFailure('Формат не поддерживается: $format');
-        }
+      return await Isolate.run<NormalizedBook>(() {
+        return switch (bookFormat) {
+          BookFormat.epub => EpubParser().parseFile(filePath),
+          BookFormat.fb2 => Fb2Parser().parseFile(filePath),
+          BookFormat.txt => TxtBookParser().parseFile(filePath),
+          BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
+          BookFormat.unknown => throw UnsupportedError('Unknown format'),
+        };
       });
     } on Object catch (_) {
-      final parser = _parsers[format];
+      final parser = _parsers[bookFormat];
       if (parser == null) {
-        throw BookOpenFailure('Формат не поддерживается: $format');
+        throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
       }
       return parser.parseFile(filePath);
     }
