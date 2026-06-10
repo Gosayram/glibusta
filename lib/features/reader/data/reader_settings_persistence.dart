@@ -41,6 +41,24 @@ class ReaderSettingsPersistence {
         ),
         customDayHour: (map['customDayHour'] as num?)?.toInt() ?? 7,
         customNightHour: (map['customNightHour'] as num?)?.toInt() ?? 20,
+        brightness: (map['brightness'] as num?)?.toDouble() ?? 1.0,
+        warmth: (map['warmth'] as num?)?.toDouble() ?? 0.0,
+        keepScreenAwake: map['keepScreenAwake'] as bool? ?? false,
+        autoHideDelay: (map['autoHideDelay'] as num?)?.toInt() ?? 3,
+        progressBarPosition: ProgressBarPosition.values.firstWhere(
+          (e) => e.name == map['progressBarPosition'],
+          orElse: () => ProgressBarPosition.bottom,
+        ),
+        bottomBarContent: BottomBarContent.values.firstWhere(
+          (e) => e.name == map['bottomBarContent'],
+          orElse: () => BottomBarContent.percent,
+        ),
+        paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 0.0,
+        hyphenation: map['hyphenation'] as bool? ?? true,
+        tapZoneLayout: TapZoneLayout.values.firstWhere(
+          (e) => e.name == map['tapZoneLayout'],
+          orElse: () => TapZoneLayout.third,
+        ),
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -64,6 +82,15 @@ class ReaderSettingsPersistence {
         'autoThemeMode': settings.autoThemeMode.name,
         'customDayHour': settings.customDayHour,
         'customNightHour': settings.customNightHour,
+        'brightness': settings.brightness,
+        'warmth': settings.warmth,
+        'keepScreenAwake': settings.keepScreenAwake,
+        'autoHideDelay': settings.autoHideDelay,
+        'progressBarPosition': settings.progressBarPosition.name,
+        'bottomBarContent': settings.bottomBarContent.name,
+        'paragraphFirstLineIndent': settings.paragraphFirstLineIndent,
+        'hyphenation': settings.hyphenation,
+        'tapZoneLayout': settings.tapZoneLayout.name,
       }),
     );
   }

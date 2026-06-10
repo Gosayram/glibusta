@@ -34,6 +34,12 @@ enum ReaderTextAlign {
   final String displayName;
 }
 
+enum ProgressBarPosition { top, bottom, hidden }
+
+enum BottomBarContent { percent, page, chapter, time, none }
+
+enum TapZoneLayout { third, quarter, edge }
+
 class ReaderSettings {
   final ReaderTheme theme;
   final ReaderMode mode;
@@ -47,6 +53,15 @@ class ReaderSettings {
   final AutoThemeMode autoThemeMode;
   final int customDayHour;
   final int customNightHour;
+  final double brightness;
+  final double warmth;
+  final bool keepScreenAwake;
+  final int autoHideDelay;
+  final ProgressBarPosition progressBarPosition;
+  final BottomBarContent bottomBarContent;
+  final double paragraphFirstLineIndent;
+  final bool hyphenation;
+  final TapZoneLayout tapZoneLayout;
 
   const ReaderSettings({
     this.theme = ReaderTheme.dark,
@@ -61,6 +76,15 @@ class ReaderSettings {
     this.autoThemeMode = AutoThemeMode.off,
     this.customDayHour = 7,
     this.customNightHour = 20,
+    this.brightness = 1.0,
+    this.warmth = 0.0,
+    this.keepScreenAwake = false,
+    this.autoHideDelay = 3,
+    this.progressBarPosition = ProgressBarPosition.bottom,
+    this.bottomBarContent = BottomBarContent.percent,
+    this.paragraphFirstLineIndent = 0.0,
+    this.hyphenation = true,
+    this.tapZoneLayout = TapZoneLayout.third,
   });
 
   ReaderSettings copyWith({
@@ -76,6 +100,15 @@ class ReaderSettings {
     AutoThemeMode? autoThemeMode,
     int? customDayHour,
     int? customNightHour,
+    double? brightness,
+    double? warmth,
+    bool? keepScreenAwake,
+    int? autoHideDelay,
+    ProgressBarPosition? progressBarPosition,
+    BottomBarContent? bottomBarContent,
+    double? paragraphFirstLineIndent,
+    bool? hyphenation,
+    TapZoneLayout? tapZoneLayout,
   }) {
     return ReaderSettings(
       theme: theme ?? this.theme,
@@ -90,6 +123,15 @@ class ReaderSettings {
       autoThemeMode: autoThemeMode ?? this.autoThemeMode,
       customDayHour: customDayHour ?? this.customDayHour,
       customNightHour: customNightHour ?? this.customNightHour,
+      brightness: brightness ?? this.brightness,
+      warmth: warmth ?? this.warmth,
+      keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
+      autoHideDelay: autoHideDelay ?? this.autoHideDelay,
+      progressBarPosition: progressBarPosition ?? this.progressBarPosition,
+      bottomBarContent: bottomBarContent ?? this.bottomBarContent,
+      paragraphFirstLineIndent: paragraphFirstLineIndent ?? this.paragraphFirstLineIndent,
+      hyphenation: hyphenation ?? this.hyphenation,
+      tapZoneLayout: tapZoneLayout ?? this.tapZoneLayout,
     );
   }
 }

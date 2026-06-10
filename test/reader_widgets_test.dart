@@ -88,7 +88,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Прокрутка'), findsOneWidget);
-      expect(find.text('По страницам'), findsOneWidget);
+      expect(find.text('Страницы'), findsOneWidget);
+      expect(find.text('2 колонки'), findsOneWidget);
+      expect(find.text('Фокус'), findsOneWidget);
+      expect(find.text('Полный'), findsOneWidget);
     });
 
     testWidgets('default font size shows 18', (tester) async {
@@ -230,7 +233,7 @@ void main() {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderBottomBar(
-            settings: ReaderSettings(),
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.chapter),
             currentChapterIndex: 2,
             totalChapters: 10,
             scrollProgress: 0.3,
@@ -258,14 +261,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('50%'), findsOneWidget);
-      expect(find.textContaining('Осталось'), findsOneWidget);
+      expect(find.textContaining('~50м'), findsOneWidget);
     });
 
     testWidgets('formats hours and minutes correctly', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderBottomBar(
-            settings: ReaderSettings(),
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.time),
             currentChapterIndex: 0,
             totalChapters: 5,
             scrollProgress: 0.0,
@@ -283,7 +286,7 @@ void main() {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderBottomBar(
-            settings: ReaderSettings(),
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.time),
             currentChapterIndex: 0,
             totalChapters: 5,
             scrollProgress: 0.9,

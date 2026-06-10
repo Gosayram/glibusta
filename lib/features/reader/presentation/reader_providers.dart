@@ -89,6 +89,51 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
+  void updateBrightness(double brightness) {
+    state = state.copyWith(brightness: brightness);
+    _persist();
+  }
+
+  void updateWarmth(double warmth) {
+    state = state.copyWith(warmth: warmth);
+    _persist();
+  }
+
+  void updateKeepScreenAwake(bool keepAwake) {
+    state = state.copyWith(keepScreenAwake: keepAwake);
+    _persist();
+  }
+
+  void updateAutoHideDelay(int seconds) {
+    state = state.copyWith(autoHideDelay: seconds);
+    _persist();
+  }
+
+  void updateProgressBarPosition(ProgressBarPosition position) {
+    state = state.copyWith(progressBarPosition: position);
+    _persist();
+  }
+
+  void updateBottomBarContent(BottomBarContent content) {
+    state = state.copyWith(bottomBarContent: content);
+    _persist();
+  }
+
+  void updateParagraphFirstLineIndent(double indent) {
+    state = state.copyWith(paragraphFirstLineIndent: indent);
+    _persist();
+  }
+
+  void updateHyphenation(bool hyphenation) {
+    state = state.copyWith(hyphenation: hyphenation);
+    _persist();
+  }
+
+  void updateTapZoneLayout(TapZoneLayout layout) {
+    state = state.copyWith(tapZoneLayout: layout);
+    _persist();
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
     _persist();

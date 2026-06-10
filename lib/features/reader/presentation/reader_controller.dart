@@ -85,6 +85,15 @@ class ReaderController {
     unawaited(WakelockPlus.disable());
   }
 
+  void _applyWakeLock() {
+    final keepAwake = _ref.read(readerSettingsProvider).keepScreenAwake;
+    if (keepAwake) {
+      unawaited(WakelockPlus.enable());
+    } else {
+      unawaited(WakelockPlus.disable());
+    }
+  }
+
   void _updateState(ReaderState newState) {
     if (_disposed) return;
     _state = newState;
@@ -118,7 +127,7 @@ class ReaderController {
         (_) => _checkAutoTheme(),
       );
       _startHideTimer();
-      unawaited(WakelockPlus.enable());
+      _applyWakeLock();
     } on Object catch (e) {
       _updateState(_state.copyWith(isLoading: false, errorMessage: e.toString()));
     }
@@ -163,7 +172,9 @@ class ReaderController {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    _hideTimer = Timer(AppDuration.readerHideDelay, () {
+    final delay = _ref.read(readerSettingsProvider).autoHideDelay;
+    if (delay <= 0) return;
+    _hideTimer = Timer(Duration(seconds: delay), () {
       if (!_state.isBottomSheetOpen) {
         _updateState(_state.copyWith(uiVisible: false));
       }
@@ -182,8 +193,16 @@ class ReaderController {
       settings.autoThemeMode,
       settings.theme,
     );
+    final autoWarmth = _autoThemeService.resolveWarmth(
+      settings.autoThemeMode,
+      resolved,
+    );
+    final notifier = _ref.read(readerSettingsProvider.notifier);
     if (resolved != settings.theme) {
-      _ref.read(readerSettingsProvider.notifier).updateTheme(resolved);
+      notifier.updateTheme(resolved);
+    }
+    if ((autoWarmth - settings.warmth).abs() > 0.01) {
+      notifier.updateWarmth(autoWarmth);
     }
   }
 
@@ -243,14 +262,33 @@ class ReaderController {
   }
 
   void handleTap(TapUpDetails details, double width) {
+    final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
-    if (x < width / 3) {
+    final threshold1 = switch (settings.tapZoneLayout) {
+      TapZoneLayout.third => width / 3,
+      TapZoneLayout.quarter => width / 4,
+      TapZoneLayout.edge => width * 0.15,
+    };
+    final threshold2 = width - threshold1;
+    if (x < threshold1) {
       scrollToPrevious();
-    } else if (x > width * 2 / 3) {
+    } else if (x > threshold2) {
       scrollToNext();
     } else {
       toggleUi();
     }
+  }
+
+  void jumpToProgress(double progress) {
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    final maxScroll = _scrollController!.position.maxScrollExtent;
+    unawaited(
+      _scrollController!.animateTo(
+        (progress * maxScroll).clamp(0.0, maxScroll),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   void onBottomSheetOpen() {

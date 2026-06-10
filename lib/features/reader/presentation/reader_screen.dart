@@ -159,7 +159,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               scrollController: _ctrl.scrollController,
               onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
             ),
-          if (readerState.uiVisible) ...[
+          _buildWarmthOverlay(settings),
+          _buildBrightnessOverlay(settings),
+          if (_shouldShowProgressBar(settings, readerState))
+            Positioned(
+              top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
+              bottom: settings.progressBarPosition == ProgressBarPosition.bottom ? 0 : null,
+              left: 0,
+              right: 0,
+              child: ReaderProgressBar(
+                scrollProgress: readerState.scrollProgress,
+                theme: settings.theme,
+              ),
+            ),
+          if (_shouldShowChrome(settings, readerState)) ...[
             Positioned(
               top: 0,
               left: 0,
@@ -181,18 +194,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 totalChapters: readerState.book?.chapters.length ?? 0,
                 scrollProgress: readerState.scrollProgress,
                 estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                onJumpToProgress: _ctrl.jumpToProgress,
               ),
             ),
           ],
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ReaderProgressBar(
-              scrollProgress: readerState.scrollProgress,
-              theme: settings.theme,
-            ),
-          ),
         ],
       ),
     );
@@ -223,7 +228,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   )
                 : const SizedBox.shrink(),
           ),
-          if (readerState.uiVisible) ...[
+          _buildWarmthOverlay(settings),
+          _buildBrightnessOverlay(settings),
+          if (_shouldShowProgressBar(settings, readerState))
+            Positioned(
+              top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
+              bottom: settings.progressBarPosition == ProgressBarPosition.bottom ? 0 : null,
+              left: 0,
+              right: 0,
+              child: ReaderProgressBar(
+                scrollProgress: readerState.scrollProgress,
+                theme: settings.theme,
+              ),
+            ),
+          if (_shouldShowChrome(settings, readerState)) ...[
             Positioned(
               top: 0,
               left: 0,
@@ -245,18 +263,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 totalChapters: readerState.book?.chapters.length ?? 0,
                 scrollProgress: readerState.scrollProgress,
                 estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                onJumpToProgress: _ctrl.jumpToProgress,
               ),
             ),
           ],
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ReaderProgressBar(
-              scrollProgress: readerState.scrollProgress,
-              theme: settings.theme,
-            ),
-          ),
         ],
       ),
     );
@@ -283,7 +293,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               width: sidePanelWidth,
             ),
           const VerticalDivider(width: 1),
-          Expanded(
+            Expanded(
             flex: 3,
             child: Stack(
               children: [
@@ -306,7 +316,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                         )
                       : const SizedBox.shrink(),
                 ),
-                if (readerState.uiVisible) ...[
+                _buildWarmthOverlay(settings),
+                _buildBrightnessOverlay(settings),
+                if (_shouldShowProgressBar(settings, readerState))
+                  Positioned(
+                    top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
+                    bottom: settings.progressBarPosition == ProgressBarPosition.bottom ? 0 : null,
+                    left: 0,
+                    right: 0,
+                    child: ReaderProgressBar(
+                      scrollProgress: readerState.scrollProgress,
+                      theme: settings.theme,
+                    ),
+                  ),
+                if (_shouldShowChrome(settings, readerState)) ...[
                   Positioned(
                     top: 0,
                     left: 0,
@@ -331,15 +354,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                     ),
                   ),
                 ],
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: ReaderProgressBar(
-                    scrollProgress: readerState.scrollProgress,
-                    theme: settings.theme,
-                  ),
-                ),
               ],
             ),
           ),
@@ -376,6 +390,45 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
           onDismiss: () => _ctrl.onBottomSheetClose(),
         ),
       ).whenComplete(() => _ctrl.onBottomSheetClose()),
+    );
+  }
+
+  bool _shouldShowProgressBar(ReaderSettings settings, ReaderState readerState) {
+    if (settings.progressBarPosition == ProgressBarPosition.hidden) return false;
+    if (_isDistractionFree(settings)) return false;
+    return readerState.scrollProgress > 0;
+  }
+
+  bool _isDistractionFree(ReaderSettings settings) {
+    return settings.mode == ReaderMode.focus ||
+        settings.mode == ReaderMode.fullscreen;
+  }
+
+  bool _shouldShowChrome(ReaderSettings settings, ReaderState readerState) {
+    if (_isDistractionFree(settings)) return false;
+    return readerState.uiVisible;
+  }
+
+  Widget _buildWarmthOverlay(ReaderSettings settings) {
+    if (settings.warmth <= 0) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Container(
+          color: Color.fromRGBO(255, 140, 0, settings.warmth * 0.25),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrightnessOverlay(ReaderSettings settings) {
+    if (settings.brightness >= 1.0) return const SizedBox.shrink();
+    final dimAlpha = (1.0 - settings.brightness) * 0.5;
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Container(
+          color: Color.fromRGBO(0, 0, 0, dimAlpha),
+        ),
+      ),
     );
   }
 }

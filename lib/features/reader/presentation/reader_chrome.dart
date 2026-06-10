@@ -67,6 +67,7 @@ class ReaderBottomBar extends StatelessWidget {
     required this.totalChapters,
     required this.scrollProgress,
     required this.estimatedMinutesLeft,
+    this.onJumpToProgress,
   });
 
   final ReaderSettings settings;
@@ -74,16 +75,17 @@ class ReaderBottomBar extends StatelessWidget {
   final int totalChapters;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final ValueChanged<double>? onJumpToProgress;
 
   @override
   Widget build(BuildContext context) {
     final colors = ReaderColors.forTheme(settings.theme);
-    final percentage = (scrollProgress * 100).round();
-    final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
-    final hours = remainingMinutes ~/ 60;
-    final mins = remainingMinutes % 60;
-    // ignore: unnecessary_brace_in_string_interps — braces needed before Cyrillic chars
-    final timeStr = hours > 0 ? '~${hours}ч ${mins}м' : '~${mins}м';
+    if (settings.bottomBarContent == BottomBarContent.none) {
+      return const SizedBox.shrink();
+    }
+
+    final leftText = _buildLeftText(settings.bottomBarContent);
+    final rightText = _buildRightText(settings.bottomBarContent);
 
     return SafeArea(
       top: false,
@@ -105,20 +107,68 @@ class ReaderBottomBar extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Глава ${currentChapterIndex + 1} из $totalChapters',
-                  style: TextStyle(color: colors.text, fontSize: 12),
-                ),
-                Text(
-                  '$percentage%  ·  Осталось $timeStr',
-                  style: TextStyle(color: colors.text, fontSize: 12),
-                ),
+                Text(leftText, style: TextStyle(color: colors.text, fontSize: 12)),
+                Text(rightText, style: TextStyle(color: colors.text, fontSize: 12)),
               ],
             ),
+            if (onJumpToProgress != null) ...[
+              const SizedBox(height: 4),
+              SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: colors.text.withValues(alpha: 0.4),
+                  inactiveTrackColor: colors.text.withValues(alpha: 0.15),
+                  thumbColor: colors.text.withValues(alpha: 0.7),
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  trackHeight: 2,
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: Slider(
+                  value: scrollProgress.clamp(0.0, 1.0),
+                  onChanged: onJumpToProgress,
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _buildLeftText(BottomBarContent content) {
+    switch (content) {
+      case BottomBarContent.percent:
+        return '${(scrollProgress * 100).round()}%';
+      case BottomBarContent.page:
+        final page = (scrollProgress * totalChapters).ceil();
+        return 'Стр. $page';
+      case BottomBarContent.chapter:
+        return 'Глава ${currentChapterIndex + 1} из $totalChapters';
+      case BottomBarContent.time:
+        final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
+        final hours = remainingMinutes ~/ 60;
+        final mins = remainingMinutes % 60;
+        return hours > 0 ? '~${hours}ч ${mins}м' : '~${mins}м';
+      case BottomBarContent.none:
+        return '';
+    }
+  }
+
+  String _buildRightText(BottomBarContent content) {
+    switch (content) {
+      case BottomBarContent.percent:
+        final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
+        final hours = remainingMinutes ~/ 60;
+        final mins = remainingMinutes % 60;
+        return hours > 0 ? '~${hours}ч ${mins}м' : '~${mins}м';
+      case BottomBarContent.page:
+        return 'Глава ${currentChapterIndex + 1} из $totalChapters';
+      case BottomBarContent.chapter:
+        return '${(scrollProgress * 100).round()}%';
+      case BottomBarContent.time:
+        return '${(scrollProgress * 100).round()}%';
+      case BottomBarContent.none:
+        return '';
+    }
   }
 }
 

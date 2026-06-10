@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
@@ -21,6 +20,24 @@ class ReaderContentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (settings.mode == ReaderMode.paginated ||
+        settings.mode == ReaderMode.twoPage) {
+      return _PaginatedContentBody(
+        book: book,
+        settings: settings,
+        onTap: onTap,
+      );
+    }
+
+    final isFocus = settings.mode == ReaderMode.focus ||
+        settings.mode == ReaderMode.fullscreen;
+    final effectiveMargin = isFocus
+        ? EdgeInsets.symmetric(
+            horizontal: settings.margin * 1.5,
+            vertical: settings.margin,
+          )
+        : EdgeInsets.all(settings.margin);
+
     return SafeArea(
       top: false,
       bottom: false,
@@ -29,7 +46,7 @@ class ReaderContentBody extends StatelessWidget {
         onTapUp: onTap,
         child: SingleChildScrollView(
           controller: scrollController,
-          padding: EdgeInsets.all(settings.margin),
+          padding: effectiveMargin,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -163,12 +180,18 @@ class ReaderContentBody extends StatelessWidget {
           ),
         );
       case BlockType.paragraph:
+        final indent = settings.paragraphFirstLineIndent > 0
+            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+            : EdgeInsets.zero;
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: Text(
-            block.text,
-            style: _getReaderStyle(settings),
-            textAlign: textAlign,
+          child: Padding(
+            padding: indent,
+            child: Text(
+              block.text,
+              style: _getReaderStyle(settings),
+              textAlign: textAlign,
+            ),
           ),
         );
     }
@@ -176,35 +199,269 @@ class ReaderContentBody extends StatelessWidget {
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
     final colors = ReaderColors.forTheme(settings.theme);
+    final String fontFamily;
     switch (settings.font) {
       case ReaderFont.sourceSerif:
-        return GoogleFonts.sourceSerif4(
-          fontSize: settings.fontSize,
-          height: settings.lineHeight,
-          color: colors.text,
-          letterSpacing: settings.letterSpacing,
-        );
+        fontFamily = 'SourceSerif4';
+        break;
       case ReaderFont.literata:
-        return GoogleFonts.literata(
-          fontSize: settings.fontSize,
-          height: settings.lineHeight,
-          color: colors.text,
-          letterSpacing: settings.letterSpacing,
-        );
+        fontFamily = 'Literata';
+        break;
       case ReaderFont.robotoSerif:
-        return GoogleFonts.robotoSerif(
-          fontSize: settings.fontSize,
-          height: settings.lineHeight,
-          color: colors.text,
-          letterSpacing: settings.letterSpacing,
-        );
+        fontFamily = 'RobotoSerif';
+        break;
       case ReaderFont.inter:
-        return GoogleFonts.inter(
-          fontSize: settings.fontSize,
-          height: settings.lineHeight,
-          color: colors.text,
-          letterSpacing: settings.letterSpacing,
+        fontFamily = 'Inter';
+        break;
+    }
+    return TextStyle(
+      fontFamily: fontFamily,
+      fontSize: settings.fontSize,
+      height: settings.lineHeight,
+      color: colors.text,
+      letterSpacing: settings.letterSpacing,
+    );
+  }
+}
+
+class _PaginatedContentBody extends StatefulWidget {
+  const _PaginatedContentBody({
+    required this.book,
+    required this.settings,
+    required this.onTap,
+  });
+
+  final NormalizedBook book;
+  final ReaderSettings settings;
+  final GestureTapUpCallback onTap;
+
+  @override
+  State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
+}
+
+class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
+  late final PageController _pageController;
+  static const double _pageScrollFraction = 0.85;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final useTwoPageLayout = isTwoPage && screenWidth > 600;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTapUp: widget.onTap,
+      child: PageView.builder(
+        controller: _pageController,
+        physics: const BouncingScrollPhysics(),
+        itemCount: useTwoPageLayout
+            ? ((widget.book.chapters.length + 1) ~/ 2)
+            : widget.book.chapters.length,
+        itemBuilder: (context, index) {
+          if (useTwoPageLayout) {
+            final leftIndex = index * 2;
+            final rightIndex = index * 2 + 1;
+            return Row(
+              children: [
+                Expanded(
+                  child: SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.all(widget.settings.margin),
+                      child: _buildChapterContent(leftIndex),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  color: ReaderColors.forTheme(widget.settings.theme)
+                      .text
+                      .withValues(alpha: 0.1),
+                ),
+                Expanded(
+                  child: rightIndex < widget.book.chapters.length
+                      ? SafeArea(
+                          top: false,
+                          bottom: false,
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.all(widget.settings.margin),
+                            child: _buildChapterContent(rightIndex),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            );
+          }
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
+            child: SafeArea(
+              key: ValueKey(index),
+              top: false,
+              bottom: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(widget.settings.margin),
+                child: _buildChapterContent(index),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChapterContent(int chapterIndex) {
+    final book = widget.book;
+    final settings = widget.settings;
+    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
+      return const SizedBox.shrink();
+    }
+
+    final chapter = book.chapters[chapterIndex];
+    final textAlign = switch (settings.textAlign) {
+      ReaderTextAlign.left => TextAlign.left,
+      ReaderTextAlign.justify => TextAlign.justify,
+      ReaderTextAlign.center => TextAlign.center,
+      ReaderTextAlign.right => TextAlign.right,
+    };
+
+    final style = _getReaderStyle(settings);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (chapter.title.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
+            child: Text(
+              chapter.title,
+              style: style.copyWith(
+                fontSize: settings.fontSize * 1.4,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: textAlign,
+            ),
+          ),
+        ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+      ],
+    );
+  }
+
+  Widget _buildBlock(ReaderBlock block, TextAlign textAlign) {
+    final settings = widget.settings;
+    final style = _getReaderStyle(settings);
+
+    switch (block.type) {
+      case BlockType.heading:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing * 2,
+            bottom: settings.paragraphSpacing,
+          ),
+          child: Text(
+            block.text,
+            style: style.copyWith(
+              fontSize: settings.fontSize * 1.2,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.quote:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: style.color!.withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: Text(
+            block.text,
+            style: style.copyWith(fontStyle: FontStyle.italic),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.separator:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          child: Center(child: Text('* * *', style: style)),
+        );
+      case BlockType.image:
+        if (block.imageUrl != null) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+            child: Center(
+              child: Icon(Icons.image, size: 64, color: style.color),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      case BlockType.footnote:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
+          child: Text(
+            block.text,
+            style: style.copyWith(fontSize: settings.fontSize * 0.85),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.paragraph:
+        final indent = settings.paragraphFirstLineIndent > 0
+            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+            : EdgeInsets.zero;
+        return Padding(
+          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+          child: Padding(
+            padding: indent,
+            child: Text(block.text, style: style, textAlign: textAlign),
+          ),
         );
     }
+  }
+
+  TextStyle _getReaderStyle(ReaderSettings settings) {
+    final colors = ReaderColors.forTheme(settings.theme);
+    final String fontFamily;
+    switch (settings.font) {
+      case ReaderFont.sourceSerif:
+        fontFamily = 'SourceSerif4';
+        break;
+      case ReaderFont.literata:
+        fontFamily = 'Literata';
+        break;
+      case ReaderFont.robotoSerif:
+        fontFamily = 'RobotoSerif';
+        break;
+      case ReaderFont.inter:
+        fontFamily = 'Inter';
+        break;
+    }
+    return TextStyle(
+      fontFamily: fontFamily,
+      fontSize: settings.fontSize,
+      height: settings.lineHeight,
+      color: colors.text,
+      letterSpacing: settings.letterSpacing,
+    );
   }
 }

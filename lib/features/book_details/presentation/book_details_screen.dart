@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
@@ -15,19 +14,15 @@ import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_details_repository_impl.dart';
 
-part 'book_details_screen.g.dart';
-
-@riverpod
-Future<BookDetails> bookDetails(Ref ref, String bookId) async {
+final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
   final repository = ref.watch(bookDetailsRepositoryProvider);
   return repository.getBookDetails(bookId);
-}
+});
 
-@riverpod
-Future<ReadingProgressData?> bookReadingProgress(Ref ref, String bookId) async {
+final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((ref, bookId) async {
   final db = ref.watch(databaseProvider);
   return db.getReadingProgress(bookId);
-}
+});
 
 class BookDetailsScreen extends ConsumerWidget {
   final String bookId;
@@ -107,14 +102,13 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
-                  child: progressAsync.when(
-                    data: (ReadingProgressData? progress) {
-                      if (progress == null) return const SizedBox.shrink();
-                      return _ReadingProgressIndicator(progress: progress);
-                    },
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, _) => const SizedBox.shrink(),
-                  ),
+                  child: () {
+                    final async = progressAsync;
+                    if (async.isLoading || async.hasError) return null;
+                    final progress = async.value;
+                    if (progress == null) return null;
+                    return _ReadingProgressIndicator(progress: progress);
+                  }(),
                 ),
               ),
               SliverPersistentHeader(

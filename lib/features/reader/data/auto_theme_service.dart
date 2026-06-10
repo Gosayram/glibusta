@@ -10,6 +10,13 @@ class AutoThemeService {
     return isNight ? ReaderTheme.dark : ReaderTheme.light;
   }
 
+  double resolveWarmth(AutoThemeMode mode, ReaderTheme resolvedTheme, {DateTime? now}) {
+    if (mode == AutoThemeMode.off) return 0.0;
+    if (resolvedTheme == ReaderTheme.bedtime) return 0.6;
+    if (resolvedTheme == ReaderTheme.dark) return 0.15;
+    return 0.0;
+  }
+
   bool _isNight(AutoThemeMode mode, DateTime dt) {
     return switch (mode) {
       AutoThemeMode.off => false,

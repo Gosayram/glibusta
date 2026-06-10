@@ -73,6 +73,52 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
               const Text('Режим', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               _buildModeRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Яркость', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildBrightnessRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Тёплый фильтр', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildWarmthRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              _buildToggleRow(
+                'Не выключать экран',
+                Icons.screen_lock_portrait,
+                settings.keepScreenAwake,
+                (v) => notifier.updateKeepScreenAwake(v),
+              ),
+              const SizedBox(height: 12),
+
+              _buildToggleRow(
+                'Переносы',
+                Icons.format_textdirection_l_to_r,
+                settings.hyphenation,
+                (v) => notifier.updateHyphenation(v),
+              ),
+              const SizedBox(height: 20),
+
+              const Text('Скрытие UI (сек)', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildAutoHideRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Позиция прогресса', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildProgressBarPositionRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Содержимое нижней панели', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildBottomBarContentRow(settings, notifier),
+              const SizedBox(height: 20),
+
+              const Text('Зоны касания', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildTapZoneRow(settings, notifier),
               const SizedBox(height: 16),
             ],
           ),
@@ -270,24 +316,167 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
   ) {
+    const modeLabels = {
+      ReaderMode.continuous: 'Прокрутка',
+      ReaderMode.paginated: 'Страницы',
+      ReaderMode.twoPage: '2 колонки',
+      ReaderMode.focus: 'Фокус',
+      ReaderMode.fullscreen: 'Полный',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: ReaderMode.values.map((mode) {
+        return ChoiceChip(
+          label: Text(modeLabels[mode]!),
+          selected: settings.mode == mode,
+          onSelected: (_) => notifier.updateMode(mode),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildBrightnessRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
     return Row(
       children: [
+        const Icon(Icons.brightness_low, size: 20),
         Expanded(
-          child: ChoiceChip(
-            label: const Text('Прокрутка'),
-            selected: settings.mode == ReaderMode.continuous,
-            onSelected: (_) => notifier.updateMode(ReaderMode.continuous),
+          child: Slider(
+            value: settings.brightness,
+            min: 0.2,
+            max: 1.0,
+            divisions: 8,
+            label: '${(settings.brightness * 100).round()}%',
+            onChanged: (v) => notifier.updateBrightness(v),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ChoiceChip(
-            label: const Text('По страницам'),
-            selected: settings.mode == ReaderMode.paginated,
-            onSelected: (_) => notifier.updateMode(ReaderMode.paginated),
-          ),
-        ),
+        const Icon(Icons.brightness_high, size: 20),
       ],
+    );
+  }
+
+  static Widget _buildWarmthRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Row(
+      children: [
+        const Icon(Icons.wb_sunny_outlined, size: 20),
+        Expanded(
+          child: Slider(
+            value: settings.warmth,
+            min: 0.0,
+            max: 1.0,
+            divisions: 10,
+            label: '${(settings.warmth * 100).round()}%',
+            onChanged: (v) => notifier.updateWarmth(v),
+          ),
+        ),
+        const Icon(Icons.wb_sunny, size: 20, color: Colors.orange),
+      ],
+    );
+  }
+
+  static Widget _buildToggleRow(
+    String label,
+    IconData icon,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    return Row(
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label)),
+        Switch.adaptive(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
+  static Widget _buildAutoHideRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const values = [0, 3, 5, 10, 15];
+    return Wrap(
+      spacing: 8,
+      children: values.map((v) {
+        final isSelected = settings.autoHideDelay == v;
+        return ChoiceChip(
+          label: Text(v == 0 ? 'Никогда' : '$v'),
+          selected: isSelected,
+          onSelected: (_) => notifier.updateAutoHideDelay(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildProgressBarPositionRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      ProgressBarPosition.top: 'Сверху',
+      ProgressBarPosition.bottom: 'Снизу',
+      ProgressBarPosition.hidden: 'Скрыта',
+    };
+    return Wrap(
+      spacing: 8,
+      children: ProgressBarPosition.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.progressBarPosition == v,
+          onSelected: (_) => notifier.updateProgressBarPosition(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildBottomBarContentRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      BottomBarContent.percent: 'Процент',
+      BottomBarContent.page: 'Страница',
+      BottomBarContent.chapter: 'Глава',
+      BottomBarContent.time: 'Время',
+      BottomBarContent.none: 'Скрыта',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: BottomBarContent.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.bottomBarContent == v,
+          onSelected: (_) => notifier.updateBottomBarContent(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildTapZoneRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      TapZoneLayout.third: '1/3',
+      TapZoneLayout.quarter: '1/4',
+      TapZoneLayout.edge: 'Край',
+    };
+    return Wrap(
+      spacing: 8,
+      children: TapZoneLayout.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.tapZoneLayout == v,
+          onSelected: (_) => notifier.updateTapZoneLayout(v),
+        );
+      }).toList(),
     );
   }
 }

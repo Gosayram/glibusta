@@ -1,7 +1,6 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../core/theme/app_colors.dart';
 
@@ -32,7 +31,7 @@ class AppTheme {
     ),
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     swapLegacyOnMaterial3: true,
-    fontFamily: GoogleFonts.inter().fontFamily,
+    fontFamily: 'Inter',
   );
 
   // Dark theme
@@ -47,7 +46,7 @@ class AppTheme {
     ),
     visualDensity: FlexColorScheme.comfortablePlatformDensity,
     swapLegacyOnMaterial3: true,
-    fontFamily: GoogleFonts.inter().fontFamily,
+    fontFamily: 'Inter',
   );
 
   // Reader-specific themes
@@ -62,7 +61,7 @@ class AppTheme {
         ),
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         swapLegacyOnMaterial3: true,
-        fontFamily: GoogleFonts.inter().fontFamily,
+        fontFamily: 'Inter',
       ).copyWith(
         scaffoldBackgroundColor: AppColors.readerDay,
       );
@@ -78,7 +77,7 @@ class AppTheme {
         ),
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         swapLegacyOnMaterial3: true,
-        fontFamily: GoogleFonts.inter().fontFamily,
+        fontFamily: 'Inter',
       ).copyWith(
         scaffoldBackgroundColor: AppColors.readerNight,
       );
@@ -94,7 +93,7 @@ class AppTheme {
         ),
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         swapLegacyOnMaterial3: true,
-        fontFamily: GoogleFonts.inter().fontFamily,
+        fontFamily: 'Inter',
       ).copyWith(
         scaffoldBackgroundColor: AppColors.readerSepia,
       );
@@ -109,7 +108,7 @@ class AppTheme {
         ),
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         swapLegacyOnMaterial3: true,
-        fontFamily: GoogleFonts.inter().fontFamily,
+        fontFamily: 'Inter',
       ).copyWith(
         scaffoldBackgroundColor: AppColors.readerOledBlack,
       );
@@ -125,7 +124,7 @@ class AppTheme {
         ),
         visualDensity: FlexColorScheme.comfortablePlatformDensity,
         swapLegacyOnMaterial3: true,
-        fontFamily: GoogleFonts.inter().fontFamily,
+        fontFamily: 'Inter',
       ).copyWith(
         scaffoldBackgroundColor: AppColors.readerPaper,
       );
