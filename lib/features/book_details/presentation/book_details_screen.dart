@@ -665,7 +665,11 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
                 child: !isAuthenticated
                     ? Row(
                         children: [
-                          Icon(Icons.lock_outline, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                          Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -725,7 +729,7 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
     final text = _commentController.text.trim();
     if (text.isEmpty) return;
 
-    final authState = ref.read(auth.authStateProvider).value as auth.AuthStateData?;
+    final authState = ref.read(auth.authStateProvider).value;
     if (authState?.session == null) return;
 
     setState(() => _isPosting = true);

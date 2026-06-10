@@ -16,8 +16,7 @@ class AuthInterceptor extends Interceptor {
     final authState = _ref.read(authStateProvider);
     final session = authState.value?.session;
     if (session != null && session.cookies.isNotEmpty) {
-      final cookieHeader =
-          session.cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      final cookieHeader = session.cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
       options.headers['Cookie'] = cookieHeader;
     }
     handler.next(options);

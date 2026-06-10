@@ -63,8 +63,7 @@ class BookCommentsService {
         formData['form_token'] = formToken;
       }
 
-      final cookieHeader =
-          cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      final cookieHeader = cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
 
       await _client.dio.post<String>(
         '/comment/add/node/book',
@@ -106,12 +105,14 @@ class BookCommentsService {
         createdAt = DateTime.tryParse(dateEl.attributes['datetime'] ?? '');
       }
 
-      comments.add(BookComment(
-        id: 'comment_${idx++}',
-        author: author,
-        text: body,
-        createdAt: createdAt,
-      ));
+      comments.add(
+        BookComment(
+          id: 'comment_${idx++}',
+          author: author,
+          text: body,
+          createdAt: createdAt,
+        ),
+      );
     }
     return comments;
   }

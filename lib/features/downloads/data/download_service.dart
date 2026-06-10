@@ -118,8 +118,22 @@ class DownloadService {
     );
   }
 
+  /// Finds the [DownloadTask] whose [Task.metaData] matches
+  /// `'bookId=$bookId'`. Returns `null` if the task is no longer active.
+  Future<DownloadTask?> _findTaskByBookId(String bookId) async {
+    final allTasks = await FileDownloader().allTasks();
+    final needle = 'bookId=$bookId';
+    for (final t in allTasks) {
+      if (t is DownloadTask && t.metaData == needle) return t;
+    }
+    return null;
+  }
+
   Future<void> pauseDownload(String downloadId) async {
-    await FileDownloader().pauseAll();
+    final task = await _findTaskByBookId(downloadId);
+    if (task != null) {
+      await FileDownloader().pause(task);
+    }
     await (_database.update(_database.downloads)..where((d) => d.id.equals(downloadId))).write(
       const DownloadsCompanion(
         status: Value(DownloadStatusDb.paused),
@@ -128,7 +142,10 @@ class DownloadService {
   }
 
   Future<void> resumeDownload(String downloadId) async {
-    await FileDownloader().resumeAll();
+    final task = await _findTaskByBookId(downloadId);
+    if (task != null) {
+      await FileDownloader().resume(task);
+    }
     await (_database.update(_database.downloads)..where((d) => d.id.equals(downloadId))).write(
       const DownloadsCompanion(
         status: Value(DownloadStatusDb.running),
@@ -137,7 +154,10 @@ class DownloadService {
   }
 
   Future<void> cancelDownload(String downloadId) async {
-    await FileDownloader().cancelAll();
+    final task = await _findTaskByBookId(downloadId);
+    if (task != null) {
+      await FileDownloader().cancelTaskWithId(task.taskId);
+    }
     await (_database.update(_database.downloads)..where((d) => d.id.equals(downloadId))).write(
       const DownloadsCompanion(
         status: Value(DownloadStatusDb.canceled),

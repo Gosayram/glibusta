@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +20,7 @@ class DiagnosticsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Диагностика')),
       body: FutureBuilder<DiagnosticsInfo>(
-        future: _gatherInfo(ref),
+        future: _gatherInfo(context, ref),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -31,12 +32,63 @@ class DiagnosticsScreen extends ConsumerWidget {
               _section('Приложение', [
                 ListTile(
                   title: const Text('Версия'),
-                  trailing: Text(info.appVersion),
+                  trailing: Text('${info.appVersion}+${info.buildNumber}'),
                 ),
                 ListTile(
                   title: const Text('Платформа'),
                   trailing: Text(info.platform),
                 ),
+              ]),
+              _section('Устройство', [
+                ListTile(
+                  title: const Text('Модель'),
+                  trailing: Text(info.deviceModel),
+                ),
+                if (info.deviceManufacturer.isNotEmpty)
+                  ListTile(
+                    title: const Text('Производитель'),
+                    trailing: Text(info.deviceManufacturer),
+                  ),
+                ListTile(
+                  title: const Text('ОС'),
+                  trailing: Text(info.deviceOS),
+                ),
+              ]),
+              _section('Экран', [
+                ListTile(
+                  title: const Text('Размер'),
+                  trailing: Text(
+                    '${info.screenWidth.toStringAsFixed(0)}×${info.screenHeight.toStringAsFixed(0)}',
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Pixel Ratio'),
+                  trailing: Text('${info.pixelRatio}x'),
+                ),
+                ListTile(
+                  title: const Text('Ориентация'),
+                  trailing: Text(info.orientation),
+                ),
+                ListTile(
+                  title: const Text('Яркость'),
+                  trailing: Text(info.brightness),
+                ),
+                ListTile(
+                  title: const Text('Масштаб текста'),
+                  trailing: Text(info.textScale),
+                ),
+                if (info.paddingTop > 0)
+                  ListTile(
+                    title: const Text('Insets (верх/низ)'),
+                    trailing: Text(
+                      '${info.paddingTop.toStringAsFixed(0)} / ${info.paddingBottom.toStringAsFixed(0)}',
+                    ),
+                  ),
+                if (info.viewInsetsBottom > 0)
+                  ListTile(
+                    title: const Text('Клавиатура'),
+                    trailing: Text('${info.viewInsetsBottom.toStringAsFixed(0)}px'),
+                  ),
               ]),
               _section('База данных', [
                 ListTile(
@@ -193,7 +245,7 @@ class DiagnosticsScreen extends ConsumerWidget {
     );
   }
 
-  Future<DiagnosticsInfo> _gatherInfo(WidgetRef ref) async {
+  Future<DiagnosticsInfo> _gatherInfo(BuildContext context, WidgetRef ref) async {
     final db = ref.read(databaseProvider);
     final logger = ref.read(appLoggerProvider);
 
@@ -262,13 +314,55 @@ class DiagnosticsScreen extends ConsumerWidget {
 
     // App version
     String appVersion = '0.1.0';
+    String buildNumber = '';
     try {
       final info = await PackageInfo.fromPlatform();
       appVersion = info.version;
+      buildNumber = info.buildNumber;
     } on Object catch (_) {}
+
+    // Device info
+    String deviceModel = 'Неизвестно';
+    String deviceManufacturer = '';
+    String deviceOS = Platform.operatingSystemVersion;
+    String deviceBrand = '';
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final android = await deviceInfo.androidInfo;
+        deviceModel = android.model;
+        deviceManufacturer = android.manufacturer;
+        deviceBrand = android.brand;
+        deviceOS = 'Android ${android.version.release} (SDK ${android.version.sdkInt})';
+      } else if (Platform.isIOS) {
+        final ios = await deviceInfo.iosInfo;
+        deviceModel = ios.model;
+        deviceManufacturer = 'Apple';
+        deviceBrand = 'Apple';
+        deviceOS = 'iOS ${ios.systemVersion}';
+      } else if (Platform.isMacOS) {
+        final mac = await deviceInfo.macOsInfo;
+        deviceModel = mac.model;
+        deviceManufacturer = 'Apple';
+        deviceBrand = 'Apple';
+        deviceOS = 'macOS ${mac.osRelease}';
+      }
+    } on Object catch (_) {}
+
+    // Screen info from MediaQuery
+    final mq = MediaQuery.of(context);
+    final screenWidth = mq.size.width;
+    final screenHeight = mq.size.height;
+    final pixelRatio = mq.devicePixelRatio;
+    final orientation = mq.orientation.name;
+    final brightness = mq.platformBrightness.name;
+    final textScale = mq.textScaler.scale(14).toStringAsFixed(1);
+    final padding = mq.padding;
+    final viewInsets = mq.viewInsets;
 
     return DiagnosticsInfo(
       appVersion: appVersion,
+      buildNumber: buildNumber,
       platform: Platform.operatingSystem,
       totalBooks: totalBooks,
       fb2Count: fb2Count,
@@ -282,6 +376,19 @@ class DiagnosticsScreen extends ConsumerWidget {
       appSize: appSize,
       connectivityOk: connectivityOk,
       connectivityType: connectivityType,
+      deviceModel: deviceModel,
+      deviceManufacturer: deviceManufacturer,
+      deviceBrand: deviceBrand,
+      deviceOS: deviceOS,
+      screenWidth: screenWidth,
+      screenHeight: screenHeight,
+      pixelRatio: pixelRatio,
+      orientation: orientation,
+      brightness: brightness,
+      textScale: textScale,
+      paddingTop: padding.top,
+      paddingBottom: padding.bottom,
+      viewInsetsBottom: viewInsets.bottom,
     );
   }
 
@@ -293,9 +400,24 @@ class DiagnosticsScreen extends ConsumerWidget {
   }
 
   Future<void> _exportReport(BuildContext context, DiagnosticsInfo info) async {
+    final now = DateTime.now();
+    final dateStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     final report = [
       '=== Glibusta Health Report ===',
-      'Date: ${DateTime.now()}',
+      'Date: $dateStr',
+      '',
+      '--- Device ---',
+      'Model: ${info.deviceManufacturer.isNotEmpty ? "${info.deviceManufacturer} " : ""}${info.deviceModel}',
+      'OS: ${info.deviceOS}',
+      'Screen: ${info.screenWidth.toStringAsFixed(0)}x${info.screenHeight.toStringAsFixed(0)} @${info.pixelRatio}x',
+      'Orientation: ${info.orientation}',
+      'Brightness: ${info.brightness}',
+      'Text Scale: ${info.textScale}',
+      if (info.paddingTop > 0)
+        'Padding: top=${info.paddingTop.toStringAsFixed(0)} bottom=${info.paddingBottom.toStringAsFixed(0)}',
+      if (info.viewInsetsBottom > 0) 'Keyboard: ${info.viewInsetsBottom.toStringAsFixed(0)}px',
       '',
       '--- System ---',
       'DB: ${info.dbOk ? "OK" : "ERROR"}',
@@ -303,7 +425,7 @@ class DiagnosticsScreen extends ConsumerWidget {
       'Connectivity: ${info.connectivityOk ? "OK" : "ERROR"} (${info.connectivityType})',
       '',
       '--- App ---',
-      'Version: ${info.appVersion}',
+      'Version: ${info.appVersion}+${info.buildNumber}',
       'Platform: ${info.platform}',
       'Books: ${info.totalBooks} (FB2: ${info.fb2Count}, EPUB: ${info.epubCount})',
       'DB Size: ${info.dbSize}',
@@ -342,6 +464,7 @@ class _HealthItem {
 
 class DiagnosticsInfo {
   final String appVersion;
+  final String buildNumber;
   final String platform;
   final int totalBooks;
   final int fb2Count;
@@ -355,9 +478,23 @@ class DiagnosticsInfo {
   final String appSize;
   final bool connectivityOk;
   final String connectivityType;
+  final String deviceModel;
+  final String deviceManufacturer;
+  final String deviceBrand;
+  final String deviceOS;
+  final double screenWidth;
+  final double screenHeight;
+  final double pixelRatio;
+  final String orientation;
+  final String brightness;
+  final String textScale;
+  final double paddingTop;
+  final double paddingBottom;
+  final double viewInsetsBottom;
 
   DiagnosticsInfo({
     required this.appVersion,
+    required this.buildNumber,
     required this.platform,
     required this.totalBooks,
     required this.fb2Count,
@@ -371,5 +508,18 @@ class DiagnosticsInfo {
     required this.appSize,
     required this.connectivityOk,
     required this.connectivityType,
+    required this.deviceModel,
+    required this.deviceManufacturer,
+    required this.deviceBrand,
+    required this.deviceOS,
+    required this.screenWidth,
+    required this.screenHeight,
+    required this.pixelRatio,
+    required this.orientation,
+    required this.brightness,
+    required this.textScale,
+    required this.paddingTop,
+    required this.paddingBottom,
+    required this.viewInsetsBottom,
   });
 }

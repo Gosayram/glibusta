@@ -31,7 +31,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authStateProvider);
-    final authData = authAsync.value;
 
     ref.listen(authStateProvider, (prev, next) {
       final data = next.value;
@@ -129,8 +128,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   SizedBox(
                     height: 48,
                     child: ElevatedButton(
-                    onPressed: authAsync.isLoading ? null : _login,
-                    child: authAsync.isLoading
+                      onPressed: authAsync.isLoading ? null : _login,
+                      child: authAsync.isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
