@@ -1,0 +1,102 @@
+import 'package:dio/dio.dart';
+import 'package:logging/logging.dart';
+
+final _log = Logger('AppInterceptors');
+
+class AuthInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    // Placeholder for auth token injection
+    handler.next(options);
+  }
+}
+
+class LoggingInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    _log.info('→ ${options.method} ${options.uri}');
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+    _log.info('← ${response.statusCode} ${response.requestOptions.uri}');
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    _log.severe(
+      '✗ ${err.requestOptions.method} ${err.requestOptions.uri} '
+      '${err.response?.statusCode} ${err.message}',
+    );
+    handler.next(err);
+  }
+}
+
+class ErrorMappingInterceptor extends Interceptor {
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final mappedError = _mapError(err);
+    handler.next(mappedError);
+  }
+
+  DioException _mapError(DioException err) {
+    switch (err.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'Network timeout. Check your connection.',
+          type: err.type,
+        );
+      case DioExceptionType.connectionError:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'No internet connection.',
+          type: err.type,
+        );
+      case DioExceptionType.badResponse:
+        return _mapStatusCode(err);
+      default:
+        return err;
+    }
+  }
+
+  DioException _mapStatusCode(DioException err) {
+    final statusCode = err.response?.statusCode;
+    switch (statusCode) {
+      case 401:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'Unauthorized. Please log in again.',
+          type: err.type,
+          response: err.response,
+        );
+      case 403:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'Access denied.',
+          type: err.type,
+          response: err.response,
+        );
+      case 404:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'Resource not found.',
+          type: err.type,
+          response: err.response,
+        );
+      case 500:
+        return DioException(
+          requestOptions: err.requestOptions,
+          error: 'Server error. Please try again later.',
+          type: err.type,
+          response: err.response,
+        );
+      default:
+        return err;
+    }
+  }
+}

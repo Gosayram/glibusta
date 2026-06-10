@@ -5,6 +5,7 @@ import 'package:dio/io.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
+import 'app_interceptors.dart';
 
 part 'dio_provider.g.dart';
 
@@ -38,7 +39,12 @@ Dio dio(Ref ref) {
     return io.HttpClient()
       ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
   };
-  dio.interceptors.add(_RetryInterceptor(dio: dio, maxRetries: 3));
+  dio.interceptors.addAll([
+    AuthInterceptor(),
+    LoggingInterceptor(),
+    ErrorMappingInterceptor(),
+    _RetryInterceptor(dio: dio, maxRetries: 3),
+  ]);
   return dio;
 }
 
