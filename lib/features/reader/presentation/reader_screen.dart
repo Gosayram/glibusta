@@ -55,6 +55,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ReaderController(widget.bookId, ref);
     unawaited(_ctrl.loadBook());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncFullscreen(ref.read(readerSettingsProvider).mode);
+      ref.listenManual(readerSettingsProvider, (prev, next) {
+        _syncFullscreen(next.mode);
+      });
+    });
+  }
+
+  void _syncFullscreen(ReaderMode mode) {
+    final isFullscreen = mode == ReaderMode.fullscreen;
+    if (isFullscreen == _fullscreenMode) return;
+    _fullscreenMode = isFullscreen;
+    if (isFullscreen) {
+      _ctrl.enableFullscreen();
+    } else {
+      _ctrl.disableFullscreen();
+    }
   }
 
   void _handleVerticalDragStart(DragStartDetails details) {
@@ -81,8 +100,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void dispose() {
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    _ctrl.dispose();
     _ctrl.disableFullscreen();
+    _ctrl.dispose();
     super.dispose();
   }
 
@@ -111,15 +130,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Widget build(BuildContext context) {
     final readerState = _ctrl.state;
     final settings = ref.watch(readerSettingsProvider);
-    final fullscreenMode = settings.mode == ReaderMode.fullscreen;
-    if (fullscreenMode != _fullscreenMode) {
-      _fullscreenMode = fullscreenMode;
-      if (fullscreenMode) {
-        _ctrl.enableFullscreen();
-      } else {
-        _ctrl.disableFullscreen();
-      }
-    }
     final resolvedTheme = _resolveTheme(settings);
     final theme = _getThemeData(resolvedTheme);
 
@@ -554,10 +564,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             child: Stack(
               children: [
                 Container(
-                  width: effectiveWidth,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                  ),
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: readerState.book != null
                       ? SelectionAreaWrapper(
                           child: GestureDetector(
@@ -716,7 +724,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         builder: (context) => ReaderQuickSettingsSheet(
           onDismiss: () => _ctrl.onBottomSheetClose(),
         ),
-      ).whenComplete(() => _ctrl.onBottomSheetClose()),
+      ),
     );
   }
 

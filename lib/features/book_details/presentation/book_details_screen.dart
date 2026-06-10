@@ -108,13 +108,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
-                  child: () {
-                    final async = progressAsync;
-                    if (async.isLoading || async.hasError) return null;
-                    final progress = async.value;
-                    if (progress == null) return null;
-                    return _ReadingProgressIndicator(progress: progress);
-                  }(),
+                  child: _buildReadingProgress(progressAsync),
                 ),
               ),
               SliverPadding(
@@ -145,6 +139,13 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
         _BottomActionBar(book: book, details: widget.details),
       ],
     );
+  }
+
+  Widget? _buildReadingProgress(AsyncValue<ReadingProgressData?> progressAsync) {
+    if (progressAsync.isLoading || progressAsync.hasError) return null;
+    final progress = progressAsync.value;
+    if (progress == null) return null;
+    return _ReadingProgressIndicator(progress: progress);
   }
 }
 
@@ -811,7 +812,13 @@ class _BottomActionBar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             OutlinedButton.icon(
-              onPressed: details.availableFormats.isNotEmpty ? () => _downloadBook(context) : null,
+              onPressed: details.availableFormats.isNotEmpty
+                  ? () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Скоро будет доступно')),
+                      );
+                    }
+                  : null,
               icon: const Icon(Icons.download),
               label: const Text('Скачать'),
             ),
@@ -819,9 +826,5 @@ class _BottomActionBar extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _downloadBook(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Загрузка начата')));
   }
 }

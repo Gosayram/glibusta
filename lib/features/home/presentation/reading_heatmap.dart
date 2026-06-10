@@ -31,7 +31,7 @@ class ReadingHeatmap extends StatelessWidget {
           children: [
             for (int i = 0; i < weeks.length; i += 4)
               Padding(
-                padding: EdgeInsets.only(left: i * 16.0),
+                padding: EdgeInsets.only(left: i * 14.0),
                 child: Text(
                   _monthLabel(weeks[i].first.date),
                   style: theme.textTheme.labelSmall?.copyWith(

@@ -46,7 +46,7 @@ dependencies:
 
   # Reader formats
   epubx: 4.0.0
-  xml: ^6.0.0
+  xml: ^6.6.1
 
   # Utilities
   async: ^2.13.0

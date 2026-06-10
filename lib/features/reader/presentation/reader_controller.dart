@@ -466,7 +466,7 @@ class ReaderController {
         toggleUi();
         break;
       case DoubleTapAction.addBookmark:
-        // TODO: Add bookmark
+        addBookmark();
         break;
       case DoubleTapAction.toggleFullscreen:
         final notifier = _ref.read(readerSettingsProvider.notifier);
