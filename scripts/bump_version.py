@@ -5,8 +5,8 @@ Usage:
     bump_version.py              # bump PATCH:  0.1.5+3 → 0.1.6+0
     bump_version.py --minor      # bump MINOR:  0.1.5+3 → 0.2.0+0
     bump_version.py --major      # bump MAJOR:  0.1.5+3 → 1.0.0+0
+    bump_version.py --build      # bump BUILD:  0.1.5+3 → 0.1.5+4
 """
-
 from __future__ import annotations
 
 import argparse
@@ -27,6 +27,7 @@ def main() -> int:
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--major", action="store_true", help="Bump major version")
     group.add_argument("--minor", action="store_true", help="Bump minor version")
+    group.add_argument("--build", action="store_true", help="Bump build number only")
     args = parser.parse_args()
 
     pubspec = Path("pubspec.yaml")
@@ -43,22 +44,28 @@ def main() -> int:
     major = int(match.group("major"))
     minor = int(match.group("minor"))
     patch = int(match.group("patch"))
+    build = int(match.group("build")) if match.group("build") else 0
 
     if args.major:
         major += 1
         minor = 0
         patch = 0
+        build = 0
     elif args.minor:
         minor += 1
         patch = 0
+        build = 0
+    elif args.build:
+        build += 1
     else:
         patch += 1
+        build = 0
 
     prefix = match.group(1)
-    new_version = f"{prefix}{major}.{minor}.{patch}+0"
+    new_version = f"{prefix}{major}.{minor}.{patch}+{build}"
     new_text = text[: match.start()] + new_version + text[match.end() :]
     pubspec.write_text(new_text, encoding="utf-8")
-    print(f"{major}.{minor}.{patch}+0")
+    print(f"{major}.{minor}.{patch}+{build}")
     return 0
 
 
