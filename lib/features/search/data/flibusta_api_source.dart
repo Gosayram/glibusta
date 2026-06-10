@@ -21,6 +21,16 @@ class FlibustaApiSource extends BookSource {
 
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query) async {
+    if (query.hasFilters) {
+      return SearchResultPage(
+        books: const [],
+        totalCount: 0,
+        currentPage: query.page,
+        totalPages: 0,
+        hasNextPage: false,
+      );
+    }
+
     try {
       final result = await _client.searchBooksByNameOpds(
         query.query,

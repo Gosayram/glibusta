@@ -114,6 +114,7 @@ class HomeScreen extends ConsumerWidget {
                           return SizedBox(
                             width: 120,
                             child: BookCard(
+                              key: ValueKey(book.id),
                               book: book,
                               onTap: () => context.push('/book/${book.id}'),
                             ),

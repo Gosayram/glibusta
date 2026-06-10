@@ -7,7 +7,9 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/models/search_query.dart';
 import '../../../shared/widgets/book_card.dart';
+import '../../../shared/widgets/book_cover_image.dart';
 import 'search_controller.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -19,11 +21,21 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final SearchController _searchController = SearchController();
+  final TextEditingController _genreController = TextEditingController();
+  final TextEditingController _languageController = TextEditingController();
   Timer? _debounceTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(ref.read(searchControllerProvider.notifier).loadHistory());
+  }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _genreController.dispose();
+    _languageController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -39,6 +51,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
+  void _setFormatFilter(BookFormat? format) {
+    final filters = ref.read(searchControllerProvider).filters;
+    ref
+        .read(searchControllerProvider.notifier)
+        .setFilters(
+          filters.copyWith(format: format, clearFormat: format == null),
+        );
+  }
+
+  void _setGenreFilter(String value) {
+    final filters = ref.read(searchControllerProvider).filters;
+    ref
+        .read(searchControllerProvider.notifier)
+        .setFilters(
+          filters.copyWith(genre: value.trim(), clearGenre: value.trim().isEmpty),
+        );
+  }
+
+  void _setLanguageFilter(String value) {
+    final filters = ref.read(searchControllerProvider).filters;
+    ref
+        .read(searchControllerProvider.notifier)
+        .setFilters(
+          filters.copyWith(
+            language: value.trim(),
+            clearLanguage: value.trim().isEmpty,
+          ),
+        );
+  }
+
+  void _clearFilters() {
+    _debounceTimer?.cancel();
+    _genreController.clear();
+    _languageController.clear();
+    ref.read(searchControllerProvider.notifier).setFilters(const SearchFilters());
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(searchControllerProvider);
@@ -52,11 +101,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           onSubmitted: (value) {
             _debounceTimer?.cancel();
             if (value.trim().isNotEmpty) {
+              _searchController.closeView(value.trim());
               unawaited(ref.read(searchControllerProvider.notifier).search(value.trim()));
             }
           },
           suggestionsBuilder: (context, controller) {
-            return [];
+            if (state.history.isEmpty) {
+              return [
+                const ListTile(
+                  enabled: false,
+                  title: Text('Нет недавних запросов'),
+                ),
+              ];
+            }
+
+            return state.history.map(
+              (query) => ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(query),
+                onTap: () {
+                  controller.closeView(query);
+                  unawaited(ref.read(searchControllerProvider.notifier).search(query));
+                },
+              ),
+            );
           },
           viewLeading: IconButton(
             icon: const Icon(Icons.arrow_back),
@@ -69,6 +137,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onPressed: () {},
           ),
           viewTrailing: [
+            if (state.history.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Очистить историю поиска',
+                onPressed: () {
+                  unawaited(ref.read(searchControllerProvider.notifier).clearHistory());
+                },
+              ),
             IconButton(
               icon: const Icon(Icons.clear),
               onPressed: () {
@@ -82,6 +158,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: Column(
         children: [
+          _buildFilters(context, state),
           if (state.isLoading && state.books.isEmpty) const LinearProgressIndicator(),
           if (state.error != null)
             Padding(
@@ -95,6 +172,102 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: _buildResults(context, state),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilters(BuildContext context, SearchState state) {
+    final filters = state.filters;
+    final theme = Theme.of(context);
+
+    return Material(
+      color: theme.colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Фильтры',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('Все'),
+                  selected: filters.format == null,
+                  onSelected: (_) => _setFormatFilter(null),
+                ),
+                ...BookFormat.values.map(
+                  (format) => FilterChip(
+                    label: Text(format.name.toUpperCase()),
+                    selected: filters.format == format,
+                    onSelected: (selected) => _setFormatFilter(selected ? format : null),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _genreController,
+                    decoration: const InputDecoration(
+                      labelText: 'Жанр',
+                      hintText: 'Например: фантастика',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (value) {
+                      _debounceTimer?.cancel();
+                      _setGenreFilter(value);
+                    },
+                    onChanged: (value) {
+                      _debounceTimer?.cancel();
+                      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                        _setGenreFilter(value);
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _languageController,
+                    decoration: const InputDecoration(
+                      labelText: 'Язык',
+                      hintText: 'Например: ru',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (value) {
+                      _debounceTimer?.cancel();
+                      _setLanguageFilter(value);
+                    },
+                    onChanged: (value) {
+                      _debounceTimer?.cancel();
+                      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                        _setLanguageFilter(value);
+                      });
+                    },
+                  ),
+                ),
+                if (filters.hasFilters)
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Сбросить фильтры',
+                    onPressed: _clearFilters,
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -145,6 +318,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 }
                 final book = state.books[index];
                 return BookCard(
+                  key: ValueKey(book.id),
                   book: book,
                   onTap: () => unawaited(context.push('/reader/${book.id}')),
                 );
@@ -202,34 +376,11 @@ class BookListItem extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
-        leading: book.coverUrl != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  book.coverUrl!,
-                  width: 48,
-                  height: 64,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 48,
-                    height: 64,
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.book, size: 24),
-                  ),
-                ),
-              )
-            : Container(
-                width: 48,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Icon(
-                  Icons.book,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
+        leading: SizedBox(
+          width: 48,
+          height: 64,
+          child: BookCoverImage(book: book, width: 48, height: 64),
+        ),
         title: Text(
           book.title,
           maxLines: 2,

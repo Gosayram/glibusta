@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/errors/failures.dart';
 import '../data/parsers/book_parser.dart';
 import '../data/parsers/epub_parser.dart';
 import '../data/parsers/fb2_parser.dart';
@@ -35,23 +36,23 @@ class BookOpenService {
   Future<NormalizedBook> openBook(String bookId) async {
     final download = await _findDownload(bookId);
     if (download == null) {
-      throw BookOpenException('Книга не найдена в загрузках');
+      throw const BookOpenFailure('Книга не найдена в загрузках');
     }
 
     final filePath = download.targetPath;
     if (filePath == null || filePath.isEmpty) {
-      throw BookOpenException('Путь к файлу не указан');
+      throw const BookOpenFailure('Путь к файлу не указан');
     }
 
     final file = File(filePath);
     if (!await file.exists()) {
-      throw BookOpenException('Файл не найден: $filePath');
+      throw BookOpenFailure('Файл не найден: $filePath');
     }
 
     final format = download.format.toLowerCase();
     final parser = _parsers[format];
     if (parser == null) {
-      throw BookOpenException('Формат не поддерживается: $format');
+      throw BookOpenFailure('Формат не поддерживается: $format');
     }
 
     return _parseInIsolate(format, filePath);
@@ -66,13 +67,13 @@ class BookOpenService {
           case 'fb2':
             return Fb2Parser().parseFile(filePath);
           default:
-            throw BookOpenException('Формат не поддерживается: $format');
+            throw BookOpenFailure('Формат не поддерживается: $format');
         }
       });
     } on Object catch (_) {
       final parser = _parsers[format];
       if (parser == null) {
-        throw BookOpenException('Формат не поддерживается: $format');
+        throw BookOpenFailure('Формат не поддерживается: $format');
       }
       return parser.parseFile(filePath);
     }
@@ -128,11 +129,4 @@ class BookOpenService {
     await saveToCache(bookId, book);
     return book;
   }
-}
-
-class BookOpenException implements Exception {
-  final String message;
-  BookOpenException(this.message);
-  @override
-  String toString() => message;
 }

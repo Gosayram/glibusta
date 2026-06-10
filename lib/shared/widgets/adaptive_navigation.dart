@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/platform/app_platform.dart';
 import '../../core/utils/app_breakpoints.dart';
-import '../../core/utils/platform_detector.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -262,16 +262,16 @@ class MacOSShell extends ConsumerWidget {
   }
 }
 
-class ShellWithNav extends StatelessWidget {
+class ShellWithNav extends ConsumerWidget {
   const ShellWithNav({super.key, required this.child});
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final width = MediaQuery.sizeOf(context).width;
+    final capabilities = ref.watch(platformCapabilitiesProvider);
 
-    // macOS: always use sidebar with drag-drop
-    if (PlatformDetector.isMacOS) {
+    if (capabilities.hasNativeMenuBar) {
       return MacOSShell(child: child);
     }
 

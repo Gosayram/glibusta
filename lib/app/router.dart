@@ -16,6 +16,13 @@ import '../shared/widgets/adaptive_navigation.dart';
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/library',
+    onException: (context, state, router) {
+      debugPrint('Router exception at ${state.uri.path}: ${state.error}');
+      if (state.uri.path != '/error') {
+        final message = state.error?.toString() ?? 'Unknown router error';
+        router.go('/error?message=${Uri.encodeComponent(message)}');
+      }
+    },
     routes: <RouteBase>[
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
@@ -65,6 +72,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             name: 'diagnostics',
             builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
           ),
+          GoRoute(
+            path: '/404',
+            redirect: (_, state) => '/error',
+          ),
+          GoRoute(
+            path: '/error',
+            name: 'error',
+            builder: (BuildContext context, GoRouterState state) => _ErrorRoute(
+              message: state.uri.queryParameters['message'],
+            ),
+          ),
         ],
       ),
       GoRoute(
@@ -86,3 +104,53 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _ErrorRoute extends StatelessWidget {
+  final String? message;
+
+  const _ErrorRoute({this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Ошибка')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Theme.of(context).colorScheme.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Страница не найдена или произошла ошибка навигации',
+                    style: Theme.of(context).textTheme.titleLarge,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (message != null && message!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      message!,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () => context.go('/library'),
+                    child: const Text('В библиотеку'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

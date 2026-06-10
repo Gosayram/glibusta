@@ -46,6 +46,7 @@ class BookGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final book = books[index];
         return BookCard(
+          key: ValueKey(book.id),
           book: book,
           isDownloaded: downloadStatus?[book.id],
           progress: showProgress && progress != null ? progress![book.id] : null,

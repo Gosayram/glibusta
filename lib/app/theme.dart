@@ -1,12 +1,13 @@
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/theme/app_colors.dart';
 
-final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+part 'theme.g.dart';
 
-class ThemeModeNotifier extends Notifier<ThemeMode> {
+@riverpod
+class ThemeModeNotifier extends _$ThemeModeNotifier {
   @override
   ThemeMode build() => ThemeMode.system;
 

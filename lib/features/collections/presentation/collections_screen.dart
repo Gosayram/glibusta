@@ -132,6 +132,7 @@ class _SmartCollectionSection extends StatelessWidget {
               return SizedBox(
                 width: 120,
                 child: BookCard(
+                  key: ValueKey(book.id),
                   book: book,
                   onTap: () => onBookTap(book.id),
                 ),

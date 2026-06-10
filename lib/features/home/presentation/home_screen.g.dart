@@ -13,7 +13,12 @@ part of 'home_screen.dart';
 final recentBooksProvider = RecentBooksProvider._();
 
 final class RecentBooksProvider
-    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Book>>,
+          List<Book>,
+          FutureOr<List<Book>>
+        >
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   RecentBooksProvider._()
     : super(

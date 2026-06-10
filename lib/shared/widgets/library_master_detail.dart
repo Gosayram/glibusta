@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/book_cover_image.dart';
 
 class LibraryMasterDetail extends StatefulWidget {
   final List<Book> books;
@@ -63,31 +64,11 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
         final book = widget.books[index];
         final isSelected = _selectedBook?.id == book.id;
         return ListTile(
-          leading: book.coverUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.network(
-                    book.coverUrl!,
-                    width: 40,
-                    height: 56,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 40,
-                      height: 56,
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      child: const Icon(Icons.book, size: 20),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 40,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(Icons.book, size: 20),
-                ),
+          leading: SizedBox(
+            width: 40,
+            height: 56,
+            child: BookCoverImage(book: book, width: 40, height: 56),
+          ),
           title: Text(
             book.title,
             maxLines: 2,
@@ -124,18 +105,7 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
             if (book.coverUrl != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  book.coverUrl!,
-                  width: 120,
-                  height: 180,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 120,
-                    height: 180,
-                    color: theme.colorScheme.primaryContainer,
-                    child: const Icon(Icons.book, size: 48),
-                  ),
-                ),
+                child: BookCoverImage(book: book, width: 120, height: 180),
               )
             else
               Container(

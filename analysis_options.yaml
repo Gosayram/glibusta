@@ -1,5 +1,4 @@
-include:
-  - package:flutter_lints/flutter.yaml
+include: package:very_good_analysis/analysis_options.yaml
 
 analyzer:
   plugins:
@@ -15,6 +14,33 @@ analyzer:
     unused_import: warning
     unused_local_variable: warning
     invalid_annotation_target: ignore
+    public_member_api_docs: ignore
+    always_use_package_imports: ignore
+    lines_longer_than_80_chars: ignore
+    avoid_types_on_closure_parameters: ignore
+    cascade_invocations: ignore
+    always_put_required_named_parameters_first: ignore
+    use_setters_to_change_properties: ignore
+    specify_nonobvious_property_types: ignore
+    avoid_positional_boolean_parameters: ignore
+    avoid_slow_async_io: ignore
+    unnecessary_lambdas: ignore
+    prefer_int_literals: ignore
+    no_runtimetype_tostring: ignore
+    no_default_cases: ignore
+    omit_local_variable_types: ignore
+    document_ignores: ignore
+    unnecessary_ignore: ignore
+    avoid_dynamic_calls: ignore
+    unnecessary_breaks: ignore
+    unnecessary_raw_strings: ignore
+    prefer_foreach: ignore
+    one_member_abstracts: ignore
+    unnecessary_parenthesis: ignore
+    sort_pub_dependencies: ignore
+    prefer_const_declarations: ignore
+    only_throw_errors: ignore
+    flutter_style_todos: ignore
 
 formatter:
   page_width: 100
@@ -33,6 +59,7 @@ linter:
     directives_ordering: true
     require_trailing_commas: true
     prefer_relative_imports: true
+    always_use_package_imports: false
     file_names: true
     library_prefixes: true
     no_leading_underscores_for_library_prefixes: true

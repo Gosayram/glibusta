@@ -8,6 +8,6 @@ Future<AppResult<T>> runInIsolate<T>(T Function() computation) async {
     final result = await Isolate.run(computation);
     return Success(result);
   } on Object catch (e) {
-    return Failure(ParseFailure(message: 'Isolate error: $e'));
+    return Failure(ParserFailure('Isolate error: $e'));
   }
 }

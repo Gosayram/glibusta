@@ -4,15 +4,19 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
-import '../core/utils/platform_detector.dart';
+import '../shared/widgets/command_palette.dart';
 import 'router.dart';
 import 'theme.dart';
 
-final isObscuredProvider = NotifierProvider<IsObscuredNotifier, bool>(IsObscuredNotifier.new);
+part 'app.g.dart';
 
-class IsObscuredNotifier extends Notifier<bool> {
+@riverpod
+class IsObscuredNotifier extends _$IsObscuredNotifier {
   @override
   bool build() => false;
 
@@ -39,7 +43,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   void _initPlatform() {
-    if (PlatformDetector.isAndroid) {
+    if (ref.read(platformCapabilitiesProvider).supportsPredictiveBack) {
       _initAndroidEdgeToEdge();
     }
   }
@@ -106,7 +110,11 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
           routerConfig: router,
           restorationScopeId: 'app',
           builder: (context, child) {
-            if (!isObscured) return child ?? const SizedBox.shrink();
+            final wrappedChild = _GlobalKeyboardShortcuts(
+              key: const Key('global-keyboard-shortcuts'),
+              child: child ?? const SizedBox.shrink(),
+            );
+            if (!isObscured) return wrappedChild;
             return Stack(
               children: [
                 child ?? const SizedBox.shrink(),
@@ -128,5 +136,61 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
         );
       },
     );
+  }
+}
+
+class _GlobalKeyboardShortcuts extends StatefulWidget {
+  final Widget child;
+
+  const _GlobalKeyboardShortcuts({super.key, required this.child});
+
+  @override
+  State<_GlobalKeyboardShortcuts> createState() => _GlobalKeyboardShortcutsState();
+}
+
+class _GlobalKeyboardShortcutsState extends State<_GlobalKeyboardShortcuts> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (!_hasCommandModifier()) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.keyK) {
+      CommandPalette.show(context);
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.keyF && !_isReaderRoute()) {
+      context.go('/search');
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _hasCommandModifier() {
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    return keys.contains(LogicalKeyboardKey.meta) || keys.contains(LogicalKeyboardKey.control);
+  }
+
+  bool _isReaderRoute() {
+    try {
+      return GoRouterState.of(context).uri.path.startsWith('/reader/');
+    } on Object {
+      return false;
+    }
   }
 }

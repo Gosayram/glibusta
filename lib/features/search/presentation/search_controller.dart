@@ -1,81 +1,62 @@
 import 'dart:async';
 
 import 'package:async/async.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:drift/drift.dart' show OrderingTerm;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
 import '../data/composite_source.dart';
 import '../domain/book_source.dart';
 
-final searchControllerProvider = StateNotifierProvider<SearchStateController, SearchState>((ref) {
-  final source = ref.watch(bookSourceProvider);
-  return SearchStateController(source);
-});
+part 'search_controller.g.dart';
 
-class SearchState {
-  final List<Book> books;
-  final bool isLoading;
-  final String? error;
-  final bool hasMore;
-  final int currentPage;
-  final String lastQuery;
-
-  const SearchState({
-    this.books = const [],
-    this.isLoading = false,
-    this.error,
-    this.hasMore = false,
-    this.currentPage = 0,
-    this.lastQuery = '',
-  });
-
-  SearchState copyWith({
-    List<Book>? books,
-    bool? isLoading,
-    String? error,
-    bool? hasMore,
-    int? currentPage,
-    String? lastQuery,
-  }) {
-    return SearchState(
-      books: books ?? this.books,
-      isLoading: isLoading ?? this.isLoading,
-      error: error,
-      hasMore: hasMore ?? this.hasMore,
-      currentPage: currentPage ?? this.currentPage,
-      lastQuery: lastQuery ?? this.lastQuery,
-    );
-  }
-}
-
-class SearchStateController extends StateNotifier<SearchState> {
-  final BookSource source;
+@riverpod
+class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelableOperation<SearchResultPage>? _currentSearch;
 
-  SearchStateController(this.source) : super(const SearchState());
+  @override
+  SearchState build() {
+    ref.onDispose(() => unawaited(_currentSearch?.cancel()));
+    return const SearchState();
+  }
+
+  BookSource get _source => ref.read(bookSourceProvider);
 
   Future<void> search(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) {
+      clearResults();
+      return;
+    }
+
     unawaited(_currentSearch?.cancel());
     state = state.copyWith(
       isLoading: true,
-      lastQuery: query,
+      lastQuery: normalized,
+      clearError: true,
     );
 
-    final searchQuery = SearchQuery(query: query);
-    _currentSearch = CancelableOperation.fromFuture(source.searchBooks(searchQuery));
+    final searchQuery = SearchQuery(
+      query: normalized,
+      filters: state.filters,
+    );
+    _currentSearch = CancelableOperation.fromFuture(_source.searchBooks(searchQuery));
 
     try {
       final result = await _currentSearch!.value;
-      if (!mounted) return;
+      if (!ref.mounted) return;
+      unawaited(_rememberSearch(normalized));
       state = state.copyWith(
         books: result.books,
         isLoading: false,
         hasMore: result.hasNextPage,
         currentPage: result.currentPage,
+        clearError: true,
       );
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!ref.mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -88,32 +69,137 @@ class SearchStateController extends StateNotifier<SearchState> {
     final searchQuery = SearchQuery(
       query: state.lastQuery,
       page: state.currentPage + 1,
+      filters: state.filters,
     );
-    _currentSearch = CancelableOperation.fromFuture(source.searchBooks(searchQuery));
+    _currentSearch = CancelableOperation.fromFuture(_source.searchBooks(searchQuery));
 
     try {
       final result = await _currentSearch!.value;
-      if (!mounted) return;
+      if (!ref.mounted) return;
       state = state.copyWith(
         books: [...state.books, ...result.books],
         isLoading: false,
         hasMore: result.hasNextPage,
         currentPage: result.currentPage,
+        clearError: true,
       );
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!ref.mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
-  void clearResults() {
-    unawaited(_currentSearch?.cancel());
-    state = const SearchState();
+  void setFilters(SearchFilters filters) {
+    final query = state.lastQuery;
+    state = state.copyWith(
+      filters: filters,
+      books: const [],
+      isLoading: false,
+      hasMore: false,
+      currentPage: 0,
+      clearError: true,
+    );
+
+    if (query.isNotEmpty) {
+      unawaited(search(query));
+    }
   }
 
-  @override
-  void dispose() {
+  Future<void> loadHistory() async {
+    final db = ref.read(databaseProvider);
+    final rows =
+        await (db.select(db.searchHistory)
+              ..orderBy([(table) => OrderingTerm.desc(table.searchedAt)])
+              ..limit(8))
+            .get();
+    if (!ref.mounted) return;
+    state = state.copyWith(
+      history: rows
+          .map((row) => row.query.trim())
+          .where((query) => query.isNotEmpty)
+          .toSet()
+          .toList(),
+    );
+  }
+
+  Future<void> _rememberSearch(String query) async {
+    final normalized = query.trim();
+    if (normalized.isEmpty) return;
+
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.searchHistory)
+        .insert(
+          SearchHistoryCompanion.insert(
+            query: normalized,
+            type: 'online',
+          ),
+        );
+
+    if (!ref.mounted) return;
+    unawaited(loadHistory());
+  }
+
+  Future<void> clearHistory() async {
+    final db = ref.read(databaseProvider);
+    await db.delete(db.searchHistory).go();
+    if (!ref.mounted) return;
+    state = state.copyWith(history: const []);
+  }
+
+  void clearResults() {
     unawaited(_currentSearch?.cancel());
-    super.dispose();
+    state = state.copyWith(
+      books: const [],
+      isLoading: false,
+      clearError: true,
+      hasMore: false,
+      lastQuery: '',
+    );
+  }
+}
+
+class SearchState {
+  final List<Book> books;
+  final bool isLoading;
+  final String? error;
+  final bool hasMore;
+  final int currentPage;
+  final String lastQuery;
+  final List<String> history;
+  final SearchFilters filters;
+
+  const SearchState({
+    this.books = const [],
+    this.isLoading = false,
+    this.error,
+    this.hasMore = false,
+    this.currentPage = 0,
+    this.lastQuery = '',
+    this.history = const [],
+    this.filters = const SearchFilters(),
+  });
+
+  SearchState copyWith({
+    List<Book>? books,
+    bool? isLoading,
+    String? error,
+    bool? hasMore,
+    int? currentPage,
+    String? lastQuery,
+    List<String>? history,
+    SearchFilters? filters,
+    bool clearError = false,
+  }) {
+    return SearchState(
+      books: books ?? this.books,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
+      lastQuery: lastQuery ?? this.lastQuery,
+      history: history ?? this.history,
+      filters: filters ?? this.filters,
+    );
   }
 }

@@ -38,7 +38,8 @@ class CatalogScreen extends ConsumerWidget {
         title: const Text('Каталог'),
         automaticallyImplyLeading: false,
       ),
-      body: ListView(
+      body: _RestorableListView(
+        restorationId: 'catalog-scroll',
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
@@ -241,6 +242,7 @@ class CatalogScreen extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final book = books[index];
                         return BookCard(
+                          key: ValueKey(book.id),
                           book: book,
                           isDownloaded: downloadedMap[book.id],
                         );
@@ -262,6 +264,7 @@ class CatalogScreen extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final book = books[index];
                         return BookCard(
+                          key: ValueKey(book.id),
                           book: book,
                           isDownloaded: downloadedMap[book.id],
                         );
@@ -282,6 +285,7 @@ class CatalogScreen extends ConsumerWidget {
                       itemBuilder: (context, index) {
                         final book = books[index];
                         return BookCard(
+                          key: ValueKey(book.id),
                           book: book,
                           isDownloaded: downloadedMap[book.id],
                         );
@@ -311,5 +315,69 @@ class CatalogScreen extends ConsumerWidget {
       }
     }
     return downloadedMap;
+  }
+}
+
+class _RestorableListView extends StatefulWidget {
+  final String restorationId;
+  final List<Widget> children;
+
+  const _RestorableListView({
+    required this.restorationId,
+    required this.children,
+  });
+
+  @override
+  State<_RestorableListView> createState() => _RestorableListViewState();
+}
+
+class _RestorableListViewState extends State<_RestorableListView> with RestorationMixin {
+  final RestorableDouble _offset = RestorableDouble(0);
+  ScrollController? _controller;
+
+  @override
+  String? get restorationId => widget.restorationId;
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
+    registerForRestoration(_offset, 'scroll_offset');
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_saveOffset);
+    _controller?.dispose();
+    _offset.dispose();
+    super.dispose();
+  }
+
+  ScrollController _getController() {
+    _controller ??= ScrollController(
+      initialScrollOffset: _offset.value,
+      keepScrollOffset: false,
+    )..addListener(_saveOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
+    return _controller!;
+  }
+
+  void _saveOffset() {
+    final controller = _controller;
+    if (controller == null || !controller.hasClients) return;
+    _offset.value = controller.position.pixels;
+  }
+
+  void _restoreOffset() {
+    final controller = _controller;
+    if (!mounted || controller == null || !controller.hasClients) return;
+    final maxOffset = controller.position.maxScrollExtent;
+    final offset = _offset.value.clamp(0.0, maxOffset);
+    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
+      controller.jumpTo(offset);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(controller: _getController(), children: widget.children);
   }
 }

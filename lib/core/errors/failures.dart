@@ -15,16 +15,16 @@ final class NotFoundFailure extends AppFailure {
   const NotFoundFailure([super.message]);
 }
 
+final class BookOpenFailure extends AppFailure {
+  const BookOpenFailure([super.message]);
+}
+
 final class SourceUnavailableFailure extends AppFailure {
   const SourceUnavailableFailure([super.message]);
 }
 
 final class ParserFailure extends AppFailure {
   const ParserFailure([super.message]);
-}
-
-final class ParseFailure extends AppFailure {
-  const ParseFailure({String? message}) : super(message);
 }
 
 final class DownloadFailure extends AppFailure {

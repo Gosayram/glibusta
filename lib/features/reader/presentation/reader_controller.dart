@@ -32,6 +32,7 @@ class ReaderState {
   final double scrollProgress;
   final int estimatedMinutesLeft;
   final bool isSearchOpen;
+  final String? highlightedQuery;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -47,6 +48,7 @@ class ReaderState {
     this.scrollProgress = 0.0,
     this.estimatedMinutesLeft = 0,
     this.isSearchOpen = false,
+    this.highlightedQuery,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   ReaderState copyWith({
@@ -62,6 +64,8 @@ class ReaderState {
     double? scrollProgress,
     int? estimatedMinutesLeft,
     bool? isSearchOpen,
+    String? highlightedQuery,
+    bool clearHighlight = false,
   }) {
     return ReaderState(
       book: book ?? this.book,
@@ -76,6 +80,7 @@ class ReaderState {
       scrollProgress: scrollProgress ?? this.scrollProgress,
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
+      highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
     );
   }
 }
@@ -154,6 +159,7 @@ class ReaderController {
           isLoading: false,
           currentPosition: savedPosition.clamp(chapterCount: book.chapters.length),
           estimatedMinutesLeft: (totalWords / wordsPerMinute).ceil(),
+          clearHighlight: true,
         ),
       );
       _scrollController = ScrollController()..addListener(_onScroll);
@@ -564,11 +570,26 @@ class ReaderController {
   }
 
   void toggleSearch() {
-    _updateState(_state.copyWith(isSearchOpen: !_state.isSearchOpen));
+    final shouldOpen = !_state.isSearchOpen;
+    _updateState(_state.copyWith(isSearchOpen: shouldOpen, clearHighlight: shouldOpen));
   }
 
   void closeSearch() {
-    _updateState(_state.copyWith(isSearchOpen: false));
+    _updateState(_state.copyWith(isSearchOpen: false, clearHighlight: true));
+  }
+
+  void highlightSearchQuery(String query) {
+    final trimmed = query.trim();
+    _updateState(
+      _state.copyWith(
+        highlightedQuery: trimmed.isEmpty ? null : trimmed,
+        clearHighlight: trimmed.isEmpty,
+      ),
+    );
+  }
+
+  void clearHighlight() {
+    _updateState(_state.copyWith(clearHighlight: true));
   }
 
   Future<void> deleteBookFile() async {

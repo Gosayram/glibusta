@@ -13,7 +13,7 @@ class BookSearchOverlay extends StatefulWidget {
   });
 
   final BookSearchService searchService;
-  final ValueChanged<ReaderPosition> onJumpToResult;
+  final void Function(ReaderPosition position, String query) onJumpToResult;
   final VoidCallback onDismiss;
   final ReaderTheme theme;
 
@@ -164,6 +164,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
             paragraphIndex: result.paragraphIndex,
             updatedAt: DateTime.now(),
           ),
+          _controller.text.trim(),
         );
       },
       child: Padding(

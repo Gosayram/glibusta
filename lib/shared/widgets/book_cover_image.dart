@@ -1,9 +1,80 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
+
+const List<int> _transparentImageBytes = [
+  137,
+  80,
+  78,
+  71,
+  13,
+  10,
+  26,
+  10,
+  0,
+  0,
+  0,
+  13,
+  73,
+  72,
+  68,
+  82,
+  0,
+  0,
+  0,
+  1,
+  0,
+  0,
+  0,
+  1,
+  8,
+  6,
+  0,
+  0,
+  0,
+  31,
+  21,
+  196,
+  137,
+  0,
+  0,
+  0,
+  10,
+  73,
+  68,
+  65,
+  84,
+  120,
+  156,
+  99,
+  0,
+  1,
+  0,
+  0,
+  5,
+  0,
+  1,
+  13,
+  10,
+  57,
+  60,
+  0,
+  0,
+  0,
+  0,
+  73,
+  69,
+  78,
+  68,
+  174,
+  66,
+  96,
+  130,
+];
 
 class BookCoverImage extends StatelessWidget {
   final Book book;
@@ -21,16 +92,33 @@ class BookCoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (book.coverUrl != null) {
-      return Image.network(
-        book.coverUrl!,
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (_, _, _) => _buildPlaceholder(context),
-      );
+    if (book.coverUrl == null || book.coverUrl!.isEmpty) {
+      return _buildPlaceholder(context);
     }
-    return _buildPlaceholder(context);
+
+    final placeholder = _buildPlaceholder(context);
+    final scale = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
+    final targetWidth = width != null ? (width! * scale).round() : null;
+    final targetHeight = height != null ? (height! * scale).round() : null;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        placeholder,
+        FadeInImage(
+          placeholder: MemoryImage(Uint8List.fromList(_transparentImageBytes)),
+          image: ResizeImage(
+            NetworkImage(book.coverUrl!),
+            width: targetWidth,
+            height: targetHeight,
+          ),
+          width: width,
+          height: height,
+          fit: fit,
+          imageErrorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ],
+    );
   }
 
   Widget _buildPlaceholder(BuildContext context) {

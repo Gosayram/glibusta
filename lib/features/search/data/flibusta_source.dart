@@ -60,8 +60,15 @@ class FlibustaHtmlSource extends BookSource {
     if (query.series != null && query.series!.isNotEmpty) {
       params.add('series=${Uri.encodeComponent(query.series!)}');
     }
-    if (query.genre != null && query.genre!.isNotEmpty) {
-      params.add('genre=${Uri.encodeComponent(query.genre!)}');
+    final genre = query.filters.genre ?? query.genre;
+    if (query.filters.format != null) {
+      params.add('format=${Uri.encodeComponent(query.filters.format!.name)}');
+    }
+    if (query.filters.language != null && query.filters.language!.trim().isNotEmpty) {
+      params.add('language=${Uri.encodeComponent(query.filters.language!)}');
+    }
+    if (genre != null && genre.trim().isNotEmpty) {
+      params.add('genre=${Uri.encodeComponent(genre)}');
     }
     if (query.page > 0) {
       params.add('page=${query.page + 1}');

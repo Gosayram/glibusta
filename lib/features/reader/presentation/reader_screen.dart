@@ -27,8 +27,9 @@ class ReaderScreen extends ConsumerStatefulWidget {
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBindingObserver {
+class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
+  AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _fullscreenMode = false;
@@ -36,7 +37,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: _handleAppLifecycleState,
+    );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ReaderController(widget.bookId, ref);
     unawaited(_ctrl.loadBook());
@@ -64,15 +67,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _ctrl.dispose();
     _ctrl.disableFullscreen();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _handleAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
@@ -274,13 +276,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   ? _ctrl.handleLongPress
                   : null,
               behavior: HitTestBehavior.translucent,
-              child: ReaderContentBody(
-                book: readerState.book!,
-                settings: settings,
-                scrollController: _ctrl.scrollController,
-                onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
-                initialProgress: readerState.scrollProgress,
-                initialPage: readerState.currentPosition.chapterIndex,
+              child: RepaintBoundary(
+                child: ReaderContentBody(
+                  book: readerState.book!,
+                  settings: settings,
+                  scrollController: _ctrl.scrollController,
+                  onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                  initialProgress: readerState.scrollProgress,
+                  initialPage: readerState.currentPosition.chapterIndex,
+                  highlightQuery: readerState.highlightedQuery,
+                ),
               ),
             ),
           _buildWarmthOverlay(settings),
@@ -328,8 +333,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             Positioned.fill(
               child: BookSearchOverlay(
                 searchService: _ctrl.createSearchService()!,
-                onJumpToResult: (position) {
+                onJumpToResult: (position, query) {
                   _ctrl.closeSearch();
+                  _ctrl.highlightSearchQuery(query);
                   _ctrl.jumpToPosition(
                     position.copyWith(bookId: widget.bookId),
                   );
@@ -378,14 +384,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                         ? _ctrl.handleLongPress
                         : null,
                     behavior: HitTestBehavior.translucent,
-                    child: ReaderContentBody(
-                      book: readerState.book!,
-                      settings: settings,
-                      scrollController: _ctrl.scrollController,
-                      onTap: (details) =>
-                          _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
-                      initialProgress: readerState.scrollProgress,
-                      initialPage: readerState.currentPosition.chapterIndex,
+                    child: RepaintBoundary(
+                      child: ReaderContentBody(
+                        book: readerState.book!,
+                        settings: settings,
+                        scrollController: _ctrl.scrollController,
+                        onTap: (details) =>
+                            _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+                        initialProgress: readerState.scrollProgress,
+                        initialPage: readerState.currentPosition.chapterIndex,
+                        highlightQuery: readerState.highlightedQuery,
+                      ),
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -435,8 +444,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
             Positioned.fill(
               child: BookSearchOverlay(
                 searchService: _ctrl.createSearchService()!,
-                onJumpToResult: (position) {
+                onJumpToResult: (position, query) {
                   _ctrl.closeSearch();
+                  _ctrl.highlightSearchQuery(query);
                   _ctrl.jumpToPosition(
                     position.copyWith(bookId: widget.bookId),
                   );
@@ -503,16 +513,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                                 ? _ctrl.handleLongPress
                                 : null,
                             behavior: HitTestBehavior.translucent,
-                            child: ReaderContentBody(
-                              book: readerState.book!,
-                              settings: settings,
-                              scrollController: _ctrl.scrollController,
-                              onTap: (details) => _ctrl.handleTap(
-                                details,
-                                MediaQuery.sizeOf(context).width,
+                            child: RepaintBoundary(
+                              child: ReaderContentBody(
+                                book: readerState.book!,
+                                settings: settings,
+                                scrollController: _ctrl.scrollController,
+                                onTap: (details) => _ctrl.handleTap(
+                                  details,
+                                  MediaQuery.sizeOf(context).width,
+                                ),
+                                initialProgress: readerState.scrollProgress,
+                                initialPage: readerState.currentPosition.chapterIndex,
+                                highlightQuery: readerState.highlightedQuery,
                               ),
-                              initialProgress: readerState.scrollProgress,
-                              initialPage: readerState.currentPosition.chapterIndex,
                             ),
                           ),
                         )
@@ -562,8 +575,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                   Positioned.fill(
                     child: BookSearchOverlay(
                       searchService: _ctrl.createSearchService()!,
-                      onJumpToResult: (position) {
+                      onJumpToResult: (position, query) {
                         _ctrl.closeSearch();
+                        _ctrl.highlightSearchQuery(query);
                         _ctrl.jumpToPosition(
                           position.copyWith(bookId: widget.bookId),
                         );

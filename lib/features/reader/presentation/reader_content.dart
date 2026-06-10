@@ -15,6 +15,7 @@ class ReaderContentBody extends StatelessWidget {
     required this.onTap,
     this.initialProgress = 0.0,
     this.initialPage = 0,
+    this.highlightQuery,
   });
 
   final NormalizedBook book;
@@ -23,6 +24,7 @@ class ReaderContentBody extends StatelessWidget {
   final GestureTapUpCallback onTap;
   final double initialProgress;
   final int initialPage;
+  final String? highlightQuery;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +34,7 @@ class ReaderContentBody extends StatelessWidget {
         settings: settings,
         onTap: onTap,
         initialPage: initialPage,
+        highlightQuery: highlightQuery,
       );
     }
 
@@ -122,13 +125,13 @@ class ReaderContentBody extends StatelessWidget {
         if (chapter.title.isNotEmpty)
           Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: Text(
+            child: _buildHighlightedText(
               chapter.title,
-              style: _getReaderStyle(settings).copyWith(
+              _getReaderStyle(settings).copyWith(
                 fontSize: settings.fontSize * 1.4,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: textAlign,
+              textAlign,
             ),
           ),
         ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
@@ -148,13 +151,13 @@ class ReaderContentBody extends StatelessWidget {
             top: settings.paragraphSpacing * 2,
             bottom: settings.paragraphSpacing,
           ),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: _getReaderStyle(settings).copyWith(
+            _getReaderStyle(settings).copyWith(
               fontSize: settings.fontSize * 1.2,
               fontWeight: FontWeight.bold,
             ),
-            textAlign: textAlign,
+            textAlign,
           ),
         );
       case BlockType.quote:
@@ -169,12 +172,12 @@ class ReaderContentBody extends StatelessWidget {
               ),
             ),
           ),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: _getReaderStyle(settings).copyWith(
+            _getReaderStyle(settings).copyWith(
               fontStyle: FontStyle.italic,
             ),
-            textAlign: textAlign,
+            textAlign,
           ),
         );
       case BlockType.separator:
@@ -199,12 +202,12 @@ class ReaderContentBody extends StatelessWidget {
       case BlockType.footnote:
         return Padding(
           padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: _getReaderStyle(settings).copyWith(
+            _getReaderStyle(settings).copyWith(
               fontSize: settings.fontSize * 0.85,
             ),
-            textAlign: textAlign,
+            textAlign,
           ),
         );
       case BlockType.paragraph:
@@ -215,14 +218,52 @@ class ReaderContentBody extends StatelessWidget {
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: Text(
-              block.text,
-              style: _getReaderStyle(settings),
-              textAlign: textAlign,
-            ),
+            child: _buildHighlightedText(block.text, _getReaderStyle(settings), textAlign),
           ),
         );
     }
+  }
+
+  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign) {
+    final query = highlightQuery?.trim();
+    if (query == null || query.isEmpty) {
+      return Text(text, style: style, textAlign: textAlign);
+    }
+
+    return Text.rich(
+      TextSpan(children: _buildHighlightedSpans(text, style, query)),
+      textAlign: textAlign,
+    );
+  }
+
+  List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
+    final regex = RegExp(RegExp.escape(query), caseSensitive: false);
+    final matches = regex.allMatches(text).toList();
+    if (matches.isEmpty) {
+      return [TextSpan(text: text, style: style)];
+    }
+
+    final spans = <InlineSpan>[];
+    var start = 0;
+    for (final match in matches) {
+      if (match.start > start) {
+        spans.add(TextSpan(text: text.substring(start, match.start), style: style));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: style.copyWith(
+            color: Colors.amber,
+            backgroundColor: Colors.black38,
+          ),
+        ),
+      );
+      start = match.end;
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: style));
+    }
+    return spans;
   }
 
   static TextDirection _effectiveTextDirection(
@@ -272,12 +313,14 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.settings,
     required this.onTap,
     required this.initialPage,
+    this.highlightQuery,
   });
 
   final NormalizedBook book;
   final ReaderSettings settings;
   final GestureTapUpCallback onTap;
   final int initialPage;
+  final String? highlightQuery;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -351,13 +394,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (chapter.title.isNotEmpty)
           Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: Text(
+            child: _buildHighlightedText(
               chapter.title,
-              style: style.copyWith(
+              style.copyWith(
                 fontSize: settings.fontSize * 1.4,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: textAlign,
+              textAlign,
             ),
           ),
         ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
@@ -376,13 +419,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             top: settings.paragraphSpacing * 2,
             bottom: settings.paragraphSpacing,
           ),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: style.copyWith(
+            style.copyWith(
               fontSize: settings.fontSize * 1.2,
               fontWeight: FontWeight.bold,
             ),
-            textAlign: textAlign,
+            textAlign,
           ),
         );
       case BlockType.quote:
@@ -397,10 +440,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               ),
             ),
           ),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: style.copyWith(fontStyle: FontStyle.italic),
-            textAlign: textAlign,
+            style.copyWith(fontStyle: FontStyle.italic),
+            textAlign,
           ),
         );
       case BlockType.separator:
@@ -425,12 +468,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.footnote:
         return Padding(
           padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
-          child: Text(
+          child: _buildHighlightedText(
             block.text,
-            style: style.copyWith(
+            style.copyWith(
               fontSize: settings.fontSize * 0.85,
             ),
-            textAlign: textAlign,
+            textAlign,
           ),
         );
       case BlockType.paragraph:
@@ -441,14 +484,52 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: Text(
-              block.text,
-              style: style,
-              textAlign: textAlign,
-            ),
+            child: _buildHighlightedText(block.text, style, textAlign),
           ),
         );
     }
+  }
+
+  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign) {
+    final query = widget.highlightQuery?.trim();
+    if (query == null || query.isEmpty) {
+      return Text(text, style: style, textAlign: textAlign);
+    }
+
+    return Text.rich(
+      TextSpan(children: _buildHighlightedSpans(text, style, query)),
+      textAlign: textAlign,
+    );
+  }
+
+  List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
+    final regex = RegExp(RegExp.escape(query), caseSensitive: false);
+    final matches = regex.allMatches(text).toList();
+    if (matches.isEmpty) {
+      return [TextSpan(text: text, style: style)];
+    }
+
+    final spans = <InlineSpan>[];
+    var start = 0;
+    for (final match in matches) {
+      if (match.start > start) {
+        spans.add(TextSpan(text: text.substring(start, match.start), style: style));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(0),
+          style: style.copyWith(
+            color: Colors.amber,
+            backgroundColor: Colors.black38,
+          ),
+        ),
+      );
+      start = match.end;
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: style));
+    }
+    return spans;
   }
 
   TextDirection _effectiveTextDirection(BuildContext context) {

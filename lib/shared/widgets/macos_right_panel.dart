@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../shared/models/book.dart';
+import '../../shared/widgets/book_cover_image.dart';
 
 class SelectedBookNotifier extends Notifier<Book?> {
   @override
@@ -104,18 +105,7 @@ class _BookDetailsTab extends StatelessWidget {
           Center(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                book.coverUrl!,
-                width: 120,
-                height: 180,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
-                  width: 120,
-                  height: 180,
-                  color: theme.colorScheme.primaryContainer,
-                  child: const Icon(Icons.book, size: 48),
-                ),
-              ),
+              child: BookCoverImage(book: book, width: 120, height: 180),
             ),
           )
         else

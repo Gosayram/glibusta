@@ -197,7 +197,8 @@ class LibraryScreen extends ConsumerWidget {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
-    return CustomScrollView(
+    return _RestorableCustomScrollView(
+      restorationId: 'library-books-scroll',
       slivers: [
         // Pinned section
         if (pinnedBooksList.isNotEmpty) ...[
@@ -236,6 +237,7 @@ class LibraryScreen extends ConsumerWidget {
                 (context, index) {
                   final book = pinnedBooksList[index];
                   return BookCard(
+                    key: ValueKey(book.id),
                     book: book,
                     onTap: () => unawaited(context.push('/reader/${book.id}')),
                     onLongPress: () => _showBookMenu(context, ref, book),
@@ -280,6 +282,7 @@ class LibraryScreen extends ConsumerWidget {
           ),
           delegate: SliverChildBuilderDelegate(
             (context, index) => BookCard(
+              key: ValueKey(books[index].id),
               book: books[index],
               onTap: () => unawaited(context.push('/reader/${books[index].id}')),
               onLongPress: () => _showBookMenu(context, ref, books[index]),
@@ -320,6 +323,7 @@ class LibraryScreen extends ConsumerWidget {
           ),
           delegate: SliverChildBuilderDelegate(
             (context, index) => BookCard(
+              key: ValueKey(books[index].id),
               book: books[index],
               onTap: () => unawaited(context.push('/reader/${books[index].id}')),
               onLongPress: () => _showBookMenu(context, ref, books[index]),
@@ -373,5 +377,70 @@ class LibraryScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _RestorableCustomScrollView extends StatefulWidget {
+  final String restorationId;
+  final List<Widget> slivers;
+
+  const _RestorableCustomScrollView({
+    required this.restorationId,
+    required this.slivers,
+  });
+
+  @override
+  State<_RestorableCustomScrollView> createState() => _RestorableCustomScrollViewState();
+}
+
+class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView>
+    with RestorationMixin {
+  final RestorableDouble _offset = RestorableDouble(0);
+  ScrollController? _controller;
+
+  @override
+  String? get restorationId => widget.restorationId;
+
+  @override
+  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
+    registerForRestoration(_offset, 'scroll_offset');
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_saveOffset);
+    _controller?.dispose();
+    _offset.dispose();
+    super.dispose();
+  }
+
+  ScrollController _getController() {
+    _controller ??= ScrollController(
+      initialScrollOffset: _offset.value,
+      keepScrollOffset: false,
+    )..addListener(_saveOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
+    return _controller!;
+  }
+
+  void _saveOffset() {
+    final controller = _controller;
+    if (controller == null || !controller.hasClients) return;
+    _offset.value = controller.position.pixels;
+  }
+
+  void _restoreOffset() {
+    final controller = _controller;
+    if (!mounted || controller == null || !controller.hasClients) return;
+    final maxOffset = controller.position.maxScrollExtent;
+    final offset = _offset.value.clamp(0.0, maxOffset);
+    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
+      controller.jumpTo(offset);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(controller: _getController(), slivers: widget.slivers);
   }
 }

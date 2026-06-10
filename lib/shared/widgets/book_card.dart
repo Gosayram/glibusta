@@ -27,77 +27,79 @@ class BookCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Semantics(
-      label: 'Книга: ${book.title}',
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap ?? () => context.push('/book/${book.id}'),
-          onLongPress: onLongPress,
-          onSecondaryTapDown: (details) => _showContextMenu(
-            context,
-            details.globalPosition,
-          ),
-          child: Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      BookCoverImage(book: book),
-                      if (isDownloaded == true)
-                        const Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Icon(
-                            Icons.download_done,
-                            size: 16,
-                            color: AppColors.success,
-                          ),
-                        )
-                      else if (isDownloaded == false)
-                        const Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Icon(
-                            Icons.cloud_download_outlined,
-                            size: 16,
-                            color: AppColors.info,
-                          ),
-                        ),
-                      if (progress != null && progress! > 0)
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 3,
-                            backgroundColor: Colors.black26,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              theme.colorScheme.secondary,
+    return RepaintBoundary(
+      child: Semantics(
+        label: 'Книга: ${book.title}',
+        button: true,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: onTap ?? () => context.push('/book/${book.id}'),
+            onLongPress: onLongPress,
+            onSecondaryTapDown: (details) => _showContextMenu(
+              context,
+              details.globalPosition,
+            ),
+            child: Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        BookCoverImage(book: book),
+                        if (isDownloaded == true)
+                          const Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Icon(
+                              Icons.download_done,
+                              size: 16,
+                              color: AppColors.success,
+                            ),
+                          )
+                        else if (isDownloaded == false)
+                          const Positioned(
+                            top: 4,
+                            right: 4,
+                            child: Icon(
+                              Icons.cloud_download_outlined,
+                              size: 16,
+                              color: AppColors.info,
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Text(
-                    book.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                        if (progress != null && progress! > 0)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 3,
+                              backgroundColor: Colors.black26,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                theme.colorScheme.secondary,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(
+                      book.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

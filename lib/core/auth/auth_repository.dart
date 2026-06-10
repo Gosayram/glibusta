@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../http/dio_provider.dart';
+
+part 'auth_repository.g.dart';
 
 class UserSession {
   final String name;
@@ -114,10 +116,42 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(dio);
 });
 
-final authStateProvider = StateNotifierProvider<AuthState, AuthStateData>((ref) {
-  final repo = ref.watch(authRepositoryProvider);
-  return AuthState(repo);
-});
+@riverpod
+class AuthStateNotifier extends _$AuthStateNotifier {
+  @override
+  AuthStateData build() {
+    return const AuthStateData();
+  }
+
+  Future<void> login(String name, String password, bool persistent) async {
+    state = state.copyWith(isLoading: true);
+    try {
+      final session = await ref
+          .read(authRepositoryProvider)
+          .login(
+            name: name,
+            password: password,
+            persistent: persistent,
+          );
+      state = state.copyWith(isAuthenticated: true, session: session, isLoading: false);
+    } on AuthException catch (e) {
+      state = state.copyWith(error: e.message, isLoading: false);
+    } on Object catch (_) {
+      state = state.copyWith(error: 'Connection error', isLoading: false);
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await ref.read(authRepositoryProvider).logout();
+    } on Object catch (_) {}
+    state = const AuthStateData();
+  }
+
+  void clearError() {
+    state = state.copyWith(clearError: true);
+  }
+}
 
 class AuthStateData {
   final bool isAuthenticated;
@@ -137,41 +171,13 @@ class AuthStateData {
     UserSession? session,
     String? error,
     bool? isLoading,
+    bool clearError = false,
   }) {
     return AuthStateData(
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       session: session ?? this.session,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
       isLoading: isLoading ?? this.isLoading,
     );
-  }
-}
-
-class AuthState extends StateNotifier<AuthStateData> {
-  final AuthRepository _repo;
-
-  AuthState(this._repo) : super(const AuthStateData());
-
-  Future<void> login(String name, String password, bool persistent) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final session = await _repo.login(name: name, password: password, persistent: persistent);
-      state = state.copyWith(isAuthenticated: true, session: session, isLoading: false);
-    } on AuthException catch (e) {
-      state = state.copyWith(error: e.message, isLoading: false);
-    } on Object catch (_) {
-      state = state.copyWith(error: 'Connection error', isLoading: false);
-    }
-  }
-
-  Future<void> logout() async {
-    try {
-      await _repo.logout();
-    } on Object catch (_) {}
-    state = const AuthStateData();
-  }
-
-  void clearError() {
-    state = state.copyWith();
   }
 }
