@@ -241,7 +241,6 @@ class _PaginatedContentBody extends StatefulWidget {
 
 class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
-  int _currentPage = 0;
 
   @override
   void initState() {
@@ -253,6 +252,154 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  Widget _buildChapterContent(int chapterIndex) {
+    final book = widget.book;
+    final settings = widget.settings;
+    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
+      return const SizedBox.shrink();
+    }
+
+    final chapter = book.chapters[chapterIndex];
+    final textAlign = switch (settings.textAlign) {
+      ReaderTextAlign.left => TextAlign.left,
+      ReaderTextAlign.justify => TextAlign.justify,
+      ReaderTextAlign.center => TextAlign.center,
+      ReaderTextAlign.right => TextAlign.right,
+    };
+
+    final style = _getReaderStyle(settings);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (chapter.title.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
+            child: Text(
+              chapter.title,
+              style: style.copyWith(
+                fontSize: settings.fontSize * 1.4,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: textAlign,
+            ),
+          ),
+        ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+      ],
+    );
+  }
+
+  Widget _buildBlock(ReaderBlock block, TextAlign textAlign) {
+    final settings = widget.settings;
+    final style = _getReaderStyle(settings);
+
+    switch (block.type) {
+      case BlockType.heading:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing * 2,
+            bottom: settings.paragraphSpacing,
+          ),
+          child: Text(
+            block.text,
+            style: style.copyWith(
+              fontSize: settings.fontSize * 1.2,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.quote:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: style.color!.withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: Text(
+            block.text,
+            style: style.copyWith(fontStyle: FontStyle.italic),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.separator:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          child: Center(child: Text('* * *', style: style)),
+        );
+      case BlockType.image:
+        if (block.imageUrl != null) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+            child: Center(
+              child: Icon(
+                Icons.image,
+                size: 64,
+                color: style.color,
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      case BlockType.footnote:
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
+          child: Text(
+            block.text,
+            style: style.copyWith(
+              fontSize: settings.fontSize * 0.85,
+            ),
+            textAlign: textAlign,
+          ),
+        );
+      case BlockType.paragraph:
+        final indent = settings.paragraphFirstLineIndent > 0
+            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+            : EdgeInsets.zero;
+        return Padding(
+          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+          child: Padding(
+            padding: indent,
+            child: Text(
+              block.text,
+              style: style,
+              textAlign: textAlign,
+            ),
+          ),
+        );
+    }
+  }
+
+  TextStyle _getReaderStyle(ReaderSettings settings) {
+    final colors = ReaderColors.forTheme(settings.theme);
+    final String fontFamily;
+    switch (settings.font) {
+      case ReaderFont.sourceSerif:
+        fontFamily = 'SourceSerif4';
+        break;
+      case ReaderFont.literata:
+        fontFamily = 'Literata';
+        break;
+      case ReaderFont.robotoSerif:
+        fontFamily = 'RobotoSerif';
+        break;
+      case ReaderFont.inter:
+        fontFamily = 'Inter';
+        break;
+    }
+    return TextStyle(
+      fontFamily: fontFamily,
+      fontSize: settings.fontSize,
+      height: settings.lineHeight,
+      color: colors.text,
+      letterSpacing: settings.letterSpacing,
+    );
   }
 
   Widget _buildPage(int index) {
@@ -365,7 +512,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         );
 
       case PageTurnAnimation.slide:
-      default:
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapUp: widget.onTap,
