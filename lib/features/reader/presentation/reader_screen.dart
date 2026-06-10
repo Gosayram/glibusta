@@ -15,6 +15,7 @@ import 'reader_content.dart';
 import 'reader_controller.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
+import 'reader_search_overlay.dart';
 import 'reader_side_panel.dart';
 
 class ReaderScreen extends ConsumerStatefulWidget {
@@ -123,18 +124,90 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
         child: Scaffold(
           appBar: AppBar(title: const Text('Читалка')),
           body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline, size: 48),
-                const SizedBox(height: 16),
-                Text(readerState.errorMessage!, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => _ctrl.loadBook(),
-                  child: const Text('Повторить'),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48, color: Colors.orange),
+                      const SizedBox(height: 16),
+                      Text(
+                        readerState.errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      if (readerState.errorFilePath != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (readerState.errorFormat != null)
+                                Text(
+                                  'Формат: ${readerState.errorFormat}',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              if (readerState.errorFileSize != null)
+                                Text(
+                                  'Размер: ${(readerState.errorFileSize! / 1024).toStringAsFixed(1)} KB',
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Путь: ${readerState.errorFilePath}',
+                                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () => _ctrl.loadBook(),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Повторить'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              _ctrl.copyDiagnostics();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Диагностика скопирована')),
+                              );
+                            },
+                            icon: const Icon(Icons.copy),
+                            label: const Text('Копировать диагностику'),
+                          ),
+                          if (readerState.errorFilePath != null)
+                            OutlinedButton.icon(
+                              onPressed: () => _showDeleteConfirmDialog(context),
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              label: const Text(
+                                'Удалить файл',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -233,7 +306,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 bookTitle: readerState.book?.title ?? '',
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
-                onSearch: () {},
+                onSearch: () => _ctrl.toggleSearch(),
                 onMore: () {},
               ),
             ),
@@ -251,6 +324,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               ),
             ),
           ],
+          if (readerState.isSearchOpen && readerState.book != null)
+            Positioned.fill(
+              child: BookSearchOverlay(
+                searchService: _ctrl.createSearchService()!,
+                onJumpToResult: (position) {
+                  _ctrl.closeSearch();
+                  _ctrl.jumpToPosition(
+                    position.copyWith(bookId: widget.bookId),
+                  );
+                },
+                onDismiss: () => _ctrl.closeSearch(),
+                theme: settings.theme,
+              ),
+            ),
         ],
       ),
     );
@@ -326,7 +413,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                 bookTitle: readerState.book?.title ?? '',
                 onBack: () => Navigator.of(context).pop(),
                 onSettings: () => _showQuickSettings(context),
-                onSearch: () {},
+                onSearch: () => _ctrl.toggleSearch(),
                 onMore: () {},
               ),
             ),
@@ -344,6 +431,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
               ),
             ),
           ],
+          if (readerState.isSearchOpen && readerState.book != null)
+            Positioned.fill(
+              child: BookSearchOverlay(
+                searchService: _ctrl.createSearchService()!,
+                onJumpToResult: (position) {
+                  _ctrl.closeSearch();
+                  _ctrl.jumpToPosition(
+                    position.copyWith(bookId: widget.bookId),
+                  );
+                },
+                onDismiss: () => _ctrl.closeSearch(),
+                theme: settings.theme,
+              ),
+            ),
         ],
       ),
     );
@@ -440,7 +541,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                       bookTitle: readerState.book?.title ?? '',
                       onBack: () => Navigator.of(context).pop(),
                       onSettings: () => _showQuickSettings(context),
-                      onSearch: () {},
+                      onSearch: () => _ctrl.toggleSearch(),
                       onMore: () {},
                     ),
                   ),
@@ -457,6 +558,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
                     ),
                   ),
                 ],
+                if (readerState.isSearchOpen && readerState.book != null)
+                  Positioned.fill(
+                    child: BookSearchOverlay(
+                      searchService: _ctrl.createSearchService()!,
+                      onJumpToResult: (position) {
+                        _ctrl.closeSearch();
+                        _ctrl.jumpToPosition(
+                          position.copyWith(bookId: widget.bookId),
+                        );
+                      },
+                      onDismiss: () => _ctrl.closeSearch(),
+                      theme: settings.theme,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -500,6 +615,38 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
           onDismiss: () => _ctrl.onBottomSheetClose(),
         ),
       ).whenComplete(() => _ctrl.onBottomSheetClose()),
+    );
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context) {
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Удалить файл?'),
+          content: const Text(
+            'Файл книги будет удалён с устройства. '
+            'Это действие нельзя отменить.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                unawaited(_ctrl.deleteBookFile());
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Удалить'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

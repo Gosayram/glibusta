@@ -1,4 +1,4 @@
-import '../parsers/normalized_book.dart';
+import 'parsers/normalized_book.dart';
 
 class BookSearchResult {
   final int chapterIndex;

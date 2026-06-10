@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -7,10 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/tables.dart' show DownloadStatusDb;
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
+import '../data/book_search_service.dart';
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
 import 'reader_providers.dart';
@@ -20,43 +23,59 @@ class ReaderState {
   final NormalizedBook? book;
   final bool isLoading;
   final String? errorMessage;
+  final String? errorFilePath;
+  final String? errorFormat;
+  final int? errorFileSize;
   final ReaderPosition currentPosition;
   final bool uiVisible;
   final bool isBottomSheetOpen;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final bool isSearchOpen;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
     this.book,
     this.isLoading = true,
     this.errorMessage,
+    this.errorFilePath,
+    this.errorFormat,
+    this.errorFileSize,
     ReaderPosition? currentPosition,
     this.uiVisible = true,
     this.isBottomSheetOpen = false,
     this.scrollProgress = 0.0,
     this.estimatedMinutesLeft = 0,
+    this.isSearchOpen = false,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   ReaderState copyWith({
     NormalizedBook? book,
     bool? isLoading,
     String? errorMessage,
+    String? errorFilePath,
+    String? errorFormat,
+    int? errorFileSize,
     ReaderPosition? currentPosition,
     bool? uiVisible,
     bool? isBottomSheetOpen,
     double? scrollProgress,
     int? estimatedMinutesLeft,
+    bool? isSearchOpen,
   }) {
     return ReaderState(
       book: book ?? this.book,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
+      errorMessage: errorMessage ?? this.errorMessage,
+      errorFilePath: errorFilePath ?? this.errorFilePath,
+      errorFormat: errorFormat ?? this.errorFormat,
+      errorFileSize: errorFileSize ?? this.errorFileSize,
       currentPosition: currentPosition ?? this.currentPosition,
       uiVisible: uiVisible ?? this.uiVisible,
       isBottomSheetOpen: isBottomSheetOpen ?? this.isBottomSheetOpen,
       scrollProgress: scrollProgress ?? this.scrollProgress,
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
+      isSearchOpen: isSearchOpen ?? this.isSearchOpen,
     );
   }
 }
@@ -149,7 +168,35 @@ class ReaderController {
       _startHideTimer();
       _applyWakeLock();
     } on Object catch (e) {
-      _updateState(_state.copyWith(isLoading: false, errorMessage: e.toString()));
+      String? filePath;
+      String? format;
+      int? fileSize;
+      try {
+        final db = _ref.read(databaseProvider);
+        final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(_bookId))).get();
+        for (final row in rows) {
+          if (row.status == DownloadStatusDb.completed) {
+            filePath = row.targetPath;
+            format = row.format;
+            if (filePath != null && filePath.isNotEmpty) {
+              final file = File(filePath);
+              if (await file.exists()) {
+                fileSize = await file.length();
+              }
+            }
+            break;
+          }
+        }
+      } on Object catch (_) {}
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          errorMessage: e.toString(),
+          errorFilePath: filePath,
+          errorFormat: format,
+          errorFileSize: fileSize,
+        ),
+      );
     }
   }
 
@@ -508,5 +555,59 @@ class ReaderController {
   void onBottomSheetClose() {
     _updateState(_state.copyWith(isBottomSheetOpen: false));
     _startHideTimer();
+  }
+
+  BookSearchService? createSearchService() {
+    final book = _state.book;
+    if (book == null) return null;
+    return BookSearchService(book);
+  }
+
+  void toggleSearch() {
+    _updateState(_state.copyWith(isSearchOpen: !_state.isSearchOpen));
+  }
+
+  void closeSearch() {
+    _updateState(_state.copyWith(isSearchOpen: false));
+  }
+
+  Future<void> deleteBookFile() async {
+    final filePath = _state.errorFilePath;
+    if (filePath == null || filePath.isEmpty) return;
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      final db = _ref.read(databaseProvider);
+      await (db.delete(db.downloads)..where((d) => d.bookId.equals(_bookId))).go();
+      await (db.delete(db.readingProgress)..where((t) => t.bookId.equals(_bookId))).go();
+    } on Object catch (_) {}
+    _updateState(
+      _state.copyWith(
+        errorMessage: 'Файл удалён',
+      ),
+    );
+  }
+
+  String buildDiagnostics() {
+    final buffer = StringBuffer();
+    buffer.writeln('=== Diagnostics ===');
+    buffer.writeln('Book ID: $_bookId');
+    buffer.writeln('Error: ${_state.errorMessage ?? "none"}');
+    buffer.writeln('File: ${_state.errorFilePath ?? "unknown"}');
+    buffer.writeln('Format: ${_state.errorFormat ?? "unknown"}');
+    buffer.writeln(
+      'Size: ${_state.errorFileSize != null ? "${(_state.errorFileSize! / 1024).toStringAsFixed(1)} KB" : "unknown"}',
+    );
+    buffer.writeln('Chapters: ${_state.book?.chapters.length ?? 0}');
+    buffer.writeln('Platform: ${Platform.operatingSystem}');
+    buffer.writeln('Time: ${DateTime.now().toIso8601String()}');
+    return buffer.toString();
+  }
+
+  void copyDiagnostics() {
+    final diagnostics = buildDiagnostics();
+    unawaited(Clipboard.setData(ClipboardData(text: diagnostics)));
   }
 }
