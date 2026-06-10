@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/catalog_repository_impl.dart';
 
@@ -239,7 +240,10 @@ class CatalogScreen extends ConsumerWidget {
                       itemCount: books.length,
                       itemBuilder: (context, index) {
                         final book = books[index];
-                        return _buildBookCard(context, book, isDownloaded: downloadedMap[book.id]);
+                        return BookCard(
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
                       },
                     );
                   } else if (width < AppBreakpoints.expanded) {
@@ -257,7 +261,10 @@ class CatalogScreen extends ConsumerWidget {
                       itemCount: books.length,
                       itemBuilder: (context, index) {
                         final book = books[index];
-                        return _buildBookCard(context, book, isDownloaded: downloadedMap[book.id]);
+                        return BookCard(
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
                       },
                     );
                   } else {
@@ -274,7 +281,10 @@ class CatalogScreen extends ConsumerWidget {
                       itemCount: books.length,
                       itemBuilder: (context, index) {
                         final book = books[index];
-                        return _buildBookCard(context, book, isDownloaded: downloadedMap[book.id]);
+                        return BookCard(
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
                       },
                     );
                   }
@@ -301,74 +311,5 @@ class CatalogScreen extends ConsumerWidget {
       }
     }
     return downloadedMap;
-  }
-
-  Widget _buildBookCard(BuildContext context, Book book, {bool? isDownloaded}) {
-    return Semantics(
-      label: 'Книга: ${book.title}',
-      button: true,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Card(
-          margin: const EdgeInsets.only(right: 8),
-          child: Stack(
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: book.coverUrl != null
-                        ? Image.network(
-                            book.coverUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.book),
-                            ),
-                          )
-                        : Container(
-                            color: Colors.grey[300],
-                            child: const Icon(Icons.book),
-                          ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Text(
-                      book.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              // Download status indicator
-              if (isDownloaded == true)
-                const Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Icon(
-                    Icons.download_done,
-                    size: 16,
-                    color: Colors.green,
-                  ),
-                )
-              else if (isDownloaded == false)
-                const Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Icon(
-                    Icons.cloud_download_outlined,
-                    size: 16,
-                    color: Colors.blue,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

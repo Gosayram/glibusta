@@ -154,6 +154,31 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deleteReadingProgress(String bookId) {
     return (delete(readingProgress)..where((t) => t.bookId.equals(bookId))).go();
   }
+
+  Future<List<SavedBook>> getBooksWithProgress() async {
+    final query = select(savedBooks).join([
+      innerJoin(
+        readingProgress,
+        readingProgress.bookId.equalsExp(savedBooks.id),
+      ),
+    ]);
+    query.orderBy([OrderingTerm.desc(readingProgress.lastRead)]);
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(savedBooks)).toList();
+  }
+
+  Stream<List<SavedBook>> watchBooksWithProgress() {
+    final query = select(savedBooks).join([
+      innerJoin(
+        readingProgress,
+        readingProgress.bookId.equalsExp(savedBooks.id),
+      ),
+    ]);
+    query.orderBy([OrderingTerm.desc(readingProgress.lastRead)]);
+    return query.watch().map(
+      (rows) => rows.map((row) => row.readTable(savedBooks)).toList(),
+    );
+  }
 }
 
 LazyDatabase _openConnection() {

@@ -7,10 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/database/tables.dart';
-import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/book_import_service.dart';
@@ -162,274 +160,61 @@ class LibraryScreen extends ConsumerWidget {
       );
     }
 
-    return FutureBuilder<Map<String, dynamic>>(
-      future: _getBookStatusData(ref, books),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return Skeletonizer(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.75,
-              ),
-              itemCount: 6,
-              itemBuilder: (_, _) => const Card(
-                child: ListTile(
-                  leading: Bone.circle(size: 48),
-                  title: Bone.text(words: 3),
-                  subtitle: Bone.text(words: 2),
-                ),
-              ),
-            ),
-          );
-        }
-        final progressMap = snapshot.data!['progress'] as Map<String, double>;
-        final downloadedMap = snapshot.data!['downloaded'] as Map<String, bool>;
-
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-
-            // Determine grid layout based on width
-            if (width < AppBreakpoints.compact) {
-              // Phone: 2 columns
-              return _buildGridView(context, books, progressMap, downloadedMap, crossAxisCount: 2);
-            } else if (width < AppBreakpoints.expanded) {
-              // Tablet: 3 columns
-              return _buildGridView(context, books, progressMap, downloadedMap, crossAxisCount: 3);
-            } else {
-              // Desktop: adaptive card width
-              return _buildDesktopGridView(context, books, progressMap, downloadedMap);
-            }
-          },
-        );
-      },
-    );
-  }
-
-  Future<Map<String, dynamic>> _getBookStatusData(WidgetRef ref, List<Book> books) async {
-    final bookIds = books.map((book) => book.id).toList();
-    final database = ref.read(databaseProvider);
-
-    final progressMap = <String, double>{};
-    final downloadedMap = <String, bool>{};
-
-    if (bookIds.isNotEmpty) {
-      // Get reading progress for all books
-      final progressRows = await (database.select(
-        database.readingProgress,
-      )..where((t) => t.bookId.isIn(bookIds))).get();
-      for (final row in progressRows) {
-        if (row.totalPages > 0) {
-          progressMap[row.bookId] = row.currentPosition / row.totalPages;
-        } else {
-          progressMap[row.bookId] = 0.0;
-        }
-      }
-
-      // Get download status for all books
-      final downloadRows = await (database.select(
-        database.downloads,
-      )..where((t) => t.bookId.isIn(bookIds))).get();
-      for (final row in downloadRows) {
-        // Consider a book downloaded if status is completed
-        downloadedMap[row.bookId] = row.status == DownloadStatusDb.completed;
-      }
-    }
-
-    return {'progress': progressMap, 'downloaded': downloadedMap};
-  }
-
-  Widget _buildGridView(
-    BuildContext context,
-    List<Book> books,
-    Map<String, double> progressMap,
-    Map<String, bool> downloadedMap, {
-    required int crossAxisCount,
-  }) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.75,
-      ),
-      itemCount: books.length,
-      itemBuilder: (context, index) {
-        final book = books[index];
-        return LibraryBookTile(
-          book: book,
-          progress: progressMap[book.id],
-          isDownloaded: downloadedMap[book.id],
-        );
-      },
-    );
-  }
-
-  Widget _buildDesktopGridView(
-    BuildContext context,
-    List<Book> books,
-    Map<String, double> progressMap,
-    Map<String, bool> downloadedMap,
-  ) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
+        maxCrossAxisExtent: 210,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.75,
+        childAspectRatio: 0.62,
       ),
       itemCount: books.length,
       itemBuilder: (context, index) {
         final book = books[index];
-        return LibraryBookTile(
+        return BookCard(
           book: book,
-          progress: progressMap[book.id],
-          isDownloaded: downloadedMap[book.id],
+          onTap: () => unawaited(context.push('/reader/${book.id}')),
+          onLongPress: () => _showBookMenu(context, ref, book),
         );
       },
     );
   }
-}
 
-class LibraryBookTile extends ConsumerWidget {
-  final Book book;
-  final double? progress; // 0.0 to 1.0
-  final bool? isDownloaded; // true if downloaded, false if not, null if unknown
-
-  const LibraryBookTile({
-    super.key,
-    required this.book,
-    this.progress,
-    this.isDownloaded,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: ListTile(
-          leading: Stack(
+  void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 48,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: book.coverUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Semantics(
-                          label: 'Обложка: ${book.title}',
-                          child: Image.network(
-                            book.coverUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Icon(
-                              Icons.book,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                      )
-                    : Icon(
-                        Icons.book,
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
+              ListTile(
+                leading: const Icon(Icons.menu_book),
+                title: const Text('Читать'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(context.push('/reader/${book.id}'));
+                },
               ),
-              // Progress indicator
-              if (progress != null)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(4),
-                        bottomRight: Radius.circular(4),
-                      ),
-                      color: progress == 1.0
-                          ? Theme.of(context).colorScheme.secondary
-                          : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
-                    ),
-                    width: progress! * 48, // 48 is the width of the container
-                  ),
-                ),
-              // Download status indicator
-              if (isDownloaded == true)
-                const Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Icon(
-                    Icons.download_done,
-                    size: 16,
-                    color: Colors.green,
-                  ),
-                )
-              else if (isDownloaded == false)
-                const Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Icon(
-                    Icons.cloud_download_outlined,
-                    size: 16,
-                    color: Colors.blue,
-                  ),
-                ),
+              ListTile(
+                leading: const Icon(Icons.download),
+                title: const Text('Скачать'),
+                onTap: () => Navigator.pop(ctx),
+              ),
+              ListTile(
+                leading: const Icon(Icons.bookmark_add),
+                title: const Text('Добавить закладку'),
+                onTap: () => Navigator.pop(ctx),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Удалить'),
+                onTap: () => Navigator.pop(ctx),
+              ),
             ],
           ),
-          title: Text(
-            book.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            semanticsLabel: book.title,
-          ),
-          subtitle: book.authorIds.isNotEmpty
-              ? Text(
-                  book.authorIds.join(', '),
-                  style: theme.textTheme.bodySmall,
-                )
-              : null,
-          trailing: PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) => _handleMenuAction(context, ref, value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'read', child: Text('Читать')),
-              const PopupMenuItem(value: 'download', child: Text('Скачать')),
-              const PopupMenuItem(value: 'bookmark', child: Text('Добавить закладку')),
-              const PopupMenuItem(value: 'delete', child: Text('Удалить')),
-            ],
-          ),
-          onTap: () {
-            unawaited(context.push('/reader/${book.id}'));
-          },
         ),
       ),
     );
-  }
-
-  void _handleMenuAction(BuildContext context, WidgetRef ref, String value) {
-    switch (value) {
-      case 'read':
-        unawaited(context.push('/reader/${book.id}'));
-      case 'download':
-      // TODO: Implement download
-      case 'bookmark':
-      // TODO: Implement bookmark
-      case 'delete':
-      // TODO: Implement delete
-    }
   }
 }

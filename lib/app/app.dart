@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../core/platform/lifecycle_service.dart';
+import '../core/utils/platform_detector.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -32,8 +35,29 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_initWindowManager());
+    _initPlatform();
     _initLifecycle();
+  }
+
+  void _initPlatform() {
+    if (PlatformDetector.isDesktop) {
+      unawaited(_initWindowManager());
+    }
+    if (PlatformDetector.isAndroid) {
+      _initAndroidEdgeToEdge();
+    }
+  }
+
+  void _initAndroidEdgeToEdge() {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
   }
 
   void _initLifecycle() {
@@ -53,7 +77,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   Future<void> _initWindowManager() async {
     await windowManager.ensureInitialized();
 
-    final WindowOptions windowOptions = const WindowOptions(
+    const windowOptions = WindowOptions(
       size: Size(1200, 800),
       minimumSize: Size(900, 620),
       center: true,
@@ -83,26 +107,40 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final isObscured = ref.watch(isObscuredProvider);
-    return MaterialApp.router(
-      title: 'Glibusta',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      routerConfig: router,
-      restorationScopeId: 'app',
-      builder: (context, child) {
-        if (!isObscured) return child ?? const SizedBox.shrink();
-        return Stack(
-          children: [
-            child ?? const SizedBox.shrink(),
-            const Positioned.fill(
-              child: ColoredBox(
-                color: Colors.white,
-                child: Center(
-                  child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+    return DynamicColorBuilder(
+      builder: (ColorScheme? dynamicLight, ColorScheme? dynamicDark) {
+        final lightTheme = dynamicLight != null
+            ? AppTheme.lightTheme.copyWith(
+                colorScheme: dynamicLight,
+              )
+            : AppTheme.lightTheme;
+        final darkTheme = dynamicDark != null
+            ? AppTheme.darkTheme.copyWith(
+                colorScheme: dynamicDark,
+              )
+            : AppTheme.darkTheme;
+        return MaterialApp.router(
+          title: 'Glibusta',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          routerConfig: router,
+          restorationScopeId: 'app',
+          builder: (context, child) {
+            if (!isObscured) return child ?? const SizedBox.shrink();
+            return Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.white,
+                    child: Center(
+                      child: Icon(Icons.menu_book, size: 48, color: Colors.grey),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );

@@ -1,12 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/utils/app_breakpoints.dart';
+import '../../core/utils/platform_detector.dart';
+import 'book_drop_zone.dart';
 
-final showNavigationRailProvider = Provider<bool>((ref) => false);
-
-class AdaptiveNavigation extends ConsumerWidget {
+class AdaptiveNavigation extends StatelessWidget {
   const AdaptiveNavigation({super.key});
 
   static const List<NavigationDestination> destinations = [
@@ -27,16 +28,23 @@ class AdaptiveNavigation extends ConsumerWidget {
     '/settings',
   ];
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final showRail = ref.watch(showNavigationRailProvider);
+  int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
-    final selectedIndex = routes.indexOf(location);
+    final idx = routes.indexOf(location);
+    return idx >= 0 ? idx : 0;
+  }
 
-    if (showRail) {
+  void _onTap(BuildContext context, int index) => context.go(routes[index]);
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedIndex = _selectedIndex(context);
+    final width = MediaQuery.sizeOf(context).width;
+
+    if (width >= AppBreakpoints.compact) {
       return NavigationRail(
-        selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
-        onDestinationSelected: (int index) => context.go(routes[index]),
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (i) => _onTap(context, i),
         labelType: NavigationRailLabelType.all,
         leading: const Padding(
           padding: EdgeInsets.symmetric(vertical: 8),
@@ -44,7 +52,7 @@ class AdaptiveNavigation extends ConsumerWidget {
         ),
         destinations: destinations
             .map(
-              (NavigationDestination d) => NavigationRailDestination(
+              (d) => NavigationRailDestination(
                 icon: d.icon,
                 label: Text(d.label),
               ),
@@ -54,21 +62,112 @@ class AdaptiveNavigation extends ConsumerWidget {
     }
 
     return NavigationBar(
-      selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
-      onDestinationSelected: (int index) => context.go(routes[index]),
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (i) => _onTap(context, i),
       animationDuration: const Duration(milliseconds: 300),
       destinations: destinations,
     );
   }
 }
 
-class MobileShell extends ConsumerWidget {
-  final Widget child;
+/// macOS-style sidebar navigation
+class SidebarNavigation extends StatelessWidget {
+  const SidebarNavigation({super.key});
 
-  const MobileShell({super.key, required this.child});
+  static const List<_SidebarItem> _items = [
+    _SidebarItem(icon: Icons.home, label: 'Библиотека', route: '/'),
+    _SidebarItem(icon: Icons.search, label: 'Поиск', route: '/search'),
+    _SidebarItem(icon: Icons.download, label: 'Загрузки', route: '/downloads'),
+    _SidebarItem(icon: Icons.settings, label: 'Настройки', route: '/settings'),
+  ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).uri.path;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colorScheme.surfaceContainerHighest,
+      child: SizedBox(
+        width: 220,
+        child: Column(
+          children: [
+            const SizedBox(height: 48),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.menu_book, size: 24, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Glibusta',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: _items.length,
+                itemBuilder: (context, index) {
+                  final item = _items[index];
+                  final isSelected = location == item.route;
+                  return ListTile(
+                    leading: Icon(
+                      item.icon,
+                      color: isSelected ? colorScheme.primary : null,
+                    ),
+                    title: Text(
+                      item.label,
+                      style: TextStyle(
+                        color: isSelected ? colorScheme.primary : null,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    onTap: () => context.go(item.route),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarItem {
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+  });
+  final IconData icon;
+  final String label;
+  final String route;
+}
+
+// ─── Shells ─────────────────────────────────────────────
+
+class MobileShell extends StatelessWidget {
+  const MobileShell({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: child,
       bottomNavigationBar: const AdaptiveNavigation(),
@@ -76,13 +175,12 @@ class MobileShell extends ConsumerWidget {
   }
 }
 
-class TabletShell extends ConsumerWidget {
+class TabletShell extends StatelessWidget {
+  const TabletShell({super.key, required this.child});
   final Widget child;
 
-  const TabletShell({super.key, required this.child});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
@@ -95,40 +193,73 @@ class TabletShell extends ConsumerWidget {
   }
 }
 
-class DesktopShell extends ConsumerWidget {
+class DesktopShell extends StatelessWidget {
+  const DesktopShell({super.key, required this.child});
   final Widget child;
 
-  const DesktopShell({super.key, required this.child});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
           const AdaptiveNavigation(),
           const VerticalDivider(width: 1),
-          Expanded(
-            flex: 3,
-            child: child,
-          ),
+          Expanded(child: child),
         ],
       ),
     );
   }
 }
 
-class ShellWithNav extends StatelessWidget {
+/// macOS-style shell with sidebar
+class MacOSShell extends StatelessWidget {
+  const MacOSShell({super.key, required this.child});
   final Widget child;
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: BookDropZone(
+        onBooksDropped: (paths) => _handleDrop(context, paths),
+        child: Row(
+          children: [
+            const SidebarNavigation(),
+            const VerticalDivider(width: 1),
+            Expanded(child: child),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleDrop(BuildContext context, List<String> paths) {
+    final epubPaths = paths.where((p) => p.endsWith('.epub')).toList();
+    if (epubPaths.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Поддерживаются только .epub файлы')),
+      );
+      return;
+    }
+    unawaited(context.push('/library'));
+  }
+}
+
+class ShellWithNav extends StatelessWidget {
   const ShellWithNav({super.key, required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
 
+    // macOS: always use sidebar with drag-drop
+    if (PlatformDetector.isMacOS) {
+      return MacOSShell(child: child);
+    }
+
     if (width < AppBreakpoints.compact) {
       return MobileShell(child: child);
-    } else if (width < AppBreakpoints.expanded) {
+    } else if (width < AppBreakpoints.medium) {
       return TabletShell(child: child);
     } else {
       return DesktopShell(child: child);

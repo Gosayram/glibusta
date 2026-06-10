@@ -65,6 +65,10 @@ dependencies:
   window_manager: ^0.4.0
   desktop_drop: ^0.5.0
 
+  # Android-specific
+  wakelock_plus: ^1.2.8
+  dynamic_color: ^1.7.0
+
   # UI & Theming
   flex_color_scheme: ^8.4.0
   google_fonts: ^6.2.1

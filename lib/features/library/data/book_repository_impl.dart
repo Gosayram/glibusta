@@ -24,6 +24,12 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<List<Book>> getBooksWithProgress() async {
+    final rows = await _db.getBooksWithProgress();
+    return rows.map(_rowToBook).toList();
+  }
+
+  @override
   Future<Book?> getBookById(String id) async {
     final row = await _db.getBookById(id);
     if (row == null) return null;

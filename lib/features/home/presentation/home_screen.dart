@@ -1,12 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-class HomeScreen extends StatelessWidget {
+import '../../../shared/models/book.dart';
+import '../../../shared/widgets/book_card.dart';
+import '../../library/data/book_repository_impl.dart';
+import '../../library/presentation/library_screen.dart';
+
+part 'home_screen.g.dart';
+
+@riverpod
+Future<List<Book>> continueReadingBooks(Ref ref) async {
+  final repository = ref.watch(bookRepositoryProvider);
+  return repository.getBooksWithProgress();
+}
+
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final continueReadingAsync = ref.watch(continueReadingBooksProvider);
+    final booksAsync = ref.watch(libraryBooksProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Glibusta'),
@@ -22,23 +40,30 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 200,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _ContinueReadingCard(
-                        title: 'Пример книги',
-                        author: 'Автор',
-                        progress: 0.65,
-                        onTap: () => context.go('/reader/1'),
-                      ),
-                      const SizedBox(width: 12),
-                      _ContinueReadingCard(
-                        title: 'Другая книга',
-                        author: 'Другой автор',
-                        progress: 0.32,
-                        onTap: () => context.go('/reader/2'),
-                      ),
-                    ],
+                  child: continueReadingAsync.when(
+                    data: (books) {
+                      if (books.isEmpty) {
+                        return const Center(
+                          child: Text('Начните читать книгу', style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: books.length,
+                        itemBuilder: (context, index) {
+                          final book = books[index];
+                          return SizedBox(
+                            width: 140,
+                            child: BookCard(
+                              book: book,
+                              onTap: () => context.push('/reader/${book.id}'),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (_, _) => const Center(child: Text('Ошибка загрузки')),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -46,19 +71,31 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 SizedBox(
                   height: 160,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _RecentlyAddedCard(
-                        title: 'Новая книга',
-                        onTap: () => context.go('/book/1'),
-                      ),
-                      const SizedBox(width: 12),
-                      _RecentlyAddedCard(
-                        title: 'Ещё одна книга',
-                        onTap: () => context.go('/book/2'),
-                      ),
-                    ],
+                  child: booksAsync.when(
+                    data: (books) {
+                      if (books.isEmpty) {
+                        return const Center(
+                          child: Text('Библиотека пуста', style: TextStyle(color: Colors.grey)),
+                        );
+                      }
+                      final recent = books.length > 5 ? books.sublist(0, 5) : books;
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: recent.length,
+                        itemBuilder: (context, index) {
+                          final book = recent[index];
+                          return SizedBox(
+                            width: 120,
+                            child: BookCard(
+                              book: book,
+                              onTap: () => context.push('/book/${book.id}'),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (_, _) => const Center(child: Text('Ошибка загрузки')),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -103,122 +140,6 @@ class _SectionHeader extends StatelessWidget {
       title,
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.bold,
-      ),
-    ).animate().fadeIn(duration: 300.ms);
-  }
-}
-
-class _ContinueReadingCard extends StatelessWidget {
-  final String title;
-  final String author;
-  final double progress;
-  final VoidCallback? onTap;
-
-  const _ContinueReadingCard({
-    required this.title,
-    required this.author,
-    required this.progress,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 140,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.menu_book,
-                  size: 40,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  author,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(progress * 100).round()}%',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ).animate().fadeIn(duration: 300.ms);
-  }
-}
-
-class _RecentlyAddedCard extends StatelessWidget {
-  final String title;
-  final VoidCallback? onTap;
-
-  const _RecentlyAddedCard({
-    required this.title,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 120,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.auto_stories,
-                  size: 32,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     ).animate().fadeIn(duration: 300.ms);
   }

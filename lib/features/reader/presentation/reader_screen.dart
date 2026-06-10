@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/app_breakpoints.dart';
@@ -60,6 +61,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
       (_) => _checkAutoTheme(),
     );
     _startHideTimer();
+    unawaited(WakelockPlus.enable());
   }
 
   void _onScroll() {
@@ -178,6 +180,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 
@@ -251,29 +254,36 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> with WidgetsBinding
 
     return Theme(
       data: theme,
-      child: ReaderShortcuts(
-        onNextPage: _scrollToNextChapter,
-        onPreviousPage: _scrollToPreviousChapter,
-        onIncreaseFontSize: () {
-          final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
-          ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+      child: PopScope(
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            _saveProgress();
+          }
         },
-        onDecreaseFontSize: () {
-          final newSize = (settings.fontSize - 2.0).clamp(12.0, 32.0);
-          ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
-        },
-        onClosePanel: () => Navigator.of(context).pop(),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            if (width < AppBreakpoints.compact) {
-              return _buildPhoneReaderLayout(context, settings);
-            } else if (width < AppBreakpoints.expanded) {
-              return _buildTabletReaderLayout(context, settings);
-            } else {
-              return _buildDesktopReaderLayout(context, settings);
-            }
+        child: ReaderShortcuts(
+          onNextPage: _scrollToNextChapter,
+          onPreviousPage: _scrollToPreviousChapter,
+          onIncreaseFontSize: () {
+            final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
+            ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
+          onDecreaseFontSize: () {
+            final newSize = (settings.fontSize - 2.0).clamp(12.0, 32.0);
+            ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+          },
+          onClosePanel: () => Navigator.of(context).pop(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              if (width < AppBreakpoints.compact) {
+                return _buildPhoneReaderLayout(context, settings);
+              } else if (width < AppBreakpoints.expanded) {
+                return _buildTabletReaderLayout(context, settings);
+              } else {
+                return _buildDesktopReaderLayout(context, settings);
+              }
+            },
+          ),
         ),
       ),
     );
