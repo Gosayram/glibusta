@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/models/book.dart';
@@ -34,7 +36,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       final result = await _source.searchBooks(query);
       return result.books;
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log('Catalog query failed', name: 'CatalogRepository', error: e, stackTrace: st);
       return const [];
     }
   }
@@ -45,7 +48,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       final result = await _source.searchBooks(query);
       return result.books;
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log('Catalog query failed', name: 'CatalogRepository', error: e, stackTrace: st);
       return const [];
     }
   }
@@ -56,7 +60,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
     try {
       final result = await _source.searchBooks(query);
       return result.books;
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log('Catalog query failed', name: 'CatalogRepository', error: e, stackTrace: st);
       return const [];
     }
   }

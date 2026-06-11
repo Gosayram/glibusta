@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -82,7 +83,9 @@ class AppDatabase extends _$AppDatabase {
         final backupFile = File('${await _databasePath}.v${previousVersion ?? 0}.bak');
         await dbFile.copy(backupFile.path);
       }
-    } on Object catch (_) {}
+    } on Object catch (e, st) {
+      developer.log('Database backup failed', name: 'AppDatabase', error: e, stackTrace: st);
+    }
   }
 
   static Future<String> get _databasePath async {

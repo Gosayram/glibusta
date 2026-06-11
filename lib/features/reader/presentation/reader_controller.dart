@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
@@ -197,7 +198,14 @@ class ReaderController {
             break;
           }
         }
-      } on Object catch (_) {}
+      } on Object catch (e, st) {
+        developer.log(
+          'Download lookup failed during error recovery',
+          name: 'ReaderController',
+          error: e,
+          stackTrace: st,
+        );
+      }
       _updateState(
         _state.copyWith(
           isLoading: false,
@@ -329,7 +337,13 @@ class ReaderController {
         progressPercent: progressPercent.clamp(0.0, 1.0),
         updatedAt: row.updatedAt,
       ).clamp(chapterCount: chapterCount);
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to load reading position',
+        name: 'ReaderController',
+        error: e,
+        stackTrace: st,
+      );
       return ReaderPosition(
         bookId: _bookId,
         chapterIndex: 0,
@@ -608,7 +622,14 @@ class ReaderController {
       final db = _ref.read(databaseProvider);
       await (db.delete(db.downloads)..where((d) => d.bookId.equals(_bookId))).go();
       await (db.delete(db.readingProgress)..where((t) => t.bookId.equals(_bookId))).go();
-    } on Object catch (_) {}
+    } on Object catch (e, st) {
+      developer.log(
+        'Error during file deletion cleanup',
+        name: 'ReaderController',
+        error: e,
+        stackTrace: st,
+      );
+    }
     _updateState(
       _state.copyWith(
         errorMessage: 'Файл удалён',

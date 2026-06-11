@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum ContentSafetyLevel {
@@ -19,7 +21,13 @@ class ContentSafetyService {
       final index = prefs.getInt(_key) ?? 0;
       final safeIndex = index.clamp(0, ContentSafetyLevel.values.length - 1);
       return ContentSafetyLevel.values[safeIndex];
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to load safety level',
+        name: 'ContentSafetyService',
+        error: e,
+        stackTrace: st,
+      );
       return ContentSafetyLevel.standard;
     }
   }
@@ -28,7 +36,14 @@ class ContentSafetyService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_key, level.index);
-    } on Object catch (_) {}
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to save safety level',
+        name: 'ContentSafetyService',
+        error: e,
+        stackTrace: st,
+      );
+    }
   }
 
   static bool shouldFilter(ContentSafetyLevel level, List<String> tags) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -176,7 +177,14 @@ class AuthStateNotifier extends _$AuthStateNotifier {
   Future<void> logout() async {
     try {
       await ref.read(authRepositoryProvider).logout();
-    } on Object catch (_) {}
+    } on Object catch (e, st) {
+      developer.log(
+        'Logout API call failed (proceeding with local cleanup)',
+        name: 'AuthRepository',
+        error: e,
+        stackTrace: st,
+      );
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionNameKey);
     await prefs.remove(_kSessionMailKey);

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:isolate';
 
@@ -80,7 +81,13 @@ class BookOpenService {
           BookFormat.unknown => throw UnsupportedError('Unknown format'),
         };
       });
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log(
+        'Isolate parsing failed, trying sync fallback',
+        name: 'BookOpenService',
+        error: e,
+        stackTrace: st,
+      );
       final parser = _parsers[bookFormat];
       if (parser == null) {
         throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
@@ -121,7 +128,13 @@ class BookOpenService {
     try {
       final json = await cacheFile.readAsString();
       return NormalizedBook.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (_) {
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to read cached book',
+        name: 'BookOpenService',
+        error: e,
+        stackTrace: st,
+      );
       return null;
     }
   }
