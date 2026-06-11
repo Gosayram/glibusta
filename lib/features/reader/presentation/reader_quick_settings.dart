@@ -160,6 +160,11 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                 settings.restoreLastPosition,
                 (v) => notifier.updateRestoreLastPosition(v),
               ),
+              const SizedBox(height: 20),
+
+              const Text('Кодировка', style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              _buildEncodingRow(settings, notifier),
               const SizedBox(height: 16),
             ],
           ),
@@ -632,6 +637,46 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
           label: Text(labels[v]!),
           selected: settings.longPressAction == v,
           onSelected: (_) => notifier.updateLongPressAction(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static const _encodingOptions = <String?>[
+    null, // auto
+    'utf-8',
+    'windows-1251',
+    'koi8-r',
+    'ibm866',
+    'iso-8859-5',
+    'utf-16le',
+    'utf-16be',
+  ];
+
+  static const _encodingLabels = <String, String>{
+    'utf-8': 'UTF-8',
+    'windows-1251': 'Windows-1251',
+    'koi8-r': 'KOI8-R',
+    'ibm866': 'CP866',
+    'iso-8859-5': 'ISO-8859-5',
+    'utf-16le': 'UTF-16 LE',
+    'utf-16be': 'UTF-16 BE',
+  };
+
+  static Widget _buildEncodingRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _encodingOptions.map((encoding) {
+        final isSelected = settings.forcedEncoding == encoding;
+        final label = encoding == null ? 'Авто' : (_encodingLabels[encoding] ?? encoding);
+        return ChoiceChip(
+          label: Text(label),
+          selected: isSelected,
+          onSelected: (_) => notifier.updateForcedEncoding(encoding),
         );
       }).toList(),
     );

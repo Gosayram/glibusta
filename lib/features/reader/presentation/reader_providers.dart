@@ -173,6 +173,11 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     _persist();
   }
 
+  void updateForcedEncoding(String? encoding) {
+    state = state.copyWith(forcedEncoding: encoding);
+    _persist();
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
     _persist();

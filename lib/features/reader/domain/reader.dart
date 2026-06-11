@@ -81,6 +81,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(DoubleTapAction.toggleUI) DoubleTapAction doubleTapAction,
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
     @Default(true) bool restoreLastPosition,
+    String? forcedEncoding,
   }) = _ReaderSettings;
 }
 

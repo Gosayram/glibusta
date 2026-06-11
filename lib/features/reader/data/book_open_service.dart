@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -95,6 +96,47 @@ class BookOpenService {
       }
       return parser.parseFile(filePath);
     }
+  }
+
+  /// Re-parse a book with a forced encoding and update the DB metadata.
+  Future<NormalizedBook> reloadWithEncoding(
+    String bookId,
+    String encoding,
+  ) async {
+    // Find the book file path from downloads
+    final download = await _findDownload(bookId);
+    if (download == null) {
+      throw BookOpenFailure('Книга не найдена: $bookId');
+    }
+
+    final filePath = download.targetPath;
+    if (filePath == null || !await File(filePath).exists()) {
+      throw BookOpenFailure('Файл книги не найден: $bookId');
+    }
+
+    final format = detectBookFormat(filePath);
+    if (format == BookFormat.unknown || format == BookFormat.pdf) {
+      throw BookOpenFailure('Формат не поддерживается: ${format.name}');
+    }
+
+    final parser = _parsers[format];
+    if (parser == null) {
+      throw BookOpenFailure('Парсер не найден: ${format.name}');
+    }
+
+    // Parse with forced encoding
+    final book = await parser.parseFile(filePath, forcedEncoding: encoding);
+
+    // Update encoding metadata in DB
+    await (_database.update(_database.savedBooks)..where((t) => t.id.equals(bookId))).write(
+      SavedBooksCompanion(
+        detectedEncoding: Value(encoding),
+        encodingSource: const Value('manual'),
+        userForcedEncoding: Value(encoding),
+      ),
+    );
+
+    return book;
   }
 
   Future<Download?> _findDownload(String bookId) async {
