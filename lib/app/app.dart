@@ -107,16 +107,14 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
                 colorScheme: dynamicLight,
                 pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
-                    for (final p in TargetPlatform.values)
-                      p: _platformTransitionBuilder(p),
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
                   },
                 ),
               )
             : AppTheme.lightTheme.copyWith(
                 pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
-                    for (final p in TargetPlatform.values)
-                      p: _platformTransitionBuilder(p),
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
                   },
                 ),
               );
@@ -125,16 +123,14 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
                 colorScheme: dynamicDark,
                 pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
-                    for (final p in TargetPlatform.values)
-                      p: _platformTransitionBuilder(p),
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
                   },
                 ),
               )
             : AppTheme.darkTheme.copyWith(
                 pageTransitionsTheme: PageTransitionsTheme(
                   builders: {
-                    for (final p in TargetPlatform.values)
-                      p: _platformTransitionBuilder(p),
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
                   },
                 ),
               );

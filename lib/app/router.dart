@@ -37,9 +37,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: <RouteBase>[
       StatefulShellRoute.indexedStack(
-        builder: (BuildContext context, GoRouterState state, StatefulNavigationShell navigationShell) {
-          return ShellWithNav(navigationShell: navigationShell);
-        },
+        builder:
+            (BuildContext context, GoRouterState state, StatefulNavigationShell navigationShell) {
+              return ShellWithNav(navigationShell: navigationShell);
+            },
         branches: <StatefulShellBranch>[
           // ── Library ──
           StatefulShellBranch(

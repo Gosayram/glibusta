@@ -308,72 +308,72 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         }
       },
       child: NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollEndNotification &&
-            notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
-          unawaited(ref.read(searchControllerProvider.notifier).loadMore());
-        }
-        return false;
-      },
-      child: useGrid
-          ? GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 180,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.62,
+        onNotification: (notification) {
+          if (notification is ScrollEndNotification &&
+              notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
+            unawaited(ref.read(searchControllerProvider.notifier).loadMore());
+          }
+          return false;
+        },
+        child: useGrid
+            ? GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 180,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.62,
+                ),
+                itemCount: state.books.length + (state.hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == state.books.length) {
+                    return const Card(
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final book = state.books[index];
+                  return BookCard(
+                    key: ValueKey(book.id),
+                    book: book,
+                    onTap: () => unawaited(context.push('/reader/${book.id}')),
+                  );
+                },
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: state.books.length + (state.hasMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == state.books.length) {
+                    return const Skeletonizer(
+                      child: Column(
+                        children: [
+                          Card(
+                            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: ListTile(
+                              leading: Bone.circle(size: 48),
+                              title: Bone.text(words: 3),
+                              subtitle: Bone.text(words: 2),
+                            ),
+                          ),
+                          Card(
+                            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            child: ListTile(
+                              leading: Bone.circle(size: 48),
+                              title: Bone.text(words: 3),
+                              subtitle: Bone.text(words: 2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final book = state.books[index];
+                  return BookListItem(
+                    book: book,
+                    onTap: () => unawaited(context.push('/reader/${book.id}')),
+                  );
+                },
               ),
-              itemCount: state.books.length + (state.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == state.books.length) {
-                  return const Card(
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final book = state.books[index];
-                return BookCard(
-                  key: ValueKey(book.id),
-                  book: book,
-                  onTap: () => unawaited(context.push('/reader/${book.id}')),
-                );
-              },
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: state.books.length + (state.hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == state.books.length) {
-                  return const Skeletonizer(
-                    child: Column(
-                      children: [
-                        Card(
-                          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          child: ListTile(
-                            leading: Bone.circle(size: 48),
-                            title: Bone.text(words: 3),
-                            subtitle: Bone.text(words: 2),
-                          ),
-                        ),
-                        Card(
-                          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          child: ListTile(
-                            leading: Bone.circle(size: 48),
-                            title: Bone.text(words: 3),
-                            subtitle: Bone.text(words: 2),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                final book = state.books[index];
-                return BookListItem(
-                  book: book,
-                  onTap: () => unawaited(context.push('/reader/${book.id}')),
-                );
-              },
-            ),
       ),
     );
   }

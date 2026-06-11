@@ -7,7 +7,7 @@ part 'book_dao.g.dart';
 
 @DriftAccessor(tables: [SavedBooks, ReadingProgress, ReadingSessions])
 class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
-  BookDao(super.db);
+  BookDao(super.attachedDatabase);
 
   Future<List<SavedBook>> getAllBooks() async => select(savedBooks).get();
 
@@ -17,8 +17,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<int> insertBook(SavedBooksCompanion entry) =>
       into(savedBooks).insertOnConflictUpdate(entry);
 
-  Future<int> deleteBook(String id) =>
-      (delete(savedBooks)..where((t) => t.id.equals(id))).go();
+  Future<int> deleteBook(String id) => (delete(savedBooks)..where((t) => t.id.equals(id))).go();
 
   Future<int> updateReadingStatus(String bookId, String status) =>
       (update(savedBooks)..where((t) => t.id.equals(bookId))).write(
@@ -26,8 +25,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
       );
 
   Future<ReadingProgressData?> getReadingProgress(String bookId) async =>
-      (select(readingProgress)..where((t) => t.bookId.equals(bookId)))
-          .getSingleOrNull();
+      (select(readingProgress)..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
 
   Future<int> upsertReadingProgress(ReadingProgressCompanion entry) =>
       into(readingProgress).insertOnConflictUpdate(entry);
@@ -82,8 +80,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
 
   Future<Map<DateTime, int>> getDailyReadingMinutes(int days) async {
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: days));
+    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
 
     final sessions = await getSessionsForDateRange(start, now);
     final dailyMinutes = <DateTime, int>{};

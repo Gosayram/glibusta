@@ -287,7 +287,7 @@ paths:
             type: string
             enum: [a, b, t]
             default: a
-            description: "a=alphabet, b=series, t=date"
+            description: 'a=alphabet, b=series, t=date'
       responses:
         '200':
           description: Author page
@@ -371,7 +371,7 @@ paths:
           schema:
             type: string
             enum: [a, b]
-            description: "a=alphabet, b=book count"
+            description: 'a=alphabet, b=book count'
         - name: type1
           in: query
           schema:
@@ -406,7 +406,7 @@ paths:
           schema:
             type: string
             enum: [o, a, t]
-            description: "o=default, a=alphabet, t=date"
+            description: 'o=default, a=alphabet, t=date'
         - name: sa
           in: query
           schema:
@@ -485,7 +485,7 @@ paths:
           schema:
             type: string
             enum: [a, b, t, p]
-            description: "a=alpha, b=author, t=date, p=popularity"
+            description: 'a=alpha, b=author, t=date, p=popularity'
       responses:
         '200':
           description: Genre page
@@ -752,7 +752,7 @@ paths:
           description: Filter by language
           schema:
             type: string
-            examples: ["ru", "en", "be", "kk"]
+            examples: ['ru', 'en', 'be', 'kk']
         - name: type
           in: query
           description: Filter by format
@@ -761,11 +761,11 @@ paths:
             enum: [fb2, pdf, djvu, doc, html, epub, mobi, lrf, rtf, txt]
         - name: sr
           in: query
-          description: "Sort: 1=new+fixed, 2=new only"
+          description: 'Sort: 1=new+fixed, 2=new only'
           schema:
             type: string
-            enum: ["1", "2"]
-            default: "1"
+            enum: ['1', '2']
+            default: '1'
         - name: sa
           in: query
           description: Show all
@@ -1681,7 +1681,7 @@ components:
           type: array
           items:
             type: string
-          description: "Available formats: fb2, epub, mobi, pdf, txt, djvu"
+          description: 'Available formats: fb2, epub, mobi, pdf, txt, djvu'
         downloadUrls:
           type: array
           items:
@@ -1993,7 +1993,7 @@ components:
       properties:
         flag:
           type: string
-          enum: [on, ""]
+          enum: [on, '']
         body:
           type: string
           description: Review text

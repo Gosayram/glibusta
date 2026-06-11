@@ -105,7 +105,6 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: SidebarNavigation(
-              selectedIndex: 0,
               onDestinationSelected: (_) {},
             ),
           ),
@@ -127,7 +126,6 @@ void main() {
         MaterialApp(
           home: Scaffold(
             body: SidebarNavigation(
-              selectedIndex: 0,
               onDestinationSelected: (_) {},
             ),
           ),

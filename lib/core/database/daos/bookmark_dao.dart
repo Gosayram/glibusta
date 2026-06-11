@@ -6,9 +6,8 @@ import '../tables.dart';
 part 'bookmark_dao.g.dart';
 
 @DriftAccessor(tables: [Bookmarks, Notes, Quotes])
-class BookmarkDao extends DatabaseAccessor<AppDatabase>
-    with _$BookmarkDaoMixin {
-  BookmarkDao(super.db);
+class BookmarkDao extends DatabaseAccessor<AppDatabase> with _$BookmarkDaoMixin {
+  BookmarkDao(super.attachedDatabase);
 
   Future<List<Bookmark>> getBookmarksForBook(String bookId) async =>
       (select(bookmarks)..where((t) => t.bookId.equals(bookId))).get();

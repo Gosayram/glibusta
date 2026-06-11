@@ -73,7 +73,9 @@ class ReaderProgressHelper {
   }
 
   Future<void> deleteProgress() async {
-    await (_database.delete(_database.readingProgress)..where((t) => t.bookId.equals(_bookId))).go();
+    await (_database.delete(
+      _database.readingProgress,
+    )..where((t) => t.bookId.equals(_bookId))).go();
   }
 
   Future<void> deleteDownload() async {

@@ -6,17 +6,14 @@ import '../tables.dart';
 part 'download_dao.g.dart';
 
 @DriftAccessor(tables: [Downloads])
-class DownloadDao extends DatabaseAccessor<AppDatabase>
-    with _$DownloadDaoMixin {
-  DownloadDao(super.db);
+class DownloadDao extends DatabaseAccessor<AppDatabase> with _$DownloadDaoMixin {
+  DownloadDao(super.attachedDatabase);
 
   Future<List<Download>> getAllDownloads() async =>
-      (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+      (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
 
   Stream<List<Download>> watchAllDownloads() =>
-      (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .watch();
+      (select(downloads)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).watch();
 
   Future<Download?> getDownloadById(String id) async =>
       (select(downloads)..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -37,6 +34,5 @@ class DownloadDao extends DatabaseAccessor<AppDatabase>
         ),
       );
 
-  Future<int> deleteDownload(String id) =>
-      (delete(downloads)..where((t) => t.id.equals(id))).go();
+  Future<int> deleteDownload(String id) => (delete(downloads)..where((t) => t.id.equals(id))).go();
 }

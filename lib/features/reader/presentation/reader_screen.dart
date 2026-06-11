@@ -745,16 +745,18 @@ class _ReaderContextMenu extends StatelessWidget {
     );
     if (result != null && context.mounted) {
       final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db.into(db.quotes).insert(
-        QuotesCompanion.insert(
-          id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-          bookId: bookId,
-          chapterIndex: chapterIndex,
-          paragraphIndex: paragraphIndex,
-          selectedText: text,
-          note: Value(result.isEmpty ? null : result),
-        ),
-      );
+      await db
+          .into(db.quotes)
+          .insert(
+            QuotesCompanion.insert(
+              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+              bookId: bookId,
+              chapterIndex: chapterIndex,
+              paragraphIndex: paragraphIndex,
+              selectedText: text,
+              note: Value(result.isEmpty ? null : result),
+            ),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Цитата сохранена')),
@@ -766,15 +768,17 @@ class _ReaderContextMenu extends StatelessWidget {
   Future<void> _saveBookmark(BuildContext context, String text) async {
     if (!context.mounted) return;
     final db = ProviderScope.containerOf(context).read(databaseProvider);
-    await db.into(db.bookmarks).insert(
-      BookmarksCompanion.insert(
-        id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-        bookId: bookId,
-        chapterIndex: chapterIndex,
-        paragraphIndex: paragraphIndex,
-        selectedText: Value(text),
-      ),
-    );
+    await db
+        .into(db.bookmarks)
+        .insert(
+          BookmarksCompanion.insert(
+            id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+            bookId: bookId,
+            chapterIndex: chapterIndex,
+            paragraphIndex: paragraphIndex,
+            selectedText: Value(text),
+          ),
+        );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Закладка сохранена')),
@@ -836,15 +840,17 @@ class _ReaderContextMenu extends StatelessWidget {
     );
     if (result != null && context.mounted) {
       final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db.into(db.notes).insert(
-        NotesCompanion.insert(
-          id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-          bookId: bookId,
-          chapterIndex: chapterIndex,
-          paragraphIndex: paragraphIndex,
-          content: result,
-        ),
-      );
+      await db
+          .into(db.notes)
+          .insert(
+            NotesCompanion.insert(
+              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+              bookId: bookId,
+              chapterIndex: chapterIndex,
+              paragraphIndex: paragraphIndex,
+              content: result,
+            ),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Заметка сохранена')),

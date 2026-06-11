@@ -6,9 +6,8 @@ import '../tables.dart';
 part 'collection_dao.g.dart';
 
 @DriftAccessor(tables: [Collections, BookCollections, SavedBooks])
-class CollectionDao extends DatabaseAccessor<AppDatabase>
-    with _$CollectionDaoMixin {
-  CollectionDao(super.db);
+class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMixin {
+  CollectionDao(super.attachedDatabase);
 
   Future<List<Collection>> getAllCollections() async => select(collections).get();
 
@@ -44,19 +43,16 @@ class CollectionDao extends DatabaseAccessor<AppDatabase>
     String bookId,
     String collectionId,
   ) async {
-    await (delete(bookCollections)
-          ..where(
-            (t) =>
-                t.bookId.equals(bookId) &
-                t.collectionId.equals(collectionId),
-          ))
+    await (delete(bookCollections)..where(
+          (t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId),
+        ))
         .go();
   }
 
   Future<List<SavedBook>> getBooksInCollection(String collectionId) async {
-    final bcRows = await (select(bookCollections)
-          ..where((t) => t.collectionId.equals(collectionId)))
-        .get();
+    final bcRows = await (select(
+      bookCollections,
+    )..where((t) => t.collectionId.equals(collectionId))).get();
     if (bcRows.isEmpty) return [];
     final bookIds = bcRows.map((r) => r.bookId).toList();
     return (select(savedBooks)..where((t) => t.id.isIn(bookIds))).get();

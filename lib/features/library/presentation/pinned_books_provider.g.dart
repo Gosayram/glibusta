@@ -12,8 +12,7 @@ part of 'pinned_books_provider.dart';
 @ProviderFor(PinnedBooks)
 final pinnedBooksProvider = PinnedBooksProvider._();
 
-final class PinnedBooksProvider
-    extends $AsyncNotifierProvider<PinnedBooks, List<String>> {
+final class PinnedBooksProvider extends $AsyncNotifierProvider<PinnedBooks, List<String>> {
   PinnedBooksProvider._()
     : super(
         from: null,
@@ -57,12 +56,7 @@ abstract class _$PinnedBooks extends $AsyncNotifier<List<String>> {
 final pinnedBooksListProvider = PinnedBooksListProvider._();
 
 final class PinnedBooksListProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Book>>,
-          List<Book>,
-          FutureOr<List<Book>>
-        >
+    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   PinnedBooksListProvider._()
     : super(

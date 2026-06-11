@@ -7,15 +7,14 @@ part 'series_dao.g.dart';
 
 @DriftAccessor(tables: [Series, BookSeries])
 class SeriesDao extends DatabaseAccessor<AppDatabase> with _$SeriesDaoMixin {
-  SeriesDao(super.db);
+  SeriesDao(super.attachedDatabase);
 
   Future<List<Sery>> getAllSeries() async => select(series).get();
 
   Future<Sery?> getSeriesById(String id) async =>
       (select(series)..where((t) => t.id.equals(id))).getSingleOrNull();
 
-  Future<int> insertSeries(SeriesCompanion entry) =>
-      into(series).insertOnConflictUpdate(entry);
+  Future<int> insertSeries(SeriesCompanion entry) => into(series).insertOnConflictUpdate(entry);
 
   Future<List<BookSery>> getBookSeriesForBook(String bookId) async =>
       (select(bookSeries)..where((t) => t.bookId.equals(bookId))).get();

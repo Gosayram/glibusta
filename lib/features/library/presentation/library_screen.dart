@@ -65,44 +65,44 @@ class LibraryScreen extends ConsumerWidget {
             ref.invalidate(libraryBooksProvider);
           },
           child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: KeyedSubtree(
-            key: ValueKey(
-              booksAsync.isLoading
-                  ? 'loading'
-                  : booksAsync.hasError
-                  ? 'error'
-                  : 'data_${booksAsync.value?.length ?? 0}',
-            ),
-            child: booksAsync.when(
-              data: (List<Book> books) => _buildBooksGrid(context, ref, books),
-              loading: () => Skeletonizer(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: 6,
-                  itemBuilder: (_, _) => const Card(
-                    child: ListTile(
-                      leading: Bone.circle(size: 48),
-                      title: Bone.text(words: 3),
-                      subtitle: Bone.text(words: 2),
+            duration: const Duration(milliseconds: 300),
+            child: KeyedSubtree(
+              key: ValueKey(
+                booksAsync.isLoading
+                    ? 'loading'
+                    : booksAsync.hasError
+                    ? 'error'
+                    : 'data_${booksAsync.value?.length ?? 0}',
+              ),
+              child: booksAsync.when(
+                data: (List<Book> books) => _buildBooksGrid(context, ref, books),
+                loading: () => Skeletonizer(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: 6,
+                    itemBuilder: (_, _) => const Card(
+                      child: ListTile(
+                        leading: Bone.circle(size: 48),
+                        title: Bone.text(words: 3),
+                        subtitle: Bone.text(words: 2),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              error: (Object e, _) => ErrorStateWidget(
-                message: 'Не удалось загрузить библиотеку',
-                details: e.toString(),
-                onRetry: () => ref.invalidate(libraryBooksProvider),
+                error: (Object e, _) => ErrorStateWidget(
+                  message: 'Не удалось загрузить библиотеку',
+                  details: e.toString(),
+                  onRetry: () => ref.invalidate(libraryBooksProvider),
+                ),
               ),
             ),
           ),
-        ),
         ),
       ),
     );
@@ -174,36 +174,42 @@ class LibraryScreen extends ConsumerWidget {
             child: child,
           ),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.library_books_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Библиотека пуста',
-              style: TextStyle(fontSize: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Найдите и скачайте книги, или импортируйте файлы',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.tonal(
-              onPressed: () => context.go('/catalog'),
-              child: const Text('Перейти в каталог'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () => _importBook(context, ref),
-              child: const Text('Импортировать файл'),
-            ),
-          ],
-        ),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.library_books_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Библиотека пуста',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Найдите и скачайте книги, или импортируйте файлы',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.tonal(
+                onPressed: () => context.go('/catalog'),
+                child: const Text('Перейти в каталог'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => _importBook(context, ref),
+                child: const Text('Импортировать файл'),
+              ),
+            ],
+          ),
         ),
       );
     }

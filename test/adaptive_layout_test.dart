@@ -71,7 +71,7 @@ void main() {
           Scaffold(
             body: Column(
               children: [
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
                 AdaptiveNavigation(
                   selectedIndex: 0,
                   onDestinationSelected: (_) {},
@@ -113,7 +113,7 @@ void main() {
           Scaffold(
             body: Column(
               children: [
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
                 AdaptiveNavigation(
                   selectedIndex: 0,
                   onDestinationSelected: (_) {},
@@ -159,7 +159,7 @@ void main() {
                   onDestinationSelected: (_) {},
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
               ],
             ),
           ),
@@ -249,7 +249,7 @@ void main() {
                   onDestinationSelected: (_) {},
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
               ],
             ),
           ),
@@ -276,7 +276,7 @@ void main() {
                   onDestinationSelected: (_) {},
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
               ],
             ),
           ),
@@ -329,7 +329,7 @@ void main() {
                   onDestinationSelected: (_) {},
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
               ],
             ),
           ),
@@ -368,7 +368,7 @@ void main() {
                   onDestinationSelected: (_) {},
                 ),
                 const VerticalDivider(width: 1),
-                Expanded(child: Center(child: Text('Content'))),
+                const Expanded(child: Center(child: Text('Content'))),
               ],
             ),
           ),
