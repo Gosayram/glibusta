@@ -73,14 +73,14 @@ class NotesScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final note = notes[index];
               return NoteTile(
-                note: note,
-                onTap: () {
-                  _showNoteDialog(context, ref, note);
-                },
-                onDelete: () {
-                  _deleteNote(ref, note.id);
-                },
-              )
+                    note: note,
+                    onTap: () {
+                      _showNoteDialog(context, ref, note);
+                    },
+                    onDelete: () {
+                      _deleteNote(ref, note.id);
+                    },
+                  )
                   .animate()
                   .fadeIn(delay: (index * 50).ms, duration: 300.ms)
                   .slideX(begin: 0.03, duration: 300.ms);

@@ -85,10 +85,10 @@ class SeriesDetailScreen extends ConsumerWidget {
                   itemBuilder: (context, int index) {
                     final book = detail.books[index];
                     return BookCard(
-                      key: ValueKey(book.id),
-                      book: book,
-                      onTap: () => context.push('/book/${book.id}'),
-                    )
+                          key: ValueKey(book.id),
+                          book: book,
+                          onTap: () => context.push('/book/${book.id}'),
+                        )
                         .animate()
                         .fadeIn(delay: (index * 60).ms, duration: 400.ms)
                         .scale(begin: const Offset(0.95, 0.95), duration: 400.ms);

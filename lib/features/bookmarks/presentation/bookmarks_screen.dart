@@ -73,12 +73,12 @@ class BookmarksScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final bookmark = bookmarks[index];
               return BookmarkTile(
-                bookmark: bookmark,
-                onTap: () {},
-                onDelete: () {
-                  _deleteBookmark(ref, bookmark.id);
-                },
-              )
+                    bookmark: bookmark,
+                    onTap: () {},
+                    onDelete: () {
+                      _deleteBookmark(ref, bookmark.id);
+                    },
+                  )
                   .animate()
                   .fadeIn(delay: (index * 50).ms, duration: 300.ms)
                   .slideX(begin: 0.03, duration: 300.ms);

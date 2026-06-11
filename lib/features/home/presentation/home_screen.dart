@@ -81,9 +81,9 @@ class HomeScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final info = infos[index];
                           return ContinueReadingCard(
-                            info: info,
-                            onTap: () => context.push('/reader/${info.book.id}'),
-                          )
+                                info: info,
+                                onTap: () => context.push('/reader/${info.book.id}'),
+                              )
                               .animate()
                               .fadeIn(delay: (index * 80).ms, duration: 400.ms)
                               .slideX(begin: 0.05, duration: 400.ms);
@@ -216,13 +216,13 @@ class HomeScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final book = recent[index];
                           return SizedBox(
-                            width: 120,
-                            child: BookCard(
-                              key: ValueKey(book.id),
-                              book: book,
-                              onTap: () => context.push('/book/${book.id}'),
-                            ),
-                          )
+                                width: 120,
+                                child: BookCard(
+                                  key: ValueKey(book.id),
+                                  book: book,
+                                  onTap: () => context.push('/book/${book.id}'),
+                                ),
+                              )
                               .animate()
                               .fadeIn(delay: (index * 60).ms, duration: 400.ms)
                               .slideY(begin: 0.05, duration: 400.ms);

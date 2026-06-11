@@ -73,10 +73,10 @@ class QuotesScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final quote = quotes[index];
               return QuoteTile(
-                quote: quote,
-                onTap: () => _showQuoteDetail(context, ref, quote),
-                onDelete: () => _deleteQuote(ref, quote.id),
-              )
+                    quote: quote,
+                    onTap: () => _showQuoteDetail(context, ref, quote),
+                    onDelete: () => _deleteQuote(ref, quote.id),
+                  )
                   .animate()
                   .fadeIn(delay: (index * 50).ms, duration: 300.ms)
                   .slideX(begin: 0.03, duration: 300.ms);
