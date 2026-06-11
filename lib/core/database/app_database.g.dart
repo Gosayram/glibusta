@@ -159,6 +159,50 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     requiredDuringInsert: false,
     defaultValue: const Constant('none'),
   );
+  static const VerificationMeta _detectedEncodingMeta = const VerificationMeta(
+    'detectedEncoding',
+  );
+  @override
+  late final GeneratedColumn<String> detectedEncoding = GeneratedColumn<String>(
+    'detected_encoding',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _encodingConfidenceMeta = const VerificationMeta(
+    'encodingConfidence',
+  );
+  @override
+  late final GeneratedColumn<double> encodingConfidence = GeneratedColumn<double>(
+    'encoding_confidence',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _encodingSourceMeta = const VerificationMeta(
+    'encodingSource',
+  );
+  @override
+  late final GeneratedColumn<String> encodingSource = GeneratedColumn<String>(
+    'encoding_source',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _userForcedEncodingMeta = const VerificationMeta(
+    'userForcedEncoding',
+  );
+  @override
+  late final GeneratedColumn<String> userForcedEncoding = GeneratedColumn<String>(
+    'user_forced_encoding',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -175,6 +219,10 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     fileSize,
     filePath,
     readingStatus,
+    detectedEncoding,
+    encodingConfidence,
+    encodingSource,
+    userForcedEncoding,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -273,6 +321,42 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         ),
       );
     }
+    if (data.containsKey('detected_encoding')) {
+      context.handle(
+        _detectedEncodingMeta,
+        detectedEncoding.isAcceptableOrUnknown(
+          data['detected_encoding']!,
+          _detectedEncodingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('encoding_confidence')) {
+      context.handle(
+        _encodingConfidenceMeta,
+        encodingConfidence.isAcceptableOrUnknown(
+          data['encoding_confidence']!,
+          _encodingConfidenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('encoding_source')) {
+      context.handle(
+        _encodingSourceMeta,
+        encodingSource.isAcceptableOrUnknown(
+          data['encoding_source']!,
+          _encodingSourceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('user_forced_encoding')) {
+      context.handle(
+        _userForcedEncodingMeta,
+        userForcedEncoding.isAcceptableOrUnknown(
+          data['user_forced_encoding']!,
+          _userForcedEncodingMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -342,6 +426,22 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}reading_status'],
       )!,
+      detectedEncoding: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}detected_encoding'],
+      ),
+      encodingConfidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}encoding_confidence'],
+      ),
+      encodingSource: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}encoding_source'],
+      ),
+      userForcedEncoding: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_forced_encoding'],
+      ),
     );
   }
 
@@ -369,6 +469,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final int? fileSize;
   final String filePath;
   final String readingStatus;
+  final String? detectedEncoding;
+  final double? encodingConfidence;
+  final String? encodingSource;
+  final String? userForcedEncoding;
   const SavedBook({
     required this.id,
     required this.title,
@@ -384,6 +488,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     this.fileSize,
     required this.filePath,
     required this.readingStatus,
+    this.detectedEncoding,
+    this.encodingConfidence,
+    this.encodingSource,
+    this.userForcedEncoding,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -424,6 +532,18 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     }
     map['file_path'] = Variable<String>(filePath);
     map['reading_status'] = Variable<String>(readingStatus);
+    if (!nullToAbsent || detectedEncoding != null) {
+      map['detected_encoding'] = Variable<String>(detectedEncoding);
+    }
+    if (!nullToAbsent || encodingConfidence != null) {
+      map['encoding_confidence'] = Variable<double>(encodingConfidence);
+    }
+    if (!nullToAbsent || encodingSource != null) {
+      map['encoding_source'] = Variable<String>(encodingSource);
+    }
+    if (!nullToAbsent || userForcedEncoding != null) {
+      map['user_forced_encoding'] = Variable<String>(userForcedEncoding);
+    }
     return map;
   }
 
@@ -443,6 +563,18 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       fileSize: fileSize == null && nullToAbsent ? const Value.absent() : Value(fileSize),
       filePath: Value(filePath),
       readingStatus: Value(readingStatus),
+      detectedEncoding: detectedEncoding == null && nullToAbsent
+          ? const Value.absent()
+          : Value(detectedEncoding),
+      encodingConfidence: encodingConfidence == null && nullToAbsent
+          ? const Value.absent()
+          : Value(encodingConfidence),
+      encodingSource: encodingSource == null && nullToAbsent
+          ? const Value.absent()
+          : Value(encodingSource),
+      userForcedEncoding: userForcedEncoding == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userForcedEncoding),
     );
   }
 
@@ -466,6 +598,14 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       fileSize: serializer.fromJson<int?>(json['fileSize']),
       filePath: serializer.fromJson<String>(json['filePath']),
       readingStatus: serializer.fromJson<String>(json['readingStatus']),
+      detectedEncoding: serializer.fromJson<String?>(json['detectedEncoding']),
+      encodingConfidence: serializer.fromJson<double?>(
+        json['encodingConfidence'],
+      ),
+      encodingSource: serializer.fromJson<String?>(json['encodingSource']),
+      userForcedEncoding: serializer.fromJson<String?>(
+        json['userForcedEncoding'],
+      ),
     );
   }
   @override
@@ -486,6 +626,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'fileSize': serializer.toJson<int?>(fileSize),
       'filePath': serializer.toJson<String>(filePath),
       'readingStatus': serializer.toJson<String>(readingStatus),
+      'detectedEncoding': serializer.toJson<String?>(detectedEncoding),
+      'encodingConfidence': serializer.toJson<double?>(encodingConfidence),
+      'encodingSource': serializer.toJson<String?>(encodingSource),
+      'userForcedEncoding': serializer.toJson<String?>(userForcedEncoding),
     };
   }
 
@@ -504,6 +648,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     Value<int?> fileSize = const Value.absent(),
     String? filePath,
     String? readingStatus,
+    Value<String?> detectedEncoding = const Value.absent(),
+    Value<double?> encodingConfidence = const Value.absent(),
+    Value<String?> encodingSource = const Value.absent(),
+    Value<String?> userForcedEncoding = const Value.absent(),
   }) => SavedBook(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -519,6 +667,14 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     fileSize: fileSize.present ? fileSize.value : this.fileSize,
     filePath: filePath ?? this.filePath,
     readingStatus: readingStatus ?? this.readingStatus,
+    detectedEncoding: detectedEncoding.present ? detectedEncoding.value : this.detectedEncoding,
+    encodingConfidence: encodingConfidence.present
+        ? encodingConfidence.value
+        : this.encodingConfidence,
+    encodingSource: encodingSource.present ? encodingSource.value : this.encodingSource,
+    userForcedEncoding: userForcedEncoding.present
+        ? userForcedEncoding.value
+        : this.userForcedEncoding,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
     return SavedBook(
@@ -536,6 +692,16 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
       readingStatus: data.readingStatus.present ? data.readingStatus.value : this.readingStatus,
+      detectedEncoding: data.detectedEncoding.present
+          ? data.detectedEncoding.value
+          : this.detectedEncoding,
+      encodingConfidence: data.encodingConfidence.present
+          ? data.encodingConfidence.value
+          : this.encodingConfidence,
+      encodingSource: data.encodingSource.present ? data.encodingSource.value : this.encodingSource,
+      userForcedEncoding: data.userForcedEncoding.present
+          ? data.userForcedEncoding.value
+          : this.userForcedEncoding,
     );
   }
 
@@ -555,7 +721,11 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('contentHash: $contentHash, ')
           ..write('fileSize: $fileSize, ')
           ..write('filePath: $filePath, ')
-          ..write('readingStatus: $readingStatus')
+          ..write('readingStatus: $readingStatus, ')
+          ..write('detectedEncoding: $detectedEncoding, ')
+          ..write('encodingConfidence: $encodingConfidence, ')
+          ..write('encodingSource: $encodingSource, ')
+          ..write('userForcedEncoding: $userForcedEncoding')
           ..write(')'))
         .toString();
   }
@@ -576,6 +746,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     fileSize,
     filePath,
     readingStatus,
+    detectedEncoding,
+    encodingConfidence,
+    encodingSource,
+    userForcedEncoding,
   );
   @override
   bool operator ==(Object other) =>
@@ -594,7 +768,11 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.contentHash == this.contentHash &&
           other.fileSize == this.fileSize &&
           other.filePath == this.filePath &&
-          other.readingStatus == this.readingStatus);
+          other.readingStatus == this.readingStatus &&
+          other.detectedEncoding == this.detectedEncoding &&
+          other.encodingConfidence == this.encodingConfidence &&
+          other.encodingSource == this.encodingSource &&
+          other.userForcedEncoding == this.userForcedEncoding);
 }
 
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
@@ -612,6 +790,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<int?> fileSize;
   final Value<String> filePath;
   final Value<String> readingStatus;
+  final Value<String?> detectedEncoding;
+  final Value<double?> encodingConfidence;
+  final Value<String?> encodingSource;
+  final Value<String?> userForcedEncoding;
   final Value<int> rowid;
   const SavedBooksCompanion({
     this.id = const Value.absent(),
@@ -628,6 +810,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.fileSize = const Value.absent(),
     this.filePath = const Value.absent(),
     this.readingStatus = const Value.absent(),
+    this.detectedEncoding = const Value.absent(),
+    this.encodingConfidence = const Value.absent(),
+    this.encodingSource = const Value.absent(),
+    this.userForcedEncoding = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedBooksCompanion.insert({
@@ -645,6 +831,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.fileSize = const Value.absent(),
     this.filePath = const Value.absent(),
     this.readingStatus = const Value.absent(),
+    this.detectedEncoding = const Value.absent(),
+    this.encodingConfidence = const Value.absent(),
+    this.encodingSource = const Value.absent(),
+    this.userForcedEncoding = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -663,6 +853,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<int>? fileSize,
     Expression<String>? filePath,
     Expression<String>? readingStatus,
+    Expression<String>? detectedEncoding,
+    Expression<double>? encodingConfidence,
+    Expression<String>? encodingSource,
+    Expression<String>? userForcedEncoding,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -680,6 +874,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (fileSize != null) 'file_size': fileSize,
       if (filePath != null) 'file_path': filePath,
       if (readingStatus != null) 'reading_status': readingStatus,
+      if (detectedEncoding != null) 'detected_encoding': detectedEncoding,
+      if (encodingConfidence != null) 'encoding_confidence': encodingConfidence,
+      if (encodingSource != null) 'encoding_source': encodingSource,
+      if (userForcedEncoding != null) 'user_forced_encoding': userForcedEncoding,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -699,6 +897,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<int?>? fileSize,
     Value<String>? filePath,
     Value<String>? readingStatus,
+    Value<String?>? detectedEncoding,
+    Value<double?>? encodingConfidence,
+    Value<String?>? encodingSource,
+    Value<String?>? userForcedEncoding,
     Value<int>? rowid,
   }) {
     return SavedBooksCompanion(
@@ -716,6 +918,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       fileSize: fileSize ?? this.fileSize,
       filePath: filePath ?? this.filePath,
       readingStatus: readingStatus ?? this.readingStatus,
+      detectedEncoding: detectedEncoding ?? this.detectedEncoding,
+      encodingConfidence: encodingConfidence ?? this.encodingConfidence,
+      encodingSource: encodingSource ?? this.encodingSource,
+      userForcedEncoding: userForcedEncoding ?? this.userForcedEncoding,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -769,6 +975,18 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     if (readingStatus.present) {
       map['reading_status'] = Variable<String>(readingStatus.value);
     }
+    if (detectedEncoding.present) {
+      map['detected_encoding'] = Variable<String>(detectedEncoding.value);
+    }
+    if (encodingConfidence.present) {
+      map['encoding_confidence'] = Variable<double>(encodingConfidence.value);
+    }
+    if (encodingSource.present) {
+      map['encoding_source'] = Variable<String>(encodingSource.value);
+    }
+    if (userForcedEncoding.present) {
+      map['user_forced_encoding'] = Variable<String>(userForcedEncoding.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -792,6 +1010,10 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('fileSize: $fileSize, ')
           ..write('filePath: $filePath, ')
           ..write('readingStatus: $readingStatus, ')
+          ..write('detectedEncoding: $detectedEncoding, ')
+          ..write('encodingConfidence: $encodingConfidence, ')
+          ..write('encodingSource: $encodingSource, ')
+          ..write('userForcedEncoding: $userForcedEncoding, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6159,6 +6381,10 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<int?> fileSize,
       Value<String> filePath,
       Value<String> readingStatus,
+      Value<String?> detectedEncoding,
+      Value<double?> encodingConfidence,
+      Value<String?> encodingSource,
+      Value<String?> userForcedEncoding,
       Value<int> rowid,
     });
 typedef $$SavedBooksTableUpdateCompanionBuilder =
@@ -6177,6 +6403,10 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<int?> fileSize,
       Value<String> filePath,
       Value<String> readingStatus,
+      Value<String?> detectedEncoding,
+      Value<double?> encodingConfidence,
+      Value<String?> encodingSource,
+      Value<String?> userForcedEncoding,
       Value<int> rowid,
     });
 
@@ -6259,6 +6489,26 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     column: $table.readingStatus,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get detectedEncoding => $composableBuilder(
+    column: $table.detectedEncoding,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get encodingConfidence => $composableBuilder(
+    column: $table.encodingConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get encodingSource => $composableBuilder(
+    column: $table.encodingSource,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userForcedEncoding => $composableBuilder(
+    column: $table.userForcedEncoding,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -6338,6 +6588,26 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     column: $table.readingStatus,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get detectedEncoding => $composableBuilder(
+    column: $table.detectedEncoding,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get encodingConfidence => $composableBuilder(
+    column: $table.encodingConfidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get encodingSource => $composableBuilder(
+    column: $table.encodingSource,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get userForcedEncoding => $composableBuilder(
+    column: $table.userForcedEncoding,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -6397,6 +6667,26 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
     column: $table.readingStatus,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get detectedEncoding => $composableBuilder(
+    column: $table.detectedEncoding,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get encodingConfidence => $composableBuilder(
+    column: $table.encodingConfidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get encodingSource => $composableBuilder(
+    column: $table.encodingSource,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get userForcedEncoding => $composableBuilder(
+    column: $table.userForcedEncoding,
+    builder: (column) => column,
+  );
 }
 
 class $$SavedBooksTableTableManager
@@ -6442,6 +6732,10 @@ class $$SavedBooksTableTableManager
                 Value<int?> fileSize = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> readingStatus = const Value.absent(),
+                Value<String?> detectedEncoding = const Value.absent(),
+                Value<double?> encodingConfidence = const Value.absent(),
+                Value<String?> encodingSource = const Value.absent(),
+                Value<String?> userForcedEncoding = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
                 id: id,
@@ -6458,6 +6752,10 @@ class $$SavedBooksTableTableManager
                 fileSize: fileSize,
                 filePath: filePath,
                 readingStatus: readingStatus,
+                detectedEncoding: detectedEncoding,
+                encodingConfidence: encodingConfidence,
+                encodingSource: encodingSource,
+                userForcedEncoding: userForcedEncoding,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6476,6 +6774,10 @@ class $$SavedBooksTableTableManager
                 Value<int?> fileSize = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
                 Value<String> readingStatus = const Value.absent(),
+                Value<String?> detectedEncoding = const Value.absent(),
+                Value<double?> encodingConfidence = const Value.absent(),
+                Value<String?> encodingSource = const Value.absent(),
+                Value<String?> userForcedEncoding = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(
                 id: id,
@@ -6492,6 +6794,10 @@ class $$SavedBooksTableTableManager
                 fileSize: fileSize,
                 filePath: filePath,
                 readingStatus: readingStatus,
+                detectedEncoding: detectedEncoding,
+                encodingConfidence: encodingConfidence,
+                encodingSource: encodingSource,
+                userForcedEncoding: userForcedEncoding,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>

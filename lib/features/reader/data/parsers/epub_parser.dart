@@ -6,27 +6,37 @@ import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:xml/xml.dart';
 
+import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
 
 class EpubParser implements BookParser {
+  final _detector = BookEncodingDetector();
+
   @override
   bool supports(BookFormat format) => format == BookFormat.epub;
 
   @override
-  Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
+  Future<NormalizedBook> parse(
+    Uint8List bytes, {
+    String? fileName,
+    String? forcedEncoding,
+  }) async {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
-      return _parseArchive(archive);
+      return _parseArchive(archive, forcedEncoding: forcedEncoding);
     } on Object catch (e) {
       throw ParserFailure('Ошибка при разборе EPUB: $e');
     }
   }
 
   @override
-  Future<NormalizedBook> parseFile(String filePath) async {
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  }) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
@@ -36,13 +46,20 @@ class EpubParser implements BookParser {
       if (bytes.isEmpty) {
         throw ParserFailure('Файл пуст: $filePath');
       }
-      return parse(bytes, fileName: filePath.split('/').last);
+      return parse(
+        bytes,
+        fileName: filePath.split('/').last,
+        forcedEncoding: forcedEncoding,
+      );
     } on FileSystemException catch (e) {
       throw ParserFailure('Не удалось прочитать файл EPUB: ${e.message}');
     }
   }
 
-  NormalizedBook _parseArchive(Archive archive) {
+  Future<NormalizedBook> _parseArchive(
+    Archive archive, {
+    String? forcedEncoding,
+  }) async {
     final fileIndex = <String, ArchiveFile>{};
     for (final file in archive) {
       if (file.isFile) {
@@ -54,23 +71,31 @@ class EpubParser implements BookParser {
       }
     }
 
-    final containerXml = _findFileFromIndex(fileIndex, 'META-INF/container.xml');
-    if (containerXml == null) {
+    final containerBytes = _findFileBytesFromIndex(fileIndex, 'META-INF/container.xml');
+    if (containerBytes == null) {
       throw const ParserFailure('EPUB: container.xml не найден');
     }
+    final containerResult = await _detector.detect(
+      Uint8List.fromList(containerBytes),
+      forcedEncoding: forcedEncoding,
+    );
 
-    final opfPath = _parseContainerPath(containerXml);
+    final opfPath = _parseContainerPath(containerResult.text);
     if (opfPath == null) {
       throw const ParserFailure('EPUB: путь к OPF не найден');
     }
 
-    final opfContent = _findFileFromIndex(fileIndex, opfPath);
-    if (opfContent == null) {
+    final opfBytes = _findFileBytesFromIndex(fileIndex, opfPath);
+    if (opfBytes == null) {
       throw ParserFailure('EPUB: OPF файл не найден: $opfPath');
     }
+    final opfResult = await _detector.detect(
+      Uint8List.fromList(opfBytes),
+      forcedEncoding: forcedEncoding,
+    );
 
     final opfBase = opfPath.contains('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
-    final opfDoc = XmlDocument.parse(opfContent);
+    final opfDoc = XmlDocument.parse(opfResult.text);
 
     final metadata = _parseMetadata(opfDoc);
     final manifest = _parseManifest(opfDoc, opfBase);
@@ -80,11 +105,16 @@ class EpubParser implements BookParser {
     var chapterIndex = 0;
     for (final href in spineOrder) {
       final fullPath = '$opfBase$href';
-      final htmlContent =
-          _findFileFromIndex(fileIndex, fullPath) ?? _findFileFromIndex(fileIndex, href);
-      if (htmlContent == null) continue;
+      final htmlBytes =
+          _findFileBytesFromIndex(fileIndex, fullPath) ?? _findFileBytesFromIndex(fileIndex, href);
+      if (htmlBytes == null) continue;
 
-      final doc = html_parser.parse(htmlContent);
+      final htmlResult = await _detector.detect(
+        Uint8List.fromList(htmlBytes),
+        forcedEncoding: forcedEncoding,
+      );
+
+      final doc = html_parser.parse(htmlResult.text);
       final title = _extractChapterTitle(doc);
       final blocks = _htmlToBlocks(doc);
 
@@ -291,15 +321,6 @@ class EpubParser implements BookParser {
   String? _firstChildText(XmlElement parent, String tag) {
     final el = parent.findAllElements(tag).firstOrNull;
     return el?.innerText.trim();
-  }
-
-  String? _findFileFromIndex(Map<String, ArchiveFile> index, String path) {
-    final normalized = path.startsWith('/') ? path.substring(1) : path;
-    final file = index[normalized] ?? index[Uri.decodeComponent(normalized)];
-    if (file != null) {
-      return String.fromCharCodes(file.content);
-    }
-    return null;
   }
 
   List<int>? _findFileBytesFromIndex(Map<String, ArchiveFile> index, String path) {

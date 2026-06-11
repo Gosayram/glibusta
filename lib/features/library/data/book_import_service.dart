@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/book.dart';
 import '../../reader/data/parsers/book_parser.dart';
@@ -21,8 +22,11 @@ final bookImportServiceProvider = Provider<BookImportService>((ref) {
 class BookImportService {
   final AppDatabase _database;
   final AppFileStorage _storage;
+  final BookEncodingDetector _detector;
 
-  BookImportService(this._database) : _storage = AppFileStorageImpl();
+  BookImportService(this._database)
+    : _storage = AppFileStorageImpl(),
+      _detector = BookEncodingDetector();
 
   final Map<String, BookParser> _parsers = {
     'fb2': Fb2Parser(),
@@ -58,7 +62,17 @@ class BookImportService {
     }
 
     try {
-      final book = await parser.parse(bytes, fileName: filePath.split('/').last);
+      // Detect encoding before parsing
+      final encodingResult = await _detector.detect(
+        bytes,
+        fileName: filePath.split('/').last,
+      );
+
+      final book = await parser.parse(
+        bytes,
+        fileName: filePath.split('/').last,
+        forcedEncoding: encodingResult.encoding,
+      );
 
       final targetFile = await _storage.bookFile(
         book.id,
@@ -83,6 +97,9 @@ class BookImportService {
               contentHash: Value(contentHash),
               fileSize: Value(fileSize),
               filePath: Value(targetFile.path),
+              detectedEncoding: Value(encodingResult.encoding),
+              encodingConfidence: Value(encodingResult.confidence),
+              encodingSource: Value(encodingResult.source.name),
             ),
           );
 

@@ -5,6 +5,15 @@ import 'normalized_book.dart';
 
 abstract class BookParser {
   bool supports(BookFormat format);
-  Future<NormalizedBook> parse(Uint8List bytes, {String? fileName});
-  Future<NormalizedBook> parseFile(String filePath);
+
+  Future<NormalizedBook> parse(
+    Uint8List bytes, {
+    String? fileName,
+    String? forcedEncoding,
+  });
+
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  });
 }

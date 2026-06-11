@@ -3,19 +3,31 @@ import 'dart:typed_data';
 
 import 'package:xml/xml.dart';
 
+import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
 
 class Fb2Parser implements BookParser {
+  final _detector = BookEncodingDetector();
+
   @override
   bool supports(BookFormat format) => format == BookFormat.fb2;
 
   @override
-  Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
+  Future<NormalizedBook> parse(
+    Uint8List bytes, {
+    String? fileName,
+    String? forcedEncoding,
+  }) async {
     try {
-      final document = XmlDocument.parse(String.fromCharCodes(bytes));
+      final result = await _detector.detect(
+        bytes,
+        fileName: fileName,
+        forcedEncoding: forcedEncoding,
+      );
+      final document = XmlDocument.parse(result.text);
       return _parseDocument(document);
     } on XmlException catch (e) {
       throw ParserFailure('Ошибка разбора FB2: ${e.message}');
@@ -27,11 +39,18 @@ class Fb2Parser implements BookParser {
   }
 
   @override
-  Future<NormalizedBook> parseFile(String filePath) async {
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  }) async {
     try {
       final file = File(filePath);
       final bytes = await file.readAsBytes();
-      return parse(bytes, fileName: filePath.split('/').last);
+      return parse(
+        bytes,
+        fileName: filePath.split('/').last,
+        forcedEncoding: forcedEncoding,
+      );
     } on FileSystemException catch (e) {
       throw ParserFailure('Не удалось прочитать файл FB2: ${e.message}');
     }

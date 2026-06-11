@@ -19,6 +19,10 @@ class SavedBooks extends Table {
   IntColumn get fileSize => integer().nullable()();
   TextColumn get filePath => text().withDefault(const Constant(''))();
   TextColumn get readingStatus => text().withDefault(const Constant('none'))();
+  TextColumn get detectedEncoding => text().nullable()();
+  RealColumn get encodingConfidence => real().nullable()();
+  TextColumn get encodingSource => text().nullable()();
+  TextColumn get userForcedEncoding => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

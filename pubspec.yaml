@@ -50,6 +50,10 @@ dependencies:
   xml: ^7.0.1
   archive: ^4.0.0
 
+  # Encoding detection
+  flutter_charset_detector: ^6.0.0
+  fl_charset: ^1.0.2
+
   # Utilities
   crypto: ^3.0.7
   flutter_dotenv: ^6.0.1

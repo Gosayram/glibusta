@@ -1,28 +1,41 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
 
 final class TxtBookParser implements BookParser {
+  final _detector = BookEncodingDetector();
+
   @override
   bool supports(BookFormat format) => format == BookFormat.txt;
 
   @override
-  Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
+  Future<NormalizedBook> parse(
+    Uint8List bytes, {
+    String? fileName,
+    String? forcedEncoding,
+  }) async {
     try {
-      final text = utf8.decode(bytes, allowMalformed: true);
-      return _textToBook(text, fileName: fileName ?? 'unknown.txt');
+      final result = await _detector.detect(
+        bytes,
+        fileName: fileName,
+        forcedEncoding: forcedEncoding,
+      );
+      return _textToBook(result.text, fileName: fileName ?? 'unknown.txt');
     } on Object catch (e) {
       throw ParserFailure('Ошибка разбора TXT: $e');
     }
   }
 
   @override
-  Future<NormalizedBook> parseFile(String filePath) async {
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  }) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
@@ -33,7 +46,7 @@ final class TxtBookParser implements BookParser {
         throw ParserFailure('Файл пуст: $filePath');
       }
       final name = filePath.split('/').last;
-      return parse(bytes, fileName: name);
+      return parse(bytes, fileName: name, forcedEncoding: forcedEncoding);
     } on FileSystemException catch (e) {
       throw ParserFailure('Не удалось прочитать файл TXT: ${e.message}');
     }
