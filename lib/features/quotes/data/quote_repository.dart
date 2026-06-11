@@ -57,6 +57,19 @@ class QuoteRepository {
     return (_db.delete(_db.quotes)..where((q) => q.id.equals(id))).go();
   }
 
+  Future<void> insertQuote(Quote quote) async {
+    await _db.into(_db.quotes).insert(
+          QuotesCompanion.insert(
+            id: quote.id,
+            bookId: quote.bookId,
+            chapterIndex: quote.chapterIndex,
+            paragraphIndex: quote.paragraphIndex,
+            selectedText: quote.selectedText,
+            note: Value(quote.note),
+          ),
+        );
+  }
+
   Stream<List<Quote>> watchQuotes(String bookId) {
     return (_db.select(_db.quotes)
           ..where((q) => q.bookId.equals(bookId))

@@ -59,6 +59,20 @@ class BookmarkRepository {
     return (_db.delete(_db.bookmarks)..where((b) => b.id.equals(id))).go();
   }
 
+  Future<void> insertBookmark(Bookmark bookmark) async {
+    await _db.into(_db.bookmarks).insert(
+          BookmarksCompanion.insert(
+            id: bookmark.id,
+            bookId: bookmark.bookId,
+            chapterIndex: bookmark.chapterIndex,
+            paragraphIndex: bookmark.paragraphIndex,
+            localOffset: Value(bookmark.localOffset),
+            selectedText: Value(bookmark.selectedText),
+            note: Value(bookmark.note),
+          ),
+        );
+  }
+
   Stream<List<Bookmark>> watchBookmarks(String bookId) {
     return (_db.select(_db.bookmarks)
           ..where((b) => b.bookId.equals(bookId))

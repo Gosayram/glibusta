@@ -60,6 +60,19 @@ class NoteRepository {
     return (_db.delete(_db.notes)..where((n) => n.id.equals(id))).go();
   }
 
+  Future<void> insertNote(Note note) async {
+    await _db.into(_db.notes).insert(
+          NotesCompanion.insert(
+            id: note.id,
+            bookId: note.bookId,
+            chapterIndex: note.chapterIndex,
+            paragraphIndex: note.paragraphIndex,
+            content: note.content,
+            highlightColor: Value(note.highlightColor),
+          ),
+        );
+  }
+
   Stream<List<Note>> watchNotes(String bookId) {
     return (_db.select(_db.notes)
           ..where((n) => n.bookId.equals(bookId))

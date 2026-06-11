@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,12 +22,23 @@ class AnnotationData {
   });
 }
 
+final _bookmarkRepoProvider = Provider<BookmarkRepository>((ref) {
+  return BookmarkRepository(ref.watch(databaseProvider));
+});
+
+final _noteRepoProvider = Provider<NoteRepository>((ref) {
+  return NoteRepository(ref.watch(databaseProvider));
+});
+
+final _quoteRepoProvider = Provider<QuoteRepository>((ref) {
+  return QuoteRepository(ref.watch(databaseProvider));
+});
+
 final allAnnotationsProvider = FutureProvider.family<AnnotationData, String?>((ref, bookId) async {
   final db = ref.watch(databaseProvider);
-
-  final bookmarkRepo = BookmarkRepository(db);
-  final noteRepo = NoteRepository(db);
-  final quoteRepo = QuoteRepository(db);
+  final bookmarkRepo = ref.watch(_bookmarkRepoProvider);
+  final noteRepo = ref.watch(_noteRepoProvider);
+  final quoteRepo = ref.watch(_quoteRepoProvider);
 
   final List<Bookmark> bookmarks;
   final List<Note> notes;
@@ -144,9 +153,28 @@ class _BookmarkList extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 16),
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
-          onDismissed: (_) {
-            final db = ref.read(databaseProvider);
-            unawaited(BookmarkRepository(db).deleteBookmark(bookmark.id));
+          confirmDismiss: (_) async {
+            final repo = ref.read(_bookmarkRepoProvider);
+            final scaffold = ScaffoldMessenger.of(context);
+            final theme = Theme.of(context);
+            await repo.deleteBookmark(bookmark.id);
+            if (!context.mounted) return false;
+            scaffold.showSnackBar(
+              SnackBar(
+                content: const Text('Закладка удалена'),
+                action: SnackBarAction(
+                  label: 'Отмена',
+                  textColor: theme.colorScheme.inversePrimary,
+                  onPressed: () async {
+                    await repo.insertBookmark(bookmark);
+                    if (context.mounted) {
+                      ref.invalidate(allAnnotationsProvider(null));
+                    }
+                  },
+                ),
+              ),
+            );
+            return true;
           },
           child: ListTile(
             leading: const Icon(Icons.bookmark),
@@ -198,14 +226,33 @@ class _NoteList extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 16),
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
-          onDismissed: (_) {
-            final db = ref.read(databaseProvider);
-            unawaited(NoteRepository(db).deleteNote(note.id));
+          confirmDismiss: (_) async {
+            final repo = ref.read(_noteRepoProvider);
+            final scaffold = ScaffoldMessenger.of(context);
+            final theme = Theme.of(context);
+            await repo.deleteNote(note.id);
+            if (!context.mounted) return false;
+            scaffold.showSnackBar(
+              SnackBar(
+                content: const Text('Заметка удалена'),
+                action: SnackBarAction(
+                  label: 'Отмена',
+                  textColor: theme.colorScheme.inversePrimary,
+                  onPressed: () async {
+                    await repo.insertNote(note);
+                    if (context.mounted) {
+                      ref.invalidate(allAnnotationsProvider(null));
+                    }
+                  },
+                ),
+              ),
+            );
+            return true;
           },
           child: ListTile(
             leading: Icon(
               Icons.note,
-              color: Color(int.parse('0xFF${note.highlightColor.substring(1)}')),
+              color: _parseColor(note.highlightColor),
             ),
             title: Text(
               note.content,
@@ -253,9 +300,28 @@ class _QuoteList extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 16),
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
-          onDismissed: (_) {
-            final db = ref.read(databaseProvider);
-            unawaited(QuoteRepository(db).deleteQuote(quote.id));
+          confirmDismiss: (_) async {
+            final repo = ref.read(_quoteRepoProvider);
+            final scaffold = ScaffoldMessenger.of(context);
+            final theme = Theme.of(context);
+            await repo.deleteQuote(quote.id);
+            if (!context.mounted) return false;
+            scaffold.showSnackBar(
+              SnackBar(
+                content: const Text('Цитата удалена'),
+                action: SnackBarAction(
+                  label: 'Отмена',
+                  textColor: theme.colorScheme.inversePrimary,
+                  onPressed: () async {
+                    await repo.insertQuote(quote);
+                    if (context.mounted) {
+                      ref.invalidate(allAnnotationsProvider(null));
+                    }
+                  },
+                ),
+              ),
+            );
+            return true;
           },
           child: ListTile(
             leading: const Icon(Icons.format_quote),
@@ -293,6 +359,17 @@ class _QuoteList extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+Color _parseColor(String? hexString) {
+  if (hexString == null || hexString.isEmpty) return Colors.amber;
+  final cleaned = hexString.startsWith('#') ? hexString.substring(1) : hexString;
+  if (cleaned.length != 6 && cleaned.length != 8) return Colors.amber;
+  try {
+    return Color(int.parse('0xFF$cleaned'));
+  } on Object catch (_) {
+    return Colors.amber;
   }
 }
 
