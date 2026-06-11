@@ -1,4 +1,4 @@
-package com.example.glibusta
+package com.gosayram.glibusta
 
 import android.content.Intent
 import android.net.Uri
@@ -13,7 +13,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
-    private val CHANNEL = "com.example.glibusta/storage_bridge"
+    private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private var pendingResult: MethodChannel.Result? = null
 
     private val openTreeLauncher: ActivityResultLauncher<Uri?> =

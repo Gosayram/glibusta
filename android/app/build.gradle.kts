@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.glibusta"
+    namespace = "com.gosayram.glibusta"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.glibusta"
+        applicationId = "com.gosayram.glibusta"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

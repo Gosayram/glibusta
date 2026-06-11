@@ -4,7 +4,7 @@ import 'external_book_file.dart';
 import 'storage_bridge.dart';
 
 class StorageBridgeImpl implements StorageBridge {
-  static const _channel = MethodChannel('com.example.glibusta/storage_bridge');
+  static const _channel = MethodChannel('com.gosayram.glibusta/storage_bridge');
 
   @override
   Future<String?> pickFolder() async {

@@ -13,7 +13,7 @@
 -keep class com.google.android.play.core.** { *; }
 
 # Keep Drift database classes
--keep class com.example.glibusta.core.database.** { *; }
+-keep class com.gosayram.glibusta.core.database.** { *; }
 
 # Keep serialization models
 -keep class **.freezed.** { *; }
@@ -23,4 +23,4 @@
 -keep class io.sentry.** { *; }
 
 # Keep background_downloader
--keep class com.example.glibusta.** { *; }
+-keep class com.gosayram.glibusta.** { *; }
