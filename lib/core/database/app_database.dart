@@ -65,6 +65,10 @@ class AppDatabase extends _$AppDatabase {
       }
     },
     beforeOpen: (details) async {
+      await customStatement('PRAGMA journal_mode = WAL');
+      await customStatement('PRAGMA synchronous = NORMAL');
+      await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement('PRAGMA cache_size = -8000');
       if (details.hadUpgrade) {
         await _backupDatabase(details.versionBefore);
       }
@@ -351,6 +355,7 @@ QueryExecutor _openConnection() {
   return driftDatabase(
     name: 'glibusta',
     native: DriftNativeOptions(
+      shareAcrossIsolates: true,
       databaseDirectory: () async {
         final dir = await getApplicationDocumentsDirectory();
         return Directory(p.join(dir.path, 'glibusta'));

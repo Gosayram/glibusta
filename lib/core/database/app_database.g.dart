@@ -6081,6 +6081,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ReadingSessionsTable readingSessions = $ReadingSessionsTable(
     this,
   );
+  late final Index idxDownloadsBookId = Index(
+    'idx_downloads_bookId',
+    'CREATE INDEX idx_downloads_bookId ON downloads (book_id)',
+  );
+  late final Index idxBookmarksBookId = Index(
+    'idx_bookmarks_bookId',
+    'CREATE INDEX idx_bookmarks_bookId ON bookmarks (book_id)',
+  );
+  late final Index idxNotesBookId = Index(
+    'idx_notes_bookId',
+    'CREATE INDEX idx_notes_bookId ON notes (book_id)',
+  );
+  late final Index idxQuotesBookId = Index(
+    'idx_quotes_bookId',
+    'CREATE INDEX idx_quotes_bookId ON quotes (book_id)',
+  );
+  late final Index idxReadingSessionsBookId = Index(
+    'idx_reading_sessions_bookId',
+    'CREATE INDEX idx_reading_sessions_bookId ON reading_sessions (book_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6100,6 +6120,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     collections,
     bookCollections,
     readingSessions,
+    idxDownloadsBookId,
+    idxBookmarksBookId,
+    idxNotesBookId,
+    idxQuotesBookId,
+    idxReadingSessionsBookId,
   ];
 }
 

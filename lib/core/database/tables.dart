@@ -57,6 +57,7 @@ class Genres extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_downloads_bookId', columns: {#bookId})
 class Downloads extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text()();
@@ -92,6 +93,7 @@ class ReadingProgress extends Table {
   Set<Column<Object>> get primaryKey => {bookId};
 }
 
+@TableIndex(name: 'idx_bookmarks_bookId', columns: {#bookId})
 class Bookmarks extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text()();
@@ -106,6 +108,7 @@ class Bookmarks extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_notes_bookId', columns: {#bookId})
 class Notes extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text()();
@@ -121,6 +124,7 @@ class Notes extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_quotes_bookId', columns: {#bookId})
 class Quotes extends Table {
   TextColumn get id => text()();
   TextColumn get bookId => text()();
@@ -163,6 +167,7 @@ class BookCollections extends Table {
   Set<Column<Object>> get primaryKey => {bookId, collectionId};
 }
 
+@TableIndex(name: 'idx_reading_sessions_bookId', columns: {#bookId})
 class ReadingSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get bookId => text()();

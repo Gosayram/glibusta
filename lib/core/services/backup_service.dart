@@ -87,31 +87,17 @@ class BackupService {
       final goalMap = parsed['readingGoal'] as Map<String, dynamic>?;
       final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
 
-      await db.transaction(() async {
-        await db.delete(db.readingProgress).go();
-        for (final row in progressList) {
-          await db.into(db.readingProgress).insert(_progressFromMap(row));
-        }
-
-        await db.delete(db.bookmarks).go();
-        for (final row in bookmarksList) {
-          await db.into(db.bookmarks).insert(_bookmarkFromMap(row));
-        }
-
-        await db.delete(db.notes).go();
-        for (final row in notesList) {
-          await db.into(db.notes).insert(_noteFromMap(row));
-        }
-
-        await db.delete(db.quotes).go();
-        for (final row in quotesList) {
-          await db.into(db.quotes).insert(_quoteFromMap(row));
-        }
-
-        await db.delete(db.collections).go();
-        for (final row in collectionsList) {
-          await db.into(db.collections).insert(_collectionFromMap(row));
-        }
+      await db.batch((b) {
+        b.deleteAll(db.readingProgress);
+        b.insertAll(db.readingProgress, progressList.map(_progressFromMap));
+        b.deleteAll(db.bookmarks);
+        b.insertAll(db.bookmarks, bookmarksList.map(_bookmarkFromMap));
+        b.deleteAll(db.notes);
+        b.insertAll(db.notes, notesList.map(_noteFromMap));
+        b.deleteAll(db.quotes);
+        b.insertAll(db.quotes, quotesList.map(_quoteFromMap));
+        b.deleteAll(db.collections);
+        b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
       });
 
       final prefs = await SharedPreferences.getInstance();
@@ -140,12 +126,12 @@ class BackupService {
   }
 
   Future<void> clearAllData() async {
-    await db.transaction(() async {
-      await db.delete(db.readingProgress).go();
-      await db.delete(db.bookmarks).go();
-      await db.delete(db.notes).go();
-      await db.delete(db.quotes).go();
-      await db.delete(db.collections).go();
+    await db.batch((b) {
+      b.deleteAll(db.readingProgress);
+      b.deleteAll(db.bookmarks);
+      b.deleteAll(db.notes);
+      b.deleteAll(db.quotes);
+      b.deleteAll(db.collections);
     });
 
     final prefs = await SharedPreferences.getInstance();

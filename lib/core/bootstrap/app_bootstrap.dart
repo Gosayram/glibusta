@@ -59,6 +59,25 @@ class AppBootstrap {
         (options) {
           options.dsn = dsn;
           options.tracesSampleRate = kReleaseMode ? 0.1 : 1.0;
+          options.beforeSend = (event, hint) {
+            event.contexts['app'] = 'glibusta';
+            final breadcrumbs = event.breadcrumbs;
+            if (breadcrumbs != null) {
+              for (final crumb in breadcrumbs) {
+                final data = crumb.data;
+                if (data != null) {
+                  data.removeWhere((key, value) {
+                    final lower = value?.toString().toLowerCase() ?? '';
+                    return lower.contains('password') ||
+                        lower.contains('token') ||
+                        lower.contains('cookie') ||
+                        lower.contains('authorization');
+                  });
+                }
+              }
+            }
+            return event;
+          };
         },
         appRunner: appRunner,
       );

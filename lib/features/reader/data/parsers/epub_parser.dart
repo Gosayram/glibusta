@@ -43,7 +43,18 @@ class EpubParser implements BookParser {
   }
 
   NormalizedBook _parseArchive(Archive archive) {
-    final containerXml = _findFile(archive, 'META-INF/container.xml');
+    final fileIndex = <String, ArchiveFile>{};
+    for (final file in archive) {
+      if (file.isFile) {
+        fileIndex[file.name] = file;
+        final decoded = Uri.decodeComponent(file.name);
+        if (decoded != file.name) {
+          fileIndex[decoded] = file;
+        }
+      }
+    }
+
+    final containerXml = _findFileFromIndex(fileIndex, 'META-INF/container.xml');
     if (containerXml == null) {
       throw const ParserFailure('EPUB: container.xml не найден');
     }
@@ -53,7 +64,7 @@ class EpubParser implements BookParser {
       throw const ParserFailure('EPUB: путь к OPF не найден');
     }
 
-    final opfContent = _findFile(archive, opfPath);
+    final opfContent = _findFileFromIndex(fileIndex, opfPath);
     if (opfContent == null) {
       throw ParserFailure('EPUB: OPF файл не найден: $opfPath');
     }
@@ -69,7 +80,8 @@ class EpubParser implements BookParser {
     var chapterIndex = 0;
     for (final href in spineOrder) {
       final fullPath = '$opfBase$href';
-      final htmlContent = _findFile(archive, fullPath) ?? _findFile(archive, href);
+      final htmlContent =
+          _findFileFromIndex(fileIndex, fullPath) ?? _findFileFromIndex(fileIndex, href);
       if (htmlContent == null) continue;
 
       final doc = html_parser.parse(htmlContent);
@@ -93,7 +105,8 @@ class EpubParser implements BookParser {
       final coverHref = manifest[coverId];
       if (coverHref != null) {
         final coverData =
-            _findFileBytes(archive, '$opfBase$coverHref') ?? _findFileBytes(archive, coverHref);
+            _findFileBytesFromIndex(fileIndex, '$opfBase$coverHref') ??
+            _findFileBytesFromIndex(fileIndex, coverHref);
         if (coverData != null) {
           coverBytes = coverData;
         }
@@ -280,29 +293,18 @@ class EpubParser implements BookParser {
     return el?.innerText.trim();
   }
 
-  String? _findFile(Archive archive, String path) {
+  String? _findFileFromIndex(Map<String, ArchiveFile> index, String path) {
     final normalized = path.startsWith('/') ? path.substring(1) : path;
-    final decoded = _decodePath(normalized);
-    for (final file in archive) {
-      if (file.isFile && (file.name == normalized || file.name == decoded)) {
-        return String.fromCharCodes(file.content);
-      }
+    final file = index[normalized] ?? index[Uri.decodeComponent(normalized)];
+    if (file != null) {
+      return String.fromCharCodes(file.content);
     }
     return null;
   }
 
-  List<int>? _findFileBytes(Archive archive, String path) {
+  List<int>? _findFileBytesFromIndex(Map<String, ArchiveFile> index, String path) {
     final normalized = path.startsWith('/') ? path.substring(1) : path;
-    final decoded = _decodePath(normalized);
-    for (final file in archive) {
-      if (file.isFile && (file.name == normalized || file.name == decoded)) {
-        return file.content;
-      }
-    }
-    return null;
-  }
-
-  String _decodePath(String path) {
-    return Uri.decodeComponent(path);
+    final file = index[normalized] ?? index[Uri.decodeComponent(normalized)];
+    return file?.content;
   }
 }
