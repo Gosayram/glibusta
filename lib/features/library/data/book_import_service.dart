@@ -3,13 +3,15 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/platform/app_file_storage.dart';
+import '../../../shared/models/book.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
+import '../../reader/data/parsers/txt_parser.dart';
 
 final bookImportServiceProvider = Provider<BookImportService>((ref) {
   final database = ref.watch(databaseProvider);
@@ -18,12 +20,14 @@ final bookImportServiceProvider = Provider<BookImportService>((ref) {
 
 class BookImportService {
   final AppDatabase _database;
+  final AppFileStorage _storage;
 
-  BookImportService(this._database);
+  BookImportService(this._database) : _storage = AppFileStorageImpl();
 
   final Map<String, BookParser> _parsers = {
     'fb2': Fb2Parser(),
     'epub': EpubParser(),
+    'txt': TxtBookParser(),
   };
 
   static const _supportedExtensions = ['fb2', 'epub', 'txt'];
@@ -56,9 +60,15 @@ class BookImportService {
     try {
       final book = await parser.parse(bytes, fileName: filePath.split('/').last);
 
-      final booksDir = await _booksDirectory;
-      final targetPath = '$booksDir/${book.id}.$ext';
-      await file.copy(targetPath);
+      final targetFile = await _storage.bookFile(
+        book.id,
+        BookFormat.values.firstWhere(
+          (f) => f.name == ext,
+          orElse: () => BookFormat.epub,
+        ),
+      );
+      await targetFile.parent.create(recursive: true);
+      await file.copy(targetFile.path);
 
       await _database
           .into(_database.savedBooks)
@@ -72,7 +82,7 @@ class BookImportService {
               sourceUrl: Value(filePath),
               contentHash: Value(contentHash),
               fileSize: Value(fileSize),
-              filePath: Value(targetPath),
+              filePath: Value(targetFile.path),
             ),
           );
 
@@ -85,7 +95,7 @@ class BookImportService {
               bookTitle: Value(book.title),
               format: ext,
               sourceUrl: filePath,
-              targetPath: Value(targetPath),
+              targetPath: Value(targetFile.path),
               status: DownloadStatusDb.completed,
             ),
           );
@@ -120,15 +130,6 @@ class BookImportService {
       _database.savedBooks,
     )..where((t) => t.contentHash.equals(hash))).get();
     return rows.isNotEmpty ? rows.first : null;
-  }
-
-  Future<String> get _booksDirectory async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final booksDir = Directory('${appDir.path}/books');
-    if (!await booksDir.exists()) {
-      await booksDir.create(recursive: true);
-    }
-    return booksDir.path;
   }
 }
 

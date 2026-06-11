@@ -5,11 +5,11 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/platform/app_file_storage.dart';
 import 'parsers/book_parser.dart';
 import 'parsers/epub_parser.dart';
 import 'parsers/fb2_parser.dart';
@@ -110,12 +110,8 @@ class BookOpenService {
   }
 
   Future<String> get booksCacheDir async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final cacheDir = Directory('${appDir.path}/books_cache');
-    if (!await cacheDir.exists()) {
-      await cacheDir.create(recursive: true);
-    }
-    return cacheDir.path;
+    final dir = await AppFileStorageImpl().cacheDir();
+    return dir.path;
   }
 
   Future<File> _getCacheFile(String bookId) async {

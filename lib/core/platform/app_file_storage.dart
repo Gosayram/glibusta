@@ -11,9 +11,10 @@ abstract interface class AppFileStorage {
   Future<Directory> tempDir();
   Future<Directory> booksDir();
   Future<Directory> coversDir();
+  Future<Directory> cacheDir();
 }
 
-String _sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|.]'), '_');
+String sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|.]'), '_');
 
 class AppFileStorageImpl implements AppFileStorage {
   @override
@@ -35,13 +36,13 @@ class AppFileStorageImpl implements AppFileStorage {
   @override
   Future<File> bookFile(String bookId, BookFormat format) async {
     final dir = await booksDir();
-    return File(p.join(dir.path, '${_sanitizeId(bookId)}.${format.name}'));
+    return File(p.join(dir.path, '${sanitizeId(bookId)}.${format.name}'));
   }
 
   @override
   Future<File> coverFile(String bookId) async {
     final dir = await coversDir();
-    return File(p.join(dir.path, '${_sanitizeId(bookId)}.jpg'));
+    return File(p.join(dir.path, '${sanitizeId(bookId)}.jpg'));
   }
 
   @override
@@ -50,5 +51,13 @@ class AppFileStorageImpl implements AppFileStorage {
     final tempDir = Directory(p.join(dir.path, 'glibusta'));
     await tempDir.create(recursive: true);
     return tempDir;
+  }
+
+  @override
+  Future<Directory> cacheDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final cacheDir = Directory(p.join(dir.path, 'glibusta', 'cache'));
+    await cacheDir.create(recursive: true);
+    return cacheDir;
   }
 }

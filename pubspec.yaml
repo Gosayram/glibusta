@@ -1,7 +1,7 @@
 name: glibusta
 description: Cross-platform book library app for Flibusta
 publish_to: 'none'
-version: 0.1.2+1
+version: 0.1.2+2
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -38,7 +38,9 @@ dependencies:
   # File system
   path: ^1.9.0
   path_provider: ^2.1.5
-  file_picker: ^12.0.0-beta.1
+  file_picker: ^12.0.0-beta.5
+  file_selector: ^1.0.4
+  receive_sharing_intent: ^1.8.0
 
   # Downloads
   background_downloader: ^9.5.5
@@ -58,7 +60,6 @@ dependencies:
   url_launcher: ^6.3.2
   skeletonizer: ^2.0.0
   connectivity_plus: ^7.1.1
-  permission_handler: ^12.0.3
 
   # Android-specific
   wakelock_plus: ^1.6.0

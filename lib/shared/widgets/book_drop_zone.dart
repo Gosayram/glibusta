@@ -1,6 +1,7 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/platform/file_picker_service.dart';
 
 class BookDropZone extends ConsumerWidget {
   final Widget child;
@@ -24,13 +25,8 @@ class BookDropZone extends ConsumerWidget {
   }
 
   Future<void> _showImportDialog(BuildContext context) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['fb2', 'epub', 'txt'],
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    final paths = result.files.where((f) => f.path != null).map((f) => f.path!).toList();
+    final picker = BookFilePicker();
+    final paths = await picker.pickBookFiles();
     if (paths.isNotEmpty) {
       onBooksDropped(paths);
     }

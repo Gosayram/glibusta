@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +7,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/platform/adaptive_context.dart';
+import '../../../core/platform/file_picker_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
@@ -50,6 +50,11 @@ class LibraryScreen extends ConsumerWidget {
             ),
             tooltip: 'Вид',
             onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Импортировать папку',
+            onPressed: () => _importFolder(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.add),
@@ -133,31 +138,47 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   Future<void> _importBook(BuildContext context, WidgetRef ref) async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['fb2', 'epub'],
-    );
-    if (result == null || result.files.isEmpty) return;
+    final picker = BookFilePicker();
+    final filePath = await picker.pickBookFile();
+    if (filePath == null) return;
 
     final service = ref.read(bookImportServiceProvider);
-    for (final file in result.files) {
-      if (file.path != null) {
-        final importResult = await service.importFile(file.path!);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                importResult.isSuccess
-                    ? 'Импортировано: ${importResult.title}'
-                    : importResult.isDuplicate
-                    ? 'Дубликат: ${importResult.title}'
-                    : 'Ошибка: ${importResult.error}',
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
+    final importResult = await service.importFile(filePath);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            importResult.isSuccess
+                ? 'Импортировано: ${importResult.title}'
+                : importResult.isDuplicate
+                ? 'Дубликат: ${importResult.title}'
+                : 'Ошибка: ${importResult.error}',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+    ref.invalidate(libraryBooksProvider);
+  }
+
+  Future<void> _importFolder(BuildContext context, WidgetRef ref) async {
+    final picker = BookFilePicker();
+    final dirPath = await picker.pickDirectory();
+    if (dirPath == null) return;
+
+    final service = ref.read(bookImportServiceProvider);
+    final batchResult = await service.importDirectory(dirPath);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Импортировано: ${batchResult.successCount}, '
+            'дубликатов: ${batchResult.duplicateCount}, '
+            'ошибок: ${batchResult.failureCount}',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
     ref.invalidate(libraryBooksProvider);
   }

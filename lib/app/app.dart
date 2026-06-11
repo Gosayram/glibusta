@@ -9,6 +9,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
+import '../core/platform/share_handler.dart';
+import '../features/library/data/book_import_service.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -43,6 +45,8 @@ class GlibustaApp extends ConsumerStatefulWidget {
 
 class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingObserver {
   late final LifecycleObserver _lifecycleObserver;
+  final _shareHandler = ShareHandler();
+  bool _shareHandlerInitialized = false;
 
   @override
   void initState() {
@@ -50,6 +54,16 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     WidgetsBinding.instance.addObserver(this);
     _initPlatform();
     _initLifecycle();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_shareHandlerInitialized) {
+      _shareHandlerInitialized = true;
+      final importService = ref.read(bookImportServiceProvider);
+      _shareHandler.init(context, importService);
+    }
   }
 
   void _initPlatform() {
@@ -86,6 +100,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
 
   @override
   void dispose() {
+    _shareHandler.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

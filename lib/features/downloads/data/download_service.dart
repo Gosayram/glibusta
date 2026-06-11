@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/platform/app_file_storage.dart';
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {
   final database = ref.watch(databaseProvider);
@@ -16,16 +16,13 @@ final downloadServiceProvider = Provider<DownloadService>((ref) {
 
 class DownloadService {
   final AppDatabase _database;
+  final AppFileStorage _storage;
 
-  DownloadService(this._database);
+  DownloadService(this._database) : _storage = AppFileStorageImpl();
 
   Future<String> get booksDirectory async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final booksDir = Directory('${appDir.path}/books');
-    if (!await booksDir.exists()) {
-      await booksDir.create(recursive: true);
-    }
-    return booksDir.path;
+    final dir = await _storage.booksDir();
+    return dir.path;
   }
 
   Future<void> downloadBook({
