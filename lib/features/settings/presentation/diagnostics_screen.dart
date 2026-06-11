@@ -304,7 +304,7 @@ class DiagnosticsScreen extends ConsumerWidget {
     String connectivityType = 'Неизвестно';
     try {
       final service = ref.read(offlineModeServiceProvider);
-      connectivityType = service.state.name;
+      connectivityType = service.state.kind.name;
       // Probe the actual server, not just network interface
       final settings = ref.read(appSettingsControllerProvider);
       connectivityOk = await OfflineModeService.probeServer(settings.baseUrl);

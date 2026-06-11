@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
@@ -77,6 +78,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Параллельные загрузки',
             subtitle: '${settings.maxConcurrentDownloads}',
             onTap: () => _editMaxConcurrent(context, ref, settings),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.cell_tower),
+            title: const Text('Скачивать через мобильную сеть'),
+            subtitle: const Text('По умолчанию только Wi-Fi'),
+            value: ref.watch(allowMobileDownloadsProvider),
+            onChanged: (v) => ref.read(allowMobileDownloadsProvider.notifier).update(v),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.play_circle),
+            title: const Text('Авто-продолжение при Wi-Fi'),
+            subtitle: const Text('Возобновлять загрузки при появлении сети'),
+            value: ref.watch(autoResumeOnWifiProvider),
+            onChanged: (v) => ref.read(autoResumeOnWifiProvider.notifier).update(v),
           ),
 
           const Divider(),

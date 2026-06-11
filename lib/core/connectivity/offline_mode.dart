@@ -5,10 +5,129 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../logging/app_logger.dart';
 
-enum ConnectivityState { online, offline, unknown }
+part 'offline_mode.g.dart';
+
+// --- Network state models ---
+
+enum NetworkKind { unknown, offline, wifi, mobile, ethernet, other }
+
+final class NetworkState {
+  const NetworkState({required this.kind, required this.isMetered});
+
+  final NetworkKind kind;
+  final bool isMetered;
+
+  bool get canDownload => kind != NetworkKind.offline;
+  bool get shouldAskBeforeLargeDownload => isMetered;
+}
+
+NetworkState mapConnectivity(List<ConnectivityResult> results) {
+  if (results.contains(ConnectivityResult.none)) {
+    return const NetworkState(kind: NetworkKind.offline, isMetered: false);
+  }
+  if (results.contains(ConnectivityResult.wifi)) {
+    return const NetworkState(kind: NetworkKind.wifi, isMetered: false);
+  }
+  if (results.contains(ConnectivityResult.ethernet)) {
+    return const NetworkState(kind: NetworkKind.ethernet, isMetered: false);
+  }
+  if (results.contains(ConnectivityResult.mobile)) {
+    return const NetworkState(kind: NetworkKind.mobile, isMetered: true);
+  }
+  return const NetworkState(kind: NetworkKind.other, isMetered: true);
+}
+
+// --- Download policy ---
+
+const _kAllowMobileDownloads = 'allow_mobile_downloads';
+const _kAutoResumeOnWifi = 'auto_resume_on_wifi';
+
+class DownloadPolicyPersistence {
+  DownloadPolicyPersistence(this._prefs);
+
+  final SharedPreferences _prefs;
+
+  bool get allowMobileDownloads => _prefs.getBool(_kAllowMobileDownloads) ?? false;
+  set allowMobileDownloads(bool v) => unawaited(_prefs.setBool(_kAllowMobileDownloads, v));
+
+  bool get autoResumeOnWifi => _prefs.getBool(_kAutoResumeOnWifi) ?? true;
+  set autoResumeOnWifi(bool v) => unawaited(_prefs.setBool(_kAutoResumeOnWifi, v));
+}
+
+@Riverpod(keepAlive: true)
+Future<DownloadPolicyPersistence> downloadPolicyPersistence(Ref ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return DownloadPolicyPersistence(prefs);
+}
+
+@Riverpod(keepAlive: true)
+class AllowMobileDownloadsNotifier extends _$AllowMobileDownloadsNotifier {
+  @override
+  bool build() {
+    unawaited(_load());
+    return false;
+  }
+
+  Future<void> _load() async {
+    final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    state = p.allowMobileDownloads;
+  }
+
+  Future<void> update(bool value) async {
+    state = value;
+    final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    p.allowMobileDownloads = value;
+  }
+}
+
+@Riverpod(keepAlive: true)
+class AutoResumeOnWifiNotifier extends _$AutoResumeOnWifiNotifier {
+  @override
+  bool build() {
+    unawaited(_load());
+    return true;
+  }
+
+  Future<void> _load() async {
+    final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    state = p.autoResumeOnWifi;
+  }
+
+  Future<void> update(bool value) async {
+    state = value;
+    final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    p.autoResumeOnWifi = value;
+  }
+}
+
+bool canStartDownload({
+  required NetworkState network,
+  required bool allowMobileDownloads,
+}) {
+  if (!network.canDownload) return false;
+  if (network.isMetered && !allowMobileDownloads) return false;
+  return true;
+}
+
+// --- Stream provider ---
+
+@Riverpod(keepAlive: true)
+Stream<NetworkState> networkState(Ref ref) {
+  return Connectivity().onConnectivityChanged.map(mapConnectivity);
+}
+
+@Riverpod(keepAlive: true)
+Future<NetworkState> currentNetwork(Ref ref) async {
+  final results = await Connectivity().checkConnectivity();
+  return mapConnectivity(results);
+}
+
+// --- Legacy OfflineModeService (kept for backward compatibility) ---
 
 class OfflineModeService {
   OfflineModeService(this._logger) {
@@ -16,15 +135,14 @@ class OfflineModeService {
   }
 
   final AppLogger _logger;
-  final _controller = StreamController<ConnectivityState>.broadcast();
-  ConnectivityState _state = ConnectivityState.unknown;
+  final _controller = StreamController<NetworkState>.broadcast();
+  NetworkState _state = const NetworkState(kind: NetworkKind.unknown, isMetered: false);
   StreamSubscription<List<ConnectivityResult>>? _subscription;
-  final List<void Function(ConnectivityState)> _listeners = [];
 
-  ConnectivityState get state => _state;
-  bool get isOnline => _state == ConnectivityState.online;
-  bool get isOffline => _state == ConnectivityState.offline;
-  Stream<ConnectivityState> get stream => _controller.stream;
+  NetworkState get state => _state;
+  bool get isOnline => _state.kind != NetworkKind.offline;
+  bool get isOffline => _state.kind == NetworkKind.offline;
+  Stream<NetworkState> get stream => _controller.stream;
 
   Future<void> _init() async {
     try {
@@ -34,34 +152,16 @@ class OfflineModeService {
       _logger.warning('Connectivity check failed: $e', name: 'OfflineMode');
     }
 
-    _subscription = Connectivity().onConnectivityChanged.listen((results) {
-      _updateState(results);
-    });
+    _subscription = Connectivity().onConnectivityChanged.listen(_updateState);
   }
 
   void _updateState(List<ConnectivityResult> results) {
-    final hasConnection = results.any((r) => r != ConnectivityResult.none);
-    final newState = hasConnection ? ConnectivityState.online : ConnectivityState.offline;
-
-    if (newState != _state) {
+    final newState = mapConnectivity(results);
+    if (newState.kind != _state.kind) {
       _state = newState;
-      _logger.info(
-        'Connectivity changed: ${newState.name}',
-        name: 'OfflineMode',
-      );
+      _logger.info('Connectivity changed: ${newState.kind.name}', name: 'OfflineMode');
       _controller.add(newState);
-      for (final listener in _listeners) {
-        listener(newState);
-      }
     }
-  }
-
-  void addListener(void Function(ConnectivityState) listener) {
-    _listeners.add(listener);
-  }
-
-  void removeListener(void Function(ConnectivityState) listener) {
-    _listeners.remove(listener);
   }
 
   Future<void> waitForConnection({Duration timeout = const Duration(seconds: 30)}) async {
@@ -70,16 +170,14 @@ class OfflineModeService {
     Timer? timer;
 
     final sub = stream.listen((state) {
-      if (state == ConnectivityState.online && !completer.isCompleted) {
+      if (state.kind != NetworkKind.offline && !completer.isCompleted) {
         timer?.cancel();
         completer.complete();
       }
     });
 
     timer = Timer(timeout, () {
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
+      if (!completer.isCompleted) completer.complete();
     });
 
     await completer.future;
@@ -89,11 +187,8 @@ class OfflineModeService {
   void dispose() {
     unawaited(_subscription?.cancel());
     unawaited(_controller.close());
-    _listeners.clear();
   }
 
-  /// Probes the server by making a lightweight HEAD request.
-  /// Returns `true` if the server responds (any status code).
   static Future<bool> probeServer(
     String baseUrl, {
     Duration timeout = const Duration(seconds: 5),
@@ -123,7 +218,7 @@ class OfflineModeService {
   }
 }
 
-// --- Riverpod providers ---
+// --- Legacy providers (kept for backward compatibility) ---
 
 final offlineModeServiceProvider = Provider<OfflineModeService>((ref) {
   final logger = ref.watch(appLoggerProvider);
@@ -132,13 +227,13 @@ final offlineModeServiceProvider = Provider<OfflineModeService>((ref) {
   return service;
 });
 
-final connectivityStateProvider = StreamProvider<ConnectivityState>((ref) {
+final connectivityStateProvider = StreamProvider<NetworkState>((ref) {
   final service = ref.watch(offlineModeServiceProvider);
   return service.stream;
 });
 
 final isOnlineProvider = Provider<bool>((ref) {
   final asyncState = ref.watch(connectivityStateProvider);
-  final state = asyncState.value ?? ConnectivityState.unknown;
-  return state == ConnectivityState.online;
+  final state = asyncState.value;
+  return state != null && state.kind != NetworkKind.offline;
 });

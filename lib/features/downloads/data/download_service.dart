@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -13,6 +15,14 @@ final downloadServiceProvider = Provider<DownloadService>((ref) {
   final database = ref.watch(databaseProvider);
   return DownloadService(database);
 });
+
+class DownloadBlockedException implements Exception {
+  const DownloadBlockedException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'DownloadBlockedException: $message';
+}
 
 class DownloadService {
   final AppDatabase _database;
@@ -31,6 +41,13 @@ class DownloadService {
     required String format,
     required String sourceUrl,
   }) async {
+    // Check network before starting download
+    final results = await Connectivity().checkConnectivity();
+    final network = mapConnectivity(results);
+    if (!network.canDownload) {
+      throw const DownloadBlockedException('Нет подключения к сети');
+    }
+
     final booksDir = await booksDirectory;
     final fileName = '$bookId.$format';
     final targetPath = '$booksDir/$fileName';

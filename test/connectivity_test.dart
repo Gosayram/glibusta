@@ -3,18 +3,32 @@ import 'package:glibusta/core/connectivity/offline_mode.dart';
 
 void main() {
   group('OfflineModeService', () {
-    test('initial state is unknown', () {
-      // OfflineModeService requires AppLogger, skip construction
-      // Just verify enum values exist
-      expect(ConnectivityState.values, contains(ConnectivityState.unknown));
-      expect(ConnectivityState.values, contains(ConnectivityState.online));
-      expect(ConnectivityState.values, contains(ConnectivityState.offline));
+    test('NetworkKind enum values exist', () {
+      expect(NetworkKind.values, contains(NetworkKind.unknown));
+      expect(NetworkKind.values, contains(NetworkKind.offline));
+      expect(NetworkKind.values, contains(NetworkKind.wifi));
+      expect(NetworkKind.values, contains(NetworkKind.mobile));
+      expect(NetworkKind.values, contains(NetworkKind.ethernet));
+      expect(NetworkKind.values, contains(NetworkKind.other));
+    });
+
+    test('NetworkState helpers', () {
+      const offline = NetworkState(kind: NetworkKind.offline, isMetered: false);
+      expect(offline.canDownload, isFalse);
+
+      const wifi = NetworkState(kind: NetworkKind.wifi, isMetered: false);
+      expect(wifi.canDownload, isTrue);
+      expect(wifi.shouldAskBeforeLargeDownload, isFalse);
+
+      const mobile = NetworkState(kind: NetworkKind.mobile, isMetered: true);
+      expect(mobile.canDownload, isTrue);
+      expect(mobile.shouldAskBeforeLargeDownload, isTrue);
     });
 
     group('probeServer', () {
       test('returns bool for unreachable server', () async {
         final result = await OfflineModeService.probeServer(
-          'http://192.0.2.1', // RFC 5737 TEST-NET — always unreachable
+          'http://192.0.2.1',
           timeout: const Duration(seconds: 2),
         );
         expect(result, isA<bool>());
