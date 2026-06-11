@@ -12,7 +12,7 @@ class AppBootstrap {
 
   static Future<void> init() async {
     await dotenv.load();
-    pdfrxFlutterInitialize();
+    unawaited(pdfrxFlutterInitialize());
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();

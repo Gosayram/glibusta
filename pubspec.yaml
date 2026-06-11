@@ -47,6 +47,7 @@ dependencies:
   # Reader formats
   pdfrx: ^2.4.3
   xml: ^6.6.1
+  archive: ^4.0.0
 
   # Utilities
   async: ^2.13.0

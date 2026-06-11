@@ -18,7 +18,7 @@ class EpubParser implements BookParser {
   @override
   Future<NormalizedBook> parse(Uint8List bytes, {String? fileName}) async {
     try {
-      final archive = ZipDecoder().decodeBytes(bytes, verify: false);
+      final archive = ZipDecoder().decodeBytes(bytes);
       return _parseArchive(archive);
     } on Object catch (e) {
       throw ParserFailure('Ошибка при разборе EPUB: $e');

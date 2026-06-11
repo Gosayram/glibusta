@@ -69,7 +69,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         params: PdfViewerParams(
           backgroundColor: colorScheme.surface,
           margin: 4,
-          textSelectionParams: const PdfTextSelectionParams(enabled: true),
+          textSelectionParams: const PdfTextSelectionParams(),
           sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
             maxScale: 8.0,
             minScale: 0.1,
@@ -86,12 +86,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             }
           },
           onDocumentLoadFinished: (documentRef, loadSucceeded) {
-            if (loadSucceeded) {
-              documentRef.resolveListenable().useDocument((doc) {
-                if (mounted) {
-                  setState(() => _totalPages = doc.pages.length);
-                }
-              });
+            if (!loadSucceeded || !mounted) return;
+            final doc = documentRef.resolveListenable().document;
+            if (doc != null && mounted) {
+              setState(() => _totalPages = doc.pages.length);
             }
           },
           viewerOverlayBuilder: (context, size, handleLinkTap) {
