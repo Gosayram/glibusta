@@ -116,10 +116,11 @@ class ReaderController {
   ReaderState _state = ReaderState();
   final _stateController = StreamController<ReaderState>.broadcast();
   bool _disposed = false;
+  bool _loaded = false;
   bool _fullscreenEnabled = false;
 
-  ReaderContentHelper? _content;
-  ReaderProgressHelper? _progress;
+  late final ReaderContentHelper _content;
+  late final ReaderProgressHelper _progress;
 
   ReaderState get state => _state;
   Stream<ReaderState> get stateStream => _stateController.stream;
@@ -152,10 +153,11 @@ class ReaderController {
     final db = _ref.read(databaseProvider);
     _content = ReaderContentHelper(service, _bookId);
     _progress = ReaderProgressHelper(db, _bookId);
+    _loaded = true;
 
     try {
-      final meta = await _content!.loadMetadata();
-      final savedPosition = await _progress!.loadSavedPosition(meta.chapterCount);
+      final meta = await _content.loadMetadata();
+      final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
 
       _updateState(
         _state.copyWith(
@@ -170,7 +172,7 @@ class ReaderController {
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
 
       const wordsPerMinute = 200;
-      final totalWords = _content!.computeTotalWords(_state.loadedChapters);
+      final totalWords = _content.computeTotalWords(_state.loadedChapters);
       _updateState(
         _state.copyWith(
           estimatedMinutesLeft: totalWords > 0 ? (totalWords / wordsPerMinute).ceil() : 0,
@@ -234,14 +236,14 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
-    final updated = await _content!.ensureChaptersLoaded(centerIndex, _state.loadedChapters);
+    final updated = await _content.ensureChaptersLoaded(centerIndex, _state.loadedChapters);
     if (!_disposed) {
       _updateState(_state.copyWith(loadedChapters: updated));
     }
   }
 
   void _evictDistantChapters(int centerIndex) {
-    final updated = _content!.evictDistantChapters(centerIndex, _state.loadedChapters);
+    final updated = _content.evictDistantChapters(centerIndex, _state.loadedChapters);
     if (updated.length != _state.loadedChapters.length) {
       _updateState(_state.copyWith(loadedChapters: updated));
     }
@@ -330,7 +332,8 @@ class ReaderController {
   }
 
   void saveProgress() {
-    _progress?.saveProgress(_state.currentPosition, _state.chapterCount);
+    if (!_loaded) return;
+    _progress.saveProgress(_state.currentPosition, _state.chapterCount);
   }
 
   // ── Navigation ────────────────────────────────────────
@@ -617,7 +620,7 @@ class ReaderController {
   BookSearchService? createSearchService() {
     final meta = _state.metadata;
     if (meta == null) return null;
-    final book = _content!.buildBookForSearch(meta, _state.loadedChapters);
+    final book = _content.buildBookForSearch(meta, _state.loadedChapters);
     return BookSearchService(book);
   }
 
@@ -629,8 +632,10 @@ class ReaderController {
       if (await file.exists()) {
         await file.delete();
       }
-      await _progress?.deleteDownload();
-      await _progress?.deleteProgress();
+      if (_loaded) {
+        await _progress.deleteDownload();
+        await _progress.deleteProgress();
+      }
     } on Object catch (e, st) {
       developer.log(
         'Error during file deletion cleanup',
