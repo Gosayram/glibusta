@@ -40,12 +40,10 @@ extension AdaptiveContext on BuildContext {
   bool get isExpanded => windowClass == WindowClass.expanded;
 
   /// True when screen width >= 1024px (macOS sidebar threshold).
-  bool get isDesktopWidth =>
-      MediaQuery.sizeOf(this).width >= AppBreakpoints.desktop;
+  bool get isDesktopWidth => MediaQuery.sizeOf(this).width >= AppBreakpoints.desktop;
 
   /// True when orientation is landscape.
-  bool get isLandscape =>
-      MediaQuery.orientationOf(this) == Orientation.landscape;
+  bool get isLandscape => MediaQuery.orientationOf(this) == Orientation.landscape;
 
   /// True when screen is wide enough for two-page reader mode.
   bool get canUseTwoPageMode {
@@ -55,29 +53,29 @@ extension AdaptiveContext on BuildContext {
 
   /// Responsive horizontal padding based on window class.
   double get pagePadding => switch (windowClass) {
-        WindowClass.compact => 16,
-        WindowClass.medium => 24,
-        WindowClass.expanded => 32,
-      };
+    WindowClass.compact => 16,
+    WindowClass.medium => 24,
+    WindowClass.expanded => 32,
+  };
 
   /// Max content width for reader based on window class.
   double get readerMaxWidth => switch (windowClass) {
-        WindowClass.compact => double.infinity,
-        WindowClass.medium => 720,
-        WindowClass.expanded => 820,
-      };
+    WindowClass.compact => double.infinity,
+    WindowClass.medium => 720,
+    WindowClass.expanded => 820,
+  };
 
   /// Max cross-axis extent for book grid cards based on window class.
   double get bookCardMaxExtent => switch (windowClass) {
-        WindowClass.compact => 180,
-        WindowClass.medium => 200,
-        WindowClass.expanded => 220,
-      };
+    WindowClass.compact => 180,
+    WindowClass.medium => 200,
+    WindowClass.expanded => 220,
+  };
 
   /// Horizontal padding for reader based on window class.
   double get readerPadding => switch (windowClass) {
-        WindowClass.compact => 20,
-        WindowClass.medium => 32,
-        WindowClass.expanded => 48,
-      };
+    WindowClass.compact => 20,
+    WindowClass.medium => 32,
+    WindowClass.expanded => 48,
+  };
 }

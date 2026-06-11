@@ -60,7 +60,9 @@ class BookmarkRepository {
   }
 
   Future<void> insertBookmark(Bookmark bookmark) async {
-    await _db.into(_db.bookmarks).insert(
+    await _db
+        .into(_db.bookmarks)
+        .insert(
           BookmarksCompanion.insert(
             id: bookmark.id,
             bookId: bookmark.bookId,

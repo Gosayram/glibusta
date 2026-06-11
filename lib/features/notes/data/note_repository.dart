@@ -61,7 +61,9 @@ class NoteRepository {
   }
 
   Future<void> insertNote(Note note) async {
-    await _db.into(_db.notes).insert(
+    await _db
+        .into(_db.notes)
+        .insert(
           NotesCompanion.insert(
             id: note.id,
             bookId: note.bookId,

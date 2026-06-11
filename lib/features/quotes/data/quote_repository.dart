@@ -58,7 +58,9 @@ class QuoteRepository {
   }
 
   Future<void> insertQuote(Quote quote) async {
-    await _db.into(_db.quotes).insert(
+    await _db
+        .into(_db.quotes)
+        .insert(
           QuotesCompanion.insert(
             id: quote.id,
             bookId: quote.bookId,
