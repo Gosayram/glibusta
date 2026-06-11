@@ -10,10 +10,9 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/book_cover_image.dart';
-import '../../reader/data/book_open_service.dart';
-import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_comments_service.dart';
 import '../data/book_details_repository_impl.dart';
+import 'book_details_providers.dart';
 
 final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
   final repository = ref.watch(bookDetailsRepositoryProvider);
@@ -296,15 +295,11 @@ class _SeriesInfoSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final db = ref.read<AppDatabase>(databaseProvider);
+    final seriesAsync = ref.watch(seriesForBookProvider(bookId));
 
-    return FutureBuilder<List<Sery>>(
-      future: db.getSeriesForBook(bookId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        final seriesList = snapshot.data!;
+    return seriesAsync.when(
+      data: (seriesList) {
+        if (seriesList.isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Column(
@@ -356,6 +351,8 @@ class _SeriesInfoSection extends ConsumerWidget {
           ),
         );
       },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
@@ -424,12 +421,11 @@ class _ChaptersTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final service = ref.read<BookOpenService>(bookOpenServiceProvider);
+    final chaptersAsync = ref.watch(chaptersForBookProvider(bookId));
 
-    return FutureBuilder<NormalizedBook?>(
-      future: service.getCachedBook(bookId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
+    return chaptersAsync.when(
+      data: (book) {
+        if (book == null) {
           return Center(
             child: Text(
               'Откройте книгу, чтобы увидеть главы',
@@ -437,7 +433,7 @@ class _ChaptersTab extends ConsumerWidget {
             ),
           );
         }
-        final chapters = snapshot.data!.chapters;
+        final chapters = book.chapters;
         return ListView.builder(
           itemCount: chapters.length,
           itemBuilder: (context, index) {
@@ -453,6 +449,13 @@ class _ChaptersTab extends ConsumerWidget {
           },
         );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => Center(
+        child: Text(
+          'Откройте книгу, чтобы увидеть главы',
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+      ),
     );
   }
 }
@@ -465,12 +468,11 @@ class _BookmarksTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final db = ref.read<AppDatabase>(databaseProvider);
+    final bookmarksAsync = ref.watch(bookmarksForBookProvider(bookId));
 
-    return FutureBuilder<List<Bookmark>>(
-      future: db.getBookmarksForBook(bookId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+    return bookmarksAsync.when(
+      data: (bookmarks) {
+        if (bookmarks.isEmpty) {
           return Center(
             child: Text(
               'Нет закладок',
@@ -479,9 +481,9 @@ class _BookmarksTab extends ConsumerWidget {
           );
         }
         return ListView.builder(
-          itemCount: snapshot.data!.length,
+          itemCount: bookmarks.length,
           itemBuilder: (context, index) {
-            final bookmark = snapshot.data![index];
+            final bookmark = bookmarks[index];
             return ListTile(
               leading: const Icon(Icons.bookmark, size: 20),
               title: Text(
@@ -495,6 +497,13 @@ class _BookmarksTab extends ConsumerWidget {
           },
         );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => Center(
+        child: Text(
+          'Нет закладок',
+          style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+        ),
+      ),
     );
   }
 }
@@ -507,20 +516,19 @@ class _QuotesTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final db = ref.read<AppDatabase>(databaseProvider);
+    final quotesAsync = ref.watch(quotesForBookProvider(bookId));
 
-    return FutureBuilder<List<Quote>>(
-      future: db.getQuotesForBook(bookId),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+    return quotesAsync.when(
+      data: (quotes) {
+        if (quotes.isEmpty) {
           return Center(
             child: Text('Нет цитат', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
           );
         }
         return ListView.builder(
-          itemCount: snapshot.data!.length,
+          itemCount: quotes.length,
           itemBuilder: (context, index) {
-            final quote = snapshot.data![index];
+            final quote = quotes[index];
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Card(
@@ -567,6 +575,10 @@ class _QuotesTab extends ConsumerWidget {
           },
         );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => Center(
+        child: Text('Нет цитат', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+      ),
     );
   }
 }
@@ -593,136 +605,137 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final commentsService = ref.read(bookCommentsServiceProvider);
+    final commentsAsync = ref.watch(commentsForBookProvider(widget.bookId));
     final authData = ref.watch(auth.authStateProvider).value;
     final isAuthenticated = authData?.isAuthenticated ?? false;
 
-    return FutureBuilder<List<BookComment>>(
-      future: commentsService.getComments(widget.bookId),
-      builder: (context, snapshot) {
-        final comments = snapshot.data ?? [];
+    return commentsAsync.when(
+      data: (comments) => _buildBody(theme, comments, isAuthenticated),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => _buildBody(theme, const [], isAuthenticated),
+    );
+  }
 
-        return Column(
-          children: [
-            Expanded(
-              child: comments.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Нет комментариев',
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: comments.length,
-                      itemBuilder: (context, index) {
-                        final comment = comments[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildBody(ThemeData theme, List<BookComment> comments, bool isAuthenticated) {
+    return Column(
+      children: [
+        Expanded(
+          child: comments.isEmpty
+              ? Center(
+                  child: Text(
+                    'Нет комментариев',
+                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: comments.length,
+                  itemBuilder: (context, index) {
+                    final comment = comments[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.person, size: 16, color: theme.colorScheme.primary),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      comment.author,
-                                      style: theme.textTheme.labelMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ),
-                                    if (comment.createdAt != null) ...[
-                                      const Spacer(),
-                                      Text(
-                                        _formatDate(comment.createdAt!),
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                Icon(Icons.person, size: 16, color: theme.colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  comment.author,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(comment.text, style: theme.textTheme.bodyMedium),
+                                if (comment.createdAt != null) ...[
+                                  const Spacer(),
+                                  Text(
+                                    _formatDate(comment.createdAt!),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: !isAuthenticated
-                    ? Row(
-                        children: [
-                          Icon(
-                            Icons.lock_outline,
-                            size: 16,
+                            const SizedBox(height: 8),
+                            Text(comment.text, style: theme.textTheme.bodyMedium),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: !isAuthenticated
+                ? Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline,
+                        size: 16,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Войдите, чтобы оставить комментарий',
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Войдите, чтобы оставить комментарий',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const _LoginPlaceholder(),
-                              ),
-                            ),
-                            child: const Text('Войти'),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _commentController,
-                              decoration: const InputDecoration(
-                                hintText: 'Комментарий...',
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              maxLines: null,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (_) => _postComment(),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          IconButton.filled(
-                            onPressed: _isPosting ? null : _postComment,
-                            icon: _isPosting
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.send, size: 18),
-                          ),
-                        ],
+                        ),
                       ),
-              ),
-            ),
-          ],
-        );
-      },
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const _LoginPlaceholder(),
+                          ),
+                        ),
+                        child: const Text('Войти'),
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          decoration: const InputDecoration(
+                            hintText: 'Комментарий...',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          maxLines: null,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _postComment(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: _isPosting ? null : _postComment,
+                        icon: _isPosting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.send, size: 18),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -747,7 +760,7 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Комментарий отправлен')),
         );
-        setState(() {});
+        ref.invalidate(commentsForBookProvider(widget.bookId));
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не удалось отправить комментарий')),
