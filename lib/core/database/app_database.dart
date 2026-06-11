@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
+import 'package:drift_flutter/drift_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -30,7 +30,7 @@ part 'app_database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   AppDatabase.forTesting(super.e);
 
@@ -83,7 +83,7 @@ class AppDatabase extends _$AppDatabase {
 
   static Future<String> get _databasePath async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    return p.join(dbFolder.path, 'glibusta', 'glibusta.db');
+    return p.join(dbFolder.path, 'glibusta', 'glibusta.sqlite');
   }
 
   // --- SavedBooks ---
@@ -347,13 +347,16 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'glibusta', 'glibusta.db'));
-    await file.parent.create(recursive: true);
-    return NativeDatabase.createInBackground(file);
-  });
+QueryExecutor _openConnection() {
+  return driftDatabase(
+    name: 'glibusta',
+    native: DriftNativeOptions(
+      databaseDirectory: () async {
+        final dir = await getApplicationDocumentsDirectory();
+        return Directory(p.join(dir.path, 'glibusta'));
+      },
+    ),
+  );
 }
 
 final databaseProvider = Provider<AppDatabase>((ref) {
