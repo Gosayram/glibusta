@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,27 +10,24 @@ class LibraryViewModeNotifier extends _$LibraryViewModeNotifier {
   static const _key = 'library_view_mode';
 
   @override
-  LibraryViewMode build() {
-    unawaited(_loadFromPrefs());
-    return LibraryViewMode.grid;
-  }
-
-  Future<void> _loadFromPrefs() async {
+  Future<LibraryViewMode> build() async {
     final prefs = await SharedPreferences.getInstance();
     final index = prefs.getInt(_key) ?? 0;
     if (index >= 0 && index < LibraryViewMode.values.length) {
-      state = LibraryViewMode.values[index];
+      return LibraryViewMode.values[index];
     }
+    return LibraryViewMode.grid;
   }
 
   Future<void> setMode(LibraryViewMode mode) async {
-    state = mode;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_key, mode.index);
+    state = AsyncData(mode);
   }
 
-  void cycle() {
-    final next = (state.index + 1) % LibraryViewMode.values.length;
-    unawaited(setMode(LibraryViewMode.values[next]));
+  Future<void> cycle() async {
+    final current = await future;
+    final next = (current.index + 1) % LibraryViewMode.values.length;
+    await setMode(LibraryViewMode.values[next]);
   }
 }

@@ -66,7 +66,7 @@ class BookImportService {
             SavedBooksCompanion.insert(
               id: book.id,
               title: book.title,
-              authorIds: Value(_encodeList(book.authors)),
+              authorIds: Value(book.authors),
               description: Value(book.description),
               coverUrl: Value(book.coverUrl),
               sourceUrl: Value(filePath),
@@ -129,10 +129,6 @@ class BookImportService {
       await booksDir.create(recursive: true);
     }
     return booksDir.path;
-  }
-
-  String _encodeList(List<String> items) {
-    return '[${items.map((i) => '"${i.replaceAll('"', r'\"')}"').join(',')}]';
   }
 }
 

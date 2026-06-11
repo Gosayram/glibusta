@@ -1,10 +1,14 @@
 import 'package:drift/drift.dart';
 
+import 'converters.dart';
+
 class SavedBooks extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
-  TextColumn get authorIds => text().withDefault(const Constant('[]'))();
-  TextColumn get genreIds => text().withDefault(const Constant('[]'))();
+  TextColumn get authorIds =>
+      text().withDefault(const Constant('[]')).map(const StringListConverter())();
+  TextColumn get genreIds =>
+      text().withDefault(const Constant('[]')).map(const StringListConverter())();
   TextColumn get description => text().nullable()();
   TextColumn get coverUrl => text().nullable()();
   DateTimeColumn get publishDate => dateTime().nullable()();
@@ -23,7 +27,8 @@ class SavedBooks extends Table {
 class Authors extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
-  TextColumn get bookIds => text().withDefault(const Constant('[]'))();
+  TextColumn get bookIds =>
+      text().withDefault(const Constant('[]')).map(const StringListConverter())();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -33,7 +38,8 @@ class Series extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get description => text().nullable()();
-  TextColumn get bookIds => text().withDefault(const Constant('[]'))();
+  TextColumn get bookIds =>
+      text().withDefault(const Constant('[]')).map(const StringListConverter())();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -151,7 +157,8 @@ class Collections extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get description => text().nullable()();
-  TextColumn get bookIds => text().withDefault(const Constant('[]'))();
+  TextColumn get bookIds =>
+      text().withDefault(const Constant('[]')).map(const StringListConverter())();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
 
   @override

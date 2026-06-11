@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,38 +12,46 @@ const _pinnedKey = 'pinned_book_ids';
 @riverpod
 class PinnedBooks extends _$PinnedBooks {
   @override
-  List<String> build() {
-    unawaited(_loadFromPrefs());
-    return [];
-  }
-
-  Future<void> _loadFromPrefs() async {
+  Future<List<String>> build() async {
     final prefs = await SharedPreferences.getInstance();
-    state = prefs.getStringList(_pinnedKey) ?? [];
+    return prefs.getStringList(_pinnedKey) ?? [];
   }
 
   Future<void> toggle(String bookId) async {
+    final current = await future;
     final prefs = await SharedPreferences.getInstance();
-    if (state.contains(bookId)) {
-      state = List.from(state)..remove(bookId);
+    List<String> updated;
+    if (current.contains(bookId)) {
+      updated = List.from(current)..remove(bookId);
     } else {
-      if (state.length >= _maxPinnedBooks) {
-        state = List.from(state)..removeLast();
+      updated = List.from(current);
+      if (updated.length >= _maxPinnedBooks) {
+        updated.removeLast();
       }
-      state = List.from(state)..add(bookId);
+      updated.add(bookId);
     }
-    await prefs.setStringList(_pinnedKey, state);
+    await prefs.setStringList(_pinnedKey, updated);
+    state = AsyncData(updated);
   }
 
-  bool isPinned(String bookId) => state.contains(bookId);
+  bool isPinned(String bookId) {
+    final value = switch (state) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
+    return value?.contains(bookId) ?? false;
+  }
 
-  int get count => state.length;
-  bool get isFull => state.length >= _maxPinnedBooks;
+  int get count => switch (state) {
+    AsyncData(:final value) => value.length,
+    _ => 0,
+  };
+  bool get isFull => count >= _maxPinnedBooks;
 }
 
 @riverpod
 Future<List<Book>> pinnedBooksList(Ref ref) async {
-  final pinnedIds = ref.watch(pinnedBooksProvider);
+  final pinnedIds = await ref.watch(pinnedBooksProvider.future);
   if (pinnedIds.isEmpty) return [];
 
   final repository = ref.watch(bookRepositoryProvider);

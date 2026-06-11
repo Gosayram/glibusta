@@ -12,7 +12,7 @@ part of 'pinned_books_provider.dart';
 @ProviderFor(PinnedBooks)
 final pinnedBooksProvider = PinnedBooksProvider._();
 
-final class PinnedBooksProvider extends $NotifierProvider<PinnedBooks, List<String>> {
+final class PinnedBooksProvider extends $AsyncNotifierProvider<PinnedBooks, List<String>> {
   PinnedBooksProvider._()
     : super(
         from: null,
@@ -30,29 +30,21 @@ final class PinnedBooksProvider extends $NotifierProvider<PinnedBooks, List<Stri
   @$internal
   @override
   PinnedBooks create() => PinnedBooks();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<String>>(value),
-    );
-  }
 }
 
-String _$pinnedBooksHash() => r'b997d0866bc5616fbde6ac3da3a6baebbe0ac0b5';
+String _$pinnedBooksHash() => r'de04ca9e7fbbadf0478b1401121f3d4511621633';
 
-abstract class _$PinnedBooks extends $Notifier<List<String>> {
-  List<String> build();
+abstract class _$PinnedBooks extends $AsyncNotifier<List<String>> {
+  FutureOr<List<String>> build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<List<String>, List<String>>;
+    final ref = this.ref as $Ref<AsyncValue<List<String>>, List<String>>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<List<String>, List<String>>,
-              List<String>,
+              AnyNotifier<AsyncValue<List<String>>, List<String>>,
+              AsyncValue<List<String>>,
               Object?,
               Object?
             >;
@@ -91,4 +83,4 @@ final class PinnedBooksListProvider
   }
 }
 
-String _$pinnedBooksListHash() => r'137a6c23780b76c0ce23540098d118b525924adb';
+String _$pinnedBooksListHash() => r'f3873a593679e8c74426ed09ceca08864fead962';

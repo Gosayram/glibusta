@@ -13,7 +13,7 @@ part of 'library_view_mode_provider.dart';
 final libraryViewModeProvider = LibraryViewModeNotifierProvider._();
 
 final class LibraryViewModeNotifierProvider
-    extends $NotifierProvider<LibraryViewModeNotifier, LibraryViewMode> {
+    extends $AsyncNotifierProvider<LibraryViewModeNotifier, LibraryViewMode> {
   LibraryViewModeNotifierProvider._()
     : super(
         from: null,
@@ -31,29 +31,21 @@ final class LibraryViewModeNotifierProvider
   @$internal
   @override
   LibraryViewModeNotifier create() => LibraryViewModeNotifier();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(LibraryViewMode value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<LibraryViewMode>(value),
-    );
-  }
 }
 
-String _$libraryViewModeNotifierHash() => r'83b2f79a9393e111b741a6ea377cff6a1f014b00';
+String _$libraryViewModeNotifierHash() => r'007c66e1a8f8e620a1d917cebf2b23ff81b55bea';
 
-abstract class _$LibraryViewModeNotifier extends $Notifier<LibraryViewMode> {
-  LibraryViewMode build();
+abstract class _$LibraryViewModeNotifier extends $AsyncNotifier<LibraryViewMode> {
+  FutureOr<LibraryViewMode> build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<LibraryViewMode, LibraryViewMode>;
+    final ref = this.ref as $Ref<AsyncValue<LibraryViewMode>, LibraryViewMode>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<LibraryViewMode, LibraryViewMode>,
-              LibraryViewMode,
+              AnyNotifier<AsyncValue<LibraryViewMode>, LibraryViewMode>,
+              AsyncValue<LibraryViewMode>,
               Object?,
               Object?
             >;

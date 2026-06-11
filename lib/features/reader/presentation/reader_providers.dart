@@ -7,6 +7,10 @@ import '../domain/reader.dart';
 
 part 'reader_providers.g.dart';
 
+// NOTE: ReaderSettingsNotifier intentionally uses the unawaited(_loadFromPrefs())
+// pattern instead of AsyncNotifier. Migration would require updating 18+ consumer
+// sites and 25+ setters to handle AsyncValue. The default ReaderSettings() is a
+// reasonable fallback — the flash is brief. Migrate if Riverpod adds auto-unwrapping.
 @riverpod
 class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   @override

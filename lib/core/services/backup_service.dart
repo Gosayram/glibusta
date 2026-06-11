@@ -277,7 +277,11 @@ class BackupService {
     return CollectionsCompanion.insert(
       id: map['id'] as String,
       name: map['name'] as String,
-      bookIds: Value(map['bookIds'] as String? ?? '[]'),
+      bookIds: Value(
+        map['bookIds'] is String
+            ? List<String>.from((jsonDecode(map['bookIds'] as String) as List<dynamic>))
+            : (map['bookIds'] as List<dynamic>?)?.cast<String>() ?? [],
+      ),
       createdAt: Value(
         map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),

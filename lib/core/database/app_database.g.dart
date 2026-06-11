@@ -26,30 +26,26 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _authorIdsMeta = const VerificationMeta(
-    'authorIds',
-  );
   @override
-  late final GeneratedColumn<String> authorIds = GeneratedColumn<String>(
-    'author_ids',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('[]'),
-  );
-  static const VerificationMeta _genreIdsMeta = const VerificationMeta(
-    'genreIds',
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> authorIds =
+      GeneratedColumn<String>(
+        'author_ids',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($SavedBooksTable.$converterauthorIds);
   @override
-  late final GeneratedColumn<String> genreIds = GeneratedColumn<String>(
-    'genre_ids',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('[]'),
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> genreIds =
+      GeneratedColumn<String>(
+        'genre_ids',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($SavedBooksTable.$convertergenreIds);
   static const VerificationMeta _descriptionMeta = const VerificationMeta(
     'description',
   );
@@ -205,18 +201,6 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     } else if (isInserting) {
       context.missing(_titleMeta);
     }
-    if (data.containsKey('author_ids')) {
-      context.handle(
-        _authorIdsMeta,
-        authorIds.isAcceptableOrUnknown(data['author_ids']!, _authorIdsMeta),
-      );
-    }
-    if (data.containsKey('genre_ids')) {
-      context.handle(
-        _genreIdsMeta,
-        genreIds.isAcceptableOrUnknown(data['genre_ids']!, _genreIdsMeta),
-      );
-    }
     if (data.containsKey('description')) {
       context.handle(
         _descriptionMeta,
@@ -306,14 +290,18 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       )!,
-      authorIds: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}author_ids'],
-      )!,
-      genreIds: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}genre_ids'],
-      )!,
+      authorIds: $SavedBooksTable.$converterauthorIds.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}author_ids'],
+        )!,
+      ),
+      genreIds: $SavedBooksTable.$convertergenreIds.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}genre_ids'],
+        )!,
+      ),
       description: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}description'],
@@ -361,13 +349,16 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
   $SavedBooksTable createAlias(String alias) {
     return $SavedBooksTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<List<String>, String> $converterauthorIds = const StringListConverter();
+  static TypeConverter<List<String>, String> $convertergenreIds = const StringListConverter();
 }
 
 class SavedBook extends DataClass implements Insertable<SavedBook> {
   final String id;
   final String title;
-  final String authorIds;
-  final String genreIds;
+  final List<String> authorIds;
+  final List<String> genreIds;
   final String? description;
   final String? coverUrl;
   final DateTime? publishDate;
@@ -399,8 +390,16 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
-    map['author_ids'] = Variable<String>(authorIds);
-    map['genre_ids'] = Variable<String>(genreIds);
+    {
+      map['author_ids'] = Variable<String>(
+        $SavedBooksTable.$converterauthorIds.toSql(authorIds),
+      );
+    }
+    {
+      map['genre_ids'] = Variable<String>(
+        $SavedBooksTable.$convertergenreIds.toSql(genreIds),
+      );
+    }
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
@@ -455,8 +454,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     return SavedBook(
       id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
-      authorIds: serializer.fromJson<String>(json['authorIds']),
-      genreIds: serializer.fromJson<String>(json['genreIds']),
+      authorIds: serializer.fromJson<List<String>>(json['authorIds']),
+      genreIds: serializer.fromJson<List<String>>(json['genreIds']),
       description: serializer.fromJson<String?>(json['description']),
       coverUrl: serializer.fromJson<String?>(json['coverUrl']),
       publishDate: serializer.fromJson<DateTime?>(json['publishDate']),
@@ -475,8 +474,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
-      'authorIds': serializer.toJson<String>(authorIds),
-      'genreIds': serializer.toJson<String>(genreIds),
+      'authorIds': serializer.toJson<List<String>>(authorIds),
+      'genreIds': serializer.toJson<List<String>>(genreIds),
       'description': serializer.toJson<String?>(description),
       'coverUrl': serializer.toJson<String?>(coverUrl),
       'publishDate': serializer.toJson<DateTime?>(publishDate),
@@ -493,8 +492,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   SavedBook copyWith({
     String? id,
     String? title,
-    String? authorIds,
-    String? genreIds,
+    List<String>? authorIds,
+    List<String>? genreIds,
     Value<String?> description = const Value.absent(),
     Value<String?> coverUrl = const Value.absent(),
     Value<DateTime?> publishDate = const Value.absent(),
@@ -601,8 +600,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<String> id;
   final Value<String> title;
-  final Value<String> authorIds;
-  final Value<String> genreIds;
+  final Value<List<String>> authorIds;
+  final Value<List<String>> genreIds;
   final Value<String?> description;
   final Value<String?> coverUrl;
   final Value<DateTime?> publishDate;
@@ -688,8 +687,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   SavedBooksCompanion copyWith({
     Value<String>? id,
     Value<String>? title,
-    Value<String>? authorIds,
-    Value<String>? genreIds,
+    Value<List<String>>? authorIds,
+    Value<List<String>>? genreIds,
     Value<String?>? description,
     Value<String?>? coverUrl,
     Value<DateTime?>? publishDate,
@@ -731,10 +730,14 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       map['title'] = Variable<String>(title.value);
     }
     if (authorIds.present) {
-      map['author_ids'] = Variable<String>(authorIds.value);
+      map['author_ids'] = Variable<String>(
+        $SavedBooksTable.$converterauthorIds.toSql(authorIds.value),
+      );
     }
     if (genreIds.present) {
-      map['genre_ids'] = Variable<String>(genreIds.value);
+      map['genre_ids'] = Variable<String>(
+        $SavedBooksTable.$convertergenreIds.toSql(genreIds.value),
+      );
     }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
@@ -818,18 +821,16 @@ class $AuthorsTable extends Authors with TableInfo<$AuthorsTable, Author> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _bookIdsMeta = const VerificationMeta(
-    'bookIds',
-  );
   @override
-  late final GeneratedColumn<String> bookIds = GeneratedColumn<String>(
-    'book_ids',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('[]'),
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> bookIds =
+      GeneratedColumn<String>(
+        'book_ids',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($AuthorsTable.$converterbookIds);
   @override
   List<GeneratedColumn> get $columns => [id, name, bookIds];
   @override
@@ -857,12 +858,6 @@ class $AuthorsTable extends Authors with TableInfo<$AuthorsTable, Author> {
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
-    if (data.containsKey('book_ids')) {
-      context.handle(
-        _bookIdsMeta,
-        bookIds.isAcceptableOrUnknown(data['book_ids']!, _bookIdsMeta),
-      );
-    }
     return context;
   }
 
@@ -880,10 +875,12 @@ class $AuthorsTable extends Authors with TableInfo<$AuthorsTable, Author> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
-      bookIds: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}book_ids'],
-      )!,
+      bookIds: $AuthorsTable.$converterbookIds.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}book_ids'],
+        )!,
+      ),
     );
   }
 
@@ -891,19 +888,25 @@ class $AuthorsTable extends Authors with TableInfo<$AuthorsTable, Author> {
   $AuthorsTable createAlias(String alias) {
     return $AuthorsTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
 }
 
 class Author extends DataClass implements Insertable<Author> {
   final String id;
   final String name;
-  final String bookIds;
+  final List<String> bookIds;
   const Author({required this.id, required this.name, required this.bookIds});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
-    map['book_ids'] = Variable<String>(bookIds);
+    {
+      map['book_ids'] = Variable<String>(
+        $AuthorsTable.$converterbookIds.toSql(bookIds),
+      );
+    }
     return map;
   }
 
@@ -923,7 +926,7 @@ class Author extends DataClass implements Insertable<Author> {
     return Author(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      bookIds: serializer.fromJson<String>(json['bookIds']),
+      bookIds: serializer.fromJson<List<String>>(json['bookIds']),
     );
   }
   @override
@@ -932,11 +935,11 @@ class Author extends DataClass implements Insertable<Author> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
-      'bookIds': serializer.toJson<String>(bookIds),
+      'bookIds': serializer.toJson<List<String>>(bookIds),
     };
   }
 
-  Author copyWith({String? id, String? name, String? bookIds}) => Author(
+  Author copyWith({String? id, String? name, List<String>? bookIds}) => Author(
     id: id ?? this.id,
     name: name ?? this.name,
     bookIds: bookIds ?? this.bookIds,
@@ -973,7 +976,7 @@ class Author extends DataClass implements Insertable<Author> {
 class AuthorsCompanion extends UpdateCompanion<Author> {
   final Value<String> id;
   final Value<String> name;
-  final Value<String> bookIds;
+  final Value<List<String>> bookIds;
   final Value<int> rowid;
   const AuthorsCompanion({
     this.id = const Value.absent(),
@@ -1005,7 +1008,7 @@ class AuthorsCompanion extends UpdateCompanion<Author> {
   AuthorsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
-    Value<String>? bookIds,
+    Value<List<String>>? bookIds,
     Value<int>? rowid,
   }) {
     return AuthorsCompanion(
@@ -1026,7 +1029,9 @@ class AuthorsCompanion extends UpdateCompanion<Author> {
       map['name'] = Variable<String>(name.value);
     }
     if (bookIds.present) {
-      map['book_ids'] = Variable<String>(bookIds.value);
+      map['book_ids'] = Variable<String>(
+        $AuthorsTable.$converterbookIds.toSql(bookIds.value),
+      );
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1080,18 +1085,16 @@ class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _bookIdsMeta = const VerificationMeta(
-    'bookIds',
-  );
   @override
-  late final GeneratedColumn<String> bookIds = GeneratedColumn<String>(
-    'book_ids',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('[]'),
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> bookIds =
+      GeneratedColumn<String>(
+        'book_ids',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($SeriesTable.$converterbookIds);
   @override
   List<GeneratedColumn> get $columns => [id, name, description, bookIds];
   @override
@@ -1128,12 +1131,6 @@ class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
         ),
       );
     }
-    if (data.containsKey('book_ids')) {
-      context.handle(
-        _bookIdsMeta,
-        bookIds.isAcceptableOrUnknown(data['book_ids']!, _bookIdsMeta),
-      );
-    }
     return context;
   }
 
@@ -1155,10 +1152,12 @@ class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
-      bookIds: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}book_ids'],
-      )!,
+      bookIds: $SeriesTable.$converterbookIds.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}book_ids'],
+        )!,
+      ),
     );
   }
 
@@ -1166,13 +1165,15 @@ class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
   $SeriesTable createAlias(String alias) {
     return $SeriesTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
 }
 
 class Sery extends DataClass implements Insertable<Sery> {
   final String id;
   final String name;
   final String? description;
-  final String bookIds;
+  final List<String> bookIds;
   const Sery({
     required this.id,
     required this.name,
@@ -1187,7 +1188,11 @@ class Sery extends DataClass implements Insertable<Sery> {
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
-    map['book_ids'] = Variable<String>(bookIds);
+    {
+      map['book_ids'] = Variable<String>(
+        $SeriesTable.$converterbookIds.toSql(bookIds),
+      );
+    }
     return map;
   }
 
@@ -1209,7 +1214,7 @@ class Sery extends DataClass implements Insertable<Sery> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
-      bookIds: serializer.fromJson<String>(json['bookIds']),
+      bookIds: serializer.fromJson<List<String>>(json['bookIds']),
     );
   }
   @override
@@ -1219,7 +1224,7 @@ class Sery extends DataClass implements Insertable<Sery> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
-      'bookIds': serializer.toJson<String>(bookIds),
+      'bookIds': serializer.toJson<List<String>>(bookIds),
     };
   }
 
@@ -1227,7 +1232,7 @@ class Sery extends DataClass implements Insertable<Sery> {
     String? id,
     String? name,
     Value<String?> description = const Value.absent(),
-    String? bookIds,
+    List<String>? bookIds,
   }) => Sery(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1270,7 +1275,7 @@ class SeriesCompanion extends UpdateCompanion<Sery> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> description;
-  final Value<String> bookIds;
+  final Value<List<String>> bookIds;
   final Value<int> rowid;
   const SeriesCompanion({
     this.id = const Value.absent(),
@@ -1307,7 +1312,7 @@ class SeriesCompanion extends UpdateCompanion<Sery> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? description,
-    Value<String>? bookIds,
+    Value<List<String>>? bookIds,
     Value<int>? rowid,
   }) {
     return SeriesCompanion(
@@ -1332,7 +1337,9 @@ class SeriesCompanion extends UpdateCompanion<Sery> {
       map['description'] = Variable<String>(description.value);
     }
     if (bookIds.present) {
-      map['book_ids'] = Variable<String>(bookIds.value);
+      map['book_ids'] = Variable<String>(
+        $SeriesTable.$converterbookIds.toSql(bookIds.value),
+      );
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -5119,18 +5126,16 @@ class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Co
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _bookIdsMeta = const VerificationMeta(
-    'bookIds',
-  );
   @override
-  late final GeneratedColumn<String> bookIds = GeneratedColumn<String>(
-    'book_ids',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('[]'),
-  );
+  late final GeneratedColumnWithTypeConverter<List<String>, String> bookIds =
+      GeneratedColumn<String>(
+        'book_ids',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      ).withConverter<List<String>>($CollectionsTable.$converterbookIds);
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -5185,12 +5190,6 @@ class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Co
         ),
       );
     }
-    if (data.containsKey('book_ids')) {
-      context.handle(
-        _bookIdsMeta,
-        bookIds.isAcceptableOrUnknown(data['book_ids']!, _bookIdsMeta),
-      );
-    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5218,10 +5217,12 @@ class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Co
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
-      bookIds: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}book_ids'],
-      )!,
+      bookIds: $CollectionsTable.$converterbookIds.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}book_ids'],
+        )!,
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5233,13 +5234,15 @@ class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Co
   $CollectionsTable createAlias(String alias) {
     return $CollectionsTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
 }
 
 class Collection extends DataClass implements Insertable<Collection> {
   final String id;
   final String name;
   final String? description;
-  final String bookIds;
+  final List<String> bookIds;
   final DateTime createdAt;
   const Collection({
     required this.id,
@@ -5256,7 +5259,11 @@ class Collection extends DataClass implements Insertable<Collection> {
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
-    map['book_ids'] = Variable<String>(bookIds);
+    {
+      map['book_ids'] = Variable<String>(
+        $CollectionsTable.$converterbookIds.toSql(bookIds),
+      );
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -5280,7 +5287,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
-      bookIds: serializer.fromJson<String>(json['bookIds']),
+      bookIds: serializer.fromJson<List<String>>(json['bookIds']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -5291,7 +5298,7 @@ class Collection extends DataClass implements Insertable<Collection> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
-      'bookIds': serializer.toJson<String>(bookIds),
+      'bookIds': serializer.toJson<List<String>>(bookIds),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -5300,7 +5307,7 @@ class Collection extends DataClass implements Insertable<Collection> {
     String? id,
     String? name,
     Value<String?> description = const Value.absent(),
-    String? bookIds,
+    List<String>? bookIds,
     DateTime? createdAt,
   }) => Collection(
     id: id ?? this.id,
@@ -5348,7 +5355,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
   final Value<String> id;
   final Value<String> name;
   final Value<String?> description;
-  final Value<String> bookIds;
+  final Value<List<String>> bookIds;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const CollectionsCompanion({
@@ -5390,7 +5397,7 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
     Value<String>? id,
     Value<String>? name,
     Value<String?>? description,
-    Value<String>? bookIds,
+    Value<List<String>>? bookIds,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -5417,7 +5424,9 @@ class CollectionsCompanion extends UpdateCompanion<Collection> {
       map['description'] = Variable<String>(description.value);
     }
     if (bookIds.present) {
-      map['book_ids'] = Variable<String>(bookIds.value);
+      map['book_ids'] = Variable<String>(
+        $CollectionsTable.$converterbookIds.toSql(bookIds.value),
+      );
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -6132,8 +6141,8 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
     SavedBooksCompanion Function({
       required String id,
       required String title,
-      Value<String> authorIds,
-      Value<String> genreIds,
+      Value<List<String>> authorIds,
+      Value<List<String>> genreIds,
       Value<String?> description,
       Value<String?> coverUrl,
       Value<DateTime?> publishDate,
@@ -6150,8 +6159,8 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
     SavedBooksCompanion Function({
       Value<String> id,
       Value<String> title,
-      Value<String> authorIds,
-      Value<String> genreIds,
+      Value<List<String>> authorIds,
+      Value<List<String>> genreIds,
       Value<String?> description,
       Value<String?> coverUrl,
       Value<DateTime?> publishDate,
@@ -6183,15 +6192,17 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get authorIds => $composableBuilder(
-    column: $table.authorIds,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get authorIds =>
+      $composableBuilder(
+        column: $table.authorIds,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
-  ColumnFilters<String> get genreIds => $composableBuilder(
-    column: $table.genreIds,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get genreIds =>
+      $composableBuilder(
+        column: $table.genreIds,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
@@ -6337,10 +6348,10 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
-  GeneratedColumn<String> get authorIds =>
+  GeneratedColumnWithTypeConverter<List<String>, String> get authorIds =>
       $composableBuilder(column: $table.authorIds, builder: (column) => column);
 
-  GeneratedColumn<String> get genreIds =>
+  GeneratedColumnWithTypeConverter<List<String>, String> get genreIds =>
       $composableBuilder(column: $table.genreIds, builder: (column) => column);
 
   GeneratedColumn<String> get description => $composableBuilder(
@@ -6413,8 +6424,8 @@ class $$SavedBooksTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
-                Value<String> authorIds = const Value.absent(),
-                Value<String> genreIds = const Value.absent(),
+                Value<List<String>> authorIds = const Value.absent(),
+                Value<List<String>> genreIds = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
@@ -6447,8 +6458,8 @@ class $$SavedBooksTableTableManager
               ({
                 required String id,
                 required String title,
-                Value<String> authorIds = const Value.absent(),
-                Value<String> genreIds = const Value.absent(),
+                Value<List<String>> authorIds = const Value.absent(),
+                Value<List<String>> genreIds = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
@@ -6502,14 +6513,14 @@ typedef $$AuthorsTableCreateCompanionBuilder =
     AuthorsCompanion Function({
       required String id,
       required String name,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<int> rowid,
     });
 typedef $$AuthorsTableUpdateCompanionBuilder =
     AuthorsCompanion Function({
       Value<String> id,
       Value<String> name,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<int> rowid,
     });
 
@@ -6531,10 +6542,11 @@ class $$AuthorsTableFilterComposer extends Composer<_$AppDatabase, $AuthorsTable
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get bookIds => $composableBuilder(
-    column: $table.bookIds,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
+      $composableBuilder(
+        column: $table.bookIds,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 }
 
 class $$AuthorsTableOrderingComposer extends Composer<_$AppDatabase, $AuthorsTable> {
@@ -6575,7 +6587,7 @@ class $$AuthorsTableAnnotationComposer extends Composer<_$AppDatabase, $AuthorsT
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumn<String> get bookIds =>
+  GeneratedColumnWithTypeConverter<List<String>, String> get bookIds =>
       $composableBuilder(column: $table.bookIds, builder: (column) => column);
 }
 
@@ -6607,7 +6619,7 @@ class $$AuthorsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AuthorsCompanion(
                 id: id,
@@ -6619,7 +6631,7 @@ class $$AuthorsTableTableManager
               ({
                 required String id,
                 required String name,
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AuthorsCompanion.insert(
                 id: id,
@@ -6653,7 +6665,7 @@ typedef $$SeriesTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<String?> description,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<int> rowid,
     });
 typedef $$SeriesTableUpdateCompanionBuilder =
@@ -6661,7 +6673,7 @@ typedef $$SeriesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String?> description,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<int> rowid,
     });
 
@@ -6688,10 +6700,11 @@ class $$SeriesTableFilterComposer extends Composer<_$AppDatabase, $SeriesTable> 
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get bookIds => $composableBuilder(
-    column: $table.bookIds,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
+      $composableBuilder(
+        column: $table.bookIds,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 }
 
 class $$SeriesTableOrderingComposer extends Composer<_$AppDatabase, $SeriesTable> {
@@ -6742,7 +6755,7 @@ class $$SeriesTableAnnotationComposer extends Composer<_$AppDatabase, $SeriesTab
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get bookIds =>
+  GeneratedColumnWithTypeConverter<List<String>, String> get bookIds =>
       $composableBuilder(column: $table.bookIds, builder: (column) => column);
 }
 
@@ -6775,7 +6788,7 @@ class $$SeriesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SeriesCompanion(
                 id: id,
@@ -6789,7 +6802,7 @@ class $$SeriesTableTableManager
                 required String id,
                 required String name,
                 Value<String?> description = const Value.absent(),
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SeriesCompanion.insert(
                 id: id,
@@ -8713,7 +8726,7 @@ typedef $$CollectionsTableCreateCompanionBuilder =
       required String id,
       required String name,
       Value<String?> description,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -8722,7 +8735,7 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String?> description,
-      Value<String> bookIds,
+      Value<List<String>> bookIds,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -8750,10 +8763,11 @@ class $$CollectionsTableFilterComposer extends Composer<_$AppDatabase, $Collecti
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get bookIds => $composableBuilder(
-    column: $table.bookIds,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
+      $composableBuilder(
+        column: $table.bookIds,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
@@ -8814,7 +8828,7 @@ class $$CollectionsTableAnnotationComposer extends Composer<_$AppDatabase, $Coll
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get bookIds =>
+  GeneratedColumnWithTypeConverter<List<String>, String> get bookIds =>
       $composableBuilder(column: $table.bookIds, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
@@ -8853,7 +8867,7 @@ class $$CollectionsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion(
@@ -8869,7 +8883,7 @@ class $$CollectionsTableTableManager
                 required String id,
                 required String name,
                 Value<String?> description = const Value.absent(),
-                Value<String> bookIds = const Value.absent(),
+                Value<List<String>> bookIds = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CollectionsCompanion.insert(

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -284,9 +283,7 @@ class _UserCollectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bookIds = collection.bookIds.isNotEmpty
-        ? (jsonDecode(collection.bookIds) as List<dynamic>).length
-        : 0;
+    final bookCount = collection.bookIds.length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -301,9 +298,9 @@ class _UserCollectionTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '$bookIds ${bookIds == 1
+          '$bookCount ${bookCount == 1
               ? 'книга'
-              : bookIds < 5
+              : bookCount < 5
               ? 'книги'
               : 'книг'}',
           style: theme.textTheme.bodySmall?.copyWith(

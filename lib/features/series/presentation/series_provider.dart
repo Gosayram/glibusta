@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
@@ -22,9 +20,7 @@ Future<List<SeriesInfo>> allSeries(Ref ref) async {
     for (final id in bookIds) {
       final row = await db.getBookById(id);
       if (row != null) {
-        final authorIds = row.authorIds.isNotEmpty
-            ? List<String>.from(jsonDecode(row.authorIds) as List<dynamic>)
-            : <String>[];
+        final authorIds = row.authorIds;
         final nameMap = await db.getAuthorNamesByIds(authorIds);
         books.add(
           Book(
@@ -32,9 +28,7 @@ Future<List<SeriesInfo>> allSeries(Ref ref) async {
             title: row.title,
             authorIds: authorIds,
             authorNames: authorIds.map((id) => nameMap[id]).whereType<String>().toList(),
-            genreIds: row.genreIds.isNotEmpty
-                ? List<String>.from(jsonDecode(row.genreIds) as List<dynamic>)
-                : <String>[],
+            genreIds: row.genreIds,
             description: row.description,
             coverUrl: row.coverUrl,
             publishDate: row.publishDate,

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -43,8 +41,8 @@ class BookRepositoryImpl implements BookRepository {
       SavedBooksCompanion(
         id: Value(book.id),
         title: Value(book.title),
-        authorIds: Value(jsonEncode(book.authorIds)),
-        genreIds: Value(jsonEncode(book.genreIds)),
+        authorIds: Value(book.authorIds),
+        genreIds: Value(book.genreIds),
         description: Value(book.description),
         coverUrl: Value(book.coverUrl),
         publishDate: Value(book.publishDate),
@@ -69,8 +67,7 @@ class BookRepositoryImpl implements BookRepository {
     final allAuthorIds = <String>{};
     for (final row in rows) {
       if (row.authorIds.isNotEmpty) {
-        final ids = List<String>.from(jsonDecode(row.authorIds) as List<dynamic>);
-        allAuthorIds.addAll(ids);
+        allAuthorIds.addAll(row.authorIds);
       }
     }
     final nameMap = await _db.getAuthorNamesByIds(allAuthorIds.toList());
@@ -78,12 +75,8 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   Book _rowToBook(SavedBook row, [Map<String, String>? authorNames]) {
-    final authorIds = row.authorIds.isNotEmpty
-        ? List<String>.from(jsonDecode(row.authorIds) as List<dynamic>)
-        : <String>[];
-    final genreIds = row.genreIds.isNotEmpty
-        ? List<String>.from(jsonDecode(row.genreIds) as List<dynamic>)
-        : <String>[];
+    final authorIds = row.authorIds;
+    final genreIds = row.genreIds;
     final names = authorNames != null
         ? authorIds.map((id) => authorNames[id]).whereType<String>().toList()
         : <String>[];

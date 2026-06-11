@@ -40,7 +40,14 @@ class LibraryScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: Icon(_viewModeIcon(ref.watch(libraryViewModeProvider))),
+            icon: Icon(
+              _viewModeIcon(
+                switch (ref.watch(libraryViewModeProvider)) {
+                  AsyncData(:final value) => value,
+                  _ => LibraryViewMode.grid,
+                },
+              ),
+            ),
             tooltip: 'Вид',
             onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
           ),
@@ -192,7 +199,10 @@ class LibraryScreen extends ConsumerWidget {
       return LibraryMasterDetail(books: books);
     }
 
-    final pinnedIds = ref.watch(pinnedBooksProvider);
+    final pinnedIds = switch (ref.watch(pinnedBooksProvider)) {
+      AsyncData(:final value) => value,
+      _ => <String>[],
+    };
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
@@ -269,7 +279,10 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   Widget _buildBookSliver(BuildContext context, WidgetRef ref, List<Book> books) {
-    final viewMode = ref.watch(libraryViewModeProvider);
+    final viewMode = switch (ref.watch(libraryViewModeProvider)) {
+      AsyncData(:final value) => value,
+      _ => LibraryViewMode.grid,
+    };
     switch (viewMode) {
       case LibraryViewMode.grid:
         return SliverGrid(
