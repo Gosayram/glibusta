@@ -38,10 +38,15 @@ class CatalogScreen extends ConsumerWidget {
         title: const Text('Каталог'),
         automaticallyImplyLeading: false,
       ),
-      body: _RestorableListView(
-        restorationId: 'catalog-scroll',
-        children: [
-          AnimatedSwitcher(
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(categoriesProvider);
+          ref.invalidate(popularBooksProvider);
+        },
+        child: _RestorableListView(
+          restorationId: 'catalog-scroll',
+          children: [
+            AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
             child: KeyedSubtree(
               key: ValueKey(
@@ -127,7 +132,8 @@ class CatalogScreen extends ConsumerWidget {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

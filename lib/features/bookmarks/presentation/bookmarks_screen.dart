@@ -75,9 +75,7 @@ class BookmarksScreen extends ConsumerWidget {
               return BookmarkTile(
                     bookmark: bookmark,
                     onTap: () {},
-                    onDelete: () {
-                      _deleteBookmark(ref, bookmark.id);
-                    },
+                    onDelete: () => _deleteBookmark(context, ref, bookmark),
                   )
                   .animate()
                   .fadeIn(delay: (index * 50).ms, duration: 300.ms)
@@ -108,10 +106,23 @@ class BookmarksScreen extends ConsumerWidget {
     );
   }
 
-  void _deleteBookmark(WidgetRef ref, String id) {
+  Future<void> _deleteBookmark(BuildContext context, WidgetRef ref, Bookmark bookmark) async {
     final database = ref.read(databaseProvider);
     final repository = BookmarkRepository(database);
-    unawaited(repository.deleteBookmark(id));
+    await repository.deleteBookmark(bookmark.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Закладка удалена'),
+        action: SnackBarAction(
+          label: 'Отмена',
+          onPressed: () {
+            unawaited(repository.insertBookmark(bookmark));
+          },
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 }
 
@@ -132,6 +143,25 @@ class BookmarkTile extends StatelessWidget {
     return Dismissible(
       key: Key(bookmark.id),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        return showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Удалить закладку?'),
+            content: const Text('Это действие можно отменить'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Удалить'),
+              ),
+            ],
+          ),
+        );
+      },
       background: Container(
         color: Theme.of(context).colorScheme.error,
         alignment: Alignment.centerRight,

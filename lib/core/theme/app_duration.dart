@@ -21,6 +21,9 @@ class AppDuration {
   static const Duration httpReceive = Duration(seconds: 30);
   static const Duration httpRequest = Duration(seconds: 30);
 
+  // Reader
+  static const Duration readerThemeTransition = Duration(milliseconds: 250);
+
   // Auto-theme check
   static const Duration autoThemeCheck = Duration(minutes: 1);
 }

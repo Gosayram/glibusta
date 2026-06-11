@@ -1,0 +1,946 @@
+#!/usr/bin/env python3
+"""Flibusta API Client — Python port of flibusta-api with full parsing."""
+
+import os
+import re
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+from urllib.parse import urljoin, quote
+
+import requests
+import urllib3
+from bs4 import BeautifulSoup
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+ATOM_NS = "http://www.w3.org/2005/Atom"
+OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
+
+
+def _load_base_url() -> str:
+    env = Path(__file__).parent.parent / ".env"
+    if env.exists():
+        for line in env.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("BASE_URL="):
+                return line.split("=", 1)[1].strip().rstrip("/")
+    return "https://www.flibusta.is"
+
+
+def _get_numbers(s: str) -> str:
+    return re.sub(r"\D", "", s)
+
+
+# ── Data classes ──────────────────────────────────────────────────────────────
+
+@dataclass
+class Author:
+    id: int
+    name: str
+
+
+@dataclass
+class AuthorBooks(Author):
+    books: Optional[int] = None
+    translations: Optional[int] = None
+
+
+@dataclass
+class Book:
+    id: int
+    name: str
+
+
+@dataclass
+class BooksByName:
+    book: Book
+    authors: list = field(default_factory=list)
+
+
+@dataclass
+class BookSeries:
+    id: int
+    name: str
+    books: Optional[int] = None
+
+
+@dataclass
+class Genre:
+    id: str
+    name: str
+
+
+@dataclass
+class OpdsAuthor:
+    name: str
+    uri: str
+
+
+@dataclass
+class OpdsDownload:
+    link: str
+    type: str
+
+
+@dataclass
+class OpdsBook:
+    authors: list = field(default_factory=list)  # list[OpdsAuthor]
+    title: str = ""
+    updated: str = ""
+    categories: list = field(default_factory=list)
+    cover: Optional[str] = None
+    downloads: list = field(default_factory=list)  # list[OpdsDownload]
+    description: str = ""
+
+
+@dataclass
+class PaginatedResult:
+    items: list = field(default_factory=list)
+    current_page: int = 0
+    total_count: Optional[int] = None
+    total_pages: int = 1
+    has_next_page: bool = False
+    has_previous_page: bool = False
+
+
+@dataclass
+class BookDetails:
+    id: str
+    title: str
+    description: str = ""
+    cover_url: Optional[str] = None
+    authors: list = field(default_factory=list)
+    genres: list = field(default_factory=list)
+    formats: list = field(default_factory=list)
+    download_urls: list = field(default_factory=list)
+    series: list = field(default_factory=list)
+
+
+# ── MIME types for OPDS downloads ─────────────────────────────────────────────
+
+OPDS_MIME_TYPES = {
+    "application/epub",
+    "application/fb2+zip",
+    "application/html+zip",
+    "application/pdf+rar",
+    "application/rtf+zip",
+    "application/txt+zip",
+    "application/x-mobipocket-ebook",
+    "application/pdf+zip",
+    "application/djvu",
+    "application/msword",
+    "application/x-rar-compressed",
+    "application/pdf",
+}
+
+
+class FlibustaClient:
+    """Flibusta API client — parses both HTML and OPDS endpoints."""
+
+    def __init__(self, base_url: Optional[str] = None):
+        self.base_url = (base_url or _load_base_url()).rstrip("/")
+        self.session = requests.Session()
+        self.session.headers["User-Agent"] = (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+        self._logged_in = False
+
+    def _get(self, path: str, **kwargs) -> Optional[requests.Response]:
+        try:
+            url = urljoin(self.base_url + "/", path.lstrip("/"))
+            return self.session.get(url, timeout=15, verify=False, **kwargs)
+        except Exception as e:
+            print(f"  ERR GET {path}: {e}")
+            return None
+
+    def _post(self, path: str, data: dict, **kwargs) -> Optional[requests.Response]:
+        try:
+            url = urljoin(self.base_url + "/", path.lstrip("/"))
+            return self.session.post(
+                url, data=data, timeout=15, verify=False,
+                allow_redirects=True, **kwargs,
+            )
+        except Exception as e:
+            print(f"  ERR POST {path}: {e}")
+            return None
+
+    # ── Auth ──────────────────────────────────────────────────────────────────
+
+    def login(self, username: str, password: str) -> bool:
+        """Login via form POST. Returns True on success."""
+        r = self._get("/user/login")
+        if not r:
+            return False
+
+        soup = BeautifulSoup(r.text, "html.parser")
+
+        # Find the login form (POST form with name/pass fields)
+        form = None
+        for f in soup.find_all("form"):
+            method = f.get("method", "GET").upper()
+            if method != "POST":
+                continue
+            inputs = {i.get("name") for i in f.find_all("input") if i.get("name")}
+            if "name" in inputs and "pass" in inputs:
+                form = f
+                break
+
+        if not form:
+            print("  Login form not found")
+            return False
+
+        action = form.get("action", "/user/login")
+        # Clean up Drupal-style action URL
+        if "index.php" in action:
+            # Extract the actual path from index.php?q=...
+            q_match = re.search(r"q=([^&]+)", action)
+            if q_match:
+                action = q_match.group(1)
+
+        # Collect all hidden fields
+        hidden = {}
+        for inp in form.find_all("input", {"type": "hidden"}):
+            name = inp.get("name")
+            value = inp.get("value", "")
+            if name:
+                hidden[name] = value
+
+        # Find submit button text
+        submit = form.find("input", {"type": "submit"})
+        op_text = submit.get("value", "Вход") if submit else "Вход"
+
+        payload = {
+            **hidden,
+            "name": username,
+            "pass": password,
+            "op": op_text,
+        }
+
+        r = self._post(action, data=payload)
+        if not r:
+            return False
+
+        # Check success: redirected to user page or page contains logout link
+        if r.status_code == 200:
+            if "logout" in r.text.lower() or "/user" in r.url.lower():
+                self._logged_in = True
+                return True
+
+        return False
+
+    def is_logged_in(self) -> bool:
+        if not self._logged_in:
+            r = self._get("/my")
+            if r and r.status_code == 200 and "logout" in r.text.lower():
+                self._logged_in = True
+        return self._logged_in
+
+    # ── HTML helpers ──────────────────────────────────────────────────────────
+
+    def _get_html_page(self, path: str) -> Optional[BeautifulSoup]:
+        r = self._get(path)
+        if not r:
+            return None
+        return BeautifulSoup(r.text, "html.parser")
+
+    def _find_results_ul(self, soup: BeautifulSoup, link_prefix: str) -> Optional:
+        """Find the UL element that contains actual search results (not nav/sidebar).
+
+        Looks for a UL inside #main that has LI elements with links matching link_prefix.
+        """
+        main = soup.select_one("#main") or soup
+        for ul in main.find_all("ul"):
+            links = ul.find_all("a", href=lambda h: h and h.startswith(link_prefix))
+            if links:
+                return ul
+        return None
+
+    def _remove_pager(self, soup: BeautifulSoup) -> BeautifulSoup:
+        for pager in soup.select("div.item-list .pager"):
+            pager.decompose()
+        return soup
+
+    def _get_page_info(self, soup: BeautifulSoup) -> dict:
+        pager = soup.select_one("div.item-list .pager")
+        if not pager:
+            return {"total_pages": 1, "has_next": False, "has_previous": False}
+
+        pager_items = pager.find_all(class_=re.compile(r"pager-(current|item)"))
+        has_next = pager.find(class_="pager-next") is not None
+        has_previous = pager.find(class_="pager-previous") is not None
+
+        return {
+            "total_pages": len(pager_items),
+            "has_next": has_next,
+            "has_previous": has_previous,
+        }
+
+    def _get_total_count(self, soup: BeautifulSoup) -> Optional[int]:
+        h3 = soup.find("h3")
+        if not h3:
+            return None
+        text = h3.get_text()
+        match = re.search(r"из\s+(\d+)", text)
+        return int(match.group(1)) if match else None
+
+    # ── OPDS helpers ──────────────────────────────────────────────────────────
+
+    def _get_opds_feed(self, path: str) -> Optional[ET.Element]:
+        r = self._get(path)
+        if not r:
+            return None
+        try:
+            return ET.fromstring(r.text)
+        except ET.ParseError as e:
+            print(f"  XML parse error: {e}")
+            return None
+
+    def _parse_opds_entry(self, entry: ET.Element) -> OpdsBook:
+        authors = []
+        author_el = entry.find(f"{{{ATOM_NS}}}author")
+        if author_el is not None:
+            if isinstance(author_el, list):
+                for a in author_el:
+                    name_el = a.find(f"{{{ATOM_NS}}}name")
+                    uri_el = a.find(f"{{{ATOM_NS}}}uri")
+                    authors.append(OpdsAuthor(
+                        name=name_el.text if name_el is not None else "",
+                        uri=uri_el.text if uri_el is not None else "",
+                    ))
+            else:
+                name_el = author_el.find(f"{{{ATOM_NS}}}name")
+                uri_el = author_el.find(f"{{{ATOM_NS}}}uri")
+                authors.append(OpdsAuthor(
+                    name=name_el.text if name_el is not None else "",
+                    uri=uri_el.text if uri_el is not None else "",
+                ))
+
+        title = entry.findtext(f"{{{ATOM_NS}}}title", "")
+        updated = entry.findtext(f"{{{ATOM_NS}}}updated", "")
+
+        categories = []
+        for cat in entry.findall(f"{{{ATOM_NS}}}category"):
+            label = cat.get("label", "")
+            if label:
+                categories.append(label)
+
+        cover = None
+        downloads = []
+        for link in entry.findall(f"{{{ATOM_NS}}}link"):
+            link_type = link.get("type", "")
+            link_href = link.get("href", "")
+            if link_type in ("image/jpeg", "image/png"):
+                cover = link_href
+            elif link_type in OPDS_MIME_TYPES:
+                downloads.append(OpdsDownload(link=link_href, type=link_type))
+
+        content_el = entry.find(f"{{{ATOM_NS}}}content")
+        description = ""
+        if content_el is not None:
+            description = content_el.text or ""
+            # Sometimes content has #text subelement
+            text_el = content_el.find(f"{{{ATOM_NS}}}text")
+            if text_el is not None and text_el.text:
+                description = text_el.text
+
+        return OpdsBook(
+            authors=authors,
+            title=title,
+            updated=updated,
+            categories=categories,
+            cover=cover,
+            downloads=downloads,
+            description=description,
+        )
+
+    # ── Search: Books by name (HTML) ──────────────────────────────────────────
+
+    def search_books_by_name(self, name: str) -> list:
+        """Search books by name via HTML."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page=0&chb=on"
+        )
+        if not soup:
+            return []
+
+        soup = self._remove_pager(soup)
+        results = []
+        results_ul = self._find_results_ul(soup, "/b/")
+        if not results_ul:
+            return []
+
+        for li in results_ul.find_all("li", recursive=False):
+            children = li.find_all("a", recursive=False)
+            if not children:
+                continue
+            book_link = children[0]
+            href = book_link.get("href", "")
+            if not href.startswith("/b/"):
+                continue
+            book_id = _get_numbers(href)
+            book_name = book_link.get_text(strip=True)
+            if book_id and book_name:
+                results.append(BooksByName(
+                    book=Book(id=int(book_id), name=book_name),
+                    authors=[
+                        Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
+                        for a in children[1:]
+                    ],
+                ))
+        return results
+
+    def search_books_by_name_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
+        """Search books by name with pagination."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page={page}&chb=on"
+        )
+        if not soup:
+            return PaginatedResult()
+
+        page_info = self._get_page_info(soup)
+        total_count = self._get_total_count(soup)
+        soup = self._remove_pager(soup)
+
+        results_ul = self._find_results_ul(soup, "/b/")
+        items = []
+        if results_ul:
+            for li in results_ul.find_all("li", recursive=False)[:limit]:
+                children = li.find_all("a", recursive=False)
+                if not children:
+                    continue
+                book_link = children[0]
+                href = book_link.get("href", "")
+                if not href.startswith("/b/"):
+                    continue
+                book_id = _get_numbers(href)
+                book_name = book_link.get_text(strip=True)
+                if book_id and book_name:
+                    items.append(BooksByName(
+                        book=Book(id=int(book_id), name=book_name),
+                        authors=[
+                            Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
+                            for a in children[1:]
+                        ],
+                    ))
+
+        return PaginatedResult(
+            items=items,
+            current_page=page,
+            total_count=total_count,
+            total_pages=page_info["total_pages"],
+            has_next_page=page_info["has_next"],
+            has_previous_page=page_info["has_previous"],
+        )
+
+    # ── Search: Authors (HTML) ────────────────────────────────────────────────
+
+    def search_authors(self, name: str) -> list:
+        """Search authors by name via HTML."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page=0&cha=on"
+        )
+        if not soup:
+            return []
+
+        soup = self._remove_pager(soup)
+        results = []
+        results_ul = self._find_results_ul(soup, "/a/")
+        if not results_ul:
+            return []
+
+        for li in results_ul.find_all("li", recursive=False):
+            children = li.find_all("a", recursive=False)
+            if not children:
+                continue
+            author_link = children[0]
+            href = author_link.get("href", "")
+            if not href.startswith("/a/"):
+                continue
+            author_id = _get_numbers(href)
+            author_name = author_link.get_text(strip=True)
+
+            books_count = None
+            translations_count = None
+            text = li.get_text()
+            books_match = re.search(r"(\d+)\s+книг", text)
+            trans_match = re.search(r"(\d+)\s+(?:перевод|перевода)", text)
+            if books_match:
+                books_count = int(books_match.group(1))
+            if trans_match:
+                translations_count = int(trans_match.group(1))
+
+            if author_id and author_name:
+                results.append(AuthorBooks(
+                    id=int(author_id),
+                    name=author_name,
+                    books=books_count,
+                    translations=translations_count,
+                ))
+        return results
+
+    def search_authors_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
+        """Search authors by name with pagination."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page={page}&cha=on"
+        )
+        if not soup:
+            return PaginatedResult()
+
+        page_info = self._get_page_info(soup)
+        total_count = self._get_total_count(soup)
+        soup = self._remove_pager(soup)
+
+        results_ul = self._find_results_ul(soup, "/a/")
+        items = []
+        if results_ul:
+            for li in results_ul.find_all("li", recursive=False)[:limit]:
+                children = li.find_all("a", recursive=False)
+                if not children:
+                    continue
+                author_link = children[0]
+                href = author_link.get("href", "")
+                if not href.startswith("/a/"):
+                    continue
+                author_id = _get_numbers(href)
+                author_name = author_link.get_text(strip=True)
+                text = li.get_text()
+                books_count = None
+                translations_count = None
+                books_match = re.search(r"(\d+)\s+книг", text)
+                trans_match = re.search(r"(\d+)\s+(?:перевод|перевода)", text)
+                if books_match:
+                    books_count = int(books_match.group(1))
+                if trans_match:
+                    translations_count = int(trans_match.group(1))
+                if author_id and author_name:
+                    items.append(AuthorBooks(
+                        id=int(author_id), name=author_name,
+                        books=books_count, translations=translations_count,
+                    ))
+
+        return PaginatedResult(
+            items=items, current_page=page, total_count=total_count,
+            total_pages=page_info["total_pages"],
+            has_next_page=page_info["has_next"],
+            has_previous_page=page_info["has_previous"],
+        )
+
+    # ── Search: Books by series (HTML) ────────────────────────────────────────
+
+    def search_books_by_series(self, name: str) -> list:
+        """Search book series by name."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page=0&chs=on"
+        )
+        if not soup:
+            return []
+
+        soup = self._remove_pager(soup)
+        results = []
+        # Series links use /sequence/ not /s/
+        results_ul = None
+        main = soup.select_one("#main") or soup
+        for ul in main.find_all("ul"):
+            links = ul.find_all("a", href=lambda h: h and "/sequence/" in h)
+            if links:
+                results_ul = ul
+                break
+        if not results_ul:
+            return []
+
+        for li in results_ul.find_all("li", recursive=False):
+            children = li.find_all("a", recursive=False)
+            if not children:
+                continue
+            series_link = children[0]
+            href = series_link.get("href", "")
+            if "/sequence/" not in href:
+                continue
+            series_id = _get_numbers(href)
+            series_name = series_link.get_text(strip=True)
+            text = li.get_text()
+            books_match = re.search(r"(\d+)\s+книг", text)
+            books_count = int(books_match.group(1)) if books_match else None
+
+            if series_id and series_name:
+                results.append(BookSeries(
+                    id=int(series_id), name=series_name, books=books_count,
+                ))
+        return results
+
+    def search_books_by_series_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
+        """Search book series with pagination."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page={page}&chs=on"
+        )
+        if not soup:
+            return PaginatedResult()
+
+        page_info = self._get_page_info(soup)
+        total_count = self._get_total_count(soup)
+        soup = self._remove_pager(soup)
+
+        # Series links use /sequence/ not /s/
+        results_ul = None
+        main = soup.select_one("#main") or soup
+        for ul in main.find_all("ul"):
+            links = ul.find_all("a", href=lambda h: h and "/sequence/" in h)
+            if links:
+                results_ul = ul
+                break
+
+        items = []
+        if results_ul:
+            for li in results_ul.find_all("li", recursive=False)[:limit]:
+                children = li.find_all("a", recursive=False)
+                if not children:
+                    continue
+                series_link = children[0]
+                href = series_link.get("href", "")
+                if "/sequence/" not in href:
+                    continue
+                series_id = _get_numbers(href)
+                series_name = series_link.get_text(strip=True)
+                text = li.get_text()
+                books_match = re.search(r"(\d+)\s+книг", text)
+                books_count = int(books_match.group(1)) if books_match else None
+                if series_id and series_name:
+                    items.append(BookSeries(
+                        id=int(series_id), name=series_name, books=books_count,
+                    ))
+
+        return PaginatedResult(
+            items=items, current_page=page, total_count=total_count,
+            total_pages=page_info["total_pages"],
+            has_next_page=page_info["has_next"],
+            has_previous_page=page_info["has_previous"],
+        )
+
+    # ── Search: Genres (HTML) ─────────────────────────────────────────────────
+
+    def search_genres(self, name: str) -> list:
+        """Search genres by name."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page=0&chg=on"
+        )
+        if not soup:
+            return []
+
+        soup = self._remove_pager(soup)
+        results = []
+        results_ul = self._find_results_ul(soup, "/g/")
+        if not results_ul:
+            return []
+
+        for li in results_ul.find_all("li", recursive=False):
+            link = li.find("a", href=lambda h: h and h.startswith("/g/"))
+            if not link:
+                continue
+            href = link.get("href", "")
+            genre_id = href.replace("/g/", "")
+            genre_name = link.get_text(strip=True)
+            if genre_id and genre_name:
+                results.append(Genre(id=genre_id, name=genre_name))
+        return results
+
+    def search_genres_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
+        """Search genres with pagination."""
+        soup = self._get_html_page(
+            f"booksearch?ask={quote(name)}&page={page}&chg=on"
+        )
+        if not soup:
+            return PaginatedResult()
+
+        page_info = self._get_page_info(soup)
+        total_count = self._get_total_count(soup)
+        soup = self._remove_pager(soup)
+
+        results_ul = self._find_results_ul(soup, "/g/")
+        items = []
+        if results_ul:
+            for li in results_ul.find_all("li", recursive=False)[:limit]:
+                link = li.find("a", href=lambda h: h and h.startswith("/g/"))
+                if not link:
+                    continue
+                href = link.get("href", "")
+                genre_id = href.replace("/g/", "")
+                genre_name = link.get_text(strip=True)
+                if genre_id and genre_name:
+                    items.append(Genre(id=genre_id, name=genre_name))
+
+        return PaginatedResult(
+            items=items, current_page=page, total_count=total_count,
+            total_pages=page_info["total_pages"],
+            has_next_page=page_info["has_next"],
+            has_previous_page=page_info["has_previous"],
+        )
+
+    # ── OPDS: Search books by name ────────────────────────────────────────────
+
+    def search_books_by_name_opds(self, name: str) -> list:
+        """Search books by name via OPDS."""
+        feed = self._get_opds_feed(
+            f"opds/opensearch?searchTerm={quote(name)}&searchType=books&pageNumber=0"
+        )
+        if feed is None:
+            return []
+
+        entries = feed.findall(f".//{{{ATOM_NS}}}entry")
+        if not entries:
+            return []
+        return [self._parse_opds_entry(e) for e in entries]
+
+    def search_books_by_name_opds_paginated(self, name: str, page: int = 0, limit: int = 20) -> PaginatedResult:
+        """Search books by name via OPDS with pagination."""
+        feed = self._get_opds_feed(
+            f"opds/opensearch?searchTerm={quote(name)}&searchType=books&pageNumber={page}"
+        )
+        if feed is None:
+            return PaginatedResult()
+
+        total_el = feed.find(f"{{{OS_NS}}}totalResults")
+        per_page_el = feed.find(f"{{{OS_NS}}}itemsPerPage")
+        start_el = feed.find(f"{{{OS_NS}}}startIndex")
+
+        total_results = int(total_el.text) if total_el is not None else 0
+        items_per_page = int(per_page_el.text) if per_page_el is not None else 20
+        start_index = int(start_el.text) if start_el is not None else 0
+
+        entries = feed.findall(f".//{{{ATOM_NS}}}entry")
+        if entries and not isinstance(entries, list):
+            entries = [entries]
+
+        items = []
+        if entries:
+            sliced = entries[:limit]
+            items = [self._parse_opds_entry(e) for e in sliced]
+
+        has_next = (start_index + items_per_page) < total_results
+        has_previous = start_index > 0
+        total_pages = max(1, round(total_results / items_per_page)) if items_per_page else 1
+
+        return PaginatedResult(
+            items=items,
+            current_page=page,
+            total_count=total_results,
+            total_pages=total_pages,
+            has_next_page=has_next,
+            has_previous_page=has_previous,
+        )
+
+    # ── OPDS: Books by author ─────────────────────────────────────────────────
+
+    def get_books_by_author_opds(self, author_id: int) -> list:
+        """Get author's books via OPDS."""
+        feed = self._get_opds_feed(f"opds/author/{author_id}/alphabet/0")
+        if feed is None:
+            return []
+
+        entries = feed.findall(f".//{{{ATOM_NS}}}entry")
+        if not entries:
+            return []
+        return [self._parse_opds_entry(e) for e in entries]
+
+    def get_books_by_author_opds_paginated(self, author_id: int, page: int = 0, limit: int = 20) -> PaginatedResult:
+        """Get author's books via OPDS with pagination."""
+        feed = self._get_opds_feed(f"opds/author/{author_id}/alphabet/{page}")
+        if feed is None:
+            return PaginatedResult()
+
+        entries = feed.findall(f".//{{{ATOM_NS}}}entry")
+        if entries and not isinstance(entries, list):
+            entries = [entries]
+
+        items = []
+        if entries:
+            sliced = entries[:limit]
+            items = [self._parse_opds_entry(e) for e in sliced]
+
+        has_next = any(
+            link.get("rel") == "next"
+            for link in feed.findall(f"{{{ATOM_NS}}}link")
+        )
+        has_previous = page > 0
+
+        return PaginatedResult(
+            items=items,
+            current_page=page,
+            has_next_page=has_next,
+            has_previous_page=has_previous,
+        )
+
+    # ── OPDS: Genres list ─────────────────────────────────────────────────────
+
+    def get_genres_list_opds(self) -> list:
+        """Get genres list via OPDS."""
+        feed = self._get_opds_feed("opds/genres")
+        if feed is None:
+            return []
+
+        entries = feed.findall(f".//{{{ATOM_NS}}}entry")
+        results = []
+        for e in entries:
+            title = e.findtext(f"{{{ATOM_NS}}}title", "")
+            eid = e.findtext(f"{{{ATOM_NS}}}id", "")
+            # Extract genre id from URL like /g/detective
+            genre_id = eid.split("/g/")[-1] if "/g/" in eid else eid
+            results.append(Genre(id=genre_id, name=title))
+        return results
+
+    # ── Cover ─────────────────────────────────────────────────────────────────
+
+    def get_cover_by_book_id(self, book_id: int) -> Optional[bytes]:
+        """Fetch cover image. Returns bytes or None."""
+        id_str = str(book_id)
+        y = int(id_str[4:]) if len(id_str) > 4 else 0
+
+        for ext in ("jpg", "png"):
+            url = f"i/{y}/{book_id}/cover.{ext}"
+            r = self._get(url)
+            if r and r.status_code == 200 and "image" in r.headers.get("content-type", ""):
+                return r.content
+        return None
+
+    # ── Book details (HTML) ───────────────────────────────────────────────────
+
+    def get_book_details(self, book_id: str) -> Optional[BookDetails]:
+        """Get detailed book information from HTML page."""
+        soup = self._get_html_page(f"b/{book_id}")
+        if not soup:
+            return None
+
+        # Title: skip the first h1 (site name "Флибуста"), use the second one
+        title = ""
+        h1_tags = soup.find_all("h1")
+        for h1 in h1_tags:
+            text = h1.get_text(strip=True)
+            if text and text != "Флибуста":
+                title = text
+                break
+
+        # Description: find h2 "Аннотация" and get following siblings until next h2
+        description = ""
+        for h2 in soup.find_all("h2"):
+            if "Аннотация" in h2.get_text():
+                desc_parts = []
+                for sib in h2.find_next_siblings():
+                    if sib.name == "h2":
+                        break
+                    desc_parts.append(sib.get_text(strip=True))
+                description = " ".join(desc_parts)
+                break
+
+        # Cover image
+        cover_img = soup.find("img", src=lambda s: s and "cover" in s.lower())
+        cover_url = cover_img["src"] if cover_img else None
+
+        # Find the book info div (contains title h1)
+        book_info_div = None
+        for div in soup.find_all("div", class_=True):
+            h1 = div.find("h1")
+            if h1 and title and title in h1.get_text():
+                book_info_div = div
+                break
+
+        # Authors: only from /a/ links BEFORE the first /b/ download link
+        authors = []
+        seen_author_ids = set()
+        if book_info_div:
+            found_download = False
+            for a in book_info_div.find_all("a", href=True):
+                href = a["href"]
+                if href.startswith("/b/") and "/download" in href or any(
+                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
+                ):
+                    found_download = True
+                    continue
+                if found_download:
+                    break
+                if href.startswith("/a/"):
+                    author_id = _get_numbers(href)
+                    author_name = a.get_text(strip=True)
+                    if author_id and author_name and author_id not in seen_author_ids:
+                        seen_author_ids.add(author_id)
+                        authors.append(Author(id=int(author_id), name=author_name))
+
+        # Genres: from /g/ links in the book info div
+        genres = []
+        seen_genre_ids = set()
+        if book_info_div:
+            found_download = False
+            for a in book_info_div.find_all("a", href=True):
+                href = a["href"]
+                if href.startswith("/b/") and any(
+                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
+                ):
+                    found_download = True
+                    continue
+                if found_download:
+                    break
+                if href.startswith("/g/"):
+                    genre_id = href.replace("/g/", "")
+                    genre_name = a.get_text(strip=True)
+                    if genre_id and genre_name and genre_id not in seen_genre_ids:
+                        seen_genre_ids.add(genre_id)
+                        genres.append(Genre(id=genre_id, name=genre_name))
+
+        # Download formats and URLs: from /b/{id}/{format} links
+        formats = []
+        download_urls = []
+        seen_formats = set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            fmt_match = re.match(rf"/b/{book_id}/(\w+)", href)
+            if fmt_match:
+                fmt = fmt_match.group(1)
+                if fmt not in seen_formats and fmt != "read":
+                    formats.append(fmt)
+                    seen_formats.add(fmt)
+                if href not in download_urls:
+                    download_urls.append(href)
+
+        # Series: from /sequence/ or /s/ links in book info div
+        series = []
+        seen_series_ids = set()
+        if book_info_div:
+            for a in book_info_div.find_all("a", href=True):
+                href = a["href"]
+                if "/sequence/" in href or href.startswith("/s/"):
+                    series_id = _get_numbers(href)
+                    series_name = a.get_text(strip=True)
+                    if series_id and series_name and series_id not in seen_series_ids:
+                        seen_series_ids.add(series_id)
+                        series.append({"id": series_id, "name": series_name})
+
+        return BookDetails(
+            id=book_id,
+            title=title,
+            description=description,
+            cover_url=cover_url,
+            authors=authors,
+            genres=genres,
+            formats=formats,
+            download_urls=download_urls,
+            series=series,
+        )
+
+    # ── Genres page (HTML) ────────────────────────────────────────────────────
+
+    def get_genres_page(self) -> list:
+        """Get genres from /genres page."""
+        soup = self._get_html_page("genres")
+        if not soup:
+            return []
+
+        results = []
+        for a in soup.select("a[href*='/g/']"):
+            href = a.get("href", "")
+            genre_id = href.replace("/g/", "")
+            genre_name = a.get_text(strip=True)
+            if genre_id and genre_name:
+                results.append(Genre(id=genre_id, name=genre_name))
+        return results

@@ -15,6 +15,16 @@ import 'theme.dart';
 
 part 'app.g.dart';
 
+/// Platform-appropriate page transition builder.
+/// Android: PredictiveBackPageTransitionsBuilder (supports predictive back gesture)
+/// Others: FadeUpwardsPageTransitionsBuilder (Material default)
+PageTransitionsBuilder _platformTransitionBuilder(TargetPlatform platform) {
+  if (platform == TargetPlatform.android) {
+    return const PredictiveBackPageTransitionsBuilder();
+  }
+  return const FadeUpwardsPageTransitionsBuilder();
+}
+
 @riverpod
 class IsObscuredNotifier extends _$IsObscuredNotifier {
   @override
@@ -95,13 +105,39 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
         final lightTheme = dynamicLight != null
             ? AppTheme.lightTheme.copyWith(
                 colorScheme: dynamicLight,
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values)
+                      p: _platformTransitionBuilder(p),
+                  },
+                ),
               )
-            : AppTheme.lightTheme;
+            : AppTheme.lightTheme.copyWith(
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values)
+                      p: _platformTransitionBuilder(p),
+                  },
+                ),
+              );
         final darkTheme = dynamicDark != null
             ? AppTheme.darkTheme.copyWith(
                 colorScheme: dynamicDark,
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values)
+                      p: _platformTransitionBuilder(p),
+                  },
+                ),
               )
-            : AppTheme.darkTheme;
+            : AppTheme.darkTheme.copyWith(
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values)
+                      p: _platformTransitionBuilder(p),
+                  },
+                ),
+              );
         return MaterialApp.router(
           title: 'Glibusta',
           theme: lightTheme,

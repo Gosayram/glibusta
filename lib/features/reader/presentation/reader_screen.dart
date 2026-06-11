@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/platform/adaptive_context.dart';
+import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
@@ -135,8 +136,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final theme = _getThemeData(resolvedTheme);
 
     if (readerState.isLoading) {
-      return Theme(
+      return AnimatedTheme(
         data: theme,
+        duration: AppDuration.readerThemeTransition,
+        curve: Curves.easeOutCubic,
         child: const Scaffold(
           body: Center(child: CircularProgressIndicator()),
         ),
@@ -144,8 +147,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     if (readerState.errorMessage != null) {
-      return Theme(
+      return AnimatedTheme(
         data: theme,
+        duration: AppDuration.readerThemeTransition,
+        curve: Curves.easeOutCubic,
         child: Scaffold(
           appBar: AppBar(title: const Text('Читалка')),
           body: Center(
@@ -239,8 +244,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
-    return Theme(
+    return AnimatedTheme(
       data: theme,
+      duration: AppDuration.readerThemeTransition,
+      curve: Curves.easeOutCubic,
       child: PopScope(
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) _ctrl.saveProgress();
@@ -296,38 +303,56 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               theme: settings.theme,
             ),
           ),
-        if (_shouldShowChrome(settings, readerState)) ...[
+        if (!_isDistractionFree(settings)) ...[
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: ReaderTopBar(
-              settings: settings,
-              bookTitle: readerState.book?.title ?? '',
-              onBack: () => Navigator.of(context).pop(),
-              onSettings: () => _showQuickSettings(context),
-              onSearch: () => _ctrl.toggleSearch(),
-              onMore: readerState.book != null
-                  ? () => TableOfContentsSheet.show(
-                      context,
-                      book: readerState.book!,
-                      currentChapterIndex: readerState.currentPosition.chapterIndex,
-                      onJumpToPosition: _ctrl.jumpToPosition,
-                    )
-                  : () {},
+            child: AnimatedSlide(
+              offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
+              duration: AppDuration.fast,
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: readerState.uiVisible ? 1.0 : 0.0,
+                duration: AppDuration.fast,
+                child: ReaderTopBar(
+                  settings: settings,
+                  bookTitle: readerState.book?.title ?? '',
+                  onBack: () => Navigator.of(context).pop(),
+                  onSettings: () => _showQuickSettings(context),
+                  onSearch: () => _ctrl.toggleSearch(),
+                  onMore: readerState.book != null
+                      ? () => TableOfContentsSheet.show(
+                          context,
+                          book: readerState.book!,
+                          currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          onJumpToPosition: _ctrl.jumpToPosition,
+                        )
+                      : () {},
+                ),
+              ),
             ),
           ),
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            child: ReaderBottomBar(
-              settings: settings,
-              currentChapterIndex: readerState.currentPosition.chapterIndex,
-              totalChapters: readerState.book?.chapters.length ?? 0,
-              scrollProgress: readerState.scrollProgress,
-              estimatedMinutesLeft: readerState.estimatedMinutesLeft,
-              onJumpToProgress: _ctrl.jumpToProgress,
+            child: AnimatedSlide(
+              offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
+              duration: AppDuration.fast,
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: readerState.uiVisible ? 1.0 : 0.0,
+                duration: AppDuration.fast,
+                child: ReaderBottomBar(
+                  settings: settings,
+                  currentChapterIndex: readerState.currentPosition.chapterIndex,
+                  totalChapters: readerState.book?.chapters.length ?? 0,
+                  scrollProgress: readerState.scrollProgress,
+                  estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                  onJumpToProgress: _ctrl.jumpToProgress,
+                ),
+              ),
             ),
           ),
         ],
@@ -563,11 +588,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   bool _isDistractionFree(ReaderSettings settings) {
     return settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
-  }
-
-  bool _shouldShowChrome(ReaderSettings settings, ReaderState readerState) {
-    if (_isDistractionFree(settings)) return false;
-    return readerState.uiVisible;
   }
 
   Widget _buildWarmthOverlay(ReaderSettings settings) {

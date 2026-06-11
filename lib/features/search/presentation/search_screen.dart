@@ -275,23 +275,39 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildResults(BuildContext context, SearchState state) {
     if (state.books.isEmpty && !state.isLoading) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(
-              'Начните поиск',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ],
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) => Opacity(
+            opacity: value,
+            child: child,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(height: 16),
+              Text(
+                'Начните поиск',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     final useGrid = !context.isCompact;
 
-    return NotificationListener<ScrollNotification>(
+    return RefreshIndicator(
+      onRefresh: () async {
+        final query = ref.read(searchControllerProvider).lastQuery;
+        if (query.isNotEmpty) {
+          await ref.read(searchControllerProvider.notifier).search(query);
+        }
+      },
+      child: NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         if (notification is ScrollEndNotification &&
             notification.metrics.pixels >= notification.metrics.maxScrollExtent - 200) {
@@ -358,6 +374,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 );
               },
             ),
+      ),
     );
   }
 }

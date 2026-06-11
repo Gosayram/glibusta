@@ -77,9 +77,7 @@ class NotesScreen extends ConsumerWidget {
                     onTap: () {
                       _showNoteDialog(context, ref, note);
                     },
-                    onDelete: () {
-                      _deleteNote(ref, note.id);
-                    },
+                    onDelete: () => _deleteNote(context, ref, note),
                   )
                   .animate()
                   .fadeIn(delay: (index * 50).ms, duration: 300.ms)
@@ -134,10 +132,23 @@ class NotesScreen extends ConsumerWidget {
     );
   }
 
-  void _deleteNote(WidgetRef ref, String id) {
+  Future<void> _deleteNote(BuildContext context, WidgetRef ref, Note note) async {
     final database = ref.read(databaseProvider);
     final repository = NoteRepository(database);
-    unawaited(repository.deleteNote(id));
+    await repository.deleteNote(note.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Заметка удалена'),
+        action: SnackBarAction(
+          label: 'Отмена',
+          onPressed: () {
+            unawaited(repository.insertNote(note));
+          },
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 }
 
@@ -158,6 +169,25 @@ class NoteTile extends StatelessWidget {
     return Dismissible(
       key: Key(note.id),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (_) async {
+        return showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Удалить заметку?'),
+            content: const Text('Это действие можно отменить'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Удалить'),
+              ),
+            ],
+          ),
+        );
+      },
       background: Container(
         color: Theme.of(context).colorScheme.error,
         alignment: Alignment.centerRight,

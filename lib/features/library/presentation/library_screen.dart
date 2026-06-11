@@ -60,7 +60,11 @@ class LibraryScreen extends ConsumerWidget {
       ),
       body: BookDropZone(
         onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
-        child: AnimatedSwitcher(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(libraryBooksProvider);
+          },
+          child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: KeyedSubtree(
             key: ValueKey(
@@ -98,6 +102,7 @@ class LibraryScreen extends ConsumerWidget {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -160,7 +165,15 @@ class LibraryScreen extends ConsumerWidget {
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
     if (books.isEmpty) {
       return Center(
-        child: Column(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) => Opacity(
+            opacity: value,
+            child: child,
+          ),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
@@ -190,6 +203,7 @@ class LibraryScreen extends ConsumerWidget {
               child: const Text('Импортировать файл'),
             ),
           ],
+        ),
         ),
       );
     }

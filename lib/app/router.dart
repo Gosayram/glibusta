@@ -117,25 +117,60 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/book/:bookId',
         name: 'bookDetails',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
-          return BookDetailsScreen(bookId: bookId);
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: BookDetailsScreen(bookId: bookId),
+            transitionsBuilder: (_, animation, second, child) {
+              final offset = Tween(
+                begin: const Offset(0.05, 0),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: offset, child: child),
+              );
+            },
+          );
         },
       ),
       GoRoute(
         path: '/reader/:bookId',
         name: 'reader',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
-          return ReaderScreen(bookId: bookId);
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: ReaderScreen(bookId: bookId),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+          );
         },
       ),
       GoRoute(
         path: '/series/:seriesId',
         name: 'seriesDetail',
-        builder: (BuildContext context, GoRouterState state) {
+        pageBuilder: (BuildContext context, GoRouterState state) {
           final seriesId = state.pathParameters['seriesId']!;
-          return SeriesDetailScreen(seriesId: seriesId);
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: SeriesDetailScreen(seriesId: seriesId),
+            transitionsBuilder: (_, animation, second, child) {
+              final offset = Tween(
+                begin: const Offset(0.05, 0),
+                end: Offset.zero,
+              ).animate(animation);
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: offset, child: child),
+              );
+            },
+          );
         },
       ),
       GoRoute(
