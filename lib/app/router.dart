@@ -21,7 +21,10 @@ import '../features/settings/presentation/settings_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final rootNavigatorKey = GlobalKey<NavigatorState>();
+
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/library',
     onException: (context, state, router) {
       if (kDebugMode) {
@@ -33,48 +36,77 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
     },
     routes: <RouteBase>[
+      StatefulShellRoute.indexedStack(
+        builder: (BuildContext context, GoRouterState state, StatefulNavigationShell navigationShell) {
+          return ShellWithNav(navigationShell: navigationShell);
+        },
+        branches: <StatefulShellBranch>[
+          // ── Library ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/library',
+                name: 'library',
+                builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
+              ),
+            ],
+          ),
+          // ── Search ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/search',
+                name: 'search',
+                builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
+              ),
+            ],
+          ),
+          // ── Downloads ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/downloads',
+                name: 'downloads',
+                builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
+              ),
+            ],
+          ),
+          // ── Settings ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/settings',
+                name: 'settings',
+                builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
+      // Redirect from root to library
+      GoRoute(
+        path: '/',
+        name: 'home',
+        redirect: (_, state) {
+          if (state.uri.path == '/') return '/library';
+          return null;
+        },
+      ),
+      // Catalog (not a main tab, but within shell for nav)
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
-          return ShellWithNav(child: child);
+          return ShellWithNav(navigationShell: state.extra as StatefulNavigationShell?);
         },
         routes: [
-          GoRoute(
-            path: '/',
-            name: 'home',
-            redirect: (_, state) {
-              if (state.uri.path == '/') return '/library';
-              return null;
-            },
-          ),
-          GoRoute(
-            path: '/library',
-            name: 'library',
-            builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
-          ),
           GoRoute(
             path: '/catalog',
             name: 'catalog',
             builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
           ),
           GoRoute(
-            path: '/search',
-            name: 'search',
-            builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
-          ),
-          GoRoute(
-            path: '/downloads',
-            name: 'downloads',
-            builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
-          ),
-          GoRoute(
             path: '/collections',
             name: 'collections',
             builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
-          ),
-          GoRoute(
-            path: '/settings',
-            name: 'settings',
-            builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
           ),
           GoRoute(
             path: '/annotations',
@@ -87,6 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
           ),
           GoRoute(
+            path: '/series',
+            name: 'series',
+            builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
+          ),
+          GoRoute(
             path: '/settings/diagnostics',
             name: 'diagnostics',
             builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
@@ -95,11 +132,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings/fonts',
             name: 'fonts',
             builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
-          ),
-          GoRoute(
-            path: '/series',
-            name: 'series',
-            builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
           ),
           GoRoute(
             path: '/404',
@@ -114,9 +146,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // Detail routes outside shell (full-screen)
       GoRoute(
         path: '/book/:bookId',
         name: 'bookDetails',
+        parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return CustomTransitionPage<void>(
@@ -138,6 +172,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/reader/:bookId',
         name: 'reader',
+        parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return CustomTransitionPage<void>(
@@ -155,6 +190,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/series/:seriesId',
         name: 'seriesDetail',
+        parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
           final seriesId = state.pathParameters['seriesId']!;
           return CustomTransitionPage<void>(
@@ -176,6 +212,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/quotes/:bookId',
         name: 'quotes',
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return QuotesScreen(bookId: bookId);
@@ -184,6 +221,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/annotations/book/:bookId',
         name: 'bookAnnotations',
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return AnnotationsScreen(bookId: bookId);

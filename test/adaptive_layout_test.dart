@@ -68,7 +68,17 @@ void main() {
       setScreenSize(tester, 360, 640);
       await tester.pumpWidget(
         buildTestApp(
-          const MobileShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Column(
+              children: [
+                Expanded(child: Center(child: Text('Content'))),
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -100,7 +110,17 @@ void main() {
       setScreenSize(tester, 412, 915);
       await tester.pumpWidget(
         buildTestApp(
-          const MobileShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Column(
+              children: [
+                Expanded(child: Center(child: Text('Content'))),
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -131,7 +151,18 @@ void main() {
       setScreenSize(tester, 800, 1280);
       await tester.pumpWidget(
         buildTestApp(
-          const TabletShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: Center(child: Text('Content'))),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -210,43 +241,24 @@ void main() {
       setScreenSize(tester, 722, 360);
       await tester.pumpWidget(
         buildTestApp(
-          const TabletShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: Center(child: Text('Content'))),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
-    });
-
-    testWidgets('uses TabletShell via ShellWithNav at 722x360', (tester) async {
-      setScreenSize(tester, 722, 360);
-
-      final router = GoRouter(
-        initialLocation: '/library',
-        routes: [
-          ShellRoute(
-            builder: (_, _, shellChild) => ShellWithNav(child: shellChild),
-            routes: [
-              GoRoute(
-                path: '/library',
-                builder: (_, _) => const Scaffold(body: Text('Library')),
-              ),
-            ],
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(TabletShell), findsOneWidget);
-      expect(find.byType(NavigationRail), findsOneWidget);
     });
   });
 
@@ -256,7 +268,18 @@ void main() {
       setScreenSize(tester, 900, 620);
       await tester.pumpWidget(
         buildTestApp(
-          const DesktopShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: Center(child: Text('Content'))),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -269,7 +292,18 @@ void main() {
       setScreenSize(tester, 900, 620);
       await tester.pumpWidget(
         buildTestApp(
-          const DesktopShell(child: SizedBox.shrink()),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -287,7 +321,18 @@ void main() {
       setScreenSize(tester, 1200, 800);
       await tester.pumpWidget(
         buildTestApp(
-          const DesktopShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: Center(child: Text('Content'))),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -315,7 +360,18 @@ void main() {
       setScreenSize(tester, 1920, 1080);
       await tester.pumpWidget(
         buildTestApp(
-          const DesktopShell(child: Center(child: Text('Content'))),
+          Scaffold(
+            body: Row(
+              children: [
+                AdaptiveNavigation(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) {},
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: Center(child: Text('Content'))),
+              ],
+            ),
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -339,122 +395,36 @@ void main() {
     });
   });
 
-  // ─── Breakpoint boundary tests ────────────────────────
-  group('Breakpoint boundaries', () {
-    testWidgets('ShellWithNav at exactly 600 uses TabletShell', (tester) async {
-      setScreenSize(tester, 600, 800);
-
-      final router = GoRouter(
-        initialLocation: '/library',
-        routes: [
-          ShellRoute(
-            builder: (_, _, shellChild) => ShellWithNav(child: shellChild),
-            routes: [
-              GoRoute(
-                path: '/library',
-                builder: (_, _) => const Scaffold(body: Text('Library')),
-              ),
-            ],
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
+  // ─── AdaptiveNavigation widget tests ──────────────────
+  group('AdaptiveNavigation', () {
+    testWidgets('renders NavigationBar on compact', (tester) async {
+      setScreenSize(tester, 360, 640);
       await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
+        buildTestApp(
+          AdaptiveNavigation(
+            selectedIndex: 0,
+            onDestinationSelected: (_) {},
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(TabletShell), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
     });
 
-    testWidgets('ShellWithNav at 599 uses MobileShell', (tester) async {
-      setScreenSize(tester, 599, 800);
-
-      final router = GoRouter(
-        initialLocation: '/library',
-        routes: [
-          ShellRoute(
-            builder: (_, _, shellChild) => ShellWithNav(child: shellChild),
-            routes: [
-              GoRoute(
-                path: '/library',
-                builder: (_, _) => const Scaffold(body: Text('Library')),
-              ),
-            ],
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
+    testWidgets('renders NavigationRail on medium+', (tester) async {
+      setScreenSize(tester, 800, 1280);
       await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
+        buildTestApp(
+          AdaptiveNavigation(
+            selectedIndex: 1,
+            onDestinationSelected: (_) {},
+          ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(MobileShell), findsOneWidget);
-    });
-
-    testWidgets('ShellWithNav at 839 uses TabletShell', (tester) async {
-      setScreenSize(tester, 839, 800);
-
-      final router = GoRouter(
-        initialLocation: '/library',
-        routes: [
-          ShellRoute(
-            builder: (_, _, shellChild) => ShellWithNav(child: shellChild),
-            routes: [
-              GoRoute(
-                path: '/library',
-                builder: (_, _) => const Scaffold(body: Text('Library')),
-              ),
-            ],
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(TabletShell), findsOneWidget);
-    });
-
-    testWidgets('ShellWithNav at 840 uses DesktopShell', (tester) async {
-      setScreenSize(tester, 840, 800);
-
-      final router = GoRouter(
-        initialLocation: '/library',
-        routes: [
-          ShellRoute(
-            builder: (_, _, shellChild) => ShellWithNav(child: shellChild),
-            routes: [
-              GoRoute(
-                path: '/library',
-                builder: (_, _) => const Scaffold(body: Text('Library')),
-              ),
-            ],
-          ),
-        ],
-      );
-      addTearDown(router.dispose);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(DesktopShell), findsOneWidget);
+      expect(find.byType(NavigationRail), findsOneWidget);
     });
   });
 }

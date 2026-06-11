@@ -11,7 +11,14 @@ import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
 
 class AdaptiveNavigation extends StatelessWidget {
-  const AdaptiveNavigation({super.key});
+  const AdaptiveNavigation({
+    super.key,
+    required this.selectedIndex,
+    required this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onDestinationSelected;
 
   static const List<NavigationDestination> compactDestinations = [
     NavigationDestination(icon: Icon(Icons.library_books), label: 'Библиотека'),
@@ -39,37 +46,12 @@ class AdaptiveNavigation extends StatelessWidget {
     ),
   ];
 
-  static const List<String> routes = [
-    '/library',
-    '/search',
-    '/downloads',
-    '/settings',
-  ];
-
-  int _selectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
-    int bestIdx = 0;
-    int bestLen = 0;
-    for (var i = 0; i < routes.length; i++) {
-      final r = routes[i];
-      if (location == r || (location.startsWith(r) && r.length > bestLen)) {
-        bestIdx = i;
-        bestLen = r.length;
-      }
-    }
-    return bestIdx;
-  }
-
-  void _onTap(BuildContext context, int index) => context.go(routes[index]);
-
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = _selectedIndex(context);
-
     if (context.isCompact) {
       return NavigationBar(
         selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i),
+        onDestinationSelected: onDestinationSelected,
         animationDuration: const Duration(milliseconds: 300),
         destinations: compactDestinations,
       );
@@ -77,7 +59,7 @@ class AdaptiveNavigation extends StatelessWidget {
 
     return NavigationRail(
       selectedIndex: selectedIndex,
-      onDestinationSelected: (i) => _onTap(context, i),
+      onDestinationSelected: onDestinationSelected,
       labelType: NavigationRailLabelType.all,
       leading: const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
@@ -90,7 +72,14 @@ class AdaptiveNavigation extends StatelessWidget {
 
 /// macOS-style sidebar navigation
 class SidebarNavigation extends StatelessWidget {
-  const SidebarNavigation({super.key});
+  const SidebarNavigation({
+    super.key,
+    this.selectedIndex = 0,
+    this.onDestinationSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int>? onDestinationSelected;
 
   static const List<_SidebarItem> _items = [
     _SidebarItem(icon: Icons.library_books, label: 'Библиотека', route: '/library'),
@@ -104,7 +93,6 @@ class SidebarNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.path;
     final colorScheme = Theme.of(context).colorScheme;
 
     return Material(
@@ -138,7 +126,7 @@ class SidebarNavigation extends StatelessWidget {
                 itemCount: _items.length,
                 itemBuilder: (context, index) {
                   final item = _items[index];
-                  final isSelected = location == item.route;
+                  final isSelected = index == selectedIndex;
                   return ListTile(
                     leading: Icon(
                       item.icon,
@@ -158,7 +146,7 @@ class SidebarNavigation extends StatelessWidget {
                     ),
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    onTap: () => context.go(item.route),
+                    onTap: () => onDestinationSelected?.call(index),
                   );
                 },
               ),
@@ -184,30 +172,42 @@ class _SidebarItem {
 // ─── Shells ─────────────────────────────────────────────
 
 class MobileShell extends StatelessWidget {
-  const MobileShell({super.key, required this.child});
-  final Widget child;
+  const MobileShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: child,
-      bottomNavigationBar: const AdaptiveNavigation(),
+      body: navigationShell,
+      bottomNavigationBar: AdaptiveNavigation(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: (index) => navigationShell.goBranch(
+          index,
+          initialLocation: index == navigationShell.currentIndex,
+        ),
+      ),
     );
   }
 }
 
 class TabletShell extends StatelessWidget {
-  const TabletShell({super.key, required this.child});
-  final Widget child;
+  const TabletShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
-          const AdaptiveNavigation(),
+          AdaptiveNavigation(
+            selectedIndex: navigationShell.currentIndex,
+            onDestinationSelected: (index) => navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            ),
+          ),
           const VerticalDivider(width: 1),
-          Expanded(child: child),
+          Expanded(child: navigationShell),
         ],
       ),
     );
@@ -215,17 +215,23 @@ class TabletShell extends StatelessWidget {
 }
 
 class DesktopShell extends StatelessWidget {
-  const DesktopShell({super.key, required this.child});
-  final Widget child;
+  const DesktopShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
-          const AdaptiveNavigation(),
+          AdaptiveNavigation(
+            selectedIndex: navigationShell.currentIndex,
+            onDestinationSelected: (index) => navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            ),
+          ),
           const VerticalDivider(width: 1),
-          Expanded(child: child),
+          Expanded(child: navigationShell),
         ],
       ),
     );
@@ -234,8 +240,8 @@ class DesktopShell extends StatelessWidget {
 
 /// macOS-style shell with sidebar
 class MacOSShell extends ConsumerWidget {
-  const MacOSShell({super.key, required this.child});
-  final Widget child;
+  const MacOSShell({super.key, required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -246,9 +252,15 @@ class MacOSShell extends ConsumerWidget {
         onBooksDropped: (paths) => _handleDrop(context, paths),
         child: Row(
           children: [
-            const SidebarNavigation(),
+            SidebarNavigation(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
+            ),
             const VerticalDivider(width: 1),
-            Expanded(child: child),
+            Expanded(child: navigationShell),
             if (selectedBook != null) ...[
               const VerticalDivider(width: 1),
               const MacOSRightPanel(),
@@ -272,23 +284,32 @@ class MacOSShell extends ConsumerWidget {
 }
 
 class ShellWithNav extends ConsumerWidget {
-  const ShellWithNav({super.key, required this.child});
-  final Widget child;
+  const ShellWithNav({super.key, this.navigationShell});
+  final StatefulNavigationShell? navigationShell;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final capabilities = ref.watch(platformCapabilitiesProvider);
 
+    // Fallback for non-StatefulShellRoute routes (catalog, collections, etc.)
+    final shell = navigationShell;
+
     if (capabilities.hasNativeMenuBar) {
-      return MacOSShell(child: child);
+      return shell != null
+          ? MacOSShell(navigationShell: shell)
+          : const Scaffold(body: SizedBox.shrink());
+    }
+
+    if (shell == null) {
+      return const Scaffold(body: SizedBox.shrink());
     }
 
     if (context.isCompact) {
-      return MobileShell(child: child);
+      return MobileShell(navigationShell: shell);
     } else if (context.isMedium) {
-      return TabletShell(child: child);
+      return TabletShell(navigationShell: shell);
     } else {
-      return DesktopShell(child: child);
+      return DesktopShell(navigationShell: shell);
     }
   }
 }
