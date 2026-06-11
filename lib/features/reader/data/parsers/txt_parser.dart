@@ -52,7 +52,6 @@ final class TxtBookParser implements BookParser {
         ReaderBlock(
           index: i,
           text: paragraphs[i],
-          type: BlockType.paragraph,
         ),
       );
     }

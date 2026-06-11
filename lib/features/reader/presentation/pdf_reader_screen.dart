@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -38,35 +39,25 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       );
     }
 
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          _currentPage != null && _totalPages != null ? 'Стр. $_currentPage / $_totalPages' : 'PDF',
-        ),
+        title: Text(_appBarTitle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.zoom_out),
-            onPressed: _zoomOut,
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_in),
-            onPressed: _zoomIn,
-          ),
           PopupMenuButton<String>(
             onSelected: _handleMenuAction,
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'fit_width',
-                child: Text('По ширине'),
-              ),
-              const PopupMenuItem(
-                value: 'fit_page',
-                child: Text('Вся страница'),
-              ),
+              const PopupMenuItem(value: 'fit_width', child: Text('По ширине')),
+              const PopupMenuItem(value: 'fit_page', child: Text('Вся страница')),
+              const PopupMenuItem(value: 'first', child: Text('Первая страница')),
+              const PopupMenuItem(value: 'last', child: Text('Последняя страница')),
+              if (_currentPage != null && _totalPages != null)
+                PopupMenuItem(
+                  value: 'go_to',
+                  child: Text('Перейти ($_currentPage/$_totalPages)'),
+                ),
             ],
           ),
         ],
@@ -76,18 +67,16 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         controller: _controller,
         initialPageNumber: widget.initialPage,
         params: PdfViewerParams(
-          textSelectionParams: const PdfTextSelectionParams(
-            enabled: true,
-          ),
           backgroundColor: colorScheme.surface,
           margin: 4,
-          maxScale: 8.0,
-          minScale: 0.2,
-          useAlternativeFitScaleAsMinScale: true,
-          onePassRenderingScaleThreshold: 200 / 72,
-          limitRenderingCache: true,
-          enableKeyboardNavigation: true,
-          scrollByMouseWheel: 0.2,
+          textSelectionParams: const PdfTextSelectionParams(enabled: true),
+          sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
+            maxScale: 8.0,
+            minScale: 0.1,
+            useAlternativeFitScaleAsMinScale: true,
+            onePassRenderingScaleThreshold: 200 / 72,
+          ),
+          scrollPhysics: const FixedOverscrollPhysics(maxOverscroll: 120),
           onPageChanged: (pageNumber) {
             if (mounted) setState(() => _currentPage = pageNumber);
           },
@@ -96,15 +85,31 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
               setState(() => _totalPages = document.pages.length);
             }
           },
+          onDocumentLoadFinished: (documentRef, loadSucceeded) {
+            if (loadSucceeded) {
+              documentRef.resolveListenable().useDocument((doc) {
+                if (mounted) {
+                  setState(() => _totalPages = doc.pages.length);
+                }
+              });
+            }
+          },
           viewerOverlayBuilder: (context, size, handleLinkTap) {
             return [
-              PdfViewerScrollThumb(
-                controller: _controller,
-                orientation: ScrollbarOrientation.right,
+              Positioned(
+                right: 8,
+                top: size.height * 0.1,
+                bottom: size.height * 0.1,
+                child: PdfViewerScrollThumb(controller: _controller),
               ),
-              PdfViewerScrollThumb(
-                controller: _controller,
-                orientation: ScrollbarOrientation.bottom,
+              Positioned(
+                bottom: 8,
+                left: size.width * 0.1,
+                right: size.width * 0.1,
+                child: PdfViewerScrollThumb(
+                  controller: _controller,
+                  orientation: ScrollbarOrientation.bottom,
+                ),
               ),
             ];
           },
@@ -114,20 +119,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 bottom: 4,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     '${page.pageNumber}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ),
               ),
@@ -140,14 +139,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 children: [
                   CircularProgressIndicator(
                     value: totalBytes != null ? bytesDownloaded / totalBytes : null,
-                    backgroundColor: colorScheme.surfaceContainerHighest,
                   ),
                   const SizedBox(height: 12),
                   Text(
                     totalBytes != null
-                        ? 'Загрузка: ${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
+                        ? '${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
                         : 'Загрузка...',
-                    style: theme.textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -160,14 +157,11 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 children: [
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 12),
-                  Text(
-                    'Ошибка загрузки PDF',
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  Text('Ошибка загрузки PDF', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
                     '$error',
-                    style: theme.textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -182,52 +176,96 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
             },
           ),
           getPageRenderingScale: (context, page, controller, estimatedScale) {
-            final width = page.width * estimatedScale;
-            final height = page.height * estimatedScale;
-            if (width > 4096 || height > 4096) {
+            final w = page.width * estimatedScale;
+            final h = page.height * estimatedScale;
+            if (w > 4096 || h > 4096) {
               return (200 / 72.0).clamp(estimatedScale * 0.5, estimatedScale);
             }
             return estimatedScale;
+          },
+          buildContextMenu: (context, params) {
+            if (!params.isTextSelectionEnabled) return null;
+            return PopupMenuButton<String>(
+              onSelected: (value) {
+                params.dismissContextMenu();
+                if (value == 'copy') {
+                  unawaited(params.textSelectionDelegate.copyTextSelection());
+                } else if (value == 'clear') {
+                  unawaited(params.textSelectionDelegate.clearTextSelection());
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'copy', child: Text('Копировать')),
+                const PopupMenuItem(value: 'clear', child: Text('Снять выделение')),
+              ],
+            );
           },
         ),
       ),
     );
   }
 
-  void _zoomIn() {
-    if (!_controller.isReady) return;
-    final center = _controller.visibleRect.center;
-    final zoom = _controller.currentZoom * 1.25;
-    _controller.setZoom(center, zoom);
+  String get _appBarTitle {
+    if (_currentPage != null && _totalPages != null) {
+      return 'Стр. $_currentPage / $_totalPages';
+    }
+    return 'PDF';
   }
 
-  void _zoomOut() {
+  Future<void> _handleMenuAction(String action) async {
     if (!_controller.isReady) return;
-    final center = _controller.visibleRect.center;
-    final zoom = _controller.currentZoom * 0.8;
-    _controller.setZoom(center, zoom);
-  }
-
-  void _handleMenuAction(String action) {
     switch (action) {
       case 'fit_width':
-        if (!_controller.isReady) return;
         final zoom = _controller.viewSize.width / _controller.documentSize.width;
-        final center = _controller.visibleRect.center;
-        _controller.setZoom(center, zoom);
+        await _controller.setZoom(_controller.visibleRect.center, zoom);
         break;
       case 'fit_page':
-        if (!_controller.isReady) return;
         final altScale = _controller.alternativeFitScale;
         if (altScale != null) {
-          _controller.goTo(
-            _controller.calcMatrixFor(
-              _controller.visibleRect.center,
-              zoom: altScale,
-            ),
+          await _controller.goTo(
+            _controller.calcMatrixFor(_controller.visibleRect.center, zoom: altScale),
           );
         }
         break;
+      case 'first':
+        await _controller.goToPage(pageNumber: 1);
+        break;
+      case 'last':
+        await _controller.goToPage(pageNumber: _controller.pageCount);
+        break;
+      case 'go_to':
+        final page = await _showGoToPageDialog();
+        if (page != null) {
+          await _controller.goToPage(pageNumber: page);
+        }
+        break;
     }
+  }
+
+  Future<int?> _showGoToPageDialog() async {
+    final ctrl = TextEditingController(text: _currentPage?.toString() ?? '');
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Перейти к странице'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(hintText: '1 – ${_totalPages ?? "?"}'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+          FilledButton(
+            onPressed: () {
+              final p = int.tryParse(ctrl.text);
+              if (p != null && p > 0) Navigator.pop(context, p);
+            },
+            child: const Text('Перейти'),
+          ),
+        ],
+      ),
+    );
+    return result;
   }
 }
