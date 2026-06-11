@@ -944,3 +944,282 @@ class FlibustaClient:
             if genre_id and genre_name:
                 results.append(Genre(id=genre_id, name=genre_name))
         return results
+
+    # ── NEW ENDPOINTS ────────────────────────────────────────────────────────
+
+    def get_genres_list_page(self) -> list:
+        """Get all genres from /g page."""
+        soup = self._get_html_page("/g")
+        if not soup:
+            return []
+        results = []
+        seen = set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if href.startswith("/g/") and href not in seen:
+                seen.add(href)
+                genre_id = href.replace("/g/", "")
+                genre_name = a.get_text(strip=True)
+                if genre_id and genre_name:
+                    results.append(Genre(id=genre_id, name=genre_name))
+        return results
+
+    def get_recent_additions(self, lang=None, fmt=None, sort="1") -> dict:
+        """Get recent additions from /new with filters.
+
+        Args:
+            lang: Language code (e.g. 'ru', 'en') or None for all
+            fmt: Format (e.g. 'fb2', 'pdf') or None for all
+            sort: '1' = new+fixed, '2' = new only
+        """
+        params = []
+        if lang:
+            params.append(f"lang={lang}")
+        if fmt:
+            params.append(f"type={fmt}")
+        if sort:
+            params.append(f"sr={sort}")
+        path = "/new" + ("?" + "&".join(params) if params else "")
+        soup = self._get_html_page(path)
+        if not soup:
+            return {"books": [], "total": 0}
+
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+
+        return {"books": books, "total": len(books)}
+
+    def get_popular_books(self) -> list:
+        """Get popular books from /stat/b."""
+        soup = self._get_html_page("/stat/b")
+        if not soup:
+            return []
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+        return books
+
+    def get_all_genres(self) -> list:
+        """Get complete genre list from /g (with 500+ genres)."""
+        soup = self._get_html_page("/g")
+        if not soup:
+            return []
+        results = []
+        seen = set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if href.startswith("/g/") and href not in seen:
+                seen.add(href)
+                genre_id = href.replace("/g/", "")
+                genre_name = a.get_text(strip=True)
+                if genre_id and genre_name:
+                    results.append(Genre(id=genre_id, name=genre_name))
+        return results
+
+    def get_all_authors_letter(self, letter: str) -> list:
+        """Get authors starting with a specific letter."""
+        soup = self._get_html_page(f"/{letter}")
+        if not soup:
+            return []
+        results = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if href.startswith("/a/"):
+                author_id = _get_numbers(href)
+                author_name = a.get_text(strip=True)
+                if author_id and author_name:
+                    results.append(Author(id=int(author_id), name=author_name))
+        return results
+
+    def get_book_mail_formats(self, book_id: str) -> list:
+        """Get available email formats for a book."""
+        soup = self._get_html_page(f"/b/{book_id}/mail")
+        if not soup:
+            return []
+        formats = []
+        for form in soup.find_all("form"):
+            if "mail" in form.get("action", ""):
+                for select in form.find_all("select"):
+                    if select.get("name") == "format":
+                        formats = [o.get("value") for o in select.find_all("option")]
+        return formats
+
+    def get_user_profile(self, user_id: str) -> dict:
+        """Get user public profile."""
+        soup = self._get_html_page(f"/user/{user_id}")
+        if not soup:
+            return {}
+        title = soup.title.get_text(strip=True) if soup.title else ""
+        return {"user_id": user_id, "title": title}
+
+    def get_book_compare(self, book_id_1: str, book_id_2: str) -> Optional[str]:
+        """Compare two books via /comp endpoint."""
+        r = self._get(f"/comp?b1={book_id_1}&b2={book_id_2}")
+        if not r:
+            return None
+        return r.text
+
+    def get_series_with_books(self, series_id: int) -> dict:
+        """Get series page with books and sort options."""
+        soup = self._get_html_page(f"/s/{series_id}")
+        if not soup:
+            return {"books": [], "sort_options": []}
+
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+
+        sort_options = []
+        for form in soup.find_all("form"):
+            if form.get("action", "").startswith("/s/"):
+                for select in form.find_all("select"):
+                    if select.get("name") == "order":
+                        for opt in select.find_all("option"):
+                            sort_options.append(opt.get("value", ""))
+
+        return {"books": books, "sort_options": sort_options}
+
+    def get_genre_books(self, genre_id: str, order: str = "a") -> list:
+        """Get books in a genre with sort order."""
+        soup = self._get_html_page(f"/g/{genre_id}?order={order}")
+        if not soup:
+            return []
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+        return books
+
+    def get_author_books_filtered(self, author_id: int, lang=None, order="a", ghosts=False, translations=False) -> list:
+        """Get author books with filters."""
+        params = []
+        if ghosts:
+            params.append("hg=1")
+        if translations:
+            params.append("sa=1")
+        if lang:
+            params.append(f"lang={lang}")
+        if order:
+            params.append(f"order={order}")
+        path = f"/a/{author_id}" + ("?" + "&".join(params) if params else "")
+        soup = self._get_html_page(path)
+        if not soup:
+            return []
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+        return books
+
+    def get_mass_download_form(self) -> dict:
+        """Get mass download form from /new page."""
+        soup = self._get_html_page("/new")
+        if not soup:
+            return {}
+        for form in soup.find_all("form"):
+            action = form.get("action", "")
+            if "mass" in action or "download" in action:
+                inputs = []
+                for inp in form.find_all("input"):
+                    name = inp.get("name")
+                    if name:
+                        inputs.append(name)
+                return {"action": action, "inputs": inputs[:20]}
+        return {}
+
+    def send_book_to_email(self, book_id: str, email: str, fmt: str = "fb2") -> bool:
+        """Send book to email via /b/{id}/mail form."""
+        payload = {
+            "to": email,
+            "format": fmt,
+            "bookmailFormParams": "Отправить",
+        }
+        r = self._post(f"/b/{book_id}/mail", data=payload)
+        return r is not None and r.status_code == 200
+
+    def add_to_polka(self, book_id: str, flag: bool = True) -> bool:
+        """Add book to polka (bookshelf)."""
+        payload = {
+            "flag": "on" if flag else "",
+        }
+        r = self._post(f"/polka/add/{book_id}", data=payload)
+        return r is not None and r.status_code == 200
+
+    def watch_book(self, book_id: str) -> bool:
+        """Start watching/tracking a book."""
+        payload = {"id": book_id}
+        r = self._post("/polka/watch/add", data=payload)
+        return r is not None and r.status_code == 200
+
+    def get_messages(self) -> list:
+        """Get inbox messages."""
+        soup = self._get_html_page("/messages")
+        if not soup:
+            return []
+        messages = []
+        for tr in soup.find_all("tr"):
+            cells = tr.find_all("td")
+            if len(cells) >= 3:
+                sender = cells[0].get_text(strip=True)
+                subject = cells[1].get_text(strip=True)
+                date = cells[2].get_text(strip=True)
+                if sender and subject:
+                    messages.append({"sender": sender, "subject": subject, "date": date})
+        return messages
+
+    def send_message(self, recipient: str, subject: str, body: str) -> bool:
+        """Send a private message."""
+        payload = {
+            "recipient": recipient,
+            "subject": subject,
+            "body": body,
+            "op": "Отправить сообщение",
+        }
+        r = self._post("/messages/new", data=payload)
+        return r is not None and r.status_code == 200
+
+    def get_user_bwlist(self, user_id: str) -> dict:
+        """Get user's black/white list."""
+        soup = self._get_html_page(f"/bwlist/show/{user_id}")
+        if not soup:
+            return {"black": [], "white": []}
+        # Parse the list - structure varies
+        return {"user_id": user_id, "status": "parsed"}
+
+    def get_recommendations(self, view="recs", user_id=None) -> list:
+        """Get community recommendations."""
+        path = "/rec"
+        params = [f"view={view}"]
+        if user_id:
+            params.append(f"user={user_id}")
+        path += "?" + "&".join(params)
+        soup = self._get_html_page(path)
+        if not soup:
+            return []
+        books = []
+        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
+            href = a["href"]
+            book_id = _get_numbers(href)
+            book_name = a.get_text(strip=True)
+            if book_id and book_name:
+                books.append({"id": book_id, "name": book_name})
+        return books

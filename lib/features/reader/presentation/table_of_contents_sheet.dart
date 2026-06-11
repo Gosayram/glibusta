@@ -6,20 +6,20 @@ import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
 
 class TableOfContentsSheet extends StatelessWidget {
-  final NormalizedBook book;
+  final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final ValueChanged<ReaderPosition> onJumpToPosition;
 
   const TableOfContentsSheet({
     super.key,
-    required this.book,
+    required this.metadata,
     required this.currentChapterIndex,
     required this.onJumpToPosition,
   });
 
   static void show(
     BuildContext context, {
-    required NormalizedBook book,
+    required NormalizedBookMetadata metadata,
     required int currentChapterIndex,
     required ValueChanged<ReaderPosition> onJumpToPosition,
   }) {
@@ -34,7 +34,7 @@ class TableOfContentsSheet extends StatelessWidget {
           maxChildSize: 0.9,
           expand: false,
           builder: (context, scrollController) => _TableOfContentsContent(
-            book: book,
+            metadata: metadata,
             currentChapterIndex: currentChapterIndex,
             onJumpToPosition: onJumpToPosition,
             scrollController: scrollController,
@@ -51,13 +51,13 @@ class TableOfContentsSheet extends StatelessWidget {
 }
 
 class _TableOfContentsContent extends StatelessWidget {
-  final NormalizedBook book;
+  final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final ScrollController scrollController;
 
   const _TableOfContentsContent({
-    required this.book,
+    required this.metadata,
     required this.currentChapterIndex,
     required this.onJumpToPosition,
     required this.scrollController,
@@ -67,7 +67,6 @@ class _TableOfContentsContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Drag handle
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Container(
@@ -79,7 +78,6 @@ class _TableOfContentsContent extends StatelessWidget {
             ),
           ),
         ),
-        // Title
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -97,7 +95,7 @@ class _TableOfContentsContent extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${book.chapters.length} глав',
+                '${metadata.chapterCount} глав',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -107,13 +105,14 @@ class _TableOfContentsContent extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         const Divider(height: 1),
-        // Chapter list
         Expanded(
           child: ListView.builder(
             controller: scrollController,
-            itemCount: book.chapters.length,
+            itemCount: metadata.chapterCount,
             itemBuilder: (context, index) {
-              final chapter = book.chapters[index];
+              final title = index < metadata.chapterTitles.length
+                  ? metadata.chapterTitles[index]
+                  : '';
               final isActive = index == currentChapterIndex;
               return ListTile(
                 leading: CircleAvatar(
@@ -132,27 +131,21 @@ class _TableOfContentsContent extends StatelessWidget {
                   ),
                 ),
                 title: Text(
-                  chapter.title.isNotEmpty ? chapter.title : 'Глава ${index + 1}',
+                  title.isNotEmpty ? title : 'Глава ${index + 1}',
                   style: TextStyle(
                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                     color: isActive ? Theme.of(context).colorScheme.primary : null,
                   ),
                 ),
-                subtitle: Text(
-                  '${chapter.blocks.length} абзацев',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();
-                  final progress = book.chapters.length <= 1
+                  final progress = metadata.chapterCount <= 1
                       ? 0.0
-                      : index / (book.chapters.length - 1);
+                      : index / (metadata.chapterCount - 1);
                   onJumpToPosition(
                     ReaderPosition(
-                      bookId: book.id,
+                      bookId: metadata.id,
                       chapterIndex: index,
                       paragraphIndex: 0,
                       progressPercent: progress,

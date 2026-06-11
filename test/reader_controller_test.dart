@@ -33,7 +33,7 @@ void main() {
   group('ReaderState', () {
     test('default values are correct', () {
       final state = ReaderState();
-      expect(state.book, isNull);
+      expect(state.metadata, isNull);
       expect(state.isLoading, isTrue);
       expect(state.errorMessage, isNull);
       expect(state.errorFilePath, isNull);

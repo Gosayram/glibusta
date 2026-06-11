@@ -11,14 +11,14 @@ import '../domain/reader.dart';
 class ReaderSidePanel extends ConsumerStatefulWidget {
   const ReaderSidePanel({
     super.key,
-    required this.book,
+    required this.metadata,
     required this.currentChapterIndex,
     required this.scrollController,
     required this.width,
     this.onJumpToPosition,
   });
 
-  final NormalizedBook book;
+  final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final ScrollController scrollController;
   final double width;
@@ -78,13 +78,15 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
 
   Widget _buildTableOfContents(BuildContext context) {
     return ListView.builder(
-      itemCount: widget.book.chapters.length,
+      itemCount: widget.metadata.chapterCount,
       itemBuilder: (context, index) {
-        final chapter = widget.book.chapters[index];
+        final title = index < widget.metadata.chapterTitles.length
+            ? widget.metadata.chapterTitles[index]
+            : '';
         final isActive = index == widget.currentChapterIndex;
         return ListTile(
           title: Text(
-            chapter.title.isNotEmpty ? chapter.title : 'Глава ${index + 1}',
+            title.isNotEmpty ? title : 'Глава ${index + 1}',
             style: TextStyle(
               fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               color: isActive ? Theme.of(context).colorScheme.primary : null,
@@ -99,7 +101,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
 
   Widget _buildBookmarks() {
     return StreamBuilder<List<Bookmark>>(
-      stream: _bookmarks.watchBookmarks(widget.book.id),
+      stream: _bookmarks.watchBookmarks(widget.metadata.id),
       builder: (context, snapshot) {
         final bookmarks = snapshot.data ?? const <Bookmark>[];
         if (bookmarks.isEmpty) return const Center(child: Text('Нет закладок'));
@@ -128,7 +130,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
 
   Widget _buildNotes() {
     return StreamBuilder<List<Note>>(
-      stream: _notes.watchNotes(widget.book.id),
+      stream: _notes.watchNotes(widget.metadata.id),
       builder: (context, snapshot) {
         final notes = snapshot.data ?? const <Note>[];
         if (notes.isEmpty) return const Center(child: Text('Нет заметок'));
@@ -153,7 +155,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
 
   Widget _buildQuotes() {
     return StreamBuilder<List<Quote>>(
-      stream: _quotes.watchQuotes(widget.book.id),
+      stream: _quotes.watchQuotes(widget.metadata.id),
       builder: (context, snapshot) {
         final quotes = snapshot.data ?? const <Quote>[];
         if (quotes.isEmpty) return const Center(child: Text('Нет цитат'));
@@ -201,12 +203,12 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   }
 
   void _jumpToChapter(int chapterIndex) {
-    final progress = widget.book.chapters.length <= 1
+    final progress = widget.metadata.chapterCount <= 1
         ? 0.0
-        : chapterIndex / (widget.book.chapters.length - 1);
+        : chapterIndex / (widget.metadata.chapterCount - 1);
     widget.onJumpToPosition?.call(
       ReaderPosition(
-        bookId: widget.book.id,
+        bookId: widget.metadata.id,
         chapterIndex: chapterIndex,
         paragraphIndex: 0,
         progressPercent: progress,
@@ -216,11 +218,11 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   }
 
   ReaderPosition _toReaderPosition(int chapterIndex, int paragraphIndex, double localOffset) {
-    final progress = widget.book.chapters.length <= 1
+    final progress = widget.metadata.chapterCount <= 1
         ? 0.0
-        : chapterIndex / (widget.book.chapters.length - 1);
+        : chapterIndex / (widget.metadata.chapterCount - 1);
     return ReaderPosition(
-      bookId: widget.book.id,
+      bookId: widget.metadata.id,
       chapterIndex: chapterIndex,
       paragraphIndex: paragraphIndex,
       localOffset: localOffset * 100.0,

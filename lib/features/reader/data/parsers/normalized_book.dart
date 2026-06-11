@@ -17,6 +17,17 @@ class NormalizedBook {
     this.metadata,
   });
 
+  NormalizedBookMetadata toMetadata() => NormalizedBookMetadata(
+    id: id,
+    title: title,
+    authors: authors,
+    description: description,
+    coverUrl: coverUrl,
+    chapterCount: chapters.length,
+    chapterTitles: chapters.map((c) => c.title).toList(),
+    metadata: metadata,
+  );
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
@@ -38,6 +49,50 @@ class NormalizedBook {
             ?.map((c) => ReaderChapter.fromJson(c as Map<String, dynamic>))
             .toList() ??
         [],
+    metadata: json['metadata'] as Map<String, dynamic>?,
+  );
+}
+
+class NormalizedBookMetadata {
+  final String id;
+  final String title;
+  final List<String> authors;
+  final String? description;
+  final String? coverUrl;
+  final int chapterCount;
+  final List<String> chapterTitles;
+  final Map<String, dynamic>? metadata;
+
+  const NormalizedBookMetadata({
+    required this.id,
+    required this.title,
+    required this.authors,
+    this.description,
+    this.coverUrl,
+    required this.chapterCount,
+    required this.chapterTitles,
+    this.metadata,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'authors': authors,
+    'description': description,
+    'coverUrl': coverUrl,
+    'chapterCount': chapterCount,
+    'chapterTitles': chapterTitles,
+    'metadata': metadata,
+  };
+
+  factory NormalizedBookMetadata.fromJson(Map<String, dynamic> json) => NormalizedBookMetadata(
+    id: json['id'] as String,
+    title: json['title'] as String,
+    authors: (json['authors'] as List<String>?) ?? [],
+    description: json['description'] as String?,
+    coverUrl: json['coverUrl'] as String?,
+    chapterCount: json['chapterCount'] as int,
+    chapterTitles: (json['chapterTitles'] as List<dynamic>?)?.cast<String>() ?? [],
     metadata: json['metadata'] as Map<String, dynamic>?,
   );
 }

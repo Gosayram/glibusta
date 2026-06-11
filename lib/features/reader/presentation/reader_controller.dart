@@ -19,9 +19,12 @@ import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
 import 'reader_providers.dart';
 
+const int _chapterWindowSize = 2;
+
 @immutable
 class ReaderState {
-  final NormalizedBook? book;
+  final NormalizedBookMetadata? metadata;
+  final Map<int, ReaderChapter> loadedChapters;
   final bool isLoading;
   final String? errorMessage;
   final String? errorFilePath;
@@ -37,7 +40,8 @@ class ReaderState {
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
-    this.book,
+    this.metadata,
+    this.loadedChapters = const {},
     this.isLoading = true,
     this.errorMessage,
     this.errorFilePath,
@@ -52,8 +56,21 @@ class ReaderState {
     this.highlightedQuery,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
+  int get chapterCount => metadata?.chapterCount ?? 0;
+
+  ReaderChapter? chapterAt(int index) => loadedChapters[index];
+
+  String chapterTitle(int index) {
+    final titles = metadata?.chapterTitles;
+    if (titles != null && index >= 0 && index < titles.length) {
+      return titles[index];
+    }
+    return '';
+  }
+
   ReaderState copyWith({
-    NormalizedBook? book,
+    NormalizedBookMetadata? metadata,
+    Map<int, ReaderChapter>? loadedChapters,
     bool? isLoading,
     String? errorMessage,
     String? errorFilePath,
@@ -69,7 +86,8 @@ class ReaderState {
     bool clearHighlight = false,
   }) {
     return ReaderState(
-      book: book ?? this.book,
+      metadata: metadata ?? this.metadata,
+      loadedChapters: loadedChapters ?? this.loadedChapters,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       errorFilePath: errorFilePath ?? this.errorFilePath,
@@ -144,30 +162,100 @@ class ReaderController {
     if (!_stateController.isClosed) _stateController.add(newState);
   }
 
+  Future<void> _ensureChaptersLoaded(int centerIndex, {int windowSize = _chapterWindowSize}) async {
+    final service = _ref.read(bookOpenServiceProvider);
+    final bookId = _bookId;
+    final total = _state.chapterCount;
+    if (total == 0) return;
+
+    final minIdx = (centerIndex - windowSize).clamp(0, total - 1);
+    final maxIdx = (centerIndex + windowSize).clamp(0, total - 1);
+
+    final toLoad = <int>[];
+    for (var i = minIdx; i <= maxIdx; i++) {
+      if (!_state.loadedChapters.containsKey(i)) {
+        toLoad.add(i);
+      }
+    }
+
+    if (toLoad.isEmpty) return;
+
+    final updates = Map<int, ReaderChapter>.from(_state.loadedChapters);
+    for (final idx in toLoad) {
+      final chapter = await service.loadChapter(bookId, idx);
+      if (chapter != null) {
+        updates[idx] = chapter;
+      }
+    }
+    _updateState(_state.copyWith(loadedChapters: updates));
+  }
+
+  void _evictDistantChapters(int centerIndex, {int windowSize = _chapterWindowSize + 1}) {
+    final total = _state.chapterCount;
+    if (total == 0) return;
+
+    final minKeep = (centerIndex - windowSize).clamp(0, total - 1);
+    final maxKeep = (centerIndex + windowSize).clamp(0, total - 1);
+
+    final updated = Map<int, ReaderChapter>.from(_state.loadedChapters);
+    final keysToRemove = <int>[];
+    for (final key in updated.keys) {
+      if (key < minKeep || key > maxKeep) {
+        keysToRemove.add(key);
+      }
+    }
+    if (keysToRemove.isNotEmpty) {
+      for (final key in keysToRemove) {
+        updated.remove(key);
+      }
+      _updateState(_state.copyWith(loadedChapters: updated));
+    }
+  }
+
   Future<void> loadBook() async {
     _updateState(_state.copyWith(isLoading: true));
     try {
       final service = _ref.read(bookOpenServiceProvider);
-      final book = await service.openBookWithCache(_bookId);
-      final savedPosition = await _loadSavedPosition(book.chapters.length);
-      final totalWords = book.chapters.fold<int>(0, (sum, ch) {
-        final chapterWords = ch.blocks.fold<int>(
-          0,
-          (bSum, block) => bSum + block.text.split(RegExp(r'\s+')).length,
-        );
-        return sum + chapterWords;
-      });
+
+      // Load metadata
+      final metadata = await service.getCachedMetadata(_bookId);
+      NormalizedBookMetadata meta;
+      if (metadata != null) {
+        meta = metadata;
+      } else {
+        // Full parse — need metadata
+        final book = await service.openBookWithCache(_bookId);
+        meta = book.toMetadata();
+      }
+
+      final savedPosition = await _loadSavedPosition(meta.chapterCount);
+
+      // Estimate total words from chapter count (rough estimate until chapters are loaded)
+      // We'll update this once chapters are loaded
       const wordsPerMinute = 200;
+
       _updateState(
         _state.copyWith(
-          book: book,
+          metadata: meta,
           isLoading: false,
-          currentPosition: savedPosition.clamp(chapterCount: book.chapters.length),
-          estimatedMinutesLeft: (totalWords / wordsPerMinute).ceil(),
+          currentPosition: savedPosition.clamp(chapterCount: meta.chapterCount),
           clearHighlight: true,
         ),
       );
       _scrollController = ScrollController()..addListener(_onScroll);
+
+      // Pre-load the initial chapter window
+      final startChapter = savedPosition.chapterIndex;
+      await _ensureChaptersLoaded(startChapter);
+
+      // Compute accurate word count from loaded chapters
+      final totalWords = _computeTotalWords();
+      _updateState(
+        _state.copyWith(
+          estimatedMinutesLeft: totalWords > 0 ? (totalWords / wordsPerMinute).ceil() : 0,
+        ),
+      );
+
       final settings = _ref.read(readerSettingsProvider);
       if (settings.restoreLastPosition && savedPosition.progressPercent > 0) {
         _restoreSavedPosition(savedPosition);
@@ -218,6 +306,16 @@ class ReaderController {
     }
   }
 
+  int _computeTotalWords() {
+    var total = 0;
+    for (final chapter in _state.loadedChapters.values) {
+      for (final block in chapter.blocks) {
+        total += block.text.split(RegExp(r'\s+')).length;
+      }
+    }
+    return total;
+  }
+
   ScrollController get scrollController {
     _scrollController ??= ScrollController()..addListener(_onScroll);
     return _scrollController!;
@@ -236,7 +334,8 @@ class ReaderController {
   }
 
   void _updatePositionFromScroll(double progress) {
-    if (_state.book == null || _state.book!.chapters.isEmpty) return;
+    final total = _state.chapterCount;
+    if (total == 0) return;
     final position = _positionFromProgress(progress);
     if (position.chapterIndex == _state.currentPosition.chapterIndex &&
         position.paragraphIndex == _state.currentPosition.paragraphIndex &&
@@ -247,13 +346,13 @@ class ReaderController {
     _ref
         .read(readingProgressProvider.notifier)
         .updateProgress(
-          ReadingProgress.fromPosition(position, totalPages: _state.book!.chapters.length),
+          ReadingProgress.fromPosition(position, totalPages: total),
         );
   }
 
   ReaderPosition _positionFromProgress(double progress) {
-    final book = _state.book!;
-    if (book.chapters.isEmpty) {
+    final total = _state.chapterCount;
+    if (total == 0) {
       return ReaderPosition(
         bookId: _bookId,
         chapterIndex: 0,
@@ -261,10 +360,10 @@ class ReaderController {
         updatedAt: DateTime.now(),
       );
     }
-    final lastChapter = book.chapters.length - 1;
+    final lastChapter = total - 1;
     final chapterIndex = (progress * lastChapter).round().clamp(0, lastChapter);
-    final chapter = book.chapters[chapterIndex];
-    final lastParagraph = chapter.blocks.isEmpty ? 0 : chapter.blocks.length - 1;
+    final chapter = _state.chapterAt(chapterIndex);
+    final lastParagraph = (chapter?.blocks.isEmpty ?? true) ? 0 : chapter!.blocks.length - 1;
     final paragraphIndex = (progress * lastParagraph).round().clamp(0, lastParagraph);
     return ReaderPosition(
       bookId: _bookId,
@@ -375,7 +474,8 @@ class ReaderController {
   }
 
   void saveProgress() {
-    if (_state.book == null) return;
+    final total = _state.chapterCount;
+    if (total == 0) return;
     final database = _ref.read(databaseProvider);
     final position = _state.currentPosition.copyWith(
       bookId: _bookId,
@@ -390,7 +490,7 @@ class ReaderController {
           paragraphIndex: Value(position.paragraphIndex),
           localOffset: Value(position.localOffset),
           progressPercent: Value(position.progressPercent),
-          totalPages: Value(_state.book!.chapters.length),
+          totalPages: Value(total),
           lastRead: Value(position.updatedAt),
           updatedAt: Value(position.updatedAt),
         ),
@@ -404,13 +504,15 @@ class ReaderController {
       final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
-        (_state.book?.chapters.length ?? 1) - 1,
+        _state.chapterCount - 1,
       );
       _updateState(
         _state.copyWith(
           currentPosition: _state.currentPosition.copyWith(chapterIndex: nextChapter),
         ),
       );
+      unawaited(_ensureChaptersLoaded(nextChapter));
+      _evictDistantChapters(nextChapter);
       return;
     }
     if (_scrollController == null || !_scrollController!.hasClients) return;
@@ -433,13 +535,15 @@ class ReaderController {
       final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
-        (_state.book?.chapters.length ?? 1) - 1,
+        _state.chapterCount - 1,
       );
       _updateState(
         _state.copyWith(
           currentPosition: _state.currentPosition.copyWith(chapterIndex: previousChapter),
         ),
       );
+      unawaited(_ensureChaptersLoaded(previousChapter));
+      _evictDistantChapters(previousChapter);
       return;
     }
     if (_scrollController == null || !_scrollController!.hasClients) return;
@@ -511,7 +615,8 @@ class ReaderController {
   }
 
   void addBookmark() {
-    if (_state.book == null) return;
+    final total = _state.chapterCount;
+    if (total == 0) return;
     final position = _state.currentPosition.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     final database = _ref.read(databaseProvider);
     final id = DateTime.now().microsecondsSinceEpoch.toString();
@@ -532,18 +637,20 @@ class ReaderController {
   }
 
   void jumpToPosition(ReaderPosition position) {
-    if (_state.book == null || _state.book!.chapters.isEmpty) return;
-    final clamped = position.clamp(chapterCount: _state.book!.chapters.length);
+    final total = _state.chapterCount;
+    if (total == 0) return;
+    final clamped = position.clamp(chapterCount: total);
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
       _updateState(_state.copyWith(currentPosition: clamped));
+      unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
+      _evictDistantChapters(clamped.chapterIndex);
       return;
     }
     if (_scrollController == null || !_scrollController!.hasClients) return;
-    final chapterCount = _state.book!.chapters.length;
     final progress = clamped.progressPercent > 0
         ? clamped.progressPercent
-        : (chapterCount > 1 ? clamped.chapterIndex / (chapterCount - 1) : 0.0);
+        : (total > 1 ? clamped.chapterIndex / (total - 1) : 0.0);
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
       _scrollController!.animateTo(
@@ -583,8 +690,25 @@ class ReaderController {
   }
 
   BookSearchService? createSearchService() {
-    final book = _state.book;
-    if (book == null) return null;
+    final meta = _state.metadata;
+    if (meta == null) return null;
+    // Build a NormalizedBook from metadata + loaded chapters for search
+    final chapters = <ReaderChapter>[];
+    for (var i = 0; i < meta.chapterCount; i++) {
+      chapters.add(
+        _state.chapterAt(i) ??
+            ReaderChapter(index: i, title: meta.chapterTitles[i], blocks: const []),
+      );
+    }
+    final book = NormalizedBook(
+      id: meta.id,
+      title: meta.title,
+      authors: meta.authors,
+      description: meta.description,
+      coverUrl: meta.coverUrl,
+      chapters: chapters,
+      metadata: meta.metadata,
+    );
     return BookSearchService(book);
   }
 
@@ -647,7 +771,8 @@ class ReaderController {
     buffer.writeln(
       'Size: ${_state.errorFileSize != null ? "${(_state.errorFileSize! / 1024).toStringAsFixed(1)} KB" : "unknown"}',
     );
-    buffer.writeln('Chapters: ${_state.book?.chapters.length ?? 0}');
+    buffer.writeln('Chapters: ${_state.chapterCount}');
+    buffer.writeln('Loaded chapters: ${_state.loadedChapters.length}');
     buffer.writeln('Platform: ${Platform.operatingSystem}');
     buffer.writeln('Time: ${DateTime.now().toIso8601String()}');
     return buffer.toString();

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
@@ -122,6 +123,72 @@ class BookOpenService {
     return File('$dir/$bookId.json');
   }
 
+  Future<Directory> _getBookDir(String bookId) async {
+    final dir = await booksCacheDir;
+    final bookDir = Directory('$dir/$bookId');
+    if (!await bookDir.exists()) {
+      await bookDir.create(recursive: true);
+    }
+    return bookDir;
+  }
+
+  File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
+
+  File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
+
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    try {
+      final bookDir = await _getBookDir(bookId);
+      final metaFile = _getMetadataFile(bookDir);
+      if (!await metaFile.exists()) return null;
+      final json = await metaFile.readAsString();
+      return NormalizedBookMetadata.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to read cached metadata',
+        name: 'BookOpenService',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
+  }
+
+  Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
+    final bookDir = await _getBookDir(bookId);
+    final metaFile = _getMetadataFile(bookDir);
+    await metaFile.writeAsString(jsonEncode(book.toMetadata().toJson()));
+    for (final chapter in book.chapters) {
+      final chapterFile = _getChapterFile(bookDir, chapter.index);
+      await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
+    }
+  }
+
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    try {
+      final bookDir = await _getBookDir(bookId);
+      final chapterFile = _getChapterFile(bookDir, index);
+      if (!await chapterFile.exists()) return null;
+      final json = await chapterFile.readAsString();
+      return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
+    } on Object catch (e, st) {
+      developer.log(
+        'Failed to load chapter $index for $bookId',
+        name: 'BookOpenService',
+        error: e,
+        stackTrace: st,
+      );
+      return null;
+    }
+  }
+
+  Future<void> saveChapter(String bookId, ReaderChapter chapter) async {
+    final bookDir = await _getBookDir(bookId);
+    final chapterFile = _getChapterFile(bookDir, chapter.index);
+    await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
+  }
+
+  // Legacy monolithic cache — kept for migration fallback
   Future<NormalizedBook?> getCachedBook(String bookId) async {
     final cacheFile = await _getCacheFile(bookId);
     if (!await cacheFile.exists()) return null;
@@ -145,11 +212,40 @@ class BookOpenService {
   }
 
   Future<NormalizedBook> openBookWithCache(String bookId) async {
-    final cached = await getCachedBook(bookId);
-    if (cached != null) return cached;
+    // Try split cache first
+    final cachedMeta = await getCachedMetadata(bookId);
+    if (cachedMeta != null) {
+      final chapters = <ReaderChapter>[];
+      for (var i = 0; i < cachedMeta.chapterCount; i++) {
+        final chapter = await loadChapter(bookId, i);
+        if (chapter != null) {
+          chapters.add(chapter);
+        }
+      }
+      if (chapters.length == cachedMeta.chapterCount) {
+        return NormalizedBook(
+          id: cachedMeta.id,
+          title: cachedMeta.title,
+          authors: cachedMeta.authors,
+          description: cachedMeta.description,
+          coverUrl: cachedMeta.coverUrl,
+          chapters: chapters,
+          metadata: cachedMeta.metadata,
+        );
+      }
+    }
 
+    // Try legacy monolithic cache
+    final cached = await getCachedBook(bookId);
+    if (cached != null) {
+      // Migrate to split cache in background
+      unawaited(_saveSplitCache(bookId, cached));
+      return cached;
+    }
+
+    // Parse fresh and save as split cache
     final book = await openBook(bookId);
-    await saveToCache(bookId, book);
+    await _saveSplitCache(bookId, book);
     return book;
   }
 }

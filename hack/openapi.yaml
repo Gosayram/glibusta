@@ -1,0 +1,1869 @@
+openapi: 3.1.0
+info:
+  title: Flibusta API
+  description: |
+    Community-driven digital library API providing book search, metadata,
+    author/series/genre browsing, OPDS catalog, user bookshelf, messaging,
+    and recommendations.
+
+    ## Content Types
+    - HTML endpoints return `text/html` — requires client-side parsing
+    - OPDS endpoints return `application/atom+xml` — standard Atom XML
+
+    ## Authentication
+    - Session-based via form POST to `/user/login`
+    - Returns session cookie (`SESS*` / `SSESS*`)
+    - Some endpoints require auth (marked with `🔒`)
+
+    ## Pagination
+    - HTML pages use `?page=N` (0-indexed)
+    - OPDS uses `os:startIndex` / `os:itemsPerPage`
+    - Pagination info in `div.item-list .pager`
+
+    ## Parsing Notes
+    - Search results: `<ul>` inside `#main` with `<a href="/b/...">` links
+    - Book title: second `<h1>` (first is site name)
+    - Description: siblings after `<h2>Аннотация</h2>`
+    - Authors: `/a/{id}` links BEFORE download links
+  version: 1.0.0
+  contact:
+    name: Glibusta
+  license:
+    name: MIT
+
+servers:
+  - description: Production
+    url: /
+
+tags:
+  - name: Books
+    description: Book details, download, read, and email delivery
+  - name: Authors
+    description: Author profiles, books, and series
+  - name: Series
+    description: Book series browsing and sorting
+  - name: Genres
+    description: Genre catalog and book listings
+  - name: Search
+    description: Full-text search across books, authors, series, genres
+  - name: OPDS
+    description: OPDS 1.2 catalog (Atom XML)
+  - name: Recent
+    description: Recently added books and comments tracker
+  - name: Statistics
+    description: Popular books and user stats
+  - name: User
+    description: Profile, settings, and authentication
+  - name: Messages
+    description: Private messaging between users
+  - name: Bookshelf
+    description: User bookshelf (Polka) — ratings, reviews, tracking
+  - name: BlackWhiteList
+    description: User black/white list management
+  - name: Recommendations
+    description: Community and per-user book recommendations
+  - name: Forum
+    description: Forum topics and discussions
+  - name: Blog
+    description: User blogs
+  - name: Catalog
+    description: Database dumps, full catalog download
+
+security:
+  - sessionAuth: []
+
+paths:
+  # ═══════════════════════════════════════════════════════════════
+  # BOOKS
+  # ═══════════════════════════════════════════════════════════════
+  /b:
+    get:
+      operationId: getBookIndex
+      summary: Book index
+      description: Alphabetical listing of all books.
+      tags: [Books]
+      security: []
+      responses:
+        '200':
+          description: Book index page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /b/{bookId}:
+    get:
+      operationId: getBookDetails
+      summary: Book details
+      description: |
+        Full book page with title, authors, genres, series, cover, description,
+        and available download formats.
+      tags: [Books]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Book details page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/BookDetailsPage'
+
+  /b/{bookId}/read:
+    get:
+      operationId: readBookOnline
+      summary: Read book online
+      description: HTML-based online reader.
+      tags: [Books]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Online reader page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /b/{bookId}/download:
+    get:
+      operationId: getBookDownloadPage
+      summary: Download page
+      description: Page listing all available download formats.
+      tags: [Books]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Download page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /b/{bookId}/{format}:
+    get:
+      operationId: downloadBook
+      summary: Direct file download
+      description: Direct download of book in specified format.
+      tags: [Books]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+        - name: format
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [fb2, epub, mobi, pdf, txt, djvu, rtf, html, doc]
+      responses:
+        '200':
+          description: Book file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /b/{bookId}/mail:
+    get:
+      operationId: getBookMailForm
+      summary: Get email delivery form
+      description: Form to send book to registered email. Requires auth.
+      tags: [Books]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Email form page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/MailFormPage'
+
+    post:
+      operationId: sendBookToEmail
+      summary: Send book to email
+      description: Sends the book file to the user's registered email address.
+      tags: [Books]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BookMailRequest'
+      responses:
+        '200':
+          description: Book sent
+        '302':
+          description: Redirect after send
+
+  /b/{bookId}/complain:
+    get:
+      operationId: complainAboutBook
+      summary: Complain about file quality
+      description: Report a problem with the book file.
+      tags: [Books]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Complaint page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  # ═══════════════════════════════════════════════════════════════
+  # AUTHORS
+  # ═══════════════════════════════════════════════════════════════
+  /a:
+    get:
+      operationId: getAuthorIndex
+      summary: Author index
+      description: Alphabetical listing of all authors.
+      tags: [Authors]
+      security: []
+      responses:
+        '200':
+          description: Author index page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /a/all:
+    get:
+      operationId: getAllAuthors
+      summary: All authors list
+      description: Complete author listing.
+      tags: [Authors]
+      security: []
+      responses:
+        '200':
+          description: All authors page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /a/{authorId}:
+    get:
+      operationId: getAuthorDetails
+      summary: Author page with books
+      description: |
+        Author profile with list of books. Supports filters for ghost
+        authorships, translations, language, and sort order.
+      tags: [Authors]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+        - name: hg
+          in: query
+          description: Include ghost authorships
+          schema:
+            type: boolean
+            default: false
+        - name: sa
+          in: query
+          description: Include translations
+          schema:
+            type: boolean
+            default: false
+        - name: lang
+          in: query
+          description: Filter by language code
+          schema:
+            type: string
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [a, b, t]
+            default: a
+            description: "a=alphabet, b=series, t=date"
+      responses:
+        '200':
+          description: Author page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/AuthorPage'
+
+    post:
+      operationId: authorBulkAction
+      summary: Bulk action on author's books
+      description: Mark as read or compare selected books.
+      tags: [Authors]
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AuthorBulkRequest'
+      responses:
+        '200':
+          description: Action completed
+
+  /a/{authorId}/series:
+    get:
+      operationId: getAuthorSeries
+      summary: Author series
+      description: Series containing this author's books.
+      tags: [Authors]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+      responses:
+        '200':
+          description: Author series page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /{letter}:
+    get:
+      operationId: getAuthorsByLetter
+      summary: Authors by letter
+      description: Authors whose surname starts with the given letter.
+      tags: [Authors]
+      security: []
+      parameters:
+        - name: letter
+          in: path
+          required: true
+          schema:
+            type: string
+            examples:
+              - Aa
+              - Bb
+              - Sh
+              - Other
+      responses:
+        '200':
+          description: Authors page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # SERIES
+  # ═══════════════════════════════════════════════════════════════
+  /s:
+    get:
+      operationId: getSeriesIndex
+      summary: Series index
+      description: All series with sort and type filters.
+      tags: [Series]
+      security: []
+      parameters:
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [a, b]
+            description: "a=alphabet, b=book count"
+        - name: type1
+          in: query
+          schema:
+            type: boolean
+        - name: type2
+          in: query
+          schema:
+            type: boolean
+        - name: type3
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Series index
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /s/{seriesId}:
+    get:
+      operationId: getSeriesDetails
+      summary: Series page with books
+      description: Series details with book list and sort options.
+      tags: [Series]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [o, a, t]
+            description: "o=default, a=alphabet, t=date"
+        - name: sa
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Series page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/SeriesPage'
+
+  /sequence/{seriesId}:
+    get:
+      operationId: getSeriesBySequence
+      summary: Series page (alias)
+      description: Alias for /s/{seriesId}.
+      tags: [Series]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      responses:
+        '200':
+          description: Series page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/SeriesPage'
+
+  /sequence/{seriesId}/all:
+    get:
+      operationId: getAllBooksInSeries
+      summary: All books in series
+      description: Complete book list for a series.
+      tags: [Series]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      responses:
+        '200':
+          description: Series books page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # GENRES
+  # ═══════════════════════════════════════════════════════════════
+  /g:
+    get:
+      operationId: getGenreList
+      summary: Genre list
+      description: Complete list of all available genres (500+).
+      tags: [Genres]
+      security: []
+      responses:
+        '200':
+          description: Genre list page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/GenreListPage'
+
+  /g/{genreId}:
+    get:
+      operationId: getGenreBooks
+      summary: Genre page with books
+      description: Books in a specific genre with sort options.
+      tags: [Genres]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/GenreId'
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [a, b, t, p]
+            description: "a=alpha, b=author, t=date, p=popularity"
+      responses:
+        '200':
+          description: Genre page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/GenrePage'
+
+  /g/{genreId}/all:
+    get:
+      operationId: getAllBooksInGenre
+      summary: All books in genre
+      description: Complete book list for a genre.
+      tags: [Genres]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/GenreId'
+      responses:
+        '200':
+          description: Genre books page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # SEARCH
+  # ═══════════════════════════════════════════════════════════════
+  /booksearch:
+    get:
+      operationId: searchBooks
+      summary: Search books
+      description: |
+        Full-text search across books, authors, series, or genres.
+        Toggle via `chb`, `cha`, `chs`, `chg` flags.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: ask
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+        - name: chb
+          in: query
+          description: Search books
+          schema:
+            type: string
+            enum: [on]
+        - name: cha
+          in: query
+          description: Search authors
+          schema:
+            type: string
+            enum: [on]
+        - name: chs
+          in: query
+          description: Search series
+          schema:
+            type: string
+            enum: [on]
+        - name: chg
+          in: query
+          description: Search genres
+          schema:
+            type: string
+            enum: [on]
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Search results
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/SearchResultsPage'
+
+  /comp:
+    get:
+      operationId: compareBooks
+      summary: Compare two books
+      description: Side-by-side comparison of two books.
+      tags: [Search]
+      security: []
+      parameters:
+        - name: b1
+          in: query
+          required: true
+          description: First book ID
+          schema:
+            type: string
+        - name: b2
+          in: query
+          required: true
+          description: Second book ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comparison page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  # ═══════════════════════════════════════════════════════════════
+  # OPDS
+  # ═══════════════════════════════════════════════════════════════
+  /opds/:
+    get:
+      operationId: getOpdsRoot
+      summary: OPDS root catalog
+      description: Root of the OPDS 1.2 catalog (Atom XML).
+      tags: [OPDS]
+      security: []
+      responses:
+        '200':
+          description: OPDS catalog
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/popular:
+    get:
+      operationId: getOpdsPopular
+      summary: Popular books (OPDS)
+      tags: [OPDS]
+      security: []
+      responses:
+        '200':
+          description: Popular books feed
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/recent:
+    get:
+      operationId: getOpdsRecent
+      summary: Recent additions (OPDS)
+      tags: [OPDS]
+      security: []
+      responses:
+        '200':
+          description: Recent books feed
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/genres:
+    get:
+      operationId: getOpdsGenres
+      summary: Genre list (OPDS)
+      tags: [OPDS]
+      security: []
+      responses:
+        '200':
+          description: Genre catalog
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/authors:
+    get:
+      operationId: getOpdsAuthors
+      summary: Author list (OPDS)
+      tags: [OPDS]
+      security: []
+      responses:
+        '200':
+          description: Author catalog
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/opensearch:
+    get:
+      operationId: opdsSearch
+      summary: OPDS search
+      description: Search books or authors via OpenSearch (Atom XML).
+      tags: [OPDS]
+      security: []
+      parameters:
+        - name: searchTerm
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: searchType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [books, authors]
+        - name: pageNumber
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/author/{authorId}/alphabet/{page}:
+    get:
+      operationId: getOpdsAuthorBooks
+      summary: Author books by alphabet (OPDS)
+      tags: [OPDS]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+        - $ref: '#/components/parameters/OpdsPage'
+      responses:
+        '200':
+          description: Author books feed
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  /opds/genre/{genreId}/{page}:
+    get:
+      operationId: getOpdsGenreBooks
+      summary: Genre books (OPDS)
+      tags: [OPDS]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/GenreId'
+        - $ref: '#/components/parameters/OpdsPage'
+      responses:
+        '200':
+          description: Genre books feed
+          content:
+            application/atom+xml:
+              schema:
+                $ref: '#/components/schemas/OpdsFeed'
+
+  # ═══════════════════════════════════════════════════════════════
+  # RECENT / TRACKER
+  # ═══════════════════════════════════════════════════════════════
+  /new:
+    get:
+      operationId: getRecentAdditions
+      summary: Recent additions
+      description: Recently added and updated books with filters.
+      tags: [Recent]
+      security: []
+      parameters:
+        - name: lang
+          in: query
+          description: Filter by language
+          schema:
+            type: string
+            examples: ["ru", "en", "be", "kk"]
+        - name: type
+          in: query
+          description: Filter by format
+          schema:
+            type: string
+            enum: [fb2, pdf, djvu, doc, html, epub, mobi, lrf, rtf, txt]
+        - name: sr
+          in: query
+          description: "Sort: 1=new+fixed, 2=new only"
+          schema:
+            type: string
+            enum: ["1", "2"]
+            default: "1"
+        - name: sa
+          in: query
+          description: Show all
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Recent additions page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/RecentPage'
+
+  /tracker:
+    get:
+      operationId: getRecentComments
+      summary: Recent comments
+      description: Latest comments across all books.
+      tags: [Recent]
+      security: []
+      responses:
+        '200':
+          description: Tracker page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # STATISTICS
+  # ═══════════════════════════════════════════════════════════════
+  /stat:
+    get:
+      operationId: getSiteStats
+      summary: Site statistics
+      tags: [Statistics]
+      security: []
+      responses:
+        '200':
+          description: Statistics page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /stat/b:
+    get:
+      operationId: getPopularBooks
+      summary: Popular books
+      description: Most popular/downloaded books.
+      tags: [Statistics]
+      security: []
+      responses:
+        '200':
+          description: Popular books page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /stat/my:
+    get:
+      operationId: getMyStats
+      summary: My statistics
+      description: Personal reading/upload statistics.
+      tags: [Statistics]
+      responses:
+        '200':
+          description: My stats page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # USER
+  # ═══════════════════════════════════════════════════════════════
+  /user/login:
+    post:
+      operationId: loginUser
+      summary: Login
+      description: Authenticate via username/password form.
+      tags: [User]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login success (sets session cookie)
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '302':
+          description: Redirect after login
+
+  /user/register:
+    get:
+      operationId: getRegistrationForm
+      summary: Registration form
+      tags: [User]
+      security: []
+      responses:
+        '200':
+          description: Registration page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /user/password:
+    get:
+      operationId: getPasswordReset
+      summary: Password reset
+      tags: [User]
+      security: []
+      responses:
+        '200':
+          description: Password reset page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /user/me:
+    get:
+      operationId: getMyProfile
+      summary: My profile
+      description: Current user's profile page with tabs.
+      tags: [User]
+      responses:
+        '200':
+          description: Profile page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/UserProfilePage'
+
+  /user/me/edit:
+    get:
+      operationId: getEditProfileForm
+      summary: Edit profile form
+      tags: [User]
+      responses:
+        '200':
+          description: Edit form
+          content:
+            text/html:
+              schema:
+                type: string
+
+    post:
+      operationId: updateProfile
+      summary: Update profile
+      tags: [User]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EditProfileRequest'
+      responses:
+        '200':
+          description: Profile updated
+        '302':
+          description: Redirect after update
+
+  /user/me/watcher:
+    get:
+      operationId: getWatchedPosts
+      summary: Watched posts
+      description: List of tracked discussions.
+      tags: [User]
+      responses:
+        '200':
+          description: Watched posts page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /user/me/track:
+    get:
+      operationId: getTracking
+      summary: Tracking list
+      description: User's tracked items.
+      tags: [User]
+      responses:
+        '200':
+          description: Tracking page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /user/me/openid:
+    post:
+      operationId: updateOpenId
+      summary: Update OpenID
+      tags: [User]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                openid_identifier:
+                  type: string
+      responses:
+        '200':
+          description: OpenID updated
+
+  /user/{userId}:
+    get:
+      operationId: getUserProfile
+      summary: Public user profile
+      tags: [User]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User profile
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/UserProfilePage'
+
+  /logout:
+    get:
+      operationId: logoutUser
+      summary: Logout
+      tags: [User]
+      responses:
+        '200':
+          description: Logged out
+        '302':
+          description: Redirect to home
+
+  # ═══════════════════════════════════════════════════════════════
+  # MESSAGES
+  # ═══════════════════════════════════════════════════════════════
+  /messages:
+    get:
+      operationId: getInbox
+      summary: Message inbox
+      tags: [Messages]
+      responses:
+        '200':
+          description: Inbox page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/MessagesPage'
+
+  /messages/new:
+    get:
+      operationId: getComposeForm
+      summary: Compose message form
+      tags: [Messages]
+      responses:
+        '200':
+          description: Compose page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/ComposeMessageForm'
+
+    post:
+      operationId: sendMessage
+      summary: Send private message
+      tags: [Messages]
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '200':
+          description: Message sent
+        '302':
+          description: Redirect after send
+
+  /messages/new/{userId}:
+    get:
+      operationId: getComposeToUser
+      summary: Compose message to specific user
+      tags: [Messages]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Pre-filled compose page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/ComposeMessageForm'
+
+  # ═══════════════════════════════════════════════════════════════
+  # BOOKSHELF / POLKA
+  # ═══════════════════════════════════════════════════════════════
+  /polka:
+    get:
+      operationId: getBookshelfRoot
+      summary: Bookshelf root
+      tags: [Bookshelf]
+      security: []
+      responses:
+        '200':
+          description: Bookshelf page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /polka/show/{userId}:
+    get:
+      operationId: getUserBookshelf
+      summary: User's rated books
+      description: Books rated/reviewed by a specific user.
+      tags: [Bookshelf]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User bookshelf
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/BookshelfPage'
+
+  /polka/show/all:
+    get:
+      operationId: getAllReviews
+      summary: All reviews
+      description: Community-wide book reviews.
+      tags: [Bookshelf]
+      security: []
+      responses:
+        '200':
+          description: All reviews page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /polka/add/{bookId}:
+    post:
+      operationId: addBookReview
+      summary: Add/update book review
+      tags: [Bookshelf]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PolkaAddRequest'
+      responses:
+        '200':
+          description: Review saved
+        '302':
+          description: Redirect to book page
+
+  /polka/watch/add/{bookId}:
+    get:
+      operationId: watchBook
+      summary: Start tracking book
+      description: Add book to watchlist for updates.
+      tags: [Bookshelf]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+      responses:
+        '200':
+          description: Book added to watchlist
+
+  # ═══════════════════════════════════════════════════════════════
+  # BLACK/WHITE LIST
+  # ═══════════════════════════════════════════════════════════════
+  /bwlist:
+    get:
+      operationId: getBWListRoot
+      summary: Black/white list
+      tags: [BlackWhiteList]
+      responses:
+        '200':
+          description: BW list page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /bwlist/show/{userId}:
+    get:
+      operationId: getUserBWList
+      summary: User's black/white list
+      tags: [BlackWhiteList]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User BW list
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # RECOMMENDATIONS
+  # ═══════════════════════════════════════════════════════════════
+  /rec:
+    get:
+      operationId: getRecommendations
+      summary: Community recommendations
+      description: Book recommendations from the community.
+      tags: [Recommendations]
+      security: []
+      parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [recs, new, popular]
+            default: recs
+        - name: user
+          in: query
+          description: Filter by user ID
+          schema:
+            type: string
+        - name: author
+          in: query
+          description: Filter by author
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recommendations page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # FORUM / BLOG
+  # ═══════════════════════════════════════════════════════════════
+  /forum:
+    get:
+      operationId: getForumIndex
+      summary: Forum index
+      tags: [Forum]
+      security: []
+      responses:
+        '200':
+          description: Forum index
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /forum/{forumId}:
+    get:
+      operationId: getForumTopic
+      summary: Forum topic
+      tags: [Forum]
+      security: []
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Forum topic page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /blog:
+    get:
+      operationId: getBlogIndex
+      summary: Blog index
+      tags: [Blog]
+      security: []
+      responses:
+        '200':
+          description: Blog index
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /blog/{blogId}:
+    get:
+      operationId: getBlogPosts
+      summary: User blog
+      tags: [Blog]
+      security: []
+      parameters:
+        - name: blogId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Blog page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /blog/me:
+    get:
+      operationId: getMyBlog
+      summary: My blog
+      tags: [Blog]
+      responses:
+        '200':
+          description: My blog page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  # ═══════════════════════════════════════════════════════════════
+  # CATALOG / MISC
+  # ═══════════════════════════════════════════════════════════════
+  /catalog/catalog.zip:
+    get:
+      operationId: downloadFullCatalog
+      summary: Download full catalog
+      description: Complete library catalog as ZIP archive.
+      tags: [Catalog]
+      security: []
+      responses:
+        '200':
+          description: ZIP archive
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  /sql/:
+    get:
+      operationId: getDatabaseFiles
+      summary: Database files
+      description: Downloadable database dumps.
+      tags: [Catalog]
+      security: []
+      responses:
+        '200':
+          description: Database files page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /daily/:
+    get:
+      operationId: getDailyFiles
+      summary: Update files
+      description: Incremental update files.
+      tags: [Catalog]
+      security: []
+      responses:
+        '200':
+          description: Daily files page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /node/{nodeId}:
+    get:
+      operationId: getNodePage
+      summary: Static content page
+      description: FAQ, rules, help pages.
+      tags: [Catalog]
+      security: []
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Content page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /comment/{commentId}:
+    get:
+      operationId: getComment
+      summary: Comment permalink
+      tags: [Catalog]
+      security: []
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comment page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /dostup:
+    post:
+      operationId: requestAccess
+      summary: Request access through block
+      tags: [Catalog]
+      responses:
+        '200':
+          description: Access request processed
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session cookie obtained from /user/login
+
+  parameters:
+    BookId:
+      name: bookId
+      in: path
+      required: true
+      description: Unique book identifier
+      schema:
+        type: string
+
+    AuthorId:
+      name: authorId
+      in: path
+      required: true
+      description: Unique author identifier
+      schema:
+        type: string
+
+    SeriesId:
+      name: seriesId
+      in: path
+      required: true
+      description: Unique series identifier
+      schema:
+        type: string
+
+    GenreId:
+      name: genreId
+      in: path
+      required: true
+      description: Genre identifier (slug or numeric)
+      schema:
+        type: string
+
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Unique user identifier
+      schema:
+        type: string
+
+    OpdsPage:
+      name: page
+      in: path
+      required: true
+      description: Page number (0-indexed)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  schemas:
+    # ── Primitives ──────────────────────────────────────────────
+    BookId:
+      type: string
+      description: Unique book identifier
+
+    AuthorId:
+      type: string
+      description: Unique author identifier
+
+    AuthorName:
+      type: string
+      description: Full author name
+
+    SeriesId:
+      type: string
+      description: Unique series identifier
+
+    GenreId:
+      type: string
+      description: Genre slug or numeric ID
+
+    # ── Books ───────────────────────────────────────────────────
+    BookSummary:
+      type: object
+      description: Brief book info from search results
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorSummary'
+
+    AuthorSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    BookDetailsPage:
+      type: object
+      description: Parsed book details from HTML page
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        coverUrl:
+          type: string
+          nullable: true
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorSummary'
+        genres:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenreSummary'
+        formats:
+          type: array
+          items:
+            type: string
+          description: "Available formats: fb2, epub, mobi, pdf, txt, djvu"
+        downloadUrls:
+          type: array
+          items:
+            type: string
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesSummary'
+
+    SeriesSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    GenreSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    # ── Authors ─────────────────────────────────────────────────
+    AuthorDetailsPage:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+
+    # ── Series ──────────────────────────────────────────────────
+    SeriesPage:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+
+    # ── Genres ──────────────────────────────────────────────────
+    GenrePage:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+
+    GenreListPage:
+      type: object
+      properties:
+        genres:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenreSummary'
+
+    # ── Search ──────────────────────────────────────────────────
+    SearchResultsPage:
+      type: object
+      properties:
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthorSummary'
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeriesSummary'
+        genres:
+          type: array
+          items:
+            $ref: '#/components/schemas/GenreSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    PaginationInfo:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalCount:
+          type: integer
+          nullable: true
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    # ── Recent ──────────────────────────────────────────────────
+    RecentPage:
+      type: object
+      properties:
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+        totalBooks:
+          type: integer
+
+    # ── OPDS ────────────────────────────────────────────────────
+    OpdsFeed:
+      type: object
+      description: OPDS 1.2 Atom feed
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        updated:
+          type: string
+          format: date-time
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpdsEntry'
+
+    OpdsEntry:
+      type: object
+      description: Single OPDS entry (book or author)
+      properties:
+        title:
+          type: string
+        id:
+          type: string
+        updated:
+          type: string
+          format: date-time
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpdsAuthor'
+        categories:
+          type: array
+          items:
+            type: string
+        coverUrl:
+          type: string
+          nullable: true
+        downloads:
+          type: array
+          items:
+            $ref: '#/components/schemas/OpdsDownload'
+        description:
+          type: string
+
+    OpdsAuthor:
+      type: object
+      properties:
+        name:
+          type: string
+        uri:
+          type: string
+
+    OpdsDownload:
+      type: object
+      properties:
+        link:
+          type: string
+        type:
+          type: string
+          description: MIME type
+          enum:
+            - application/epub
+            - application/fb2+zip
+            - application/html+zip
+            - application/pdf+rar
+            - application/pdf+zip
+            - application/rtf+zip
+            - application/txt+zip
+            - application/x-mobipocket-ebook
+            - application/djvu
+            - application/msword
+            - application/x-rar-compressed
+            - application/pdf
+
+    # ── User ────────────────────────────────────────────────────
+    UserProfilePage:
+      type: object
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        tabs:
+          type: array
+          items:
+            type: string
+
+    # ── Bookshelf ───────────────────────────────────────────────
+    BookshelfPage:
+      type: object
+      properties:
+        userId:
+          type: string
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookSummary'
+
+    # ── Messages ────────────────────────────────────────────────
+    MessagesPage:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+
+    Message:
+      type: object
+      properties:
+        sender:
+          type: string
+        subject:
+          type: string
+        date:
+          type: string
+
+    # ── Forms ───────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [name, pass]
+      properties:
+        name:
+          type: string
+          description: Username
+        pass:
+          type: string
+          format: password
+          description: Password
+        persistent_login:
+          type: string
+          description: "Set to '1' to stay logged in"
+        form_build_id:
+          type: string
+        form_id:
+          type: string
+          enum: [user_login]
+
+    EditProfileRequest:
+      type: object
+      properties:
+        mail:
+          type: string
+          format: email
+        pass[pass1]:
+          type: string
+          format: password
+        pass[pass2]:
+          type: string
+          format: password
+        form_build_id:
+          type: string
+        form_token:
+          type: string
+
+    SendMessageRequest:
+      type: object
+      required: [recipient, subject, body]
+      properties:
+        recipient:
+          type: string
+          description: Recipient username
+        subject:
+          type: string
+        body:
+          type: string
+        op:
+          type: string
+          enum: [Отправить сообщение, Предпросмотр сообщения]
+
+    BookMailRequest:
+      type: object
+      properties:
+        to:
+          type: string
+          format: email
+        format:
+          type: string
+          enum: [fb2, html, txt, rtf, epub, mobi]
+        bookmailFormParams:
+          type: string
+          enum: [Отправить]
+
+    PolkaAddRequest:
+      type: object
+      properties:
+        flag:
+          type: string
+          enum: [on, ""]
+        body:
+          type: string
+          description: Review text
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Book rating (1-5)
+
+    AuthorBulkRequest:
+      type: object
+      properties:
+        readedall:
+          type: string
+          description: Mark selected as read
+        bookscomp:
+          type: string
+          description: Compare selected books
+
+    # ── Pages ───────────────────────────────────────────────────
+    HtmlPage:
+      type: object
+      description: Generic HTML page wrapper
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+          description: Raw HTML content

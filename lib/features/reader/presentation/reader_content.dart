@@ -10,7 +10,8 @@ import '../domain/reader.dart';
 class ReaderContentBody extends StatelessWidget {
   const ReaderContentBody({
     super.key,
-    required this.book,
+    required this.metadata,
+    required this.loadedChapters,
     required this.settings,
     required this.scrollController,
     required this.onTap,
@@ -19,7 +20,8 @@ class ReaderContentBody extends StatelessWidget {
     this.highlightQuery,
   });
 
-  final NormalizedBook book;
+  final NormalizedBookMetadata metadata;
+  final Map<int, ReaderChapter> loadedChapters;
   final ReaderSettings settings;
   final ScrollController scrollController;
   final GestureTapUpCallback onTap;
@@ -31,7 +33,8 @@ class ReaderContentBody extends StatelessWidget {
   Widget build(BuildContext context) {
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
-        book: book,
+        metadata: metadata,
+        loadedChapters: loadedChapters,
         settings: settings,
         onTap: onTap,
         initialPage: initialPage,
@@ -75,14 +78,21 @@ class ReaderContentBody extends StatelessWidget {
           child: ListView.builder(
             controller: scrollController,
             padding: effectiveMargin,
-            itemCount: book.chapters.length,
+            itemCount: metadata.chapterCount,
             itemBuilder: (context, index) {
-              final isLast = index == book.chapters.length - 1;
+              final chapter = loadedChapters[index];
+              final isLast = index == metadata.chapterCount - 1;
+              final nextTitle = index + 1 < metadata.chapterTitles.length
+                  ? metadata.chapterTitles[index + 1]
+                  : '';
               return Column(
                 key: ValueKey('chapter-$index'),
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildChapterContent(index, settings),
+                  if (chapter != null)
+                    _buildChapterContent(chapter, settings, index)
+                  else
+                    _buildLoadingPlaceholder(settings, index),
                   if (!isLast)
                     Padding(
                       padding: EdgeInsets.symmetric(
@@ -90,7 +100,7 @@ class ReaderContentBody extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          '— ${book.chapters[index + 1].title} —',
+                          '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
                           style: _getReaderStyle(settings).copyWith(
                             color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
                           ),
@@ -107,12 +117,42 @@ class ReaderContentBody extends StatelessWidget {
     );
   }
 
-  Widget _buildChapterContent(int chapterIndex, ReaderSettings settings) {
-    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
+    final title = index < metadata.chapterTitles.length
+        ? metadata.chapterTitles[index]
+        : 'Глава ${index + 1}';
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 1.4,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: settings.paragraphSpacing * 2),
+          ...List.generate(
+            3,
+            (i) => Padding(
+              padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+              child: Container(
+                height: settings.fontSize * settings.lineHeight,
+                decoration: BoxDecoration(
+                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    final chapter = book.chapters[chapterIndex];
+  Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
     final textAlign = switch (settings.textAlign) {
       ReaderTextAlign.left => TextAlign.left,
       ReaderTextAlign.justify => TextAlign.justify,
@@ -304,14 +344,16 @@ class ReaderContentBody extends StatelessWidget {
 
 class _PaginatedContentBody extends StatefulWidget {
   const _PaginatedContentBody({
-    required this.book,
+    required this.metadata,
+    required this.loadedChapters,
     required this.settings,
     required this.onTap,
     required this.initialPage,
     this.highlightQuery,
   });
 
-  final NormalizedBook book;
+  final NormalizedBookMetadata metadata;
+  final Map<int, ReaderChapter> loadedChapters;
   final ReaderSettings settings;
   final GestureTapUpCallback onTap;
   final int initialPage;
@@ -341,8 +383,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
         final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
         final pageCount = useTwoPageLayout
-            ? ((widget.book.chapters.length + 1) ~/ 2)
-            : widget.book.chapters.length;
+            ? ((widget.metadata.chapterCount + 1) ~/ 2)
+            : widget.metadata.chapterCount;
         if (pageCount == 0) return;
         final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
           0,
@@ -367,19 +409,18 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   Widget _buildChapterContent(int chapterIndex) {
-    final book = widget.book;
     final settings = widget.settings;
-    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
-      return const SizedBox.shrink();
-    }
-
-    final chapter = book.chapters[chapterIndex];
+    final chapter = widget.loadedChapters[chapterIndex];
     final textAlign = switch (settings.textAlign) {
       ReaderTextAlign.left => TextAlign.left,
       ReaderTextAlign.justify => TextAlign.justify,
       ReaderTextAlign.center => TextAlign.center,
       ReaderTextAlign.right => TextAlign.right,
     };
+
+    if (chapter == null) {
+      return _buildLoadingPlaceholder(settings, chapterIndex);
+    }
 
     final style = _getReaderStyle(settings);
     return Column(
@@ -399,6 +440,41 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ),
         ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
       ],
+    );
+  }
+
+  Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
+    final title = index < widget.metadata.chapterTitles.length
+        ? widget.metadata.chapterTitles[index]
+        : 'Глава ${index + 1}';
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 1.4,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: settings.paragraphSpacing * 2),
+          ...List.generate(
+            3,
+            (i) => Padding(
+              padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+              child: Container(
+                height: settings.fontSize * settings.lineHeight,
+                decoration: BoxDecoration(
+                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -594,7 +670,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             color: ReaderColors.forTheme(widget.settings.theme).text.withValues(alpha: 0.1),
           ),
           Expanded(
-            child: rightIndex < widget.book.chapters.length
+            child: rightIndex < widget.metadata.chapterCount
                 ? SafeArea(
                     top: false,
                     bottom: false,
@@ -615,8 +691,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
     final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
     final pageCount = useTwoPageLayout
-        ? ((widget.book.chapters.length + 1) ~/ 2)
-        : widget.book.chapters.length;
+        ? ((widget.metadata.chapterCount + 1) ~/ 2)
+        : widget.metadata.chapterCount;
     if (!_didRestoreInitialPage && widget.initialPage > 0 && pageCount > 0) {
       final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
         0,

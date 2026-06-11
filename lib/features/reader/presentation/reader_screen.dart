@@ -319,14 +319,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 duration: AppDuration.fast,
                 child: ReaderTopBar(
                   settings: settings,
-                  bookTitle: readerState.book?.title ?? '',
+                  bookTitle: readerState.metadata?.title ?? '',
                   onBack: () => Navigator.of(context).pop(),
                   onSettings: () => _showQuickSettings(context),
                   onSearch: () => _ctrl.toggleSearch(),
-                  onMore: readerState.book != null
+                  onMore: readerState.metadata != null
                       ? () => TableOfContentsSheet.show(
                           context,
-                          book: readerState.book!,
+                          metadata: readerState.metadata!,
                           currentChapterIndex: readerState.currentPosition.chapterIndex,
                           onJumpToPosition: _ctrl.jumpToPosition,
                         )
@@ -349,7 +349,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 child: ReaderBottomBar(
                   settings: settings,
                   currentChapterIndex: readerState.currentPosition.chapterIndex,
-                  totalChapters: readerState.book?.chapters.length ?? 0,
+                  totalChapters: readerState.chapterCount,
                   scrollProgress: readerState.scrollProgress,
                   estimatedMinutesLeft: readerState.estimatedMinutesLeft,
                   onJumpToProgress: _ctrl.jumpToProgress,
@@ -358,7 +358,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             ),
           ),
         ],
-        if (readerState.isSearchOpen && readerState.book != null)
+        if (readerState.isSearchOpen && readerState.metadata != null)
           Positioned.fill(
             child: BookSearchOverlay(
               searchService: _ctrl.createSearchService()!,
@@ -373,7 +373,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               theme: settings.theme,
             ),
           ),
-        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.book != null)
+        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
           Positioned(
             bottom: 80,
             left: 24,
@@ -394,7 +394,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderState readerState,
     ReaderSettings settings,
   ) {
-    if (readerState.book == null) return const SizedBox.shrink();
+    if (readerState.metadata == null) return const SizedBox.shrink();
     return SelectionAreaWrapper(
       contextMenuBuilder: (BuildContext context, SelectableRegionState state) {
         return _ReaderContextMenu(
@@ -422,7 +422,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         behavior: HitTestBehavior.translucent,
         child: RepaintBoundary(
           child: ReaderContentBody(
-            book: readerState.book!,
+            metadata: readerState.metadata!,
+            loadedChapters: readerState.loadedChapters,
             settings: settings,
             scrollController: _ctrl.scrollController,
             onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
@@ -492,9 +493,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
       body: Row(
         children: [
-          if (readerState.book != null)
+          if (readerState.metadata != null)
             ReaderSidePanel(
-              book: readerState.book!,
+              metadata: readerState.metadata!,
               currentChapterIndex: readerState.currentPosition.chapterIndex,
               scrollController: _ctrl.scrollController,
               width: sidePanelWidth,
