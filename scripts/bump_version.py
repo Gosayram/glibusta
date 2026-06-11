@@ -7,6 +7,7 @@ Usage:
     bump_version.py --major      # bump MAJOR:  0.1.5+3 → 1.0.0+0
     bump_version.py --build      # bump BUILD:  0.1.5+3 → 0.1.5+4
 """
+
 from __future__ import annotations
 
 import argparse

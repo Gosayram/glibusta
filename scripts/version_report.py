@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Parse flutter pub outdated --json and print a formatted version report."""
+
 from __future__ import annotations
 
 import json
