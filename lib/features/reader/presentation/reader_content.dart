@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/platform/adaptive_context.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
@@ -338,8 +339,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_disposed || !_pageController.hasClients) return;
         final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        final useTwoPageLayout = isTwoPage && screenWidth > 600;
+        final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
         final pageCount = useTwoPageLayout
             ? ((widget.book.chapters.length + 1) ~/ 2)
             : widget.book.chapters.length;
@@ -613,8 +613,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   @override
   Widget build(BuildContext context) {
     final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final useTwoPageLayout = isTwoPage && screenWidth > 600;
+    final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
     final pageCount = useTwoPageLayout
         ? ((widget.book.chapters.length + 1) ~/ 2)
         : widget.book.chapters.length;

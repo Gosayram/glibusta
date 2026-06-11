@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/platform/adaptive_context.dart';
+import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../data/auto_theme_service.dart';
@@ -510,12 +511,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _showQuickSettings(BuildContext context) {
     _ctrl.onBottomSheetOpen();
     unawaited(
-      showModalBottomSheet<void>(
+      showAdaptivePanel<void>(
         context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => ReaderQuickSettingsSheet(
-          onDismiss: () => _ctrl.onBottomSheetClose(),
+        child: ReaderQuickSettingsSheet(
+          onDismiss: () {
+            _ctrl.onBottomSheetClose();
+            Navigator.of(context).pop();
+          },
         ),
       ),
     );

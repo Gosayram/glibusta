@@ -8,6 +8,7 @@ import '../../core/database/app_database.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/library/presentation/library_screen.dart';
 import '../models/book.dart';
+import 'adaptive_panel.dart';
 import 'book_cover_image.dart';
 
 class BookCard extends StatelessWidget {
@@ -152,9 +153,9 @@ class BookCard extends StatelessWidget {
 
   void _showStatusMenu(BuildContext context) {
     unawaited(
-      showModalBottomSheet<void>(
+      showAdaptivePanel<void>(
         context: context,
-        builder: (context) => SafeArea(
+        child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
