@@ -3,7 +3,8 @@
 part of 'app_database.dart';
 
 // ignore_for_file: type=lint
-class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, SavedBook> {
+class $SavedBooksTable extends SavedBooks
+    with TableInfo<$SavedBooksTable, SavedBook> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -350,8 +351,10 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     return $SavedBooksTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<List<String>, String> $converterauthorIds = const StringListConverter();
-  static TypeConverter<List<String>, String> $convertergenreIds = const StringListConverter();
+  static TypeConverter<List<String>, String> $converterauthorIds =
+      const StringListConverter();
+  static TypeConverter<List<String>, String> $convertergenreIds =
+      const StringListConverter();
 }
 
 class SavedBook extends DataClass implements Insertable<SavedBook> {
@@ -433,14 +436,28 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       title: Value(title),
       authorIds: Value(authorIds),
       genreIds: Value(genreIds),
-      description: description == null && nullToAbsent ? const Value.absent() : Value(description),
-      coverUrl: coverUrl == null && nullToAbsent ? const Value.absent() : Value(coverUrl),
-      publishDate: publishDate == null && nullToAbsent ? const Value.absent() : Value(publishDate),
-      sourceId: sourceId == null && nullToAbsent ? const Value.absent() : Value(sourceId),
-      sourceUrl: sourceUrl == null && nullToAbsent ? const Value.absent() : Value(sourceUrl),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      coverUrl: coverUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverUrl),
+      publishDate: publishDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(publishDate),
+      sourceId: sourceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceId),
+      sourceUrl: sourceUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceUrl),
       addedAt: Value(addedAt),
-      contentHash: contentHash == null && nullToAbsent ? const Value.absent() : Value(contentHash),
-      fileSize: fileSize == null && nullToAbsent ? const Value.absent() : Value(fileSize),
+      contentHash: contentHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contentHash),
+      fileSize: fileSize == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fileSize),
       filePath: Value(filePath),
       readingStatus: Value(readingStatus),
     );
@@ -526,16 +543,24 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       title: data.title.present ? data.title.value : this.title,
       authorIds: data.authorIds.present ? data.authorIds.value : this.authorIds,
       genreIds: data.genreIds.present ? data.genreIds.value : this.genreIds,
-      description: data.description.present ? data.description.value : this.description,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
       coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
-      publishDate: data.publishDate.present ? data.publishDate.value : this.publishDate,
+      publishDate: data.publishDate.present
+          ? data.publishDate.value
+          : this.publishDate,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
       sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
-      contentHash: data.contentHash.present ? data.contentHash.value : this.contentHash,
+      contentHash: data.contentHash.present
+          ? data.contentHash.value
+          : this.contentHash,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
-      readingStatus: data.readingStatus.present ? data.readingStatus.value : this.readingStatus,
+      readingStatus: data.readingStatus.present
+          ? data.readingStatus.value
+          : this.readingStatus,
     );
   }
 
@@ -889,7 +914,8 @@ class $AuthorsTable extends Authors with TableInfo<$AuthorsTable, Author> {
     return $AuthorsTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
+  static TypeConverter<List<String>, String> $converterbookIds =
+      const StringListConverter();
 }
 
 class Author extends DataClass implements Insertable<Author> {
@@ -1166,7 +1192,8 @@ class $SeriesTable extends Series with TableInfo<$SeriesTable, Sery> {
     return $SeriesTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
+  static TypeConverter<List<String>, String> $converterbookIds =
+      const StringListConverter();
 }
 
 class Sery extends DataClass implements Insertable<Sery> {
@@ -1200,7 +1227,9 @@ class Sery extends DataClass implements Insertable<Sery> {
     return SeriesCompanion(
       id: Value(id),
       name: Value(name),
-      description: description == null && nullToAbsent ? const Value.absent() : Value(description),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
       bookIds: Value(bookIds),
     );
   }
@@ -1243,7 +1272,9 @@ class Sery extends DataClass implements Insertable<Sery> {
     return Sery(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      description: data.description.present ? data.description.value : this.description,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
       bookIds: data.bookIds.present ? data.bookIds.value : this.bookIds,
     );
   }
@@ -1360,7 +1391,8 @@ class SeriesCompanion extends UpdateCompanion<Sery> {
   }
 }
 
-class $BookSeriesTable extends BookSeries with TableInfo<$BookSeriesTable, BookSery> {
+class $BookSeriesTable extends BookSeries
+    with TableInfo<$BookSeriesTable, BookSery> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1523,13 +1555,17 @@ class BookSery extends DataClass implements Insertable<BookSery> {
   }) => BookSery(
     bookId: bookId ?? this.bookId,
     seriesId: seriesId ?? this.seriesId,
-    sequenceNumber: sequenceNumber.present ? sequenceNumber.value : this.sequenceNumber,
+    sequenceNumber: sequenceNumber.present
+        ? sequenceNumber.value
+        : this.sequenceNumber,
   );
   BookSery copyWithCompanion(BookSeriesCompanion data) {
     return BookSery(
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
       seriesId: data.seriesId.present ? data.seriesId.value : this.seriesId,
-      sequenceNumber: data.sequenceNumber.present ? data.sequenceNumber.value : this.sequenceNumber,
+      sequenceNumber: data.sequenceNumber.present
+          ? data.sequenceNumber.value
+          : this.sequenceNumber,
     );
   }
 
@@ -1747,7 +1783,9 @@ class Genre extends DataClass implements Insertable<Genre> {
     return GenresCompanion(
       id: Value(id),
       name: Value(name),
-      parentId: parentId == null && nullToAbsent ? const Value.absent() : Value(parentId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
     );
   }
 
@@ -1886,7 +1924,8 @@ class GenresCompanion extends UpdateCompanion<Genre> {
   }
 }
 
-class $DownloadsTable extends Downloads with TableInfo<$DownloadsTable, Download> {
+class $DownloadsTable extends Downloads
+    with TableInfo<$DownloadsTable, Download> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -1953,13 +1992,14 @@ class $DownloadsTable extends Downloads with TableInfo<$DownloadsTable, Download
     requiredDuringInsert: false,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<DownloadStatusDb, int> status = GeneratedColumn<int>(
-    'status',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  ).withConverter<DownloadStatusDb>($DownloadsTable.$converterstatus);
+  late final GeneratedColumnWithTypeConverter<DownloadStatusDb, int> status =
+      GeneratedColumn<int>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DownloadStatusDb>($DownloadsTable.$converterstatus);
   static const VerificationMeta _downloadedBytesMeta = const VerificationMeta(
     'downloadedBytes',
   );
@@ -2255,13 +2295,19 @@ class Download extends DataClass implements Insertable<Download> {
       bookTitle: Value(bookTitle),
       format: Value(format),
       sourceUrl: Value(sourceUrl),
-      targetPath: targetPath == null && nullToAbsent ? const Value.absent() : Value(targetPath),
+      targetPath: targetPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetPath),
       status: Value(status),
       downloadedBytes: Value(downloadedBytes),
       totalBytes: Value(totalBytes),
       createdAt: Value(createdAt),
-      startedAt: startedAt == null && nullToAbsent ? const Value.absent() : Value(startedAt),
-      completedAt: completedAt == null && nullToAbsent ? const Value.absent() : Value(completedAt),
+      startedAt: startedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
     );
   }
 
@@ -2342,15 +2388,21 @@ class Download extends DataClass implements Insertable<Download> {
       bookTitle: data.bookTitle.present ? data.bookTitle.value : this.bookTitle,
       format: data.format.present ? data.format.value : this.format,
       sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
-      targetPath: data.targetPath.present ? data.targetPath.value : this.targetPath,
+      targetPath: data.targetPath.present
+          ? data.targetPath.value
+          : this.targetPath,
       status: data.status.present ? data.status.value : this.status,
       downloadedBytes: data.downloadedBytes.present
           ? data.downloadedBytes.value
           : this.downloadedBytes,
-      totalBytes: data.totalBytes.present ? data.totalBytes.value : this.totalBytes,
+      totalBytes: data.totalBytes.present
+          ? data.totalBytes.value
+          : this.totalBytes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
-      completedAt: data.completedAt.present ? data.completedAt.value : this.completedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
     );
   }
 
@@ -2846,7 +2898,8 @@ class $ReadingProgressTable extends ReadingProgress
   }
 }
 
-class ReadingProgressData extends DataClass implements Insertable<ReadingProgressData> {
+class ReadingProgressData extends DataClass
+    implements Insertable<ReadingProgressData> {
   final String bookId;
   final int currentPosition;
   final int chapterIndex;
@@ -2956,13 +3009,21 @@ class ReadingProgressData extends DataClass implements Insertable<ReadingProgres
       currentPosition: data.currentPosition.present
           ? data.currentPosition.value
           : this.currentPosition,
-      chapterIndex: data.chapterIndex.present ? data.chapterIndex.value : this.chapterIndex,
-      paragraphIndex: data.paragraphIndex.present ? data.paragraphIndex.value : this.paragraphIndex,
-      localOffset: data.localOffset.present ? data.localOffset.value : this.localOffset,
+      chapterIndex: data.chapterIndex.present
+          ? data.chapterIndex.value
+          : this.chapterIndex,
+      paragraphIndex: data.paragraphIndex.present
+          ? data.paragraphIndex.value
+          : this.paragraphIndex,
+      localOffset: data.localOffset.present
+          ? data.localOffset.value
+          : this.localOffset,
       progressPercent: data.progressPercent.present
           ? data.progressPercent.value
           : this.progressPercent,
-      totalPages: data.totalPages.present ? data.totalPages.value : this.totalPages,
+      totalPages: data.totalPages.present
+          ? data.totalPages.value
+          : this.totalPages,
       lastRead: data.lastRead.present ? data.lastRead.value : this.lastRead,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -3152,7 +3213,8 @@ class ReadingProgressCompanion extends UpdateCompanion<ReadingProgressData> {
   }
 }
 
-class $BookmarksTable extends Bookmarks with TableInfo<$BookmarksTable, Bookmark> {
+class $BookmarksTable extends Bookmarks
+    with TableInfo<$BookmarksTable, Bookmark> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -3485,10 +3547,18 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     return Bookmark(
       id: data.id.present ? data.id.value : this.id,
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
-      chapterIndex: data.chapterIndex.present ? data.chapterIndex.value : this.chapterIndex,
-      paragraphIndex: data.paragraphIndex.present ? data.paragraphIndex.value : this.paragraphIndex,
-      localOffset: data.localOffset.present ? data.localOffset.value : this.localOffset,
-      selectedText: data.selectedText.present ? data.selectedText.value : this.selectedText,
+      chapterIndex: data.chapterIndex.present
+          ? data.chapterIndex.value
+          : this.chapterIndex,
+      paragraphIndex: data.paragraphIndex.present
+          ? data.paragraphIndex.value
+          : this.paragraphIndex,
+      localOffset: data.localOffset.present
+          ? data.localOffset.value
+          : this.localOffset,
+      selectedText: data.selectedText.present
+          ? data.selectedText.value
+          : this.selectedText,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -3969,7 +4039,9 @@ class Note extends DataClass implements Insertable<Note> {
       content: Value(content),
       highlightColor: Value(highlightColor),
       createdAt: Value(createdAt),
-      updatedAt: updatedAt == null && nullToAbsent ? const Value.absent() : Value(updatedAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
     );
   }
 
@@ -4031,11 +4103,19 @@ class Note extends DataClass implements Insertable<Note> {
     return Note(
       id: data.id.present ? data.id.value : this.id,
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
-      chapterIndex: data.chapterIndex.present ? data.chapterIndex.value : this.chapterIndex,
-      paragraphIndex: data.paragraphIndex.present ? data.paragraphIndex.value : this.paragraphIndex,
-      localOffset: data.localOffset.present ? data.localOffset.value : this.localOffset,
+      chapterIndex: data.chapterIndex.present
+          ? data.chapterIndex.value
+          : this.chapterIndex,
+      paragraphIndex: data.paragraphIndex.present
+          ? data.paragraphIndex.value
+          : this.paragraphIndex,
+      localOffset: data.localOffset.present
+          ? data.localOffset.value
+          : this.localOffset,
       content: data.content.present ? data.content.value : this.content,
-      highlightColor: data.highlightColor.present ? data.highlightColor.value : this.highlightColor,
+      highlightColor: data.highlightColor.present
+          ? data.highlightColor.value
+          : this.highlightColor,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4591,7 +4671,9 @@ class Quote extends DataClass implements Insertable<Quote> {
     chapterIndex: chapterIndex ?? this.chapterIndex,
     paragraphIndex: paragraphIndex ?? this.paragraphIndex,
     selectedText: selectedText ?? this.selectedText,
-    beforeContext: beforeContext.present ? beforeContext.value : this.beforeContext,
+    beforeContext: beforeContext.present
+        ? beforeContext.value
+        : this.beforeContext,
     afterContext: afterContext.present ? afterContext.value : this.afterContext,
     note: note.present ? note.value : this.note,
     createdAt: createdAt ?? this.createdAt,
@@ -4600,11 +4682,21 @@ class Quote extends DataClass implements Insertable<Quote> {
     return Quote(
       id: data.id.present ? data.id.value : this.id,
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
-      chapterIndex: data.chapterIndex.present ? data.chapterIndex.value : this.chapterIndex,
-      paragraphIndex: data.paragraphIndex.present ? data.paragraphIndex.value : this.paragraphIndex,
-      selectedText: data.selectedText.present ? data.selectedText.value : this.selectedText,
-      beforeContext: data.beforeContext.present ? data.beforeContext.value : this.beforeContext,
-      afterContext: data.afterContext.present ? data.afterContext.value : this.afterContext,
+      chapterIndex: data.chapterIndex.present
+          ? data.chapterIndex.value
+          : this.chapterIndex,
+      paragraphIndex: data.paragraphIndex.present
+          ? data.paragraphIndex.value
+          : this.paragraphIndex,
+      selectedText: data.selectedText.present
+          ? data.selectedText.value
+          : this.selectedText,
+      beforeContext: data.beforeContext.present
+          ? data.beforeContext.value
+          : this.beforeContext,
+      afterContext: data.afterContext.present
+          ? data.afterContext.value
+          : this.afterContext,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -4920,7 +5012,8 @@ class $SearchHistoryTable extends SearchHistory
   }
 }
 
-class SearchHistoryData extends DataClass implements Insertable<SearchHistoryData> {
+class SearchHistoryData extends DataClass
+    implements Insertable<SearchHistoryData> {
   final int id;
   final String query;
   final String type;
@@ -4989,7 +5082,9 @@ class SearchHistoryData extends DataClass implements Insertable<SearchHistoryDat
       id: data.id.present ? data.id.value : this.id,
       query: data.query.present ? data.query.value : this.query,
       type: data.type.present ? data.type.value : this.type,
-      searchedAt: data.searchedAt.present ? data.searchedAt.value : this.searchedAt,
+      searchedAt: data.searchedAt.present
+          ? data.searchedAt.value
+          : this.searchedAt,
     );
   }
 
@@ -5092,7 +5187,8 @@ class SearchHistoryCompanion extends UpdateCompanion<SearchHistoryData> {
   }
 }
 
-class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Collection> {
+class $CollectionsTable extends Collections
+    with TableInfo<$CollectionsTable, Collection> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -5235,7 +5331,8 @@ class $CollectionsTable extends Collections with TableInfo<$CollectionsTable, Co
     return $CollectionsTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<List<String>, String> $converterbookIds = const StringListConverter();
+  static TypeConverter<List<String>, String> $converterbookIds =
+      const StringListConverter();
 }
 
 class Collection extends DataClass implements Insertable<Collection> {
@@ -5272,7 +5369,9 @@ class Collection extends DataClass implements Insertable<Collection> {
     return CollectionsCompanion(
       id: Value(id),
       name: Value(name),
-      description: description == null && nullToAbsent ? const Value.absent() : Value(description),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
       bookIds: Value(bookIds),
       createdAt: Value(createdAt),
     );
@@ -5320,7 +5419,9 @@ class Collection extends DataClass implements Insertable<Collection> {
     return Collection(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      description: data.description.present ? data.description.value : this.description,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
       bookIds: data.bookIds.present ? data.bookIds.value : this.bookIds,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -5617,7 +5718,9 @@ class BookCollection extends DataClass implements Insertable<BookCollection> {
   BookCollection copyWithCompanion(BookCollectionsCompanion data) {
     return BookCollection(
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
-      collectionId: data.collectionId.present ? data.collectionId.value : this.collectionId,
+      collectionId: data.collectionId.present
+          ? data.collectionId.value
+          : this.collectionId,
       addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
     );
   }
@@ -5903,7 +6006,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       id: Value(id),
       bookId: Value(bookId),
       startedAt: Value(startedAt),
-      endedAt: endedAt == null && nullToAbsent ? const Value.absent() : Value(endedAt),
+      endedAt: endedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endedAt),
       chaptersRead: Value(chaptersRead),
     );
   }
@@ -5952,7 +6057,9 @@ class ReadingSession extends DataClass implements Insertable<ReadingSession> {
       bookId: data.bookId.present ? data.bookId.value : this.bookId,
       startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
       endedAt: data.endedAt.present ? data.endedAt.value : this.endedAt,
-      chaptersRead: data.chaptersRead.present ? data.chaptersRead.value : this.chaptersRead,
+      chaptersRead: data.chaptersRead.present
+          ? data.chaptersRead.value
+          : this.chaptersRead,
     );
   }
 
@@ -6110,6 +6217,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_reading_sessions_bookId',
     'CREATE INDEX idx_reading_sessions_bookId ON reading_sessions (book_id)',
   );
+  late final BookDao bookDao = BookDao(this as AppDatabase);
+  late final AuthorDao authorDao = AuthorDao(this as AppDatabase);
+  late final SeriesDao seriesDao = SeriesDao(this as AppDatabase);
+  late final CollectionDao collectionDao = CollectionDao(this as AppDatabase);
+  late final DownloadDao downloadDao = DownloadDao(this as AppDatabase);
+  late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6174,7 +6287,8 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
+class $$SavedBooksTableFilterComposer
+    extends Composer<_$AppDatabase, $SavedBooksTable> {
   $$SavedBooksTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -6192,17 +6306,17 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get authorIds =>
-      $composableBuilder(
-        column: $table.authorIds,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get authorIds => $composableBuilder(
+    column: $table.authorIds,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 
-  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get genreIds =>
-      $composableBuilder(
-        column: $table.genreIds,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get genreIds => $composableBuilder(
+    column: $table.genreIds,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
@@ -6255,7 +6369,8 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
   );
 }
 
-class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
+class $$SavedBooksTableOrderingComposer
+    extends Composer<_$AppDatabase, $SavedBooksTable> {
   $$SavedBooksTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -6334,7 +6449,8 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
   );
 }
 
-class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
+class $$SavedBooksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SavedBooksTable> {
   $$SavedBooksTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -6416,8 +6532,10 @@ class $$SavedBooksTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$SavedBooksTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$SavedBooksTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$SavedBooksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SavedBooksTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$SavedBooksTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -6488,8 +6606,9 @@ class $$SavedBooksTableTableManager
                 readingStatus: readingStatus,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -6524,7 +6643,8 @@ typedef $$AuthorsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$AuthorsTableFilterComposer extends Composer<_$AppDatabase, $AuthorsTable> {
+class $$AuthorsTableFilterComposer
+    extends Composer<_$AppDatabase, $AuthorsTable> {
   $$AuthorsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -6542,14 +6662,15 @@ class $$AuthorsTableFilterComposer extends Composer<_$AppDatabase, $AuthorsTable
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
-      $composableBuilder(
-        column: $table.bookIds,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get bookIds => $composableBuilder(
+    column: $table.bookIds,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 }
 
-class $$AuthorsTableOrderingComposer extends Composer<_$AppDatabase, $AuthorsTable> {
+class $$AuthorsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AuthorsTable> {
   $$AuthorsTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -6573,7 +6694,8 @@ class $$AuthorsTableOrderingComposer extends Composer<_$AppDatabase, $AuthorsTab
   );
 }
 
-class $$AuthorsTableAnnotationComposer extends Composer<_$AppDatabase, $AuthorsTable> {
+class $$AuthorsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AuthorsTable> {
   $$AuthorsTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -6611,8 +6733,10 @@ class $$AuthorsTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$AuthorsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$AuthorsTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$AuthorsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AuthorsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$AuthorsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -6639,8 +6763,9 @@ class $$AuthorsTableTableManager
                 bookIds: bookIds,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -6677,7 +6802,8 @@ typedef $$SeriesTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$SeriesTableFilterComposer extends Composer<_$AppDatabase, $SeriesTable> {
+class $$SeriesTableFilterComposer
+    extends Composer<_$AppDatabase, $SeriesTable> {
   $$SeriesTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -6700,14 +6826,15 @@ class $$SeriesTableFilterComposer extends Composer<_$AppDatabase, $SeriesTable> 
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
-      $composableBuilder(
-        column: $table.bookIds,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get bookIds => $composableBuilder(
+    column: $table.bookIds,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 }
 
-class $$SeriesTableOrderingComposer extends Composer<_$AppDatabase, $SeriesTable> {
+class $$SeriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $SeriesTable> {
   $$SeriesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -6736,7 +6863,8 @@ class $$SeriesTableOrderingComposer extends Composer<_$AppDatabase, $SeriesTable
   );
 }
 
-class $$SeriesTableAnnotationComposer extends Composer<_$AppDatabase, $SeriesTable> {
+class $$SeriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SeriesTable> {
   $$SeriesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -6779,8 +6907,10 @@ class $$SeriesTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$SeriesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$SeriesTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$SeriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SeriesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$SeriesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -6811,8 +6941,9 @@ class $$SeriesTableTableManager
                 bookIds: bookIds,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -6847,7 +6978,8 @@ typedef $$BookSeriesTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$BookSeriesTableFilterComposer extends Composer<_$AppDatabase, $BookSeriesTable> {
+class $$BookSeriesTableFilterComposer
+    extends Composer<_$AppDatabase, $BookSeriesTable> {
   $$BookSeriesTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -6871,7 +7003,8 @@ class $$BookSeriesTableFilterComposer extends Composer<_$AppDatabase, $BookSerie
   );
 }
 
-class $$BookSeriesTableOrderingComposer extends Composer<_$AppDatabase, $BookSeriesTable> {
+class $$BookSeriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $BookSeriesTable> {
   $$BookSeriesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -6895,7 +7028,8 @@ class $$BookSeriesTableOrderingComposer extends Composer<_$AppDatabase, $BookSer
   );
 }
 
-class $$BookSeriesTableAnnotationComposer extends Composer<_$AppDatabase, $BookSeriesTable> {
+class $$BookSeriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BookSeriesTable> {
   $$BookSeriesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -6935,8 +7069,10 @@ class $$BookSeriesTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$BookSeriesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$BookSeriesTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$BookSeriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BookSeriesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$BookSeriesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -6963,8 +7099,9 @@ class $$BookSeriesTableTableManager
                 sequenceNumber: sequenceNumber,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -6999,7 +7136,8 @@ typedef $$GenresTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$GenresTableFilterComposer extends Composer<_$AppDatabase, $GenresTable> {
+class $$GenresTableFilterComposer
+    extends Composer<_$AppDatabase, $GenresTable> {
   $$GenresTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -7023,7 +7161,8 @@ class $$GenresTableFilterComposer extends Composer<_$AppDatabase, $GenresTable> 
   );
 }
 
-class $$GenresTableOrderingComposer extends Composer<_$AppDatabase, $GenresTable> {
+class $$GenresTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenresTable> {
   $$GenresTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -7047,7 +7186,8 @@ class $$GenresTableOrderingComposer extends Composer<_$AppDatabase, $GenresTable
   );
 }
 
-class $$GenresTableAnnotationComposer extends Composer<_$AppDatabase, $GenresTable> {
+class $$GenresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenresTable> {
   $$GenresTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -7085,8 +7225,10 @@ class $$GenresTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$GenresTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$GenresTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$GenresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GenresTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$GenresTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -7113,8 +7255,9 @@ class $$GenresTableTableManager
                 parentId: parentId,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -7167,7 +7310,8 @@ typedef $$DownloadsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$DownloadsTableFilterComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+class $$DownloadsTableFilterComposer
+    extends Composer<_$AppDatabase, $DownloadsTable> {
   $$DownloadsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -7205,11 +7349,11 @@ class $$DownloadsTableFilterComposer extends Composer<_$AppDatabase, $DownloadsT
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<DownloadStatusDb, DownloadStatusDb, int> get status =>
-      $composableBuilder(
-        column: $table.status,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<DownloadStatusDb, DownloadStatusDb, int>
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 
   ColumnFilters<int> get downloadedBytes => $composableBuilder(
     column: $table.downloadedBytes,
@@ -7237,7 +7381,8 @@ class $$DownloadsTableFilterComposer extends Composer<_$AppDatabase, $DownloadsT
   );
 }
 
-class $$DownloadsTableOrderingComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+class $$DownloadsTableOrderingComposer
+    extends Composer<_$AppDatabase, $DownloadsTable> {
   $$DownloadsTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -7306,7 +7451,8 @@ class $$DownloadsTableOrderingComposer extends Composer<_$AppDatabase, $Download
   );
 }
 
-class $$DownloadsTableAnnotationComposer extends Composer<_$AppDatabase, $DownloadsTable> {
+class $$DownloadsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DownloadsTable> {
   $$DownloadsTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -7379,8 +7525,10 @@ class $$DownloadsTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$DownloadsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$DownloadsTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$DownloadsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DownloadsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$DownloadsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -7443,8 +7591,9 @@ class $$DownloadsTableTableManager
                 completedAt: completedAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -7491,7 +7640,8 @@ typedef $$ReadingProgressTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$ReadingProgressTableFilterComposer extends Composer<_$AppDatabase, $ReadingProgressTable> {
+class $$ReadingProgressTableFilterComposer
+    extends Composer<_$AppDatabase, $ReadingProgressTable> {
   $$ReadingProgressTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -7662,7 +7812,11 @@ class $$ReadingProgressTableTableManager
           $$ReadingProgressTableUpdateCompanionBuilder,
           (
             ReadingProgressData,
-            BaseReferences<_$AppDatabase, $ReadingProgressTable, ReadingProgressData>,
+            BaseReferences<
+              _$AppDatabase,
+              $ReadingProgressTable,
+              ReadingProgressData
+            >,
           ),
           ReadingProgressData,
           PrefetchHooks Function()
@@ -7728,8 +7882,9 @@ class $$ReadingProgressTableTableManager
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -7747,7 +7902,11 @@ typedef $$ReadingProgressTableProcessedTableManager =
       $$ReadingProgressTableUpdateCompanionBuilder,
       (
         ReadingProgressData,
-        BaseReferences<_$AppDatabase, $ReadingProgressTable, ReadingProgressData>,
+        BaseReferences<
+          _$AppDatabase,
+          $ReadingProgressTable,
+          ReadingProgressData
+        >,
       ),
       ReadingProgressData,
       PrefetchHooks Function()
@@ -7777,7 +7936,8 @@ typedef $$BookmarksTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$BookmarksTableFilterComposer extends Composer<_$AppDatabase, $BookmarksTable> {
+class $$BookmarksTableFilterComposer
+    extends Composer<_$AppDatabase, $BookmarksTable> {
   $$BookmarksTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -7826,7 +7986,8 @@ class $$BookmarksTableFilterComposer extends Composer<_$AppDatabase, $BookmarksT
   );
 }
 
-class $$BookmarksTableOrderingComposer extends Composer<_$AppDatabase, $BookmarksTable> {
+class $$BookmarksTableOrderingComposer
+    extends Composer<_$AppDatabase, $BookmarksTable> {
   $$BookmarksTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -7875,7 +8036,8 @@ class $$BookmarksTableOrderingComposer extends Composer<_$AppDatabase, $Bookmark
   );
 }
 
-class $$BookmarksTableAnnotationComposer extends Composer<_$AppDatabase, $BookmarksTable> {
+class $$BookmarksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BookmarksTable> {
   $$BookmarksTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -7936,8 +8098,10 @@ class $$BookmarksTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$BookmarksTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$BookmarksTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$BookmarksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BookmarksTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$BookmarksTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -7984,8 +8148,9 @@ class $$BookmarksTableTableManager
                 createdAt: createdAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -8086,7 +8251,8 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
   );
 }
 
-class $$NotesTableOrderingComposer extends Composer<_$AppDatabase, $NotesTable> {
+class $$NotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
   $$NotesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -8140,7 +8306,8 @@ class $$NotesTableOrderingComposer extends Composer<_$AppDatabase, $NotesTable> 
   );
 }
 
-class $$NotesTableAnnotationComposer extends Composer<_$AppDatabase, $NotesTable> {
+class $$NotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
   $$NotesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -8204,9 +8371,12 @@ class $$NotesTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$NotesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$NotesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () => $$NotesTableAnnotationComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$NotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
@@ -8255,8 +8425,9 @@ class $$NotesTableTableManager
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -8303,7 +8474,8 @@ typedef $$QuotesTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$QuotesTableFilterComposer extends Composer<_$AppDatabase, $QuotesTable> {
+class $$QuotesTableFilterComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
   $$QuotesTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -8357,7 +8529,8 @@ class $$QuotesTableFilterComposer extends Composer<_$AppDatabase, $QuotesTable> 
   );
 }
 
-class $$QuotesTableOrderingComposer extends Composer<_$AppDatabase, $QuotesTable> {
+class $$QuotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
   $$QuotesTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -8411,7 +8584,8 @@ class $$QuotesTableOrderingComposer extends Composer<_$AppDatabase, $QuotesTable
   );
 }
 
-class $$QuotesTableAnnotationComposer extends Composer<_$AppDatabase, $QuotesTable> {
+class $$QuotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuotesTable> {
   $$QuotesTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -8477,8 +8651,10 @@ class $$QuotesTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$QuotesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$QuotesTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$QuotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuotesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$QuotesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -8529,8 +8705,9 @@ class $$QuotesTableTableManager
                 createdAt: createdAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -8565,7 +8742,8 @@ typedef $$SearchHistoryTableUpdateCompanionBuilder =
       Value<DateTime> searchedAt,
     });
 
-class $$SearchHistoryTableFilterComposer extends Composer<_$AppDatabase, $SearchHistoryTable> {
+class $$SearchHistoryTableFilterComposer
+    extends Composer<_$AppDatabase, $SearchHistoryTable> {
   $$SearchHistoryTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -8594,7 +8772,8 @@ class $$SearchHistoryTableFilterComposer extends Composer<_$AppDatabase, $Search
   );
 }
 
-class $$SearchHistoryTableOrderingComposer extends Composer<_$AppDatabase, $SearchHistoryTable> {
+class $$SearchHistoryTableOrderingComposer
+    extends Composer<_$AppDatabase, $SearchHistoryTable> {
   $$SearchHistoryTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -8623,7 +8802,8 @@ class $$SearchHistoryTableOrderingComposer extends Composer<_$AppDatabase, $Sear
   );
 }
 
-class $$SearchHistoryTableAnnotationComposer extends Composer<_$AppDatabase, $SearchHistoryTable> {
+class $$SearchHistoryTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SearchHistoryTable> {
   $$SearchHistoryTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -8631,7 +8811,8 @@ class $$SearchHistoryTableAnnotationComposer extends Composer<_$AppDatabase, $Se
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get query =>
       $composableBuilder(column: $table.query, builder: (column) => column);
@@ -8658,7 +8839,11 @@ class $$SearchHistoryTableTableManager
           $$SearchHistoryTableUpdateCompanionBuilder,
           (
             SearchHistoryData,
-            BaseReferences<_$AppDatabase, $SearchHistoryTable, SearchHistoryData>,
+            BaseReferences<
+              _$AppDatabase,
+              $SearchHistoryTable,
+              SearchHistoryData
+            >,
           ),
           SearchHistoryData,
           PrefetchHooks Function()
@@ -8668,7 +8853,8 @@ class $$SearchHistoryTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$SearchHistoryTableFilterComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$SearchHistoryTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
               $$SearchHistoryTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
@@ -8697,8 +8883,9 @@ class $$SearchHistoryTableTableManager
                 type: type,
                 searchedAt: searchedAt,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -8740,7 +8927,8 @@ typedef $$CollectionsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$CollectionsTableFilterComposer extends Composer<_$AppDatabase, $CollectionsTable> {
+class $$CollectionsTableFilterComposer
+    extends Composer<_$AppDatabase, $CollectionsTable> {
   $$CollectionsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -8763,11 +8951,11 @@ class $$CollectionsTableFilterComposer extends Composer<_$AppDatabase, $Collecti
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<List<String>, List<String>, String> get bookIds =>
-      $composableBuilder(
-        column: $table.bookIds,
-        builder: (column) => ColumnWithTypeConverterFilters(column),
-      );
+  ColumnWithTypeConverterFilters<List<String>, List<String>, String>
+  get bookIds => $composableBuilder(
+    column: $table.bookIds,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
@@ -8775,7 +8963,8 @@ class $$CollectionsTableFilterComposer extends Composer<_$AppDatabase, $Collecti
   );
 }
 
-class $$CollectionsTableOrderingComposer extends Composer<_$AppDatabase, $CollectionsTable> {
+class $$CollectionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CollectionsTable> {
   $$CollectionsTableOrderingComposer({
     required super.$db,
     required super.$table,
@@ -8809,7 +8998,8 @@ class $$CollectionsTableOrderingComposer extends Composer<_$AppDatabase, $Collec
   );
 }
 
-class $$CollectionsTableAnnotationComposer extends Composer<_$AppDatabase, $CollectionsTable> {
+class $$CollectionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CollectionsTable> {
   $$CollectionsTableAnnotationComposer({
     required super.$db,
     required super.$table,
@@ -8858,8 +9048,10 @@ class $$CollectionsTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer: () => $$CollectionsTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () => $$CollectionsTableOrderingComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$CollectionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CollectionsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$CollectionsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
@@ -8894,8 +9086,9 @@ class $$CollectionsTableTableManager
                 createdAt: createdAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -8933,7 +9126,8 @@ typedef $$BookCollectionsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-class $$BookCollectionsTableFilterComposer extends Composer<_$AppDatabase, $BookCollectionsTable> {
+class $$BookCollectionsTableFilterComposer
+    extends Composer<_$AppDatabase, $BookCollectionsTable> {
   $$BookCollectionsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -9016,7 +9210,11 @@ class $$BookCollectionsTableTableManager
           $$BookCollectionsTableUpdateCompanionBuilder,
           (
             BookCollection,
-            BaseReferences<_$AppDatabase, $BookCollectionsTable, BookCollection>,
+            BaseReferences<
+              _$AppDatabase,
+              $BookCollectionsTable,
+              BookCollection
+            >,
           ),
           BookCollection,
           PrefetchHooks Function()
@@ -9058,8 +9256,9 @@ class $$BookCollectionsTableTableManager
                 addedAt: addedAt,
                 rowid: rowid,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -9099,7 +9298,8 @@ typedef $$ReadingSessionsTableUpdateCompanionBuilder =
       Value<int> chaptersRead,
     });
 
-class $$ReadingSessionsTableFilterComposer extends Composer<_$AppDatabase, $ReadingSessionsTable> {
+class $$ReadingSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $ReadingSessionsTable> {
   $$ReadingSessionsTableFilterComposer({
     required super.$db,
     required super.$table,
@@ -9177,7 +9377,8 @@ class $$ReadingSessionsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id => $composableBuilder(column: $table.id, builder: (column) => column);
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get bookId =>
       $composableBuilder(column: $table.bookId, builder: (column) => column);
@@ -9207,7 +9408,11 @@ class $$ReadingSessionsTableTableManager
           $$ReadingSessionsTableUpdateCompanionBuilder,
           (
             ReadingSession,
-            BaseReferences<_$AppDatabase, $ReadingSessionsTable, ReadingSession>,
+            BaseReferences<
+              _$AppDatabase,
+              $ReadingSessionsTable,
+              ReadingSession
+            >,
           ),
           ReadingSession,
           PrefetchHooks Function()
@@ -9253,8 +9458,9 @@ class $$ReadingSessionsTableTableManager
                 endedAt: endedAt,
                 chaptersRead: chaptersRead,
               ),
-          withReferenceMapper: (p0) =>
-              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );
@@ -9283,17 +9489,24 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$SavedBooksTableTableManager get savedBooks =>
       $$SavedBooksTableTableManager(_db, _db.savedBooks);
-  $$AuthorsTableTableManager get authors => $$AuthorsTableTableManager(_db, _db.authors);
-  $$SeriesTableTableManager get series => $$SeriesTableTableManager(_db, _db.series);
+  $$AuthorsTableTableManager get authors =>
+      $$AuthorsTableTableManager(_db, _db.authors);
+  $$SeriesTableTableManager get series =>
+      $$SeriesTableTableManager(_db, _db.series);
   $$BookSeriesTableTableManager get bookSeries =>
       $$BookSeriesTableTableManager(_db, _db.bookSeries);
-  $$GenresTableTableManager get genres => $$GenresTableTableManager(_db, _db.genres);
-  $$DownloadsTableTableManager get downloads => $$DownloadsTableTableManager(_db, _db.downloads);
+  $$GenresTableTableManager get genres =>
+      $$GenresTableTableManager(_db, _db.genres);
+  $$DownloadsTableTableManager get downloads =>
+      $$DownloadsTableTableManager(_db, _db.downloads);
   $$ReadingProgressTableTableManager get readingProgress =>
       $$ReadingProgressTableTableManager(_db, _db.readingProgress);
-  $$BookmarksTableTableManager get bookmarks => $$BookmarksTableTableManager(_db, _db.bookmarks);
-  $$NotesTableTableManager get notes => $$NotesTableTableManager(_db, _db.notes);
-  $$QuotesTableTableManager get quotes => $$QuotesTableTableManager(_db, _db.quotes);
+  $$BookmarksTableTableManager get bookmarks =>
+      $$BookmarksTableTableManager(_db, _db.bookmarks);
+  $$NotesTableTableManager get notes =>
+      $$NotesTableTableManager(_db, _db.notes);
+  $$QuotesTableTableManager get quotes =>
+      $$QuotesTableTableManager(_db, _db.quotes);
   $$SearchHistoryTableTableManager get searchHistory =>
       $$SearchHistoryTableTableManager(_db, _db.searchHistory);
   $$CollectionsTableTableManager get collections =>

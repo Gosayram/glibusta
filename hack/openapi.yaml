@@ -1397,6 +1397,162 @@ paths:
         '200':
           description: Access request processed
 
+  # ═══════════════════════════════════════════════════════════════
+  # DISCOVERED ENDPOINTS
+  # ═══════════════════════════════════════════════════════════════
+  /a/{authorId}/rss:
+    get:
+      operationId: getAuthorRss
+      summary: Author RSS feed
+      description: RSS feed of author's latest additions.
+      tags: [Authors]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+      responses:
+        '200':
+          description: RSS feed
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+
+  /a/{authorId}/forum:
+    get:
+      operationId: getAuthorForumPosts
+      summary: Author's forum posts
+      description: Forum posts related to the author.
+      tags: [Authors]
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/AuthorId'
+      responses:
+        '200':
+          description: Forum posts page
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /blog/{blogId}/feed:
+    get:
+      operationId: getBlogFeed
+      summary: Blog RSS feed
+      description: RSS feed of a user's blog posts.
+      tags: [Blog]
+      security: []
+      parameters:
+        - name: blogId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: RSS feed
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+
+  /b/{bookId}/delalias/{aliasId}:
+    get:
+      operationId: deleteBookAlias
+      summary: Delete book alias
+      description: Remove a duplicate/alias book entry.
+      tags: [Books]
+      parameters:
+        - $ref: '#/components/parameters/BookId'
+        - name: aliasId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Alias deleted
+        '302':
+          description: Redirect after delete
+
+  /bwlist/black/{userId}:
+    get:
+      operationId: getBlackListForUser
+      summary: User's black list (filtered)
+      description: Black list filtered to show specific entries.
+      tags: [BlackWhiteList]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Filtered black list
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /bwlist/white/{userId}:
+    get:
+      operationId: getWhiteListForUser
+      summary: User's white list (filtered)
+      description: White list filtered to show specific entries.
+      tags: [BlackWhiteList]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Filtered white list
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
+  /bwlist/use/black/{token}:
+    post:
+      operationId: importBlackList
+      summary: Import black list via token
+      description: Import another user's black list using a shared token.
+      tags: [BlackWhiteList]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Black list imported
+
+  /bwlist/use/white/{token}:
+    post:
+      operationId: importWhiteList
+      summary: Import white list via token
+      description: Import another user's white list using a shared token.
+      tags: [BlackWhiteList]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: White list imported
+
+  /book:
+    get:
+      operationId: advancedSearch
+      summary: Advanced search
+      description: Advanced book search form with multiple filters.
+      tags: [Search]
+      security: []
+      responses:
+        '200':
+          description: Advanced search form
+          content:
+            text/html:
+              schema:
+                $ref: '#/components/schemas/HtmlPage'
+
 components:
   securitySchemes:
     sessionAuth:

@@ -312,6 +312,22 @@ GET /rec
 
 ---
 
+## 17. NEWLY DISCOVERED
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/a/{id}/rss` | GET | No | Author RSS feed (application/rss+xml) |
+| `/a/{id}/forum` | GET | No | Author's forum posts |
+| `/blog/{id}/feed` | GET | No | Blog RSS feed (application/rss+xml) |
+| `/b/{id}/delalias/{alias_id}` | GET | Yes | Delete book alias |
+| `/bwlist/black/{user_id}` | GET | Yes | User's black list (filtered) |
+| `/bwlist/white/{user_id}` | GET | Yes | User's white list (filtered) |
+| `/bwlist/use/black/{token}` | POST | Yes | Import black list via token |
+| `/bwlist/use/white/{token}` | POST | Yes | Import white list via token |
+| `/book` | GET | No | Advanced search form |
+
+---
+
 ## PARSING NOTES
 
 ### HTML Search Results
