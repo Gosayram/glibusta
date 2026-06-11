@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -76,11 +78,27 @@ class BookmarksScreen extends ConsumerWidget {
                 onDelete: () {
                   _deleteBookmark(ref, bookmark.id);
                 },
-              );
+              )
+                  .animate()
+                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
+                  .slideX(begin: 0.03, duration: 300.ms);
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Skeletonizer(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 5,
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Bone.circle(size: 24),
+                title: Bone.text(words: 4),
+                subtitle: Bone.text(words: 2),
+              ),
+            ),
+          ),
+        ),
         error: (e, _) => ErrorStateWidget(
           message: 'Не удалось загрузить закладки',
           details: e.toString(),

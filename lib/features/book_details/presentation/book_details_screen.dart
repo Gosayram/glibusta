@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
@@ -40,7 +41,39 @@ class BookDetailsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => _BookDetailsContent(details: details, bookId: bookId),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Skeletonizer(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Bone(width: 120, height: 180),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Bone.text(words: 4),
+                          SizedBox(height: 8),
+                          Bone.text(words: 2),
+                          SizedBox(height: 8),
+                          Bone.text(words: 3),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 24),
+                Bone(height: 40),
+                SizedBox(height: 16),
+                Bone(height: 100),
+              ],
+            ),
+          ),
+        ),
         error: (Object e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,

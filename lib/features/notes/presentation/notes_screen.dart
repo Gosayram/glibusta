@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -78,11 +80,33 @@ class NotesScreen extends ConsumerWidget {
                 onDelete: () {
                   _deleteNote(ref, note.id);
                 },
-              );
+              )
+                  .animate()
+                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
+                  .slideX(begin: 0.03, duration: 300.ms);
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Skeletonizer(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 5,
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Bone.text(words: 3),
+                    SizedBox(height: 8),
+                    Bone.text(words: 6),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
         error: (e, _) => ErrorStateWidget(
           message: 'Не удалось загрузить заметки',
           details: e.toString(),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../shared/widgets/book_card.dart';
 import 'series_provider.dart';
@@ -86,14 +88,51 @@ class SeriesDetailScreen extends ConsumerWidget {
                       key: ValueKey(book.id),
                       book: book,
                       onTap: () => context.push('/book/${book.id}'),
-                    );
+                    )
+                        .animate()
+                        .fadeIn(delay: (index * 60).ms, duration: 400.ms)
+                        .scale(begin: const Offset(0.95, 0.95), duration: 400.ms);
                   },
                 ),
               ),
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Skeletonizer(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Bone.text(words: 3),
+                const SizedBox(height: 8),
+                const Bone.text(words: 5),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 180,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 4,
+                    itemBuilder: (_, _) => const SizedBox(
+                      width: 120,
+                      child: Card(
+                        child: Column(
+                          children: [
+                            Bone(height: 120),
+                            Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Bone.text(words: 2),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
         error: (Object e, _) => Center(child: Text('Ошибка: $e')),
       ),
     );

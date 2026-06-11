@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
@@ -82,11 +83,49 @@ class HomeScreen extends ConsumerWidget {
                           return ContinueReadingCard(
                             info: info,
                             onTap: () => context.push('/reader/${info.book.id}'),
-                          );
+                          )
+                              .animate()
+                              .fadeIn(delay: (index * 80).ms, duration: 400.ms)
+                              .slideX(begin: 0.05, duration: 400.ms);
                         },
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () => SizedBox(
+                      height: 160,
+                      child: Skeletonizer(
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: 3,
+                          itemBuilder: (_, _) => const SizedBox(
+                            width: 280,
+                            child: Card(
+                              margin: EdgeInsets.only(right: 12),
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Bone(width: 60, height: 90),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Bone.text(words: 3),
+                                          SizedBox(height: 8),
+                                          Bone.text(words: 2),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     error: (_, _) => const Center(child: Text('Ошибка загрузки')),
                   ),
                 ),
@@ -183,11 +222,37 @@ class HomeScreen extends ConsumerWidget {
                               book: book,
                               onTap: () => context.push('/book/${book.id}'),
                             ),
-                          );
+                          )
+                              .animate()
+                              .fadeIn(delay: (index * 60).ms, duration: 400.ms)
+                              .slideY(begin: 0.05, duration: 400.ms);
                         },
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading: () => SizedBox(
+                      height: 180,
+                      child: Skeletonizer(
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: 5,
+                          itemBuilder: (_, _) => const SizedBox(
+                            width: 120,
+                            child: Card(
+                              child: Column(
+                                children: [
+                                  Bone(height: 120),
+                                  Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Bone.text(words: 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                     error: (_, _) => const Center(child: Text('Ошибка загрузки')),
                   ),
                 ),
@@ -359,7 +424,23 @@ class _ReadingStatsSection extends ConsumerWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator()),
+          child: Skeletonizer(
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Bone.circle(size: 32),
+                    SizedBox(width: 8),
+                    Bone.circle(size: 32),
+                    SizedBox(width: 8),
+                    Bone.circle(size: 32),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Bone(height: 100),
+              ],
+            ),
+          ),
         ),
       ),
       error: (_, _) => const SizedBox.shrink(),

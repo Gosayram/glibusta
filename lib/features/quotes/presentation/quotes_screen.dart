@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -74,11 +76,35 @@ class QuotesScreen extends ConsumerWidget {
                 quote: quote,
                 onTap: () => _showQuoteDetail(context, ref, quote),
                 onDelete: () => _deleteQuote(ref, quote.id),
-              );
+              )
+                  .animate()
+                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
+                  .slideX(begin: 0.03, duration: 300.ms);
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Skeletonizer(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 4,
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Bone.text(words: 2),
+                    SizedBox(height: 8),
+                    Bone.text(words: 8),
+                    SizedBox(height: 8),
+                    Bone.text(words: 4),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
         error: (e, _) => ErrorStateWidget(
           message: 'Не удалось загрузить цитаты',
           details: e.toString(),

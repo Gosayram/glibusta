@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import 'series_provider.dart';
 
@@ -46,11 +48,27 @@ class SeriesScreen extends ConsumerWidget {
             itemCount: seriesList.length,
             itemBuilder: (context, int index) {
               final series = seriesList[index];
-              return _SeriesTile(series: series);
+              return _SeriesTile(series: series)
+                  .animate()
+                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
+                  .slideX(begin: 0.03, duration: 300.ms);
             },
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Skeletonizer(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: 6,
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: Bone.circle(size: 40),
+                title: Bone.text(words: 3),
+                subtitle: Bone.text(words: 2),
+              ),
+            ),
+          ),
+        ),
         error: (Object e, _) => Center(child: Text('Ошибка: $e')),
       ),
     );
