@@ -203,6 +203,29 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _storageModeMeta = const VerificationMeta(
+    'storageMode',
+  );
+  @override
+  late final GeneratedColumn<String> storageMode = GeneratedColumn<String>(
+    'storage_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('internal'),
+  );
+  static const VerificationMeta _externalUriMeta = const VerificationMeta(
+    'externalUri',
+  );
+  @override
+  late final GeneratedColumn<String> externalUri = GeneratedColumn<String>(
+    'external_uri',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -223,6 +246,8 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     encodingConfidence,
     encodingSource,
     userForcedEncoding,
+    storageMode,
+    externalUri,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -357,6 +382,24 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         ),
       );
     }
+    if (data.containsKey('storage_mode')) {
+      context.handle(
+        _storageModeMeta,
+        storageMode.isAcceptableOrUnknown(
+          data['storage_mode']!,
+          _storageModeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('external_uri')) {
+      context.handle(
+        _externalUriMeta,
+        externalUri.isAcceptableOrUnknown(
+          data['external_uri']!,
+          _externalUriMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -442,6 +485,14 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}user_forced_encoding'],
       ),
+      storageMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}storage_mode'],
+      )!,
+      externalUri: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}external_uri'],
+      ),
     );
   }
 
@@ -473,6 +524,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final double? encodingConfidence;
   final String? encodingSource;
   final String? userForcedEncoding;
+  final String storageMode;
+  final String? externalUri;
   const SavedBook({
     required this.id,
     required this.title,
@@ -492,6 +545,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     this.encodingConfidence,
     this.encodingSource,
     this.userForcedEncoding,
+    required this.storageMode,
+    this.externalUri,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -544,6 +599,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || userForcedEncoding != null) {
       map['user_forced_encoding'] = Variable<String>(userForcedEncoding);
     }
+    map['storage_mode'] = Variable<String>(storageMode);
+    if (!nullToAbsent || externalUri != null) {
+      map['external_uri'] = Variable<String>(externalUri);
+    }
     return map;
   }
 
@@ -575,6 +634,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       userForcedEncoding: userForcedEncoding == null && nullToAbsent
           ? const Value.absent()
           : Value(userForcedEncoding),
+      storageMode: Value(storageMode),
+      externalUri: externalUri == null && nullToAbsent ? const Value.absent() : Value(externalUri),
     );
   }
 
@@ -606,6 +667,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       userForcedEncoding: serializer.fromJson<String?>(
         json['userForcedEncoding'],
       ),
+      storageMode: serializer.fromJson<String>(json['storageMode']),
+      externalUri: serializer.fromJson<String?>(json['externalUri']),
     );
   }
   @override
@@ -630,6 +693,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'encodingConfidence': serializer.toJson<double?>(encodingConfidence),
       'encodingSource': serializer.toJson<String?>(encodingSource),
       'userForcedEncoding': serializer.toJson<String?>(userForcedEncoding),
+      'storageMode': serializer.toJson<String>(storageMode),
+      'externalUri': serializer.toJson<String?>(externalUri),
     };
   }
 
@@ -652,6 +717,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     Value<double?> encodingConfidence = const Value.absent(),
     Value<String?> encodingSource = const Value.absent(),
     Value<String?> userForcedEncoding = const Value.absent(),
+    String? storageMode,
+    Value<String?> externalUri = const Value.absent(),
   }) => SavedBook(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -675,6 +742,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     userForcedEncoding: userForcedEncoding.present
         ? userForcedEncoding.value
         : this.userForcedEncoding,
+    storageMode: storageMode ?? this.storageMode,
+    externalUri: externalUri.present ? externalUri.value : this.externalUri,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
     return SavedBook(
@@ -702,6 +771,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       userForcedEncoding: data.userForcedEncoding.present
           ? data.userForcedEncoding.value
           : this.userForcedEncoding,
+      storageMode: data.storageMode.present ? data.storageMode.value : this.storageMode,
+      externalUri: data.externalUri.present ? data.externalUri.value : this.externalUri,
     );
   }
 
@@ -725,7 +796,9 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('detectedEncoding: $detectedEncoding, ')
           ..write('encodingConfidence: $encodingConfidence, ')
           ..write('encodingSource: $encodingSource, ')
-          ..write('userForcedEncoding: $userForcedEncoding')
+          ..write('userForcedEncoding: $userForcedEncoding, ')
+          ..write('storageMode: $storageMode, ')
+          ..write('externalUri: $externalUri')
           ..write(')'))
         .toString();
   }
@@ -750,6 +823,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     encodingConfidence,
     encodingSource,
     userForcedEncoding,
+    storageMode,
+    externalUri,
   );
   @override
   bool operator ==(Object other) =>
@@ -772,7 +847,9 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.detectedEncoding == this.detectedEncoding &&
           other.encodingConfidence == this.encodingConfidence &&
           other.encodingSource == this.encodingSource &&
-          other.userForcedEncoding == this.userForcedEncoding);
+          other.userForcedEncoding == this.userForcedEncoding &&
+          other.storageMode == this.storageMode &&
+          other.externalUri == this.externalUri);
 }
 
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
@@ -794,6 +871,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<double?> encodingConfidence;
   final Value<String?> encodingSource;
   final Value<String?> userForcedEncoding;
+  final Value<String> storageMode;
+  final Value<String?> externalUri;
   final Value<int> rowid;
   const SavedBooksCompanion({
     this.id = const Value.absent(),
@@ -814,6 +893,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.encodingConfidence = const Value.absent(),
     this.encodingSource = const Value.absent(),
     this.userForcedEncoding = const Value.absent(),
+    this.storageMode = const Value.absent(),
+    this.externalUri = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedBooksCompanion.insert({
@@ -835,6 +916,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.encodingConfidence = const Value.absent(),
     this.encodingSource = const Value.absent(),
     this.userForcedEncoding = const Value.absent(),
+    this.storageMode = const Value.absent(),
+    this.externalUri = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -857,6 +940,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<double>? encodingConfidence,
     Expression<String>? encodingSource,
     Expression<String>? userForcedEncoding,
+    Expression<String>? storageMode,
+    Expression<String>? externalUri,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -878,6 +963,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (encodingConfidence != null) 'encoding_confidence': encodingConfidence,
       if (encodingSource != null) 'encoding_source': encodingSource,
       if (userForcedEncoding != null) 'user_forced_encoding': userForcedEncoding,
+      if (storageMode != null) 'storage_mode': storageMode,
+      if (externalUri != null) 'external_uri': externalUri,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -901,6 +988,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<double?>? encodingConfidence,
     Value<String?>? encodingSource,
     Value<String?>? userForcedEncoding,
+    Value<String>? storageMode,
+    Value<String?>? externalUri,
     Value<int>? rowid,
   }) {
     return SavedBooksCompanion(
@@ -922,6 +1011,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       encodingConfidence: encodingConfidence ?? this.encodingConfidence,
       encodingSource: encodingSource ?? this.encodingSource,
       userForcedEncoding: userForcedEncoding ?? this.userForcedEncoding,
+      storageMode: storageMode ?? this.storageMode,
+      externalUri: externalUri ?? this.externalUri,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -987,6 +1078,12 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     if (userForcedEncoding.present) {
       map['user_forced_encoding'] = Variable<String>(userForcedEncoding.value);
     }
+    if (storageMode.present) {
+      map['storage_mode'] = Variable<String>(storageMode.value);
+    }
+    if (externalUri.present) {
+      map['external_uri'] = Variable<String>(externalUri.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1014,6 +1111,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('encodingConfidence: $encodingConfidence, ')
           ..write('encodingSource: $encodingSource, ')
           ..write('userForcedEncoding: $userForcedEncoding, ')
+          ..write('storageMode: $storageMode, ')
+          ..write('externalUri: $externalUri, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6385,6 +6484,8 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<double?> encodingConfidence,
       Value<String?> encodingSource,
       Value<String?> userForcedEncoding,
+      Value<String> storageMode,
+      Value<String?> externalUri,
       Value<int> rowid,
     });
 typedef $$SavedBooksTableUpdateCompanionBuilder =
@@ -6407,6 +6508,8 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<double?> encodingConfidence,
       Value<String?> encodingSource,
       Value<String?> userForcedEncoding,
+      Value<String> storageMode,
+      Value<String?> externalUri,
       Value<int> rowid,
     });
 
@@ -6509,6 +6612,16 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     column: $table.userForcedEncoding,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get storageMode => $composableBuilder(
+    column: $table.storageMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get externalUri => $composableBuilder(
+    column: $table.externalUri,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -6608,6 +6721,16 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     column: $table.userForcedEncoding,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get storageMode => $composableBuilder(
+    column: $table.storageMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get externalUri => $composableBuilder(
+    column: $table.externalUri,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -6687,6 +6810,16 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
     column: $table.userForcedEncoding,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get storageMode => $composableBuilder(
+    column: $table.storageMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get externalUri => $composableBuilder(
+    column: $table.externalUri,
+    builder: (column) => column,
+  );
 }
 
 class $$SavedBooksTableTableManager
@@ -6736,6 +6869,8 @@ class $$SavedBooksTableTableManager
                 Value<double?> encodingConfidence = const Value.absent(),
                 Value<String?> encodingSource = const Value.absent(),
                 Value<String?> userForcedEncoding = const Value.absent(),
+                Value<String> storageMode = const Value.absent(),
+                Value<String?> externalUri = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
                 id: id,
@@ -6756,6 +6891,8 @@ class $$SavedBooksTableTableManager
                 encodingConfidence: encodingConfidence,
                 encodingSource: encodingSource,
                 userForcedEncoding: userForcedEncoding,
+                storageMode: storageMode,
+                externalUri: externalUri,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6778,6 +6915,8 @@ class $$SavedBooksTableTableManager
                 Value<double?> encodingConfidence = const Value.absent(),
                 Value<String?> encodingSource = const Value.absent(),
                 Value<String?> userForcedEncoding = const Value.absent(),
+                Value<String> storageMode = const Value.absent(),
+                Value<String?> externalUri = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(
                 id: id,
@@ -6798,6 +6937,8 @@ class $$SavedBooksTableTableManager
                 encodingConfidence: encodingConfidence,
                 encodingSource: encodingSource,
                 userForcedEncoding: userForcedEncoding,
+                storageMode: storageMode,
+                externalUri: externalUri,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>

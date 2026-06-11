@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../../core/storage/external_book_file.dart';
+import '../../../core/storage/storage_bridge.dart';
 import '../../../shared/models/book.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
@@ -144,6 +146,86 @@ class BookImportService {
       return ImportResult.success(book.title);
     } on Object catch (e) {
       return ImportResult.failure('Ошибка при импорте: $e');
+    }
+  }
+
+  /// Import a book from an external SAF URI into the app library.
+  Future<ImportResult> importFromExternal(
+    ExternalBookFile external, {
+    required StorageBridge bridge,
+  }) async {
+    final ext = external.extension.toLowerCase();
+    if (!_supportedExtensions.contains(ext)) {
+      return ImportResult.failure('Формат не поддерживается: .$ext');
+    }
+
+    try {
+      final bytes = await bridge.readFile(external.uri);
+      if (bytes.isEmpty) {
+        return ImportResult.failure('Файл пуст: ${external.name}');
+      }
+
+      final contentHash = sha256.convert(bytes).toString();
+      final existing = await _findByHash(contentHash);
+      if (existing != null) {
+        return ImportResult.duplicate(existing.title, contentHash);
+      }
+
+      final parser = _parsers[ext];
+      if (parser == null) {
+        return ImportResult.failure('Парсер для .$ext не найден');
+      }
+
+      final book = await parser.parse(
+        bytes,
+        fileName: external.name,
+      );
+
+      final targetFile = await _storage.bookFile(
+        book.id,
+        BookFormat.values.firstWhere(
+          (f) => f.name == ext,
+          orElse: () => BookFormat.epub,
+        ),
+      );
+      await targetFile.parent.create(recursive: true);
+      await targetFile.writeAsBytes(bytes, flush: true);
+
+      await _database
+          .into(_database.savedBooks)
+          .insertOnConflictUpdate(
+            SavedBooksCompanion.insert(
+              id: book.id,
+              title: book.title,
+              authorIds: Value(book.authors),
+              description: Value(book.description),
+              coverUrl: Value(book.coverUrl),
+              sourceUrl: Value(external.uri),
+              contentHash: Value(contentHash),
+              fileSize: Value(external.size),
+              filePath: Value(targetFile.path),
+              storageMode: const Value('external'),
+              externalUri: Value(external.uri),
+            ),
+          );
+
+      await _database
+          .into(_database.downloads)
+          .insertOnConflictUpdate(
+            DownloadsCompanion.insert(
+              id: book.id,
+              bookId: book.id,
+              bookTitle: Value(book.title),
+              format: ext,
+              sourceUrl: external.uri,
+              targetPath: Value(targetFile.path),
+              status: DownloadStatusDb.completed,
+            ),
+          );
+
+      return ImportResult.success(book.title);
+    } on Object catch (e) {
+      return ImportResult.failure('Ошибка при импорте из внешней папки: $e');
     }
   }
 

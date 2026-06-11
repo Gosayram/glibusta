@@ -11,6 +11,9 @@ import '../../../core/config/app_settings.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
+import '../../../core/storage/storage_bridge_impl.dart';
+import '../../../core/storage/storage_mode.dart';
+import '../../../core/storage/storage_settings_provider.dart';
 import '../../auth/presentation/login_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -75,6 +78,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: '${settings.maxConcurrentDownloads}',
             onTap: () => _editMaxConcurrent(context, ref, settings),
           ),
+
+          const Divider(),
+          const _SectionHeader(title: 'Хранилище библиотеки'),
+          _buildStorageModeTile(context, ref),
 
           const Divider(),
           const _SectionHeader(title: 'Отображение'),
@@ -468,6 +475,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildStorageModeTile(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(storageModeProvider);
+    final folder = ref.watch(externalFolderProvider);
+
+    final modeLabels = {
+      StorageMode.internal: 'Внутренняя библиотека',
+      StorageMode.downloads: 'Downloads/Glibusta',
+      StorageMode.external: 'Выбранная папка',
+    };
+
+    final subtitles = {
+      StorageMode.internal: 'Стабильный режим, файлы в sandbox приложения',
+      StorageMode.downloads: 'Доступна из файлового менеджера',
+      StorageMode.external: folder.name ?? 'Папка не выбрана',
+    };
+
+    return ListTile(
+      leading: const Icon(Icons.folder),
+      title: const Text('Хранилище'),
+      subtitle: Text(subtitles[mode]!),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showStorageModeDialog(context, ref, mode, modeLabels),
+    );
+  }
+
+  Future<void> _showStorageModeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    StorageMode currentMode,
+    Map<StorageMode, String> modeLabels,
+  ) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Режим хранилища'),
+        children: StorageMode.values.map((mode) {
+          return SimpleDialogOption(
+            onPressed: () {
+              Navigator.of(context).pop();
+              unawaited(ref.read(storageModeProvider.notifier).updateMode(mode));
+              if (mode == StorageMode.downloads || mode == StorageMode.external) {
+                unawaited(_pickFolder(context, ref, mode));
+              }
+            },
+            child: Row(
+              children: [
+                Icon(
+                  mode == currentMode ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: mode == currentMode ? Theme.of(context).colorScheme.primary : null,
+                ),
+                const SizedBox(width: 12),
+                Text(modeLabels[mode]!),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Future<void> _pickFolder(BuildContext context, WidgetRef ref, StorageMode mode) async {
+    final folder = ref.read(externalFolderProvider);
+    if (folder.uri != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Текущая папка: ${folder.name ?? folder.uri}'),
+          action: SnackBarAction(
+            label: 'Выбрать другую',
+            onPressed: () => _doPickFolder(context, ref, mode),
+          ),
+        ),
+      );
+    } else {
+      await _doPickFolder(context, ref, mode);
+    }
+  }
+
+  Future<void> _doPickFolder(BuildContext context, WidgetRef ref, StorageMode mode) async {
+    try {
+      final bridge = StorageBridgeImpl();
+      final uri = await bridge.pickFolder();
+      if (uri == null) return;
+
+      final scanned = await bridge.scanBooks(uri);
+      final name = uri.split('/').last;
+
+      await ref.read(externalFolderProvider.notifier).updateFolder(uri: uri, name: name);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Найдено книг: ${scanned.length}')),
+        );
+      }
+    } on Object catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    }
   }
 }
 

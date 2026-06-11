@@ -23,6 +23,8 @@ class SavedBooks extends Table {
   RealColumn get encodingConfidence => real().nullable()();
   TextColumn get encodingSource => text().nullable()();
   TextColumn get userForcedEncoding => text().nullable()();
+  TextColumn get storageMode => text().withDefault(const Constant('internal'))();
+  TextColumn get externalUri => text().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

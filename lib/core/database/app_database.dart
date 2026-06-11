@@ -50,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -83,6 +83,10 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(savedBooks, savedBooks.encodingConfidence);
         await m.addColumn(savedBooks, savedBooks.encodingSource);
         await m.addColumn(savedBooks, savedBooks.userForcedEncoding);
+      }
+      if (from < 8) {
+        await m.addColumn(savedBooks, savedBooks.storageMode);
+        await m.addColumn(savedBooks, savedBooks.externalUri);
       }
     },
     beforeOpen: (details) async {
