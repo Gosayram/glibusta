@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-import '../../../core/utils/app_breakpoints.dart';
+import '../../../core/platform/adaptive_context.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
@@ -194,8 +194,9 @@ class LibraryScreen extends ConsumerWidget {
       );
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    if (width >= AppBreakpoints.compact) {
+    if (context.isCompact) {
+      // Phone: fall through to grid view below
+    } else {
       return LibraryMasterDetail(books: books);
     }
 

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
-import '../../core/utils/app_breakpoints.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -65,26 +65,25 @@ class AdaptiveNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _selectedIndex(context);
-    final width = MediaQuery.sizeOf(context).width;
 
-    if (width >= AppBreakpoints.compact) {
-      return NavigationRail(
+    if (context.isCompact) {
+      return NavigationBar(
         selectedIndex: selectedIndex,
         onDestinationSelected: (i) => _onTap(context, i),
-        labelType: NavigationRailLabelType.all,
-        leading: const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Icon(Icons.menu_book, size: 28),
-        ),
-        destinations: expandedDestinations,
+        animationDuration: const Duration(milliseconds: 300),
+        destinations: compactDestinations,
       );
     }
 
-    return NavigationBar(
+    return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: (i) => _onTap(context, i),
-      animationDuration: const Duration(milliseconds: 300),
-      destinations: compactDestinations,
+      labelType: NavigationRailLabelType.all,
+      leading: const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Icon(Icons.menu_book, size: 28),
+      ),
+      destinations: expandedDestinations,
     );
   }
 }
@@ -278,16 +277,15 @@ class ShellWithNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final width = MediaQuery.sizeOf(context).width;
     final capabilities = ref.watch(platformCapabilitiesProvider);
 
     if (capabilities.hasNativeMenuBar) {
       return MacOSShell(child: child);
     }
 
-    if (width < AppBreakpoints.compact) {
+    if (context.isCompact) {
       return MobileShell(child: child);
-    } else if (width < AppBreakpoints.medium) {
+    } else if (context.isMedium) {
       return TabletShell(child: child);
     } else {
       return DesktopShell(child: child);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/platform/adaptive_context.dart';
 import '../models/book.dart';
 import 'book_card.dart';
 
@@ -36,8 +37,8 @@ class BookGrid extends StatelessWidget {
       controller: controller,
       physics: physics,
       scrollDirection: scrollDirection,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 180,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: context.bookCardMaxExtent,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 0.58,

@@ -248,7 +248,7 @@ class CatalogScreen extends ConsumerWidget {
                         );
                       },
                     );
-                  } else if (width < AppBreakpoints.expanded) {
+                  } else if (width < AppBreakpoints.medium) {
                     // Tablet: 3-4 columns
                     final crossAxisCount = (width / 180).floor().clamp(3, 4);
                     return GridView.builder(

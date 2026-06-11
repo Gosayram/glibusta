@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-import '../../../core/utils/app_breakpoints.dart';
+import '../../../core/platform/adaptive_context.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
 import '../../../shared/widgets/book_card.dart';
@@ -289,8 +289,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
 
-    final width = MediaQuery.sizeOf(context).width;
-    final useGrid = width >= AppBreakpoints.compact;
+    final useGrid = !context.isCompact;
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {

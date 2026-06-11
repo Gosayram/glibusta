@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../platform/adaptive_context.dart';
+
 class AppSpacing {
   AppSpacing._();
 
@@ -46,10 +48,9 @@ class AppSpacing {
 // Extension for responsive spacing
 extension ResponsiveSpacing on BuildContext {
   double get responsiveHorizontalPadding {
-    final width = MediaQuery.of(this).size.width;
-    if (width < 600) return AppSpacing.lg;
-    if (width < 1200) return AppSpacing.xl;
-    return AppSpacing.xxl;
+    if (isCompact) return AppSpacing.lg;
+    if (isExpanded) return AppSpacing.xxl;
+    return AppSpacing.xl;
   }
 
   double get responsiveVerticalPadding {

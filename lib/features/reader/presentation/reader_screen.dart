@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/app_breakpoints.dart';
+import '../../../core/platform/adaptive_context.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../data/auto_theme_service.dart';
@@ -258,10 +258,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           onClosePanel: () => Navigator.of(context).pop(),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              if (width < AppBreakpoints.compact) {
+              final wc = windowClassOf(context);
+              if (wc == WindowClass.compact) {
                 return _buildPhoneLayout(context, readerState, settings);
-              } else if (width < AppBreakpoints.expanded) {
+              } else if (wc == WindowClass.medium) {
                 return _buildTabletLayout(context, readerState, settings);
               } else {
                 return _buildDesktopLayout(context, readerState, settings);
