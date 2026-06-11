@@ -1,10 +1,6 @@
-enum BookFormat {
-  epub,
-  fb2,
-  pdf,
-  txt,
-  unknown,
-}
+import '../../../../shared/models/book.dart';
+
+export '../../../../shared/models/book.dart' show BookFormat;
 
 BookFormat detectBookFormat(String path) {
   final lower = path.toLowerCase();

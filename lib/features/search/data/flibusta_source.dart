@@ -286,11 +286,11 @@ class FlibustaHtmlSource extends BookSource {
     }
     if (lower.endsWith('.txt') || lower.contains('.txt?')) return BookFormat.txt;
     if (lower.endsWith('.mobi') || lower.contains('.mobi?')) {
-      return BookFormat.mobi;
+      return BookFormat.unknown;
     }
     if (lower.endsWith('.pdf') || lower.contains('.pdf?')) return BookFormat.pdf;
     if (lower.endsWith('.djvu') || lower.contains('.djvu?')) {
-      return BookFormat.djvu;
+      return BookFormat.unknown;
     }
     return null;
   }

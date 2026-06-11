@@ -203,13 +203,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   selected: filters.format == null,
                   onSelected: (_) => _setFormatFilter(null),
                 ),
-                ...BookFormat.values.map(
-                  (format) => FilterChip(
-                    label: Text(format.name.toUpperCase()),
-                    selected: filters.format == format,
-                    onSelected: (selected) => _setFormatFilter(selected ? format : null),
-                  ),
-                ),
+                ...BookFormat.values
+                    .where((f) => f != BookFormat.unknown)
+                    .map(
+                      (format) => FilterChip(
+                        label: Text(format.name.toUpperCase()),
+                        selected: filters.format == format,
+                        onSelected: (selected) => _setFormatFilter(selected ? format : null),
+                      ),
+                    ),
               ],
             ),
             const SizedBox(height: 8),

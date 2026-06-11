@@ -6,13 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
-import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/book.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
+import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/txt_parser.dart';
+import 'inspectors/book_inspection_result.dart';
 
 final bookImportServiceProvider = Provider<BookImportService>((ref) {
   final database = ref.watch(databaseProvider);
@@ -22,11 +23,8 @@ final bookImportServiceProvider = Provider<BookImportService>((ref) {
 class BookImportService {
   final AppDatabase _database;
   final AppFileStorage _storage;
-  final BookEncodingDetector _detector;
 
-  BookImportService(this._database)
-    : _storage = AppFileStorageImpl(),
-      _detector = BookEncodingDetector();
+  BookImportService(this._database) : _storage = AppFileStorageImpl();
 
   final Map<String, BookParser> _parsers = {
     'fb2': Fb2Parser(),
@@ -36,17 +34,49 @@ class BookImportService {
 
   static const _supportedExtensions = ['fb2', 'epub', 'txt'];
 
+  /// Import a file from its inspection result.
+  Future<ImportResult> importFromInspection(
+    BookFileInspectionResult inspection,
+  ) async {
+    if (inspection.decision == ImportDecision.duplicate) {
+      return ImportResult.duplicate(inspection.title ?? 'unknown', inspection.hash);
+    }
+    if (inspection.decision == ImportDecision.corrupted) {
+      return ImportResult.failure(inspection.reason ?? 'Файл повреждён');
+    }
+    if (inspection.decision == ImportDecision.unsupported) {
+      return ImportResult.failure(inspection.reason ?? 'Формат не поддерживается');
+    }
+    if (inspection.decision == ImportDecision.openAsPdf) {
+      return ImportResult.failure('PDF открывается отдельным просмотрщиком');
+    }
+    if (inspection.decision == ImportDecision.needsEncodingSelection) {
+      return ImportResult.needsEncoding(
+        inspection.title ?? 'Неизвестная кодировка',
+        inspection.encoding,
+      );
+    }
+
+    // importAsBook
+    return _doImport(inspection.path, forcedEncoding: inspection.encoding);
+  }
+
+  /// Import a file by path (runs full inspection + import).
   Future<ImportResult> importFile(String filePath) async {
+    final ext = filePath.split('.').last.toLowerCase();
+    if (!_supportedExtensions.contains(ext)) {
+      return ImportResult.failure('Формат не поддерживается: .$ext');
+    }
+    return _doImport(filePath);
+  }
+
+  Future<ImportResult> _doImport(String filePath, {String? forcedEncoding}) async {
     final file = File(filePath);
     if (!await file.exists()) {
       return ImportResult.failure('Файл не найден: $filePath');
     }
 
     final ext = filePath.split('.').last.toLowerCase();
-    if (!_supportedExtensions.contains(ext)) {
-      return ImportResult.failure('Формат не поддерживается: .$ext');
-    }
-
     final bytes = await file.readAsBytes();
     final contentHash = sha256.convert(bytes).toString();
     final fileSize = bytes.length;
@@ -62,16 +92,10 @@ class BookImportService {
     }
 
     try {
-      // Detect encoding before parsing
-      final encodingResult = await _detector.detect(
-        bytes,
-        fileName: filePath.split('/').last,
-      );
-
       final book = await parser.parse(
         bytes,
         fileName: filePath.split('/').last,
-        forcedEncoding: encodingResult.encoding,
+        forcedEncoding: forcedEncoding,
       );
 
       final targetFile = await _storage.bookFile(
@@ -97,9 +121,9 @@ class BookImportService {
               contentHash: Value(contentHash),
               fileSize: Value(fileSize),
               filePath: Value(targetFile.path),
-              detectedEncoding: Value(encodingResult.encoding),
-              encodingConfidence: Value(encodingResult.confidence),
-              encodingSource: Value(encodingResult.source.name),
+              detectedEncoding: Value(forcedEncoding),
+              encodingSource: forcedEncoding != null ? const Value('manual') : const Value.absent(),
+              userForcedEncoding: Value(forcedEncoding),
             ),
           );
 
@@ -153,22 +177,31 @@ class BookImportService {
 class ImportResult {
   final bool isSuccess;
   final bool isDuplicate;
+  final bool needsEncodingSelection;
   final String? title;
   final String? error;
   final String? hash;
+  final String? suggestedEncoding;
 
   ImportResult._({
     this.isSuccess = false,
     this.isDuplicate = false,
+    this.needsEncodingSelection = false,
     this.title,
     this.error,
     this.hash,
+    this.suggestedEncoding,
   });
 
   factory ImportResult.success(String title) => ImportResult._(isSuccess: true, title: title);
   factory ImportResult.duplicate(String title, String hash) =>
       ImportResult._(isDuplicate: true, title: title, hash: hash);
   factory ImportResult.failure(String error) => ImportResult._(error: error);
+  factory ImportResult.needsEncoding(String title, String? encoding) => ImportResult._(
+    needsEncodingSelection: true,
+    title: title,
+    suggestedEncoding: encoding,
+  );
 }
 
 class ImportBatchResult {

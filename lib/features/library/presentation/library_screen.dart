@@ -16,6 +16,8 @@ import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
+import '../data/inspectors/book_inspection_provider.dart';
+import '../data/inspectors/book_inspection_result.dart';
 import 'library_view_mode_provider.dart';
 import 'pinned_books_provider.dart';
 
@@ -127,13 +129,19 @@ class LibraryScreen extends ConsumerWidget {
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
     final service = ref.read(bookImportServiceProvider);
     for (final path in paths) {
-      unawaited(
-        service.importFile(path).then((result) {
-          if (result.isSuccess) {
-            ref.invalidate(libraryBooksProvider);
-          }
-        }),
-      );
+      unawaited(_inspectAndImport(ref, path, service));
+    }
+  }
+
+  Future<void> _inspectAndImport(
+    WidgetRef ref,
+    String path,
+    BookImportService service,
+  ) async {
+    final inspection = await ref.read(bookFileInspectionProvider(path).future);
+    final result = await service.importFromInspection(inspection);
+    if (result.isSuccess || result.needsEncodingSelection) {
+      ref.invalidate(libraryBooksProvider);
     }
   }
 
@@ -142,16 +150,54 @@ class LibraryScreen extends ConsumerWidget {
     final filePath = await picker.pickBookFile();
     if (filePath == null) return;
 
+    final inspection = await ref.read(bookFileInspectionProvider(filePath).future);
+
+    if (inspection.decision == ImportDecision.duplicate) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Дубликат: ${inspection.title ?? inspection.reason}')),
+        );
+      }
+      return;
+    }
+
+    if (inspection.decision == ImportDecision.corrupted) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: ${inspection.reason}')),
+        );
+      }
+      return;
+    }
+
+    if (inspection.decision == ImportDecision.unsupported) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Формат не поддерживается')),
+        );
+      }
+      return;
+    }
+
+    if (inspection.decision == ImportDecision.openAsPdf) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF открывается отдельным просмотрщиком')),
+        );
+      }
+      return;
+    }
+
     final service = ref.read(bookImportServiceProvider);
-    final importResult = await service.importFile(filePath);
+    final importResult = await service.importFromInspection(inspection);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             importResult.isSuccess
                 ? 'Импортировано: ${importResult.title}'
-                : importResult.isDuplicate
-                ? 'Дубликат: ${importResult.title}'
+                : importResult.needsEncodingSelection
+                ? 'Нужен выбор кодировки'
                 : 'Ошибка: ${importResult.error}',
           ),
           duration: const Duration(seconds: 2),
