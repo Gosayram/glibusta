@@ -7,6 +7,7 @@ plus book details, covers, and authenticated features.
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -286,84 +287,129 @@ def test_auth(client: FlibustaClient):
 
     print(f"  Logging in as: {user[:3]}***")
     success = client.login(user, password)
-    if success:
-        print("  Login SUCCESS")
-        print(f"  Is logged in: {client.is_logged_in()}")
+    if not success:
+        print("  Login FAILED — check credentials")
+        return
 
-        # Test authenticated endpoints
-        print("\n  [1] Testing /my page...")
-        r = client._get("/my")
-        if r:
-            print(f"    Status: {r.status_code}")
-            soup = BeautifulSoup(r.text, "html.parser")
-            # Find user info
-            h1 = soup.find("h1")
-            if h1:
-                print(f"    User page title: {h1.get_text(strip=True)[:60]}")
-            save_result("15_auth_my_page.html", r.text[:10000])
+    print("  Login SUCCESS")
+    print(f"  Is logged in: {client.is_logged_in()}")
 
-        # Test bookmarks
-        print("\n  [2] Testing bookmarks...")
-        r = client._get("/user/bookmarks")
+    # Get user ID from profile
+    r = client._get("/user/me")
+    user_id = None
+    if r:
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Extract user ID from links like /polka/show/1452402
+        for a in soup.find_all("a", href=True):
+            m = re.search(r"/(\d+)", a.get("href", ""))
+            if m and a.get_text(strip=True):
+                uid = m.group(1)
+                if uid != "68682" and uid != "4023":  # Skip site pages
+                    user_id = uid
+                    break
+        print(f"  User ID: {user_id}")
+
+    # 1. Profile
+    print("\n  [1] /user/me — Profile...")
+    if r:
+        soup = BeautifulSoup(r.text, "html.parser")
+        title = soup.title.get_text(strip=True) if soup.title else "N/A"
+        print(f"    Title: {title}")
+        save_result("15_auth_profile.html", r.text[:15000])
+
+    # 2. Rated books (polka)
+    print("\n  [2] /polka/show/{id} — Rated books (shelf)...")
+    if user_id:
+        r = client._get(f"/polka/show/{user_id}")
         if r:
             print(f"    Status: {r.status_code}")
             soup = BeautifulSoup(r.text, "html.parser")
             book_links = soup.find_all("a", href=lambda h: h and "/b/" in h)
-            print(f"    Bookmark links: {len(book_links)}")
+            print(f"    Rated books: {len(book_links)}")
             for a in book_links[:5]:
                 print(f"      {a.get('href')} -> {a.get_text(strip=True)[:50]}")
-            save_result("15_auth_bookmarks.html", r.text[:10000])
+            save_result("15_auth_rated_books.html", r.text[:15000])
 
-        # Test history
-        print("\n  [3] Testing history...")
-        r = client._get("/user/history")
+    # 3. Black/white list (users)
+    print("\n  [3] /bwlist/show/{id} — User list...")
+    if user_id:
+        r = client._get(f"/bwlist/show/{user_id}")
         if r:
             print(f"    Status: {r.status_code}")
-            save_result("15_auth_history.html", r.text[:10000])
+            save_result("15_auth_bwlist.html", r.text[:15000])
 
-        # Test collections/shelves
-        print("\n  [4] Testing collections...")
-        r = client._get("/collections")
+    # 4. Tracked comments
+    print("\n  [4] /user/{id}/track/comments — Tracked comments...")
+    if user_id:
+        r = client._get(f"/user/{user_id}/track/comments")
         if r:
             print(f"    Status: {r.status_code}")
-            soup = BeautifulSoup(r.text, "html.parser")
-            collection_links = soup.find_all("a", href=lambda h: h and "/collection/" in h)
-            print(f"    Collection links: {len(collection_links)}")
-            for a in collection_links[:5]:
-                print(f"      {a.get('href')} -> {a.get_text(strip=True)[:50]}")
-            save_result("15_auth_collections.html", r.text[:10000])
+            save_result("15_auth_tracked_comments.html", r.text[:15000])
 
-        # Test adding a bookmark
-        print("\n  [5] Testing add bookmark...")
+    # 5. Blog
+    print("\n  [5] /blog/{id} — User blog...")
+    if user_id:
+        r = client._get(f"/blog/{user_id}")
+        if r:
+            print(f"    Status: {r.status_code}")
+            save_result("15_auth_blog.html", r.text[:15000])
+
+    # 6. Stats
+    print("\n  [6] /stat/my — Work stats...")
+    r = client._get("/stat/my")
+    if r:
+        print(f"    Status: {r.status_code}")
+        save_result("15_auth_stats.html", r.text[:15000])
+
+    # 7. Watcher
+    print("\n  [7] /user/me/watcher — Watched posts...")
+    r = client._get("/user/me/watcher")
+    if r:
+        print(f"    Status: {r.status_code}")
+        save_result("15_auth_watcher.html", r.text[:15000])
+
+    # 8. Track
+    print("\n  [8] /user/me/track — Tracking...")
+    r = client._get("/user/me/track")
+    if r:
+        print(f"    Status: {r.status_code}")
+        save_result("15_auth_track.html", r.text[:15000])
+
+    # 9. Recommendations
+    print("\n  [9] /rec — Recommendations...")
+    if user_id:
+        r = client._get(f"/rec?view=recs&user={user_id}&udata=id")
+        if r:
+            print(f"    Status: {r.status_code}")
+            save_result("15_auth_recommendations.html", r.text[:15000])
+
+    # 10. Test add to shelf (polka)
+    print("\n  [10] Add book to shelf...")
+    if user_id:
+        # First get a book page to find the polka form
         r = client._get("/b/226302")
         if r:
             soup = BeautifulSoup(r.text, "html.parser")
-            # Look for bookmark form
-            bookmark_form = None
-            for form in soup.find_all("form"):
-                inputs = {i.get("name") for i in form.find_all("input") if i.get("name")}
-                if "bookmark" in str(inputs).lower() or "collection" in str(inputs).lower():
-                    bookmark_form = form
+            # Look for polka/bookshelf forms
+            forms = soup.find_all("form")
+            for form in forms:
+                action = form.get("action", "")
+                if "polka" in action or "shelf" in action or "bookmark" in action:
+                    print(f"    Shelf form: {action}")
                     break
-            if bookmark_form:
-                print(f"    Bookmark form found: {bookmark_form.get('action', '')}")
-            else:
-                print("    No bookmark form found (might need different approach)")
 
-        # Test OPDS with auth
-        print("\n  [6] Testing OPDS with auth...")
-        r = client._get("/opds/")
-        if r:
-            print(f"    OPDS status: {r.status_code}")
-            save_result("15_auth_opds.xml", r.text[:5000])
+    # 11. OPDS with auth
+    print("\n  [11] OPDS with auth...")
+    r = client._get("/opds/")
+    if r:
+        print(f"    OPDS status: {r.status_code}")
 
-        # Test search with auth
-        print("\n  [7] Testing search with auth session...")
-        books = client.search_books_by_name("Толстой")
-        print(f"    Books found: {len(books)}")
+    # 12. Search with auth
+    print("\n  [12] Search with auth session...")
+    books = client.search_books_by_name("Толстой")
+    print(f"    Books found: {len(books)}")
 
-    else:
-        print("  Login FAILED — check credentials")
+    print("\n  Auth tests completed!")
 
 
 def test_pagination_deep(client: FlibustaClient):
