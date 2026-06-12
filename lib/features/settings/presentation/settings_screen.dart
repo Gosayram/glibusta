@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
@@ -143,11 +144,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const Divider(),
           const _SectionHeader(title: 'О приложении'),
-          const _SettingsTile(
-            icon: Icons.info_outline,
-            title: 'Версия',
-            subtitle: '0.1.0+1',
-          ),
+          const _VersionTile(),
           _SettingsTile(
             icon: Icons.keyboard,
             title: 'Горячие клавиши',
@@ -234,7 +231,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _exportData(BuildContext context) async {
     try {
       final db = ref.read(databaseProvider);
-      final backupService = BackupService(db: db, appVersion: '0.1.0+1');
+      final info = await PackageInfo.fromPlatform();
+      final backupService = BackupService(
+        db: db,
+        appVersion: '${info.version}+${info.buildNumber}',
+      );
       final json = await backupService.exportData();
       // TODO: Use file picker or share to save the JSON
       if (kDebugMode) {
@@ -283,7 +284,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     try {
       final db = ref.read(databaseProvider);
-      final backupService = BackupService(db: db, appVersion: '0.1.0+1');
+      final info = await PackageInfo.fromPlatform();
+      final backupService = BackupService(
+        db: db,
+        appVersion: '${info.version}+${info.buildNumber}',
+      );
       final result = await backupService.importData('');
 
       if (!context.mounted) return;
@@ -635,6 +640,26 @@ class _SettingsTile extends StatelessWidget {
       title: Text(title),
       subtitle: Text(subtitle),
       onTap: onTap,
+    );
+  }
+}
+
+class _VersionTile extends StatelessWidget {
+  const _VersionTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        final version = info != null ? '${info.version}+${info.buildNumber}' : '...';
+        return ListTile(
+          leading: const Icon(Icons.info_outline),
+          title: const Text('Версия'),
+          subtitle: Text(version),
+        );
+      },
     );
   }
 }

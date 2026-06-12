@@ -54,6 +54,20 @@ clean-artifacts: ## Remove generated release artifacts
 	@$(PRINT_STEP) "Cleaning release artifacts"
 	rm -rf "$(DIST_DIR)"
 
+.PHONY: clean-build
+clean-build: ## Remove all build artifacts and caches for a fresh build
+	@$(PRINT_STEP) "Cleaning build artifacts and caches"
+	rm -rf "$(BUILD_DIR)"
+	rm -rf .dart_tool
+	rm -rf .flutter-plugins
+	rm -rf .flutter-plugins-dependencies
+	rm -rf .packages
+	$(FLUTTER) pub get
+
+.PHONY: clean-all
+clean-all: clean-build clean-artifacts ## Remove everything: build + artifacts + caches
+	@$(PRINT_OK) "All cleaned"
+
 .PHONY: prepare-artifacts
 prepare-artifacts: require-python ## Create release artifact directory
 	@mkdir -p "$(DIST_DIR)"
@@ -67,7 +81,7 @@ macos-available: ## Verify macOS platform files exist
 	@test -d macos || { $(PRINT_ERROR) "macOS platform directory is missing"; exit 1; }
 
 .PHONY: build-android-apk
-build-android-apk: bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
+build-android-apk: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
 	@$(PRINT_STEP) "Building signed Android APK $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK)
 	@test -f "$(ANDROID_APK_SOURCE)" || { $(PRINT_ERROR) "APK not found: $(ANDROID_APK_SOURCE)"; exit 1; }
@@ -75,7 +89,7 @@ build-android-apk: bump-build require-flutter android-available sign-android pre
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
 .PHONY: build-android-apk-split
-build-android-apk-split: bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
+build-android-apk-split: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
 	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK_SPLIT)
 	@for abi in arm64-v8a armeabi-v7a x86_64 universal; do \
@@ -86,7 +100,7 @@ build-android-apk-split: bump-build require-flutter android-available sign-andro
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab
-build-android-aab: bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
+build-android-aab: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
 	@$(PRINT_STEP) "Building signed Android App Bundle $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_AAB)
 	@test -f "$(ANDROID_AAB_SOURCE)" || { $(PRINT_ERROR) "AAB not found: $(ANDROID_AAB_SOURCE)"; exit 1; }
@@ -106,7 +120,7 @@ sign-macos: macos-available ## Sign macOS app bundle with MACOS_CODESIGN_IDENTIT
 	@$(PRINT_OK) "macOS app signed"
 
 .PHONY: build-macos
-build-macos: bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS release zip
+build-macos: clean-build bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS release zip
 	@$(call REQUIRE_TOOL,$(DITTO))
 	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_MACOS)
