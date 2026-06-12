@@ -62,7 +62,10 @@ class AdaptiveNavigation extends StatelessWidget {
     return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
-      labelType: NavigationRailLabelType.all,
+      extended: context.isExpanded,
+      labelType: context.isExpanded
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
       leading: const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Icon(Icons.menu_book, size: 28),

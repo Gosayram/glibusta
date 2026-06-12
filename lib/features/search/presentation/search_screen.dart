@@ -155,22 +155,107 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        children: [
-          _buildFilters(context, state),
-          if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
-          if (state.error != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                'Ошибка: ${state.error}',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+      body: context.isCompact
+          ? _buildPhoneLayout(context, state)
+          : _buildTabletLayout(context, state),
+    );
+  }
+
+  Widget _buildPhoneLayout(BuildContext context, SearchState state) {
+    return Column(
+      children: [
+        _buildFilters(context, state),
+        if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
+        if (state.error != null) _buildErrorCard(context, state),
+        Expanded(
+          child: _buildResults(context, state),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabletLayout(BuildContext context, SearchState state) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 300,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                right: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 1,
+                ),
               ),
             ),
-          Expanded(
-            child: _buildResults(context, state),
+            child: _buildFilters(context, state),
           ),
-        ],
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
+              if (state.error != null) _buildErrorCard(context, state),
+              Expanded(
+                child: _buildResults(context, state),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorCard(BuildContext context, SearchState state) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        color: Theme.of(context).colorScheme.errorContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: Theme.of(context).colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Не удалось выполнить поиск',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Проверьте подключение к интернету и попробуйте снова',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton.tonal(
+                onPressed: () {
+                  final query = state.lastQuery;
+                  if (query.isNotEmpty) {
+                    unawaited(ref.read(searchControllerProvider.notifier).search(query));
+                  }
+                },
+                child: const Text('Повторить'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -182,9 +267,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Material(
       color: theme.colorScheme.surface,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               'Фильтры',
