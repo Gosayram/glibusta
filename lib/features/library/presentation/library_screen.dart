@@ -57,9 +57,9 @@ class LibraryScreen extends ConsumerWidget {
             onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
           ),
           IconButton(
-            icon: const Icon(Icons.folder_open),
-            tooltip: 'Импортировать папку',
-            onPressed: () => _importFolder(context, ref),
+            icon: const Icon(Icons.add),
+            tooltip: 'Добавить книги',
+            onPressed: () => _showImportSheet(context, ref),
           ),
         ],
       ),
@@ -241,6 +241,47 @@ class LibraryScreen extends ConsumerWidget {
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
+  }
+
+  void _showImportSheet(BuildContext context, WidgetRef ref) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Добавить книги',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_open),
+                title: const Text('Файлы'),
+                subtitle: const Text('EPUB, FB2, TXT'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_importBook(context, ref));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder),
+                title: const Text('Папка'),
+                subtitle: const Text('Все книги из папки'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_importFolder(context, ref));
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
