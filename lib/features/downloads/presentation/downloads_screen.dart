@@ -127,7 +127,7 @@ class DownloadTile extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    task.sourceUrl.split('/').last,
+                    task.bookTitle ?? task.sourceUrl.split('/').last,
                     style: theme.textTheme.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

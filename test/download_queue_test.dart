@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/http/http_client.dart';
+import 'package:glibusta/core/notifications/download_notification_service.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
 import 'package:glibusta/shared/models/book.dart';
@@ -10,18 +11,43 @@ class MockDownloadRepository extends Mock implements DownloadRepository {}
 
 class MockHttpClient extends Mock implements HttpClient {}
 
+class MockDownloadNotificationService extends Mock implements DownloadNotificationService {}
+
 void main() {
   late MockDownloadRepository mockRepo;
   late MockHttpClient mockClient;
+  late MockDownloadNotificationService mockNotificationService;
 
   setUpAll(() {
     registerFallbackValue(DownloadStatus.queued);
     registerFallbackValue(DownloadStatus.running);
+    registerFallbackValue(
+      const DownloadTask(
+        id: '',
+        bookId: '',
+        format: BookFormat.epub,
+        sourceUrl: '',
+        targetPath: '',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      ),
+    );
   });
 
   setUp(() {
     mockRepo = MockDownloadRepository();
     mockClient = MockHttpClient();
+    mockNotificationService = MockDownloadNotificationService();
+    when(() => mockNotificationService.cancel(any())).thenAnswer((_) async {});
+    when(() => mockNotificationService.showCompleted(any())).thenAnswer((_) async {});
+    when(() => mockNotificationService.showFailed(any(), any())).thenAnswer((_) async {});
+    when(
+      () => mockNotificationService.showProgress(
+        task: any(named: 'task'),
+        speedBytesPerSec: any(named: 'speedBytesPerSec'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   group('DownloadQueue.enqueue', () {
@@ -50,7 +76,7 @@ void main() {
         () => mockClient.download(any(), any(), onProgress: any(named: 'onProgress')),
       ).thenAnswer((_) async {});
 
-      final queue = DownloadQueue(mockRepo, mockClient);
+      final queue = DownloadQueue(mockRepo, mockClient, mockNotificationService);
 
       await queue.enqueue(
         bookId: 'book-1',
@@ -77,7 +103,7 @@ void main() {
     test('calls repo.removeDownload', () async {
       when(() => mockRepo.removeDownload(any())).thenAnswer((_) async {});
 
-      final queue = DownloadQueue(mockRepo, mockClient);
+      final queue = DownloadQueue(mockRepo, mockClient, mockNotificationService);
       await queue.remove('task-99');
 
       verify(() => mockRepo.removeDownload('task-99')).called(1);

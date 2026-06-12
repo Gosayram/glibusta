@@ -173,6 +173,11 @@ class HttpClient {
         ..set(io.HttpHeaders.acceptHeader, '*/*')
         ..set(io.HttpHeaders.connectionHeader, 'close');
 
+      if (_sessionCookies.isNotEmpty) {
+        final cookieHeader = _sessionCookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+        request.headers.set(io.HttpHeaders.cookieHeader, cookieHeader);
+      }
+
       final ua = await _getOrCreateUserAgent();
       if (ua != null) {
         request.headers.set(io.HttpHeaders.userAgentHeader, ua);

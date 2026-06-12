@@ -103,7 +103,7 @@ class BookCommentsService {
       final bodyDoc = html_parser.parse(bodyHtml);
       final body = bodyDoc.body?.text.trim() ?? '';
       // Strip trailing <div></div><hr> artifacts
-      final cleanBody = body.replaceAll(RegExp(r'\s*'), ' ').trim();
+      final cleanBody = body.replaceAll(RegExp(r'\s+'), ' ').trim();
       if (cleanBody.isEmpty) continue;
 
       // Try to extract date from the header text before <br>

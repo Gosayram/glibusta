@@ -746,68 +746,56 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
                 ),
         ),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
           ),
           child: SafeArea(
             top: false,
-            child: !isAuthenticated
-                ? Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Войдите, чтобы оставить комментарий',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const _LoginPlaceholder(),
-                          ),
-                        ),
-                        child: const Text('Войти'),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _commentController,
-                          decoration: const InputDecoration(
-                            hintText: 'Комментарий...',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          maxLines: null,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _postComment(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: _isPosting ? null : _postComment,
-                        icon: _isPosting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send, size: 18),
-                      ),
-                    ],
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration: InputDecoration(
+                      hintText: isAuthenticated
+                          ? 'Комментарий...'
+                          : 'Войдите, чтобы комментировать',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    enabled: isAuthenticated,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _postComment(),
                   ),
+                ),
+                const SizedBox(width: 8),
+                if (!isAuthenticated)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const _LoginPlaceholder(),
+                      ),
+                    ),
+                    child: const Text('Войти'),
+                  )
+                else
+                  IconButton.filled(
+                    onPressed: _isPosting ? null : _postComment,
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    icon: _isPosting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send, size: 18),
+                  ),
+              ],
+            ),
           ),
         ),
       ],

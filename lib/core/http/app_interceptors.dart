@@ -24,7 +24,10 @@ class AuthInterceptor extends Interceptor {
 }
 
 class LoggingInterceptor extends Interceptor {
-  static Uri _redactedUri(Uri uri) => uri.replace(query: '');
+  static Uri _redactedUri(Uri uri) {
+    if (uri.query.isEmpty) return uri;
+    return uri.replace(query: '');
+  }
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -40,9 +43,11 @@ class LoggingInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    final status = err.response?.statusCode;
+    final message = err.message ?? err.type.name;
     _log.severe(
       '✗ ${err.requestOptions.method} ${_redactedUri(err.requestOptions.uri)} '
-      '${err.response?.statusCode} ${err.message}',
+      '${status ?? '-'} $message',
     );
     handler.next(err);
   }
