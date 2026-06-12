@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,9 +86,27 @@ class AppLogger {
     for (final listener in _listeners) {
       listener(entry);
     }
+
+    final name = loggerName ?? 'App';
+    final errorSuffix = error != null ? ' | $error' : '';
+    final traceSuffix = stackTrace != null ? '\n$stackTrace' : '';
+    developer.log('$level: $message$errorSuffix$traceSuffix', name: name, level: _levelInt(level));
+
     if (level == 'SEVERE' || level == 'SHOUT') {
       unawaited(_persistError(entry));
     }
+  }
+
+  static int _levelInt(String level) {
+    return switch (level) {
+      'FINEST' => 300,
+      'FINE' => 500,
+      'INFO' => 800,
+      'WARNING' => 900,
+      'SEVERE' => 1000,
+      'SHOUT' => 1200,
+      _ => 800,
+    };
   }
 
   Future<void> _persistError(LogEntry entry) async {
