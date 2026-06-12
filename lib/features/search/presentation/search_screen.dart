@@ -175,11 +175,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildTabletLayout(BuildContext context, SearchState state) {
+    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 300,
-          child: Container(
+          child: DecoratedBox(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               border: Border(
@@ -189,11 +191,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
             ),
-            child: _buildFilters(context, state),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding + 24),
+              child: _buildFilters(context, state),
+            ),
           ),
         ),
         Expanded(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
               if (state.error != null) _buildErrorCard(context, state),
@@ -264,20 +270,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final filters = state.filters;
     final theme = Theme.of(context);
 
-    return Material(
-      color: theme.colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Фильтры',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Фильтры',
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.primary,
+          ),
+        ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -351,11 +353,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     tooltip: 'Сбросить фильтры',
                     onPressed: _clearFilters,
                   ),
-              ],
-            ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -401,7 +401,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           return false;
         },
         child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            MediaQuery.viewPaddingOf(context).bottom + 24,
+          ),
           children: [
             if (state.authors.isNotEmpty) ...[
               Padding(
@@ -450,11 +455,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 )
               else
                 GridView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(context.isExpanded ? 24 : 16),
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 180,
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: context.isExpanded ? 220 : 180,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
                     childAspectRatio: 0.62,

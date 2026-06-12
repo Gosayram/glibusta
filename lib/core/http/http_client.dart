@@ -159,22 +159,62 @@ class HttpClient {
     String savePath, {
     void Function(int received, int total)? onProgress,
   }) async {
+    final uri = Uri.parse(url);
+    final client = io.HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..idleTimeout = const Duration(minutes: 5)
+      ..maxConnectionsPerHost = 1;
     try {
-      await _dio.download(
-        url,
-        savePath,
-        onReceiveProgress: onProgress != null
-            ? (received, total) {
-                onProgress(received, total > 0 ? total : 0);
-              }
-            : null,
+      final request = await client.getUrl(uri);
+      request.headers
+        ..set(io.HttpHeaders.acceptHeader, '*/*')
+        ..set(io.HttpHeaders.connectionHeader, 'close');
+
+      final ua = await _getOrCreateUserAgent();
+      if (ua != null) {
+        request.headers.set(io.HttpHeaders.userAgentHeader, ua);
+      }
+
+      final response = await request.close().timeout(
+        const Duration(minutes: 10),
       );
-    } on DioException catch (e) {
-      throw HttpException(
-        message: e.message ?? 'Download failed',
-        statusCode: e.response?.statusCode,
-        url: url,
-      );
+
+      if (response.statusCode < 200 || response.statusCode >= 400) {
+        throw HttpException(
+          message: 'HTTP ${response.statusCode}',
+          statusCode: response.statusCode,
+          url: url,
+        );
+      }
+
+      final file = io.File(savePath);
+      final sink = file.openWrite();
+      int received = 0;
+      final total = response.contentLength;
+
+      await for (final chunk in response) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (onProgress != null) {
+          onProgress(received, total > 0 ? total : 0);
+        }
+      }
+      await sink.close();
+
+      if (received == 0) {
+        throw HttpException(message: 'Empty download', url: url);
+      }
+
+      final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
+      if (contentType.contains('text/html') || contentType.contains('text/plain')) {
+        final body = await file.readAsString();
+        if (body.contains('Книга не найдена') || body.contains('<html')) {
+          await file.delete();
+          throw HttpException(message: 'Server returned HTML instead of book file', url: url);
+        }
+      }
+    } finally {
+      client.close(force: true);
     }
   }
 }

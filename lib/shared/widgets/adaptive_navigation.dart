@@ -202,18 +202,20 @@ class TabletShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          AdaptiveNavigation(
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: (index) => navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
+      body: SafeArea(
+        child: Row(
+          children: [
+            AdaptiveNavigation(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
             ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: navigationShell),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(child: navigationShell),
+          ],
+        ),
       ),
     );
   }
@@ -226,18 +228,20 @@ class DesktopShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          AdaptiveNavigation(
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: (index) => navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
+      body: SafeArea(
+        child: Row(
+          children: [
+            AdaptiveNavigation(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
             ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: navigationShell),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(child: navigationShell),
+          ],
+        ),
       ),
     );
   }

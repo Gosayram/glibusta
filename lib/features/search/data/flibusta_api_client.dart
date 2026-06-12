@@ -431,20 +431,152 @@ class FlibustaApiClient {
       }
     }
 
-    final books = <SearchBookItem>[];
-    final seen = <String>{};
-    final main = doc.querySelector('#main') ?? doc;
-
-    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
-      final href = a.attributes['href'] ?? '';
-      final id = _extractId(href, '/b/');
-      final bookName = a.text.trim();
-      if (id != null && bookName.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: bookName));
+    // Avatar: img with /ia/ in src inside #divabio
+    String? avatarUrl;
+    final divabio = doc.querySelector('#divabio');
+    if (divabio != null) {
+      for (final img in divabio.querySelectorAll('img')) {
+        final src = img.attributes['src'] ?? '';
+        if (src.contains('/ia/')) {
+          avatarUrl = src;
+          break;
+        }
       }
     }
 
-    return AuthorDetailResponse(id: authorId, name: name, books: books);
+    // Biography: <p> text inside #divabio (excluding external links)
+    String biography = '';
+    if (divabio != null) {
+      final parts = <String>[];
+      for (final p in divabio.querySelectorAll('p')) {
+        final text = p.text.trim();
+        if (text.isNotEmpty && !text.startsWith('http')) {
+          parts.add(text);
+        }
+      }
+      biography = parts.join('\n\n');
+    }
+
+    // Find the POST form with books
+    Element? booksForm;
+    for (final form in doc.querySelectorAll('form')) {
+      final method = (form.attributes['method'] ?? '').toUpperCase();
+      if (method == 'POST' && form.innerHtml.contains('/b/')) {
+        booksForm = form;
+        break;
+      }
+    }
+
+    final seriesGroups = <AuthorSeriesGroup>[];
+    final allBooks = <SearchBookItem>[];
+    final seenBookIds = <String>{};
+
+    if (booksForm != null) {
+      AuthorSeriesGroup? currentSeries;
+
+      for (final child in booksForm.nodes) {
+        if (child is! Element) continue;
+
+        // Series header: <a href="/s/ID"><span class="h8">Name</span></a>
+        if (child.localName == 'a') {
+          final href = child.attributes['href'] ?? '';
+          final seriesMatch = RegExp(r'^/s/(\d+)$').firstMatch(href);
+          if (seriesMatch != null) {
+            final seriesId = seriesMatch.group(1)!;
+            final h8 = child.querySelector('span.h8');
+            final seriesName = h8?.text.trim() ?? child.text.trim();
+
+            // Collect genres from following siblings until <br>
+            final genres = <AuthorGenreItem>[];
+            Element? sibling = child.nextElementSibling;
+            while (sibling != null) {
+              if (sibling.localName == 'br') break;
+              if (sibling.localName == 'a') {
+                final ghref = sibling.attributes['href'] ?? '';
+                final gidMatch = RegExp(r'^/g/(\d+)$').firstMatch(ghref);
+                if (gidMatch != null) {
+                  genres.add(AuthorGenreItem(
+                    id: gidMatch.group(1)!,
+                    name: sibling.text.trim(),
+                  ));
+                }
+              }
+              sibling = sibling.nextElementSibling;
+            }
+
+            currentSeries = AuthorSeriesGroup(
+              id: seriesId,
+              name: seriesName,
+              genres: genres,
+            );
+            seriesGroups.add(currentSeries);
+            continue;
+          }
+
+          // Book link: <a href="/b/ID">Book Name</a>
+          final bookMatch = RegExp(r'^/b/(\d+)$').firstMatch(href);
+          if (bookMatch != null) {
+            final bookId = bookMatch.group(1)!;
+            final bookName = child.text.trim();
+            if (bookName.isEmpty) continue;
+
+            // Look for rating in preceding SVG
+            Element? prev = child.previousElementSibling;
+            for (var k = 0; k < 10 && prev != null; k++) {
+              if (prev.localName == 'svg') {
+                break;
+              }
+              prev = prev.previousElementSibling;
+            }
+
+            // Look for size, pages, formats in following siblings
+            final formats = <String>[];
+            Element? next = child.nextElementSibling;
+            for (var k = 0; k < 15 && next != null; k++) {
+              if (next.localName == 'br') break;
+              if (next.localName == 'a') {
+                final ahref = next.attributes['href'] ?? '';
+                final fmtMatch = RegExp('^/b/$bookId/(\\\\w+)\$').firstMatch(ahref);
+                if (fmtMatch != null) {
+                  final fmt = fmtMatch.group(1)!;
+                  if (fmt != 'read' && fmt != 'download' && fmt != 'mail' && fmt != 'complain') {
+                    formats.add(fmt);
+                  }
+                }
+              }
+              next = next.nextElementSibling;
+            }
+
+            if (seenBookIds.add(bookId)) {
+              final bookItem = SearchBookItem(id: bookId, name: bookName);
+              allBooks.add(bookItem);
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: if no form found, collect all /b/ links
+    if (allBooks.isEmpty) {
+      final main = doc.querySelector('#main') ?? doc;
+      for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+        final href = a.attributes['href'] ?? '';
+        final id = _extractId(href, '/b/');
+        final bookName = a.text.trim();
+        if (id != null && bookName.isNotEmpty && seenBookIds.add(id)) {
+          allBooks.add(SearchBookItem(id: id, name: bookName));
+        }
+      }
+    }
+
+    return AuthorDetailResponse(
+      id: authorId,
+      name: name,
+      avatarUrl: avatarUrl,
+      biography: biography,
+      seriesGroups: seriesGroups,
+      books: allBooks,
+    );
   }
 
   // ── Genre Books (HTML) ──────────────────────────────────────────────────────
@@ -904,12 +1036,59 @@ class RecentBooksResponse {
 class AuthorDetailResponse {
   final String id;
   final String name;
+  final String? avatarUrl;
+  final String biography;
+  final List<AuthorSeriesGroup> seriesGroups;
   final List<SearchBookItem> books;
 
   const AuthorDetailResponse({
     required this.id,
     required this.name,
+    this.avatarUrl,
+    this.biography = '',
+    this.seriesGroups = const [],
     required this.books,
+  });
+}
+
+class AuthorSeriesGroup {
+  final String id;
+  final String name;
+  final List<AuthorGenreItem> genres;
+  final List<AuthorBookItem> books;
+
+  const AuthorSeriesGroup({
+    required this.id,
+    required this.name,
+    this.genres = const [],
+    this.books = const [],
+  });
+}
+
+class AuthorGenreItem {
+  final String id;
+  final String name;
+
+  const AuthorGenreItem({required this.id, required this.name});
+}
+
+class AuthorBookItem {
+  final String id;
+  final String name;
+  final int? index;
+  final String? size;
+  final int? pages;
+  final double? rating;
+  final List<String> formats;
+
+  const AuthorBookItem({
+    required this.id,
+    required this.name,
+    this.index,
+    this.size,
+    this.pages,
+    this.rating,
+    this.formats = const [],
   });
 }
 

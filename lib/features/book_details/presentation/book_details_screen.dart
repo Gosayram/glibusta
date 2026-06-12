@@ -901,22 +901,32 @@ class _BottomActionBar extends ConsumerWidget {
     final formats = details.availableFormats;
     if (formats.isEmpty) return;
 
-    final format = formats.contains(BookFormat.epub) ? BookFormat.epub : formats.first;
+    // Show format selection bottom sheet
+    final selectedFormat = await showModalBottomSheet<BookFormat>(
+      context: context,
+      builder: (context) => _FormatSelectionSheet(
+        bookTitle: book.title,
+        formats: formats,
+      ),
+    );
+
+    if (selectedFormat == null || !context.mounted) return;
+
     final source = ref.read(bookSourceProvider);
     final queue = ref.read(downloadQueueProvider);
 
     try {
-      final url = await source.getDownloadUrl(book.id, format);
+      final url = await source.getDownloadUrl(book.id, selectedFormat);
       await queue.enqueue(
         bookId: book.id,
         bookTitle: book.title,
-        format: format,
+        format: selectedFormat,
         sourceUrl: url,
       );
       ref.invalidate(bookDownloadStateProvider(book.id));
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Загрузка ${book.title} (${format.name})')),
+          SnackBar(content: Text('Загрузка ${book.title} (${selectedFormat.name})')),
         );
       }
     } on Object catch (e) {
@@ -928,4 +938,123 @@ class _BottomActionBar extends ConsumerWidget {
       }
     }
   }
+}
+
+// ── Format Selection Bottom Sheet ─────────────────────────────────────────────
+
+class _FormatSelectionSheet extends StatelessWidget {
+  final String bookTitle;
+  final List<BookFormat> formats;
+
+  const _FormatSelectionSheet({required this.bookTitle, required this.formats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 32,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              'Скачать в формате',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (bookTitle.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                bookTitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          const Divider(height: 1),
+          ...formats.map((format) {
+            final info = _formatInfo(format);
+            return ListTile(
+              leading: Icon(info.icon, color: info.color),
+              title: Text(info.label),
+              subtitle: Text(info.description, style: theme.textTheme.bodySmall),
+              onTap: () => Navigator.of(context).pop(format),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  _FormatInfo _formatInfo(BookFormat format) {
+    switch (format) {
+      case BookFormat.fb2:
+        return const _FormatInfo(
+          Icons.description,
+          'FB2',
+          'FictionBook 2 — стандарт Флибусты',
+          Color(0xFF4CAF50),
+        );
+      case BookFormat.epub:
+        return const _FormatInfo(
+          Icons.menu_book,
+          'EPUB',
+          'Universal Publication — для большинства ридеров',
+          Color(0xFF2196F3),
+        );
+      case BookFormat.mobi:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'MOBI',
+          'Mobipocket — для Kindle',
+          Color(0xFFFF9800),
+        );
+      case BookFormat.pdf:
+        return const _FormatInfo(
+          Icons.picture_as_pdf,
+          'PDF',
+          'Portable Document — для печати и экрана',
+          Color(0xFFF44336),
+        );
+      case BookFormat.txt:
+        return const _FormatInfo(
+          Icons.text_snippet,
+          'TXT',
+          'Текстовый файл — универсальный',
+          Color(0xFF9E9E9E),
+        );
+      case BookFormat.unknown:
+        return _FormatInfo(
+          Icons.help_outline,
+          format.name.toUpperCase(),
+          'Неизвестный формат',
+          const Color(0xFF757575),
+        );
+    }
+  }
+}
+
+class _FormatInfo {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+
+  const _FormatInfo(this.icon, this.label, this.description, this.color);
 }
