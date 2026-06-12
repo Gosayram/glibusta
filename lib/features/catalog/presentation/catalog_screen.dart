@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -84,6 +85,37 @@ class CatalogScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+              ),
+            ),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.new_releases_outlined,
+                      label: 'Новые',
+                      onTap: () => context.push('/recent'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.category_outlined,
+                      label: 'Жанры',
+                      onTap: () => context.push('/genres'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.trending_up,
+                      label: 'Популярные',
+                      onTap: () {},
+                    ),
+                  ),
+                ],
               ),
             ),
             const Divider(),
@@ -385,5 +417,39 @@ class _RestorableListViewState extends State<_RestorableListView> with Restorati
   @override
   Widget build(BuildContext context) {
     return ListView(controller: _getController(), children: widget.children);
+  }
+}
+
+class _QuickAccessTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAccessTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 28, color: colorScheme.primary),
+              const SizedBox(height: 4),
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

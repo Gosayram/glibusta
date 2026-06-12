@@ -5,7 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
+import '../features/catalog/presentation/author_detail_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
+import '../features/catalog/presentation/genre_books_screen.dart';
+import '../features/catalog/presentation/genre_list_screen.dart';
+import '../features/catalog/presentation/recent_books_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -226,6 +230,64 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return AnnotationsScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/author/:authorId',
+        name: 'authorDetail',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          final authorId = state.pathParameters['authorId']!;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: AuthorDetailScreen(authorId: authorId),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/genres',
+        name: 'genreList',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: const GenreListScreen(),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/genre/:genreId',
+        name: 'genreBooks',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          final genreId = state.pathParameters['genreId']!;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: GenreBooksScreen(genreId: genreId),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/recent',
+        name: 'recentBooks',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: const RecentBooksScreen(),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
         },
       ),
     ],
