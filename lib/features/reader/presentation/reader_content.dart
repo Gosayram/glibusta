@@ -68,7 +68,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         : EdgeInsets.all(settings.margin);
     final textDirection = _effectiveTextDirection(context, settings);
 
-    if (!_didScrollToProgress && initialProgress > 0 && scrollController.hasClients) {
+    if (!_didScrollToProgress && initialProgress > 0) {
       _didScrollToProgress = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!scrollController.hasClients) return;
@@ -490,12 +490,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: chapter.blocks.length,
-          addAutomaticKeepAlives: false,
-          itemBuilder: (context, i) => _buildBlock(chapter.blocks[i], textAlign),
+        ListBody(
+          children: [
+            for (int i = 0; i < chapter.blocks.length; i++)
+              _buildBlock(chapter.blocks[i], textAlign),
+          ],
         ),
       ],
     );

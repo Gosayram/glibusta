@@ -155,7 +155,6 @@ class _BookmarkList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
-            if (!context.mounted) return false;
             final repo = ref.read(_bookmarkRepoProvider);
             final scaffold = ScaffoldMessenger.of(context);
             final theme = Theme.of(context);

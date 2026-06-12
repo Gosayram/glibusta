@@ -150,7 +150,9 @@ class OfflineModeService {
       _updateState(results);
     } on Object catch (e) {
       _logger.warning('Connectivity check failed: $e', name: 'OfflineMode');
-      _controller.add(const NetworkState(kind: NetworkKind.offline, isMetered: false));
+      const offline = NetworkState(kind: NetworkKind.offline, isMetered: false);
+      _state = offline;
+      _controller.add(offline);
     }
 
     _subscription = Connectivity().onConnectivityChanged.listen(_updateState);

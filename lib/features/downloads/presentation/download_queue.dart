@@ -198,6 +198,7 @@ class DownloadQueue {
         },
       );
 
+      final latest = _tasks[task.id] ?? task;
       final completed = DownloadTask(
         id: task.id,
         bookId: task.bookId,
@@ -205,8 +206,8 @@ class DownloadQueue {
         sourceUrl: task.sourceUrl,
         targetPath: task.targetPath,
         status: DownloadStatus.completed,
-        downloadedBytes: task.downloadedBytes ?? task.totalBytes ?? 0,
-        totalBytes: task.totalBytes ?? task.downloadedBytes ?? 0,
+        downloadedBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
+        totalBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
       );
       _tasks[task.id] = completed;
       await _repository.updateStatus(task.id, DownloadStatus.completed);

@@ -20,7 +20,7 @@ class BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final coverPath = book.coverPath;
-    if (coverPath != null && coverPath.isNotEmpty && File(coverPath).existsSync()) {
+    if (coverPath != null && coverPath.isNotEmpty) {
       return AspectRatio(
         aspectRatio: 2 / 3,
         child: ClipRRect(

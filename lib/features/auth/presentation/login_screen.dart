@@ -205,12 +205,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           )
           .then((_) {
             if (_persistent && mounted) {
-              unawaited(
-                _secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
-              );
-              unawaited(
-                _secureStorage.write(key: 'auth_password', value: _passwordController.text),
-              );
+              final authState = ref.read(authStateProvider);
+              if (authState.hasValue && authState.value!.isAuthenticated) {
+                unawaited(
+                  _secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
+                );
+                unawaited(
+                  _secureStorage.write(key: 'auth_password', value: _passwordController.text),
+                );
+              }
             }
           }),
     );

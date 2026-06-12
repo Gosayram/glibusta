@@ -110,10 +110,8 @@ void main() {
     test('detects ZIP magic bytes in FB2.ZIP files', () async {
       for (final name in ['161303.fb2', '181420.fb2', '52496.fb2']) {
         final file = File(p.join(testDir, name));
-        if (!await file.exists()) {
-          expect(await file.exists(), isTrue, reason: 'Missing fixture: $name');
-          continue;
-        }
+        final exists = await file.exists();
+        expect(exists, isTrue, reason: 'Missing fixture: $name');
 
         final bytes = await file.readAsBytes();
         expect(bytes.length, greaterThan(100), reason: '$name should be non-empty');

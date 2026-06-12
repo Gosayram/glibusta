@@ -150,6 +150,9 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
         ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
         : <String, String>{};
+    if (cookies.isEmpty) {
+      return const AuthStateData();
+    }
     return AuthStateData(
       isAuthenticated: true,
       session: UserSession(name: name, mail: mail, cookies: cookies),

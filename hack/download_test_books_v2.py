@@ -8,6 +8,9 @@ import requests
 import urllib3
 from pathlib import Path
 
+# SECURITY: Only disable TLS verification for local dev/testing against
+# flubusta mirrors that use self-signed or expired certificates.
+# NEVER set DISABLE_TLS_VERIFY=1 in production or against untrusted networks.
 DISABLE_TLS_VERIFY = os.environ.get('DISABLE_TLS_VERIFY', '').lower() in ('1', 'true', 'yes')
 if DISABLE_TLS_VERIFY:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

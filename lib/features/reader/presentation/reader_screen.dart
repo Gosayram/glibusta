@@ -584,10 +584,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _showDeleteConfirmDialog(BuildContext context) {
+    final rootContext = context;
     unawaited(
       showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: const Text('Удалить файл?'),
           content: const Text(
             'Файл книги будет удалён с устройства. '
@@ -595,24 +596,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Отмена'),
             ),
             FilledButton(
               onPressed: () async {
                 _ctrl.saveProgress();
-                Navigator.of(context).pop();
-                try {
-                  await _ctrl.deleteBookFile();
-                } on Object catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Не удалось удалить: $e')),
-                    );
-                  }
+                Navigator.of(dialogContext).pop();
+                await _ctrl.deleteBookFile();
+                if (rootContext.mounted) {
+                  ScaffoldMessenger.of(rootContext).showSnackBar(
+                    const SnackBar(content: Text('Файл удалён')),
+                  );
                 }
-                if (context.mounted && Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
+                if (rootContext.mounted && Navigator.of(rootContext).canPop()) {
+                  Navigator.of(rootContext).pop();
                 }
               },
               style: FilledButton.styleFrom(

@@ -36,9 +36,10 @@ class FlibustaApiClient {
     String name, {
     int page = 0,
     int limit = 50,
+    CancelToken? cancelToken,
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chb=on';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseSearchBooksResponse(response);
   }
 
@@ -277,6 +278,7 @@ class FlibustaApiClient {
 
     // Authors: /a/ links BEFORE download links
     final authors = <String>[];
+    final authorIds = <String>[];
     final seenAuthorIds = <String>{};
     if (bookInfoDiv != null) {
       bool foundDownload = false;
@@ -298,6 +300,7 @@ class FlibustaApiClient {
           final authorId = _extractDigits(href);
           if (authorId != null && seenAuthorIds.add(authorId)) {
             authors.add(a.text.trim());
+            authorIds.add(authorId);
           }
         }
       }
@@ -306,7 +309,12 @@ class FlibustaApiClient {
     if (authors.isEmpty) {
       for (final a in doc.querySelectorAll('a[href^="/a/"]')) {
         final name = a.text.trim();
-        if (name.isNotEmpty) authors.add(name);
+        final href = a.attributes['href'] ?? '';
+        final id = _extractDigits(href);
+        if (name.isNotEmpty) {
+          authors.add(name);
+          if (id != null) authorIds.add(id);
+        }
       }
     }
 
@@ -366,6 +374,7 @@ class FlibustaApiClient {
       description: description,
       coverUrl: coverUrl,
       authors: authors,
+      authorIds: authorIds,
       formats: formats,
       genres: genreIds,
       series: seriesList,
@@ -1006,6 +1015,7 @@ class BookDetailsResponse {
   final String description;
   final String? coverUrl;
   final List<String> authors;
+  final List<String> authorIds;
   final List<String> formats;
   final List<String> genres;
   final List<SeriesInfoItem> series;
@@ -1016,6 +1026,7 @@ class BookDetailsResponse {
     required this.description,
     this.coverUrl,
     required this.authors,
+    this.authorIds = const [],
     required this.formats,
     this.genres = const [],
     this.series = const [],
