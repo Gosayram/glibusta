@@ -1,7 +1,5 @@
-import 'dart:io' as io;
-
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import 'package:native_dio_adapter/native_dio_adapter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
@@ -12,17 +10,7 @@ import 'user_agent.dart';
 
 part 'dio_provider.g.dart';
 
-class _HttpOverrides extends io.HttpOverrides {
-  @override
-  io.HttpClient createHttpClient(io.SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-  }
-}
-
-void enableSslBypass() {
-  io.HttpOverrides.global = _HttpOverrides();
-}
+void enableSslBypass() {}
 
 @riverpod
 Dio dio(Ref ref) {
@@ -33,14 +21,20 @@ Dio dio(Ref ref) {
       connectTimeout: AppDuration.httpConnect,
       receiveTimeout: AppDuration.httpReceive,
       responseType: ResponseType.plain,
+      followRedirects: true,
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'close',
+      },
     ),
   );
-  (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-    return io.HttpClient()
-      ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-  };
+
+  dio.httpClientAdapter = NativeAdapter();
+
   dio.interceptors.addAll([
-    const _UserAgentInterceptor(),
+    _UserAgentInterceptor(),
     LogInterceptor(
       requestHeader: false,
       responseHeader: false,

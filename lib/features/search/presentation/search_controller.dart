@@ -52,12 +52,52 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     );
 
     try {
-      final bookFuture = _source.searchBooks(searchQuery, cancelToken: _currentToken);
-      final authorFuture = _source.searchAuthors(searchQuery, cancelToken: _currentToken);
+      SearchResultPage bookResult;
+      SearchAuthorsResultPage authorResult;
 
-      final results = await Future.wait([bookFuture, authorFuture]);
-      final bookResult = results[0] as SearchResultPage;
-      final authorResult = results[1] as SearchAuthorsResultPage;
+      final bookToken = CancelToken();
+      final authorToken = CancelToken();
+      _currentToken = bookToken;
+
+      Object? bookError;
+
+      try {
+        bookResult = await _source.searchBooks(searchQuery, cancelToken: bookToken);
+      } on Object catch (e) {
+        bookError = e;
+        _logger.warning('Book search failed: $e', name: 'Search', error: e);
+        bookResult = SearchResultPage(
+          books: const [],
+          totalCount: 0,
+          currentPage: searchQuery.page,
+          totalPages: 0,
+          hasNextPage: false,
+        );
+      }
+
+      if (!ref.mounted) return;
+
+      Object? authorError;
+
+      try {
+        authorResult = await _source.searchAuthors(searchQuery, cancelToken: authorToken);
+      } on Object catch (e) {
+        authorError = e;
+        _logger.warning('Author search failed: $e', name: 'Search', error: e);
+        authorResult = const SearchAuthorsResultPage(authors: []);
+      }
+
+      if (!ref.mounted) return;
+
+      if (bookResult.books.isEmpty && authorResult.authors.isEmpty && bookError != null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: bookError.toString(),
+          books: const [],
+          authors: const [],
+        );
+        return;
+      }
 
       if (!ref.mounted) return;
       _logger.info(

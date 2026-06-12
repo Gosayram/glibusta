@@ -1,10 +1,14 @@
+import 'dart:async';
+import 'dart:io' as io;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_settings.dart';
 import '../encoding/encoding_detection.dart';
+import '../logging/app_logger.dart';
 import 'dio_provider.dart';
 
 part 'http_client.g.dart';
@@ -20,6 +24,7 @@ class HttpClient {
   final Dio _dio;
   final List<String> _mirrors;
   final _encodingDetector = BookEncodingDetector();
+  final _logger = AppLogger();
   Map<String, String> _sessionCookies = {};
 
   HttpClient(this._dio, {List<String> mirrors = const []})
@@ -39,10 +44,11 @@ class HttpClient {
 
   Dio get dio => _dio;
 
-  Future<String> get(String url, {CancelToken? cancelToken}) async {
+  Future<String> getUri(Uri uri, {CancelToken? cancelToken}) async {
+    final url = uri.toString();
     try {
-      final response = await _dio.get<Uint8List>(
-        url,
+      final response = await _dio.getUri<Uint8List>(
+        uri,
         cancelToken: cancelToken,
         options: Options(responseType: ResponseType.bytes),
       );
@@ -51,8 +57,69 @@ class HttpClient {
       final result = await _encodingDetector.detect(bytes);
       return result.text;
     } on DioException catch (e) {
+      _logger.warning('Dio failed for $url: ${e.type}', name: 'Http');
       throw _dioExceptionToHttpException(e, url);
     }
+  }
+
+  Future<String> getUriWithFallback(Uri uri, {CancelToken? cancelToken}) async {
+    try {
+      return await getUri(uri, cancelToken: cancelToken);
+    } on Object catch (_) {
+      return _rawGet(uri);
+    }
+  }
+
+  Future<String> _rawGet(Uri uri) async {
+    final client = io.HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..idleTimeout = Duration.zero
+      ..maxConnectionsPerHost = 1;
+
+    try {
+      final request = await client.getUrl(uri);
+      request.headers
+        ..set(io.HttpHeaders.acceptHeader, 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        ..set(io.HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
+        ..set(io.HttpHeaders.acceptEncodingHeader, 'gzip, deflate')
+        ..set(io.HttpHeaders.connectionHeader, 'close');
+
+      final ua = await _getOrCreateUserAgent();
+      if (ua != null) {
+        request.headers.set(io.HttpHeaders.userAgentHeader, ua);
+      }
+
+      final response = await request.close().timeout(const Duration(seconds: 30));
+
+      final completer = Completer<Uint8List>();
+      final bytes = <int>[];
+      response.listen(
+        bytes.addAll,
+        onDone: () => completer.complete(Uint8List.fromList(bytes)),
+        onError: completer.completeError,
+      );
+      final rawBytes = await completer.future;
+
+      if (rawBytes.isEmpty) return '';
+      final detected = await _encodingDetector.detect(rawBytes);
+      return detected.text;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<String?> _getOrCreateUserAgent() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('device_user_agent');
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<String> get(String url, {CancelToken? cancelToken}) async {
+    final uri = Uri.parse(url);
+    return getUri(uri, cancelToken: cancelToken);
   }
 
   HttpException _dioExceptionToHttpException(DioException e, String url) {
@@ -76,10 +143,11 @@ class HttpClient {
     HttpException? lastError;
     for (final url in urls) {
       try {
-        return await get(url, cancelToken: cancelToken);
-      } on DioException catch (e) {
-        if (e.type == DioExceptionType.cancel) rethrow;
-        lastError = _dioExceptionToHttpException(e, url);
+        final uri = Uri.parse(url);
+        return await getUriWithFallback(uri, cancelToken: cancelToken);
+      } on HttpException catch (e) {
+        if (e.message == 'Cancelled') rethrow;
+        lastError = e;
         continue;
       }
     }

@@ -22,6 +22,7 @@ class FlibustaApiClient {
   FlibustaApiClient(this._httpClient, this._dio);
 
   Dio get dio => _dio;
+  HttpClient get httpClient => _httpClient;
 
   Future<String> _getText(String relativePath, {CancelToken? cancelToken}) async {
     final base = _dio.options.baseUrl;
@@ -543,6 +544,27 @@ class FlibustaApiClient {
     }
 
     return SeriesDetailResponse(id: seriesId, name: name, books: books);
+  }
+
+  // ── Popular books (HTML /stat/b) ──────────────────────────────────────────────
+
+  Future<OpdsBooksResponse> getPopularBooks() async {
+    final response = await _getText('stat/b');
+    final doc = parse(response);
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final name = a.text.trim();
+      if (id != null && name.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: name));
+      }
+    }
+
+    return OpdsBooksResponse(books: books);
   }
 
   // ── OPDS: Popular/Recent books ──────────────────────────────────────────────

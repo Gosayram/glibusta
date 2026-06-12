@@ -194,11 +194,25 @@ class OfflineModeService {
     String baseUrl, {
     Duration timeout = const Duration(seconds: 5),
   }) async {
+    String ua;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('device_user_agent');
+      ua = cached ?? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+    } on Object {
+      ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+    }
     final dio = Dio(
       BaseOptions(
         connectTimeout: timeout,
         receiveTimeout: timeout,
-        headers: {'User-Agent': 'Glibusta/0.1.0'},
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
       ),
     );
     (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {

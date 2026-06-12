@@ -45,11 +45,9 @@ class DeviceUserAgent {
     final version = info.version.release;
     final model = info.model;
 
-    final chromeBuild = _generateChromeBuild(model, info.version.sdkInt);
-
-    return 'Mozilla/5.0 (Linux; Android $version; $model Build/$chromeBuild; wv) '
+    return 'Mozilla/5.0 (Linux; Android $version; $model) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Version/4.0 Chrome/$_chromeVersion Mobile Safari/537.36';
+        'Chrome/$_chromeVersion Mobile Safari/537.36';
   }
 
   static String _iosUA(IosDeviceInfo info) {
@@ -71,13 +69,6 @@ class DeviceUserAgent {
 
     return 'Mozilla/5.0 (Linux; Android $version; $model) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Version/4.0 Chrome/$_chromeVersion Mobile Safari/537.36';
-  }
-
-  static String _generateChromeBuild(String model, int sdk) {
-    final safeModel = model.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
-    final r = Random(safeModel.hashCode ^ sdk);
-    final buildNum = 1000000000 + r.nextInt(900000000);
-    return 'TP1A.$buildNum.015';
+        'Chrome/$_chromeVersion Mobile Safari/537.36';
   }
 }

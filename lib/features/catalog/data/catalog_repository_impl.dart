@@ -41,10 +41,29 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getPopularBooks() async {
-    final query = const SearchQuery(query: '');
     try {
-      final result = await _source.searchBooks(query);
-      return result.books;
+      final result = await _apiClient.getPopularBooks();
+      final rawBase = _apiClient.dio.options.baseUrl;
+      final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+      return result.books
+          .map(
+            (item) => Book(
+              id: item.id,
+              title: item.name,
+              authorIds: item.authors.map((a) => a.id).toList(),
+              authorNames: item.authors.map((a) => a.name).toList(),
+              genreIds: const [],
+              description: null,
+              coverUrl: null,
+              publishDate: null,
+              availableFormats: const [],
+              source: BookSourceInfo(
+                sourceId: 'flibusta-api',
+                sourceUrl: '$base/b/${item.id}',
+              ),
+            ),
+          )
+          .toList();
     } on Object catch (e) {
       _logger.warning('Popular books query failed: $e', name: 'Catalog', error: e);
       return const [];
@@ -53,10 +72,29 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getRecentBooks() async {
-    final query = const SearchQuery(query: '');
     try {
-      final result = await _source.searchBooks(query);
-      return result.books;
+      final result = await _apiClient.getRecentBooks();
+      final rawBase = _apiClient.dio.options.baseUrl;
+      final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+      return result.books
+          .map(
+            (item) => Book(
+              id: item.id,
+              title: item.name,
+              authorIds: item.authors.map((a) => a.id).toList(),
+              authorNames: item.authors.map((a) => a.name).toList(),
+              genreIds: const [],
+              description: null,
+              coverUrl: null,
+              publishDate: null,
+              availableFormats: const [],
+              source: BookSourceInfo(
+                sourceId: 'flibusta-api',
+                sourceUrl: '$base/b/${item.id}',
+              ),
+            ),
+          )
+          .toList();
     } on Object catch (e) {
       _logger.warning('Recent books query failed: $e', name: 'Catalog', error: e);
       return const [];
