@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart' show DownloadStatusDb;
+import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
 import '../data/auto_theme_service.dart';
@@ -214,12 +214,11 @@ class ReaderController {
           break;
         }
       }
-    } on Object catch (e, st) {
-      developer.log(
-        'Download lookup failed during error recovery',
-        name: 'ReaderController',
+    } on Object catch (e) {
+      AppLogger().warning(
+        'Download lookup failed during error recovery: $e',
+        name: 'Reader',
         error: e,
-        stackTrace: st,
       );
     }
     _updateState(
@@ -636,13 +635,8 @@ class ReaderController {
         await _progress.deleteDownload();
         await _progress.deleteProgress();
       }
-    } on Object catch (e, st) {
-      developer.log(
-        'Error during file deletion cleanup',
-        name: 'ReaderController',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      AppLogger().warning('Error during file deletion: $e', name: 'Reader', error: e);
     }
     _updateState(_state.copyWith(errorMessage: 'Файл удалён'));
   }

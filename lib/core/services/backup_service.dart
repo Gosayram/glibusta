@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database/app_database.dart';
+import '../logging/app_logger.dart';
 
 class ImportResult {
   final bool success;
@@ -28,6 +29,7 @@ class ImportResult {
 class BackupService {
   final AppDatabase db;
   final String appVersion;
+  final _logger = AppLogger();
 
   static const _settingsKey = 'reader_settings';
   static const _pinnedBooksKey = 'pinned_book_ids';
@@ -37,44 +39,55 @@ class BackupService {
   BackupService({required this.db, required this.appVersion});
 
   Future<String> exportData() async {
-    final progress = await db.select(db.readingProgress).get();
-    final bookmarks = await db.select(db.bookmarks).get();
-    final notes = await db.select(db.notes).get();
-    final quotes = await db.select(db.quotes).get();
-    final collections = await db.select(db.collections).get();
+    _logger.info('Starting export', name: 'Backup');
+    try {
+      final progress = await db.select(db.readingProgress).get();
+      final bookmarks = await db.select(db.bookmarks).get();
+      final notes = await db.select(db.notes).get();
+      final quotes = await db.select(db.quotes).get();
+      final collections = await db.select(db.collections).get();
 
-    final prefs = await SharedPreferences.getInstance();
-    final settingsJson = prefs.getString(_settingsKey);
-    Map<String, dynamic> settings = {};
-    if (settingsJson != null) {
-      settings = jsonDecode(settingsJson) as Map<String, dynamic>;
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = prefs.getString(_settingsKey);
+      Map<String, dynamic> settings = {};
+      if (settingsJson != null) {
+        settings = jsonDecode(settingsJson) as Map<String, dynamic>;
+      }
+
+      final pinnedIds = prefs.getStringList(_pinnedBooksKey) ?? [];
+      final goalMinutes = prefs.getInt(_readingGoalMinutesKey) ?? 30;
+      final goalEnabled = prefs.getBool(_readingGoalEnabledKey) ?? false;
+
+      final data = {
+        'version': '2.0',
+        'appVersion': appVersion,
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+        'readingProgress': progress.map(_progressToMap).toList(),
+        'bookmarks': bookmarks.map(_bookmarkToMap).toList(),
+        'notes': notes.map(_noteToMap).toList(),
+        'quotes': quotes.map(_quoteToMap).toList(),
+        'collections': collections.map(_collectionToMap).toList(),
+        'pinnedBooks': pinnedIds,
+        'readingGoal': {
+          'dailyMinutes': goalMinutes,
+          'isEnabled': goalEnabled,
+        },
+        'settings': settings,
+      };
+
+      _logger.info(
+        'Export complete: ${progress.length} progress, ${bookmarks.length} bookmarks, ${notes.length} notes, ${quotes.length} quotes, ${collections.length} collections',
+        name: 'Backup',
+      );
+      return const JsonEncoder.withIndent('  ').convert(data);
+    } on Exception catch (e) {
+      _logger.severe('Export failed: $e', name: 'Backup');
+      rethrow;
     }
-
-    final pinnedIds = prefs.getStringList(_pinnedBooksKey) ?? [];
-    final goalMinutes = prefs.getInt(_readingGoalMinutesKey) ?? 30;
-    final goalEnabled = prefs.getBool(_readingGoalEnabledKey) ?? false;
-
-    final data = {
-      'version': '2.0',
-      'appVersion': appVersion,
-      'exportedAt': DateTime.now().toUtc().toIso8601String(),
-      'readingProgress': progress.map(_progressToMap).toList(),
-      'bookmarks': bookmarks.map(_bookmarkToMap).toList(),
-      'notes': notes.map(_noteToMap).toList(),
-      'quotes': quotes.map(_quoteToMap).toList(),
-      'collections': collections.map(_collectionToMap).toList(),
-      'pinnedBooks': pinnedIds,
-      'readingGoal': {
-        'dailyMinutes': goalMinutes,
-        'isEnabled': goalEnabled,
-      },
-      'settings': settings,
-    };
-
-    return const JsonEncoder.withIndent('  ').convert(data);
   }
 
   Future<ImportResult> importData(String json) async {
+    _logger.info('Starting import (size: ${json.length})', name: 'Backup');
     try {
       final parsed = jsonDecode(json) as Map<String, dynamic>;
 
@@ -110,6 +123,10 @@ class BackupService {
         await prefs.setBool(_readingGoalEnabledKey, goalMap['isEnabled'] as bool? ?? false);
       }
 
+      _logger.info(
+        'Import complete: ${progressList.length} progress, ${bookmarksList.length} bookmarks, ${notesList.length} notes, ${quotesList.length} quotes, ${collectionsList.length} collections',
+        name: 'Backup',
+      );
       return ImportResult(
         success: true,
         progressImported: progressList.length,
@@ -119,13 +136,16 @@ class BackupService {
         collectionsImported: collectionsList.length,
       );
     } on FormatException catch (e) {
+      _logger.warning('Import failed: invalid JSON - ${e.message}', name: 'Backup');
       return ImportResult(success: false, error: 'Invalid JSON: ${e.message}');
     } on Exception catch (e) {
+      _logger.warning('Import failed: $e', name: 'Backup');
       return ImportResult(success: false, error: e.toString());
     }
   }
 
   Future<void> clearAllData() async {
+    _logger.warning('Clearing all user data', name: 'Backup');
     await db.batch((b) {
       b.deleteAll(db.readingProgress);
       b.deleteAll(db.bookmarks);
@@ -139,6 +159,7 @@ class BackupService {
     await prefs.remove(_pinnedBooksKey);
     await prefs.remove(_readingGoalMinutesKey);
     await prefs.remove(_readingGoalEnabledKey);
+    _logger.info('All data cleared', name: 'Backup');
   }
 
   Map<String, dynamic> _progressToMap(ReadingProgressData row) {

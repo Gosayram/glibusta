@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
@@ -744,45 +745,55 @@ class _ReaderContextMenu extends StatelessWidget {
       ),
     );
     if (result != null && context.mounted) {
-      final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db
-          .into(db.quotes)
-          .insert(
-            QuotesCompanion.insert(
-              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-              bookId: bookId,
-              chapterIndex: chapterIndex,
-              paragraphIndex: paragraphIndex,
-              selectedText: text,
-              note: Value(result.isEmpty ? null : result),
-            ),
+      try {
+        final db = ProviderScope.containerOf(context).read(databaseProvider);
+        await db
+            .into(db.quotes)
+            .insert(
+              QuotesCompanion.insert(
+                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+                bookId: bookId,
+                chapterIndex: chapterIndex,
+                paragraphIndex: paragraphIndex,
+                selectedText: text,
+                note: Value(result.isEmpty ? null : result),
+              ),
+            );
+        AppLogger().fine('quote saved for chapter $chapterIndex', name: 'Reader');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Цитата сохранена')),
           );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Цитата сохранена')),
-        );
+        }
+      } on Object catch (e) {
+        AppLogger().warning('Failed to save quote: $e', name: 'Reader', error: e);
       }
     }
   }
 
   Future<void> _saveBookmark(BuildContext context, String text) async {
     if (!context.mounted) return;
-    final db = ProviderScope.containerOf(context).read(databaseProvider);
-    await db
-        .into(db.bookmarks)
-        .insert(
-          BookmarksCompanion.insert(
-            id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-            bookId: bookId,
-            chapterIndex: chapterIndex,
-            paragraphIndex: paragraphIndex,
-            selectedText: Value(text),
-          ),
+    try {
+      final db = ProviderScope.containerOf(context).read(databaseProvider);
+      await db
+          .into(db.bookmarks)
+          .insert(
+            BookmarksCompanion.insert(
+              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+              bookId: bookId,
+              chapterIndex: chapterIndex,
+              paragraphIndex: paragraphIndex,
+              selectedText: Value(text),
+            ),
+          );
+      AppLogger().fine('bookmark saved for chapter $chapterIndex', name: 'Reader');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Закладка сохранена')),
         );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Закладка сохранена')),
-      );
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Failed to save bookmark: $e', name: 'Reader', error: e);
     }
   }
 
@@ -839,22 +850,27 @@ class _ReaderContextMenu extends StatelessWidget {
       ),
     );
     if (result != null && context.mounted) {
-      final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db
-          .into(db.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-              bookId: bookId,
-              chapterIndex: chapterIndex,
-              paragraphIndex: paragraphIndex,
-              content: result,
-            ),
+      try {
+        final db = ProviderScope.containerOf(context).read(databaseProvider);
+        await db
+            .into(db.notes)
+            .insert(
+              NotesCompanion.insert(
+                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
+                bookId: bookId,
+                chapterIndex: chapterIndex,
+                paragraphIndex: paragraphIndex,
+                content: result,
+              ),
+            );
+        AppLogger().fine('note saved for chapter $chapterIndex', name: 'Reader');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Заметка сохранена')),
           );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Заметка сохранена')),
-        );
+        }
+      } on Object catch (e) {
+        AppLogger().warning('Failed to save note: $e', name: 'Reader', error: e);
       }
     }
   }

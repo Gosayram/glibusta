@@ -13,16 +13,53 @@ import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 
-class DiagnosticsScreen extends ConsumerWidget {
+class DiagnosticsScreen extends ConsumerStatefulWidget {
   const DiagnosticsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
+}
+
+class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
+  late final Future<DiagnosticsInfo> _infoFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _infoFuture = _gatherInfo(context, ref);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Диагностика')),
       body: FutureBuilder<DiagnosticsInfo>(
-        future: _gatherInfo(context, ref),
+        future: _infoFuture,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Ошибка загрузки диагностики',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -149,9 +186,22 @@ class DiagnosticsScreen extends ConsumerWidget {
                   ...info.recentErrors.map(
                     (e) => ListTile(
                       dense: true,
-                      title: Text(e, style: const TextStyle(fontSize: 12)),
+                      title: Text(e, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
                     ),
                   ),
+                if (info.recentWarnings.isNotEmpty) ...[
+                  const Divider(),
+                  const ListTile(
+                    dense: true,
+                    title: Text('Предупреждения', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  ...info.recentWarnings.map(
+                    (w) => ListTile(
+                      dense: true,
+                      title: Text(w, style: const TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
               ]),
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -319,15 +369,28 @@ class DiagnosticsScreen extends ConsumerWidget {
     // Error info
     String? lastError;
     final recentErrors = <String>[];
+    final recentWarnings = <String>[];
     try {
       final prefs = await SharedPreferences.getInstance();
       lastError = prefs.getString('last_error');
-      final errors = logger.entries
-          .where((e) => e.level == 'SEVERE')
+
+      final severeErrors = logger.entries.where((e) => e.level == 'SEVERE').take(5).map((e) {
+        final sb = StringBuffer('${e.time.hour}:${e.time.minute} - ${e.message}');
+        if (e.error != null) sb.write('\n  Error: ${e.error}');
+        if (e.stackTrace != null) {
+          final trace = e.stackTrace.toString().split('\n').take(3).join('\n  ');
+          sb.write('\n  $trace');
+        }
+        return sb.toString();
+      }).toList();
+      recentErrors.addAll(severeErrors);
+
+      final warnings = logger.entries
+          .where((e) => e.level == 'WARNING')
           .take(5)
           .map((e) => '${e.time.hour}:${e.time.minute} - ${e.message}')
           .toList();
-      recentErrors.addAll(errors);
+      recentWarnings.addAll(warnings);
     } on Object catch (_) {}
 
     // App version
@@ -377,6 +440,7 @@ class DiagnosticsScreen extends ConsumerWidget {
       dbSize: '~${_formatBytes(totalBooks * 500 * 1024)}',
       lastError: lastError,
       recentErrors: recentErrors,
+      recentWarnings: recentWarnings,
       dbOk: dbOk,
       storageOk: storageOk,
       storageFree: storageFree,
@@ -441,6 +505,10 @@ class DiagnosticsScreen extends ConsumerWidget {
       '--- Errors ---',
       'Last: ${info.lastError ?? "None"}',
       ...info.recentErrors.map((e) => '  $e'),
+      '',
+      '--- Warnings ---',
+      if (info.recentWarnings.isEmpty) '  None',
+      ...info.recentWarnings.map((w) => '  $w'),
     ].join('\n');
 
     await Clipboard.setData(ClipboardData(text: report));
@@ -479,6 +547,7 @@ class DiagnosticsInfo {
   final String dbSize;
   final String? lastError;
   final List<String> recentErrors;
+  final List<String> recentWarnings;
   final bool dbOk;
   final bool storageOk;
   final String storageFree;
@@ -509,6 +578,7 @@ class DiagnosticsInfo {
     required this.dbSize,
     this.lastError,
     this.recentErrors = const [],
+    this.recentWarnings = const [],
     required this.dbOk,
     required this.storageOk,
     required this.storageFree,

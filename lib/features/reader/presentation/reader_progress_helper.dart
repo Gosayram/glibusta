@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:drift/drift.dart' show Value;
 
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../domain/reader.dart';
 
 class ReaderProgressHelper {
@@ -11,6 +11,7 @@ class ReaderProgressHelper {
 
   final AppDatabase _database;
   final String _bookId;
+  final _logger = AppLogger();
 
   Future<ReaderPosition> loadSavedPosition(int chapterCount) async {
     try {
@@ -36,13 +37,8 @@ class ReaderProgressHelper {
         progressPercent: progressPercent.clamp(0.0, 1.0),
         updatedAt: row.updatedAt,
       ).clamp(chapterCount: chapterCount);
-    } on Object catch (e, st) {
-      developer.log(
-        'Failed to load reading position',
-        name: 'ReaderProgressHelper',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      _logger.warning('Failed to load reading position for $_bookId: $e', name: 'Reader', error: e);
       return ReaderPosition(
         bookId: _bookId,
         chapterIndex: 0,

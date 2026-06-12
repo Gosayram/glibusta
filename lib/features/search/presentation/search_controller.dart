@@ -5,6 +5,7 @@ import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
 import '../data/composite_source.dart';
@@ -15,6 +16,7 @@ part 'search_controller.g.dart';
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
+  final _logger = AppLogger();
 
   @override
   SearchState build() {
@@ -34,6 +36,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       return;
     }
 
+    _logger.info('Searching: "$normalized"', name: 'Search');
+
     _currentToken?.cancel();
     _currentToken = CancelToken();
     state = state.copyWith(
@@ -50,6 +54,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     try {
       final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
       if (!ref.mounted) return;
+      _logger.info('Search returned ${result.books.length} results', name: 'Search');
       unawaited(_rememberSearch(normalized));
       state = state.copyWith(
         books: result.books,
@@ -60,6 +65,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       );
     } on Object catch (e) {
       if (!ref.mounted) return;
+      _logger.warning('Search failed: $e', name: 'Search');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -67,11 +73,14 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
   Future<void> loadMore() async {
     if (state.isLoading || !state.hasMore || state.lastQuery.isEmpty) return;
 
+    final nextPage = state.currentPage + 1;
+    _logger.info('Loading more: page $nextPage', name: 'Search');
+
     state = state.copyWith(isLoading: true);
 
     final searchQuery = SearchQuery(
       query: state.lastQuery,
-      page: state.currentPage + 1,
+      page: nextPage,
       filters: state.filters,
     );
     _currentToken?.cancel();
@@ -80,6 +89,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     try {
       final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
       if (!ref.mounted) return;
+      _logger.info('Load more returned ${result.books.length} results', name: 'Search');
       state = state.copyWith(
         books: [...state.books, ...result.books],
         isLoading: false,
@@ -89,6 +99,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       );
     } on Object catch (e) {
       if (!ref.mounted) return;
+      _logger.warning('Load more failed: $e', name: 'Search');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

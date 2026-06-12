@@ -1,3 +1,4 @@
+import '../../../core/logging/app_logger.dart';
 import '../data/book_open_service.dart';
 import '../data/parsers/normalized_book.dart';
 
@@ -8,10 +9,15 @@ class ReaderContentHelper {
 
   final BookOpenService _service;
   final String _bookId;
+  final _logger = AppLogger();
 
   Future<NormalizedBookMetadata> loadMetadata() async {
     final cached = await _service.getCachedMetadata(_bookId);
-    if (cached != null) return cached;
+    if (cached != null) {
+      _logger.fine('Metadata cache hit for $_bookId', name: 'Reader');
+      return cached;
+    }
+    _logger.info('Loading fresh metadata for $_bookId', name: 'Reader');
     final book = await _service.openBookWithCache(_bookId);
     return book.toMetadata();
   }
@@ -33,11 +39,14 @@ class ReaderContentHelper {
 
     if (toLoad.isEmpty) return currentlyLoaded;
 
+    _logger.fine('Loading chapters: $toLoad', name: 'Reader');
     final updates = Map<int, ReaderChapter>.from(currentlyLoaded);
     for (final idx in toLoad) {
       final chapter = await _service.loadChapter(_bookId, idx);
       if (chapter != null) {
         updates[idx] = chapter;
+      } else {
+        _logger.warning('Chapter $idx returned null', name: 'Reader');
       }
     }
     return updates;

@@ -62,6 +62,25 @@ clean-build: ## Remove all build artifacts and caches for a fresh build
 	rm -rf .flutter-plugins
 	rm -rf .flutter-plugins-dependencies
 	rm -rf .packages
+	rm -rf android/.gradle
+	rm -rf android/build
+	rm -rf android/app/build
+	rm -rf ios/Pods
+	rm -rf ios/.symlinks
+	rm -rf ios/Flutter/Flutter.framework
+	rm -rf ios/Flutter/Flutter.podspec
+	rm -rf ios/Flutter/Generated.xcconfig
+	rm -rf ios/Flutter/app.framework
+	rm -rf ios/Flutter/flutter_export_environment.sh
+	rm -rf ios/ServiceDefinitions.json
+	rm -rf ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+	rm -rf macos/Pods
+	rm -rf macos/Flutter/ephemeral
+	rm -rf macos/Flutter/GeneratedPluginRegistrant.swift
+	rm -rf macos/Flutter/ephemeral/
+	rm -rf linux/flutter/ephemeral
+	rm -rf windows/flutter/ephemeral
+	rm -rf web/favicon.png
 	$(FLUTTER) pub get
 
 .PHONY: clean-all

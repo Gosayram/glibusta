@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
@@ -25,6 +26,7 @@ final bookImportServiceProvider = Provider<BookImportService>((ref) {
 class BookImportService {
   final AppDatabase _database;
   final AppFileStorage _storage;
+  final _logger = AppLogger();
 
   BookImportService(this._database) : _storage = AppFileStorageImpl();
 
@@ -40,6 +42,10 @@ class BookImportService {
   Future<ImportResult> importFromInspection(
     BookFileInspectionResult inspection,
   ) async {
+    _logger.info(
+      'Import from inspection: ${inspection.decision.name} - ${inspection.title ?? inspection.path}',
+      name: 'Import',
+    );
     if (inspection.decision == ImportDecision.duplicate) {
       return ImportResult.duplicate(inspection.title ?? 'unknown', inspection.hash);
     }
@@ -85,6 +91,10 @@ class BookImportService {
 
     final existing = await _findByHash(contentHash);
     if (existing != null) {
+      _logger.info(
+        'Duplicate detected: ${existing.title} (${contentHash.substring(0, 8)})',
+        name: 'Import',
+      );
       return ImportResult.duplicate(existing.title, contentHash);
     }
 
@@ -145,6 +155,7 @@ class BookImportService {
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
+      _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
       return ImportResult.failure('Ошибка при импорте: $e');
     }
   }
@@ -154,6 +165,7 @@ class BookImportService {
     ExternalBookFile external, {
     required StorageBridge bridge,
   }) async {
+    _logger.info('Import from external: ${external.name} (${external.extension})', name: 'Import');
     final ext = external.extension.toLowerCase();
     if (!_supportedExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
@@ -230,8 +242,10 @@ class BookImportService {
   }
 
   Future<ImportBatchResult> importDirectory(String dirPath) async {
+    _logger.info('Import directory: $dirPath', name: 'Import');
     final dir = Directory(dirPath);
     if (!await dir.exists()) {
+      _logger.warning('Directory not found: $dirPath', name: 'Import');
       return ImportBatchResult(directory: dirPath, results: [], error: 'Директория не найдена');
     }
 
@@ -245,7 +259,12 @@ class BookImportService {
       }
     }
 
-    return ImportBatchResult(directory: dirPath, results: results);
+    final batch = ImportBatchResult(directory: dirPath, results: results);
+    _logger.info(
+      'Directory import complete: ${batch.successCount} imported, ${batch.duplicateCount} duplicates, ${batch.failureCount} errors',
+      name: 'Import',
+    );
+    return batch;
   }
 
   Future<SavedBook?> _findByHash(String hash) async {

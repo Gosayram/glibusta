@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../shared/models/book.dart';
@@ -127,9 +128,13 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
-    final service = ref.read(bookImportServiceProvider);
-    for (final path in paths) {
-      unawaited(_inspectAndImport(ref, path, service));
+    try {
+      final service = ref.read(bookImportServiceProvider);
+      for (final path in paths) {
+        unawaited(_inspectAndImport(ref, path, service));
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
   }
 
@@ -138,95 +143,107 @@ class LibraryScreen extends ConsumerWidget {
     String path,
     BookImportService service,
   ) async {
-    final inspection = await ref.read(bookFileInspectionProvider(path).future);
-    final result = await service.importFromInspection(inspection);
-    if (result.isSuccess || result.needsEncodingSelection) {
-      ref.invalidate(libraryBooksProvider);
+    try {
+      final inspection = await ref.read(bookFileInspectionProvider(path).future);
+      final result = await service.importFromInspection(inspection);
+      if (result.isSuccess || result.needsEncodingSelection) {
+        ref.invalidate(libraryBooksProvider);
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
   }
 
   Future<void> _importBook(BuildContext context, WidgetRef ref) async {
-    final picker = BookFilePicker();
-    final filePath = await picker.pickBookFile();
-    if (filePath == null) return;
+    try {
+      final picker = BookFilePicker();
+      final filePath = await picker.pickBookFile();
+      if (filePath == null) return;
 
-    final inspection = await ref.read(bookFileInspectionProvider(filePath).future);
+      final inspection = await ref.read(bookFileInspectionProvider(filePath).future);
 
-    if (inspection.decision == ImportDecision.duplicate) {
+      if (inspection.decision == ImportDecision.duplicate) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Дубликат: ${inspection.title ?? inspection.reason}')),
+          );
+        }
+        return;
+      }
+
+      if (inspection.decision == ImportDecision.corrupted) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: ${inspection.reason}')),
+          );
+        }
+        return;
+      }
+
+      if (inspection.decision == ImportDecision.unsupported) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Формат не поддерживается')),
+          );
+        }
+        return;
+      }
+
+      if (inspection.decision == ImportDecision.openAsPdf) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PDF открывается отдельным просмотрщиком')),
+          );
+        }
+        return;
+      }
+
+      final service = ref.read(bookImportServiceProvider);
+      final importResult = await service.importFromInspection(inspection);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Дубликат: ${inspection.title ?? inspection.reason}')),
-        );
-      }
-      return;
-    }
-
-    if (inspection.decision == ImportDecision.corrupted) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: ${inspection.reason}')),
-        );
-      }
-      return;
-    }
-
-    if (inspection.decision == ImportDecision.unsupported) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Формат не поддерживается')),
-        );
-      }
-      return;
-    }
-
-    if (inspection.decision == ImportDecision.openAsPdf) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PDF открывается отдельным просмотрщиком')),
-        );
-      }
-      return;
-    }
-
-    final service = ref.read(bookImportServiceProvider);
-    final importResult = await service.importFromInspection(inspection);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            importResult.isSuccess
-                ? 'Импортировано: ${importResult.title}'
-                : importResult.needsEncodingSelection
-                ? 'Нужен выбор кодировки'
-                : 'Ошибка: ${importResult.error}',
+          SnackBar(
+            content: Text(
+              importResult.isSuccess
+                  ? 'Импортировано: ${importResult.title}'
+                  : importResult.needsEncodingSelection
+                  ? 'Нужен выбор кодировки'
+                  : 'Ошибка: ${importResult.error}',
+            ),
+            duration: const Duration(seconds: 2),
           ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        );
+      }
+      ref.invalidate(libraryBooksProvider);
+    } on Object catch (e) {
+      AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
-    ref.invalidate(libraryBooksProvider);
   }
 
   Future<void> _importFolder(BuildContext context, WidgetRef ref) async {
-    final picker = BookFilePicker();
-    final dirPath = await picker.pickDirectory();
-    if (dirPath == null) return;
+    try {
+      final picker = BookFilePicker();
+      final dirPath = await picker.pickDirectory();
+      if (dirPath == null) return;
 
-    final service = ref.read(bookImportServiceProvider);
-    final batchResult = await service.importDirectory(dirPath);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Импортировано: ${batchResult.successCount}, '
-            'дубликатов: ${batchResult.duplicateCount}, '
-            'ошибок: ${batchResult.failureCount}',
+      final service = ref.read(bookImportServiceProvider);
+      final batchResult = await service.importDirectory(dirPath);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Импортировано: ${batchResult.successCount}, '
+              'дубликатов: ${batchResult.duplicateCount}, '
+              'ошибок: ${batchResult.failureCount}',
+            ),
+            duration: const Duration(seconds: 3),
           ),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        );
+      }
+      ref.invalidate(libraryBooksProvider);
+    } on Object catch (e) {
+      AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
-    ref.invalidate(libraryBooksProvider);
   }
 
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {

@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../../features/library/data/book_import_service.dart';
+import '../logging/app_logger.dart';
 
 class ShareHandler {
   StreamSubscription<List<SharedMediaFile>>? _subscription;
+  final _logger = AppLogger();
 
   void init(BuildContext context, BookImportService importService) {
+    _logger.info('ShareHandler initialized', name: 'Share');
     _subscription = ReceiveSharingIntent.instance.getMediaStream().listen(
       (files) {
         if (!context.mounted) return;
@@ -34,9 +37,13 @@ class ShareHandler {
     BuildContext context,
     BookImportService importService,
   ) {
+    _logger.info('Shared ${files.length} files', name: 'Share');
     for (final file in files) {
       final ext = file.path.split('.').last.toLowerCase();
-      if (!['epub', 'fb2', 'txt'].contains(ext)) continue;
+      if (!['epub', 'fb2', 'txt'].contains(ext)) {
+        _logger.info('Skipping unsupported: ${file.path}', name: 'Share');
+        continue;
+      }
 
       unawaited(
         importService.importFile(file.path).then((result) {

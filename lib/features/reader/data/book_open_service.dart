@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:isolate';
 
@@ -10,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import 'parsers/book_parser.dart';
 import 'parsers/epub_parser.dart';
@@ -30,6 +30,7 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 
 class BookOpenService {
   final AppDatabase _database;
+  final _logger = AppLogger();
 
   BookOpenService(this._database);
 
@@ -84,11 +85,11 @@ class BookOpenService {
         };
       });
     } on Object catch (e, st) {
-      developer.log(
-        'Isolate parsing failed, trying sync fallback',
-        name: 'BookOpenService',
+      _logger.severe(
+        'Isolate parsing failed, trying sync fallback: $e',
+        name: 'Reader',
         error: e,
-        stackTrace: st,
+        st: st,
       );
       final parser = _parsers[bookFormat];
       if (parser == null) {
@@ -181,13 +182,8 @@ class BookOpenService {
       if (!await metaFile.exists()) return null;
       final json = await metaFile.readAsString();
       return NormalizedBookMetadata.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e, st) {
-      developer.log(
-        'Failed to read cached metadata',
-        name: 'BookOpenService',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      _logger.warning('Failed to read cached metadata: $e', name: 'Reader', error: e);
       return null;
     }
   }
@@ -209,13 +205,8 @@ class BookOpenService {
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
       return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e, st) {
-      developer.log(
-        'Failed to load chapter $index for $bookId',
-        name: 'BookOpenService',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      _logger.warning('Failed to load chapter $index for $bookId: $e', name: 'Reader', error: e);
       return null;
     }
   }
@@ -233,13 +224,8 @@ class BookOpenService {
     try {
       final json = await cacheFile.readAsString();
       return NormalizedBook.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e, st) {
-      developer.log(
-        'Failed to read cached book',
-        name: 'BookOpenService',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      _logger.warning('Failed to read cached book: $e', name: 'Reader', error: e);
       return null;
     }
   }

@@ -5,6 +5,7 @@ import 'package:dio/io.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
+import '../logging/app_logger.dart';
 import '../theme/app_duration.dart';
 import 'app_interceptors.dart';
 
@@ -52,21 +53,32 @@ Dio dio(Ref ref) {
 class _RetryInterceptor extends Interceptor {
   final int maxRetries;
   final Dio _dio;
+  final _logger = AppLogger();
 
   _RetryInterceptor({required this.maxRetries, required Dio dio}) : _dio = dio;
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     if (_shouldNotRetry(err)) {
+      _logger.info('Skipping retry: ${err.type}', name: 'Http');
       handler.next(err);
       return;
     }
 
     final retryCount = (err.requestOptions.extra['retryCount'] as int?) ?? 0;
     if (retryCount >= maxRetries) {
+      _logger.warning(
+        'Max retries ($maxRetries) exhausted for ${err.requestOptions.path}',
+        name: 'Http',
+      );
       handler.next(err);
       return;
     }
+
+    _logger.info(
+      'Retrying ${err.requestOptions.path} (attempt ${retryCount + 1}/$maxRetries)',
+      name: 'Http',
+    );
 
     final delay = Duration(seconds: 1 << retryCount);
     await Future<void>.delayed(delay);
@@ -84,8 +96,16 @@ class _RetryInterceptor extends Interceptor {
         queryParameters: err.requestOptions.queryParameters,
         options: options,
       );
+      _logger.info(
+        'Retry succeeded for ${err.requestOptions.path}',
+        name: 'Http',
+      );
       handler.resolve(response);
     } on DioException catch (e) {
+      _logger.warning(
+        'Retry failed for ${err.requestOptions.path}: ${e.type}',
+        name: 'Http',
+      );
       handler.next(e);
     }
   }

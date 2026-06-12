@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../logging/app_logger.dart';
 import 'converters.dart';
 import 'daos/author_dao.dart';
 import 'daos/book_dao.dart';
@@ -109,13 +109,8 @@ class AppDatabase extends _$AppDatabase {
         );
         await dbFile.copy(backupFile.path);
       }
-    } on Object catch (e, st) {
-      developer.log(
-        'Database backup failed',
-        name: 'AppDatabase',
-        error: e,
-        stackTrace: st,
-      );
+    } on Object catch (e) {
+      AppLogger().warning('Database backup failed: $e', name: 'Database', error: e);
     }
   }
 

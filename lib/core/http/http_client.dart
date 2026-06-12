@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/app_settings.dart';
+import '../encoding/encoding_detection.dart';
 import 'dio_provider.dart';
 
 part 'http_client.g.dart';
@@ -16,6 +19,7 @@ HttpClient httpClient(Ref ref) {
 class HttpClient {
   final Dio _dio;
   final List<String> _mirrors;
+  final _encodingDetector = BookEncodingDetector();
   Map<String, String> _sessionCookies = {};
 
   HttpClient(this._dio, {List<String> mirrors = const []})
@@ -37,8 +41,15 @@ class HttpClient {
 
   Future<String> get(String url, {CancelToken? cancelToken}) async {
     try {
-      final response = await _dio.get<String>(url, cancelToken: cancelToken);
-      return response.data ?? '';
+      final response = await _dio.get<Uint8List>(
+        url,
+        cancelToken: cancelToken,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) return '';
+      final result = await _encodingDetector.detect(bytes);
+      return result.text;
     } on DioException catch (e) {
       throw _dioExceptionToHttpException(e, url);
     }

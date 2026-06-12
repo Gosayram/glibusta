@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {
@@ -27,6 +28,7 @@ class DownloadBlockedException implements Exception {
 class DownloadService {
   final AppDatabase _database;
   final AppFileStorage _storage;
+  final _logger = AppLogger();
 
   DownloadService(this._database) : _storage = AppFileStorageImpl();
 
@@ -45,6 +47,7 @@ class DownloadService {
     final results = await Connectivity().checkConnectivity();
     final network = mapConnectivity(results);
     if (!network.canDownload) {
+      _logger.warning('Download blocked: offline ($bookId)', name: 'Download');
       throw const DownloadBlockedException('Нет подключения к сети');
     }
 
@@ -52,6 +55,7 @@ class DownloadService {
     final fileName = '$bookId.$format';
     final targetPath = '$booksDir/$fileName';
 
+    _logger.info('Starting download: $bookTitle ($format) from $sourceUrl', name: 'Download');
     await _database
         .into(_database.downloads)
         .insert(
@@ -85,6 +89,7 @@ class DownloadService {
     );
 
     if (result.status == TaskStatus.complete) {
+      _logger.info('Download completed: $bookTitle ($bookId)', name: 'Download');
       await (_database.update(_database.downloads)..where((d) => d.id.equals(bookId))).write(
         DownloadsCompanion(
           status: const Value(DownloadStatusDb.completed),
@@ -111,12 +116,15 @@ class DownloadService {
         break;
       case TaskStatus.paused:
         dbStatus = DownloadStatusDb.paused;
+        _logger.info('Download paused: $downloadId', name: 'Download');
         break;
       case TaskStatus.failed:
         dbStatus = DownloadStatusDb.failed;
+        _logger.warning('Download failed: $downloadId', name: 'Download');
         break;
       case TaskStatus.canceled:
         dbStatus = DownloadStatusDb.canceled;
+        _logger.info('Download canceled: $downloadId', name: 'Download');
         break;
       case TaskStatus.complete:
         dbStatus = DownloadStatusDb.completed;
