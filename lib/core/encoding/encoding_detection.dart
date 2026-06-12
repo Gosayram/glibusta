@@ -73,7 +73,7 @@ final class BookEncodingDetector {
     if (declared != null) {
       final text = await _decodeByName(bytes, declared);
       final score = encodingQualityScore(text);
-      if (score > 0.75) {
+      if (declared == 'utf-8' || score > 0.50) {
         return EncodingDetectionResult(
           text: text,
           encoding: declared,
