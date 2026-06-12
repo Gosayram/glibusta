@@ -12,7 +12,6 @@ class RecentBooksScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncBooks = ref.watch(recentBooksProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Недавно добавленные')),
       body: asyncBooks.when(
@@ -45,15 +44,19 @@ class RecentBooksScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: Text(
                   '${response.books.length} ${_bookCountText(response.books.length)}',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   itemCount: response.books.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 4),
                   itemBuilder: (context, index) {
                     final book = response.books[index];
                     return ListTile(
@@ -62,13 +65,17 @@ class RecentBooksScreen extends ConsumerWidget {
                           ),
                           title: Text(
                             book.name,
+                            style: const TextStyle(fontSize: 14),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           onTap: () => context.push('/book/${book.id}'),
                         )
                         .animate()
-                        .fadeIn(delay: (index * 40).ms, duration: 300.ms)
+                        .fadeIn(
+                          delay: (index * 40).ms,
+                          duration: 300.ms,
+                        )
                         .slideX(begin: 0.05, duration: 300.ms);
                   },
                 ),

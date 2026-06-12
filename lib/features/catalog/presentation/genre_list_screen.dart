@@ -6,18 +6,69 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../data/genre_providers.dart';
 
-class GenreListScreen extends ConsumerWidget {
+class GenreListScreen extends ConsumerStatefulWidget {
   const GenreListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GenreListScreen> createState() => _GenreListScreenState();
+}
+
+class _GenreListScreenState extends ConsumerState<GenreListScreen> {
+  final _filterController = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final asyncList = ref.watch(genreListProvider);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final crossAxisCount = screenWidth < 600
+        ? 2
+        : screenWidth < 900
+        ? 3
+        : 4;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Жанры')),
+      appBar: AppBar(
+        title: const Text('Жанры'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: TextField(
+              controller: _filterController,
+              decoration: InputDecoration(
+                hintText: 'Фильтр...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _filter.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _filterController.clear();
+                          setState(() => _filter = '');
+                        },
+                      )
+                    : null,
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (v) => setState(() => _filter = v.trim().toLowerCase()),
+            ),
+          ),
+        ),
+      ),
       body: asyncList.when(
         data: (response) {
-          if (response.genres.isEmpty) {
+          final genres = _filter.isEmpty
+              ? response.genres
+              : response.genres.where((g) => g.name.toLowerCase().contains(_filter)).toList();
+
+          if (genres.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -29,7 +80,7 @@ class GenreListScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Нет жанров',
+                    _filter.isNotEmpty ? 'Ничего не найдено' : 'Нет жанров',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -38,65 +89,65 @@ class GenreListScreen extends ConsumerWidget {
               ),
             );
           }
+
           return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 200,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.2,
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.5,
             ),
-            itemCount: response.genres.length,
+            itemCount: genres.length,
             itemBuilder: (context, index) {
-              final genre = response.genres[index];
+              final genre = genres[index];
               return Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: () => context.push('/genre/${genre.id}'),
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            genre.name,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                        ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => context.push('/genre/${genre.id}'),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        genre.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
-                  )
-                  .animate()
-                  .fadeIn(delay: (index * 30).ms, duration: 300.ms)
-                  .scale(begin: const Offset(0.95, 0.95), duration: 300.ms);
+                  ),
+                ),
+              ).animate().fadeIn(duration: 200.ms, delay: (index * 10).ms);
             },
           );
         },
-        loading: () => Skeletonizer(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 200,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 2.2,
-            ),
-            itemCount: 12,
-            itemBuilder: (_, _) => const Card(
-              child: Center(child: Bone.text(words: 2)),
+        loading: () => GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.5,
+          ),
+          itemCount: 12,
+          itemBuilder: (_, _) => const Card(
+            child: Center(
+              child: Skeletonizer(
+                child: Bone.text(),
+              ),
             ),
           ),
         ),
-        error: (Object e, _) => Center(
+        error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 64),
+              const Icon(Icons.error_outline, size: 48),
               const SizedBox(height: 16),
-              Text('Ошибка загрузки: $e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
+              const Text('Ошибка загрузки жанров'),
+              const SizedBox(height: 8),
+              FilledButton.tonal(
                 onPressed: () => ref.invalidate(genreListProvider),
                 child: const Text('Повторить'),
               ),

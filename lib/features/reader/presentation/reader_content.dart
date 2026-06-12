@@ -79,6 +79,7 @@ class ReaderContentBody extends StatelessWidget {
             controller: scrollController,
             padding: effectiveMargin,
             itemCount: metadata.chapterCount,
+            addAutomaticKeepAlives: false,
             itemBuilder: (context, index) {
               final chapter = loadedChapters[index];
               final isLast = index == metadata.chapterCount - 1;
@@ -160,11 +161,8 @@ class ReaderContentBody extends StatelessWidget {
       ReaderTextAlign.right => TextAlign.right,
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (chapter.title.isNotEmpty)
-          Padding(
+    final header = chapter.title.isNotEmpty
+        ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
             child: _buildHighlightedText(
               chapter.title,
@@ -174,8 +172,30 @@ class ReaderContentBody extends StatelessWidget {
               ),
               textAlign,
             ),
-          ),
-        ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+          )
+        : const SizedBox.shrink();
+
+    if (chapter.blocks.length <= 50) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: chapter.blocks.length,
+          addAutomaticKeepAlives: false,
+          itemBuilder: (context, i) => _buildBlock(chapter.blocks[i], settings, textAlign),
+        ),
       ],
     );
   }
@@ -423,11 +443,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
 
     final style = _getReaderStyle(settings);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (chapter.title.isNotEmpty)
-          Padding(
+    final header = chapter.title.isNotEmpty
+        ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
             child: _buildHighlightedText(
               chapter.title,
@@ -437,8 +454,30 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               ),
               textAlign,
             ),
-          ),
-        ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+          )
+        : const SizedBox.shrink();
+
+    if (chapter.blocks.length <= 50) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header,
+          ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        header,
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: chapter.blocks.length,
+          addAutomaticKeepAlives: false,
+          itemBuilder: (context, i) => _buildBlock(chapter.blocks[i], textAlign),
+        ),
       ],
     );
   }
