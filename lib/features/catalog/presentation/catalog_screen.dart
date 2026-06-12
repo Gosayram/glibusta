@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -182,32 +184,37 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            'Категории',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Жанры',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: () => context.push('/genres'),
+                child: const Text('Все жанры'),
+              ),
+            ],
           ),
         ),
         SizedBox(
-          height: 120,
+          height: 44,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: categories.length,
+            itemCount: categories.length > 20 ? 20 : categories.length,
             itemBuilder: (context, index) {
               final category = categories[index];
-              return Card(
-                margin: const EdgeInsets.only(right: 8),
-                child: SizedBox(
-                  width: 100,
-                  child: Center(
-                    child: Text(
-                      category,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  label: Text(category, style: const TextStyle(fontSize: 13)),
+                  onPressed: () {
+                    unawaited(context.push('/search'));
+                  },
                 ),
               );
             },

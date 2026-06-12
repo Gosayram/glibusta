@@ -59,11 +59,6 @@ class LibraryScreen extends ConsumerWidget {
             tooltip: 'Импортировать папку',
             onPressed: () => _importFolder(context, ref),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Импортировать книгу',
-            onPressed: () => _importBook(context, ref),
-          ),
         ],
       ),
       body: BookDropZone(

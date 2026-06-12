@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:html/dom.dart' show Element;
+import 'package:html/parser.dart' show parse;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/http/dio_provider.dart';
@@ -27,6 +29,8 @@ class FlibustaApiClient {
     return _httpClient.get('$normalizedBase/$relativePath', cancelToken: cancelToken);
   }
 
+  // ── Search: Books (HTML) ────────────────────────────────────────────────────
+
   Future<SearchByNameResponse> searchBooksByName(
     String name, {
     int page = 0,
@@ -34,8 +38,43 @@ class FlibustaApiClient {
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chb=on';
     final response = await _getText(url);
-    return _parseSearchByNameResponse(response);
+    return _parseSearchBooksResponse(response);
   }
+
+  SearchByNameResponse _parseSearchBooksResponse(String html) {
+    final doc = parse(html);
+    final books = <SearchBookItem>[];
+    final main = doc.querySelector('#main');
+    if (main == null) return SearchByNameResponse(books: books);
+
+    final resultsUl = _findResultsUl(main, '/b/');
+    if (resultsUl == null) return SearchByNameResponse(books: books);
+
+    for (final li in resultsUl.children) {
+      if (li.localName != 'li') continue;
+      final links = li.querySelectorAll('a');
+      if (links.isEmpty) continue;
+      final bookLink = links.first;
+      final href = bookLink.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final name = bookLink.text.trim();
+      if (id != null && name.isNotEmpty) {
+        final authors = <SearchAuthorItem>[];
+        for (final a in links.skip(1)) {
+          final aHref = a.attributes['href'] ?? '';
+          final aId = _extractId(aHref, '/a/');
+          if (aId != null) {
+            authors.add(SearchAuthorItem(id: aId, name: a.text.trim()));
+          }
+        }
+        books.add(SearchBookItem(id: id, name: name, authors: authors));
+      }
+    }
+
+    return SearchByNameResponse(books: books);
+  }
+
+  // ── Search: Books (OPDS) ────────────────────────────────────────────────────
 
   Future<SearchByNameResponse> searchBooksByNameOpds(
     String name, {
@@ -49,6 +88,30 @@ class FlibustaApiClient {
     return _parseOpdsSearchResponse(response);
   }
 
+  SearchByNameResponse _parseOpdsSearchResponse(String xml) {
+    final doc = parse(xml);
+    final books = <SearchBookItem>[];
+    for (final entry in doc.querySelectorAll('entry')) {
+      final id = _extractOpdsBookId(entry);
+      final title = entry.querySelector('title')?.text.trim() ?? '';
+      if (id != null && title.isNotEmpty) {
+        final authors = <SearchAuthorItem>[];
+        for (final authorEl in entry.querySelectorAll('author')) {
+          final aName = authorEl.querySelector('name')?.text.trim() ?? '';
+          final aUri = authorEl.querySelector('uri')?.text.trim() ?? '';
+          final aId = _extractId(aUri, '/a/');
+          if (aName.isNotEmpty) {
+            authors.add(SearchAuthorItem(id: aId ?? '', name: aName));
+          }
+        }
+        books.add(SearchBookItem(id: id, name: title, authors: authors));
+      }
+    }
+    return SearchByNameResponse(books: books);
+  }
+
+  // ── Search: Authors (HTML) ──────────────────────────────────────────────────
+
   Future<SearchAuthorsResponse> searchAuthors(
     String name, {
     int page = 0,
@@ -58,6 +121,32 @@ class FlibustaApiClient {
     final response = await _getText(url);
     return _parseSearchAuthorsResponse(response);
   }
+
+  SearchAuthorsResponse _parseSearchAuthorsResponse(String html) {
+    final doc = parse(html);
+    final authors = <SearchAuthorItem>[];
+    final main = doc.querySelector('#main');
+    if (main == null) return SearchAuthorsResponse(authors: authors);
+
+    final resultsUl = _findResultsUl(main, '/a/');
+    if (resultsUl == null) return SearchAuthorsResponse(authors: authors);
+
+    for (final li in resultsUl.children) {
+      if (li.localName != 'li') continue;
+      final link = li.querySelector('a[href^="/a/"]');
+      if (link == null) continue;
+      final href = link.attributes['href'] ?? '';
+      final id = _extractDigits(href);
+      final name = link.text.trim();
+      if (id != null && name.isNotEmpty) {
+        authors.add(SearchAuthorItem(id: id, name: name));
+      }
+    }
+
+    return SearchAuthorsResponse(authors: authors);
+  }
+
+  // ── Search: Series (HTML) ───────────────────────────────────────────────────
 
   Future<SearchSeriesResponse> searchBooksBySeries(
     String name, {
@@ -69,6 +158,38 @@ class FlibustaApiClient {
     return _parseSearchSeriesResponse(response);
   }
 
+  SearchSeriesResponse _parseSearchSeriesResponse(String html) {
+    final doc = parse(html);
+    final series = <SearchSeriesItem>[];
+    final main = doc.querySelector('#main');
+    if (main == null) return SearchSeriesResponse(series: series);
+
+    Element? resultsUl;
+    for (final ul in main.querySelectorAll('ul')) {
+      if (ul.querySelectorAll('a[href*="/sequence/"]').isNotEmpty) {
+        resultsUl = ul;
+        break;
+      }
+    }
+    if (resultsUl == null) return SearchSeriesResponse(series: series);
+
+    for (final li in resultsUl.children) {
+      if (li.localName != 'li') continue;
+      final link = li.querySelector('a[href*="/sequence/"]');
+      if (link == null) continue;
+      final href = link.attributes['href'] ?? '';
+      final id = _extractDigits(href);
+      final name = link.text.trim();
+      if (id != null && name.isNotEmpty) {
+        series.add(SearchSeriesItem(id: id, name: name));
+      }
+    }
+
+    return SearchSeriesResponse(series: series);
+  }
+
+  // ── Search: Genres (HTML) ───────────────────────────────────────────────────
+
   Future<SearchGenresResponse> searchGenres(
     String name, {
     int page = 0,
@@ -79,94 +200,22 @@ class FlibustaApiClient {
     return _parseSearchGenresResponse(response);
   }
 
-  Future<BookDetailsResponse> getBookDetails(String bookId) async {
-    final url = 'b/$bookId';
-    final response = await _getText(url);
-    return _parseBookDetailsResponse(response, bookId);
-  }
-
-  Future<String> getDownloadUrl(String bookId, String format) async {
-    final base = _dio.options.baseUrl;
-    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
-    return '$normalizedBase/b/$bookId/download/$format';
-  }
-
-  SearchByNameResponse _parseSearchByNameResponse(String html) {
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<li>.*?<a href="/b/(\d+)">(.*?)</a>.*?</li>', dotAll: true);
-    final matches = bookRegex.allMatches(html);
-
-    for (final match in matches) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty) {
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return SearchByNameResponse(books: books);
-  }
-
-  SearchByNameResponse _parseOpdsSearchResponse(String xml) {
-    final books = <SearchBookItem>[];
-    final entryRegex = RegExp(r'<entry>.*?</entry>', dotAll: true);
-    final entries = entryRegex.allMatches(xml);
-
-    for (final entry in entries) {
-      final entryXml = entry.group(0) ?? '';
-      final idMatch = RegExp(r'<id>.*?/b/(\d+)</id>').firstMatch(entryXml);
-      final titleMatch = RegExp(r'<title>(.*?)</title>').firstMatch(entryXml);
-
-      if (idMatch != null && titleMatch != null) {
-        final id = idMatch.group(1) ?? '';
-        final name = titleMatch.group(1) ?? '';
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return SearchByNameResponse(books: books);
-  }
-
-  SearchAuthorsResponse _parseSearchAuthorsResponse(String html) {
-    final authors = <SearchAuthorItem>[];
-    final authorRegex = RegExp(r'<li>.*?<a href="/a/(\d+)">(.*?)</a>.*?</li>', dotAll: true);
-    final matches = authorRegex.allMatches(html);
-
-    for (final match in matches) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty) {
-        authors.add(SearchAuthorItem(id: id, name: name));
-      }
-    }
-
-    return SearchAuthorsResponse(authors: authors);
-  }
-
-  SearchSeriesResponse _parseSearchSeriesResponse(String html) {
-    final series = <SearchSeriesItem>[];
-    final seriesRegex = RegExp(r'<li>.*?<a href="/sequence/(\d+)">(.*?)</a>.*?</li>', dotAll: true);
-    final matches = seriesRegex.allMatches(html);
-
-    for (final match in matches) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty) {
-        series.add(SearchSeriesItem(id: id, name: name));
-      }
-    }
-
-    return SearchSeriesResponse(series: series);
-  }
-
   SearchGenresResponse _parseSearchGenresResponse(String html) {
+    final doc = parse(html);
     final genres = <SearchGenreItem>[];
-    final genreRegex = RegExp(r'<li>.*?<a href="/g/([^"]+)">(.*?)</a>.*?</li>', dotAll: true);
-    final matches = genreRegex.allMatches(html);
+    final main = doc.querySelector('#main');
+    if (main == null) return SearchGenresResponse(genres: genres);
 
-    for (final match in matches) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
+    final resultsUl = _findResultsUl(main, '/g/');
+    if (resultsUl == null) return SearchGenresResponse(genres: genres);
+
+    for (final li in resultsUl.children) {
+      if (li.localName != 'li') continue;
+      final link = li.querySelector('a[href^="/g/"]');
+      if (link == null) continue;
+      final href = link.attributes['href'] ?? '';
+      final id = href.replaceFirst('/g/', '');
+      final name = link.text.trim();
       if (id.isNotEmpty && name.isNotEmpty) {
         genres.add(SearchGenreItem(id: id, name: name));
       }
@@ -174,6 +223,161 @@ class FlibustaApiClient {
 
     return SearchGenresResponse(genres: genres);
   }
+
+  // ── Book Details (HTML) ─────────────────────────────────────────────────────
+
+  Future<BookDetailsResponse> getBookDetails(String bookId) async {
+    final response = await _getText('b/$bookId');
+    return _parseBookDetailsResponse(response, bookId);
+  }
+
+  BookDetailsResponse _parseBookDetailsResponse(String html, String bookId) {
+    final doc = parse(html);
+
+    // Title: skip first h1 ("Флибуста" site name), use the second
+    String title = '';
+    final h1Tags = doc.querySelectorAll('h1');
+    for (final h1 in h1Tags) {
+      final text = h1.text.trim();
+      if (text.isNotEmpty && text != 'Флибуста') {
+        title = text;
+        break;
+      }
+    }
+
+    // Description: find h2 "Аннотация:" and collect sibling text
+    String description = '';
+    for (final h2 in doc.querySelectorAll('h2')) {
+      if (h2.text.contains('Аннотация')) {
+        final parts = <String>[];
+        Element? sibling = h2.nextElementSibling;
+        while (sibling != null && sibling.localName != 'h2') {
+          parts.add(sibling.text.trim());
+          sibling = sibling.nextElementSibling;
+        }
+        description = parts.join(' ');
+        break;
+      }
+    }
+
+    // Cover: img with "cover" in src
+    final coverImg = doc.querySelector('img[src*="cover"]');
+    final coverUrl = coverImg?.attributes['src'];
+
+    // Find the book info container (div with the title h1)
+    Element? bookInfoDiv;
+    for (final div in doc.querySelectorAll('div')) {
+      final h1 = div.querySelector('h1');
+      if (h1 != null && title.isNotEmpty && h1.text.contains(title)) {
+        bookInfoDiv = div;
+        break;
+      }
+    }
+
+    // Authors: /a/ links BEFORE download links
+    final authors = <String>[];
+    final seenAuthorIds = <String>{};
+    if (bookInfoDiv != null) {
+      bool foundDownload = false;
+      for (final a in bookInfoDiv.querySelectorAll('a[href]')) {
+        final href = a.attributes['href'] ?? '';
+        if (href.startsWith('/b/') &&
+            (href.contains('/download') ||
+                href.endsWith('/read') ||
+                href.endsWith('/fb2') ||
+                href.endsWith('/epub') ||
+                href.endsWith('/mobi') ||
+                href.endsWith('/txt') ||
+                href.endsWith('/pdf'))) {
+          foundDownload = true;
+          continue;
+        }
+        if (foundDownload) break;
+        if (href.startsWith('/a/')) {
+          final authorId = _extractDigits(href);
+          if (authorId != null && seenAuthorIds.add(authorId)) {
+            authors.add(a.text.trim());
+          }
+        }
+      }
+    }
+    // Fallback: all /a/ links if no bookInfoDiv found
+    if (authors.isEmpty) {
+      for (final a in doc.querySelectorAll('a[href^="/a/"]')) {
+        final name = a.text.trim();
+        if (name.isNotEmpty) authors.add(name);
+      }
+    }
+
+    // Genres: /g/ links BEFORE download links
+    final genreIds = <String>[];
+    if (bookInfoDiv != null) {
+      bool foundDownload = false;
+      for (final a in bookInfoDiv.querySelectorAll('a[href]')) {
+        final href = a.attributes['href'] ?? '';
+        if (href.startsWith('/b/') &&
+            (href.endsWith('/read') ||
+                href.endsWith('/fb2') ||
+                href.endsWith('/epub') ||
+                href.endsWith('/mobi') ||
+                href.endsWith('/txt') ||
+                href.endsWith('/pdf'))) {
+          foundDownload = true;
+          continue;
+        }
+        if (foundDownload) break;
+        if (href.startsWith('/g/')) {
+          genreIds.add(href.replaceFirst('/g/', ''));
+        }
+      }
+    }
+
+    // Download formats: /b/{id}/{format} links
+    final formats = <String>[];
+    final seenFormats = <String>{};
+    for (final a in doc.querySelectorAll('a[href^="/b/$bookId/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final fmtMatch = RegExp(r'/b/\d+/(\w+)$').firstMatch(href);
+      if (fmtMatch != null) {
+        final fmt = fmtMatch.group(1)!;
+        if (fmt == 'read' || fmt == 'download' || fmt == 'mail' || fmt == 'complain') continue;
+        if (seenFormats.add(fmt)) formats.add(fmt);
+      }
+    }
+
+    // Series: /sequence/ or /s/ links in book info div
+    final seriesList = <SeriesInfoItem>[];
+    if (bookInfoDiv != null) {
+      for (final a in bookInfoDiv.querySelectorAll('a[href]')) {
+        final href = a.attributes['href'] ?? '';
+        if (href.contains('/sequence/') || href.startsWith('/s/')) {
+          final sId = _extractDigits(href);
+          if (sId != null) {
+            seriesList.add(SeriesInfoItem(id: sId, name: a.text.trim()));
+          }
+        }
+      }
+    }
+
+    return BookDetailsResponse(
+      id: bookId,
+      title: title,
+      description: description,
+      coverUrl: coverUrl,
+      authors: authors,
+      formats: formats,
+      genres: genreIds,
+      series: seriesList,
+    );
+  }
+
+  Future<String> getDownloadUrl(String bookId, String format) async {
+    final base = _dio.options.baseUrl;
+    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    return '$normalizedBase/b/$bookId/$format';
+  }
+
+  // ── Recent Books (HTML) ─────────────────────────────────────────────────────
 
   Future<RecentBooksResponse> getRecentBooks({
     String? lang,
@@ -187,10 +391,62 @@ class FlibustaApiClient {
     return _parseRecentBooksResponse(response);
   }
 
+  RecentBooksResponse _parseRecentBooksResponse(String html) {
+    final doc = parse(html);
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final name = a.text.trim();
+      if (id != null && name.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: name));
+      }
+    }
+
+    return RecentBooksResponse(books: books);
+  }
+
+  // ── Author Detail (HTML) ────────────────────────────────────────────────────
+
   Future<AuthorDetailResponse> getAuthorDetail(String authorId) async {
     final response = await _getText('a/$authorId');
     return _parseAuthorDetailResponse(response, authorId);
   }
+
+  AuthorDetailResponse _parseAuthorDetailResponse(String html, String authorId) {
+    final doc = parse(html);
+
+    // Name: skip first h1 ("Флибуста")
+    String name = '';
+    final h1Tags = doc.querySelectorAll('h1');
+    for (final h1 in h1Tags) {
+      final text = h1.text.trim();
+      if (text.isNotEmpty && text != 'Флибуста') {
+        name = text;
+        break;
+      }
+    }
+
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final bookName = a.text.trim();
+      if (id != null && bookName.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: bookName));
+      }
+    }
+
+    return AuthorDetailResponse(id: authorId, name: name, books: books);
+  }
+
+  // ── Genre Books (HTML) ──────────────────────────────────────────────────────
 
   Future<GenreBooksResponse> getGenreBooks(
     String genreId, {
@@ -200,15 +456,96 @@ class FlibustaApiClient {
     return _parseGenreBooksResponse(response, genreId);
   }
 
+  GenreBooksResponse _parseGenreBooksResponse(String html, String genreId) {
+    final doc = parse(html);
+
+    String name = '';
+    final h1Tags = doc.querySelectorAll('h1');
+    for (final h1 in h1Tags) {
+      final text = h1.text.trim();
+      if (text.isNotEmpty && text != 'Флибуста') {
+        name = text;
+        break;
+      }
+    }
+
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final bookName = a.text.trim();
+      if (id != null && bookName.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: bookName));
+      }
+    }
+
+    return GenreBooksResponse(id: genreId, name: name, books: books);
+  }
+
+  // ── Genre List (HTML from /g) ───────────────────────────────────────────────
+
   Future<GenreListResponse> getGenreList() async {
-    final response = await _getText('genres');
+    final response = await _getText('g');
     return _parseGenreListResponse(response);
   }
+
+  GenreListResponse _parseGenreListResponse(String html) {
+    final doc = parse(html);
+    final genres = <SearchGenreItem>[];
+    final seen = <String>{};
+
+    for (final a in doc.querySelectorAll('a[href^="/g/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = href.replaceFirst('/g/', '');
+      final name = a.text.trim();
+      if (id.isNotEmpty && name.isNotEmpty && seen.add(id)) {
+        genres.add(SearchGenreItem(id: id, name: name));
+      }
+    }
+
+    return GenreListResponse(genres: genres);
+  }
+
+  // ── Series Detail (HTML) ────────────────────────────────────────────────────
 
   Future<SeriesDetailResponse> getSeriesDetail(String seriesId) async {
     final response = await _getText('sequence/$seriesId');
     return _parseSeriesDetailResponse(response, seriesId);
   }
+
+  SeriesDetailResponse _parseSeriesDetailResponse(String html, String seriesId) {
+    final doc = parse(html);
+
+    String name = '';
+    final h1Tags = doc.querySelectorAll('h1');
+    for (final h1 in h1Tags) {
+      final text = h1.text.trim();
+      if (text.isNotEmpty && text != 'Флибуста') {
+        name = text;
+        break;
+      }
+    }
+
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final bookName = a.text.trim();
+      if (id != null && bookName.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: bookName));
+      }
+    }
+
+    return SeriesDetailResponse(id: seriesId, name: name, books: books);
+  }
+
+  // ── OPDS: Popular/Recent books ──────────────────────────────────────────────
 
   Future<OpdsBooksResponse> getPopularBooksOpds({int page = 0}) async {
     final response = await _getText('opds/popular?pageNumber=$page');
@@ -220,10 +557,56 @@ class FlibustaApiClient {
     return _parseOpdsBooksResponse(response);
   }
 
+  OpdsBooksResponse _parseOpdsBooksResponse(String xml) {
+    final doc = parse(xml);
+    final books = <SearchBookItem>[];
+
+    for (final entry in doc.querySelectorAll('entry')) {
+      final id = _extractOpdsBookId(entry);
+      final title = entry.querySelector('title')?.text.trim() ?? '';
+      if (id != null && title.isNotEmpty) {
+        final authors = <SearchAuthorItem>[];
+        for (final authorEl in entry.querySelectorAll('author')) {
+          final aName = authorEl.querySelector('name')?.text.trim() ?? '';
+          if (aName.isNotEmpty) {
+            authors.add(SearchAuthorItem(id: '', name: aName));
+          }
+        }
+        books.add(SearchBookItem(id: id, name: title, authors: authors));
+      }
+    }
+
+    return OpdsBooksResponse(books: books);
+  }
+
+  // ── OPDS: Genres ────────────────────────────────────────────────────────────
+
   Future<OpdsGenresResponse> getGenresOpds() async {
     final response = await _getText('opds/genres');
     return _parseOpdsGenresResponse(response);
   }
+
+  OpdsGenresResponse _parseOpdsGenresResponse(String xml) {
+    final doc = parse(xml);
+    final genres = <SearchGenreItem>[];
+
+    for (final entry in doc.querySelectorAll('entry')) {
+      final idEl = entry.querySelector('id');
+      final titleEl = entry.querySelector('title');
+      if (idEl == null || titleEl == null) continue;
+
+      final rawId = idEl.text.trim();
+      final genreId = rawId.contains('/g/') ? rawId.split('/g/').last : rawId;
+      final name = titleEl.text.trim();
+      if (genreId.isNotEmpty && name.isNotEmpty) {
+        genres.add(SearchGenreItem(id: genreId, name: name));
+      }
+    }
+
+    return OpdsGenresResponse(genres: genres);
+  }
+
+  // ── Bookshelf (Polka) ───────────────────────────────────────────────────────
 
   Future<bool> addToBookshelf(
     String bookId, {
@@ -249,9 +632,30 @@ class FlibustaApiClient {
     return response.isNotEmpty;
   }
 
+  // ── Messages ────────────────────────────────────────────────────────────────
+
   Future<MessagesResponse> getMessages() async {
     final response = await _getText('messages');
     return _parseMessagesResponse(response);
+  }
+
+  MessagesResponse _parseMessagesResponse(String html) {
+    final doc = parse(html);
+    final messages = <MessageItem>[];
+
+    for (final tr in doc.querySelectorAll('tr')) {
+      final cells = tr.querySelectorAll('td');
+      if (cells.length >= 3) {
+        final sender = cells[0].text.trim();
+        final subject = cells[1].text.trim();
+        final date = cells[2].text.trim();
+        if (sender.isNotEmpty || subject.isNotEmpty) {
+          messages.add(MessageItem(sender: sender, subject: subject, date: date));
+        }
+      }
+    }
+
+    return MessagesResponse(messages: messages);
   }
 
   Future<bool> sendMessage(
@@ -272,10 +676,24 @@ class FlibustaApiClient {
     return response.statusCode == 200 || response.statusCode == 302;
   }
 
+  // ── User Profile ────────────────────────────────────────────────────────────
+
   Future<UserProfileResponse> getUserProfile(String userId) async {
     final response = await _getText('user/$userId');
     return _parseUserProfileResponse(response, userId);
   }
+
+  UserProfileResponse _parseUserProfileResponse(String html, String userId) {
+    final doc = parse(html);
+    final title = doc.querySelector('title')?.text.trim() ?? '';
+    final username = title.replaceAll(' | Флибуста', '').trim();
+    return UserProfileResponse(
+      userId: userId,
+      username: username.isNotEmpty ? username : 'User #$userId',
+    );
+  }
+
+  // ── Recommendations ─────────────────────────────────────────────────────────
 
   Future<RecommendationsResponse> getRecommendations({String? userId}) async {
     final url = userId != null ? 'rec?view=recs&user=$userId' : 'rec';
@@ -283,308 +701,86 @@ class FlibustaApiClient {
     return _parseRecommendationsResponse(response);
   }
 
+  RecommendationsResponse _parseRecommendationsResponse(String html) {
+    final books = _extractBookLinks(html);
+    return RecommendationsResponse(books: books);
+  }
+
+  // ── Black/White List ────────────────────────────────────────────────────────
+
   Future<BwListResponse> getBwList(String userId) async {
     final response = await _getText('bwlist/show/$userId');
     return _parseBwListResponse(response, userId);
   }
+
+  BwListResponse _parseBwListResponse(String html, String userId) {
+    final books = _extractBookLinks(html);
+    return BwListResponse(userId: userId, books: books);
+  }
+
+  // ── Tracker ─────────────────────────────────────────────────────────────────
 
   Future<TrackerResponse> getTracker() async {
     final response = await _getText('tracker');
     return _parseTrackerResponse(response);
   }
 
-  BookDetailsResponse _parseBookDetailsResponse(String html, String bookId) {
-    final titleMatch = RegExp(r'<h1>(.*?)</h1>').firstMatch(html);
-    final title = titleMatch?.group(1) ?? '';
-
-    final descriptionMatch = RegExp(
-      r'<div class="book_description">(.*?)</div>',
-      dotAll: true,
-    ).firstMatch(html);
-    final description = descriptionMatch?.group(1) ?? '';
-
-    final coverMatch = RegExp(r'<img src="(/i/[^"]+)"').firstMatch(html);
-    final coverUrl = coverMatch?.group(1);
-
-    final authorMatches = RegExp(r'<a href="/a/\d+">(.*?)</a>').allMatches(html);
-    final authors = authorMatches.map((m) => m.group(1) ?? '').where((a) => a.isNotEmpty).toList();
-
-    final formatMatches = RegExp(r'<a href="/b/\d+/(\w+)">').allMatches(html);
-    final formats = formatMatches.map((m) => m.group(1) ?? '').where((f) => f.isNotEmpty).toList();
-
-    return BookDetailsResponse(
-      id: bookId,
-      title: title,
-      description: description,
-      coverUrl: coverUrl,
-      authors: authors,
-      formats: formats,
-    );
-  }
-
-  RecentBooksResponse _parseRecentBooksResponse(String html) {
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>', dotAll: true);
-    final matches = bookRegex.allMatches(html);
-    final seen = <String>{};
-
-    for (final match in matches) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return RecentBooksResponse(books: books);
-  }
-
-  AuthorDetailResponse _parseAuthorDetailResponse(
-    String html,
-    String authorId,
-  ) {
-    final titleMatch = RegExp(r'<h1>(.*?)</h1>').firstMatch(html);
-    final name = titleMatch?.group(1)?.trim() ?? '';
-
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final bookName = match.group(2) ?? '';
-      if (id.isNotEmpty && bookName.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: bookName));
-      }
-    }
-
-    return AuthorDetailResponse(
-      id: authorId,
-      name: name,
-      books: books,
-    );
-  }
-
-  GenreBooksResponse _parseGenreBooksResponse(
-    String html,
-    String genreId,
-  ) {
-    final titleMatch = RegExp(r'<h1>(.*?)</h1>').firstMatch(html);
-    final name = titleMatch?.group(1)?.trim() ?? '';
-
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final bookName = match.group(2) ?? '';
-      if (id.isNotEmpty && bookName.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: bookName));
-      }
-    }
-
-    return GenreBooksResponse(
-      id: genreId,
-      name: name,
-      books: books,
-    );
-  }
-
-  GenreListResponse _parseGenreListResponse(String html) {
-    final genres = <SearchGenreItem>[];
-    final genreRegex = RegExp(r'<a href="/g/([^"]+)">(.*?)</a>');
-    final matches = genreRegex.allMatches(html);
-    final seen = <String>{};
-
-    for (final match in matches) {
-      final slug = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (slug.isNotEmpty && name.isNotEmpty && seen.add(slug)) {
-        genres.add(SearchGenreItem(id: slug, name: name));
-      }
-    }
-
-    return GenreListResponse(genres: genres);
-  }
-
-  SeriesDetailResponse _parseSeriesDetailResponse(
-    String html,
-    String seriesId,
-  ) {
-    final titleMatch = RegExp(r'<h1>(.*?)</h1>').firstMatch(html);
-    final name = titleMatch?.group(1)?.trim() ?? '';
-
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final bookName = match.group(2) ?? '';
-      if (id.isNotEmpty && bookName.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: bookName));
-      }
-    }
-
-    return SeriesDetailResponse(
-      id: seriesId,
-      name: name,
-      books: books,
-    );
-  }
-
-  OpdsBooksResponse _parseOpdsBooksResponse(String xml) {
-    final books = <SearchBookItem>[];
-    final entryRegex = RegExp(r'<entry>.*?</entry>', dotAll: true);
-    final entries = entryRegex.allMatches(xml);
-
-    for (final entry in entries) {
-      final entryXml = entry.group(0) ?? '';
-      final idMatch = RegExp(r'<id>.*?/b/(\d+)</id>').firstMatch(entryXml);
-      final titleMatch = RegExp(r'<title>(.*?)</title>').firstMatch(entryXml);
-
-      if (idMatch != null && titleMatch != null) {
-        final id = idMatch.group(1) ?? '';
-        final name = titleMatch.group(1) ?? '';
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return OpdsBooksResponse(books: books);
-  }
-
-  OpdsGenresResponse _parseOpdsGenresResponse(String xml) {
-    final genres = <SearchGenreItem>[];
-    final entryRegex = RegExp(r'<entry>.*?</entry>', dotAll: true);
-    final entries = entryRegex.allMatches(xml);
-
-    for (final entry in entries) {
-      final entryXml = entry.group(0) ?? '';
-      final idMatch = RegExp(r'<id>.*?/g/([^<]+)</id>').firstMatch(entryXml);
-      final titleMatch = RegExp(r'<title>(.*?)</title>').firstMatch(entryXml);
-
-      if (idMatch != null && titleMatch != null) {
-        final slug = idMatch.group(1) ?? '';
-        final name = titleMatch.group(1) ?? '';
-        if (slug.isNotEmpty && name.isNotEmpty) {
-          genres.add(SearchGenreItem(id: slug, name: name));
-        }
-      }
-    }
-
-    return OpdsGenresResponse(genres: genres);
-  }
-
-  MessagesResponse _parseMessagesResponse(String html) {
-    final messages = <MessageItem>[];
-    final rowRegex = RegExp(
-      r'<tr[^>]*>.*?</tr>',
-      dotAll: true,
-    );
-    final rows = rowRegex.allMatches(html);
-
-    for (final row in rows) {
-      final rowHtml = row.group(0) ?? '';
-      final senderMatch = RegExp(
-        r'<td[^>]*>.*?<a[^>]*>(.*?)</a>.*?</td>',
-        dotAll: true,
-      ).firstMatch(rowHtml);
-      final subjectMatch = RegExp(
-        r'<td[^>]*>.*?<a[^>]*>(.*?)</a>.*?</td>',
-        dotAll: true,
-      ).allMatches(rowHtml);
-
-      if (senderMatch != null && subjectMatch.length >= 2) {
-        final sender = _cleanHtml(senderMatch.group(1) ?? '');
-        final subject = _cleanHtml(subjectMatch.last.group(1) ?? '');
-        final date = '';
-        if (sender.isNotEmpty || subject.isNotEmpty) {
-          messages.add(
-            MessageItem(sender: sender, subject: subject, date: date),
-          );
-        }
-      }
-    }
-
-    return MessagesResponse(messages: messages);
-  }
-
-  UserProfileResponse _parseUserProfileResponse(
-    String html,
-    String userId,
-  ) {
-    final usernameMatch = RegExp(
-      r'<div[^>]*class="[^"]*username[^"]*"[^>]*>(.*?)</div>',
-      dotAll: true,
-    ).firstMatch(html);
-    final username = _cleanHtml(usernameMatch?.group(1) ?? '');
-
-    return UserProfileResponse(
-      userId: userId,
-      username: username.isNotEmpty ? username : 'User #$userId',
-    );
-  }
-
-  RecommendationsResponse _parseRecommendationsResponse(String html) {
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return RecommendationsResponse(books: books);
-  }
-
-  BwListResponse _parseBwListResponse(String html, String userId) {
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
-    return BwListResponse(userId: userId, books: books);
-  }
-
   TrackerResponse _parseTrackerResponse(String html) {
-    final books = <SearchBookItem>[];
-    final bookRegex = RegExp(r'<a href="/b/(\d+)">(.*?)</a>');
-    final seen = <String>{};
-
-    for (final match in bookRegex.allMatches(html)) {
-      final id = match.group(1) ?? '';
-      final name = match.group(2) ?? '';
-      if (id.isNotEmpty && name.isNotEmpty && seen.add(id)) {
-        books.add(SearchBookItem(id: id, name: name));
-      }
-    }
-
+    final books = _extractBookLinks(html);
     return TrackerResponse(books: books);
   }
 
-  String _cleanHtml(String html) {
-    return html
-        .replaceAll(RegExp(r'<[^>]*>'), '')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .trim();
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  Element? _findResultsUl(Element container, String linkPrefix) {
+    for (final ul in container.querySelectorAll('ul')) {
+      if (ul.querySelectorAll('a[href^="$linkPrefix"]').isNotEmpty) {
+        return ul;
+      }
+    }
+    return null;
+  }
+
+  String? _extractId(String href, String prefix) {
+    if (!href.startsWith(prefix)) return null;
+    final remainder = href.substring(prefix.length);
+    final match = RegExp(r'^(\d+)').firstMatch(remainder);
+    return match?.group(1);
+  }
+
+  String? _extractDigits(String text) {
+    final match = RegExp(r'(\d+)').firstMatch(text);
+    return match?.group(1);
+  }
+
+  String? _extractOpdsBookId(Element entry) {
+    final idEl = entry.querySelector('id');
+    if (idEl == null) return null;
+    final raw = idEl.text.trim();
+    final match = RegExp(r'/b/(\d+)').firstMatch(raw);
+    return match?.group(1);
+  }
+
+  List<SearchBookItem> _extractBookLinks(String html) {
+    final doc = parse(html);
+    final books = <SearchBookItem>[];
+    final seen = <String>{};
+    final main = doc.querySelector('#main') ?? doc;
+
+    for (final a in main.querySelectorAll('a[href^="/b/"]')) {
+      final href = a.attributes['href'] ?? '';
+      final id = _extractId(href, '/b/');
+      final name = a.text.trim();
+      if (id != null && name.isNotEmpty && seen.add(id)) {
+        books.add(SearchBookItem(id: id, name: name));
+      }
+    }
+
+    return books;
   }
 }
+
+// ── Response models ───────────────────────────────────────────────────────────
 
 class SearchByNameResponse {
   final List<SearchBookItem> books;
@@ -595,8 +791,9 @@ class SearchByNameResponse {
 class SearchBookItem {
   final String id;
   final String name;
+  final List<SearchAuthorItem> authors;
 
-  const SearchBookItem({required this.id, required this.name});
+  const SearchBookItem({required this.id, required this.name, this.authors = const []});
 }
 
 class SearchAuthorsResponse {
@@ -645,6 +842,8 @@ class BookDetailsResponse {
   final String? coverUrl;
   final List<String> authors;
   final List<String> formats;
+  final List<String> genres;
+  final List<SeriesInfoItem> series;
 
   const BookDetailsResponse({
     required this.id,
@@ -653,7 +852,16 @@ class BookDetailsResponse {
     this.coverUrl,
     required this.authors,
     required this.formats,
+    this.genres = const [],
+    this.series = const [],
   });
+}
+
+class SeriesInfoItem {
+  final String id;
+  final String name;
+
+  const SeriesInfoItem({required this.id, required this.name});
 }
 
 class RecentBooksResponse {

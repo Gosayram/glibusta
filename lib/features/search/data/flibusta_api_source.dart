@@ -45,7 +45,8 @@ class FlibustaApiSource extends BookSource {
             (item) => Book(
               id: item.id,
               title: item.name,
-              authorIds: const [],
+              authorIds: item.authors.map((a) => a.id).toList(),
+              authorNames: item.authors.map((a) => a.name).toList(),
               genreIds: const [],
               description: null,
               coverUrl: null,
@@ -85,8 +86,8 @@ class FlibustaApiSource extends BookSource {
         title: result.title,
         authorIds: result.authors,
         authorNames: result.authors,
-        genreIds: const [],
-        description: result.description,
+        genreIds: result.genres,
+        description: result.description.isNotEmpty ? result.description : null,
         coverUrl: result.coverUrl != null ? '$normalizedBase${result.coverUrl}' : null,
         publishDate: null,
         availableFormats: _parseFormats(result.formats),
@@ -98,9 +99,9 @@ class FlibustaApiSource extends BookSource {
 
       return BookDetails(
         book: book,
-        description: result.description,
+        description: result.description.isNotEmpty ? result.description : null,
         availableFormats: _parseFormats(result.formats),
-        downloadUrls: result.formats.map((f) => '$normalizedBase/b/$bookId/download/$f').toList(),
+        downloadUrls: result.formats.map((f) => '$normalizedBase/b/$bookId/$f').toList(),
       );
     } on Object catch (e) {
       throw Exception('Failed to get book details: $e');

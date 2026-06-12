@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_repository.dart';
@@ -15,11 +16,31 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  static const _secureStorage = FlutterSecureStorage();
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _persistent = true;
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadSavedCredentials());
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final username = await _secureStorage.read(key: 'auth_username');
+    final password = await _secureStorage.read(key: 'auth_password');
+    if (username != null && mounted) {
+      _nameController.text = username;
+    }
+    if (password != null && mounted) {
+      _passwordController.text = password;
+      if (mounted) setState(() {});
+    }
+  }
 
   @override
   void dispose() {
@@ -69,48 +90,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(height: 32),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Имя пользователя',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
-                    ),
-                    textInputAction: TextInputAction.next,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Введите имя пользователя';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Пароль',
-                      prefixIcon: const Icon(Icons.lock),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                  AutofillGroup(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _nameController,
+                          autofillHints: const [AutofillHints.username],
+                          decoration: const InputDecoration(
+                            labelText: 'Имя пользователя',
+                            prefixIcon: Icon(Icons.person),
+                            border: OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Введите имя пользователя';
+                            }
+                            return null;
+                          },
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          autofillHints: const [AutofillHints.password],
+                          obscureText: _obscurePassword,
+                          enableSuggestions: false,
+                          autocorrect: false,
+                          decoration: InputDecoration(
+                            labelText: 'Пароль',
+                            prefixIcon: const Icon(Icons.lock),
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _login(),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Введите пароль';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                     ),
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _login(),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Введите пароль';
-                      }
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 16),
                   CheckboxListTile(
@@ -171,7 +202,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _nameController.text.trim(),
             _passwordController.text,
             _persistent,
-          ),
+          )
+          .then((_) {
+            if (_persistent && mounted) {
+              unawaited(
+                _secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
+              );
+              unawaited(
+                _secureStorage.write(key: 'auth_password', value: _passwordController.text),
+              );
+            }
+          }),
     );
   }
 }
