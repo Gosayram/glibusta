@@ -42,6 +42,9 @@ Dio dio(Ref ref) {
       ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
   };
   dio.interceptors.addAll([
+    LogInterceptor(
+      logPrint: (obj) => AppLogger().finest('$obj', name: 'Http'),
+    ),
     AuthInterceptor(ref),
     LoggingInterceptor(),
     ErrorMappingInterceptor(),

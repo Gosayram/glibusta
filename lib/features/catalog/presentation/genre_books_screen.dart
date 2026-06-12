@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/book_card_skeleton.dart';
 import '../data/genre_providers.dart';
 
 class GenreBooksScreen extends ConsumerWidget {
-  final String genreId;
-
   const GenreBooksScreen({super.key, required this.genreId});
+
+  final String genreId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncBooks = ref.watch(genreBooksProvider(genreId));
+
     return Scaffold(
       appBar: AppBar(title: Text(asyncBooks.value?.name ?? 'Жанр')),
       body: asyncBooks.when(
@@ -53,18 +54,13 @@ class GenreBooksScreen extends ConsumerWidget {
               ),
               Expanded(
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   itemCount: response.books.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 4),
                   itemBuilder: (context, index) {
                     final book = response.books[index];
                     return ListTile(
-                          leading: CircleAvatar(
-                            child: Text('${index + 1}'),
-                          ),
+                          leading: CircleAvatar(child: Text('${index + 1}')),
                           title: Text(
                             book.name,
                             style: const TextStyle(fontSize: 14),
@@ -74,10 +70,7 @@ class GenreBooksScreen extends ConsumerWidget {
                           onTap: () => context.push('/book/${book.id}'),
                         )
                         .animate()
-                        .fadeIn(
-                          delay: (index * 40).ms,
-                          duration: 300.ms,
-                        )
+                        .fadeIn(delay: (index * 40).ms, duration: 300.ms)
                         .slideX(begin: 0.05, duration: 300.ms);
                   },
                 ),
@@ -85,38 +78,34 @@ class GenreBooksScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => Skeletonizer(
+        loading: () => const BookListSkeleton(),
+        error: (Object e, _) => Center(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Bone.text(words: 2),
+                const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 16),
-                for (var i = 0; i < 6; i++) ...[
-                  const ListTile(
-                    leading: Bone.circle(size: 40),
-                    title: Bone.text(words: 4),
-                  ),
-                  const SizedBox(height: 4),
-                ],
+                Text(
+                  'Не удалось загрузить жанр',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$e',
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () => ref.invalidate(genreBooksProvider(genreId)),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Повторить'),
+                ),
               ],
             ),
-          ),
-        ),
-        error: (Object e, _) => Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 64),
-              const SizedBox(height: 16),
-              Text('Ошибка загрузки: $e'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(genreBooksProvider(genreId)),
-                child: const Text('Повторить'),
-              ),
-            ],
           ),
         ),
       ),

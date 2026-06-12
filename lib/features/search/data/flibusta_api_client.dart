@@ -2,21 +2,30 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/http/dio_provider.dart';
+import '../../../core/http/http_client.dart';
 
 part 'flibusta_api_client.g.dart';
 
 @riverpod
 FlibustaApiClient flibustaApiClient(Ref ref) {
+  final httpClient = ref.watch(httpClientProvider);
   final dio = ref.watch(dioProvider);
-  return FlibustaApiClient(dio);
+  return FlibustaApiClient(httpClient, dio);
 }
 
 class FlibustaApiClient {
+  final HttpClient _httpClient;
   final Dio _dio;
 
-  FlibustaApiClient(this._dio);
+  FlibustaApiClient(this._httpClient, this._dio);
 
   Dio get dio => _dio;
+
+  Future<String> _getText(String relativePath, {CancelToken? cancelToken}) async {
+    final base = _dio.options.baseUrl;
+    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+    return _httpClient.get('$normalizedBase/$relativePath', cancelToken: cancelToken);
+  }
 
   Future<SearchByNameResponse> searchBooksByName(
     String name, {
@@ -24,8 +33,8 @@ class FlibustaApiClient {
     int limit = 50,
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chb=on';
-    final response = await _dio.get<String>(url);
-    return _parseSearchByNameResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseSearchByNameResponse(response);
   }
 
   Future<SearchByNameResponse> searchBooksByNameOpds(
@@ -36,8 +45,8 @@ class FlibustaApiClient {
   }) async {
     final url =
         'opds/opensearch?searchTerm=${Uri.encodeComponent(name)}&searchType=books&pageNumber=$page';
-    final response = await _dio.get<String>(url, cancelToken: cancelToken);
-    return _parseOpdsSearchResponse(response.data ?? '');
+    final response = await _getText(url, cancelToken: cancelToken);
+    return _parseOpdsSearchResponse(response);
   }
 
   Future<SearchAuthorsResponse> searchAuthors(
@@ -46,8 +55,8 @@ class FlibustaApiClient {
     int limit = 50,
   }) async {
     final url = 'authorsearch?ask=${Uri.encodeComponent(name)}&page=$page';
-    final response = await _dio.get<String>(url);
-    return _parseSearchAuthorsResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseSearchAuthorsResponse(response);
   }
 
   Future<SearchSeriesResponse> searchBooksBySeries(
@@ -56,8 +65,8 @@ class FlibustaApiClient {
     int limit = 50,
   }) async {
     final url = 'series?search=${Uri.encodeComponent(name)}&page=$page';
-    final response = await _dio.get<String>(url);
-    return _parseSearchSeriesResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseSearchSeriesResponse(response);
   }
 
   Future<SearchGenresResponse> searchGenres(
@@ -66,14 +75,14 @@ class FlibustaApiClient {
     int limit = 50,
   }) async {
     final url = 'genres?search=${Uri.encodeComponent(name)}&page=$page';
-    final response = await _dio.get<String>(url);
-    return _parseSearchGenresResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseSearchGenresResponse(response);
   }
 
   Future<BookDetailsResponse> getBookDetails(String bookId) async {
     final url = 'b/$bookId';
-    final response = await _dio.get<String>(url);
-    return _parseBookDetailsResponse(response.data ?? '', bookId);
+    final response = await _getText(url);
+    return _parseBookDetailsResponse(response, bookId);
   }
 
   Future<String> getDownloadUrl(String bookId, String format) async {
@@ -174,46 +183,46 @@ class FlibustaApiClient {
     if (lang != null) params.add('lang=$lang');
     if (type != null) params.add('type=$type');
     final url = 'new${params.isNotEmpty ? '?${params.join('&')}' : ''}';
-    final response = await _dio.get<String>(url);
-    return _parseRecentBooksResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseRecentBooksResponse(response);
   }
 
   Future<AuthorDetailResponse> getAuthorDetail(String authorId) async {
-    final response = await _dio.get<String>('a/$authorId');
-    return _parseAuthorDetailResponse(response.data ?? '', authorId);
+    final response = await _getText('a/$authorId');
+    return _parseAuthorDetailResponse(response, authorId);
   }
 
   Future<GenreBooksResponse> getGenreBooks(
     String genreId, {
     String order = 'a',
   }) async {
-    final response = await _dio.get<String>('g/$genreId?order=$order');
-    return _parseGenreBooksResponse(response.data ?? '', genreId);
+    final response = await _getText('g/$genreId?order=$order');
+    return _parseGenreBooksResponse(response, genreId);
   }
 
   Future<GenreListResponse> getGenreList() async {
-    final response = await _dio.get<String>('genres');
-    return _parseGenreListResponse(response.data ?? '');
+    final response = await _getText('genres');
+    return _parseGenreListResponse(response);
   }
 
   Future<SeriesDetailResponse> getSeriesDetail(String seriesId) async {
-    final response = await _dio.get<String>('sequence/$seriesId');
-    return _parseSeriesDetailResponse(response.data ?? '', seriesId);
+    final response = await _getText('sequence/$seriesId');
+    return _parseSeriesDetailResponse(response, seriesId);
   }
 
   Future<OpdsBooksResponse> getPopularBooksOpds({int page = 0}) async {
-    final response = await _dio.get<String>('opds/popular?pageNumber=$page');
-    return _parseOpdsBooksResponse(response.data ?? '');
+    final response = await _getText('opds/popular?pageNumber=$page');
+    return _parseOpdsBooksResponse(response);
   }
 
   Future<OpdsBooksResponse> getRecentBooksOpds({int page = 0}) async {
-    final response = await _dio.get<String>('opds/recent?pageNumber=$page');
-    return _parseOpdsBooksResponse(response.data ?? '');
+    final response = await _getText('opds/recent?pageNumber=$page');
+    return _parseOpdsBooksResponse(response);
   }
 
   Future<OpdsGenresResponse> getGenresOpds() async {
-    final response = await _dio.get<String>('opds/genres');
-    return _parseOpdsGenresResponse(response.data ?? '');
+    final response = await _getText('opds/genres');
+    return _parseOpdsGenresResponse(response);
   }
 
   Future<bool> addToBookshelf(
@@ -236,13 +245,13 @@ class FlibustaApiClient {
   }
 
   Future<bool> watchBook(String bookId) async {
-    final response = await _dio.get<String>('polka/watch/add/$bookId');
-    return response.statusCode == 200;
+    final response = await _getText('polka/watch/add/$bookId');
+    return response.isNotEmpty;
   }
 
   Future<MessagesResponse> getMessages() async {
-    final response = await _dio.get<String>('messages');
-    return _parseMessagesResponse(response.data ?? '');
+    final response = await _getText('messages');
+    return _parseMessagesResponse(response);
   }
 
   Future<bool> sendMessage(
@@ -264,24 +273,24 @@ class FlibustaApiClient {
   }
 
   Future<UserProfileResponse> getUserProfile(String userId) async {
-    final response = await _dio.get<String>('user/$userId');
-    return _parseUserProfileResponse(response.data ?? '', userId);
+    final response = await _getText('user/$userId');
+    return _parseUserProfileResponse(response, userId);
   }
 
   Future<RecommendationsResponse> getRecommendations({String? userId}) async {
     final url = userId != null ? 'rec?view=recs&user=$userId' : 'rec';
-    final response = await _dio.get<String>(url);
-    return _parseRecommendationsResponse(response.data ?? '');
+    final response = await _getText(url);
+    return _parseRecommendationsResponse(response);
   }
 
   Future<BwListResponse> getBwList(String userId) async {
-    final response = await _dio.get<String>('bwlist/show/$userId');
-    return _parseBwListResponse(response.data ?? '', userId);
+    final response = await _getText('bwlist/show/$userId');
+    return _parseBwListResponse(response, userId);
   }
 
   Future<TrackerResponse> getTracker() async {
-    final response = await _dio.get<String>('tracker');
-    return _parseTrackerResponse(response.data ?? '');
+    final response = await _getText('tracker');
+    return _parseTrackerResponse(response);
   }
 
   BookDetailsResponse _parseBookDetailsResponse(String html, String bookId) {
