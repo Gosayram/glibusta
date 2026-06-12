@@ -4,31 +4,23 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/config/app_settings.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
-import '../../../core/http/http_client.dart';
-import '../../../core/platform/file_system_service.dart';
+import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../domain/download_repository.dart';
 
 final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  final fileSystem = ref.watch(fileSystemServiceProvider);
-  return DownloadRepositoryImpl(db, fileSystem);
-});
-
-final httpClientProvider = Provider<HttpClient>((ref) {
-  final settings = ref.watch(appSettingsProvider);
-  return HttpClient(baseUrl: settings.baseUrl);
+  return DownloadRepositoryImpl(db);
 });
 
 class DownloadRepositoryImpl implements DownloadRepository {
   final AppDatabase _db;
-  final FileSystemService _fileSystem;
+  final AppFileStorage _storage;
 
-  DownloadRepositoryImpl(this._db, this._fileSystem);
+  DownloadRepositoryImpl(this._db) : _storage = AppFileStorageImpl();
 
   @override
   Stream<List<DownloadTask>> watchAllDownloads() {
@@ -60,7 +52,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
     const uuid = Uuid();
     final taskId = uuid.v4();
 
-    final bookFile = await _fileSystem.getBookFile(bookId);
+    final bookFile = await _storage.bookFile(bookId, format);
     final targetPath = bookFile.path;
 
     await _db.insertDownload(

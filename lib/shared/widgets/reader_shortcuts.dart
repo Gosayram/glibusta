@@ -1,22 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+typedef VoidCallback = void Function();
+
 class ReaderShortcuts extends StatefulWidget {
-  const ReaderShortcuts({super.key, required this.child});
+  const ReaderShortcuts({
+    super.key,
+    required this.child,
+    this.onNextPage,
+    this.onPreviousPage,
+    this.onIncreaseFontSize,
+    this.onDecreaseFontSize,
+    this.onSearch,
+    this.onBookmarks,
+    this.onLibrary,
+    this.onSettings,
+    this.onClosePanel,
+  });
 
   final Widget child;
+  final VoidCallback? onNextPage;
+  final VoidCallback? onPreviousPage;
+  final VoidCallback? onIncreaseFontSize;
+  final VoidCallback? onDecreaseFontSize;
+  final VoidCallback? onSearch;
+  final VoidCallback? onBookmarks;
+  final VoidCallback? onLibrary;
+  final VoidCallback? onSettings;
+  final VoidCallback? onClosePanel;
 
   @override
   State<ReaderShortcuts> createState() => _ReaderShortcutsState();
 }
 
 class _ReaderShortcutsState extends State<ReaderShortcuts> {
-  static const _shortcuts = <ShortcutActivator, Intent>{
-    SingleActivator(LogicalKeyboardKey.arrowRight): NextPageIntent(),
-    SingleActivator(LogicalKeyboardKey.arrowLeft): PreviousPageIntent(),
-    SingleActivator(LogicalKeyboardKey.add): IncreaseFontSizeIntent(),
-    SingleActivator(LogicalKeyboardKey.minus): DecreaseFontSizeIntent(),
-  };
+  late Map<ShortcutActivator, Intent> _shortcuts;
+
+  @override
+  void initState() {
+    super.initState();
+    _shortcuts = {
+      const SingleActivator(LogicalKeyboardKey.arrowRight): const NextPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft): const PreviousPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.space): const NextPageIntent(),
+      const SingleActivator(LogicalKeyboardKey.add): const IncreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.equal): const IncreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.minus): const DecreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyF, meta: true): const SearchIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BookmarksIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const LibraryIntent(),
+      const SingleActivator(LogicalKeyboardKey.comma, meta: true): const SettingsIntent(),
+      const SingleActivator(LogicalKeyboardKey.escape): const ClosePanelIntent(),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +60,33 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
       shortcuts: _shortcuts,
       child: Actions(
         actions: <Type, Action<Intent>>{
-          NextPageIntent: NextPageAction(),
-          PreviousPageIntent: PreviousPageAction(),
-          IncreaseFontSizeIntent: IncreaseFontSizeAction(),
-          DecreaseFontSizeIntent: DecreaseFontSizeAction(),
+          NextPageIntent: CallbackAction<NextPageIntent>(
+            onInvoke: (_) => widget.onNextPage?.call(),
+          ),
+          PreviousPageIntent: CallbackAction<PreviousPageIntent>(
+            onInvoke: (_) => widget.onPreviousPage?.call(),
+          ),
+          IncreaseFontSizeIntent: CallbackAction<IncreaseFontSizeIntent>(
+            onInvoke: (_) => widget.onIncreaseFontSize?.call(),
+          ),
+          DecreaseFontSizeIntent: CallbackAction<DecreaseFontSizeIntent>(
+            onInvoke: (_) => widget.onDecreaseFontSize?.call(),
+          ),
+          SearchIntent: CallbackAction<SearchIntent>(
+            onInvoke: (_) => widget.onSearch?.call(),
+          ),
+          BookmarksIntent: CallbackAction<BookmarksIntent>(
+            onInvoke: (_) => widget.onBookmarks?.call(),
+          ),
+          LibraryIntent: CallbackAction<LibraryIntent>(
+            onInvoke: (_) => widget.onLibrary?.call(),
+          ),
+          SettingsIntent: CallbackAction<SettingsIntent>(
+            onInvoke: (_) => widget.onSettings?.call(),
+          ),
+          ClosePanelIntent: CallbackAction<ClosePanelIntent>(
+            onInvoke: (_) => widget.onClosePanel?.call(),
+          ),
         },
         child: widget.child,
       ),
@@ -51,34 +110,22 @@ class DecreaseFontSizeIntent extends Intent {
   const DecreaseFontSizeIntent();
 }
 
-class NextPageAction extends Action<NextPageIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Navigate to next page
-    return null;
-  }
+class SearchIntent extends Intent {
+  const SearchIntent();
 }
 
-class PreviousPageAction extends Action<PreviousPageIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Navigate to previous page
-    return null;
-  }
+class BookmarksIntent extends Intent {
+  const BookmarksIntent();
 }
 
-class IncreaseFontSizeAction extends Action<IncreaseFontSizeIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Increase font size
-    return null;
-  }
+class LibraryIntent extends Intent {
+  const LibraryIntent();
 }
 
-class DecreaseFontSizeAction extends Action<DecreaseFontSizeIntent> {
-  @override
-  Object? invoke(Intent intent) {
-    // Decrease font size
-    return null;
-  }
+class SettingsIntent extends Intent {
+  const SettingsIntent();
+}
+
+class ClosePanelIntent extends Intent {
+  const ClosePanelIntent();
 }

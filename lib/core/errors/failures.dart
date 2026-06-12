@@ -1,7 +1,8 @@
 sealed class AppFailure {
   final String? message;
+  final StackTrace? stackTrace;
 
-  const AppFailure([this.message]);
+  const AppFailure([this.message, this.stackTrace]);
 
   @override
   String toString() => '$runtimeType: ${message ?? 'Unknown error'}';
@@ -9,6 +10,14 @@ sealed class AppFailure {
 
 final class NetworkFailure extends AppFailure {
   const NetworkFailure([super.message]);
+}
+
+final class NotFoundFailure extends AppFailure {
+  const NotFoundFailure([super.message]);
+}
+
+final class BookOpenFailure extends AppFailure {
+  const BookOpenFailure([super.message]);
 }
 
 final class SourceUnavailableFailure extends AppFailure {
@@ -27,10 +36,14 @@ final class StorageFailure extends AppFailure {
   const StorageFailure([super.message]);
 }
 
+final class AuthFailure extends AppFailure {
+  const AuthFailure([super.message]);
+}
+
 final class CancelledFailure extends AppFailure {
   const CancelledFailure();
 }
 
 final class UnknownFailure extends AppFailure {
-  const UnknownFailure([super.message]);
+  const UnknownFailure([super.message, super.stackTrace]);
 }

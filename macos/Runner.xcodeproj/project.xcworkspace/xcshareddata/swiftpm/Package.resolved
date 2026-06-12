@@ -1,11 +1,21 @@
 {
   "pins" : [
     {
-      "identity" : "csqlite",
+      "identity" : "sentry-cocoa",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/simolus3/CSQLite.git",
+      "location" : "https://github.com/getsentry/sentry-cocoa",
       "state" : {
-        "revision" : "1ee46d19a4f451a7aa64ffc64fc99b4748131e62"
+        "revision" : "dad229c665bfd043c5d80ac7aa77717cbd19a1c3",
+        "version" : "8.58.3"
+      }
+    },
+    {
+      "identity" : "universaldetector2",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/amake/UniversalDetector2.git",
+      "state" : {
+        "revision" : "32982d5fa66d40d59e8be38ace596a046ccd3918",
+        "version" : "2.0.2"
       }
     }
   ],

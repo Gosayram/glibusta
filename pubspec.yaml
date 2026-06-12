@@ -1,58 +1,96 @@
 name: glibusta
 description: Cross-platform book library app for Flibusta
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.2+4
 
 environment:
-  sdk: ^3.12.1
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.44.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
 
   # State management & DI
   flutter_riverpod: ^3.3.1
   riverpod_annotation: ^4.0.2
 
   # Routing
-  go_router: ^15.1.3
+  go_router: ^17.3.0
 
   # HTTP client
-  dio: ^5.9.0
+  dio: ^5.9.2
 
   # HTML parsing
   html: ^0.15.1
 
   # Localization
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Local database
-  drift: ^2.28.2
-  sqlite3_flutter_libs: ^0.5.42
+  drift: ^2.34.0
+  drift_flutter: ^0.3.0
+
+  # Models / serialization
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
 
   # File system
   path: ^1.9.0
-  file: ^7.0.1
+  path_provider: ^2.1.5
+  file_picker: ^12.0.0-beta.5
+  file_selector: ^1.0.4
+  receive_sharing_intent: ^1.8.0
+
+  # Downloads
+  background_downloader: ^9.5.5
+
+  # Reader formats
+  pdfrx: ^2.4.3
+  xml: ^7.0.1
+  archive: ^4.0.0
+
+  # Encoding detection
+  flutter_charset_detector: ^6.0.0
+  fl_charset: ^1.0.2
 
   # Utilities
-  async: ^2.13.0
-  collection: ^1.19.1
   crypto: ^3.0.7
   flutter_dotenv: ^6.0.1
-  package_info_plus: ^8.3.1
-  path_provider: ^2.1.5
+  package_info_plus: ^10.1.0
+  device_info_plus: ^13.1.0
   uuid: ^4.5.0
+  logging: ^1.3.0
+  url_launcher: ^6.3.2
+  skeletonizer: ^2.0.0
+  connectivity_plus: ^7.1.1
 
+  # Android-specific
+  wakelock_plus: ^1.6.0
+  dynamic_color: ^1.8.0
+
+  # UI & Theming
+  flex_color_scheme: ^8.4.0
+  flutter_animate: ^4.5.2
+
+  # Analytics & Monitoring
+  sentry_flutter: ^9.21.0
+
+  file: any
+  shared_preferences: ^2.5.5
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  very_good_analysis: ^10.0.0
   riverpod_lint: ^3.1.3
+  riverpod_generator: ^4.0.4-dev.1
   freezed: ^3.2.5
   json_serializable: ^6.14.0
   build_runner: ^2.15.0
-  drift_dev: ^2.33.0
+  drift_dev: ^2.34.0
+  mocktail: ^1.0.4
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true
@@ -61,3 +99,16 @@ flutter:
     - .env
     - lib/l10n/app_ru.arb
     - lib/l10n/app_en.arb
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/InterVariable.ttf
+        - asset: assets/fonts/InterVariable-Italic.ttf
+          style: italic
+    - family: Literata
+      fonts:
+        - asset: assets/fonts/Literata-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Literata-Bold.ttf
+          weight: 700

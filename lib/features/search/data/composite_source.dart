@@ -1,22 +1,24 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/failures.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
+import 'flibusta_api_source.dart';
 import 'flibusta_source.dart';
 
-final compositeSourceProvider = Provider<CompositeBookSource>((ref) {
+part 'composite_source.g.dart';
+
+@riverpod
+BookSource bookSource(Ref ref) {
   final sources = <BookSource>[
+    ref.watch(flibustaApiSourceProvider),
     ref.watch(flibustaSourceProvider),
   ];
   return CompositeBookSource(sources);
-});
-
-final bookSourceProvider = Provider<BookSource>((ref) {
-  return ref.watch(compositeSourceProvider);
-});
+}
 
 class CompositeBookSource extends BookSource {
   final List<BookSource> sources;
@@ -24,11 +26,11 @@ class CompositeBookSource extends BookSource {
   CompositeBookSource(this.sources);
 
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     final errors = <AppFailure>[];
     for (final source in sources) {
       try {
-        final result = await source.searchBooks(query);
+        final result = await source.searchBooks(query, cancelToken: cancelToken);
         if (result.books.isNotEmpty) return result;
       } on AppFailure catch (e) {
         errors.add(e);

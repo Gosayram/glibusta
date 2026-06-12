@@ -19,6 +19,22 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// Force consistent JVM target across all subprojects (plugins like
+// receive_sharing_intent apply their own KGP with a different target).
+gradle.projectsEvaluated {
+    subprojects {
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+            compilerOptions {
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            }
+        }
+        tasks.withType<JavaCompile>().configureEach {
+            sourceCompatibility = "21"
+            targetCompatibility = "21"
+        }
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

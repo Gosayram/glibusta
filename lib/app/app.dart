@@ -1,76 +1,40 @@
+import 'dart:async';
+
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../features/book_details/presentation/book_details_screen.dart';
-import '../features/catalog/presentation/catalog_screen.dart';
-import '../features/downloads/presentation/downloads_screen.dart';
-import '../features/library/presentation/library_screen.dart';
-import '../features/reader/presentation/reader_screen.dart';
-import '../features/search/presentation/search_screen.dart';
-import '../features/settings/presentation/settings_screen.dart';
-import '../shared/widgets/adaptive_navigation.dart';
+import '../core/platform/app_platform.dart';
+import '../core/platform/lifecycle_service.dart';
+import '../core/platform/share_handler.dart';
+import '../features/library/data/book_import_service.dart';
+import '../shared/widgets/command_palette.dart';
+import 'router.dart';
+import 'theme.dart';
 
-final routerProvider = Provider<GoRouter>(
-  (ref) => GoRouter(
-    initialLocation: '/',
-    routes: <RouteBase>[
-      ShellRoute(
-        builder: (BuildContext context, GoRouterState state, Widget child) {
-          return ScaffoldWithNav(child: child);
-        },
-        routes: [
-          GoRoute(
-            path: '/',
-            name: 'home',
-            builder: (BuildContext context, GoRouterState state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/catalog',
-            name: 'catalog',
-            builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
-          ),
-          GoRoute(
-            path: '/search',
-            name: 'search',
-            builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
-          ),
-          GoRoute(
-            path: '/library',
-            name: 'library',
-            builder: (BuildContext context, GoRouterState state) => const LibraryScreen(),
-          ),
-          GoRoute(
-            path: '/downloads',
-            name: 'downloads',
-            builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
-          ),
-          GoRoute(
-            path: '/settings',
-            name: 'settings',
-            builder: (BuildContext context, GoRouterState state) => const SettingsScreen(),
-          ),
-        ],
-      ),
-      GoRoute(
-        path: '/book/:bookId',
-        name: 'bookDetails',
-        builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
-          return BookDetailsScreen(bookId: bookId);
-        },
-      ),
-      GoRoute(
-        path: '/reader/:bookId',
-        name: 'reader',
-        builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
-          return ReaderScreen(bookId: bookId);
-        },
-      ),
-    ],
-  ),
-);
+part 'app.g.dart';
+
+/// Platform-appropriate page transition builder.
+/// Android: PredictiveBackPageTransitionsBuilder (supports predictive back gesture)
+/// Others: FadeUpwardsPageTransitionsBuilder (Material default)
+PageTransitionsBuilder _platformTransitionBuilder(TargetPlatform platform) {
+  if (platform == TargetPlatform.android) {
+    return const PredictiveBackPageTransitionsBuilder();
+  }
+  return const FadeUpwardsPageTransitionsBuilder();
+}
+
+@riverpod
+class IsObscuredNotifier extends _$IsObscuredNotifier {
+  @override
+  bool build() => false;
+
+  void obscure() => state = true;
+  void reveal() => state = false;
+}
 
 class GlibustaApp extends ConsumerStatefulWidget {
   const GlibustaApp({super.key});
@@ -80,101 +44,200 @@ class GlibustaApp extends ConsumerStatefulWidget {
 }
 
 class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingObserver {
+  late final LifecycleObserver _lifecycleObserver;
+  final _shareHandler = ShareHandler();
+  bool _shareHandlerInitialized = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initPlatform();
+    _initLifecycle();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_shareHandlerInitialized) {
+      _shareHandlerInitialized = true;
+      final importService = ref.read(bookImportServiceProvider);
+      _shareHandler.init(context, importService);
+    }
+  }
+
+  void _initPlatform() {
+    if (ref.read(platformCapabilitiesProvider).supportsPredictiveBack) {
+      _initAndroidEdgeToEdge();
+    }
+  }
+
+  void _initAndroidEdgeToEdge() {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+  }
+
+  void _initLifecycle() {
+    final service = ref.read(lifecycleServiceProvider);
+    _lifecycleObserver = LifecycleObserver(service);
+    service.setCallback(LifecycleEvent.pause, () {
+      ref.read(isObscuredProvider.notifier).obscure();
+    });
+    service.setCallback(LifecycleEvent.inactive, () {
+      ref.read(isObscuredProvider.notifier).obscure();
+    });
+    service.setCallback(LifecycleEvent.resume, () {
+      ref.read(isObscuredProvider.notifier).reveal();
+    });
   }
 
   @override
   void dispose() {
+    _shareHandler.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-      case AppLifecycleState.hidden:
-        _saveState();
-        break;
-      case AppLifecycleState.resumed:
-      case AppLifecycleState.inactive:
-        break;
-    }
-  }
-
-  void _saveState() {
-    // Persist reading progress, download states, etc.
-    // Handled by Drift auto-persistence in repositories
+    _lifecycleObserver.didChangeAppLifecycleState(state);
   }
 
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    return MaterialApp.router(
-      title: 'Glibusta',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-        ),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      routerConfig: router,
-      restorationScopeId: 'app',
+    final isObscured = ref.watch(isObscuredProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    return DynamicColorBuilder(
+      builder: (ColorScheme? dynamicLight, ColorScheme? dynamicDark) {
+        final lightTheme = dynamicLight != null
+            ? AppTheme.lightTheme.copyWith(
+                colorScheme: dynamicLight,
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
+                  },
+                ),
+              )
+            : AppTheme.lightTheme.copyWith(
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
+                  },
+                ),
+              );
+        final darkTheme = dynamicDark != null
+            ? AppTheme.darkTheme.copyWith(
+                colorScheme: dynamicDark,
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
+                  },
+                ),
+              )
+            : AppTheme.darkTheme.copyWith(
+                pageTransitionsTheme: PageTransitionsTheme(
+                  builders: {
+                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
+                  },
+                ),
+              );
+        return MaterialApp.router(
+          title: 'Glibusta',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: themeMode,
+          routerConfig: router,
+          restorationScopeId: 'app',
+          builder: (context, child) {
+            final wrappedChild = _GlobalKeyboardShortcuts(
+              key: const Key('global-keyboard-shortcuts'),
+              child: child ?? const SizedBox.shrink(),
+            );
+            if (!isObscured) return wrappedChild;
+            return Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                Positioned.fill(
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: Center(
+                      child: Icon(
+                        Icons.menu_book,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class _GlobalKeyboardShortcuts extends StatefulWidget {
+  final Widget child;
+
+  const _GlobalKeyboardShortcuts({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Glibusta'),
-        automaticallyImplyLeading: false,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.menu_book,
-              size: 80,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Glibusta',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Кросс-платформенная библиотека',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: () => context.go('/search'),
-              icon: const Icon(Icons.search),
-              label: const Text('Найти книгу'),
-            ),
-          ],
-        ),
-      ),
-    );
+  State<_GlobalKeyboardShortcuts> createState() => _GlobalKeyboardShortcutsState();
+}
+
+class _GlobalKeyboardShortcutsState extends State<_GlobalKeyboardShortcuts> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (!_hasCommandModifier()) return false;
+
+    if (event.logicalKey == LogicalKeyboardKey.keyK) {
+      CommandPalette.show(context);
+      return true;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.keyF && !_isReaderRoute()) {
+      context.go('/search');
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _hasCommandModifier() {
+    final keys = HardwareKeyboard.instance.logicalKeysPressed;
+    return keys.contains(LogicalKeyboardKey.meta) || keys.contains(LogicalKeyboardKey.control);
+  }
+
+  bool _isReaderRoute() {
+    try {
+      return GoRouterState.of(context).uri.path.startsWith('/reader/');
+    } on Object {
+      return false;
+    }
   }
 }

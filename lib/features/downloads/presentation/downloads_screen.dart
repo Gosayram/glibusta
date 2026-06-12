@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/error_state_widget.dart';
 import 'download_queue.dart';
 
 class DownloadsScreen extends ConsumerWidget {
@@ -37,14 +40,46 @@ class DownloadsScreen extends ConsumerWidget {
       body: downloadsAsync.when(
         data: (List<DownloadTask> downloads) {
           if (downloads.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.download_done, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('Нет загрузок', style: TextStyle(color: Colors.grey)),
-                ],
+            return Center(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.0),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) => Opacity(
+                  opacity: value,
+                  child: child,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.download_done,
+                      size: 64,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Нет загрузок',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Скачайте книги из каталога',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.tonal(
+                      onPressed: () => context.go('/catalog'),
+                      child: const Text('Перейти в каталог'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -59,7 +94,11 @@ class DownloadsScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+        error: (Object e, _) => ErrorStateWidget(
+          message: 'Не удалось загрузить загрузки',
+          details: e.toString(),
+          onRetry: () => ref.invalidate(activeDownloadsProvider),
+        ),
       ),
     );
   }
@@ -84,7 +123,7 @@ class DownloadTile extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(_statusIcon(task.status), size: 20, color: _statusColor(task.status)),
+                Icon(_statusIcon(task.status), size: 20, color: _statusColor(context, task.status)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -156,14 +195,14 @@ class DownloadTile extends ConsumerWidget {
     };
   }
 
-  Color _statusColor(DownloadStatus status) {
+  Color _statusColor(BuildContext context, DownloadStatus status) {
     return switch (status) {
-      DownloadStatus.queued => Colors.orange,
-      DownloadStatus.running => Colors.blue,
-      DownloadStatus.paused => Colors.amber,
-      DownloadStatus.completed => Colors.green,
-      DownloadStatus.failed => Colors.red,
-      DownloadStatus.canceled => Colors.grey,
+      DownloadStatus.queued => AppColors.warning,
+      DownloadStatus.running => AppColors.info,
+      DownloadStatus.paused => AppColors.warning,
+      DownloadStatus.completed => AppColors.success,
+      DownloadStatus.failed => AppColors.error,
+      DownloadStatus.canceled => Theme.of(context).colorScheme.outline,
     };
   }
 

@@ -34,7 +34,9 @@ class DownloadQueue {
   int _maxConcurrent = 3;
   int _runningCount = 0;
 
-  DownloadQueue(this._repository, this._httpClient);
+  DownloadQueue(this._repository, this._httpClient) {
+    _downloadsController.add([]);
+  }
 
   Stream<List<DownloadTask>> get onDownloadsChanged => _downloadsController.stream;
 

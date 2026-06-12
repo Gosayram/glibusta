@@ -134,3 +134,9 @@ docs/
 
 # Node
 node_modules/
+
+# Packages and files
+dist/
+
+# Kotlin
+.kotlin/

@@ -1,9 +1,11 @@
+import 'package:dio/dio.dart';
+
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 
 abstract class BookSource {
-  Future<SearchResultPage> searchBooks(SearchQuery query);
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken});
 
   Future<BookDetails> getBookDetails(String bookId);
 
@@ -14,7 +16,7 @@ abstract class BookSource {
 
 class MockBookSource implements BookSource {
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     return SearchResultPage(
       books: const [],
       totalCount: 0,
@@ -35,11 +37,11 @@ class MockBookSource implements BookSource {
         description: null,
         coverUrl: null,
         publishDate: null,
-        availableFormats: const [],
+        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
         source: const BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
       ),
       description: 'Mock description',
-      availableFormats: const [],
+      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
       downloadUrls: const [],
     );
   }

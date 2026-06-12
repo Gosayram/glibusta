@@ -2,5 +2,20 @@
   "printWidth": 100,
   "proseWrap": "always",
   "singleQuote": true,
-  "trailingComma": "all"
+  "trailingComma": "all",
+  "overrides": [
+    {
+      "files": "*.md",
+      "options": {
+        "proseWrap": "preserve",
+        "printWidth": 120
+      }
+    },
+    {
+      "files": ["*.yml", "*.yaml"],
+      "options": {
+        "proseWrap": "preserve"
+      }
+    }
+  ]
 }

@@ -1,18 +1,24 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'app_settings.g.dart';
 
 @immutable
 class AppSettings {
   final String baseUrl;
-  final List<String> mirrors;
+  final List<String> defaultMirrors;
+  final List<String> customMirrors;
   final Duration requestTimeout;
   final int maxConcurrentDownloads;
   final bool enableLogging;
 
+  List<String> get mirrors => [...defaultMirrors, ...customMirrors];
+
   const AppSettings({
     required this.baseUrl,
-    this.mirrors = const [],
+    this.defaultMirrors = const [],
+    this.customMirrors = const [],
     this.requestTimeout = const Duration(seconds: 30),
     this.maxConcurrentDownloads = 3,
     this.enableLogging = false,
@@ -27,26 +33,48 @@ class AppSettings {
 
     return AppSettings(
       baseUrl: baseUrl,
-      mirrors: mirrors,
+      defaultMirrors: mirrors,
       maxConcurrentDownloads: maxConcurrentDownloads,
     );
   }
 
   AppSettings copyWith({
     String? baseUrl,
-    List<String>? mirrors,
+    List<String>? defaultMirrors,
+    List<String>? customMirrors,
     Duration? requestTimeout,
     int? maxConcurrentDownloads,
     bool? enableLogging,
   }) => AppSettings(
     baseUrl: baseUrl ?? this.baseUrl,
-    mirrors: mirrors ?? this.mirrors,
+    defaultMirrors: defaultMirrors ?? this.defaultMirrors,
+    customMirrors: customMirrors ?? this.customMirrors,
     requestTimeout: requestTimeout ?? this.requestTimeout,
     maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
     enableLogging: enableLogging ?? this.enableLogging,
   );
 }
 
-final appSettingsProvider = StateProvider<AppSettings>((ref) {
-  return AppSettings.fromEnv();
-});
+@riverpod
+class AppSettingsController extends _$AppSettingsController {
+  @override
+  AppSettings build() {
+    return AppSettings.fromEnv();
+  }
+
+  void updateBaseUrl(String baseUrl) {
+    state = state.copyWith(baseUrl: baseUrl);
+  }
+
+  void updateCustomMirrors(List<String> customMirrors) {
+    state = state.copyWith(customMirrors: customMirrors);
+  }
+
+  void updateMaxConcurrentDownloads(int maxConcurrentDownloads) {
+    state = state.copyWith(maxConcurrentDownloads: maxConcurrentDownloads);
+  }
+
+  void updateEnableLogging(bool enableLogging) {
+    state = state.copyWith(enableLogging: enableLogging);
+  }
+}

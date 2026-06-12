@@ -1,34 +1,41 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:html/dom.dart' show Document, Element;
 import 'package:html/parser.dart' show parse;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/config/app_settings.dart';
 import '../../../core/http/http_client.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
 
-final flibustaSourceProvider = Provider<FlibustaHtmlSource>((ref) {
-  final settings = ref.watch(appSettingsProvider);
-  final client = HttpClient(
-    baseUrl: settings.baseUrl,
-    mirrors: settings.mirrors,
-  );
-  return FlibustaHtmlSource(client, settings.baseUrl);
-});
+part 'flibusta_source.g.dart';
+
+@riverpod
+FlibustaHtmlSource flibustaSource(Ref ref) {
+  final client = ref.watch(httpClientProvider);
+  return FlibustaHtmlSource(client);
+}
 
 class FlibustaHtmlSource extends BookSource {
   final HttpClient client;
-  final String baseUrl;
   final String sourceId;
 
-  FlibustaHtmlSource(this.client, this.baseUrl) : sourceId = Uri.parse(baseUrl).host;
+  FlibustaHtmlSource(this.client) : sourceId = Uri.parse(client.dio.options.baseUrl).host;
 
   @override
-  Future<SearchResultPage> searchBooks(SearchQuery query) async {
+  Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
+    if (query.query.isEmpty) {
+      return SearchResultPage(
+        books: const [],
+        totalCount: 0,
+        currentPage: query.page,
+        totalPages: 0,
+        hasNextPage: false,
+      );
+    }
     final searchUrl = _buildSearchUrl(query);
-    final html = await client.getWithMirror(searchUrl);
+    final html = await client.getWithMirror(searchUrl, cancelToken: cancelToken);
     return _parseSearchResults(html, query);
   }
 
@@ -46,7 +53,9 @@ class FlibustaHtmlSource extends BookSource {
 
   @override
   Future<String> getDownloadUrl(String bookId, BookFormat format) async {
-    return '$baseUrl/b/$bookId/download/${format.name}';
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+    return '$base/b/$bookId/download/${format.name}';
   }
 
   String _buildSearchUrl(SearchQuery query) {
@@ -63,8 +72,15 @@ class FlibustaHtmlSource extends BookSource {
     if (query.series != null && query.series!.isNotEmpty) {
       params.add('series=${Uri.encodeComponent(query.series!)}');
     }
-    if (query.genre != null && query.genre!.isNotEmpty) {
-      params.add('genre=${Uri.encodeComponent(query.genre!)}');
+    final genre = query.filters.genre ?? query.genre;
+    if (query.filters.format != null) {
+      params.add('format=${Uri.encodeComponent(query.filters.format!.name)}');
+    }
+    if (query.filters.language != null && query.filters.language!.trim().isNotEmpty) {
+      params.add('language=${Uri.encodeComponent(query.filters.language!)}');
+    }
+    if (genre != null && genre.trim().isNotEmpty) {
+      params.add('genre=${Uri.encodeComponent(genre)}');
     }
     if (query.page > 0) {
       params.add('page=${query.page + 1}');
@@ -110,16 +126,19 @@ class FlibustaHtmlSource extends BookSource {
     final coverUrl = _extractCoverUrl(element);
     final description = _extractDescription(element);
 
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
     return Book(
       id: id,
       title: title,
       authorIds: authorIds,
+      authorNames: authorNames,
       genreIds: const [],
       description: description,
       coverUrl: coverUrl,
       publishDate: null,
       availableFormats: formats,
-      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$baseUrl/b/$id'),
+      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$id'),
     );
   }
 
@@ -174,6 +193,9 @@ class FlibustaHtmlSource extends BookSource {
     );
     final coverUrl = coverImg?.attributes['src'];
 
+    final rawBase = client.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+
     return BookDetails(
       book: Book(
         id: bookId,
@@ -186,7 +208,7 @@ class FlibustaHtmlSource extends BookSource {
         availableFormats: formats,
         source: BookSourceInfo(
           sourceId: sourceId,
-          sourceUrl: '$baseUrl/b/$bookId',
+          sourceUrl: '$base/b/$bookId',
         ),
       ),
       description: description,
@@ -264,11 +286,11 @@ class FlibustaHtmlSource extends BookSource {
     }
     if (lower.endsWith('.txt') || lower.contains('.txt?')) return BookFormat.txt;
     if (lower.endsWith('.mobi') || lower.contains('.mobi?')) {
-      return BookFormat.mobi;
+      return BookFormat.unknown;
     }
     if (lower.endsWith('.pdf') || lower.contains('.pdf?')) return BookFormat.pdf;
     if (lower.endsWith('.djvu') || lower.contains('.djvu?')) {
-      return BookFormat.djvu;
+      return BookFormat.unknown;
     }
     return null;
   }
