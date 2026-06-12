@@ -55,6 +55,8 @@ dependencies:
   fl_charset: ^1.0.2
 
   # Utilities
+  collection: ^1.19.0
+  image: ^4.5.4
   crypto: ^3.0.7
   flutter_dotenv: ^6.0.1
   package_info_plus: ^10.1.0

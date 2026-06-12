@@ -68,6 +68,29 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _coverPathMeta = const VerificationMeta(
+    'coverPath',
+  );
+  @override
+  late final GeneratedColumn<String> coverPath = GeneratedColumn<String>(
+    'cover_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _coverStatusMeta = const VerificationMeta(
+    'coverStatus',
+  );
+  @override
+  late final GeneratedColumn<String> coverStatus = GeneratedColumn<String>(
+    'cover_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('none'),
+  );
   static const VerificationMeta _publishDateMeta = const VerificationMeta(
     'publishDate',
   );
@@ -234,6 +257,8 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     genreIds,
     description,
     coverUrl,
+    coverPath,
+    coverStatus,
     publishDate,
     sourceId,
     sourceUrl,
@@ -287,6 +312,21 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
       context.handle(
         _coverUrlMeta,
         coverUrl.isAcceptableOrUnknown(data['cover_url']!, _coverUrlMeta),
+      );
+    }
+    if (data.containsKey('cover_path')) {
+      context.handle(
+        _coverPathMeta,
+        coverPath.isAcceptableOrUnknown(data['cover_path']!, _coverPathMeta),
+      );
+    }
+    if (data.containsKey('cover_status')) {
+      context.handle(
+        _coverStatusMeta,
+        coverStatus.isAcceptableOrUnknown(
+          data['cover_status']!,
+          _coverStatusMeta,
+        ),
       );
     }
     if (data.containsKey('publish_date')) {
@@ -437,6 +477,14 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}cover_url'],
       ),
+      coverPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_path'],
+      ),
+      coverStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_status'],
+      )!,
       publishDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}publish_date'],
@@ -512,6 +560,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final List<String> genreIds;
   final String? description;
   final String? coverUrl;
+  final String? coverPath;
+  final String coverStatus;
   final DateTime? publishDate;
   final String? sourceId;
   final String? sourceUrl;
@@ -533,6 +583,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     required this.genreIds,
     this.description,
     this.coverUrl,
+    this.coverPath,
+    required this.coverStatus,
     this.publishDate,
     this.sourceId,
     this.sourceUrl,
@@ -569,6 +621,10 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || coverUrl != null) {
       map['cover_url'] = Variable<String>(coverUrl);
     }
+    if (!nullToAbsent || coverPath != null) {
+      map['cover_path'] = Variable<String>(coverPath);
+    }
+    map['cover_status'] = Variable<String>(coverStatus);
     if (!nullToAbsent || publishDate != null) {
       map['publish_date'] = Variable<DateTime>(publishDate);
     }
@@ -614,6 +670,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       genreIds: Value(genreIds),
       description: description == null && nullToAbsent ? const Value.absent() : Value(description),
       coverUrl: coverUrl == null && nullToAbsent ? const Value.absent() : Value(coverUrl),
+      coverPath: coverPath == null && nullToAbsent ? const Value.absent() : Value(coverPath),
+      coverStatus: Value(coverStatus),
       publishDate: publishDate == null && nullToAbsent ? const Value.absent() : Value(publishDate),
       sourceId: sourceId == null && nullToAbsent ? const Value.absent() : Value(sourceId),
       sourceUrl: sourceUrl == null && nullToAbsent ? const Value.absent() : Value(sourceUrl),
@@ -651,6 +709,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       genreIds: serializer.fromJson<List<String>>(json['genreIds']),
       description: serializer.fromJson<String?>(json['description']),
       coverUrl: serializer.fromJson<String?>(json['coverUrl']),
+      coverPath: serializer.fromJson<String?>(json['coverPath']),
+      coverStatus: serializer.fromJson<String>(json['coverStatus']),
       publishDate: serializer.fromJson<DateTime?>(json['publishDate']),
       sourceId: serializer.fromJson<String?>(json['sourceId']),
       sourceUrl: serializer.fromJson<String?>(json['sourceUrl']),
@@ -681,6 +741,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'genreIds': serializer.toJson<List<String>>(genreIds),
       'description': serializer.toJson<String?>(description),
       'coverUrl': serializer.toJson<String?>(coverUrl),
+      'coverPath': serializer.toJson<String?>(coverPath),
+      'coverStatus': serializer.toJson<String>(coverStatus),
       'publishDate': serializer.toJson<DateTime?>(publishDate),
       'sourceId': serializer.toJson<String?>(sourceId),
       'sourceUrl': serializer.toJson<String?>(sourceUrl),
@@ -705,6 +767,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     List<String>? genreIds,
     Value<String?> description = const Value.absent(),
     Value<String?> coverUrl = const Value.absent(),
+    Value<String?> coverPath = const Value.absent(),
+    String? coverStatus,
     Value<DateTime?> publishDate = const Value.absent(),
     Value<String?> sourceId = const Value.absent(),
     Value<String?> sourceUrl = const Value.absent(),
@@ -726,6 +790,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     genreIds: genreIds ?? this.genreIds,
     description: description.present ? description.value : this.description,
     coverUrl: coverUrl.present ? coverUrl.value : this.coverUrl,
+    coverPath: coverPath.present ? coverPath.value : this.coverPath,
+    coverStatus: coverStatus ?? this.coverStatus,
     publishDate: publishDate.present ? publishDate.value : this.publishDate,
     sourceId: sourceId.present ? sourceId.value : this.sourceId,
     sourceUrl: sourceUrl.present ? sourceUrl.value : this.sourceUrl,
@@ -753,6 +819,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       genreIds: data.genreIds.present ? data.genreIds.value : this.genreIds,
       description: data.description.present ? data.description.value : this.description,
       coverUrl: data.coverUrl.present ? data.coverUrl.value : this.coverUrl,
+      coverPath: data.coverPath.present ? data.coverPath.value : this.coverPath,
+      coverStatus: data.coverStatus.present ? data.coverStatus.value : this.coverStatus,
       publishDate: data.publishDate.present ? data.publishDate.value : this.publishDate,
       sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
       sourceUrl: data.sourceUrl.present ? data.sourceUrl.value : this.sourceUrl,
@@ -785,6 +853,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('genreIds: $genreIds, ')
           ..write('description: $description, ')
           ..write('coverUrl: $coverUrl, ')
+          ..write('coverPath: $coverPath, ')
+          ..write('coverStatus: $coverStatus, ')
           ..write('publishDate: $publishDate, ')
           ..write('sourceId: $sourceId, ')
           ..write('sourceUrl: $sourceUrl, ')
@@ -804,13 +874,15 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     title,
     authorIds,
     genreIds,
     description,
     coverUrl,
+    coverPath,
+    coverStatus,
     publishDate,
     sourceId,
     sourceUrl,
@@ -825,7 +897,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     userForcedEncoding,
     storageMode,
     externalUri,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -836,6 +908,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.genreIds == this.genreIds &&
           other.description == this.description &&
           other.coverUrl == this.coverUrl &&
+          other.coverPath == this.coverPath &&
+          other.coverStatus == this.coverStatus &&
           other.publishDate == this.publishDate &&
           other.sourceId == this.sourceId &&
           other.sourceUrl == this.sourceUrl &&
@@ -859,6 +933,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<List<String>> genreIds;
   final Value<String?> description;
   final Value<String?> coverUrl;
+  final Value<String?> coverPath;
+  final Value<String> coverStatus;
   final Value<DateTime?> publishDate;
   final Value<String?> sourceId;
   final Value<String?> sourceUrl;
@@ -881,6 +957,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.genreIds = const Value.absent(),
     this.description = const Value.absent(),
     this.coverUrl = const Value.absent(),
+    this.coverPath = const Value.absent(),
+    this.coverStatus = const Value.absent(),
     this.publishDate = const Value.absent(),
     this.sourceId = const Value.absent(),
     this.sourceUrl = const Value.absent(),
@@ -904,6 +982,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.genreIds = const Value.absent(),
     this.description = const Value.absent(),
     this.coverUrl = const Value.absent(),
+    this.coverPath = const Value.absent(),
+    this.coverStatus = const Value.absent(),
     this.publishDate = const Value.absent(),
     this.sourceId = const Value.absent(),
     this.sourceUrl = const Value.absent(),
@@ -928,6 +1008,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<String>? genreIds,
     Expression<String>? description,
     Expression<String>? coverUrl,
+    Expression<String>? coverPath,
+    Expression<String>? coverStatus,
     Expression<DateTime>? publishDate,
     Expression<String>? sourceId,
     Expression<String>? sourceUrl,
@@ -951,6 +1033,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (genreIds != null) 'genre_ids': genreIds,
       if (description != null) 'description': description,
       if (coverUrl != null) 'cover_url': coverUrl,
+      if (coverPath != null) 'cover_path': coverPath,
+      if (coverStatus != null) 'cover_status': coverStatus,
       if (publishDate != null) 'publish_date': publishDate,
       if (sourceId != null) 'source_id': sourceId,
       if (sourceUrl != null) 'source_url': sourceUrl,
@@ -976,6 +1060,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<List<String>>? genreIds,
     Value<String?>? description,
     Value<String?>? coverUrl,
+    Value<String?>? coverPath,
+    Value<String>? coverStatus,
     Value<DateTime?>? publishDate,
     Value<String?>? sourceId,
     Value<String?>? sourceUrl,
@@ -999,6 +1085,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       genreIds: genreIds ?? this.genreIds,
       description: description ?? this.description,
       coverUrl: coverUrl ?? this.coverUrl,
+      coverPath: coverPath ?? this.coverPath,
+      coverStatus: coverStatus ?? this.coverStatus,
       publishDate: publishDate ?? this.publishDate,
       sourceId: sourceId ?? this.sourceId,
       sourceUrl: sourceUrl ?? this.sourceUrl,
@@ -1041,6 +1129,12 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     }
     if (coverUrl.present) {
       map['cover_url'] = Variable<String>(coverUrl.value);
+    }
+    if (coverPath.present) {
+      map['cover_path'] = Variable<String>(coverPath.value);
+    }
+    if (coverStatus.present) {
+      map['cover_status'] = Variable<String>(coverStatus.value);
     }
     if (publishDate.present) {
       map['publish_date'] = Variable<DateTime>(publishDate.value);
@@ -1099,6 +1193,8 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('genreIds: $genreIds, ')
           ..write('description: $description, ')
           ..write('coverUrl: $coverUrl, ')
+          ..write('coverPath: $coverPath, ')
+          ..write('coverStatus: $coverStatus, ')
           ..write('publishDate: $publishDate, ')
           ..write('sourceId: $sourceId, ')
           ..write('sourceUrl: $sourceUrl, ')
@@ -6472,6 +6568,8 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<List<String>> genreIds,
       Value<String?> description,
       Value<String?> coverUrl,
+      Value<String?> coverPath,
+      Value<String> coverStatus,
       Value<DateTime?> publishDate,
       Value<String?> sourceId,
       Value<String?> sourceUrl,
@@ -6496,6 +6594,8 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<List<String>> genreIds,
       Value<String?> description,
       Value<String?> coverUrl,
+      Value<String?> coverPath,
+      Value<String> coverStatus,
       Value<DateTime?> publishDate,
       Value<String?> sourceId,
       Value<String?> sourceUrl,
@@ -6550,6 +6650,16 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
 
   ColumnFilters<String> get coverUrl => $composableBuilder(
     column: $table.coverUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverPath => $composableBuilder(
+    column: $table.coverPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverStatus => $composableBuilder(
+    column: $table.coverStatus,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6662,6 +6772,16 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get coverPath => $composableBuilder(
+    column: $table.coverPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get coverStatus => $composableBuilder(
+    column: $table.coverStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get publishDate => $composableBuilder(
     column: $table.publishDate,
     builder: (column) => ColumnOrderings(column),
@@ -6761,6 +6881,14 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
   GeneratedColumn<String> get coverUrl =>
       $composableBuilder(column: $table.coverUrl, builder: (column) => column);
 
+  GeneratedColumn<String> get coverPath =>
+      $composableBuilder(column: $table.coverPath, builder: (column) => column);
+
+  GeneratedColumn<String> get coverStatus => $composableBuilder(
+    column: $table.coverStatus,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get publishDate => $composableBuilder(
     column: $table.publishDate,
     builder: (column) => column,
@@ -6857,6 +6985,8 @@ class $$SavedBooksTableTableManager
                 Value<List<String>> genreIds = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
+                Value<String?> coverPath = const Value.absent(),
+                Value<String> coverStatus = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
                 Value<String?> sourceId = const Value.absent(),
                 Value<String?> sourceUrl = const Value.absent(),
@@ -6879,6 +7009,8 @@ class $$SavedBooksTableTableManager
                 genreIds: genreIds,
                 description: description,
                 coverUrl: coverUrl,
+                coverPath: coverPath,
+                coverStatus: coverStatus,
                 publishDate: publishDate,
                 sourceId: sourceId,
                 sourceUrl: sourceUrl,
@@ -6903,6 +7035,8 @@ class $$SavedBooksTableTableManager
                 Value<List<String>> genreIds = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> coverUrl = const Value.absent(),
+                Value<String?> coverPath = const Value.absent(),
+                Value<String> coverStatus = const Value.absent(),
                 Value<DateTime?> publishDate = const Value.absent(),
                 Value<String?> sourceId = const Value.absent(),
                 Value<String?> sourceUrl = const Value.absent(),
@@ -6925,6 +7059,8 @@ class $$SavedBooksTableTableManager
                 genreIds: genreIds,
                 description: description,
                 coverUrl: coverUrl,
+                coverPath: coverPath,
+                coverStatus: coverStatus,
                 publishDate: publishDate,
                 sourceId: sourceId,
                 sourceUrl: sourceUrl,

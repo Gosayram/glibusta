@@ -16,6 +16,7 @@ class Book {
   final List<String> genreIds;
   final String? description;
   final String? coverUrl;
+  final String? coverPath;
   final DateTime? publishDate;
   final List<BookFormat> availableFormats;
   final BookSourceInfo source;
@@ -29,6 +30,7 @@ class Book {
     required this.genreIds,
     required this.description,
     required this.coverUrl,
+    this.coverPath,
     required this.publishDate,
     required this.availableFormats,
     required this.source,

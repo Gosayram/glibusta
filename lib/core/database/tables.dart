@@ -11,6 +11,8 @@ class SavedBooks extends Table {
       text().withDefault(const Constant('[]')).map(const StringListConverter())();
   TextColumn get description => text().nullable()();
   TextColumn get coverUrl => text().nullable()();
+  TextColumn get coverPath => text().nullable()();
+  TextColumn get coverStatus => text().withDefault(const Constant('none'))();
   DateTimeColumn get publishDate => dateTime().nullable()();
   TextColumn get sourceId => text().nullable()();
   TextColumn get sourceUrl => text().nullable()();

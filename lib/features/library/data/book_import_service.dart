@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -10,12 +11,12 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
-import '../../../shared/models/book.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/txt_parser.dart';
+import '../data/cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
 final bookImportServiceProvider = Provider<BookImportService>((ref) {
@@ -26,9 +27,12 @@ final bookImportServiceProvider = Provider<BookImportService>((ref) {
 class BookImportService {
   final AppDatabase _database;
   final AppFileStorage _storage;
+  final CoverExtractionService _coverService;
   final _logger = AppLogger();
 
-  BookImportService(this._database) : _storage = AppFileStorageImpl();
+  BookImportService(this._database)
+    : _storage = AppFileStorageImpl(),
+      _coverService = CoverExtractionService();
 
   final Map<String, BookParser> _parsers = {
     'fb2': Fb2Parser(),
@@ -153,6 +157,9 @@ class BookImportService {
             ),
           );
 
+      // Background cover extraction — don't block import
+      unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
+
       return ImportResult.success(book.title);
     } on Object catch (e) {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
@@ -272,6 +279,30 @@ class BookImportService {
       _database.savedBooks,
     )..where((t) => t.contentHash.equals(hash))).get();
     return rows.isNotEmpty ? rows.first : null;
+  }
+
+  Future<void> _extractCoverBackground(String bookId, String filePath, String format) async {
+    try {
+      _logger.info('Extracting cover for $bookId', name: 'Import');
+      final coverPath = await _coverService.extractAndSaveCover(
+        bookId: bookId,
+        filePath: filePath,
+        format: format,
+      );
+      if (coverPath != null) {
+        await (_database.update(_database.savedBooks)..where((t) => t.id.equals(bookId))).write(
+          SavedBooksCompanion(
+            coverPath: Value(coverPath),
+            coverStatus: const Value('ready'),
+          ),
+        );
+        _logger.info('Cover extracted for $bookId: $coverPath', name: 'Import');
+      } else {
+        _logger.info('No cover found for $bookId', name: 'Import');
+      }
+    } on Object catch (e) {
+      _logger.warning('Cover extraction failed for $bookId: $e', name: 'Import', error: e);
+    }
   }
 }
 
