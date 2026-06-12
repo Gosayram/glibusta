@@ -247,17 +247,21 @@ class FlibustaApiClient {
       }
     }
 
-    // Description: find h2 "Аннотация:" and collect sibling text
+    // Description: find h2 "Аннотация:" and collect only <p> siblings
     String description = '';
     for (final h2 in doc.querySelectorAll('h2')) {
       if (h2.text.contains('Аннотация')) {
         final parts = <String>[];
         Element? sibling = h2.nextElementSibling;
-        while (sibling != null && sibling.localName != 'h2') {
-          parts.add(sibling.text.trim());
+        while (sibling != null) {
+          if (sibling.localName == 'h2') break;
+          if (sibling.localName == 'p') {
+            final text = sibling.text.trim();
+            if (text.isNotEmpty) parts.add(text);
+          }
           sibling = sibling.nextElementSibling;
         }
-        description = parts.join(' ');
+        description = parts.join('\n\n');
         break;
       }
     }
@@ -531,10 +535,14 @@ class FlibustaApiClient {
             final bookName = child.text.trim();
             if (bookName.isEmpty) continue;
 
-            // Look for rating in preceding SVG
+            // Look for rating text in preceding SVG
+            double? rating;
             Element? prev = child.previousElementSibling;
             for (var k = 0; k < 10 && prev != null; k++) {
               if (prev.localName == 'svg') {
+                final svgText = prev.text.trim();
+                final r = double.tryParse(svgText);
+                if (r != null && r > 0) rating = r;
                 break;
               }
               prev = prev.previousElementSibling;
@@ -547,7 +555,7 @@ class FlibustaApiClient {
               if (next.localName == 'br') break;
               if (next.localName == 'a') {
                 final ahref = next.attributes['href'] ?? '';
-                final fmtMatch = RegExp('^/b/$bookId/(\\\\w+)\$').firstMatch(ahref);
+                final fmtMatch = RegExp('^/b/$bookId/(\\w+)\$').firstMatch(ahref);
                 if (fmtMatch != null) {
                   final fmt = fmtMatch.group(1)!;
                   if (fmt != 'read' && fmt != 'download' && fmt != 'mail' && fmt != 'complain') {
@@ -561,6 +569,14 @@ class FlibustaApiClient {
             if (seenBookIds.add(bookId)) {
               final bookItem = SearchBookItem(id: bookId, name: bookName);
               allBooks.add(bookItem);
+              currentSeries?.books.add(
+                AuthorBookItem(
+                  id: bookId,
+                  name: bookName,
+                  rating: rating,
+                  formats: formats,
+                ),
+              );
             }
           }
         }
@@ -1070,12 +1086,13 @@ class AuthorSeriesGroup {
   final List<AuthorGenreItem> genres;
   final List<AuthorBookItem> books;
 
-  const AuthorSeriesGroup({
+  AuthorSeriesGroup({
     required this.id,
     required this.name,
-    this.genres = const [],
-    this.books = const [],
-  });
+    List<AuthorGenreItem>? genres,
+    List<AuthorBookItem>? books,
+  }) : genres = genres ?? [],
+       books = books ?? [];
 }
 
 class AuthorGenreItem {

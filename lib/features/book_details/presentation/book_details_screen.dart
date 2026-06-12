@@ -109,17 +109,12 @@ class _BookDetailsContent extends ConsumerStatefulWidget {
 
 class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 5, vsync: this);
-  }
+  TabController? _tabController;
+  int _lastTabCount = 0;
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -128,6 +123,55 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
     final book = widget.details.book;
     final theme = Theme.of(context);
     final progressAsync = ref.watch(bookReadingProgressProvider(widget.bookId));
+
+    final chaptersAsync = ref.watch(chaptersForBookProvider(widget.bookId));
+    final bookmarksAsync = ref.watch(bookmarksForBookProvider(widget.bookId));
+    final quotesAsync = ref.watch(quotesForBookProvider(widget.bookId));
+
+    final hasChapters =
+        chaptersAsync.hasValue &&
+        chaptersAsync.value != null &&
+        chaptersAsync.value!.chapters.isNotEmpty;
+    final hasBookmarks =
+        bookmarksAsync.hasValue && bookmarksAsync.value != null && bookmarksAsync.value!.isNotEmpty;
+    final hasQuotes =
+        quotesAsync.hasValue && quotesAsync.value != null && quotesAsync.value!.isNotEmpty;
+
+    final tabs = <Widget>[];
+    final tabViews = <Widget>[];
+
+    tabs.add(const Tab(text: 'Описание'));
+    tabViews.add(_DescriptionTab(description: widget.details.description ?? book.description));
+
+    if (hasChapters) {
+      tabs.add(const Tab(text: 'Главы'));
+      tabViews.add(_ChaptersTab(bookId: widget.bookId));
+    }
+
+    if (hasBookmarks) {
+      tabs.add(const Tab(text: 'Закладки'));
+      tabViews.add(_BookmarksTab(bookId: widget.bookId));
+    }
+
+    if (hasQuotes) {
+      tabs.add(const Tab(text: 'Цитаты'));
+      tabViews.add(_QuotesTab(bookId: widget.bookId));
+    }
+
+    tabs.add(const Tab(text: 'Комментарии'));
+    tabViews.add(_CommentsTab(bookId: widget.bookId));
+
+    final tabCount = tabs.length;
+    if (tabCount != _lastTabCount) {
+      _tabController?.dispose();
+      _lastTabCount = tabCount;
+      _tabController = TabController(length: tabCount, vsync: this);
+    }
+
+    final controller = _tabController!;
+    if (controller.index >= tabCount) {
+      controller.index = 0;
+    }
 
     return Column(
       children: [
@@ -154,18 +198,16 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               ),
               SliverPersistentHeader(
                 pinned: true,
-                delegate: _TabBarDelegate(tabController: _tabController, theme: theme),
+                delegate: _TabBarDelegate(
+                  tabController: controller,
+                  theme: theme,
+                  tabs: tabs,
+                ),
               ),
               SliverFillRemaining(
                 child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _DescriptionTab(description: widget.details.description ?? book.description),
-                    _ChaptersTab(bookId: widget.bookId),
-                    _BookmarksTab(bookId: widget.bookId),
-                    _QuotesTab(bookId: widget.bookId),
-                    _CommentsTab(bookId: widget.bookId),
-                  ],
+                  controller: controller,
+                  children: tabViews,
                 ),
               ),
             ],
@@ -396,8 +438,9 @@ class _SeriesInfoSection extends ConsumerWidget {
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabController tabController;
   final ThemeData theme;
+  final List<Widget> tabs;
 
-  _TabBarDelegate({required this.tabController, required this.theme});
+  _TabBarDelegate({required this.tabController, required this.theme, required this.tabs});
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -405,13 +448,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
       color: theme.colorScheme.surface,
       child: TabBar(
         controller: tabController,
-        tabs: const [
-          Tab(text: 'Описание'),
-          Tab(text: 'Главы'),
-          Tab(text: 'Закладки'),
-          Tab(text: 'Цитаты'),
-          Tab(text: 'Комментарии'),
-        ],
+        tabs: tabs,
         labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         unselectedLabelStyle: theme.textTheme.labelMedium,
       ),
@@ -426,7 +463,9 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) =>
-      tabController != oldDelegate.tabController || theme != oldDelegate.theme;
+      tabController != oldDelegate.tabController ||
+      theme != oldDelegate.theme ||
+      tabs.length != oldDelegate.tabs.length;
 }
 
 class _DescriptionTab extends StatelessWidget {

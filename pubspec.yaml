@@ -1,7 +1,7 @@
 name: glibusta
 description: Cross-platform book library app for Flibusta
 publish_to: 'none'
-version: 0.1.3+2012
+version: 0.1.3+2014
 
 environment:
   sdk: '>=3.10.0 <4.0.0'

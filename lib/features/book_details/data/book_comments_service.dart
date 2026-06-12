@@ -85,31 +85,45 @@ class BookCommentsService {
     final doc = html_parser.parse(html);
     final comments = <BookComment>[];
 
-    final commentNodes = doc.querySelectorAll('.comment, .comment-wrapper, .indented');
+    // Flibusta book reviews are in <span class="container_{bookId}">
+    // Format: <b><a href="/polka/show/ID">username</a></b> в HH:MM (+tz) / DD-MM-YYYY, Оценка: rating<br>review text<div></div><hr>
+    final reviewNodes = doc.querySelectorAll('span[class^="container_"]');
     var idx = 0;
-    for (final node in commentNodes) {
-      final authorEl = node.querySelector(
-        '.comment-author a, .author a, .username, .submitted a',
-      );
-      final bodyEl = node.querySelector(
-        '.comment-body .field-item, .comment-content, .comment .content',
-      );
-      final dateEl = node.querySelector('.comment-time, .submitted, time');
+    for (final node in reviewNodes) {
+      final authorEl = node.querySelector('b a');
+      final author = authorEl?.text.trim() ?? '';
+      if (author.isEmpty) continue;
 
-      final author = authorEl?.text.trim() ?? 'Аноним';
-      final body = bodyEl?.text.trim() ?? '';
-      if (body.isEmpty) continue;
+      // Get the full text, then split at <br> to separate header from body
+      final fullText = node.innerHtml;
+      final brIndex = fullText.indexOf('<br');
+      if (brIndex < 0) continue;
 
+      final bodyHtml = fullText.substring(brIndex);
+      final bodyDoc = html_parser.parse(bodyHtml);
+      final body = bodyDoc.body?.text.trim() ?? '';
+      // Strip trailing <div></div><hr> artifacts
+      final cleanBody = body.replaceAll(RegExp(r'\s*'), ' ').trim();
+      if (cleanBody.isEmpty) continue;
+
+      // Try to extract date from the header text before <br>
       DateTime? createdAt;
-      if (dateEl != null) {
-        createdAt = DateTime.tryParse(dateEl.attributes['datetime'] ?? '');
+      final headerText = fullText.substring(0, brIndex);
+      final dateMatch = RegExp(r'/\s*(\d{2})-(\d{2})-(\d{4})').firstMatch(headerText);
+      if (dateMatch != null) {
+        final day = int.tryParse(dateMatch.group(1) ?? '');
+        final month = int.tryParse(dateMatch.group(2) ?? '');
+        final year = int.tryParse(dateMatch.group(3) ?? '');
+        if (day != null && month != null && year != null) {
+          createdAt = DateTime(year, month, day);
+        }
       }
 
       comments.add(
         BookComment(
-          id: 'comment_${idx++}',
+          id: 'review_${idx++}',
           author: author,
-          text: body,
+          text: cleanBody,
           createdAt: createdAt,
         ),
       );

@@ -19,7 +19,11 @@ final chaptersForBookProvider = FutureProvider.autoDispose.family<NormalizedBook
   bookId,
 ) async {
   final service = ref.watch(bookOpenServiceProvider);
-  return service.getCachedBook(bookId);
+  try {
+    return await service.openBookWithCache(bookId);
+  } on Object catch (_) {
+    return null;
+  }
 });
 
 final bookmarksForBookProvider = FutureProvider.autoDispose.family<List<Bookmark>, String>((
