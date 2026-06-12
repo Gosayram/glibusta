@@ -13,8 +13,10 @@ import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
+import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
+import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 import '../data/inspectors/book_inspection_provider.dart';
@@ -482,13 +484,40 @@ class LibraryScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.delete),
                 title: const Text('Удалить'),
-                onTap: () => Navigator.pop(ctx),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_confirmDelete(context, ref, book));
+                },
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Book book) async {
+    final result = await DeleteBookDialog.show(context, bookTitle: book.title);
+    if (result == null || !context.mounted) return;
+
+    final service = ref.read(bookDeleteServiceProvider);
+    if (result.deleteFile) {
+      await service.deleteBookCompletely(book.id);
+    } else {
+      await service.removeFromLibrary(book.id);
+    }
+    ref.invalidate(libraryBooksProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.deleteFile
+                ? '«${book.title}» удалена с диска'
+                : '«${book.title}» удалена из списка',
+          ),
+        ),
+      );
+    }
   }
 }
 

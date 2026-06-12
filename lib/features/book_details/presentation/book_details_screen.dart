@@ -8,9 +8,12 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/book_cover_image.dart';
+import '../../downloads/presentation/download_queue.dart';
+import '../../search/data/composite_source.dart';
 import '../data/book_comments_service.dart';
 import '../data/book_details_repository_impl.dart';
 import 'book_details_providers.dart';
@@ -829,15 +832,20 @@ class _LoginPlaceholder extends StatelessWidget {
   }
 }
 
-class _BottomActionBar extends StatelessWidget {
+class _BottomActionBar extends ConsumerWidget {
   final Book book;
   final BookDetails details;
 
   const _BottomActionBar({required this.book, required this.details});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final downloadStateAsync = ref.watch(bookDownloadStateProvider(book.id));
+    final downloadState = downloadStateAsync.value ?? BookDownloadState.notDownloaded;
+    final isDownloading = downloadState == BookDownloadState.downloading;
+    final isDownloaded = downloadState == BookDownloadState.downloaded;
+    final hasFormats = details.availableFormats.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -857,20 +865,67 @@ class _BottomActionBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: details.availableFormats.isNotEmpty
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Скоро будет доступно')),
-                      );
-                    }
-                  : null,
-              icon: const Icon(Icons.download),
-              label: const Text('Скачать'),
+            Expanded(
+              child: isDownloaded
+                  ? OutlinedButton.icon(
+                      onPressed: () => unawaited(context.push('/reader/${book.id}')),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Открыть'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: hasFormats && !isDownloading
+                          ? () => _startDownload(context, ref, book, details)
+                          : null,
+                      icon: isDownloading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download),
+                      label: Text(isDownloading ? 'Загрузка...' : 'Скачать'),
+                    ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _startDownload(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+    BookDetails details,
+  ) async {
+    final formats = details.availableFormats;
+    if (formats.isEmpty) return;
+
+    final format = formats.contains(BookFormat.epub) ? BookFormat.epub : formats.first;
+    final source = ref.read(bookSourceProvider);
+    final queue = ref.read(downloadQueueProvider);
+
+    try {
+      final url = await source.getDownloadUrl(book.id, format);
+      await queue.enqueue(
+        bookId: book.id,
+        bookTitle: book.title,
+        format: format,
+        sourceUrl: url,
+      );
+      ref.invalidate(bookDownloadStateProvider(book.id));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Загрузка ${book.title} (${format.name})')),
+        );
+      }
+    } on Object catch (e) {
+      AppLogger().severe('Download failed: $e', name: 'BookDetails', error: e);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки: $e')),
+        );
+      }
+    }
   }
 }
