@@ -8,6 +8,7 @@ import '../config/app_settings.dart';
 import '../logging/app_logger.dart';
 import '../theme/app_duration.dart';
 import 'app_interceptors.dart';
+import 'user_agent.dart';
 
 part 'dio_provider.g.dart';
 
@@ -31,9 +32,6 @@ Dio dio(Ref ref) {
       baseUrl: settings.baseUrl,
       connectTimeout: AppDuration.httpConnect,
       receiveTimeout: AppDuration.httpReceive,
-      headers: {
-        'User-Agent': 'Glibusta/0.1.0',
-      },
       responseType: ResponseType.plain,
     ),
   );
@@ -42,6 +40,7 @@ Dio dio(Ref ref) {
       ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
   };
   dio.interceptors.addAll([
+    const _UserAgentInterceptor(),
     LogInterceptor(
       requestHeader: false,
       responseHeader: false,
@@ -53,6 +52,32 @@ Dio dio(Ref ref) {
     _RetryInterceptor(dio: dio, maxRetries: 3),
   ]);
   return dio;
+}
+
+class _UserAgentInterceptor extends Interceptor {
+  const _UserAgentInterceptor();
+
+  @override
+  Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    String ua;
+    try {
+      ua = await DeviceUserAgent.get();
+    } on Object {
+      ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+          'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+    }
+    options.headers['User-Agent'] = ua;
+    options.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+    options.headers['Accept-Language'] = 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7';
+    options.headers['Accept-Encoding'] = 'gzip, deflate, br';
+    options.headers['Sec-Fetch-Dest'] = 'document';
+    options.headers['Sec-Fetch-Mode'] = 'navigate';
+    options.headers['Sec-Fetch-Site'] = 'none';
+    options.headers['Sec-Fetch-User'] = '?1';
+    options.headers['Sec-CH-UA-Mobile'] = '?1';
+    options.headers['Sec-CH-UA-Platform'] = '"Android"';
+    handler.next(options);
+  }
 }
 
 class _RetryInterceptor extends Interceptor {
