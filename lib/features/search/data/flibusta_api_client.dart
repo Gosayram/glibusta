@@ -628,8 +628,17 @@ class FlibustaApiClient {
   }
 
   Future<bool> watchBook(String bookId) async {
-    final response = await _getText('polka/watch/add/$bookId');
-    return response.isNotEmpty;
+    try {
+      final base = _dio.options.baseUrl;
+      final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
+      final response = await _dio.get<String>(
+        '$normalizedBase/polka/watch/add/$bookId',
+        options: Options(responseType: ResponseType.plain),
+      );
+      return response.statusCode == 200 && !(response.data?.contains('user/login') ?? false);
+    } on Object {
+      return false;
+    }
   }
 
   // ── Messages ────────────────────────────────────────────────────────────────

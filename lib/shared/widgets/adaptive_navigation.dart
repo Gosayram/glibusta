@@ -274,7 +274,7 @@ class MacOSShell extends ConsumerWidget {
   }
 
   void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
-    final epubPaths = paths.where((p) => p.endsWith('.epub')).toList();
+    final epubPaths = paths.where((p) => p.toLowerCase().endsWith('.epub')).toList();
     if (epubPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Поддерживаются только .epub файлы')),

@@ -122,7 +122,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                     child: _QuickAccessTile(
                       icon: Icons.trending_up,
                       label: 'Популярные',
-                      onTap: () {},
+                      onTap: () => context.push('/catalog/popular'),
                     ),
                   ),
                 ],

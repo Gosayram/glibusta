@@ -190,13 +190,7 @@ class ReaderContentBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: chapter.blocks.length,
-          addAutomaticKeepAlives: false,
-          itemBuilder: (context, i) => _buildBlock(chapter.blocks[i], settings, textAlign),
-        ),
+        ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
       ],
     );
   }

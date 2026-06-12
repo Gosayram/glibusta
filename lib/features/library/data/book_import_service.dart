@@ -242,6 +242,8 @@ class BookImportService {
             ),
           );
 
+      unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
+
       return ImportResult.success(book.title);
     } on Object catch (e) {
       return ImportResult.failure('Ошибка при импорте из внешней папки: $e');

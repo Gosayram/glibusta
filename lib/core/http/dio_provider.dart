@@ -43,6 +43,8 @@ Dio dio(Ref ref) {
   };
   dio.interceptors.addAll([
     LogInterceptor(
+      requestHeader: false,
+      responseHeader: false,
       logPrint: (obj) => AppLogger().finest('$obj', name: 'Http'),
     ),
     AuthInterceptor(ref),

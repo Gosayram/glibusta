@@ -576,7 +576,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
+                _ctrl.saveProgress();
                 unawaited(_ctrl.deleteBookFile());
                 Navigator.of(context).pop();
                 if (Navigator.of(context).canPop()) {

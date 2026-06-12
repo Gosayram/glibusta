@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
@@ -17,9 +19,25 @@ class BookCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coverUrl = book.coverUrl;
+    final coverPath = book.coverPath;
+    if (coverPath != null && coverPath.isNotEmpty && File(coverPath).existsSync()) {
+      return AspectRatio(
+        aspectRatio: 2 / 3,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            File(coverPath),
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _buildNetworkOrGenerated(),
+          ),
+        ),
+      );
+    }
+    return _buildNetworkOrGenerated();
+  }
 
-    // Try network URL
+  Widget _buildNetworkOrGenerated() {
+    final coverUrl = book.coverUrl;
     if (coverUrl != null && coverUrl.isNotEmpty && coverUrl != 'embedded') {
       return AspectRatio(
         aspectRatio: 2 / 3,
@@ -37,8 +55,6 @@ class BookCover extends StatelessWidget {
         ),
       );
     }
-
-    // Generated placeholder
     return GeneratedBookCover(
       title: book.title,
       author: book.displayAuthor,

@@ -118,8 +118,11 @@ class RecentBooksScreen extends ConsumerWidget {
   }
 
   String _bookCountText(int count) {
-    if (count == 1) return 'книга';
-    if (count >= 2 && count <= 4) return 'книги';
+    final mod100 = count % 100;
+    final mod10 = count % 10;
+    if (mod100 >= 11 && mod100 <= 14) return 'книг';
+    if (mod10 == 1) return 'книга';
+    if (mod10 >= 2 && mod10 <= 4) return 'книги';
     return 'книг';
   }
 }
