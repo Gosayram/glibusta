@@ -11,8 +11,11 @@ import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../epub/epub_book_adapter.dart';
+import '../epub/epub_image_store.dart';
+import '../epub/epub_parser.dart' as new_epub;
 import 'parsers/book_parser.dart';
-import 'parsers/epub_parser.dart';
+import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
@@ -35,7 +38,7 @@ class BookOpenService {
   BookOpenService(this._database);
 
   static final Map<BookFormat, BookParser> _parsers = {
-    BookFormat.epub: EpubParser(),
+    BookFormat.epub: legacy_epub.EpubParser(),
     BookFormat.fb2: Fb2Parser(),
     BookFormat.txt: TxtBookParser(),
   };
@@ -74,12 +77,41 @@ class BookOpenService {
   }
 
   Future<NormalizedBook> _parseInIsolate(BookFormat bookFormat, String filePath) async {
+    // EPUB: use new parser (async image extraction, can't run in Isolate)
+    if (bookFormat == BookFormat.epub) {
+      try {
+        final tempDir = await Directory.systemTemp.createTemp('epub_images_');
+        final imageStore = EpubImageStore(tempDir);
+        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+        final epubBook = await parser.parse(filePath);
+        final adapter = EpubBookAdapter();
+        final bookId = _extractBookId(filePath);
+        final normalized = adapter.toNormalizedBook(epubBook, bookId);
+        _logger.info(
+          'EPUB parsed: ${epubBook.title}, ${epubBook.chapters.length} chapters, '
+          '${epubBook.toc?.length ?? 0} TOC items',
+          name: 'Reader',
+        );
+        return normalized;
+      } on Object catch (e, st) {
+        _logger.severe(
+          'New EPUB parser failed, falling back to legacy: $e',
+          name: 'Reader',
+          error: e,
+          st: st,
+        );
+        // Fallback to legacy parser
+        return legacy_epub.EpubParser().parseFile(filePath);
+      }
+    }
+
+    // FB2/TXT: run in isolate for performance
     try {
       return await Isolate.run<NormalizedBook>(() {
         return switch (bookFormat) {
-          BookFormat.epub => EpubParser().parseFile(filePath),
           BookFormat.fb2 => Fb2Parser().parseFile(filePath),
           BookFormat.txt => TxtBookParser().parseFile(filePath),
+          BookFormat.epub => throw UnsupportedError('handled above'),
           BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
           BookFormat.unknown => throw UnsupportedError('Unknown format'),
         };
@@ -97,6 +129,12 @@ class BookOpenService {
       }
       return parser.parseFile(filePath);
     }
+  }
+
+  String _extractBookId(String filePath) {
+    final name = filePath.split('/').last;
+    final dotIndex = name.lastIndexOf('.');
+    return dotIndex > 0 ? name.substring(0, dotIndex) : name;
   }
 
   /// Re-parse a book with a forced encoding and update the DB metadata.

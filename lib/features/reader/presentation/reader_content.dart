@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -247,14 +248,21 @@ class ReaderContentBody extends StatelessWidget {
           child: Center(child: Text('* * *', style: _getReaderStyle(settings))),
         );
       case BlockType.image:
-        if (block.imageUrl != null) {
+        if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: Icon(
-                Icons.image,
-                size: 64,
-                color: _getReaderStyle(settings).color,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(block.imageUrl!),
+                  fit: BoxFit.contain,
+                  errorBuilder: (ctx, e, s) => Icon(
+                    Icons.broken_image,
+                    size: 64,
+                    color: _getReaderStyle(settings).color,
+                  ),
+                ),
               ),
             ),
           );
@@ -561,14 +569,21 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: Center(child: Text('* * *', style: style)),
         );
       case BlockType.image:
-        if (block.imageUrl != null) {
+        if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: Icon(
-                Icons.image,
-                size: 64,
-                color: style.color,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(block.imageUrl!),
+                  fit: BoxFit.contain,
+                  errorBuilder: (ctx, e, s) => Icon(
+                    Icons.broken_image,
+                    size: 64,
+                    color: style.color,
+                  ),
+                ),
               ),
             ),
           );
