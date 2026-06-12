@@ -678,6 +678,13 @@ class _VersionTile extends StatelessWidget {
     return FutureBuilder<PackageInfo>(
       future: PackageInfo.fromPlatform(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const ListTile(
+            leading: Icon(Icons.info_outline),
+            title: Text('Версия'),
+            subtitle: Text('Неизвестно'),
+          );
+        }
         final info = snapshot.data;
         final version = info != null ? '${info.version}+${info.buildNumber}' : '...';
         return ListTile(

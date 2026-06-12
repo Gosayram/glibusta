@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
+import '../features/bookmarks/presentation/bookmarks_screen.dart';
 import '../features/catalog/presentation/author_detail_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
@@ -13,6 +14,7 @@ import '../features/catalog/presentation/recent_books_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
@@ -288,6 +290,24 @@ final routerProvider = Provider<GoRouter>((ref) {
               return FadeTransition(opacity: animation, child: child);
             },
           );
+        },
+      ),
+      GoRoute(
+        path: '/bookmarks/:bookId',
+        name: 'bookmarks',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return BookmarksScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/notes/:bookId',
+        name: 'notes',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return NotesScreen(bookId: bookId);
         },
       ),
     ],

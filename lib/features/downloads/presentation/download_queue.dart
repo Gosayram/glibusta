@@ -31,6 +31,7 @@ class DownloadQueue {
 
   final List<DownloadTask> _pendingQueue = [];
   final Map<String, DownloadTask> _tasks = {};
+  List<DownloadTask> _latestTasks = [];
   int _maxConcurrent = 3;
   int _runningCount = 0;
 
@@ -38,7 +39,10 @@ class DownloadQueue {
     _downloadsController.add([]);
   }
 
-  Stream<List<DownloadTask>> get onDownloadsChanged => _downloadsController.stream;
+  Stream<List<DownloadTask>> get onDownloadsChanged async* {
+    yield _latestTasks;
+    yield* _downloadsController.stream;
+  }
 
   Stream<DownloadTask> get onProgress => _progressController.stream;
 
@@ -224,7 +228,8 @@ class DownloadQueue {
   }
 
   void _emitUpdate() {
-    _downloadsController.add(_tasks.values.toList());
+    _latestTasks = _tasks.values.toList();
+    _downloadsController.add(_latestTasks);
   }
 
   void dispose() {

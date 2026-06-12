@@ -152,6 +152,15 @@ class NotesScreen extends ConsumerWidget {
   }
 }
 
+Color _parseColorSafe(String? hex) {
+  if (hex == null || hex.isEmpty || hex.length < 7) return Colors.amber;
+  try {
+    return Color(int.parse('0xFF${hex.substring(1)}'));
+  } on Object catch (_) {
+    return Colors.amber;
+  }
+}
+
 class NoteTile extends StatelessWidget {
   final Note note;
   final VoidCallback? onTap;
@@ -198,7 +207,7 @@ class NoteTile extends StatelessWidget {
       child: ListTile(
         leading: Icon(
           Icons.note,
-          color: Color(int.parse('0xFF${note.highlightColor.substring(1)}')),
+          color: _parseColorSafe(note.highlightColor),
         ),
         title: Text(
           note.content,

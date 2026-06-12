@@ -26,11 +26,19 @@ Future<List<Book>> popularBooks(Ref ref) async {
   return repository.getPopularBooks();
 }
 
-class CatalogScreen extends ConsumerWidget {
+class CatalogScreen extends ConsumerStatefulWidget {
   const CatalogScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
+}
+
+class _CatalogScreenState extends ConsumerState<CatalogScreen> {
+  Future<Map<String, bool>>? _downloadStatusFuture;
+  List<Book> _lastBooks = const [];
+
+  @override
+  Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final popularAsync = ref.watch(popularBooksProvider);
 
@@ -210,6 +218,10 @@ class CatalogScreen extends ConsumerWidget {
   }
 
   Widget _buildPopularBooks(BuildContext context, WidgetRef ref, List<Book> books) {
+    if (!identical(books, _lastBooks)) {
+      _lastBooks = books;
+      _downloadStatusFuture = _getDownloadStatusMap(ref, books);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -223,7 +235,7 @@ class CatalogScreen extends ConsumerWidget {
         SizedBox(
           height: 240,
           child: FutureBuilder<Map<String, bool>>(
-            future: _getDownloadStatusMap(ref, books),
+            future: _downloadStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Skeletonizer(

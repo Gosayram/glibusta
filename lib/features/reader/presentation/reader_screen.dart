@@ -579,7 +579,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onPressed: () {
                 unawaited(_ctrl.deleteBookFile());
                 Navigator.of(context).pop();
-                Navigator.of(context).pop();
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
               },
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error,
