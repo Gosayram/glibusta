@@ -82,15 +82,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.cell_tower),
-            title: const Text('Скачивать через мобильную сеть'),
-            subtitle: const Text('По умолчанию только Wi-Fi'),
+            title: const Text(
+              'Скачивать через мобильную сеть',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: const Text(
+              'По умолчанию только Wi-Fi',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: ref.watch(allowMobileDownloadsProvider),
             onChanged: (v) => ref.read(allowMobileDownloadsProvider.notifier).update(v),
           ),
           SwitchListTile(
             secondary: const Icon(Icons.play_circle),
-            title: const Text('Авто-продолжение при Wi-Fi'),
-            subtitle: const Text('Возобновлять загрузки при появлении сети'),
+            title: const Text(
+              'Авто-продолжение при Wi-Fi',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: const Text(
+              'Возобновлять загрузки при появлении сети',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: ref.watch(autoResumeOnWifiProvider),
             onChanged: (v) => ref.read(autoResumeOnWifiProvider.notifier).update(v),
           ),
@@ -103,8 +119,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const _SectionHeader(title: 'Отображение'),
           SwitchListTile(
             secondary: const Icon(Icons.dark_mode),
-            title: const Text('Тёмная тема'),
-            subtitle: const Text('Использовать тёмную тему'),
+            title: const Text('Тёмная тема', maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: const Text(
+              'Использовать тёмную тему',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: Theme.of(context).brightness == Brightness.dark,
             onChanged: (value) {
               ref
@@ -515,10 +535,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return ListTile(
       leading: const Icon(Icons.folder),
-      title: const Text('Хранилище'),
-      subtitle: Text(subtitles[mode]!),
+      title: const Text('Хранилище', maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitles[mode]!, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showStorageModeDialog(context, ref, mode, modeLabels),
+      dense: true,
+      minLeadingWidth: 20,
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -637,9 +660,12 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       onTap: onTap,
+      dense: true,
+      minLeadingWidth: 20,
+      visualDensity: VisualDensity.compact,
     );
   }
 }

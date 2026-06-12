@@ -53,6 +53,7 @@ class AdaptiveNavigation extends StatelessWidget {
         selectedIndex: selectedIndex,
         onDestinationSelected: onDestinationSelected,
         animationDuration: const Duration(milliseconds: 300),
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: compactDestinations,
       );
     }
