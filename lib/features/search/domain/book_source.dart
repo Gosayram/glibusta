@@ -7,6 +7,8 @@ import '../../../shared/models/search_query.dart';
 abstract class BookSource {
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken});
 
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken});
+
   Future<BookDetails> getBookDetails(String bookId);
 
   Future<List<BookFormat>> getAvailableFormats(String bookId);
@@ -24,6 +26,11 @@ class MockBookSource implements BookSource {
       totalPages: 0,
       hasNextPage: false,
     );
+  }
+
+  @override
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+    return const SearchAuthorsResultPage(authors: []);
   }
 
   @override

@@ -60,6 +60,26 @@ class CompositeBookSource extends BookSource {
   }
 
   @override
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+    final errors = <AppFailure>[];
+    for (final source in sources) {
+      try {
+        final result = await source.searchAuthors(query, cancelToken: cancelToken);
+        if (result.authors.isNotEmpty) return result;
+      } on AppFailure catch (e) {
+        _logger?.warning('SearchAuthors failed (${source.runtimeType}): ${e.message}',
+            name: 'CompositeSource', error: e);
+        errors.add(e);
+      } on Object catch (e, st) {
+        _logger?.warning('SearchAuthors unexpected error (${source.runtimeType}): $e',
+            name: 'CompositeSource', error: e, st: st);
+        errors.add(ParserFailure('Unexpected error: $e'));
+      }
+    }
+    return const SearchAuthorsResultPage(authors: []);
+  }
+
+  @override
   Future<BookDetails> getBookDetails(String bookId) async {
     final errors = <AppFailure>[];
     for (final source in sources) {

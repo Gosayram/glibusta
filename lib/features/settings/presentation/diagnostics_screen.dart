@@ -22,12 +22,17 @@ class DiagnosticsScreen extends ConsumerStatefulWidget {
 }
 
 class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
-  late final Future<DiagnosticsInfo> _infoFuture;
+  Future<DiagnosticsInfo>? _infoFuture;
 
   @override
   void initState() {
     super.initState();
-    _infoFuture = _gatherInfo(context, ref);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _infoFuture ??= _gatherInfo(context, ref);
   }
 
   @override

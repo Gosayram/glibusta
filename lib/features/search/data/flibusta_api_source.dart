@@ -73,6 +73,23 @@ class FlibustaApiSource extends BookSource {
   }
 
   @override
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+    if (query.hasFilters) {
+      return const SearchAuthorsResultPage(authors: []);
+    }
+    try {
+      final result = await _client.searchAuthors(query.query, page: query.page);
+      return SearchAuthorsResultPage(
+        authors: result.authors
+            .map((a) => SearchAuthorResult(id: a.id, name: a.name))
+            .toList(),
+      );
+    } on Object catch (e) {
+      throw Exception('Failed to search authors: $e');
+    }
+  }
+
+  @override
   Future<BookDetails> getBookDetails(String bookId) async {
     try {
       final result = await _client.getBookDetails(bookId);

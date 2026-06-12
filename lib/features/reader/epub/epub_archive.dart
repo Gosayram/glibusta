@@ -8,7 +8,7 @@ final class EpubArchive {
 
   static Future<EpubArchive> open(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes, verify: true);
+    final archive = ZipDecoder().decodeBytes(bytes);
     return EpubArchive(archive);
   }
 

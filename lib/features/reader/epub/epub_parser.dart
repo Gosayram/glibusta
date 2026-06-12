@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 
 import 'epub_archive.dart';
@@ -27,6 +29,7 @@ final class CustomEpubParser {
     final toc = await _parseToc(epub, opf, resolver);
 
     final chapters = <EpubChapter>[];
+    var chapterCount = 0;
     for (final spineItem in opf.spineItems) {
       final resource = opf.resources[spineItem.idref];
       if (resource == null || resource.type != EpubResourceType.xhtml) continue;
@@ -45,6 +48,10 @@ final class CustomEpubParser {
           linear: spineItem.linear,
         ),
       );
+      chapterCount++;
+      if (chapterCount % 5 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
     }
 
     final coverPath = await _extractCover(epub: epub, opf: opf);

@@ -37,6 +37,8 @@ class BookOpenService {
 
   BookOpenService(this._database);
 
+  static const Duration _parsingTimeout = Duration(seconds: 60);
+
   static final Map<BookFormat, BookParser> _parsers = {
     BookFormat.epub: legacy_epub.EpubParser(),
     BookFormat.fb2: Fb2Parser(),
@@ -81,18 +83,24 @@ class BookOpenService {
     String filePath, [
     String? bookId,
   ]) async {
-    // EPUB: use new parser (async image extraction, can't run in Isolate)
     if (bookFormat == BookFormat.epub) {
+      final effectiveBookId = bookId ?? _extractBookId(filePath);
+      final bookDir = await _getBookDir(effectiveBookId);
+      final imagesDir = Directory('${bookDir.path}/epub_images');
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
+      final imageStore = EpubImageStore(imagesDir);
+      final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+
       try {
-        final effectiveBookId = bookId ?? _extractBookId(filePath);
-        final bookDir = await _getBookDir(effectiveBookId);
-        final imagesDir = Directory('${bookDir.path}/epub_images');
-        if (!await imagesDir.exists()) {
-          await imagesDir.create(recursive: true);
-        }
-        final imageStore = EpubImageStore(imagesDir);
-        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
-        final epubBook = await parser.parse(filePath);
+        final epubBook = await parser.parse(filePath).timeout(
+          _parsingTimeout,
+          onTimeout: () => throw TimeoutException(
+            'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
+            'Попробуйте повторить.',
+          ),
+        );
         final adapter = EpubBookAdapter();
         final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
         _logger.info(
@@ -101,6 +109,8 @@ class BookOpenService {
           name: 'Reader',
         );
         return normalized;
+      } on TimeoutException {
+        rethrow;
       } on Object catch (e, st) {
         _logger.severe(
           'New EPUB parser failed, falling back to legacy: $e',
@@ -108,12 +118,20 @@ class BookOpenService {
           error: e,
           st: st,
         );
-        // Fallback to legacy parser
-        return legacy_epub.EpubParser().parseFile(filePath);
+        try {
+          return await legacy_epub.EpubParser().parseFile(filePath).timeout(
+            _parsingTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Разбор EPUB (legacy) занял слишком много времени. '
+              'Попробуйте повторить.',
+            ),
+          );
+        } on TimeoutException {
+          rethrow;
+        }
       }
     }
 
-    // FB2/TXT: run in isolate for performance
     try {
       return await Isolate.run<NormalizedBook>(() {
         return switch (bookFormat) {

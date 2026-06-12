@@ -40,6 +40,58 @@ class FlibustaHtmlSource extends BookSource {
   }
 
   @override
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+    if (query.query.isEmpty) {
+      return const SearchAuthorsResultPage(authors: []);
+    }
+    final params = <String>[
+      'ask=${Uri.encodeComponent(query.query)}',
+      'page=${query.page}',
+      'cha=on',
+    ];
+    final searchUrl = '/booksearch?${params.join('&')}';
+    final html = await client.getWithMirror(searchUrl, cancelToken: cancelToken);
+    return _parseAuthorSearchResults(html);
+  }
+
+  SearchAuthorsResultPage _parseAuthorSearchResults(String html) {
+    final document = parse(html);
+    final authors = <SearchAuthorResult>[];
+
+    final main = document.querySelector('#main');
+    if (main == null) {
+      return const SearchAuthorsResultPage(authors: []);
+    }
+
+    Element? resultsUl;
+    for (final ul in main.querySelectorAll('ul')) {
+      final links = ul.querySelectorAll('a[href^="/a/"]');
+      if (links.isNotEmpty) {
+        resultsUl = ul;
+        break;
+      }
+    }
+
+    if (resultsUl != null) {
+      for (final li in resultsUl.children) {
+        if (li.localName != 'li') continue;
+        final link = li.querySelector('a[href^="/a/"]');
+        if (link == null) continue;
+        final href = link.attributes['href'] ?? '';
+        final idMatch = RegExp(r'/a/(\d+)').firstMatch(href);
+        if (idMatch == null) continue;
+        final id = idMatch.group(1)!;
+        final name = link.text.trim();
+        if (name.isNotEmpty) {
+          authors.add(SearchAuthorResult(id: id, name: name));
+        }
+      }
+    }
+
+    return SearchAuthorsResultPage(authors: authors);
+  }
+
+  @override
   Future<BookDetails> getBookDetails(String bookId) async {
     final html = await client.getWithMirror('/b/$bookId');
     return _parseBookDetails(html, bookId);

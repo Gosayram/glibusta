@@ -143,8 +143,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         data: theme,
         duration: AppDuration.readerThemeTransition,
         curve: Curves.easeOutCubic,
-        child: const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
+        child: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                if (readerState.loadingMessage != null) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    readerState.loadingMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       );
     }

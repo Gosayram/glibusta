@@ -25,6 +25,7 @@ class ReaderState {
   final NormalizedBookMetadata? metadata;
   final Map<int, ReaderChapter> loadedChapters;
   final bool isLoading;
+  final String? loadingMessage;
   final String? errorMessage;
   final String? errorFilePath;
   final String? errorFormat;
@@ -42,6 +43,7 @@ class ReaderState {
     this.metadata,
     this.loadedChapters = const {},
     this.isLoading = true,
+    this.loadingMessage,
     this.errorMessage,
     this.errorFilePath,
     this.errorFormat,
@@ -71,6 +73,7 @@ class ReaderState {
     NormalizedBookMetadata? metadata,
     Map<int, ReaderChapter>? loadedChapters,
     bool? isLoading,
+    String? loadingMessage,
     String? errorMessage,
     String? errorFilePath,
     String? errorFormat,
@@ -83,11 +86,13 @@ class ReaderState {
     bool? isSearchOpen,
     String? highlightedQuery,
     bool clearHighlight = false,
+    bool clearLoadingMessage = false,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
       loadedChapters: loadedChapters ?? this.loadedChapters,
       isLoading: isLoading ?? this.isLoading,
+      loadingMessage: clearLoadingMessage ? null : (loadingMessage ?? this.loadingMessage),
       errorMessage: errorMessage ?? this.errorMessage,
       errorFilePath: errorFilePath ?? this.errorFilePath,
       errorFormat: errorFormat ?? this.errorFormat,
@@ -147,7 +152,7 @@ class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
-    _updateState(_state.copyWith(isLoading: true));
+    _updateState(_state.copyWith(isLoading: true, loadingMessage: 'Открытие файла...'));
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);
@@ -156,13 +161,16 @@ class ReaderController {
     _loaded = true;
 
     try {
+      _updateState(_state.copyWith(loadingMessage: 'Разбор книги...'));
       final meta = await _content.loadMetadata();
+      _updateState(_state.copyWith(loadingMessage: 'Загрузка прогресса...'));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
 
       _updateState(
         _state.copyWith(
           metadata: meta,
           isLoading: false,
+          clearLoadingMessage: true,
           currentPosition: savedPosition.clamp(chapterCount: meta.chapterCount),
           clearHighlight: true,
         ),
@@ -189,6 +197,16 @@ class ReaderController {
       );
       _startHideTimer();
       _applyWakeLock();
+    } on TimeoutException {
+      _updateState(
+        _state.copyWith(
+          isLoading: false,
+          clearLoadingMessage: true,
+          errorMessage: 'Открытие книги заняло слишком много времени.\n'
+              'Возможно, файл повреждён или слишком большой.\n'
+              'Попробуйте повторить.',
+        ),
+      );
     } on Object catch (e) {
       unawaited(_handleLoadError(e));
     }
