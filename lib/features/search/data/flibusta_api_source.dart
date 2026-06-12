@@ -33,10 +33,9 @@ class FlibustaApiSource extends BookSource {
     }
 
     try {
-      final result = await _client.searchBooksByNameOpds(
+      final result = await _client.searchBooksByName(
         query.query,
         page: query.page,
-        cancelToken: cancelToken,
       );
 
       final rawBase = _client.dio.options.baseUrl;
@@ -65,7 +64,7 @@ class FlibustaApiSource extends BookSource {
         totalCount: books.length,
         currentPage: query.page,
         totalPages: books.isEmpty ? 0 : 1,
-        hasNextPage: books.length >= 20,
+        hasNextPage: books.length >= 50,
       );
     } on Object catch (e) {
       throw Exception('Failed to search books: $e');

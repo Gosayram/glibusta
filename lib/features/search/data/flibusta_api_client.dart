@@ -54,7 +54,7 @@ class FlibustaApiClient {
     int page = 0,
     int limit = 50,
   }) async {
-    final url = 'authorsearch?ask=${Uri.encodeComponent(name)}&page=$page';
+    final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&cha=on';
     final response = await _getText(url);
     return _parseSearchAuthorsResponse(response);
   }
@@ -64,7 +64,7 @@ class FlibustaApiClient {
     int page = 0,
     int limit = 50,
   }) async {
-    final url = 'series?search=${Uri.encodeComponent(name)}&page=$page';
+    final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chs=on';
     final response = await _getText(url);
     return _parseSearchSeriesResponse(response);
   }
@@ -74,7 +74,7 @@ class FlibustaApiClient {
     int page = 0,
     int limit = 50,
   }) async {
-    final url = 'genres?search=${Uri.encodeComponent(name)}&page=$page';
+    final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chg=on';
     final response = await _getText(url);
     return _parseSearchGenresResponse(response);
   }
@@ -145,7 +145,7 @@ class FlibustaApiClient {
 
   SearchSeriesResponse _parseSearchSeriesResponse(String html) {
     final series = <SearchSeriesItem>[];
-    final seriesRegex = RegExp(r'<li>.*?<a href="/s/(\d+)">(.*?)</a>.*?</li>', dotAll: true);
+    final seriesRegex = RegExp(r'<li>.*?<a href="/sequence/(\d+)">(.*?)</a>.*?</li>', dotAll: true);
     final matches = seriesRegex.allMatches(html);
 
     for (final match in matches) {

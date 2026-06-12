@@ -55,281 +55,241 @@ class FlibustaHtmlSource extends BookSource {
   Future<String> getDownloadUrl(String bookId, BookFormat format) async {
     final rawBase = client.dio.options.baseUrl;
     final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
-    return '$base/b/$bookId/download/${format.name}';
+    return '$base/b/$bookId/${format.name}';
   }
 
   String _buildSearchUrl(SearchQuery query) {
     final params = <String>[];
-    if (query.query.isNotEmpty) {
-      params.add('q=${Uri.encodeComponent(query.query)}');
-    }
-    if (query.author != null && query.author!.isNotEmpty) {
-      params.add('author=${Uri.encodeComponent(query.author!)}');
-    }
-    if (query.title != null && query.title!.isNotEmpty) {
-      params.add('title=${Uri.encodeComponent(query.title!)}');
-    }
-    if (query.series != null && query.series!.isNotEmpty) {
-      params.add('series=${Uri.encodeComponent(query.series!)}');
-    }
-    final genre = query.filters.genre ?? query.genre;
-    if (query.filters.format != null) {
-      params.add('format=${Uri.encodeComponent(query.filters.format!.name)}');
-    }
-    if (query.filters.language != null && query.filters.language!.trim().isNotEmpty) {
-      params.add('language=${Uri.encodeComponent(query.filters.language!)}');
-    }
-    if (genre != null && genre.trim().isNotEmpty) {
-      params.add('genre=${Uri.encodeComponent(genre)}');
-    }
-    if (query.page > 0) {
-      params.add('page=${query.page + 1}');
-    }
-    return '/search?${params.join('&')}';
+    params.add('ask=${Uri.encodeComponent(query.query)}');
+    params.add('page=${query.page}');
+    params.add('chb=on');
+    return '/booksearch?${params.join('&')}';
   }
 
   SearchResultPage _parseSearchResults(String html, SearchQuery query) {
     final document = parse(html);
     final books = <Book>[];
 
-    final bookElements = document.querySelectorAll('table.series tr, div.book-item');
-    for (final element in bookElements) {
-      final book = _parseBookFromElement(element);
-      if (book != null) {
-        books.add(book);
+    final main = document.querySelector('#main');
+    if (main == null) {
+      return SearchResultPage(
+        books: const [],
+        totalCount: 0,
+        currentPage: query.page,
+        totalPages: 0,
+        hasNextPage: false,
+      );
+    }
+
+    Element? resultsUl;
+    for (final ul in main.querySelectorAll('ul')) {
+      final links = ul.querySelectorAll('a[href^="/b/"]');
+      if (links.isNotEmpty) {
+        resultsUl = ul;
+        break;
+      }
+    }
+
+    if (resultsUl != null) {
+      final rawBase = client.dio.options.baseUrl;
+      final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+
+      for (final li in resultsUl.children) {
+        if (li.localName != 'li') continue;
+        final links = li.querySelectorAll('a');
+        if (links.isEmpty) continue;
+
+        final bookLink = links.first;
+        final href = bookLink.attributes['href'] ?? '';
+        final idMatch = RegExp(r'/b/(\d+)').firstMatch(href);
+        if (idMatch == null) continue;
+
+        final bookId = idMatch.group(1)!;
+        final bookName = bookLink.text.trim();
+        if (bookName.isEmpty) continue;
+
+        final authorLinks = links.skip(1).where((a) {
+          final h = a.attributes['href'] ?? '';
+          return h.startsWith('/a/');
+        });
+        final authorNames = authorLinks
+            .map((a) => a.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+        final authorIds = authorLinks
+            .map((a) {
+              final h = a.attributes['href'] ?? '';
+              final m = RegExp(r'/a/(\d+)').firstMatch(h);
+              return m?.group(1) ?? '';
+            })
+            .where((id) => id.isNotEmpty)
+            .toList();
+
+        books.add(
+          Book(
+            id: bookId,
+            title: bookName,
+            authorIds: authorIds,
+            authorNames: authorNames,
+            genreIds: const [],
+            description: null,
+            coverUrl: null,
+            publishDate: null,
+            availableFormats: const [],
+            source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$bookId'),
+          ),
+        );
       }
     }
 
     final pageInfo = _parsePagination(document);
-    final hasNextPage = query.page < pageInfo.totalPages - 1;
+    final totalCount = _parseTotalCount(document);
+    final hasNextPage = pageInfo['has_next'] as bool? ?? false;
 
     return SearchResultPage(
       books: books,
-      totalCount: pageInfo.totalCount,
+      totalCount: totalCount ?? books.length,
       currentPage: query.page,
-      totalPages: pageInfo.totalPages,
+      totalPages: pageInfo['total_pages'] as int? ?? 1,
       hasNextPage: hasNextPage,
     );
   }
 
-  Book? _parseBookFromElement(Element element) {
-    final id = _extractBookId(element);
-    if (id == null) return null;
+  Map<String, dynamic> _parsePagination(Document document) {
+    final pager = document.querySelector('div.item-list .pager');
+    if (pager == null) {
+      return {'total_pages': 1, 'has_next': false, 'has_previous': false};
+    }
 
-    final title = _extractTitle(element);
-    if (title == null || title.isEmpty) return null;
+    final pagerItems = pager.querySelectorAll('[class*="pager-current"], [class*="pager-item"]');
+    final hasNext = pager.querySelector('.pager-next') != null;
+    final hasPrevious = pager.querySelector('.pager-previous') != null;
 
-    final authorNames = _extractAuthors(element);
-    final authorIds = authorNames.map((a) => _slugify(a)).toList();
+    return {
+      'total_pages': pagerItems.isNotEmpty ? pagerItems.length : 1,
+      'has_next': hasNext,
+      'has_previous': hasPrevious,
+    };
+  }
 
-    final formats = _extractFormats(element);
-    final coverUrl = _extractCoverUrl(element);
-    final description = _extractDescription(element);
-
-    final rawBase = client.dio.options.baseUrl;
-    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
-    return Book(
-      id: id,
-      title: title,
-      authorIds: authorIds,
-      authorNames: authorNames,
-      genreIds: const [],
-      description: description,
-      coverUrl: coverUrl,
-      publishDate: null,
-      availableFormats: formats,
-      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$id'),
-    );
+  int? _parseTotalCount(Document document) {
+    final h3 = document.querySelector('h3');
+    if (h3 == null) return null;
+    final text = h3.text;
+    final match = RegExp(r'из\s+(\d+)').firstMatch(text);
+    return match != null ? int.tryParse(match.group(1) ?? '') : null;
   }
 
   BookDetails _parseBookDetails(String html, String bookId) {
     final document = parse(html);
 
-    final title =
-        document.querySelector('h1')?.text.trim() ??
-        document.querySelector('title')?.text.trim() ??
-        '';
-
-    final description = document
-        .querySelector('.book_description, .description, #book_description')
-        ?.text
-        .trim();
-
-    final authorElements = document.querySelectorAll('a[href^="/a/"], .book_author a');
-    final authorIds = authorElements
-        .map((a) => _extractIdFromHref(a.attributes['href'] ?? ''))
-        .whereType<String>()
-        .where((id) => id.isNotEmpty)
-        .toList();
-
-    final genreElements = document.querySelectorAll('a[href^="/g/"], .genre_list a');
-    final genreIds = genreElements
-        .map((g) => _extractIdFromHref(g.attributes['href'] ?? ''))
-        .whereType<String>()
-        .where((id) => id.isNotEmpty)
-        .toList();
-
-    final downloadElements = document.querySelectorAll(
-      r'a[href*="/download/"], a[href$=".fb2"], a[href$=".epub"], a[href$=".txt"], a[href$=".mobi"]',
-    );
-    final formats = <BookFormat>[];
-    final downloadUrls = <String>[];
-
-    for (final link in downloadElements) {
-      final href = link.attributes['href'] ?? '';
-      if (href.isEmpty) continue;
-
-      final format = _extractFormatFromHref(href);
-      if (format != null && !formats.contains(format)) {
-        formats.add(format);
-      }
-      if (!downloadUrls.contains(href)) {
-        downloadUrls.add(href);
+    String title = '';
+    final h1Tags = document.querySelectorAll('h1');
+    for (final h1 in h1Tags) {
+      final text = h1.text.trim();
+      if (text.isNotEmpty && text != 'Флибуста') {
+        title = text;
+        break;
       }
     }
 
-    final coverImg = document.querySelector(
-      '.book_cover img, #book_cover img, img[src*="cover"]',
-    );
+    String description = '';
+    for (final h2 in document.querySelectorAll('h2')) {
+      if (h2.text.contains('Аннотация')) {
+        final parts = <String>[];
+        Element? sibling = h2.nextElementSibling;
+        while (sibling != null && sibling.localName != 'h2') {
+          parts.add(sibling.text.trim());
+          sibling = sibling.nextElementSibling;
+        }
+        description = parts.join(' ');
+        break;
+      }
+    }
+
+    final coverImg = document.querySelector('img[src*="cover"]');
     final coverUrl = coverImg?.attributes['src'];
+
+    final authorElements = document.querySelectorAll('a[href^="/a/"]');
+    final authors = authorElements.map((a) => a.text.trim()).where((t) => t.isNotEmpty).toList();
+    final authorIds = authorElements
+        .map((a) {
+          final m = RegExp(r'/a/(\d+)').firstMatch(a.attributes['href'] ?? '');
+          return m?.group(1) ?? '';
+        })
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final genreElements = document.querySelectorAll('a[href^="/g/"]');
+    final genreIds = genreElements
+        .map((g) {
+          final href = g.attributes['href'] ?? '';
+          return href.replaceFirst('/g/', '');
+        })
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final formats = <BookFormat>[];
+    final downloadUrls = <String>[];
+    final seenFormats = <String>{};
+    final formatLinks = document.querySelectorAll('a[href^="/b/$bookId/"]');
+    for (final link in formatLinks) {
+      final href = link.attributes['href'] ?? '';
+      final fmtMatch = RegExp(r'/b/\d+/(\w+)').firstMatch(href);
+      if (fmtMatch != null) {
+        final fmt = fmtMatch.group(1)!;
+        if (fmt == 'read' || fmt == 'download' || fmt == 'mail' || fmt == 'complain') continue;
+        final format = _parseFormat(fmt);
+        if (format != null && seenFormats.add(fmt)) {
+          formats.add(format);
+        }
+        if (!downloadUrls.contains(href)) {
+          downloadUrls.add(href);
+        }
+      }
+    }
 
     final rawBase = client.dio.options.baseUrl;
     final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
 
-    return BookDetails(
-      book: Book(
-        id: bookId,
-        title: title,
-        authorIds: authorIds,
-        genreIds: genreIds,
-        description: description,
-        coverUrl: coverUrl,
-        publishDate: null,
-        availableFormats: formats,
-        source: BookSourceInfo(
-          sourceId: sourceId,
-          sourceUrl: '$base/b/$bookId',
-        ),
-      ),
-      description: description,
+    final book = Book(
+      id: bookId,
+      title: title,
+      authorIds: authorIds,
+      authorNames: authors,
+      genreIds: genreIds,
+      description: description.isNotEmpty ? description : null,
+      coverUrl: coverUrl != null ? '$base$coverUrl' : null,
+      publishDate: null,
       availableFormats: formats,
-      downloadUrls: downloadUrls,
+      source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$bookId'),
+    );
+
+    return BookDetails(
+      book: book,
+      description: description.isNotEmpty ? description : null,
+      availableFormats: formats,
+      downloadUrls: downloadUrls.map((u) => u.startsWith('/') ? '$base$u' : u).toList(),
     );
   }
 
-  String? _extractBookId(Element element) {
-    final links = element.querySelectorAll('a[href*="/b/"]');
-    for (final link in links) {
-      final href = link.attributes['href'] ?? '';
-      final match = RegExp(r'/b/(\d+)').firstMatch(href);
-      if (match != null) return match.group(1);
+  BookFormat? _parseFormat(String fmt) {
+    switch (fmt.toLowerCase()) {
+      case 'fb2':
+        return BookFormat.fb2;
+      case 'epub':
+        return BookFormat.epub;
+      case 'txt':
+        return BookFormat.txt;
+      case 'pdf':
+        return BookFormat.pdf;
+      case 'mobi':
+      case 'djvu':
+      case 'rtf':
+      case 'html':
+        return BookFormat.unknown;
+      default:
+        return null;
     }
-    final anyLink = element.querySelector('a');
-    if (anyLink != null) {
-      final href = anyLink.attributes['href'] ?? '';
-      final match = RegExp(r'/b/(\d+)').firstMatch(href);
-      if (match != null) return match.group(1);
-    }
-    return null;
   }
-
-  String? _extractTitle(Element element) {
-    final bookLink = element.querySelector('a[href*="/b/"]');
-    if (bookLink != null && bookLink.text.trim().isNotEmpty) {
-      return bookLink.text.trim();
-    }
-    return element.querySelector('a')?.text.trim();
-  }
-
-  List<String> _extractAuthors(Element element) {
-    final authorLinks = element.querySelectorAll('a[href*="/a/"]');
-    if (authorLinks.isEmpty) {
-      final fallbackLinks = element.querySelectorAll('a.author, a.book-author, .author a');
-      return fallbackLinks
-          .map((Element a) => a.text.trim())
-          .where((String t) => t.isNotEmpty)
-          .toList();
-    }
-    return authorLinks.map((Element a) => a.text.trim()).where((String t) => t.isNotEmpty).toList();
-  }
-
-  List<BookFormat> _extractFormats(Element element) {
-    final links = element.querySelectorAll(
-      r'a[href*="/download/"], a[href$=".fb2"], a[href$=".epub"], a[href$=".txt"], a[href$=".mobi"]',
-    );
-    final formats = <BookFormat>[];
-    for (final Element link in links) {
-      final href = link.attributes['href'] ?? '';
-      final format = _extractFormatFromHref(href);
-      if (format != null && !formats.contains(format)) {
-        formats.add(format);
-      }
-    }
-    return formats;
-  }
-
-  String? _extractCoverUrl(Element element) {
-    final img = element.querySelector('img');
-    return img?.attributes['src'];
-  }
-
-  String? _extractDescription(Element element) {
-    final desc = element.querySelector('.annotation, .description, .book-description');
-    return desc?.text.trim();
-  }
-
-  BookFormat? _extractFormatFromHref(String href) {
-    final lower = href.toLowerCase();
-    if (lower.endsWith('.fb2') || lower.contains('.fb2?')) return BookFormat.fb2;
-    if (lower.endsWith('.epub') || lower.contains('.epub?')) {
-      return BookFormat.epub;
-    }
-    if (lower.endsWith('.txt') || lower.contains('.txt?')) return BookFormat.txt;
-    if (lower.endsWith('.mobi') || lower.contains('.mobi?')) {
-      return BookFormat.unknown;
-    }
-    if (lower.endsWith('.pdf') || lower.contains('.pdf?')) return BookFormat.pdf;
-    if (lower.endsWith('.djvu') || lower.contains('.djvu?')) {
-      return BookFormat.unknown;
-    }
-    return null;
-  }
-
-  String? _extractIdFromHref(String href) {
-    final match = RegExp(r'/[abg]/(\d+)').firstMatch(href);
-    return match?.group(1);
-  }
-
-  _PaginationInfo _parsePagination(Document document) {
-    final pageLinks = document.querySelectorAll('.pager a, .pagination a');
-    var maxPage = 1;
-    for (final Element link in pageLinks) {
-      final text = link.text.trim();
-      final pageNum = int.tryParse(text);
-      if (pageNum != null && pageNum > maxPage) {
-        maxPage = pageNum;
-      }
-    }
-
-    final totalText = document.querySelector('.pager, .pagination')?.text ?? '';
-    final totalMatch = RegExp(r'(\d+)').firstMatch(totalText);
-    final totalCount = totalMatch != null ? int.tryParse(totalMatch.group(1) ?? '') ?? 0 : 0;
-
-    return _PaginationInfo(totalCount: totalCount, totalPages: maxPage);
-  }
-
-  String _slugify(String input) {
-    return input
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9а-яё]+'), '-')
-        .replaceAll(RegExp(r'-+'), '-')
-        .replaceAll(RegExp(r'^-|-$'), '');
-  }
-}
-
-class _PaginationInfo {
-  final int totalCount;
-  final int totalPages;
-
-  const _PaginationInfo({required this.totalCount, required this.totalPages});
 }
