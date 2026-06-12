@@ -12,7 +12,9 @@ import '../../../shared/widgets/book_cover_image.dart';
 import 'search_controller.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({super.key, this.initialCategory});
+
+  final String? initialCategory;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -28,6 +30,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void initState() {
     super.initState();
     unawaited(ref.read(searchControllerProvider.notifier).loadHistory());
+    if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
+      _genreController.text = widget.initialCategory!;
+      _setGenreFilter(widget.initialCategory!);
+    }
   }
 
   @override

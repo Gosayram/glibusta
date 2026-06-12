@@ -213,7 +213,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 child: ActionChip(
                   label: Text(category, style: const TextStyle(fontSize: 13)),
                   onPressed: () {
-                    unawaited(context.push('/search'));
+                    unawaited(context.push('/search?category=${Uri.encodeComponent(category)}'));
                   },
                 ),
               );

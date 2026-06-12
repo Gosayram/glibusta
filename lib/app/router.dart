@@ -64,7 +64,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/search',
                 name: 'search',
-                builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
+                builder: (BuildContext context, GoRouterState state) {
+                  final category = state.uri.queryParameters['category'];
+                  return SearchScreen(initialCategory: category);
+                },
               ),
             ],
           ),
