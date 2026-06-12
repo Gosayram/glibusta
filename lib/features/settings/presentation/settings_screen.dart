@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -187,29 +189,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       showDialog<void>(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Фильтр контента'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ContentSafetyLevel.values.map((level) {
-                return ListTile(
-                  leading: Icon(
-                    level == ContentSafetyLevel.standard
-                        ? Icons.check_circle
-                        : Icons.circle_outlined,
-                    color: level == ContentSafetyLevel.standard
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  title: Text(level.displayName),
-                  subtitle: Text(level.description),
-                  onTap: () {
-                    unawaited(ContentSafetyService.save(level));
-                    Navigator.of(context).pop();
-                  },
-                );
-              }).toList(),
-            ),
+          return FutureBuilder<ContentSafetyLevel>(
+            future: ContentSafetyService.load(),
+            builder: (context, snapshot) {
+              final current = snapshot.data ?? ContentSafetyLevel.standard;
+              return AlertDialog(
+                title: const Text('Фильтр контента'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: ContentSafetyLevel.values.map((level) {
+                    return ListTile(
+                      leading: Icon(
+                        level == current ? Icons.check_circle : Icons.circle_outlined,
+                        color: level == current ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                      title: Text(level.displayName),
+                      subtitle: Text(level.description),
+                      onTap: () {
+                        unawaited(ContentSafetyService.save(level));
+                        Navigator.of(context).pop();
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
           );
         },
       ),
@@ -303,30 +307,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !context.mounted) return;
 
     try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final filePath = result.files.single.path;
+      if (filePath == null) return;
+
       final db = ref.read(databaseProvider);
       final info = await PackageInfo.fromPlatform();
       final backupService = BackupService(
         db: db,
         appVersion: '${info.version}+${info.buildNumber}',
       );
-      final result = await backupService.importData('');
+      final json = await File(filePath).readAsString();
+      final importResult = await backupService.importData(json);
 
       if (!context.mounted) return;
 
-      if (result.success) {
+      if (importResult.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Импортировано: ${result.progressImported} прогрессов, '
-              '${result.bookmarksImported} закладок, '
-              '${result.notesImported} заметок, '
-              '${result.quotesImported} цитат',
+              'Импортировано: ${importResult.progressImported} прогрессов, '
+              '${importResult.bookmarksImported} закладок, '
+              '${importResult.notesImported} заметок, '
+              '${importResult.quotesImported} цитат',
             ),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: ${result.error}')),
+          SnackBar(content: Text('Ошибка: ${importResult.error}')),
         );
       }
     } on Object catch (e) {

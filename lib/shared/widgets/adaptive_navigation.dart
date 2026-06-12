@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
+import '../../features/library/data/book_import_service.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -250,7 +251,7 @@ class MacOSShell extends ConsumerWidget {
 
     return Scaffold(
       body: BookDropZone(
-        onBooksDropped: (paths) => _handleDrop(context, paths),
+        onBooksDropped: (paths) => _handleDrop(context, ref, paths),
         child: Row(
           children: [
             SidebarNavigation(
@@ -272,7 +273,7 @@ class MacOSShell extends ConsumerWidget {
     );
   }
 
-  void _handleDrop(BuildContext context, List<String> paths) {
+  void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
     final epubPaths = paths.where((p) => p.endsWith('.epub')).toList();
     if (epubPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -280,7 +281,20 @@ class MacOSShell extends ConsumerWidget {
       );
       return;
     }
-    unawaited(context.push('/library'));
+    final importService = ref.read(bookImportServiceProvider);
+    for (final path in epubPaths) {
+      unawaited(
+        importService.importFile(path).then((result) {
+          if (!context.mounted) return;
+          final msg = result.isSuccess
+              ? 'Импортировано: ${result.title}'
+              : result.isDuplicate
+              ? 'Дубликат: ${result.title}'
+              : 'Ошибка: ${result.error}';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }),
+      );
+    }
   }
 }
 

@@ -80,10 +80,10 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
   final noAuthor = allBooks.where((b) => b.authorIds.isEmpty).toList();
   collections.add(SmartCollection(type: SmartCollectionType.noAuthor, books: noAuthor));
 
-  // New books: added in last 7 days (based on publishDate if available)
+  // New books: added to library in last 7 days
   final newBooks = allBooks.where((b) {
-    if (b.publishDate == null) return false;
-    return now.difference(b.publishDate!).inDays < 7;
+    if (b.dateAdded == null) return false;
+    return now.difference(b.dateAdded!).inDays < 7;
   }).toList();
   collections.add(SmartCollection(type: SmartCollectionType.newBooks, books: newBooks));
 

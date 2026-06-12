@@ -97,6 +97,7 @@ class BookRepositoryImpl implements BookRepository {
       coverUrl: row.coverUrl,
       coverPath: row.coverPath,
       publishDate: row.publishDate,
+      dateAdded: row.addedAt,
       availableFormats: const [],
       source: BookSourceInfo(
         sourceId: row.sourceId ?? '',

@@ -100,10 +100,11 @@ class DownloadService {
   }
 
   Future<void> _updateProgress(String downloadId, double progress) async {
+    final progressPercent = (progress * 100).round().clamp(0, 100);
     await (_database.update(_database.downloads)..where((d) => d.id.equals(downloadId))).write(
       DownloadsCompanion(
-        downloadedBytes: Value((progress * 1000000).toInt()),
-        totalBytes: const Value(1000000),
+        downloadedBytes: Value(progressPercent),
+        totalBytes: const Value(100),
       ),
     );
   }

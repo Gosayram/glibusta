@@ -173,7 +173,10 @@ class DownloadQueue {
     _emitUpdate();
 
     try {
-      final targetPath = task.targetPath ?? task.sourceUrl;
+      final targetPath = task.targetPath;
+      if (targetPath == null) {
+        throw StateError('No target path for download ${task.id}');
+      }
       await _httpClient.download(
         task.sourceUrl,
         targetPath,
@@ -202,8 +205,8 @@ class DownloadQueue {
         sourceUrl: task.sourceUrl,
         targetPath: task.targetPath,
         status: DownloadStatus.completed,
-        downloadedBytes: task.totalBytes,
-        totalBytes: task.totalBytes,
+        downloadedBytes: task.downloadedBytes ?? task.totalBytes ?? 0,
+        totalBytes: task.totalBytes ?? task.downloadedBytes ?? 0,
       );
       _tasks[task.id] = completed;
       await _repository.updateStatus(task.id, DownloadStatus.completed);

@@ -421,7 +421,7 @@ class LibraryScreen extends ConsumerWidget {
                     child: BookCoverImage(book: book),
                   ),
                   title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: book.authorIds.isNotEmpty ? Text(book.authorIds.join(', ')) : null,
+                  subtitle: book.authorNames.isNotEmpty ? Text(book.authorNames.join(', ')) : null,
                   onTap: () => unawaited(context.push('/reader/${book.id}')),
                   onLongPress: () => _showBookMenu(context, ref, book),
                 ),
@@ -532,7 +532,8 @@ class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView
   }
 
   ScrollController _getController() {
-    _controller ??= ScrollController(
+    if (_controller != null) return _controller!;
+    _controller = ScrollController(
       initialScrollOffset: _offset.value,
       keepScrollOffset: false,
     )..addListener(_saveOffset);

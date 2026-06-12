@@ -403,7 +403,8 @@ class _RestorableListViewState extends State<_RestorableListView> with Restorati
   }
 
   ScrollController _getController() {
-    _controller ??= ScrollController(
+    if (_controller != null) return _controller!;
+    _controller = ScrollController(
       initialScrollOffset: _offset.value,
       keepScrollOffset: false,
     )..addListener(_saveOffset);
