@@ -19,7 +19,9 @@ final class SeriesDetailFromServerProvider
           SeriesDetailResponse,
           FutureOr<SeriesDetailResponse>
         >
-    with $FutureModifier<SeriesDetailResponse>, $FutureProvider<SeriesDetailResponse> {
+    with
+        $FutureModifier<SeriesDetailResponse>,
+        $FutureProvider<SeriesDetailResponse> {
   SeriesDetailFromServerProvider._({
     required SeriesDetailFromServerFamily super.from,
     required String super.argument,
@@ -55,7 +57,8 @@ final class SeriesDetailFromServerProvider
 
   @override
   bool operator ==(Object other) {
-    return other is SeriesDetailFromServerProvider && other.argument == argument;
+    return other is SeriesDetailFromServerProvider &&
+        other.argument == argument;
   }
 
   @override
@@ -64,7 +67,8 @@ final class SeriesDetailFromServerProvider
   }
 }
 
-String _$seriesDetailFromServerHash() => r'a3125dc4823796106da3c7bc375dcdc0e24f0349';
+String _$seriesDetailFromServerHash() =>
+    r'a3125dc4823796106da3c7bc375dcdc0e24f0349';
 
 final class SeriesDetailFromServerFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<SeriesDetailResponse>, String> {

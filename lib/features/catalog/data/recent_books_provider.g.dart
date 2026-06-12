@@ -19,7 +19,9 @@ final class RecentBooksProvider
           RecentBooksResponse,
           FutureOr<RecentBooksResponse>
         >
-    with $FutureModifier<RecentBooksResponse>, $FutureProvider<RecentBooksResponse> {
+    with
+        $FutureModifier<RecentBooksResponse>,
+        $FutureProvider<RecentBooksResponse> {
   RecentBooksProvider._()
     : super(
         from: null,

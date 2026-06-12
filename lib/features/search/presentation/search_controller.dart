@@ -16,7 +16,7 @@ part 'search_controller.g.dart';
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
-  final _logger = AppLogger();
+  AppLogger get _logger => ref.read(appLoggerProvider);
 
   @override
   SearchState build() {
@@ -63,9 +63,9 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         currentPage: result.currentPage,
         clearError: true,
       );
-    } on Object catch (e) {
+    } on Object catch (e, st) {
       if (!ref.mounted) return;
-      _logger.warning('Search failed: $e', name: 'Search');
+      _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -97,9 +97,9 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         currentPage: result.currentPage,
         clearError: true,
       );
-    } on Object catch (e) {
+    } on Object catch (e, st) {
       if (!ref.mounted) return;
-      _logger.warning('Load more failed: $e', name: 'Search');
+      _logger.severe('Load more failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }

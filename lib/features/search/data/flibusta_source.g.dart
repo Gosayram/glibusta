@@ -13,7 +13,12 @@ part of 'flibusta_source.dart';
 final flibustaSourceProvider = FlibustaSourceProvider._();
 
 final class FlibustaSourceProvider
-    extends $FunctionalProvider<FlibustaHtmlSource, FlibustaHtmlSource, FlibustaHtmlSource>
+    extends
+        $FunctionalProvider<
+          FlibustaHtmlSource,
+          FlibustaHtmlSource,
+          FlibustaHtmlSource
+        >
     with $Provider<FlibustaHtmlSource> {
   FlibustaSourceProvider._()
     : super(

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../events/app_events.dart';
 
@@ -84,13 +85,39 @@ class AppLogger {
     for (final listener in _listeners) {
       listener(entry);
     }
+    if (level == 'SEVERE' || level == 'SHOUT') {
+      unawaited(_persistError(entry));
+    }
+  }
+
+  Future<void> _persistError(LogEntry entry) async {
+    try {
+      final line = entry.toLine();
+      if (line.isNotEmpty) {
+        final dir = await getApplicationSupportDirectory();
+        final logDir = Directory('${dir.path}/logs');
+        await logDir.create(recursive: true);
+        final file = File('${logDir.path}/glibusta.log');
+        final sink = file.openWrite(mode: FileMode.append);
+        sink.writeln(line);
+        await sink.flush();
+        await sink.close();
+      }
+    } on Object catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final summary = entry.error != null
+          ? '${entry.message} | ${entry.error}'
+          : entry.message;
+      await prefs.setString('last_error', summary);
+    } on Object catch (_) {}
   }
 
   void finest(String msg, {String? name}) => log('FINEST', msg, loggerName: name);
   void fine(String msg, {String? name}) => log('FINE', msg, loggerName: name);
   void info(String msg, {String? name}) => log('INFO', msg, loggerName: name);
-  void warning(String msg, {String? name, Object? error}) =>
-      log('WARNING', msg, loggerName: name, error: error);
+  void warning(String msg, {String? name, Object? error, StackTrace? st}) =>
+      log('WARNING', msg, loggerName: name, error: error, stackTrace: st);
   void severe(String msg, {String? name, Object? error, StackTrace? st}) =>
       log('SEVERE', msg, loggerName: name, error: error, stackTrace: st);
 
@@ -113,6 +140,39 @@ class AppLogger {
 
   String exportAsText() {
     return _ringBuffer.toList().map((e) => e.toLine()).join('\n');
+  }
+
+  Future<String> readPersistentLog() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/logs/glibusta.log');
+      if (!await file.exists()) return '';
+      return await file.readAsString();
+    } on Object catch (_) {
+      return '';
+    }
+  }
+
+  Future<int> getPersistentLogSize() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/logs/glibusta.log');
+      if (!await file.exists()) return 0;
+      final stat = await file.stat();
+      return stat.size;
+    } on Object catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> clearPersistentLog() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/logs/glibusta.log');
+      if (await file.exists()) {
+        await file.writeAsString('');
+      }
+    } on Object catch (_) {}
   }
 
   void clear() {

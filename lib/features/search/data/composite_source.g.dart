@@ -12,7 +12,8 @@ part of 'composite_source.dart';
 @ProviderFor(bookSource)
 final bookSourceProvider = BookSourceProvider._();
 
-final class BookSourceProvider extends $FunctionalProvider<BookSource, BookSource, BookSource>
+final class BookSourceProvider
+    extends $FunctionalProvider<BookSource, BookSource, BookSource>
     with $Provider<BookSource> {
   BookSourceProvider._()
     : super(
@@ -47,4 +48,4 @@ final class BookSourceProvider extends $FunctionalProvider<BookSource, BookSourc
   }
 }
 
-String _$bookSourceHash() => r'a2b748570d221198b6775996367b1feff12ae150';
+String _$bookSourceHash() => r'd79dc6fc68c97f06faaaa377346a81b4356000e5';

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_settings.dart';
@@ -182,6 +183,11 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
                   ),
                 ),
+                if (info.persistentLogSize > 0)
+                  ListTile(
+                    title: const Text('Файл логов'),
+                    trailing: Text(_formatBytes(info.persistentLogSize)),
+                  ),
                 if (info.recentErrors.isNotEmpty)
                   ...info.recentErrors.map(
                     (e) => ListTile(
@@ -208,9 +214,10 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: OutlinedButton.icon(
                         onPressed: () => _exportReport(context, info),
-                        child: const Text('Экспорт отчёта'),
+                        icon: const Icon(Icons.share, size: 18),
+                        label: const Text('Экспорт отчёта'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -220,6 +227,14 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                         child: const Text('Перепроверить'),
                       ),
                     ),
+                    if (info.persistentLogSize > 0) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () => _clearLog(context, ref),
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Очистить лог',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -370,6 +385,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     String? lastError;
     final recentErrors = <String>[];
     final recentWarnings = <String>[];
+    int persistentLogSize = 0;
     try {
       final prefs = await SharedPreferences.getInstance();
       lastError = prefs.getString('last_error');
@@ -391,6 +407,8 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
           .map((e) => '${e.time.hour}:${e.time.minute} - ${e.message}')
           .toList();
       recentWarnings.addAll(warnings);
+
+      persistentLogSize = await logger.getPersistentLogSize();
     } on Object catch (_) {}
 
     // App version
@@ -441,6 +459,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       lastError: lastError,
       recentErrors: recentErrors,
       recentWarnings: recentWarnings,
+      persistentLogSize: persistentLogSize,
       dbOk: dbOk,
       storageOk: storageOk,
       storageFree: storageFree,
@@ -475,6 +494,9 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     final dateStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final dateFile =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
+        '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
     final report = [
       '=== Glibusta Health Report ===',
       'Date: $dateStr',
@@ -511,10 +533,33 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       ...info.recentWarnings.map((w) => '  $w'),
     ].join('\n');
 
-    await Clipboard.setData(ClipboardData(text: report));
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/glibusta-logs-$dateFile.txt');
+      await file.writeAsString(report);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], subject: 'Glibusta Logs $dateStr'),
+      );
+    } on Object catch (_) {
+      await Clipboard.setData(ClipboardData(text: report));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Отчёт скопирован')),
+      );
+      return;
+    }
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Отчёт скопирован')),
+      const SnackBar(content: Text('Отчёт отправлен')),
+    );
+  }
+
+  Future<void> _clearLog(BuildContext context, WidgetRef ref) async {
+    final logger = ref.read(appLoggerProvider);
+    await logger.clearPersistentLog();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Лог очищен')),
     );
   }
 
@@ -548,6 +593,7 @@ class DiagnosticsInfo {
   final String? lastError;
   final List<String> recentErrors;
   final List<String> recentWarnings;
+  final int persistentLogSize;
   final bool dbOk;
   final bool storageOk;
   final String storageFree;
@@ -579,6 +625,7 @@ class DiagnosticsInfo {
     this.lastError,
     this.recentErrors = const [],
     this.recentWarnings = const [],
+    this.persistentLogSize = 0,
     required this.dbOk,
     required this.storageOk,
     required this.storageFree,
