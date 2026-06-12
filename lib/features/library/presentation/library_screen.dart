@@ -284,7 +284,7 @@ class LibraryScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               FilledButton.tonal(
-                onPressed: () => context.go('/catalog'),
+                onPressed: () => context.push('/catalog'),
                 child: const Text('Перейти в каталог'),
               ),
               const SizedBox(height: 8),

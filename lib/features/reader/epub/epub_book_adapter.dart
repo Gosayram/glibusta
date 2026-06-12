@@ -30,8 +30,16 @@ class EpubBookAdapter {
   ReaderChapter _toChapter(epub.EpubChapter chapter, int index) {
     final blocks = <ReaderBlock>[];
     for (var i = 0; i < chapter.blocks.length; i++) {
-      final block = _toBlock(chapter.blocks[i], i);
-      if (block != null) blocks.add(block);
+      final block = chapter.blocks[i];
+      if (block is epub.SectionBlock) {
+        for (var j = 0; j < block.children.length; j++) {
+          final child = _toBlock(block.children[j], j);
+          if (child != null) blocks.add(child);
+        }
+      } else {
+        final mapped = _toBlock(block, i);
+        if (mapped != null) blocks.add(mapped);
+      }
     }
     return ReaderChapter(
       index: index,
@@ -42,6 +50,7 @@ class EpubBookAdapter {
 
   ReaderBlock? _toBlock(epub.ReaderBlock block, int index) {
     return switch (block) {
+      epub.PageBreakBlock() => null,
       epub.ParagraphBlock(:final spans) => ReaderBlock(
         index: index,
         text: spans.map((s) => s.text).join(),
@@ -75,11 +84,7 @@ class EpubBookAdapter {
         text: '',
         type: BlockType.separator,
       ),
-      epub.PageBreakBlock() => ReaderBlock(
-        index: index,
-        text: '',
-        type: BlockType.separator,
-      ),
+      epub.SectionBlock() => null,
     };
   }
 

@@ -63,23 +63,32 @@ class _FontDownloadScreenState extends ConsumerState<FontDownloadScreen> {
     });
 
     final service = ref.read(fontDownloadServiceProvider);
-    await service.downloadFont(
-      font,
-      onProgress: (received, total) {
-        if (total > 0) {
-          setState(() {
-            _progress[font.id] = received / total;
-          });
-        }
-      },
-    );
-
-    setState(() {
-      _downloading[font.id] = false;
-      _progress.remove(font.id);
-    });
-
-    ref.invalidate(fontListProvider);
+    try {
+      await service.downloadFont(
+        font,
+        onProgress: (received, total) {
+          if (total > 0) {
+            setState(() {
+              _progress[font.id] = received / total;
+            });
+          }
+        },
+      );
+    } on Object catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _downloading[font.id] = false;
+          _progress.remove(font.id);
+        });
+      }
+      ref.invalidate(fontListProvider);
+    }
   }
 
   Future<void> _deleteFont(DownloadableFont font) async {

@@ -8,7 +8,9 @@ import requests
 import urllib3
 from pathlib import Path
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+DISABLE_TLS_VERIFY = os.environ.get('DISABLE_TLS_VERIFY', '').lower() in ('1', 'true', 'yes')
+if DISABLE_TLS_VERIFY:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = "https://www.flibusta.is"
 
@@ -40,7 +42,7 @@ def download_book(book_id: str, fmt: str, output_dir: Path) -> bool:
 
     try:
         print(f"  Downloading {url} ...")
-        resp = requests.get(url, headers=HEADERS, verify=False, timeout=30, allow_redirects=True)
+        resp = requests.get(url, headers=HEADERS, verify=not DISABLE_TLS_VERIFY, timeout=30, allow_redirects=True)
         if resp.status_code == 200 and len(resp.content) > 100:
             output_file.write_bytes(resp.content)
             print(f"  OK: {output_file.name} ({len(resp.content)} bytes)")

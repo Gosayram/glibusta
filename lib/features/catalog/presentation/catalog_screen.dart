@@ -237,6 +237,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           child: FutureBuilder<Map<String, bool>>(
             future: _downloadStatusFuture,
             builder: (context, snapshot) {
+              if (snapshot.hasError) return const SizedBox.shrink();
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Skeletonizer(
                   child: GridView.builder(

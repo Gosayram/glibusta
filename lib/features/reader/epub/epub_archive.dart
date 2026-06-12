@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 
@@ -27,7 +28,7 @@ final class EpubArchive {
   String readText(String path) {
     final file = findFile(path);
     if (file == null) throw StateError('EPUB file not found: $path');
-    return String.fromCharCodes(file.content as List<int>);
+    return utf8.decode(file.content as List<int>, allowMalformed: true);
   }
 
   List<int> readBytes(String path) {

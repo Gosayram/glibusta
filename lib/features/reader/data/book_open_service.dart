@@ -73,20 +73,28 @@ class BookOpenService {
       throw const BookOpenFailure('PDF открывается отдельным просмотрщиком');
     }
 
-    return _parseInIsolate(format, filePath);
+    return _parseInIsolate(format, filePath, bookId);
   }
 
-  Future<NormalizedBook> _parseInIsolate(BookFormat bookFormat, String filePath) async {
+  Future<NormalizedBook> _parseInIsolate(
+    BookFormat bookFormat,
+    String filePath, [
+    String? bookId,
+  ]) async {
     // EPUB: use new parser (async image extraction, can't run in Isolate)
     if (bookFormat == BookFormat.epub) {
       try {
-        final tempDir = await Directory.systemTemp.createTemp('epub_images_');
-        final imageStore = EpubImageStore(tempDir);
+        final effectiveBookId = bookId ?? _extractBookId(filePath);
+        final bookDir = await _getBookDir(effectiveBookId);
+        final imagesDir = Directory('${bookDir.path}/epub_images');
+        if (!await imagesDir.exists()) {
+          await imagesDir.create(recursive: true);
+        }
+        final imageStore = EpubImageStore(imagesDir);
         final parser = new_epub.CustomEpubParser(imageStore: imageStore);
         final epubBook = await parser.parse(filePath);
         final adapter = EpubBookAdapter();
-        final bookId = _extractBookId(filePath);
-        final normalized = adapter.toNormalizedBook(epubBook, bookId);
+        final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
         _logger.info(
           'EPUB parsed: ${epubBook.title}, ${epubBook.chapters.length} chapters, '
           '${epubBook.toc?.length ?? 0} TOC items',

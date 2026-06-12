@@ -109,6 +109,9 @@ final class CustomEpubParser {
     EpubResource? cover;
     if (opf.coverId != null) cover = opf.resources[opf.coverId!];
     cover ??= opf.resources.values.firstWhereOrNull(
+      (EpubResource r) => r.isCoverImage,
+    );
+    cover ??= opf.resources.values.firstWhereOrNull(
       (EpubResource r) => r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
     );
     if (cover == null || !isSupportedImage(cover.mediaType)) return null;

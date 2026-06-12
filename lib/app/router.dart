@@ -102,7 +102,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Catalog (not a main tab, but within shell for nav)
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
-          return ShellWithNav(navigationShell: state.extra as StatefulNavigationShell?);
+          return child;
         },
         routes: [
           GoRoute(

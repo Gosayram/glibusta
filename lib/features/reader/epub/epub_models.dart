@@ -89,6 +89,11 @@ final class PageBreakBlock extends ReaderBlock {
   final String label;
 }
 
+final class SectionBlock extends ReaderBlock {
+  const SectionBlock(this.children);
+  final List<ReaderBlock> children;
+}
+
 final class TextSpan {
   const TextSpan({
     required this.text,

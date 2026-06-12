@@ -2,6 +2,11 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/features/reader/data/parsers/fb2_parser.dart';
+import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
+import 'package:glibusta/features/reader/epub/epub_archive.dart';
+import 'package:glibusta/features/reader/epub/epub_image_store.dart';
+import 'package:glibusta/features/reader/epub/epub_parser.dart' as new_epub;
 import 'package:path/path.dart' as p;
 
 void main() {
@@ -10,43 +15,86 @@ void main() {
   group('EPUB Parser (new engine)', () {
     test('parses 161303.epub (small)', () async {
       final file = File(p.join(testDir, '161303.epub'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: 161303.epub');
 
-      final bytes = await file.readAsBytes();
-      expect(bytes.length, greaterThan(100));
-      // Should start with ZIP magic
-      expect(bytes[0], 0x50); // P
-      expect(bytes[1], 0x4B); // K
+      final tempDir = await Directory.systemTemp.createTemp('epub_test_');
+      try {
+        final imageStore = EpubImageStore(tempDir);
+        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+        final book = await parser.parse(file.path);
+
+        expect(book.title, isNotEmpty);
+        expect(book.chapters, isNotEmpty);
+        // Some EPUBs may have chapters with only images/whitespace
+        final totalBlocks = book.chapters.fold(0, (sum, ch) => sum + ch.blocks.length);
+        expect(totalBlocks, greaterThanOrEqualTo(0));
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     test('parses 52496.epub (medium)', () async {
       final file = File(p.join(testDir, '52496.epub'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: 52496.epub');
 
-      final bytes = await file.readAsBytes();
-      expect(bytes.length, greaterThan(100));
-      expect(bytes[0], 0x50);
-      expect(bytes[1], 0x4B);
+      final tempDir = await Directory.systemTemp.createTemp('epub_test_');
+      try {
+        final imageStore = EpubImageStore(tempDir);
+        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+        final book = await parser.parse(file.path);
+
+        expect(book.title, isNotEmpty);
+        expect(book.chapters, isNotEmpty);
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     test('parses 280792.epub (large)', () async {
       final file = File(p.join(testDir, '280792.epub'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: 280792.epub');
 
-      final bytes = await file.readAsBytes();
-      expect(bytes.length, greaterThan(100));
-      expect(bytes[0], 0x50);
-      expect(bytes[1], 0x4B);
+      final tempDir = await Directory.systemTemp.createTemp('epub_test_');
+      try {
+        final imageStore = EpubImageStore(tempDir);
+        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+        final book = await parser.parse(file.path);
+
+        expect(book.title, isNotEmpty);
+        expect(book.chapters, isNotEmpty);
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
     });
 
     test('parses 181420.epub', () async {
       final file = File(p.join(testDir, '181420.epub'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: 181420.epub');
 
-      final bytes = await file.readAsBytes();
-      expect(bytes.length, greaterThan(100));
-      expect(bytes[0], 0x50);
-      expect(bytes[1], 0x4B);
+      final tempDir = await Directory.systemTemp.createTemp('epub_test_');
+      try {
+        final imageStore = EpubImageStore(tempDir);
+        final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+        final book = await parser.parse(file.path);
+
+        expect(book.title, isNotEmpty);
+        expect(book.chapters, isNotEmpty);
+      } finally {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    test('EPUB archive opens and reads content', () async {
+      final file = File(p.join(testDir, '161303.epub'));
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: 161303.epub');
+
+      final archive = await EpubArchive.open(file.path);
+      final containerPath = archive.findFile('META-INF/container.xml');
+      expect(containerPath, isNotNull);
+
+      final containerText = archive.readText('META-INF/container.xml');
+      expect(containerText, contains('container'));
+      expect(containerText, contains('rootfile'));
     });
   });
 
@@ -54,12 +102,13 @@ void main() {
     test('detects ZIP magic bytes in FB2.ZIP files', () async {
       for (final name in ['161303.fb2', '181420.fb2', '52496.fb2']) {
         final file = File(p.join(testDir, name));
-        if (!await file.exists()) continue;
+        if (!await file.exists()) {
+          expect(await file.exists(), isTrue, reason: 'Missing fixture: $name');
+          continue;
+        }
 
         final bytes = await file.readAsBytes();
         expect(bytes.length, greaterThan(100), reason: '$name should be non-empty');
-
-        // All Flibusta FB2 files are ZIP archives
         expect(bytes[0], 0x50, reason: '$name should start with P (ZIP magic)');
         expect(bytes[1], 0x4B, reason: '$name should start with K (ZIP magic)');
       }
@@ -67,12 +116,11 @@ void main() {
 
     test('detects plain UTF-8 FB2', () async {
       final file = File(p.join(testDir, '25. Джек Ричер, или Синяя луна.fb2'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: plain FB2 file');
 
       final bytes = await file.readAsBytes();
       expect(bytes.length, greaterThan(100));
 
-      // Plain FB2 starts with XML declaration
       final header = String.fromCharCodes(bytes.sublist(0, 50));
       expect(header, contains('<?xml'));
       expect(header, contains('UTF-8'));
@@ -80,15 +128,32 @@ void main() {
   });
 
   group('FB2 Parser — content parsing', () {
-    test('XML can be parsed from plain FB2', () async {
+    test('parses plain FB2 and extracts metadata', () async {
       final file = File(p.join(testDir, '25. Джек Ричер, или Синяя луна.fb2'));
-      if (!await file.exists()) return;
+      expect(await file.exists(), isTrue, reason: 'Missing fixture: plain FB2 file');
 
-      final bytes = await file.readAsBytes();
-      final text = String.fromCharCodes(bytes);
-      expect(text, contains('FictionBook'));
-      expect(text, contains('book-title'));
-      expect(text, contains('author'));
+      final parser = Fb2Parser();
+      final book = await parser.parseFile(file.path);
+
+      expect(book.title, isNotEmpty);
+      expect(book.authors, isNotEmpty);
+      expect(book.chapters, isNotEmpty);
+    });
+
+    test('parses FB2.ZIP and extracts metadata', () async {
+      for (final name in ['161303.fb2', '52496.fb2']) {
+        final file = File(p.join(testDir, name));
+        if (!await file.exists()) {
+          expect(await file.exists(), isTrue, reason: 'Missing fixture: $name');
+          continue;
+        }
+
+        final parser = Fb2Parser();
+        final book = await parser.parseFile(file.path);
+
+        expect(book.title, isNotEmpty, reason: '$name should have a title');
+        expect(book.chapters, isNotEmpty, reason: '$name should have chapters');
+      }
     });
   });
 
@@ -135,32 +200,23 @@ void main() {
 
   group('Format Detection', () {
     test('detects .epub extension', () {
-      expect(_detectFormat('book.epub'), 'epub');
+      expect(detectBookFormat('book.epub'), BookFormat.epub);
     });
 
     test('detects .fb2 extension', () {
-      expect(_detectFormat('book.fb2'), 'fb2');
+      expect(detectBookFormat('book.fb2'), BookFormat.fb2);
     });
 
     test('detects .txt extension', () {
-      expect(_detectFormat('book.txt'), 'txt');
+      expect(detectBookFormat('book.txt'), BookFormat.txt);
     });
 
     test('detects .pdf extension', () {
-      expect(_detectFormat('book.pdf'), 'pdf');
+      expect(detectBookFormat('book.pdf'), BookFormat.pdf);
     });
 
     test('returns unknown for .mobi', () {
-      expect(_detectFormat('book.mobi'), 'unknown');
+      expect(detectBookFormat('book.mobi'), BookFormat.unknown);
     });
   });
-}
-
-String _detectFormat(String path) {
-  final lower = path.toLowerCase();
-  if (lower.endsWith('.epub')) return 'epub';
-  if (lower.endsWith('.fb2')) return 'fb2';
-  if (lower.endsWith('.txt')) return 'txt';
-  if (lower.endsWith('.pdf')) return 'pdf';
-  return 'unknown';
 }

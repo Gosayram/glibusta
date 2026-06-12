@@ -49,11 +49,15 @@ final class EpubHtmlParser {
     final tag = el.localName;
     switch (tag) {
       case 'p':
-      case 'div':
-      case 'section':
         final spans = _extractInlineSpans(el, chapterPath);
         if (spans.isEmpty) return null;
         return ParagraphBlock(spans);
+      case 'div':
+      case 'section':
+        final childBlocks = await _processChildren(el, chapterPath);
+        if (childBlocks.isEmpty) return null;
+        if (childBlocks.length == 1) return childBlocks.first;
+        return SectionBlock(childBlocks);
 
       case 'h1':
       case 'h2':
@@ -103,7 +107,7 @@ final class EpubHtmlParser {
         final childBlocks = await _processChildren(el, chapterPath);
         if (childBlocks.isEmpty) return null;
         if (childBlocks.length == 1) return childBlocks.first;
-        return null;
+        return SectionBlock(childBlocks);
     }
   }
 
@@ -120,6 +124,7 @@ final class EpubHtmlParser {
     required bool bold,
     required bool italic,
     required bool superscript,
+    String? href,
   }) {
     for (final node in el.nodes) {
       if (node is Text) {
@@ -131,6 +136,7 @@ final class EpubHtmlParser {
               bold: bold,
               italic: italic,
               superscript: superscript,
+              href: href,
             ),
           );
         }
@@ -145,15 +151,18 @@ final class EpubHtmlParser {
           case 'strong':
           case 'b':
             newBold = true;
+            break;
           case 'em':
           case 'i':
             newItalic = true;
+            break;
           case 'sup':
             newSuperscript = true;
+            break;
           case 'a':
             href = node.attributes['href'];
+            break;
           case 'img':
-            // skip — images handled at block level
             continue;
           case 'br':
             spans.add(const TextSpan(text: '\n'));
@@ -162,9 +171,9 @@ final class EpubHtmlParser {
             break;
         }
 
-        // If this is an <a> with no child elements, extract the text directly
-        if (tag == 'a' && node.children.length == 1 && node.children.first is Text) {
-          final text = (node.children.first as Text).text;
+        // If this is an <a> with a single text node, extract it directly
+        if (tag == 'a' && node.nodes.length == 1 && node.nodes.first is Text) {
+          final text = (node.nodes.first as Text).text;
           if (text.isNotEmpty) {
             spans.add(
               TextSpan(
@@ -186,6 +195,7 @@ final class EpubHtmlParser {
           bold: newBold,
           italic: newItalic,
           superscript: newSuperscript,
+          href: href,
         );
       }
     }

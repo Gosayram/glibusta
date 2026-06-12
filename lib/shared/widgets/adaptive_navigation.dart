@@ -280,7 +280,7 @@ class MacOSShell extends ConsumerWidget {
       );
       return;
     }
-    unawaited(context.push('/library', extra: epubPaths));
+    unawaited(context.push('/library'));
   }
 }
 

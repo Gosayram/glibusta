@@ -249,6 +249,16 @@ class ReaderContentBody extends StatelessWidget {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
+          final uri = Uri.tryParse(block.imageUrl!);
+          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
+          if (!isLocal) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+              child: Center(
+                child: Icon(Icons.broken_image, size: 64, color: _getReaderStyle(settings).color),
+              ),
+            );
+          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
@@ -570,6 +580,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
+          final uri = Uri.tryParse(block.imageUrl!);
+          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
+          if (!isLocal) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+              child: Center(child: Icon(Icons.broken_image, size: 64, color: style.color)),
+            );
+          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(

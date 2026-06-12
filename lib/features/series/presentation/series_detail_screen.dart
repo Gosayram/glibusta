@@ -133,7 +133,21 @@ class SeriesDetailScreen extends ConsumerWidget {
             ),
           ),
         ),
-        error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+        error: (Object e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48),
+              const SizedBox(height: 16),
+              Text('Ошибка: $e'),
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                onPressed: () => ref.invalidate(seriesDetailProvider(seriesId)),
+                child: const Text('Повторить'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
