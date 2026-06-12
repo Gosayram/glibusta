@@ -1,5 +1,4 @@
-import 'package:html/dom.dart';
-import 'package:html/parser.dart' as html_parser;
+import 'package:xml/xml.dart';
 
 import 'epub_archive.dart';
 import 'epub_image_store.dart';
@@ -21,21 +20,33 @@ final class EpubHtmlParser {
     required String chapterPath,
     required String htmlText,
   }) async {
-    final doc = html_parser.parse(htmlText);
-    final body = doc.body;
+    final doc = XmlDocument.parse(htmlText);
+    final body = _findBody(doc);
     if (body == null) return const [];
     return _processChildren(body, chapterPath);
   }
 
-  Future<List<ReaderBlock>> _processChildren(Node parent, String chapterPath) async {
+  XmlElement? _findBody(XmlDocument doc) {
+    final root = doc.rootElement;
+    if (root.localName == 'body') return root;
+    for (final child in root.descendants.whereType<XmlElement>()) {
+      if (child.localName == 'body') return child;
+    }
+    return null;
+  }
+
+  Future<List<ReaderBlock>> _processChildren(
+    XmlElement parent,
+    String chapterPath,
+  ) async {
     final blocks = <ReaderBlock>[];
-    for (final node in parent.nodes) {
-      if (node is Text) {
-        final text = node.text.trim();
+    for (final node in parent.children) {
+      if (node is XmlText) {
+        final text = node.value.trim();
         if (text.isNotEmpty) {
           blocks.add(ParagraphBlock([TextSpan(text: text)]));
         }
-      } else if (node is Element) {
+      } else if (node is XmlElement) {
         final block = await _processElement(node, chapterPath);
         if (block != null) {
           blocks.add(block);
@@ -45,7 +56,10 @@ final class EpubHtmlParser {
     return blocks;
   }
 
-  Future<ReaderBlock?> _processElement(Element el, String chapterPath) async {
+  Future<ReaderBlock?> _processElement(
+    XmlElement el,
+    String chapterPath,
+  ) async {
     final tag = el.localName;
     switch (tag) {
       case 'p':
@@ -65,8 +79,8 @@ final class EpubHtmlParser {
       case 'h4':
       case 'h5':
       case 'h6':
-        final level = int.parse(tag![1]);
-        final text = el.text.trim();
+        final level = int.parse(tag[1]);
+        final text = el.innerText.trim();
         if (text.isEmpty) return null;
         return HeadingBlock(text, level);
 
@@ -79,10 +93,10 @@ final class EpubHtmlParser {
         return _processList(el, ordered: true, chapterPath: chapterPath);
 
       case 'table':
-        return _processTable(el, chapterPath);
+        return _processTable(el);
 
       case 'blockquote':
-        final text = el.text.trim();
+        final text = el.innerText.trim();
         if (text.isEmpty) return null;
         return QuoteBlock(text);
 
@@ -94,9 +108,10 @@ final class EpubHtmlParser {
 
       case 'span':
         if (_isPageBreak(el)) {
-          final label = el.attributes['epub:type'] == 'pagebreak'
-              ? (el.attributes['title'] ?? el.attributes['id'] ?? '')
-              : (el.attributes['title'] ?? '');
+          final epubType = el.getAttribute('epub:type');
+          final label = epubType == 'pagebreak'
+              ? (el.getAttribute('title') ?? el.getAttribute('id') ?? '')
+              : (el.getAttribute('title') ?? '');
           return PageBreakBlock(label: label);
         }
         final spans = _extractInlineSpans(el, chapterPath);
@@ -111,14 +126,14 @@ final class EpubHtmlParser {
     }
   }
 
-  List<TextSpan> _extractInlineSpans(Element el, String chapterPath) {
+  List<TextSpan> _extractInlineSpans(XmlElement el, String chapterPath) {
     final spans = <TextSpan>[];
     _walkInline(el, spans, chapterPath, bold: false, italic: false, superscript: false);
     return spans;
   }
 
   void _walkInline(
-    Element el,
+    XmlElement el,
     List<TextSpan> spans,
     String chapterPath, {
     required bool bold,
@@ -126,9 +141,9 @@ final class EpubHtmlParser {
     required bool superscript,
     String? href,
   }) {
-    for (final node in el.nodes) {
-      if (node is Text) {
-        final text = node.text;
+    for (final node in el.children) {
+      if (node is XmlText) {
+        final text = node.value;
         if (text.isNotEmpty) {
           spans.add(
             TextSpan(
@@ -140,12 +155,12 @@ final class EpubHtmlParser {
             ),
           );
         }
-      } else if (node is Element) {
+      } else if (node is XmlElement) {
         final tag = node.localName;
         var newBold = bold;
         var newItalic = italic;
         var newSuperscript = superscript;
-        String? href;
+        String? newHref = href;
 
         switch (tag) {
           case 'strong':
@@ -160,7 +175,7 @@ final class EpubHtmlParser {
             newSuperscript = true;
             break;
           case 'a':
-            href = node.attributes['href'];
+            newHref = node.getAttribute('href');
             break;
           case 'img':
             continue;
@@ -171,9 +186,9 @@ final class EpubHtmlParser {
             break;
         }
 
-        // If this is an <a> with a single text node, extract it directly
-        if (tag == 'a' && node.nodes.length == 1 && node.nodes.first is Text) {
-          final text = (node.nodes.first as Text).text;
+        final xmlChildren = node.children;
+        if (tag == 'a' && xmlChildren.length == 1 && xmlChildren.first is XmlText) {
+          final text = (xmlChildren.first as XmlText).value;
           if (text.isNotEmpty) {
             spans.add(
               TextSpan(
@@ -181,7 +196,7 @@ final class EpubHtmlParser {
                 bold: newBold,
                 italic: newItalic,
                 superscript: newSuperscript,
-                href: href,
+                href: newHref,
               ),
             );
             continue;
@@ -195,14 +210,14 @@ final class EpubHtmlParser {
           bold: newBold,
           italic: newItalic,
           superscript: newSuperscript,
-          href: href,
+          href: newHref,
         );
       }
     }
   }
 
-  Future<ReaderBlock?> _processImage(Element el, String chapterPath) async {
-    final src = el.attributes['src'];
+  Future<ReaderBlock?> _processImage(XmlElement el, String chapterPath) async {
+    final src = el.getAttribute('src');
     if (src == null || src.isEmpty) return null;
     final resource = resolver.resolveFromHref(chapterPath: chapterPath, href: src);
     if (resource == null) return null;
@@ -210,41 +225,41 @@ final class EpubHtmlParser {
     return ImageBlock(
       resourceId: resource.id,
       localPath: localPath,
-      alt: el.attributes['alt'],
+      alt: el.getAttribute('alt'),
     );
   }
 
   Future<ListBlock> _processList(
-    Element el, {
+    XmlElement el, {
     required bool ordered,
     required String chapterPath,
   }) async {
     final items = <String>[];
-    for (final child in el.children) {
+    for (final child in el.children.whereType<XmlElement>()) {
       if (child.localName == 'li') {
-        final text = child.text.trim();
+        final text = child.innerText.trim();
         if (text.isNotEmpty) items.add(text);
       }
     }
     return ListBlock(ordered: ordered, items: items);
   }
 
-  Future<TableBlock> _processTable(Element el, String chapterPath) async {
+  Future<TableBlock> _processTable(XmlElement el) async {
     final rows = <List<String>>[];
-    for (final tr in el.querySelectorAll('tr')) {
+    for (final tr in el.findAllElements('tr')) {
       final cells = <String>[];
-      for (final cell in tr.querySelectorAll('td, th')) {
-        cells.add(cell.text.trim());
+      for (final cell in tr.findAllElements('td').followedBy(tr.findAllElements('th'))) {
+        cells.add(cell.innerText.trim());
       }
       if (cells.isNotEmpty) rows.add(cells);
     }
     return TableBlock(rows);
   }
 
-  bool _isPageBreak(Element el) {
-    final epubType = el.attributes['epub:type'];
+  bool _isPageBreak(XmlElement el) {
+    final epubType = el.getAttribute('epub:type');
     if (epubType == 'pagebreak') return true;
-    if (el.localName == 'span' && el.attributes.containsKey('title')) {
+    if (el.localName == 'span' && el.getAttribute('title') != null) {
       return epubType == 'pagebreak';
     }
     return false;

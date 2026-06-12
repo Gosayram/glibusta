@@ -39,19 +39,25 @@ final class EpubOpfParser {
     final doc = XmlDocument.parse(opfText);
     final opfDir = p.posix.dirname(opfPath) == '.' ? '' : p.posix.dirname(opfPath);
 
-    // Metadata
+    // Metadata — EPUB 2 uses dc: namespace, EPUS 3 may use plain names
+    const dcNs = 'http://purl.org/dc/elements/1.1/';
     final metadata = doc.findAllElements('metadata').firstOrNull;
-    final title =
-        metadata?.findAllElements('title').firstOrNull?.innerText.trim() ?? 'Без названия';
-    final authors =
-        metadata
-            ?.findAllElements('creator')
-            .map((e) => e.innerText.trim())
-            .where((e) => e.isNotEmpty)
-            .toList() ??
-        const [];
-    final language = metadata?.findAllElements('language').firstOrNull?.innerText.trim();
-    final description = metadata?.findAllElements('description').firstOrNull?.innerText.trim();
+    String findMeta(String tag) {
+      return metadata?.findAllElements(tag, namespace: dcNs).firstOrNull?.innerText.trim() ??
+          metadata?.findAllElements(tag).firstOrNull?.innerText.trim() ??
+          '';
+    }
+
+    final title = findMeta('title').isNotEmpty ? findMeta('title') : 'Без названия';
+    final allCreators = metadata?.findAllElements('creator', namespace: dcNs).toList() ??
+        metadata?.findAllElements('creator').toList() ??
+        [];
+    final authors = allCreators
+        .map((e) => e.innerText.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final language = findMeta('language');
+    final description = findMeta('description');
     final coverId = metadata
         ?.findAllElements('meta')
         .where((e) => e.getAttribute('name') == 'cover')

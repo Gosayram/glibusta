@@ -24,10 +24,10 @@ void main() {
         final book = await parser.parse(file.path);
 
         expect(book.title, isNotEmpty);
+        expect(book.authors, isNotEmpty);
         expect(book.chapters, isNotEmpty);
-        // Some EPUBs may have chapters with only images/whitespace
         final totalBlocks = book.chapters.fold(0, (sum, ch) => sum + ch.blocks.length);
-        expect(totalBlocks, greaterThanOrEqualTo(0));
+        expect(totalBlocks, greaterThan(0));
       } finally {
         await tempDir.delete(recursive: true);
       }
@@ -44,7 +44,10 @@ void main() {
         final book = await parser.parse(file.path);
 
         expect(book.title, isNotEmpty);
+        expect(book.authors, isNotEmpty);
         expect(book.chapters, isNotEmpty);
+        final totalBlocks = book.chapters.fold(0, (sum, ch) => sum + ch.blocks.length);
+        expect(totalBlocks, greaterThan(0));
       } finally {
         await tempDir.delete(recursive: true);
       }
@@ -62,6 +65,8 @@ void main() {
 
         expect(book.title, isNotEmpty);
         expect(book.chapters, isNotEmpty);
+        final totalBlocks = book.chapters.fold(0, (sum, ch) => sum + ch.blocks.length);
+        expect(totalBlocks, greaterThan(0));
       } finally {
         await tempDir.delete(recursive: true);
       }
@@ -78,7 +83,10 @@ void main() {
         final book = await parser.parse(file.path);
 
         expect(book.title, isNotEmpty);
+        expect(book.authors, isNotEmpty);
         expect(book.chapters, isNotEmpty);
+        final totalBlocks = book.chapters.fold(0, (sum, ch) => sum + ch.blocks.length);
+        expect(totalBlocks, greaterThan(0));
       } finally {
         await tempDir.delete(recursive: true);
       }
