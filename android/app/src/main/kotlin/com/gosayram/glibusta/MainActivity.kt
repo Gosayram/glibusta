@@ -6,18 +6,18 @@ import android.provider.DocumentsContract
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
 
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private var pendingResult: MethodChannel.Result? = null
 
     private val openTreeLauncher: ActivityResultLauncher<Uri?> =
-        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
             if (uri != null && pendingResult != null) {
                 val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION
@@ -86,7 +86,7 @@ class MainActivity : FlutterActivity() {
             for (file in root.listFiles()) {
                 if (!file.isFile) continue
                 val name = file.name ?: continue
-                val ext = name.substringAfterLast('.', '').lowercase()
+                val ext = name.substringAfterLast('.', "").lowercase()
                 if (ext !in supportedExtensions) continue
 
                 books.add(mapOf(
