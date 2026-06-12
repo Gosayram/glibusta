@@ -37,18 +37,18 @@ class MockBookSource implements BookSource {
         description: null,
         coverUrl: null,
         publishDate: null,
-        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
+        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi],
         source: const BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
       ),
       description: 'Mock description',
-      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
+      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi],
       downloadUrls: const [],
     );
   }
 
   @override
   Future<List<BookFormat>> getAvailableFormats(String bookId) async {
-    return const [BookFormat.fb2, BookFormat.epub, BookFormat.txt];
+    return const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi];
   }
 
   @override

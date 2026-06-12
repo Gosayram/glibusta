@@ -30,8 +30,8 @@ void main() {
       final source = MockBookSource();
       final formats = await source.getAvailableFormats('123');
 
-      expect(formats, containsAll([BookFormat.fb2, BookFormat.epub, BookFormat.txt]));
-      expect(formats.length, 3);
+      expect(formats, containsAll([BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi]));
+      expect(formats.length, 4);
     });
 
     test('returns mock download URL', () async {
@@ -69,11 +69,12 @@ void main() {
 
   group('Book model', () {
     test('supports all format types', () {
-      expect(BookFormat.values.length, 5);
+      expect(BookFormat.values.length, 6);
       expect(BookFormat.values, contains(BookFormat.fb2));
       expect(BookFormat.values, contains(BookFormat.epub));
       expect(BookFormat.values, contains(BookFormat.txt));
       expect(BookFormat.values, contains(BookFormat.pdf));
+      expect(BookFormat.values, contains(BookFormat.mobi));
       expect(BookFormat.values, contains(BookFormat.unknown));
     });
   });

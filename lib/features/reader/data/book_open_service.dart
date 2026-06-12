@@ -69,8 +69,8 @@ class BookOpenService {
       throw BookOpenFailure('Формат не поддерживается: ${download.format}');
     }
 
-    if (format == BookFormat.pdf) {
-      throw const BookOpenFailure('PDF открывается отдельным просмотрщиком');
+    if (format == BookFormat.pdf || format == BookFormat.mobi) {
+      throw const BookOpenFailure('Формат не поддерживается');
     }
 
     return _parseInIsolate(format, filePath, bookId);
@@ -121,6 +121,7 @@ class BookOpenService {
           BookFormat.txt => TxtBookParser().parseFile(filePath),
           BookFormat.epub => throw UnsupportedError('handled above'),
           BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
+          BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
           BookFormat.unknown => throw UnsupportedError('Unknown format'),
         };
       });
@@ -162,7 +163,7 @@ class BookOpenService {
     }
 
     final format = detectBookFormat(filePath);
-    if (format == BookFormat.unknown || format == BookFormat.pdf) {
+    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
       throw BookOpenFailure('Формат не поддерживается: ${format.name}');
     }
 

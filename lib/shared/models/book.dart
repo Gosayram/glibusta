@@ -1,4 +1,4 @@
-enum BookFormat { fb2, epub, pdf, txt, unknown }
+enum BookFormat { fb2, epub, pdf, txt, mobi, unknown }
 
 enum ReadingStatus {
   none,

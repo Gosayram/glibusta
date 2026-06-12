@@ -131,6 +131,8 @@ class FlibustaApiSource extends BookSource {
         formats.add(BookFormat.txt);
       } else if (lower.contains('pdf')) {
         formats.add(BookFormat.pdf);
+      } else if (lower.contains('mobi')) {
+        formats.add(BookFormat.mobi);
       }
     }
     return formats;

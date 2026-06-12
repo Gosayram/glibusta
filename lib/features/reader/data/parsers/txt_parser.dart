@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
+
 import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/errors/failures.dart';
 import 'book_parser.dart';
@@ -20,8 +22,9 @@ final class TxtBookParser implements BookParser {
     String? forcedEncoding,
   }) async {
     try {
+      final textBytes = _extractFromZipIfNeeded(bytes);
       final result = await _detector.detect(
-        bytes,
+        textBytes,
         fileName: fileName,
         forcedEncoding: forcedEncoding,
       );
@@ -50,6 +53,23 @@ final class TxtBookParser implements BookParser {
     } on FileSystemException catch (e) {
       throw ParserFailure('Не удалось прочитать файл TXT: ${e.message}');
     }
+  }
+
+  Uint8List _extractFromZipIfNeeded(Uint8List bytes) {
+    if (bytes.length < 4) return bytes;
+    if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
+      try {
+        final archive = ZipDecoder().decodeBytes(bytes);
+        final txtFile = archive.files.cast<ArchiveFile?>().firstWhere(
+          (f) => f!.name.toLowerCase().endsWith('.txt'),
+          orElse: () => null,
+        );
+        if (txtFile != null) {
+          return Uint8List.fromList(txtFile.content as List<int>);
+        }
+      } on Object catch (_) {}
+    }
+    return bytes;
   }
 
   NormalizedBook _textToBook(String text, {required String fileName}) {

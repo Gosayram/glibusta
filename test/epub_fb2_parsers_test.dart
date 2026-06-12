@@ -224,7 +224,7 @@ void main() {
     });
 
     test('returns unknown for .mobi', () {
-      expect(detectBookFormat('book.mobi'), BookFormat.unknown);
+      expect(detectBookFormat('book.mobi'), BookFormat.mobi);
     });
   });
 }

@@ -284,6 +284,7 @@ class FlibustaHtmlSource extends BookSource {
       case 'pdf':
         return BookFormat.pdf;
       case 'mobi':
+        return BookFormat.mobi;
       case 'djvu':
       case 'rtf':
       case 'html':

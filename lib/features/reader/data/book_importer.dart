@@ -50,10 +50,8 @@ final class BookImporter {
     if (format == BookFormat.unknown) {
       throw const BookOpenFailure('Неподдерживаемый формат файла');
     }
-    if (format == BookFormat.pdf) {
-      throw const BookOpenFailure(
-        'PDF открывается отдельным просмотрщиком',
-      );
+    if (format == BookFormat.pdf || format == BookFormat.mobi) {
+      throw const BookOpenFailure('Формат не поддерживается');
     }
 
     return Isolate.run<NormalizedBook>(() {
@@ -62,6 +60,7 @@ final class BookImporter {
         BookFormat.fb2 => Fb2Parser().parseFile(filePath),
         BookFormat.txt => TxtBookParser().parseFile(filePath),
         BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
+        BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),
       };
     });
