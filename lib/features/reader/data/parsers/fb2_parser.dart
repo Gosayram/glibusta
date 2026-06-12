@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import '../../../../core/encoding/encoding_detection.dart';
@@ -22,8 +23,11 @@ class Fb2Parser implements BookParser {
     String? forcedEncoding,
   }) async {
     try {
+      // Detect and handle FB2.ZIP (ZIP archive containing FB2 XML)
+      final xmlBytes = _extractFromZipIfNeeded(bytes);
+
       final result = await _detector.detect(
-        bytes,
+        xmlBytes,
         fileName: fileName,
         forcedEncoding: forcedEncoding,
       );
@@ -36,6 +40,28 @@ class Fb2Parser implements BookParser {
     } on Object catch (e) {
       throw ParserFailure('Неожиданная ошибка при разборе FB2: $e');
     }
+  }
+
+  /// If bytes are a ZIP archive (FB2.ZIP), extract the first .fb2 file.
+  Uint8List _extractFromZipIfNeeded(Uint8List bytes) {
+    if (bytes.length < 4) return bytes;
+
+    // Check ZIP magic bytes: PK\x03\x04
+    if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
+      try {
+        final archive = ZipDecoder().decodeBytes(bytes);
+        // Find first .fb2 file in the archive
+        final fb2File = archive.files.firstWhere(
+          (f) => f.name.toLowerCase().endsWith('.fb2'),
+          orElse: () => archive.files.first,
+        );
+        return Uint8List.fromList(fb2File.content as List<int>);
+      } on Object catch (_) {
+        // If ZIP decoding fails, try raw bytes as plain FB2 XML
+        return bytes;
+      }
+    }
+    return bytes;
   }
 
   @override
