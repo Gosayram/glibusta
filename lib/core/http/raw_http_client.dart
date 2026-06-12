@@ -13,16 +13,20 @@ class RawHttpFallbackClient {
       ..connectionTimeout = const Duration(seconds: 15)
       ..idleTimeout = Duration.zero
       ..maxConnectionsPerHost = 1
-      ..userAgent = _userAgent ??
+      ..userAgent =
+          _userAgent ??
           'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/131.0.6778.81 Mobile Safari/537.36';
+              'AppleWebKit/537.36 (KHTML, like Gecko) '
+              'Chrome/131.0.6778.81 Mobile Safari/537.36';
 
     try {
       final request = await client.getUrl(uri);
 
       request.headers
-        ..set(HttpHeaders.acceptHeader, 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        ..set(
+          HttpHeaders.acceptHeader,
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        )
         ..set(HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
         ..set(HttpHeaders.acceptEncodingHeader, 'identity')
         ..set(HttpHeaders.connectionHeader, 'close');
@@ -43,10 +47,11 @@ class RawHttpFallbackClient {
       ..connectionTimeout = const Duration(seconds: 15)
       ..idleTimeout = Duration.zero
       ..maxConnectionsPerHost = 1
-      ..userAgent = _userAgent ??
+      ..userAgent =
+          _userAgent ??
           'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/131.0.6778.81 Mobile Safari/537.36';
+              'AppleWebKit/537.36 (KHTML, like Gecko) '
+              'Chrome/131.0.6778.81 Mobile Safari/537.36';
 
     try {
       final request = await client.getUrl(uri);

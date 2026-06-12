@@ -1,25 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-
 import 'package:glibusta/core/errors/failures.dart';
 import 'package:glibusta/features/search/data/composite_source.dart';
 import 'package:glibusta/features/search/domain/book_source.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/models/search_query.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockBookSource extends Mock implements BookSource {}
 
 Book _makeBook(String id, String title) => Book(
-      id: id,
-      title: title,
-      authorIds: const [],
-      genreIds: const [],
-      description: null,
-      coverUrl: null,
-      publishDate: null,
-      availableFormats: const [],
-      source: const BookSourceInfo(sourceId: 'test', sourceUrl: ''),
-    );
+  id: id,
+  title: title,
+  authorIds: const [],
+  genreIds: const [],
+  description: null,
+  coverUrl: null,
+  publishDate: null,
+  availableFormats: const [],
+  source: const BookSourceInfo(sourceId: 'test', sourceUrl: ''),
+);
 
 void main() {
   late MockBookSource mockSource1;
@@ -47,8 +46,9 @@ void main() {
         hasNextPage: false,
       );
 
-      when(() => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')))
-          .thenAnswer((_) async => result);
+      when(
+        () => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')),
+      ).thenAnswer((_) async => result);
 
       final searchResult = await composite.searchBooks(
         const SearchQuery(query: 'test'),
@@ -67,10 +67,12 @@ void main() {
         hasNextPage: false,
       );
 
-      when(() => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')))
-          .thenThrow(Exception('Source 1 failed'));
-      when(() => mockSource2.searchBooks(any(), cancelToken: any(named: 'cancelToken')))
-          .thenAnswer((_) async => result);
+      when(
+        () => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')),
+      ).thenThrow(Exception('Source 1 failed'));
+      when(
+        () => mockSource2.searchBooks(any(), cancelToken: any(named: 'cancelToken')),
+      ).thenAnswer((_) async => result);
 
       final searchResult = await composite.searchBooks(
         const SearchQuery(query: 'test'),
@@ -81,10 +83,12 @@ void main() {
     });
 
     test('throws SourceUnavailableFailure when all sources fail', () async {
-      when(() => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')))
-          .thenThrow(Exception('Source 1 failed'));
-      when(() => mockSource2.searchBooks(any(), cancelToken: any(named: 'cancelToken')))
-          .thenThrow(Exception('Source 2 failed'));
+      when(
+        () => mockSource1.searchBooks(any(), cancelToken: any(named: 'cancelToken')),
+      ).thenThrow(Exception('Source 1 failed'));
+      when(
+        () => mockSource2.searchBooks(any(), cancelToken: any(named: 'cancelToken')),
+      ).thenThrow(Exception('Source 2 failed'));
 
       expect(
         () => composite.searchBooks(const SearchQuery(query: 'test')),
@@ -95,18 +99,19 @@ void main() {
 
   group('CompositeBookSource.getDownloadUrl', () {
     test('returns URL from first source that succeeds', () async {
-      when(() => mockSource1.getDownloadUrl(any(), any()))
-          .thenAnswer((_) async => 'https://example.com/b/1/epub');
+      when(
+        () => mockSource1.getDownloadUrl(any(), any()),
+      ).thenAnswer((_) async => 'https://example.com/b/1/epub');
 
       final url = await composite.getDownloadUrl('1', BookFormat.epub);
       expect(url, 'https://example.com/b/1/epub');
     });
 
     test('falls back to second source', () async {
-      when(() => mockSource1.getDownloadUrl(any(), any()))
-          .thenThrow(Exception('Failed'));
-      when(() => mockSource2.getDownloadUrl(any(), any()))
-          .thenAnswer((_) async => 'https://mirror.com/b/1/epub');
+      when(() => mockSource1.getDownloadUrl(any(), any())).thenThrow(Exception('Failed'));
+      when(
+        () => mockSource2.getDownloadUrl(any(), any()),
+      ).thenAnswer((_) async => 'https://mirror.com/b/1/epub');
 
       final url = await composite.getDownloadUrl('1', BookFormat.epub);
       expect(url, 'https://mirror.com/b/1/epub');

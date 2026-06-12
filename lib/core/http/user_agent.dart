@@ -28,7 +28,9 @@ class DeviceUserAgent {
       if (_isIOS) {
         return _iosUA(await deviceInfo.iosInfo);
       }
-    } on Object {}
+    } on Object {
+      // Intentionally ignored — fall back to default UA
+    }
     return _fallbackUA();
   }
 

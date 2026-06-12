@@ -94,13 +94,15 @@ class BookOpenService {
       final parser = new_epub.CustomEpubParser(imageStore: imageStore);
 
       try {
-        final epubBook = await parser.parse(filePath).timeout(
-          _parsingTimeout,
-          onTimeout: () => throw TimeoutException(
-            'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
-            'Попробуйте повторить.',
-          ),
-        );
+        final epubBook = await parser
+            .parse(filePath)
+            .timeout(
+              _parsingTimeout,
+              onTimeout: () => throw TimeoutException(
+                'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
+                'Попробуйте повторить.',
+              ),
+            );
         final adapter = EpubBookAdapter();
         final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
         _logger.info(
@@ -119,13 +121,15 @@ class BookOpenService {
           st: st,
         );
         try {
-          return await legacy_epub.EpubParser().parseFile(filePath).timeout(
-            _parsingTimeout,
-            onTimeout: () => throw TimeoutException(
-              'Разбор EPUB (legacy) занял слишком много времени. '
-              'Попробуйте повторить.',
-            ),
-          );
+          return await legacy_epub.EpubParser()
+              .parseFile(filePath)
+              .timeout(
+                _parsingTimeout,
+                onTimeout: () => throw TimeoutException(
+                  'Разбор EPUB (legacy) занял слишком много времени. '
+                  'Попробуйте повторить.',
+                ),
+              );
         } on TimeoutException {
           rethrow;
         }

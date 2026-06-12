@@ -74,18 +74,20 @@ class FlibustaApiSource extends BookSource {
                 authorNames.add(a.text.trim());
               }
             }
-            books.add(Book(
-              id: id,
-              title: name,
-              authorIds: authorIds,
-              authorNames: authorNames,
-              genreIds: const [],
-              description: null,
-              coverUrl: null,
-              publishDate: null,
-              availableFormats: const [],
-              source: BookSourceInfo(sourceId: 'flibusta', sourceUrl: '/b/$id'),
-            ));
+            books.add(
+              Book(
+                id: id,
+                title: name,
+                authorIds: authorIds,
+                authorNames: authorNames,
+                genreIds: const [],
+                description: null,
+                coverUrl: null,
+                publishDate: null,
+                availableFormats: const [],
+                source: BookSourceInfo(sourceId: 'flibusta', sourceUrl: '/b/$id'),
+              ),
+            );
           }
         }
       }
@@ -105,7 +107,10 @@ class FlibustaApiSource extends BookSource {
   }
 
   @override
-  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+  Future<SearchAuthorsResultPage> searchAuthors(
+    SearchQuery query, {
+    CancelToken? cancelToken,
+  }) async {
     if (query.hasFilters) {
       return const SearchAuthorsResultPage(authors: []);
     }

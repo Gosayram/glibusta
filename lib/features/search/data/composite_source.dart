@@ -36,12 +36,19 @@ class CompositeBookSource extends BookSource {
         final result = await source.searchBooks(query, cancelToken: cancelToken);
         if (result.books.isNotEmpty) return result;
       } on AppFailure catch (e) {
-        _logger?.severe('SearchBooks failed (${source.runtimeType}): ${e.message}',
-            name: 'CompositeSource', error: e);
+        _logger?.severe(
+          'SearchBooks failed (${source.runtimeType}): ${e.message}',
+          name: 'CompositeSource',
+          error: e,
+        );
         errors.add(e);
       } on Object catch (e, st) {
-        _logger?.severe('SearchBooks unexpected error (${source.runtimeType}): $e',
-            name: 'CompositeSource', error: e, st: st);
+        _logger?.severe(
+          'SearchBooks unexpected error (${source.runtimeType}): $e',
+          name: 'CompositeSource',
+          error: e,
+          st: st,
+        );
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -60,19 +67,29 @@ class CompositeBookSource extends BookSource {
   }
 
   @override
-  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+  Future<SearchAuthorsResultPage> searchAuthors(
+    SearchQuery query, {
+    CancelToken? cancelToken,
+  }) async {
     final errors = <AppFailure>[];
     for (final source in sources) {
       try {
         final result = await source.searchAuthors(query, cancelToken: cancelToken);
         if (result.authors.isNotEmpty) return result;
       } on AppFailure catch (e) {
-        _logger?.warning('SearchAuthors failed (${source.runtimeType}): ${e.message}',
-            name: 'CompositeSource', error: e);
+        _logger?.warning(
+          'SearchAuthors failed (${source.runtimeType}): ${e.message}',
+          name: 'CompositeSource',
+          error: e,
+        );
         errors.add(e);
       } on Object catch (e, st) {
-        _logger?.warning('SearchAuthors unexpected error (${source.runtimeType}): $e',
-            name: 'CompositeSource', error: e, st: st);
+        _logger?.warning(
+          'SearchAuthors unexpected error (${source.runtimeType}): $e',
+          name: 'CompositeSource',
+          error: e,
+          st: st,
+        );
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -86,12 +103,19 @@ class CompositeBookSource extends BookSource {
       try {
         return await source.getBookDetails(bookId);
       } on AppFailure catch (e) {
-        _logger?.severe('GetBookDetails failed ($bookId, ${source.runtimeType}): ${e.message}',
-            name: 'CompositeSource', error: e);
+        _logger?.severe(
+          'GetBookDetails failed ($bookId, ${source.runtimeType}): ${e.message}',
+          name: 'CompositeSource',
+          error: e,
+        );
         errors.add(e);
       } on Object catch (e, st) {
-        _logger?.severe('GetBookDetails unexpected error ($bookId): $e',
-            name: 'CompositeSource', error: e, st: st);
+        _logger?.severe(
+          'GetBookDetails unexpected error ($bookId): $e',
+          name: 'CompositeSource',
+          error: e,
+          st: st,
+        );
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -108,12 +132,19 @@ class CompositeBookSource extends BookSource {
         final formats = await source.getAvailableFormats(bookId);
         if (formats.isNotEmpty) return formats;
       } on AppFailure catch (e) {
-        _logger?.warning('GetAvailableFormats failed ($bookId, ${source.runtimeType}): ${e.message}',
-            name: 'CompositeSource', error: e);
+        _logger?.warning(
+          'GetAvailableFormats failed ($bookId, ${source.runtimeType}): ${e.message}',
+          name: 'CompositeSource',
+          error: e,
+        );
         errors.add(e);
       } on Object catch (e, st) {
-        _logger?.warning('GetAvailableFormats unexpected error ($bookId): $e',
-            name: 'CompositeSource', error: e, st: st);
+        _logger?.warning(
+          'GetAvailableFormats unexpected error ($bookId): $e',
+          name: 'CompositeSource',
+          error: e,
+          st: st,
+        );
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }
@@ -128,12 +159,19 @@ class CompositeBookSource extends BookSource {
         final url = await source.getDownloadUrl(bookId, format);
         if (url.isNotEmpty) return url;
       } on AppFailure catch (e) {
-        _logger?.severe('GetDownloadUrl failed ($bookId, ${format.name}, ${source.runtimeType}): ${e.message}',
-            name: 'CompositeSource', error: e);
+        _logger?.severe(
+          'GetDownloadUrl failed ($bookId, ${format.name}, ${source.runtimeType}): ${e.message}',
+          name: 'CompositeSource',
+          error: e,
+        );
         errors.add(e);
       } on Object catch (e, st) {
-        _logger?.severe('GetDownloadUrl unexpected error ($bookId, ${format.name}): $e',
-            name: 'CompositeSource', error: e, st: st);
+        _logger?.severe(
+          'GetDownloadUrl unexpected error ($bookId, ${format.name}): $e',
+          name: 'CompositeSource',
+          error: e,
+          st: st,
+        );
         errors.add(ParserFailure('Unexpected error: $e'));
       }
     }

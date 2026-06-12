@@ -56,8 +56,7 @@ final bookDownloadStateProvider = FutureProvider.autoDispose.family<BookDownload
     if (row.status == DownloadStatusDb.completed) {
       return BookDownloadState.downloaded;
     }
-    if (row.status == DownloadStatusDb.queued ||
-        row.status == DownloadStatusDb.running) {
+    if (row.status == DownloadStatusDb.queued || row.status == DownloadStatusDb.running) {
       return BookDownloadState.downloading;
     }
   }

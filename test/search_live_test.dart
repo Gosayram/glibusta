@@ -1,10 +1,7 @@
-import 'dart:convert';
 import 'dart:io' as io;
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/core/encoding/encoding_detection.dart';
 import 'package:glibusta/core/http/http_client.dart';
 import 'package:glibusta/features/search/data/flibusta_source.dart';
 import 'package:glibusta/shared/models/search_query.dart';
@@ -15,11 +12,13 @@ void main() {
 
   setUpAll(() {
     io.HttpOverrides.global = _TestHttpOverrides();
-    final dio = Dio(BaseOptions(
-      baseUrl: 'https://www.flibusta.is',
-      responseType: ResponseType.plain,
-      headers: {'User-Agent': 'Mozilla/5.0'},
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: 'https://www.flibusta.is',
+        responseType: ResponseType.plain,
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      ),
+    );
     client = HttpClient(dio);
     source = FlibustaHtmlSource(client);
   });
@@ -64,9 +63,7 @@ void main() {
     test('titles contain no mojibake', () async {
       final result = await source.searchBooks(const SearchQuery(query: 'Кинг'));
       for (final b in result.books) {
-        final hasMojibake = b.title.contains('╨') ||
-            b.title.contains('╤') ||
-            b.title.contains('─');
+        final hasMojibake = b.title.contains('╨') || b.title.contains('╤') || b.title.contains('─');
         expect(hasMojibake, false, reason: 'title "${b.title}" contains mojibake');
       }
     });
@@ -84,7 +81,6 @@ void main() {
 class _TestHttpOverrides extends io.HttpOverrides {
   @override
   io.HttpClient createHttpClient(io.SecurityContext? context) {
-    return super.createHttpClient(context)
-      ..badCertificateCallback = (_, __, ___) => true;
+    return super.createHttpClient(context)..badCertificateCallback = (_, _, _) => true;
   }
 }

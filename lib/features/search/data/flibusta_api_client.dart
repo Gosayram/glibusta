@@ -495,10 +495,12 @@ class FlibustaApiClient {
                 final ghref = sibling.attributes['href'] ?? '';
                 final gidMatch = RegExp(r'^/g/(\d+)$').firstMatch(ghref);
                 if (gidMatch != null) {
-                  genres.add(AuthorGenreItem(
-                    id: gidMatch.group(1)!,
-                    name: sibling.text.trim(),
-                  ));
+                  genres.add(
+                    AuthorGenreItem(
+                      id: gidMatch.group(1)!,
+                      name: sibling.text.trim(),
+                    ),
+                  );
                 }
               }
               sibling = sibling.nextElementSibling;

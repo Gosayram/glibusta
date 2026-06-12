@@ -43,19 +43,17 @@ final class EpubOpfParser {
     const dcNs = 'http://purl.org/dc/elements/1.1/';
     final metadata = doc.findAllElements('metadata').firstOrNull;
     String findMeta(String tag) {
-      return metadata?.findAllElements(tag, namespace: dcNs).firstOrNull?.innerText.trim() ??
+      return metadata?.findAllElements(tag, namespaceUri: dcNs).firstOrNull?.innerText.trim() ??
           metadata?.findAllElements(tag).firstOrNull?.innerText.trim() ??
           '';
     }
 
     final title = findMeta('title').isNotEmpty ? findMeta('title') : 'Без названия';
-    final allCreators = metadata?.findAllElements('creator', namespace: dcNs).toList() ??
+    final allCreators =
+        metadata?.findAllElements('creator', namespaceUri: dcNs).toList() ??
         metadata?.findAllElements('creator').toList() ??
         [];
-    final authors = allCreators
-        .map((e) => e.innerText.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final authors = allCreators.map((e) => e.innerText.trim()).where((e) => e.isNotEmpty).toList();
     final language = findMeta('language');
     final description = findMeta('description');
     final coverId = metadata

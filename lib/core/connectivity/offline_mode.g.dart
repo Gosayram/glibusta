@@ -19,9 +19,7 @@ final class DownloadPolicyPersistenceProvider
           DownloadPolicyPersistence,
           FutureOr<DownloadPolicyPersistence>
         >
-    with
-        $FutureModifier<DownloadPolicyPersistence>,
-        $FutureProvider<DownloadPolicyPersistence> {
+    with $FutureModifier<DownloadPolicyPersistence>, $FutureProvider<DownloadPolicyPersistence> {
   DownloadPolicyPersistenceProvider._()
     : super(
         from: null,
@@ -48,8 +46,7 @@ final class DownloadPolicyPersistenceProvider
   }
 }
 
-String _$downloadPolicyPersistenceHash() =>
-    r'c622c4ae3cbc12dec527846d11ed61772b2a10fc';
+String _$downloadPolicyPersistenceHash() => r'c622c4ae3cbc12dec527846d11ed61772b2a10fc';
 
 @ProviderFor(AllowMobileDownloadsNotifier)
 final allowMobileDownloadsProvider = AllowMobileDownloadsNotifierProvider._();
@@ -83,8 +80,7 @@ final class AllowMobileDownloadsNotifierProvider
   }
 }
 
-String _$allowMobileDownloadsNotifierHash() =>
-    r'e52393c8f81aad27be2fed99b8e1d4a4e1d8f1ed';
+String _$allowMobileDownloadsNotifierHash() => r'e52393c8f81aad27be2fed99b8e1d4a4e1d8f1ed';
 
 abstract class _$AllowMobileDownloadsNotifier extends $Notifier<bool> {
   bool build();
@@ -93,13 +89,7 @@ abstract class _$AllowMobileDownloadsNotifier extends $Notifier<bool> {
   WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
-              Object?,
-              Object?
-            >;
+        ref.element as $ClassProviderElement<AnyNotifier<bool, bool>, bool, Object?, Object?>;
     return element.handleCreate(ref, build);
   }
 }
@@ -136,8 +126,7 @@ final class AutoResumeOnWifiNotifierProvider
   }
 }
 
-String _$autoResumeOnWifiNotifierHash() =>
-    r'25a78875c2ff20dc2b6b85f2daf0320b2ab030db';
+String _$autoResumeOnWifiNotifierHash() => r'25a78875c2ff20dc2b6b85f2daf0320b2ab030db';
 
 abstract class _$AutoResumeOnWifiNotifier extends $Notifier<bool> {
   bool build();
@@ -146,13 +135,7 @@ abstract class _$AutoResumeOnWifiNotifier extends $Notifier<bool> {
   WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
-              Object?,
-              Object?
-            >;
+        ref.element as $ClassProviderElement<AnyNotifier<bool, bool>, bool, Object?, Object?>;
     return element.handleCreate(ref, build);
   }
 }
@@ -161,12 +144,7 @@ abstract class _$AutoResumeOnWifiNotifier extends $Notifier<bool> {
 final networkStateProvider = NetworkStateProvider._();
 
 final class NetworkStateProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<NetworkState>,
-          NetworkState,
-          Stream<NetworkState>
-        >
+    extends $FunctionalProvider<AsyncValue<NetworkState>, NetworkState, Stream<NetworkState>>
     with $FutureModifier<NetworkState>, $StreamProvider<NetworkState> {
   NetworkStateProvider._()
     : super(
@@ -200,12 +178,7 @@ String _$networkStateHash() => r'eeddc3c092daba16b9680135cb45cb4e5a9e2f62';
 final currentNetworkProvider = CurrentNetworkProvider._();
 
 final class CurrentNetworkProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<NetworkState>,
-          NetworkState,
-          FutureOr<NetworkState>
-        >
+    extends $FunctionalProvider<AsyncValue<NetworkState>, NetworkState, FutureOr<NetworkState>>
     with $FutureModifier<NetworkState>, $FutureProvider<NetworkState> {
   CurrentNetworkProvider._()
     : super(

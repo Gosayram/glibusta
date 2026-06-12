@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/reader/data/parsers/fb2_parser.dart';
@@ -13,9 +12,13 @@ void main() {
   final testDir = p.join(Directory.current.path, 'test_results');
 
   group('FB2 — all files', () {
-    final files = Directory(testDir).listSync().whereType<File>().where(
-      (f) => f.path.endsWith('.fb2'),
-    ).toList();
+    final files = Directory(testDir)
+        .listSync()
+        .whereType<File>()
+        .where(
+          (f) => f.path.endsWith('.fb2'),
+        )
+        .toList();
 
     for (final file in files) {
       final name = p.basename(file.path);
@@ -32,9 +35,13 @@ void main() {
   });
 
   group('EPUB — all files', () {
-    final files = Directory(testDir).listSync().whereType<File>().where(
-      (f) => f.path.endsWith('.epub'),
-    ).toList();
+    final files = Directory(testDir)
+        .listSync()
+        .whereType<File>()
+        .where(
+          (f) => f.path.endsWith('.epub'),
+        )
+        .toList();
 
     for (final file in files) {
       final name = p.basename(file.path);
@@ -57,9 +64,13 @@ void main() {
   });
 
   group('TXT — all files', () {
-    final files = Directory(testDir).listSync().whereType<File>().where(
-      (f) => f.path.endsWith('.txt'),
-    ).toList();
+    final files = Directory(testDir)
+        .listSync()
+        .whereType<File>()
+        .where(
+          (f) => f.path.endsWith('.txt'),
+        )
+        .toList();
 
     for (final file in files) {
       final name = p.basename(file.path);
@@ -70,6 +81,7 @@ void main() {
             header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04;
 
         if (isZip) {
+          // ignore: avoid_print
           print('  NOTE: $name is actually a ZIP archive');
         }
 
@@ -84,9 +96,13 @@ void main() {
   });
 
   group('MOBI — detected as mobi format', () {
-    final files = Directory(testDir).listSync().whereType<File>().where(
-      (f) => f.path.endsWith('.mobi'),
-    ).toList();
+    final files = Directory(testDir)
+        .listSync()
+        .whereType<File>()
+        .where(
+          (f) => f.path.endsWith('.mobi'),
+        )
+        .toList();
 
     for (final file in files) {
       final name = p.basename(file.path);

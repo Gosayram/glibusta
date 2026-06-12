@@ -202,7 +202,8 @@ class ReaderController {
         _state.copyWith(
           isLoading: false,
           clearLoadingMessage: true,
-          errorMessage: 'Открытие книги заняло слишком много времени.\n'
+          errorMessage:
+              'Открытие книги заняло слишком много времени.\n'
               'Возможно, файл повреждён или слишком большой.\n'
               'Попробуйте повторить.',
         ),

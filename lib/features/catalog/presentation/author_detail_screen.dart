@@ -53,7 +53,12 @@ class AuthorDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text('Не удалось загрузить автора', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                Text('$e', maxLines: 4, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                Text(
+                  '$e',
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: () => ref.invalidate(authorDetailProvider(authorId)),
@@ -183,7 +188,11 @@ class _AuthorHeader extends StatelessWidget {
                         width: 80,
                         height: 80,
                         color: theme.colorScheme.surfaceContainerHighest,
-                        child: Icon(Icons.person, size: 40, color: theme.colorScheme.onSurfaceVariant),
+                        child: Icon(
+                          Icons.person,
+                          size: 40,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ),

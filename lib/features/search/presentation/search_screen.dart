@@ -165,7 +165,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Column(
       children: [
         _buildFilters(context, state),
-        if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
+        if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
+          const LinearProgressIndicator(),
         if (state.error != null) _buildErrorCard(context, state),
         Expanded(
           child: _buildResults(context, state),
@@ -187,7 +188,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               border: Border(
                 right: BorderSide(
                   color: Theme.of(context).colorScheme.outlineVariant,
-                  width: 1,
                 ),
               ),
             ),
@@ -201,7 +201,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) const LinearProgressIndicator(),
+              if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
+                const LinearProgressIndicator(),
               if (state.error != null) _buildErrorCard(context, state),
               Expanded(
                 child: _buildResults(context, state),
@@ -280,79 +281,79 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             color: theme.colorScheme.primary,
           ),
         ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilterChip(
-                  label: const Text('Все'),
-                  selected: filters.format == null,
-                  onSelected: (_) => _setFormatFilter(null),
-                ),
-                ...BookFormat.values
-                    .where((f) => f != BookFormat.unknown)
-                    .map(
-                      (format) => FilterChip(
-                        label: Text(format.name.toUpperCase()),
-                        selected: filters.format == format,
-                        onSelected: (selected) => _setFormatFilter(selected ? format : null),
-                      ),
-                    ),
-              ],
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilterChip(
+              label: const Text('Все'),
+              selected: filters.format == null,
+              onSelected: (_) => _setFormatFilter(null),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _genreController,
-                    decoration: const InputDecoration(
-                      labelText: 'Жанр',
-                      hintText: 'Например: фантастика',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (value) {
-                      _debounceTimer?.cancel();
-                      _setGenreFilter(value);
-                    },
-                    onChanged: (value) {
-                      _debounceTimer?.cancel();
-                      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-                        _setGenreFilter(value);
-                      });
-                    },
+            ...BookFormat.values
+                .where((f) => f != BookFormat.unknown)
+                .map(
+                  (format) => FilterChip(
+                    label: Text(format.name.toUpperCase()),
+                    selected: filters.format == format,
+                    onSelected: (selected) => _setFormatFilter(selected ? format : null),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _languageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Язык',
-                      hintText: 'Например: ru',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (value) {
-                      _debounceTimer?.cancel();
-                      _setLanguageFilter(value);
-                    },
-                    onChanged: (value) {
-                      _debounceTimer?.cancel();
-                      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-                        _setLanguageFilter(value);
-                      });
-                    },
-                  ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _genreController,
+                decoration: const InputDecoration(
+                  labelText: 'Жанр',
+                  hintText: 'Например: фантастика',
+                  isDense: true,
+                  border: OutlineInputBorder(),
                 ),
-                if (filters.hasFilters)
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    tooltip: 'Сбросить фильтры',
-                    onPressed: _clearFilters,
-                  ),
+                onSubmitted: (value) {
+                  _debounceTimer?.cancel();
+                  _setGenreFilter(value);
+                },
+                onChanged: (value) {
+                  _debounceTimer?.cancel();
+                  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                    _setGenreFilter(value);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _languageController,
+                decoration: const InputDecoration(
+                  labelText: 'Язык',
+                  hintText: 'Например: ru',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (value) {
+                  _debounceTimer?.cancel();
+                  _setLanguageFilter(value);
+                },
+                onChanged: (value) {
+                  _debounceTimer?.cancel();
+                  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                    _setLanguageFilter(value);
+                  });
+                },
+              ),
+            ),
+            if (filters.hasFilters)
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Сбросить фильтры',
+                onPressed: _clearFilters,
+              ),
           ],
         ),
       ],

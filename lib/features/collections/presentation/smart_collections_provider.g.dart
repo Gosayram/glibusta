@@ -19,9 +19,7 @@ final class SmartCollectionsProvider
           List<SmartCollection>,
           FutureOr<List<SmartCollection>>
         >
-    with
-        $FutureModifier<List<SmartCollection>>,
-        $FutureProvider<List<SmartCollection>> {
+    with $FutureModifier<List<SmartCollection>>, $FutureProvider<List<SmartCollection>> {
   SmartCollectionsProvider._()
     : super(
         from: null,

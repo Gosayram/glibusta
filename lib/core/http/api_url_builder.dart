@@ -20,7 +20,7 @@ class ApiUrlBuilder {
       path: '/booksearch',
       queryParameters: {
         'ask': query.trim(),
-        if (filter != null) filter: 'on',
+        ?filter: 'on',
         'page': page.toString(),
       },
     );
@@ -93,8 +93,8 @@ class ApiUrlBuilder {
       host: host,
       path: '/new',
       queryParameters: {
-        if (lang != null) 'lang': lang,
-        if (type != null) 'type': type,
+        'lang': ?lang,
+        'type': ?type,
       },
     );
   }
@@ -104,7 +104,7 @@ class ApiUrlBuilder {
   }
 
   Uri cover(String bookId) {
-    final idStr = bookId.toString();
+    final idStr = bookId;
     final y = idStr.length > 4 ? idStr.substring(4) : '0';
     return Uri(scheme: scheme, host: host, path: '/i/$y/$bookId/cover.jpg');
   }
@@ -139,7 +139,9 @@ class ApiUrlBuilder {
     try {
       final env = await _loadBaseUrl();
       if (env != null) baseUrl = env;
-    } on Object {}
+    } on Object {
+      // Intentionally ignored — use default baseUrl on failure
+    }
     final uri = Uri.parse(baseUrl);
     return ApiUrlBuilder(host: uri.host, scheme: uri.scheme);
   }

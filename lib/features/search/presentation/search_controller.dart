@@ -77,12 +77,9 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
       if (!ref.mounted) return;
 
-      Object? authorError;
-
       try {
         authorResult = await _source.searchAuthors(searchQuery, cancelToken: authorToken);
       } on Object catch (e) {
-        authorError = e;
         _logger.warning('Author search failed: $e', name: 'Search', error: e);
         authorResult = const SearchAuthorsResultPage(authors: []);
       }

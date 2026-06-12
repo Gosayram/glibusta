@@ -198,10 +198,13 @@ class OfflineModeService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cached = prefs.getString('device_user_agent');
-      ua = cached ?? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+      ua =
+          cached ??
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+              'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
     } on Object {
-      ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+      ua =
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
           'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
     }
     final dio = Dio(

@@ -79,7 +79,10 @@ class HttpClient {
     try {
       final request = await client.getUrl(uri);
       request.headers
-        ..set(io.HttpHeaders.acceptHeader, 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+        ..set(
+          io.HttpHeaders.acceptHeader,
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        )
         ..set(io.HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
         ..set(io.HttpHeaders.acceptEncodingHeader, 'gzip, deflate')
         ..set(io.HttpHeaders.connectionHeader, 'close');

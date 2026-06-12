@@ -125,9 +125,7 @@ class AppLogger {
     } on Object catch (_) {}
     try {
       final prefs = await SharedPreferences.getInstance();
-      final summary = entry.error != null
-          ? '${entry.message} | ${entry.error}'
-          : entry.message;
+      final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
       await prefs.setString('last_error', summary);
     } on Object catch (_) {}
   }

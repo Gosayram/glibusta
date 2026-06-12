@@ -1,11 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-
 import 'package:glibusta/core/http/http_client.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/models/download_task.dart';
+import 'package:mocktail/mocktail.dart';
 
 class MockDownloadRepository extends Mock implements DownloadRepository {}
 
@@ -27,7 +26,7 @@ void main() {
 
   group('DownloadQueue.enqueue', () {
     test('calls repo.startDownload with correct params', () async {
-      final task = DownloadTask(
+      const task = DownloadTask(
         id: 'task-1',
         bookId: 'book-1',
         format: BookFormat.epub,
@@ -38,15 +37,18 @@ void main() {
         totalBytes: 0,
       );
 
-      when(() => mockRepo.startDownload(
-        bookId: 'book-1',
-        bookTitle: 'Test Book',
-        format: BookFormat.epub,
-        sourceUrl: 'https://example.com/b/book-1/epub',
-      )).thenAnswer((_) async => task);
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) async => task);
       when(() => mockRepo.updateStatus(any(), any())).thenAnswer((_) async {});
-      when(() => mockClient.download(any(), any(), onProgress: any(named: 'onProgress')))
-          .thenAnswer((_) async {});
+      when(
+        () => mockClient.download(any(), any(), onProgress: any(named: 'onProgress')),
+      ).thenAnswer((_) async {});
 
       final queue = DownloadQueue(mockRepo, mockClient);
 
@@ -57,12 +59,14 @@ void main() {
         sourceUrl: 'https://example.com/b/book-1/epub',
       );
 
-      verify(() => mockRepo.startDownload(
-        bookId: 'book-1',
-        bookTitle: 'Test Book',
-        format: BookFormat.epub,
-        sourceUrl: 'https://example.com/b/book-1/epub',
-      )).called(1);
+      verify(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).called(1);
 
       await Future<void>.delayed(const Duration(milliseconds: 200));
       queue.dispose();

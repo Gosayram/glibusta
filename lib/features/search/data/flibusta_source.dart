@@ -40,7 +40,10 @@ class FlibustaHtmlSource extends BookSource {
   }
 
   @override
-  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+  Future<SearchAuthorsResultPage> searchAuthors(
+    SearchQuery query, {
+    CancelToken? cancelToken,
+  }) async {
     if (query.query.isEmpty) {
       return const SearchAuthorsResultPage(authors: []);
     }

@@ -34,7 +34,7 @@ Dio dio(Ref ref) {
   dio.httpClientAdapter = NativeAdapter();
 
   dio.interceptors.addAll([
-    _UserAgentInterceptor(),
+    const _UserAgentInterceptor(),
     LogInterceptor(
       requestHeader: false,
       responseHeader: false,
@@ -57,7 +57,8 @@ class _UserAgentInterceptor extends Interceptor {
     try {
       ua = await DeviceUserAgent.get();
     } on Object {
-      ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+      ua =
+          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
           'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
     }
     options.headers['User-Agent'] = ua;

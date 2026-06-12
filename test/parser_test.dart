@@ -30,7 +30,10 @@ void main() {
       final source = MockBookSource();
       final formats = await source.getAvailableFormats('123');
 
-      expect(formats, containsAll([BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi]));
+      expect(
+        formats,
+        containsAll([BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi]),
+      );
       expect(formats.length, 4);
     });
 

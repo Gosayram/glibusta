@@ -29,7 +29,10 @@ class MockBookSource implements BookSource {
   }
 
   @override
-  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken}) async {
+  Future<SearchAuthorsResultPage> searchAuthors(
+    SearchQuery query, {
+    CancelToken? cancelToken,
+  }) async {
     return const SearchAuthorsResultPage(authors: []);
   }
 
