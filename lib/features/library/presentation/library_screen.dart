@@ -13,8 +13,10 @@ import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
+import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
+import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 import '../data/inspectors/book_inspection_provider.dart';
@@ -55,14 +57,9 @@ class LibraryScreen extends ConsumerWidget {
             onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
           ),
           IconButton(
-            icon: const Icon(Icons.folder_open),
-            tooltip: 'Импортировать папку',
-            onPressed: () => _importFolder(context, ref),
-          ),
-          IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Импортировать книгу',
-            onPressed: () => _importBook(context, ref),
+            tooltip: 'Добавить книги',
+            onPressed: () => _showImportSheet(context, ref),
           ),
         ],
       ),
@@ -246,6 +243,47 @@ class LibraryScreen extends ConsumerWidget {
     }
   }
 
+  void _showImportSheet(BuildContext context, WidgetRef ref) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Добавить книги',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_open),
+                title: const Text('Файлы'),
+                subtitle: const Text('EPUB, FB2, TXT'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_importBook(context, ref));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder),
+                title: const Text('Папка'),
+                subtitle: const Text('Все книги из папки'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_importFolder(context, ref));
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
     if (books.isEmpty) {
       return Center(
@@ -284,7 +322,7 @@ class LibraryScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               FilledButton.tonal(
-                onPressed: () => context.go('/catalog'),
+                onPressed: () => context.push('/catalog'),
                 child: const Text('Перейти в каталог'),
               ),
               const SizedBox(height: 8),
@@ -421,7 +459,7 @@ class LibraryScreen extends ConsumerWidget {
                     child: BookCoverImage(book: book),
                   ),
                   title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: book.authorIds.isNotEmpty ? Text(book.authorIds.join(', ')) : null,
+                  subtitle: book.authorNames.isNotEmpty ? Text(book.authorNames.join(', ')) : null,
                   onTap: () => unawaited(context.push('/reader/${book.id}')),
                   onLongPress: () => _showBookMenu(context, ref, book),
                 ),
@@ -487,13 +525,40 @@ class LibraryScreen extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.delete),
                 title: const Text('Удалить'),
-                onTap: () => Navigator.pop(ctx),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_confirmDelete(context, ref, book));
+                },
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Book book) async {
+    final result = await DeleteBookDialog.show(context, bookTitle: book.title);
+    if (result == null || !context.mounted) return;
+
+    final service = ref.read(bookDeleteServiceProvider);
+    if (result.deleteFile) {
+      await service.deleteBookCompletely(book.id);
+    } else {
+      await service.removeFromLibrary(book.id);
+    }
+    ref.invalidate(libraryBooksProvider);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.deleteFile
+                ? '«${book.title}» удалена с диска'
+                : '«${book.title}» удалена из списка',
+          ),
+        ),
+      );
+    }
   }
 }
 
@@ -532,7 +597,8 @@ class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView
   }
 
   ScrollController _getController() {
-    _controller ??= ScrollController(
+    if (_controller != null) return _controller!;
+    _controller = ScrollController(
       initialScrollOffset: _offset.value,
       keepScrollOffset: false,
     )..addListener(_saveOffset);

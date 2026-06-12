@@ -107,9 +107,9 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
           return TabBarView(
             controller: _tabController,
             children: [
-              _BookmarkList(bookmarks: data.bookmarks),
-              _NoteList(notes: data.notes),
-              _QuoteList(quotes: data.quotes),
+              _BookmarkList(bookmarks: data.bookmarks, bookId: widget.bookId),
+              _NoteList(notes: data.notes, bookId: widget.bookId),
+              _QuoteList(quotes: data.quotes, bookId: widget.bookId),
             ],
           );
         },
@@ -126,8 +126,9 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
 
 class _BookmarkList extends ConsumerWidget {
   final List<Bookmark> bookmarks;
+  final String? bookId;
 
-  const _BookmarkList({required this.bookmarks});
+  const _BookmarkList({required this.bookmarks, this.bookId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -158,7 +159,6 @@ class _BookmarkList extends ConsumerWidget {
             final scaffold = ScaffoldMessenger.of(context);
             final theme = Theme.of(context);
             await repo.deleteBookmark(bookmark.id);
-            if (!context.mounted) return false;
             scaffold.showSnackBar(
               SnackBar(
                 content: const Text('Закладка удалена'),
@@ -168,7 +168,7 @@ class _BookmarkList extends ConsumerWidget {
                   onPressed: () async {
                     await repo.insertBookmark(bookmark);
                     if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(null));
+                      ref.invalidate(allAnnotationsProvider(bookId));
                     }
                   },
                 ),
@@ -199,8 +199,9 @@ class _BookmarkList extends ConsumerWidget {
 
 class _NoteList extends ConsumerWidget {
   final List<Note> notes;
+  final String? bookId;
 
-  const _NoteList({required this.notes});
+  const _NoteList({required this.notes, this.bookId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,11 +228,11 @@ class _NoteList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
+            if (!context.mounted) return false;
             final repo = ref.read(_noteRepoProvider);
             final scaffold = ScaffoldMessenger.of(context);
             final theme = Theme.of(context);
             await repo.deleteNote(note.id);
-            if (!context.mounted) return false;
             scaffold.showSnackBar(
               SnackBar(
                 content: const Text('Заметка удалена'),
@@ -241,7 +242,7 @@ class _NoteList extends ConsumerWidget {
                   onPressed: () async {
                     await repo.insertNote(note);
                     if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(null));
+                      ref.invalidate(allAnnotationsProvider(bookId));
                     }
                   },
                 ),
@@ -273,8 +274,9 @@ class _NoteList extends ConsumerWidget {
 
 class _QuoteList extends ConsumerWidget {
   final List<Quote> quotes;
+  final String? bookId;
 
-  const _QuoteList({required this.quotes});
+  const _QuoteList({required this.quotes, this.bookId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -301,11 +303,11 @@ class _QuoteList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
+            if (!context.mounted) return false;
             final repo = ref.read(_quoteRepoProvider);
             final scaffold = ScaffoldMessenger.of(context);
             final theme = Theme.of(context);
             await repo.deleteQuote(quote.id);
-            if (!context.mounted) return false;
             scaffold.showSnackBar(
               SnackBar(
                 content: const Text('Цитата удалена'),
@@ -315,7 +317,7 @@ class _QuoteList extends ConsumerWidget {
                   onPressed: () async {
                     await repo.insertQuote(quote);
                     if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(null));
+                      ref.invalidate(allAnnotationsProvider(bookId));
                     }
                   },
                 ),

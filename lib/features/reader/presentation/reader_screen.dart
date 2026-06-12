@@ -143,8 +143,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         data: theme,
         duration: AppDuration.readerThemeTransition,
         curve: Curves.easeOutCubic,
-        child: const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
+        child: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                if (readerState.loadingMessage != null) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    readerState.loadingMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -361,17 +378,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ],
         if (readerState.isSearchOpen && readerState.metadata != null)
           Positioned.fill(
-            child: BookSearchOverlay(
-              searchService: _ctrl.createSearchService()!,
-              onJumpToResult: (position, query) {
-                _ctrl.closeSearch();
-                _ctrl.highlightSearchQuery(query);
-                _ctrl.jumpToPosition(
-                  position.copyWith(bookId: widget.bookId),
+            child: Builder(
+              builder: (context) {
+                final searchService = _ctrl.createSearchService();
+                if (searchService == null) return const SizedBox.shrink();
+                return BookSearchOverlay(
+                  searchService: searchService,
+                  onJumpToResult: (position, query) {
+                    _ctrl.closeSearch();
+                    _ctrl.highlightSearchQuery(query);
+                    _ctrl.jumpToPosition(
+                      position.copyWith(bookId: widget.bookId),
+                    );
+                  },
+                  onDismiss: () => _ctrl.closeSearch(),
+                  theme: settings.theme,
                 );
               },
-              onDismiss: () => _ctrl.closeSearch(),
-              theme: settings.theme,
             ),
           ),
         if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
@@ -561,10 +584,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _showDeleteConfirmDialog(BuildContext context) {
+    final rootContext = context;
     unawaited(
       showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
+        builder: (dialogContext) => AlertDialog(
           title: const Text('Удалить файл?'),
           content: const Text(
             'Файл книги будет удалён с устройства. '
@@ -572,14 +596,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () {
-                unawaited(_ctrl.deleteBookFile());
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
+              onPressed: () async {
+                _ctrl.saveProgress();
+                Navigator.of(dialogContext).pop();
+                await _ctrl.deleteBookFile();
+                if (rootContext.mounted) {
+                  ScaffoldMessenger.of(rootContext).showSnackBar(
+                    const SnackBar(content: Text('Файл удалён')),
+                  );
+                }
+                if (rootContext.mounted && Navigator.of(rootContext).canPop()) {
+                  Navigator.of(rootContext).pop();
+                }
               },
               style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error,

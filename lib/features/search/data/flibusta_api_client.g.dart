@@ -49,4 +49,4 @@ final class FlibustaApiClientProvider
   }
 }
 
-String _$flibustaApiClientHash() => r'4aa059323c0b8fb2c4e79dee41932df6ebc30b92';
+String _$flibustaApiClientHash() => r'c2b0b7e6eedfe74d25cfe9781cf6ca7cc66d2c7d';

@@ -298,11 +298,7 @@ class _UserCollectionTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          '$bookCount ${bookCount == 1
-              ? 'книга'
-              : bookCount < 5
-              ? 'книги'
-              : 'книг'}',
+          '$bookCount ${_pluralizeBooks(bookCount)}',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -320,6 +316,16 @@ class _UserCollectionTile extends StatelessWidget {
         onTap: () => context.go('/collections'),
       ),
     );
+  }
+
+  static String _pluralizeBooks(int n) {
+    if (n % 10 == 1 && n % 100 != 11) {
+      return 'книга';
+    }
+    if (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) {
+      return 'книги';
+    }
+    return 'книг';
   }
 }
 

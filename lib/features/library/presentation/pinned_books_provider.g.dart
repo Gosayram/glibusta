@@ -83,4 +83,4 @@ final class PinnedBooksListProvider
   }
 }
 
-String _$pinnedBooksListHash() => r'f3873a593679e8c74426ed09ceca08864fead962';
+String _$pinnedBooksListHash() => r'cdf0095de990d763b9b30b000fd7349885ed00e0';

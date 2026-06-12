@@ -1,4 +1,4 @@
-enum BookFormat { fb2, epub, pdf, txt, unknown }
+enum BookFormat { fb2, epub, pdf, txt, mobi, unknown }
 
 enum ReadingStatus {
   none,
@@ -16,7 +16,9 @@ class Book {
   final List<String> genreIds;
   final String? description;
   final String? coverUrl;
+  final String? coverPath;
   final DateTime? publishDate;
+  final DateTime? dateAdded;
   final List<BookFormat> availableFormats;
   final BookSourceInfo source;
   final ReadingStatus readingStatus;
@@ -29,7 +31,9 @@ class Book {
     required this.genreIds,
     required this.description,
     required this.coverUrl,
+    this.coverPath,
     required this.publishDate,
+    this.dateAdded,
     required this.availableFormats,
     required this.source,
     this.readingStatus = ReadingStatus.none,

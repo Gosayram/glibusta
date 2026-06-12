@@ -16,7 +16,7 @@ part 'search_controller.g.dart';
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
-  final _logger = AppLogger();
+  AppLogger get _logger => ref.read(appLoggerProvider);
 
   @override
   SearchState build() {
@@ -52,20 +52,67 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     );
 
     try {
-      final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
+      SearchResultPage bookResult;
+      SearchAuthorsResultPage authorResult;
+
+      final bookToken = CancelToken();
+      final authorToken = CancelToken();
+      _currentToken = bookToken;
+
+      Object? bookError;
+
+      try {
+        bookResult = await _source.searchBooks(searchQuery, cancelToken: bookToken);
+      } on Object catch (e) {
+        bookError = e;
+        _logger.warning('Book search failed: $e', name: 'Search', error: e);
+        bookResult = SearchResultPage(
+          books: const [],
+          totalCount: 0,
+          currentPage: searchQuery.page,
+          totalPages: 0,
+          hasNextPage: false,
+        );
+      }
+
       if (!ref.mounted) return;
-      _logger.info('Search returned ${result.books.length} results', name: 'Search');
+
+      try {
+        authorResult = await _source.searchAuthors(searchQuery, cancelToken: authorToken);
+      } on Object catch (e) {
+        _logger.warning('Author search failed: $e', name: 'Search', error: e);
+        authorResult = const SearchAuthorsResultPage(authors: []);
+      }
+
+      if (!ref.mounted) return;
+
+      if (bookResult.books.isEmpty && authorResult.authors.isEmpty && bookError != null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: bookError.toString(),
+          books: const [],
+          authors: const [],
+        );
+        return;
+      }
+
+      if (!ref.mounted) return;
+      _logger.info(
+        'Search returned ${bookResult.books.length} books, ${authorResult.authors.length} authors',
+        name: 'Search',
+      );
       unawaited(_rememberSearch(normalized));
       state = state.copyWith(
-        books: result.books,
+        books: bookResult.books,
+        authors: authorResult.authors,
         isLoading: false,
-        hasMore: result.hasNextPage,
-        currentPage: result.currentPage,
+        hasMore: bookResult.hasNextPage,
+        currentPage: bookResult.currentPage,
         clearError: true,
       );
-    } on Object catch (e) {
+    } on Object catch (e, st) {
       if (!ref.mounted) return;
-      _logger.warning('Search failed: $e', name: 'Search');
+      _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -97,9 +144,9 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         currentPage: result.currentPage,
         clearError: true,
       );
-    } on Object catch (e) {
+    } on Object catch (e, st) {
       if (!ref.mounted) return;
-      _logger.warning('Load more failed: $e', name: 'Search');
+      _logger.severe('Load more failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -109,6 +156,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     state = state.copyWith(
       filters: filters,
       books: const [],
+      authors: const [],
       isLoading: false,
       hasMore: false,
       currentPage: 0,
@@ -167,6 +215,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     _currentToken = null;
     state = state.copyWith(
       books: const [],
+      authors: const [],
       isLoading: false,
       clearError: true,
       hasMore: false,
@@ -177,6 +226,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
 class SearchState {
   final List<Book> books;
+  final List<SearchAuthorResult> authors;
   final bool isLoading;
   final String? error;
   final bool hasMore;
@@ -187,6 +237,7 @@ class SearchState {
 
   const SearchState({
     this.books = const [],
+    this.authors = const [],
     this.isLoading = false,
     this.error,
     this.hasMore = false,
@@ -198,6 +249,7 @@ class SearchState {
 
   SearchState copyWith({
     List<Book>? books,
+    List<SearchAuthorResult>? authors,
     bool? isLoading,
     String? error,
     bool? hasMore,
@@ -209,6 +261,7 @@ class SearchState {
   }) {
     return SearchState(
       books: books ?? this.books,
+      authors: authors ?? this.authors,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       hasMore: hasMore ?? this.hasMore,

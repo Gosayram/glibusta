@@ -7,6 +7,8 @@ import '../../../shared/models/search_query.dart';
 abstract class BookSource {
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken});
 
+  Future<SearchAuthorsResultPage> searchAuthors(SearchQuery query, {CancelToken? cancelToken});
+
   Future<BookDetails> getBookDetails(String bookId);
 
   Future<List<BookFormat>> getAvailableFormats(String bookId);
@@ -27,6 +29,14 @@ class MockBookSource implements BookSource {
   }
 
   @override
+  Future<SearchAuthorsResultPage> searchAuthors(
+    SearchQuery query, {
+    CancelToken? cancelToken,
+  }) async {
+    return const SearchAuthorsResultPage(authors: []);
+  }
+
+  @override
   Future<BookDetails> getBookDetails(String bookId) async {
     return BookDetails(
       book: Book(
@@ -37,18 +47,18 @@ class MockBookSource implements BookSource {
         description: null,
         coverUrl: null,
         publishDate: null,
-        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
+        availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi],
         source: const BookSourceInfo(sourceId: 'mock', sourceUrl: ''),
       ),
       description: 'Mock description',
-      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt],
+      availableFormats: const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi],
       downloadUrls: const [],
     );
   }
 
   @override
   Future<List<BookFormat>> getAvailableFormats(String bookId) async {
-    return const [BookFormat.fb2, BookFormat.epub, BookFormat.txt];
+    return const [BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi];
   }
 
   @override

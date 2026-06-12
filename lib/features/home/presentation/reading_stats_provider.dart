@@ -89,21 +89,26 @@ Future<ReadingStats> readingStats(Ref ref) async {
   }
 
   int currentStreak = 0;
-  int longestStreak = 0;
+  for (int i = 0; i < 365; i++) {
+    final day = todayStart.subtract(Duration(days: i));
+    if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  int longestStreak = currentStreak;
   int tempStreak = 0;
 
   for (int i = 0; i < 365; i++) {
     final day = todayStart.subtract(Duration(days: i));
     if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
       tempStreak++;
-      if (i == 0 || i == currentStreak) {
-        currentStreak = tempStreak;
-      }
     } else {
       if (tempStreak > longestStreak) {
         longestStreak = tempStreak;
       }
-      if (i > 0 && i > currentStreak) break;
       tempStreak = 0;
     }
   }

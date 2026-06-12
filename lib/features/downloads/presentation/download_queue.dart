@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/http/http_client.dart';
+import '../../../core/notifications/download_notification_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../data/download_repository.dart';
@@ -11,7 +12,8 @@ import '../domain/download_repository.dart';
 final downloadQueueProvider = Provider<DownloadQueue>((ref) {
   final repository = ref.watch(downloadRepositoryProvider);
   final httpClient = ref.watch(httpClientProvider);
-  final queue = DownloadQueue(repository, httpClient);
+  final notificationService = ref.watch(downloadNotificationServiceProvider);
+  final queue = DownloadQueue(repository, httpClient, notificationService);
   ref.onDispose(() => queue.dispose());
   return queue;
 });
@@ -24,6 +26,7 @@ final activeDownloadsProvider = StreamProvider<List<DownloadTask>>((ref) {
 class DownloadQueue {
   final DownloadRepository _repository;
   final HttpClient _httpClient;
+  final DownloadNotificationService _notificationService;
   final StreamController<List<DownloadTask>> _downloadsController =
       StreamController<List<DownloadTask>>.broadcast();
   final StreamController<DownloadTask> _progressController =
@@ -31,14 +34,23 @@ class DownloadQueue {
 
   final List<DownloadTask> _pendingQueue = [];
   final Map<String, DownloadTask> _tasks = {};
+  final Map<String, _SpeedTracker> _speedTrackers = {};
+  List<DownloadTask> _latestTasks = [];
   int _maxConcurrent = 3;
   int _runningCount = 0;
 
-  DownloadQueue(this._repository, this._httpClient) {
+  DownloadQueue(
+    this._repository,
+    this._httpClient,
+    this._notificationService,
+  ) {
     _downloadsController.add([]);
   }
 
-  Stream<List<DownloadTask>> get onDownloadsChanged => _downloadsController.stream;
+  Stream<List<DownloadTask>> get onDownloadsChanged async* {
+    yield _latestTasks;
+    yield* _downloadsController.stream;
+  }
 
   Stream<DownloadTask> get onProgress => _progressController.stream;
 
@@ -73,6 +85,7 @@ class DownloadQueue {
     final paused = DownloadTask(
       id: task.id,
       bookId: task.bookId,
+      bookTitle: task.bookTitle,
       format: task.format,
       sourceUrl: task.sourceUrl,
       targetPath: task.targetPath,
@@ -83,6 +96,8 @@ class DownloadQueue {
 
     _tasks[taskId] = paused;
     _runningCount--;
+    _speedTrackers.remove(taskId);
+    await _notificationService.cancel(taskId);
     await _repository.updateStatus(taskId, DownloadStatus.paused);
     _emitUpdate();
     _processQueue();
@@ -95,6 +110,7 @@ class DownloadQueue {
     final queued = DownloadTask(
       id: task.id,
       bookId: task.bookId,
+      bookTitle: task.bookTitle,
       format: task.format,
       sourceUrl: task.sourceUrl,
       targetPath: task.targetPath,
@@ -121,6 +137,7 @@ class DownloadQueue {
     final canceled = DownloadTask(
       id: task.id,
       bookId: task.bookId,
+      bookTitle: task.bookTitle,
       format: task.format,
       sourceUrl: task.sourceUrl,
       targetPath: task.targetPath,
@@ -130,7 +147,9 @@ class DownloadQueue {
     );
 
     _tasks[taskId] = canceled;
+    _speedTrackers.remove(taskId);
     _pendingQueue.removeWhere((t) => t.id == taskId);
+    await _notificationService.cancel(taskId);
     await _repository.cancelDownload(taskId);
     _emitUpdate();
     _processQueue();
@@ -138,7 +157,9 @@ class DownloadQueue {
 
   Future<void> remove(String taskId) async {
     _tasks.remove(taskId);
+    _speedTrackers.remove(taskId);
     _pendingQueue.removeWhere((t) => t.id == taskId);
+    await _notificationService.cancel(taskId);
     await _repository.removeDownload(taskId);
     _emitUpdate();
   }
@@ -157,6 +178,7 @@ class DownloadQueue {
     final running = DownloadTask(
       id: task.id,
       bookId: task.bookId,
+      bookTitle: task.bookTitle,
       format: task.format,
       sourceUrl: task.sourceUrl,
       targetPath: task.targetPath,
@@ -165,18 +187,26 @@ class DownloadQueue {
       totalBytes: task.totalBytes,
     );
     _tasks[task.id] = running;
+    _speedTrackers[task.id] = _SpeedTracker();
     await _repository.updateStatus(task.id, DownloadStatus.running);
     _emitUpdate();
 
     try {
-      final targetPath = task.targetPath ?? task.sourceUrl;
+      final targetPath = task.targetPath;
+      if (targetPath == null) {
+        throw StateError('No target path for download ${task.id}');
+      }
       await _httpClient.download(
         task.sourceUrl,
         targetPath,
         onProgress: (int received, int total) {
+          final speedTracker = _speedTrackers[task.id];
+          final speed = speedTracker?.update(received) ?? 0;
+
           final updated = DownloadTask(
             id: task.id,
             bookId: task.bookId,
+            bookTitle: task.bookTitle,
             format: task.format,
             sourceUrl: task.sourceUrl,
             targetPath: task.targetPath,
@@ -188,25 +218,39 @@ class DownloadQueue {
           _progressController.add(updated);
 
           unawaited(_repository.updateProgress(task.id, received, total));
+
+          if (speedTracker != null && speedTracker.shouldNotify()) {
+            unawaited(
+              _notificationService.showProgress(
+                task: updated,
+                speedBytesPerSec: speed,
+              ),
+            );
+          }
         },
       );
 
+      final latest = _tasks[task.id] ?? task;
       final completed = DownloadTask(
         id: task.id,
         bookId: task.bookId,
+        bookTitle: task.bookTitle,
         format: task.format,
         sourceUrl: task.sourceUrl,
         targetPath: task.targetPath,
         status: DownloadStatus.completed,
-        downloadedBytes: task.totalBytes,
-        totalBytes: task.totalBytes,
+        downloadedBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
+        totalBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
       );
       _tasks[task.id] = completed;
+      _speedTrackers.remove(task.id);
       await _repository.updateStatus(task.id, DownloadStatus.completed);
+      await _notificationService.showCompleted(completed);
     } on Object {
       final failed = DownloadTask(
         id: task.id,
         bookId: task.bookId,
+        bookTitle: task.bookTitle,
         format: task.format,
         sourceUrl: task.sourceUrl,
         targetPath: task.targetPath,
@@ -215,7 +259,9 @@ class DownloadQueue {
         totalBytes: task.totalBytes,
       );
       _tasks[task.id] = failed;
+      _speedTrackers.remove(task.id);
       await _repository.updateStatus(task.id, DownloadStatus.failed);
+      await _notificationService.showFailed(failed, null);
     } finally {
       _runningCount--;
       _emitUpdate();
@@ -224,11 +270,40 @@ class DownloadQueue {
   }
 
   void _emitUpdate() {
-    _downloadsController.add(_tasks.values.toList());
+    _latestTasks = _tasks.values.toList();
+    _downloadsController.add(_latestTasks);
   }
 
   void dispose() {
     unawaited(_downloadsController.close());
     unawaited(_progressController.close());
+  }
+}
+
+class _SpeedTracker {
+  int _lastBytes = 0;
+  int _lastTimestamp = 0;
+  int _notificationCounter = 0;
+
+  _SpeedTracker() {
+    _lastTimestamp = DateTime.now().millisecondsSinceEpoch;
+  }
+
+  double update(int currentBytes) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsed = now - _lastTimestamp;
+    if (elapsed <= 0) return 0;
+
+    final deltaBytes = currentBytes - _lastBytes;
+    final speed = deltaBytes * 1000.0 / elapsed;
+
+    _lastBytes = currentBytes;
+    _lastTimestamp = now;
+    return speed;
+  }
+
+  bool shouldNotify() {
+    _notificationCounter++;
+    return _notificationCounter % 3 == 0;
   }
 }

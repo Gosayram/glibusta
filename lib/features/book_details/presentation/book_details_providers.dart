@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/tables.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_comments_service.dart';
@@ -18,7 +19,11 @@ final chaptersForBookProvider = FutureProvider.autoDispose.family<NormalizedBook
   bookId,
 ) async {
   final service = ref.watch(bookOpenServiceProvider);
-  return service.getCachedBook(bookId);
+  try {
+    return await service.openBookWithCache(bookId);
+  } on Object catch (_) {
+    return null;
+  }
 });
 
 final bookmarksForBookProvider = FutureProvider.autoDispose.family<List<Bookmark>, String>((
@@ -44,3 +49,22 @@ final commentsForBookProvider = FutureProvider.autoDispose.family<List<BookComme
   final service = ref.watch(bookCommentsServiceProvider);
   return service.getComments(bookId);
 });
+
+final bookDownloadStateProvider = FutureProvider.autoDispose.family<BookDownloadState, String>((
+  ref,
+  bookId,
+) async {
+  final db = ref.watch(databaseProvider);
+  final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(bookId))).get();
+  for (final row in rows) {
+    if (row.status == DownloadStatusDb.completed) {
+      return BookDownloadState.downloaded;
+    }
+    if (row.status == DownloadStatusDb.queued || row.status == DownloadStatusDb.running) {
+      return BookDownloadState.downloading;
+    }
+  }
+  return BookDownloadState.notDownloaded;
+});
+
+enum BookDownloadState { notDownloaded, downloading, downloaded }

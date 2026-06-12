@@ -20,7 +20,7 @@ final class BookMetadataExtractor {
     required BookFormat format,
     required BookEncodingDetector encodingDetector,
   }) async {
-    if (format == BookFormat.unknown || format == BookFormat.pdf) {
+    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
       return const BookMetadata();
     }
 

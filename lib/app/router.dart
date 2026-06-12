@@ -5,10 +5,16 @@ import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
+import '../features/bookmarks/presentation/bookmarks_screen.dart';
+import '../features/catalog/presentation/author_detail_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
+import '../features/catalog/presentation/genre_books_screen.dart';
+import '../features/catalog/presentation/genre_list_screen.dart';
+import '../features/catalog/presentation/recent_books_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
+import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
 import '../features/reader/presentation/reader_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
@@ -58,7 +64,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/search',
                 name: 'search',
-                builder: (BuildContext context, GoRouterState state) => const SearchScreen(),
+                builder: (BuildContext context, GoRouterState state) {
+                  final category = state.uri.queryParameters['category'];
+                  return SearchScreen(initialCategory: category);
+                },
               ),
             ],
           ),
@@ -96,7 +105,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Catalog (not a main tab, but within shell for nav)
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
-          return ShellWithNav(navigationShell: state.extra as StatefulNavigationShell?);
+          return child;
         },
         routes: [
           GoRoute(
@@ -226,6 +235,82 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId']!;
           return AnnotationsScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/author/:authorId',
+        name: 'authorDetail',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          final authorId = state.pathParameters['authorId']!;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: AuthorDetailScreen(authorId: authorId),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/genres',
+        name: 'genreList',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: const GenreListScreen(),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/genre/:genreId',
+        name: 'genreBooks',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          final genreId = state.pathParameters['genreId']!;
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: GenreBooksScreen(genreId: genreId),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/recent',
+        name: 'recentBooks',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return CustomTransitionPage<void>(
+            key: state.pageKey,
+            child: const RecentBooksScreen(),
+            transitionsBuilder: (_, animation, second, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '/bookmarks/:bookId',
+        name: 'bookmarks',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return BookmarksScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/notes/:bookId',
+        name: 'notes',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          final bookId = state.pathParameters['bookId']!;
+          return NotesScreen(bookId: bookId);
         },
       ),
     ],

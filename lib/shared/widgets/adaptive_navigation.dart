@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
+import '../../features/library/data/book_import_service.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -53,6 +54,7 @@ class AdaptiveNavigation extends StatelessWidget {
         selectedIndex: selectedIndex,
         onDestinationSelected: onDestinationSelected,
         animationDuration: const Duration(milliseconds: 300),
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: compactDestinations,
       );
     }
@@ -60,7 +62,8 @@ class AdaptiveNavigation extends StatelessWidget {
     return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
-      labelType: NavigationRailLabelType.all,
+      extended: context.isExpanded,
+      labelType: context.isExpanded ? NavigationRailLabelType.none : NavigationRailLabelType.all,
       leading: const Padding(
         padding: EdgeInsets.symmetric(vertical: 8),
         child: Icon(Icons.menu_book, size: 28),
@@ -197,18 +200,20 @@ class TabletShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          AdaptiveNavigation(
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: (index) => navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
+      body: SafeArea(
+        child: Row(
+          children: [
+            AdaptiveNavigation(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
             ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: navigationShell),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(child: navigationShell),
+          ],
+        ),
       ),
     );
   }
@@ -221,18 +226,20 @@ class DesktopShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          AdaptiveNavigation(
-            selectedIndex: navigationShell.currentIndex,
-            onDestinationSelected: (index) => navigationShell.goBranch(
-              index,
-              initialLocation: index == navigationShell.currentIndex,
+      body: SafeArea(
+        child: Row(
+          children: [
+            AdaptiveNavigation(
+              selectedIndex: navigationShell.currentIndex,
+              onDestinationSelected: (index) => navigationShell.goBranch(
+                index,
+                initialLocation: index == navigationShell.currentIndex,
+              ),
             ),
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: navigationShell),
-        ],
+            const VerticalDivider(width: 1),
+            Expanded(child: navigationShell),
+          ],
+        ),
       ),
     );
   }
@@ -249,7 +256,7 @@ class MacOSShell extends ConsumerWidget {
 
     return Scaffold(
       body: BookDropZone(
-        onBooksDropped: (paths) => _handleDrop(context, paths),
+        onBooksDropped: (paths) => _handleDrop(context, ref, paths),
         child: Row(
           children: [
             SidebarNavigation(
@@ -271,15 +278,28 @@ class MacOSShell extends ConsumerWidget {
     );
   }
 
-  void _handleDrop(BuildContext context, List<String> paths) {
-    final epubPaths = paths.where((p) => p.endsWith('.epub')).toList();
+  void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
+    final epubPaths = paths.where((p) => p.toLowerCase().endsWith('.epub')).toList();
     if (epubPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Поддерживаются только .epub файлы')),
       );
       return;
     }
-    unawaited(context.push('/library', extra: epubPaths));
+    final importService = ref.read(bookImportServiceProvider);
+    for (final path in epubPaths) {
+      unawaited(
+        importService.importFile(path).then((result) {
+          if (!context.mounted) return;
+          final msg = result.isSuccess
+              ? 'Импортировано: ${result.title}'
+              : result.isDuplicate
+              ? 'Дубликат: ${result.title}'
+              : 'Ошибка: ${result.error}';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        }),
+      );
+    }
   }
 }
 

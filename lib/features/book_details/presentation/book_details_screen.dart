@@ -8,9 +8,12 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/book_cover_image.dart';
+import '../../downloads/presentation/download_queue.dart';
+import '../../search/data/composite_source.dart';
 import '../data/book_comments_service.dart';
 import '../data/book_details_repository_impl.dart';
 import 'book_details_providers.dart';
@@ -106,17 +109,12 @@ class _BookDetailsContent extends ConsumerStatefulWidget {
 
 class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 5, vsync: this);
-  }
+  TabController? _tabController;
+  int _lastTabCount = 0;
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -125,6 +123,55 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
     final book = widget.details.book;
     final theme = Theme.of(context);
     final progressAsync = ref.watch(bookReadingProgressProvider(widget.bookId));
+
+    final chaptersAsync = ref.watch(chaptersForBookProvider(widget.bookId));
+    final bookmarksAsync = ref.watch(bookmarksForBookProvider(widget.bookId));
+    final quotesAsync = ref.watch(quotesForBookProvider(widget.bookId));
+
+    final hasChapters =
+        chaptersAsync.hasValue &&
+        chaptersAsync.value != null &&
+        chaptersAsync.value!.chapters.isNotEmpty;
+    final hasBookmarks =
+        bookmarksAsync.hasValue && bookmarksAsync.value != null && bookmarksAsync.value!.isNotEmpty;
+    final hasQuotes =
+        quotesAsync.hasValue && quotesAsync.value != null && quotesAsync.value!.isNotEmpty;
+
+    final tabs = <Widget>[];
+    final tabViews = <Widget>[];
+
+    tabs.add(const Tab(text: 'Описание'));
+    tabViews.add(_DescriptionTab(description: widget.details.description ?? book.description));
+
+    if (hasChapters) {
+      tabs.add(const Tab(text: 'Главы'));
+      tabViews.add(_ChaptersTab(bookId: widget.bookId));
+    }
+
+    if (hasBookmarks) {
+      tabs.add(const Tab(text: 'Закладки'));
+      tabViews.add(_BookmarksTab(bookId: widget.bookId));
+    }
+
+    if (hasQuotes) {
+      tabs.add(const Tab(text: 'Цитаты'));
+      tabViews.add(_QuotesTab(bookId: widget.bookId));
+    }
+
+    tabs.add(const Tab(text: 'Комментарии'));
+    tabViews.add(_CommentsTab(bookId: widget.bookId));
+
+    final tabCount = tabs.length;
+    if (tabCount != _lastTabCount) {
+      _tabController?.dispose();
+      _lastTabCount = tabCount;
+      _tabController = TabController(length: tabCount, vsync: this);
+    }
+
+    final controller = _tabController!;
+    if (controller.index >= tabCount) {
+      controller.index = 0;
+    }
 
     return Column(
       children: [
@@ -151,18 +198,16 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               ),
               SliverPersistentHeader(
                 pinned: true,
-                delegate: _TabBarDelegate(tabController: _tabController, theme: theme),
+                delegate: _TabBarDelegate(
+                  tabController: controller,
+                  theme: theme,
+                  tabs: tabs,
+                ),
               ),
               SliverFillRemaining(
                 child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _DescriptionTab(description: widget.details.description ?? book.description),
-                    _ChaptersTab(bookId: widget.bookId),
-                    _BookmarksTab(bookId: widget.bookId),
-                    _QuotesTab(bookId: widget.bookId),
-                    _CommentsTab(bookId: widget.bookId),
-                  ],
+                  controller: controller,
+                  children: tabViews,
                 ),
               ),
             ],
@@ -393,8 +438,9 @@ class _SeriesInfoSection extends ConsumerWidget {
 class _TabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabController tabController;
   final ThemeData theme;
+  final List<Widget> tabs;
 
-  _TabBarDelegate({required this.tabController, required this.theme});
+  _TabBarDelegate({required this.tabController, required this.theme, required this.tabs});
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
@@ -402,13 +448,7 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
       color: theme.colorScheme.surface,
       child: TabBar(
         controller: tabController,
-        tabs: const [
-          Tab(text: 'Описание'),
-          Tab(text: 'Главы'),
-          Tab(text: 'Закладки'),
-          Tab(text: 'Цитаты'),
-          Tab(text: 'Комментарии'),
-        ],
+        tabs: tabs,
         labelStyle: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         unselectedLabelStyle: theme.textTheme.labelMedium,
       ),
@@ -423,7 +463,9 @@ class _TabBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _TabBarDelegate oldDelegate) =>
-      tabController != oldDelegate.tabController || theme != oldDelegate.theme;
+      tabController != oldDelegate.tabController ||
+      theme != oldDelegate.theme ||
+      tabs.length != oldDelegate.tabs.length;
 }
 
 class _DescriptionTab extends StatelessWidget {
@@ -704,68 +746,56 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
                 ),
         ),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
             border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
           ),
           child: SafeArea(
             top: false,
-            child: !isAuthenticated
-                ? Row(
-                    children: [
-                      Icon(
-                        Icons.lock_outline,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Войдите, чтобы оставить комментарий',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const _LoginPlaceholder(),
-                          ),
-                        ),
-                        child: const Text('Войти'),
-                      ),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _commentController,
-                          decoration: const InputDecoration(
-                            hintText: 'Комментарий...',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          maxLines: null,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => _postComment(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: _isPosting ? null : _postComment,
-                        icon: _isPosting
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.send, size: 18),
-                      ),
-                    ],
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentController,
+                    decoration: InputDecoration(
+                      hintText: isAuthenticated
+                          ? 'Комментарий...'
+                          : 'Войдите, чтобы комментировать',
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    enabled: isAuthenticated,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _postComment(),
                   ),
+                ),
+                const SizedBox(width: 8),
+                if (!isAuthenticated)
+                  TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const _LoginPlaceholder(),
+                      ),
+                    ),
+                    child: const Text('Войти'),
+                  )
+                else
+                  IconButton.filled(
+                    onPressed: _isPosting ? null : _postComment,
+                    padding: const EdgeInsets.all(8),
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    icon: _isPosting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send, size: 18),
+                  ),
+              ],
+            ),
           ),
         ),
       ],
@@ -829,15 +859,20 @@ class _LoginPlaceholder extends StatelessWidget {
   }
 }
 
-class _BottomActionBar extends StatelessWidget {
+class _BottomActionBar extends ConsumerWidget {
   final Book book;
   final BookDetails details;
 
   const _BottomActionBar({required this.book, required this.details});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final downloadStateAsync = ref.watch(bookDownloadStateProvider(book.id));
+    final downloadState = downloadStateAsync.value ?? BookDownloadState.notDownloaded;
+    final isDownloading = downloadState == BookDownloadState.downloading;
+    final isDownloaded = downloadState == BookDownloadState.downloaded;
+    final hasFormats = details.availableFormats.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -857,20 +892,196 @@ class _BottomActionBar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            OutlinedButton.icon(
-              onPressed: details.availableFormats.isNotEmpty
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Скоро будет доступно')),
-                      );
-                    }
-                  : null,
-              icon: const Icon(Icons.download),
-              label: const Text('Скачать'),
+            Expanded(
+              child: isDownloaded
+                  ? OutlinedButton.icon(
+                      onPressed: () => unawaited(context.push('/reader/${book.id}')),
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Открыть'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: hasFormats && !isDownloading
+                          ? () => _startDownload(context, ref, book, details)
+                          : null,
+                      icon: isDownloading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download),
+                      label: Text(isDownloading ? 'Загрузка...' : 'Скачать'),
+                    ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Future<void> _startDownload(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+    BookDetails details,
+  ) async {
+    final formats = details.availableFormats;
+    if (formats.isEmpty) return;
+
+    // Show format selection bottom sheet
+    final selectedFormat = await showModalBottomSheet<BookFormat>(
+      context: context,
+      builder: (context) => _FormatSelectionSheet(
+        bookTitle: book.title,
+        formats: formats,
+      ),
+    );
+
+    if (selectedFormat == null || !context.mounted) return;
+
+    final source = ref.read(bookSourceProvider);
+    final queue = ref.read(downloadQueueProvider);
+
+    try {
+      final url = await source.getDownloadUrl(book.id, selectedFormat);
+      await queue.enqueue(
+        bookId: book.id,
+        bookTitle: book.title,
+        format: selectedFormat,
+        sourceUrl: url,
+      );
+      ref.invalidate(bookDownloadStateProvider(book.id));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Загрузка ${book.title} (${selectedFormat.name})')),
+        );
+      }
+    } on Object catch (e) {
+      AppLogger().severe('Download failed: $e', name: 'BookDetails', error: e);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка загрузки: $e')),
+        );
+      }
+    }
+  }
+}
+
+// ── Format Selection Bottom Sheet ─────────────────────────────────────────────
+
+class _FormatSelectionSheet extends StatelessWidget {
+  final String bookTitle;
+  final List<BookFormat> formats;
+
+  const _FormatSelectionSheet({required this.bookTitle, required this.formats});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 32,
+            height: 4,
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Text(
+              'Скачать в формате',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          if (bookTitle.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Text(
+                bookTitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          const Divider(height: 1),
+          ...formats.map((format) {
+            final info = _formatInfo(format);
+            return ListTile(
+              leading: Icon(info.icon, color: info.color),
+              title: Text(info.label),
+              subtitle: Text(info.description, style: theme.textTheme.bodySmall),
+              onTap: () => Navigator.of(context).pop(format),
+            );
+          }),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  _FormatInfo _formatInfo(BookFormat format) {
+    switch (format) {
+      case BookFormat.fb2:
+        return const _FormatInfo(
+          Icons.description,
+          'FB2',
+          'FictionBook 2 — стандарт Флибусты',
+          Color(0xFF4CAF50),
+        );
+      case BookFormat.epub:
+        return const _FormatInfo(
+          Icons.menu_book,
+          'EPUB',
+          'Universal Publication — для большинства ридеров',
+          Color(0xFF2196F3),
+        );
+      case BookFormat.mobi:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'MOBI',
+          'Mobipocket — для Kindle',
+          Color(0xFFFF9800),
+        );
+      case BookFormat.pdf:
+        return const _FormatInfo(
+          Icons.picture_as_pdf,
+          'PDF',
+          'Portable Document — для печати и экрана',
+          Color(0xFFF44336),
+        );
+      case BookFormat.txt:
+        return const _FormatInfo(
+          Icons.text_snippet,
+          'TXT',
+          'Текстовый файл — универсальный',
+          Color(0xFF9E9E9E),
+        );
+      case BookFormat.unknown:
+        return _FormatInfo(
+          Icons.help_outline,
+          format.name.toUpperCase(),
+          'Неизвестный формат',
+          const Color(0xFF757575),
+        );
+    }
+  }
+}
+
+class _FormatInfo {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+
+  const _FormatInfo(this.icon, this.label, this.description, this.color);
 }

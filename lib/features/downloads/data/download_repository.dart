@@ -70,6 +70,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
     return DownloadTask(
       id: taskId,
       bookId: bookId,
+      bookTitle: bookTitle,
       format: format,
       sourceUrl: sourceUrl,
       targetPath: targetPath,
@@ -108,6 +109,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
     return DownloadTask(
       id: row.id,
       bookId: row.bookId,
+      bookTitle: row.bookTitle,
       format: BookFormat.values.firstWhere(
         (BookFormat f) => f.name == row.format,
         orElse: () => BookFormat.fb2,

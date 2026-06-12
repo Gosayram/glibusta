@@ -5,6 +5,7 @@ enum DownloadStatus { queued, running, paused, completed, failed, canceled }
 class DownloadTask {
   final String id;
   final String bookId;
+  final String? bookTitle;
   final BookFormat format;
   final String sourceUrl;
   final String? targetPath;
@@ -15,6 +16,7 @@ class DownloadTask {
   const DownloadTask({
     required this.id,
     required this.bookId,
+    this.bookTitle,
     required this.format,
     required this.sourceUrl,
     required this.targetPath,

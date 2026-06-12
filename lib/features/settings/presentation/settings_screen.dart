@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,15 +84,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.cell_tower),
-            title: const Text('Скачивать через мобильную сеть'),
-            subtitle: const Text('По умолчанию только Wi-Fi'),
+            title: const Text(
+              'Скачивать через мобильную сеть',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: const Text(
+              'По умолчанию только Wi-Fi',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: ref.watch(allowMobileDownloadsProvider),
             onChanged: (v) => ref.read(allowMobileDownloadsProvider.notifier).update(v),
           ),
           SwitchListTile(
             secondary: const Icon(Icons.play_circle),
-            title: const Text('Авто-продолжение при Wi-Fi'),
-            subtitle: const Text('Возобновлять загрузки при появлении сети'),
+            title: const Text(
+              'Авто-продолжение при Wi-Fi',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: const Text(
+              'Возобновлять загрузки при появлении сети',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: ref.watch(autoResumeOnWifiProvider),
             onChanged: (v) => ref.read(autoResumeOnWifiProvider.notifier).update(v),
           ),
@@ -103,8 +121,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const _SectionHeader(title: 'Отображение'),
           SwitchListTile(
             secondary: const Icon(Icons.dark_mode),
-            title: const Text('Тёмная тема'),
-            subtitle: const Text('Использовать тёмную тему'),
+            title: const Text('Тёмная тема', maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: const Text(
+              'Использовать тёмную тему',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             value: Theme.of(context).brightness == Brightness.dark,
             onChanged: (value) {
               ref
@@ -167,29 +189,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       showDialog<void>(
         context: context,
         builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Фильтр контента'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: ContentSafetyLevel.values.map((level) {
-                return ListTile(
-                  leading: Icon(
-                    level == ContentSafetyLevel.standard
-                        ? Icons.check_circle
-                        : Icons.circle_outlined,
-                    color: level == ContentSafetyLevel.standard
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
-                  ),
-                  title: Text(level.displayName),
-                  subtitle: Text(level.description),
-                  onTap: () {
-                    unawaited(ContentSafetyService.save(level));
-                    Navigator.of(context).pop();
-                  },
-                );
-              }).toList(),
-            ),
+          return FutureBuilder<ContentSafetyLevel>(
+            future: ContentSafetyService.load(),
+            builder: (context, snapshot) {
+              final current = snapshot.data ?? ContentSafetyLevel.standard;
+              return AlertDialog(
+                title: const Text('Фильтр контента'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: ContentSafetyLevel.values.map((level) {
+                    return ListTile(
+                      leading: Icon(
+                        level == current ? Icons.check_circle : Icons.circle_outlined,
+                        color: level == current ? Theme.of(context).colorScheme.primary : null,
+                      ),
+                      title: Text(level.displayName),
+                      subtitle: Text(level.description),
+                      onTap: () {
+                        unawaited(ContentSafetyService.save(level));
+                        Navigator.of(context).pop();
+                      },
+                    );
+                  }).toList(),
+                ),
+              );
+            },
           );
         },
       ),
@@ -283,30 +307,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !context.mounted) return;
 
     try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final filePath = result.files.single.path;
+      if (filePath == null) return;
+
       final db = ref.read(databaseProvider);
       final info = await PackageInfo.fromPlatform();
       final backupService = BackupService(
         db: db,
         appVersion: '${info.version}+${info.buildNumber}',
       );
-      final result = await backupService.importData('');
+      final json = await File(filePath).readAsString();
+      final importResult = await backupService.importData(json);
 
       if (!context.mounted) return;
 
-      if (result.success) {
+      if (importResult.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Импортировано: ${result.progressImported} прогрессов, '
-              '${result.bookmarksImported} закладок, '
-              '${result.notesImported} заметок, '
-              '${result.quotesImported} цитат',
+              'Импортировано: ${importResult.progressImported} прогрессов, '
+              '${importResult.bookmarksImported} закладок, '
+              '${importResult.notesImported} заметок, '
+              '${importResult.quotesImported} цитат',
             ),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: ${result.error}')),
+          SnackBar(content: Text('Ошибка: ${importResult.error}')),
         );
       }
     } on Object catch (e) {
@@ -515,10 +548,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return ListTile(
       leading: const Icon(Icons.folder),
-      title: const Text('Хранилище'),
-      subtitle: Text(subtitles[mode]!),
+      title: const Text('Хранилище', maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitles[mode]!, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showStorageModeDialog(context, ref, mode, modeLabels),
+      dense: true,
+      minLeadingWidth: 20,
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -637,9 +673,12 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
       onTap: onTap,
+      dense: true,
+      minLeadingWidth: 20,
+      visualDensity: VisualDensity.compact,
     );
   }
 }
@@ -652,6 +691,13 @@ class _VersionTile extends StatelessWidget {
     return FutureBuilder<PackageInfo>(
       future: PackageInfo.fromPlatform(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const ListTile(
+            leading: Icon(Icons.info_outline),
+            title: Text('Версия'),
+            subtitle: Text('Неизвестно'),
+          );
+        }
         final info = snapshot.data;
         final version = info != null ? '${info.version}+${info.buildNumber}' : '...';
         return ListTile(

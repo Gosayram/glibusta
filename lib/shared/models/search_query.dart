@@ -69,3 +69,21 @@ class SearchResultPage {
     required this.hasNextPage,
   });
 }
+
+class SearchAuthorResult {
+  final String id;
+  final String name;
+  final int? bookCount;
+
+  const SearchAuthorResult({
+    required this.id,
+    required this.name,
+    this.bookCount,
+  });
+}
+
+class SearchAuthorsResultPage {
+  final List<SearchAuthorResult> authors;
+
+  const SearchAuthorsResultPage({required this.authors});
+}

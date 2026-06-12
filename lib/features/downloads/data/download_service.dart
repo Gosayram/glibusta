@@ -100,10 +100,14 @@ class DownloadService {
   }
 
   Future<void> _updateProgress(String downloadId, double progress) async {
+    // progress is 0.0–1.0 from background_downloader; we lack byte counts here.
+    // Store percent in downloadedBytes and use 1_000_000 sentinel in totalBytes
+    // so download_queue can distinguish real byte counts from percent-based.
+    final progressPercent = (progress * 100).round().clamp(0, 100);
     await (_database.update(_database.downloads)..where((d) => d.id.equals(downloadId))).write(
       DownloadsCompanion(
-        downloadedBytes: Value((progress * 1000000).toInt()),
-        totalBytes: const Value(1000000),
+        downloadedBytes: Value(progressPercent),
+        totalBytes: const Value(1_000_000),
       ),
     );
   }

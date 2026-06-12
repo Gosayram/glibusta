@@ -11,8 +11,11 @@ import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../epub/epub_book_adapter.dart';
+import '../epub/epub_image_store.dart';
+import '../epub/epub_parser.dart' as new_epub;
 import 'parsers/book_parser.dart';
-import 'parsers/epub_parser.dart';
+import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
@@ -34,8 +37,10 @@ class BookOpenService {
 
   BookOpenService(this._database);
 
+  static const Duration _parsingTimeout = Duration(seconds: 60);
+
   static final Map<BookFormat, BookParser> _parsers = {
-    BookFormat.epub: EpubParser(),
+    BookFormat.epub: legacy_epub.EpubParser(),
     BookFormat.fb2: Fb2Parser(),
     BookFormat.txt: TxtBookParser(),
   };
@@ -66,21 +71,79 @@ class BookOpenService {
       throw BookOpenFailure('Формат не поддерживается: ${download.format}');
     }
 
-    if (format == BookFormat.pdf) {
-      throw const BookOpenFailure('PDF открывается отдельным просмотрщиком');
+    if (format == BookFormat.pdf || format == BookFormat.mobi) {
+      throw const BookOpenFailure('Формат не поддерживается');
     }
 
-    return _parseInIsolate(format, filePath);
+    return _parseInIsolate(format, filePath, bookId);
   }
 
-  Future<NormalizedBook> _parseInIsolate(BookFormat bookFormat, String filePath) async {
+  Future<NormalizedBook> _parseInIsolate(
+    BookFormat bookFormat,
+    String filePath, [
+    String? bookId,
+  ]) async {
+    if (bookFormat == BookFormat.epub) {
+      final effectiveBookId = bookId ?? _extractBookId(filePath);
+      final bookDir = await _getBookDir(effectiveBookId);
+      final imagesDir = Directory('${bookDir.path}/epub_images');
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
+      final imageStore = EpubImageStore(imagesDir);
+      final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+
+      try {
+        final epubBook = await parser
+            .parse(filePath)
+            .timeout(
+              _parsingTimeout,
+              onTimeout: () => throw TimeoutException(
+                'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
+                'Попробуйте повторить.',
+              ),
+            );
+        final adapter = EpubBookAdapter();
+        final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
+        _logger.info(
+          'EPUB parsed: ${epubBook.title}, ${epubBook.chapters.length} chapters, '
+          '${epubBook.toc?.length ?? 0} TOC items',
+          name: 'Reader',
+        );
+        return normalized;
+      } on TimeoutException {
+        rethrow;
+      } on Object catch (e, st) {
+        _logger.severe(
+          'New EPUB parser failed, falling back to legacy: $e',
+          name: 'Reader',
+          error: e,
+          st: st,
+        );
+        try {
+          return await legacy_epub.EpubParser()
+              .parseFile(filePath)
+              .timeout(
+                _parsingTimeout,
+                onTimeout: () => throw TimeoutException(
+                  'Разбор EPUB (legacy) занял слишком много времени. '
+                  'Попробуйте повторить.',
+                ),
+              );
+        } on TimeoutException {
+          rethrow;
+        }
+      }
+    }
+
     try {
       return await Isolate.run<NormalizedBook>(() {
         return switch (bookFormat) {
-          BookFormat.epub => EpubParser().parseFile(filePath),
           BookFormat.fb2 => Fb2Parser().parseFile(filePath),
           BookFormat.txt => TxtBookParser().parseFile(filePath),
+          BookFormat.epub => throw UnsupportedError('handled above'),
           BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
+          BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
           BookFormat.unknown => throw UnsupportedError('Unknown format'),
         };
       });
@@ -97,6 +160,12 @@ class BookOpenService {
       }
       return parser.parseFile(filePath);
     }
+  }
+
+  String _extractBookId(String filePath) {
+    final name = filePath.split('/').last;
+    final dotIndex = name.lastIndexOf('.');
+    return dotIndex > 0 ? name.substring(0, dotIndex) : name;
   }
 
   /// Re-parse a book with a forced encoding and update the DB metadata.
@@ -116,7 +185,7 @@ class BookOpenService {
     }
 
     final format = detectBookFormat(filePath);
-    if (format == BookFormat.unknown || format == BookFormat.pdf) {
+    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
       throw BookOpenFailure('Формат не поддерживается: ${format.name}');
     }
 

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -25,11 +28,19 @@ Future<List<Book>> popularBooks(Ref ref) async {
   return repository.getPopularBooks();
 }
 
-class CatalogScreen extends ConsumerWidget {
+class CatalogScreen extends ConsumerStatefulWidget {
   const CatalogScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CatalogScreen> createState() => _CatalogScreenState();
+}
+
+class _CatalogScreenState extends ConsumerState<CatalogScreen> {
+  Future<Map<String, bool>>? _downloadStatusFuture;
+  List<Book> _lastBooks = const [];
+
+  @override
+  Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final popularAsync = ref.watch(popularBooksProvider);
 
@@ -84,6 +95,37 @@ class CatalogScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+              ),
+            ),
+            const Divider(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.new_releases_outlined,
+                      label: 'Новые',
+                      onTap: () => context.push('/recent'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.category_outlined,
+                      label: 'Жанры',
+                      onTap: () => context.push('/genres'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _QuickAccessTile(
+                      icon: Icons.trending_up,
+                      label: 'Популярные',
+                      onTap: () => context.push('/catalog/popular'),
+                    ),
+                  ),
+                ],
               ),
             ),
             const Divider(),
@@ -142,32 +184,37 @@ class CatalogScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            'Категории',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Жанры',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: () => context.push('/genres'),
+                child: const Text('Все жанры'),
+              ),
+            ],
           ),
         ),
         SizedBox(
-          height: 120,
+          height: 44,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: categories.length,
+            itemCount: categories.length > 20 ? 20 : categories.length,
             itemBuilder: (context, index) {
               final category = categories[index];
-              return Card(
-                margin: const EdgeInsets.only(right: 8),
-                child: SizedBox(
-                  width: 100,
-                  child: Center(
-                    child: Text(
-                      category,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  label: Text(category, style: const TextStyle(fontSize: 13)),
+                  onPressed: () {
+                    unawaited(context.push('/search?category=${Uri.encodeComponent(category)}'));
+                  },
                 ),
               );
             },
@@ -178,6 +225,10 @@ class CatalogScreen extends ConsumerWidget {
   }
 
   Widget _buildPopularBooks(BuildContext context, WidgetRef ref, List<Book> books) {
+    if (!identical(books, _lastBooks)) {
+      _lastBooks = books;
+      _downloadStatusFuture = _getDownloadStatusMap(ref, books);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,8 +242,12 @@ class CatalogScreen extends ConsumerWidget {
         SizedBox(
           height: 240,
           child: FutureBuilder<Map<String, bool>>(
-            future: _getDownloadStatusMap(ref, books),
+            future: _downloadStatusFuture,
             builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                debugPrint('[Catalog] Failed to fetch download status: ${snapshot.error}');
+                return const SizedBox.shrink();
+              }
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Skeletonizer(
                   child: GridView.builder(
@@ -358,7 +413,8 @@ class _RestorableListViewState extends State<_RestorableListView> with Restorati
   }
 
   ScrollController _getController() {
-    _controller ??= ScrollController(
+    if (_controller != null) return _controller!;
+    _controller = ScrollController(
       initialScrollOffset: _offset.value,
       keepScrollOffset: false,
     )..addListener(_saveOffset);
@@ -385,5 +441,39 @@ class _RestorableListViewState extends State<_RestorableListView> with Restorati
   @override
   Widget build(BuildContext context) {
     return ListView(controller: _getController(), children: widget.children);
+  }
+}
+
+class _QuickAccessTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAccessTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 28, color: colorScheme.primary),
+              const SizedBox(height: 4),
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

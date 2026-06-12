@@ -7,6 +7,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
+import '../../collections/presentation/collections_screen.dart';
 import '../../library/data/book_repository_impl.dart';
 import '../../library/presentation/pinned_books_provider.dart';
 import 'continue_reading_card.dart';
@@ -17,11 +18,6 @@ import 'reading_stats_provider.dart';
 final recentBooksProvider = FutureProvider<List<Book>>((ref) async {
   final repository = ref.watch(bookRepositoryProvider);
   return repository.getAllBooks();
-});
-
-final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.getAllCollections();
 });
 
 class HomeScreen extends ConsumerWidget {
@@ -274,7 +270,7 @@ class HomeScreen extends ConsumerWidget {
                     _QuickAction(
                       icon: Icons.bookmark,
                       label: 'Закладки',
-                      onTap: () => context.go('/bookmarks'),
+                      onTap: () => context.go('/library'),
                     ),
                     _QuickAction(
                       icon: Icons.settings,

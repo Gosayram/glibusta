@@ -74,7 +74,7 @@ class BookmarksScreen extends ConsumerWidget {
               final bookmark = bookmarks[index];
               return BookmarkTile(
                     bookmark: bookmark,
-                    onTap: () {},
+                    onTap: () => context.push('/reader/${bookmark.bookId}'),
                     onDelete: () => _deleteBookmark(context, ref, bookmark),
                   )
                   .animate()

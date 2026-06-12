@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -144,12 +145,14 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       return const AuthStateData();
     }
     final mail = prefs.getString(_kSessionMailKey);
-    final cookiesRaw = prefs.getString(_kSessionCookiesKey);
+    const secureStorage = FlutterSecureStorage();
+    final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
-        ? Map<String, String>.from(
-            Uri.splitQueryString(cookiesRaw),
-          )
+        ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
         : <String, String>{};
+    if (cookies.isEmpty) {
+      return const AuthStateData();
+    }
     return AuthStateData(
       isAuthenticated: true,
       session: UserSession(name: name, mail: mail, cookies: cookies),
@@ -187,7 +190,10 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionNameKey);
     await prefs.remove(_kSessionMailKey);
-    await prefs.remove(_kSessionCookiesKey);
+    const secureStorage = FlutterSecureStorage();
+    await secureStorage.delete(key: _kSessionCookiesKey);
+    await secureStorage.delete(key: 'auth_username');
+    await secureStorage.delete(key: 'auth_password');
     state = const AsyncValue.data(AuthStateData());
   }
 
@@ -198,17 +204,47 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     }
   }
 
+  Future<bool> tryAutoLogin() async {
+    const secureStorage = FlutterSecureStorage();
+    final username = await secureStorage.read(key: 'auth_username');
+    final password = await secureStorage.read(key: 'auth_password');
+    if (username == null || password == null || username.isEmpty || password.isEmpty) {
+      return false;
+    }
+    try {
+      final session = await ref
+          .read(authRepositoryProvider)
+          .login(
+            name: username,
+            password: password,
+            persistent: true,
+          );
+      await _saveSession(session);
+      state = AsyncValue.data(
+        AuthStateData(
+          isAuthenticated: true,
+          session: session,
+        ),
+      );
+      return true;
+    } on Object catch (e) {
+      AppLogger().warning('Auto-login failed: $e', name: 'Auth');
+      return false;
+    }
+  }
+
   Future<void> _saveSession(UserSession session) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kSessionNameKey, session.name);
     if (session.mail != null) {
       await prefs.setString(_kSessionMailKey, session.mail!);
     }
+    const secureStorage = FlutterSecureStorage();
     if (session.cookies.isNotEmpty) {
       final encoded = session.cookies.entries
           .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
           .join('&');
-      await prefs.setString(_kSessionCookiesKey, encoded);
+      await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
     }
   }
 }

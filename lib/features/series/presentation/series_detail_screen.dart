@@ -133,14 +133,32 @@ class SeriesDetailScreen extends ConsumerWidget {
             ),
           ),
         ),
-        error: (Object e, _) => Center(child: Text('Ошибка: $e')),
+        error: (Object e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48),
+              const SizedBox(height: 16),
+              Text('Ошибка: $e'),
+              const SizedBox(height: 16),
+              FilledButton.tonal(
+                onPressed: () => ref.invalidate(seriesDetailProvider(seriesId)),
+                child: const Text('Повторить'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   String _bookCountText(int count) {
-    if (count == 1) return 'книга';
-    if (count >= 2 && count <= 4) return 'книги';
+    if (count % 10 == 1 && count % 100 != 11) {
+      return 'книга';
+    }
+    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14)) {
+      return 'книги';
+    }
     return 'книг';
   }
 }

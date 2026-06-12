@@ -58,15 +58,11 @@ Future<List<Book>> pinnedBooksList(Ref ref) async {
   final allBooks = await repository.getAllBooks();
   if (allBooks.isEmpty) return [];
 
+  final bookMap = {for (final b in allBooks) b.id: b};
   final pinnedBooksList = <Book>[];
   for (final id in pinnedIds) {
-    final book = allBooks.firstWhere(
-      (b) => b.id == id,
-      orElse: () => allBooks.first,
-    );
-    if (book.id == id) {
-      pinnedBooksList.add(book);
-    }
+    final book = bookMap[id];
+    if (book != null) pinnedBooksList.add(book);
   }
   return pinnedBooksList;
 }
