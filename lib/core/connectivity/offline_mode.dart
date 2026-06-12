@@ -210,7 +210,9 @@ class OfflineModeService {
           ? baseUrl.substring(0, baseUrl.length - 1)
           : baseUrl;
       final response = await dio.head<dynamic>('$normalizedBase/opds/');
-      return response.statusCode != null;
+      return response.statusCode != null &&
+          response.statusCode! >= 200 &&
+          response.statusCode! < 500;
     } on Object catch (_) {
       return false;
     } finally {

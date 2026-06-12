@@ -50,11 +50,13 @@ class Fb2Parser implements BookParser {
     if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
       try {
         final archive = ZipDecoder().decodeBytes(bytes);
-        // Find first .fb2 file in the archive
-        final fb2File = archive.files.firstWhere(
-          (f) => f.name.toLowerCase().endsWith('.fb2'),
-          orElse: () => archive.files.first,
+        final fb2File = archive.files.cast<ArchiveFile?>().firstWhere(
+          (f) => f!.name.toLowerCase().endsWith('.fb2'),
+          orElse: () => null,
         );
+        if (fb2File == null) {
+          throw const FormatException('FB2.ZIP: .fb2 файл не найден в архиве');
+        }
         return Uint8List.fromList(fb2File.content as List<int>);
       } on Object catch (_) {
         // If ZIP decoding fails, try raw bytes as plain FB2 XML

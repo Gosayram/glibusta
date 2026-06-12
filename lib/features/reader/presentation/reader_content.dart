@@ -8,7 +8,7 @@ import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 
-class ReaderContentBody extends StatelessWidget {
+class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
     super.key,
     required this.metadata,
@@ -31,7 +31,23 @@ class ReaderContentBody extends StatelessWidget {
   final String? highlightQuery;
 
   @override
+  State<ReaderContentBody> createState() => _ReaderContentBodyState();
+}
+
+class _ReaderContentBodyState extends State<ReaderContentBody> {
+  bool _didScrollToProgress = false;
+
+  @override
   Widget build(BuildContext context) {
+    final metadata = widget.metadata;
+    final loadedChapters = widget.loadedChapters;
+    final settings = widget.settings;
+    final scrollController = widget.scrollController;
+    final onTap = widget.onTap;
+    final initialProgress = widget.initialProgress;
+    final initialPage = widget.initialPage;
+    final highlightQuery = widget.highlightQuery;
+
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
         metadata: metadata,
@@ -52,7 +68,8 @@ class ReaderContentBody extends StatelessWidget {
         : EdgeInsets.all(settings.margin);
     final textDirection = _effectiveTextDirection(context, settings);
 
-    if (initialProgress > 0 && scrollController.hasClients) {
+    if (!_didScrollToProgress && initialProgress > 0 && scrollController.hasClients) {
+      _didScrollToProgress = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!scrollController.hasClients) return;
         final maxScroll = scrollController.position.maxScrollExtent;
@@ -120,8 +137,8 @@ class ReaderContentBody extends StatelessWidget {
   }
 
   Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
-    final title = index < metadata.chapterTitles.length
-        ? metadata.chapterTitles[index]
+    final title = index < widget.metadata.chapterTitles.length
+        ? widget.metadata.chapterTitles[index]
         : 'Глава ${index + 1}';
     return Padding(
       padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
@@ -175,16 +192,6 @@ class ReaderContentBody extends StatelessWidget {
             ),
           )
         : const SizedBox.shrink();
-
-    if (chapter.blocks.length <= 50) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          header,
-          ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
-        ],
-      );
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +305,7 @@ class ReaderContentBody extends StatelessWidget {
   }
 
   Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign) {
-    final query = highlightQuery?.trim();
+    final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
       return Text(text, style: style, textAlign: textAlign);
     }

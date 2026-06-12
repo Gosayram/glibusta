@@ -302,6 +302,7 @@ class _StatusBadge extends StatelessWidget {
         color: color.withValues(alpha: 0.9),
         shape: BoxShape.circle,
       ),
+      child: Icon(icon, size: 10, color: Colors.white),
     );
   }
 }

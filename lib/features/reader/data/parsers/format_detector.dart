@@ -8,5 +8,6 @@ BookFormat detectBookFormat(String path) {
   if (lower.endsWith('.fb2')) return BookFormat.fb2;
   if (lower.endsWith('.pdf')) return BookFormat.pdf;
   if (lower.endsWith('.txt')) return BookFormat.txt;
+  if (lower.endsWith('.zip')) return BookFormat.fb2;
   return BookFormat.unknown;
 }

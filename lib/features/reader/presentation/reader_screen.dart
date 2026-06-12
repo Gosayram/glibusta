@@ -361,17 +361,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ],
         if (readerState.isSearchOpen && readerState.metadata != null)
           Positioned.fill(
-            child: BookSearchOverlay(
-              searchService: _ctrl.createSearchService()!,
-              onJumpToResult: (position, query) {
-                _ctrl.closeSearch();
-                _ctrl.highlightSearchQuery(query);
-                _ctrl.jumpToPosition(
-                  position.copyWith(bookId: widget.bookId),
+            child: Builder(
+              builder: (context) {
+                final searchService = _ctrl.createSearchService();
+                if (searchService == null) return const SizedBox.shrink();
+                return BookSearchOverlay(
+                  searchService: searchService,
+                  onJumpToResult: (position, query) {
+                    _ctrl.closeSearch();
+                    _ctrl.highlightSearchQuery(query);
+                    _ctrl.jumpToPosition(
+                      position.copyWith(bookId: widget.bookId),
+                    );
+                  },
+                  onDismiss: () => _ctrl.closeSearch(),
+                  theme: settings.theme,
                 );
               },
-              onDismiss: () => _ctrl.closeSearch(),
-              theme: settings.theme,
             ),
           ),
         if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
@@ -578,9 +584,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             FilledButton(
               onPressed: () async {
                 _ctrl.saveProgress();
-                unawaited(_ctrl.deleteBookFile());
                 Navigator.of(context).pop();
-                if (Navigator.of(context).canPop()) {
+                try {
+                  await _ctrl.deleteBookFile();
+                } on Object catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Не удалось удалить: $e')),
+                    );
+                  }
+                }
+                if (context.mounted && Navigator.of(context).canPop()) {
                   Navigator.of(context).pop();
                 }
               },
