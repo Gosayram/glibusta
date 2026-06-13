@@ -129,7 +129,7 @@ class SidebarNavigation extends StatelessWidget {
                 itemCount: _items.length,
                 itemBuilder: (context, index) {
                   final item = _items[index];
-                  final isSelected = index == selectedIndex;
+                  final isSelected = index < 4 && index == selectedIndex;
                   return ListTile(
                     leading: Icon(
                       item.icon,
@@ -149,7 +149,16 @@ class SidebarNavigation extends StatelessWidget {
                     ),
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    onTap: () => onDestinationSelected?.call(index),
+                    onTap: () {
+                      if (index < 4) {
+                        onDestinationSelected?.call(index);
+                      } else {
+                        final route = item.route;
+                        if (route.isNotEmpty) {
+                          unawaited(context.push<void>(route));
+                        }
+                      }
+                    },
                   );
                 },
               ),

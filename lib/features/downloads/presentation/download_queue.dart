@@ -35,6 +35,7 @@ class DownloadQueue {
   final List<DownloadTask> _pendingQueue = [];
   final Map<String, DownloadTask> _tasks = {};
   final Map<String, _SpeedTracker> _speedTrackers = {};
+  final Set<String> _cancelledIds = {};
   List<DownloadTask> _latestTasks = [];
   int _maxConcurrent = 3;
   int _runningCount = 0;
@@ -95,12 +96,10 @@ class DownloadQueue {
     );
 
     _tasks[taskId] = paused;
-    _runningCount--;
     _speedTrackers.remove(taskId);
     await _notificationService.cancel(taskId);
     await _repository.updateStatus(taskId, DownloadStatus.paused);
     _emitUpdate();
-    _processQueue();
   }
 
   Future<void> resume(String taskId) async {
@@ -130,9 +129,7 @@ class DownloadQueue {
     final task = _tasks[taskId];
     if (task == null) return;
 
-    if (task.status == DownloadStatus.running) {
-      _runningCount--;
-    }
+    _cancelledIds.add(taskId);
 
     final canceled = DownloadTask(
       id: task.id,
@@ -152,7 +149,6 @@ class DownloadQueue {
     await _notificationService.cancel(taskId);
     await _repository.cancelDownload(taskId);
     _emitUpdate();
-    _processQueue();
   }
 
   Future<void> remove(String taskId) async {
@@ -263,6 +259,7 @@ class DownloadQueue {
       await _repository.updateStatus(task.id, DownloadStatus.failed);
       await _notificationService.showFailed(failed, null);
     } finally {
+      _cancelledIds.remove(task.id);
       _runningCount--;
       _emitUpdate();
       _processQueue();

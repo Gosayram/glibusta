@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:html/dom.dart' show Element;
+import 'package:html/dom.dart' show Document, Element;
 import 'package:html/parser.dart' show parse;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -92,7 +92,7 @@ class FlibustaApiSource extends BookSource {
         }
       }
 
-      final totalPages = _extractTotalPages(html);
+      final totalPages = _extractTotalPages(doc);
 
       return SearchResultPage(
         books: books,
@@ -213,8 +213,7 @@ class FlibustaApiSource extends BookSource {
     return formats;
   }
 
-  int _extractTotalPages(String html) {
-    final doc = parse(html);
+  int _extractTotalPages(Document doc) {
     final pager = doc.querySelector('div.item-list .pager');
     if (pager == null) return 1;
     final items = pager.querySelectorAll('.pager-current, .pager-item');

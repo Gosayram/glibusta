@@ -175,6 +175,8 @@ class ReaderController {
           clearHighlight: true,
         ),
       );
+      _scrollController?.removeListener(_onScroll);
+      _scrollController?.dispose();
       _scrollController = ScrollController()..addListener(_onScroll);
 
       await _ensureChaptersLoaded(savedPosition.chapterIndex);

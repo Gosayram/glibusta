@@ -65,7 +65,7 @@ class HttpClient {
   Future<String> getUriWithFallback(Uri uri, {CancelToken? cancelToken}) async {
     try {
       return await getUri(uri, cancelToken: cancelToken);
-    } on Object catch (_) {
+    } on HttpException catch (_) {
       return _rawGet(uri);
     }
   }
@@ -197,29 +197,34 @@ class HttpClient {
 
       final file = io.File(savePath);
       final sink = file.openWrite();
-      int received = 0;
-      final total = response.contentLength;
+      try {
+        int received = 0;
+        final total = response.contentLength;
 
-      await for (final chunk in response) {
-        sink.add(chunk);
-        received += chunk.length;
-        if (onProgress != null) {
-          onProgress(received, total > 0 ? total : 0);
+        await for (final chunk in response) {
+          sink.add(chunk);
+          received += chunk.length;
+          if (onProgress != null) {
+            onProgress(received, total > 0 ? total : 0);
+          }
         }
-      }
-      await sink.close();
+        await sink.close();
 
-      if (received == 0) {
-        throw HttpException(message: 'Empty download', url: url);
-      }
-
-      final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
-      if (contentType.contains('text/html') || contentType.contains('text/plain')) {
-        final body = await file.readAsString();
-        if (body.contains('Книга не найдена') || body.contains('<html')) {
-          await file.delete();
-          throw HttpException(message: 'Server returned HTML instead of book file', url: url);
+        if (received == 0) {
+          throw HttpException(message: 'Empty download', url: url);
         }
+
+        final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
+        if (contentType.contains('text/html') || contentType.contains('text/plain')) {
+          final body = await file.readAsString();
+          if (body.contains('Книга не найдена') || body.contains('<html')) {
+            await file.delete();
+            throw HttpException(message: 'Server returned HTML instead of book file', url: url);
+          }
+        }
+      } on Object {
+        await sink.close().catchError((_) {});
+        rethrow;
       }
     } finally {
       client.close(force: true);

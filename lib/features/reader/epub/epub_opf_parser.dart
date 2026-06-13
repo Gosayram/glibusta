@@ -97,6 +97,7 @@ final class EpubOpfParser {
             .findAllElements('spine')
             .firstOrNull
             ?.findElements('itemref')
+            .where((e) => e.getAttribute('idref') != null)
             .map(
               (e) => SpineItem(
                 idref: e.getAttribute('idref')!,

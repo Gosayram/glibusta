@@ -525,9 +525,9 @@ class BookListItem extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (book.authorIds.isNotEmpty)
+            if (book.displayAuthor.isNotEmpty)
               Text(
-                book.authorIds.join(', '),
+                book.displayAuthor,
                 style: theme.textTheme.bodySmall,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
