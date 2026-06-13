@@ -99,11 +99,13 @@ class EpubParser implements BookParser {
 
     final metadata = _parseMetadata(opfDoc);
     final manifest = _parseManifest(opfDoc, opfBase);
-    final spineOrder = _parseSpine(opfDoc);
+    final spineIdrefs = _parseSpine(opfDoc);
 
     final chapters = <ReaderChapter>[];
     var chapterIndex = 0;
-    for (final href in spineOrder) {
+    for (final idref in spineIdrefs) {
+      final href = manifest[idref];
+      if (href == null) continue;
       final fullPath = '$opfBase$href';
       final htmlBytes =
           _findFileBytesFromIndex(fileIndex, fullPath) ?? _findFileBytesFromIndex(fileIndex, href);

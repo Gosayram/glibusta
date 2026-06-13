@@ -298,15 +298,21 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, _getReaderStyle(settings), textAlign),
+            child: _buildHighlightedText(block.text, _getReaderStyle(settings), textAlign, richSpans: block.richSpans),
           ),
         );
     }
   }
 
-  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign) {
+  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign, {List<RichSpan>? richSpans}) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
+      if (richSpans != null && richSpans.isNotEmpty) {
+        return Text.rich(
+          TextSpan(children: _buildRichTextSpans(richSpans, style)),
+          textAlign: textAlign,
+        );
+      }
       return Text(text, style: style, textAlign: textAlign);
     }
 
@@ -314,6 +320,27 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       TextSpan(children: _buildHighlightedSpans(text, style, query)),
       textAlign: textAlign,
     );
+  }
+
+  List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
+    return richSpans.map((span) {
+      var spanStyle = baseStyle;
+      if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
+      if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
+      if (span.superscript) {
+        spanStyle = spanStyle.copyWith(
+          fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
+          fontWeight: FontWeight.normal,
+        );
+      }
+      if (span.href != null) {
+        spanStyle = spanStyle.copyWith(
+          color: Colors.blue,
+          decoration: TextDecoration.underline,
+        );
+      }
+      return TextSpan(text: span.text, style: spanStyle);
+    }).toList();
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
@@ -626,15 +653,21 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, style, textAlign),
+            child: _buildHighlightedText(block.text, style, textAlign, richSpans: block.richSpans),
           ),
         );
     }
   }
 
-  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign) {
+  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign, {List<RichSpan>? richSpans}) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
+      if (richSpans != null && richSpans.isNotEmpty) {
+        return Text.rich(
+          TextSpan(children: _buildRichTextSpans(richSpans, style)),
+          textAlign: textAlign,
+        );
+      }
       return Text(text, style: style, textAlign: textAlign);
     }
 
@@ -642,6 +675,27 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       TextSpan(children: _buildHighlightedSpans(text, style, query)),
       textAlign: textAlign,
     );
+  }
+
+  List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
+    return richSpans.map((span) {
+      var spanStyle = baseStyle;
+      if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
+      if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
+      if (span.superscript) {
+        spanStyle = spanStyle.copyWith(
+          fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
+          fontWeight: FontWeight.normal,
+        );
+      }
+      if (span.href != null) {
+        spanStyle = spanStyle.copyWith(
+          color: Colors.blue,
+          decoration: TextDecoration.underline,
+        );
+      }
+      return TextSpan(text: span.text, style: spanStyle);
+    }).toList();
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {

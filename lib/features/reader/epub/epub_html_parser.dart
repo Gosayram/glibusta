@@ -260,7 +260,7 @@ final class EpubHtmlParser {
     final epubType = el.getAttribute('epub:type');
     if (epubType == 'pagebreak') return true;
     if (el.localName == 'span' && el.getAttribute('title') != null) {
-      return epubType == 'pagebreak';
+      return true;
     }
     return false;
   }

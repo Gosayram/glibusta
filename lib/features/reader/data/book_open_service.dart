@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -137,28 +136,35 @@ class BookOpenService {
     }
 
     try {
-      return await Isolate.run<NormalizedBook>(() {
-        return switch (bookFormat) {
-          BookFormat.fb2 => Fb2Parser().parseFile(filePath),
-          BookFormat.txt => TxtBookParser().parseFile(filePath),
-          BookFormat.epub => throw UnsupportedError('handled above'),
-          BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
-          BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
-          BookFormat.unknown => throw UnsupportedError('Unknown format'),
-        };
-      });
-    } on Object catch (e, st) {
-      _logger.severe(
-        'Isolate parsing failed, trying sync fallback: $e',
-        name: 'Reader',
-        error: e,
-        st: st,
-      );
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw BookOpenFailure('Файл пуст: $filePath');
+      }
+      final fileName = filePath.split('/').last;
       final parser = _parsers[bookFormat];
       if (parser == null) {
         throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
       }
-      return parser.parseFile(filePath);
+      return await parser.parse(
+        bytes,
+        fileName: fileName,
+      ).timeout(
+        _parsingTimeout,
+        onTimeout: () => throw TimeoutException(
+          'Разбор ${bookFormat.name} занял слишком много времени.',
+        ),
+      );
+    } on TimeoutException {
+      rethrow;
+    } on Object catch (e, st) {
+      _logger.severe(
+        'Parsing failed for $bookFormat: $e',
+        name: 'Reader',
+        error: e,
+        st: st,
+      );
+      rethrow;
     }
   }
 
