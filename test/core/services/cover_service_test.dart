@@ -43,7 +43,7 @@ void main() {
     });
 
     test('applies large suffix', () {
-      final service = CoverService(baseUrl: 'https.example.com');
+      final service = CoverService(baseUrl: 'https://example.com');
       final url = service.getUrl('cover.jpg', CoverSize.large);
       expect(url, contains('_t400x600'));
     });

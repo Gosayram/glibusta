@@ -115,12 +115,14 @@ class BookImportService {
       return ImportResult.failure('Парсер для .$ext не найден');
     }
 
+    String? bookId;
     try {
       final book = await parser.parse(
         bytes,
         fileName: filePath.split('/').last,
         forcedEncoding: forcedEncoding,
       );
+      bookId = book.id;
 
       final targetFile = await _storage.bookFile(
         book.id,
@@ -171,21 +173,22 @@ class BookImportService {
       return ImportResult.success(book.title);
     } on Object catch (e) {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
-      try {
-        final ext = filePath.split('.').last.toLowerCase();
-        final bookId = filePath.hashCode.toRadixString(16);
-        final targetFile = await _storage.bookFile(
-          bookId,
-          BookFormat.values.firstWhere(
-            (f) => f.name == ext,
-            orElse: () => BookFormat.epub,
-          ),
-        );
-        if (await targetFile.exists()) {
-          await targetFile.delete();
+      if (bookId != null) {
+        try {
+          final ext = filePath.split('.').last.toLowerCase();
+          final targetFile = await _storage.bookFile(
+            bookId,
+            BookFormat.values.firstWhere(
+              (f) => f.name == ext,
+              orElse: () => BookFormat.epub,
+            ),
+          );
+          if (await targetFile.exists()) {
+            await targetFile.delete();
+          }
+        } on Object catch (_) {
+          // Best-effort cleanup: ignore if target file path can't be resolved
         }
-      } on Object catch (_) {
-        // Best-effort cleanup: ignore if target file path can't be resolved
       }
       return ImportResult.failure('Ошибка при импорте: $e');
     }

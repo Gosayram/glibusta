@@ -333,6 +333,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
+    final linkColor = Theme.of(context).colorScheme.primary;
     return richSpans.map((span) {
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
@@ -340,12 +341,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       if (span.superscript) {
         spanStyle = spanStyle.copyWith(
           fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
-          fontWeight: FontWeight.normal,
         );
       }
       if (span.href != null) {
         spanStyle = spanStyle.copyWith(
-          color: Colors.blue,
+          color: linkColor,
           decoration: TextDecoration.underline,
         );
       }
@@ -693,6 +693,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
+    final linkColor = Theme.of(context).colorScheme.primary;
     return richSpans.map((span) {
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
@@ -700,12 +701,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       if (span.superscript) {
         spanStyle = spanStyle.copyWith(
           fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
-          fontWeight: FontWeight.normal,
         );
       }
       if (span.href != null) {
         spanStyle = spanStyle.copyWith(
-          color: Colors.blue,
+          color: linkColor,
           decoration: TextDecoration.underline,
         );
       }

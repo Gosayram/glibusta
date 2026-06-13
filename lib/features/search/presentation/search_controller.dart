@@ -45,6 +45,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     _authorToken?.cancel();
     _currentToken = CancelToken();
     _authorToken = CancelToken();
+    final localAuthorToken = _authorToken;
     state = state.copyWith(
       isLoading: true,
       lastQuery: normalized,
@@ -82,7 +83,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       if (!ref.mounted) return;
 
       try {
-        authorResult = await _source.searchAuthors(searchQuery, cancelToken: _authorToken);
+        authorResult = await _source.searchAuthors(searchQuery, cancelToken: localAuthorToken);
       } on Object catch (e) {
         _logger.warning('Author search failed: $e', name: 'Search', error: e);
         authorResult = const SearchAuthorsResultPage(authors: []);

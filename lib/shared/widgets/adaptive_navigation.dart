@@ -94,6 +94,13 @@ class SidebarNavigation extends StatelessWidget {
     _SidebarItem(icon: Icons.settings, label: 'Настройки', route: '/settings'),
   ];
 
+  static const _branchIndexForItem = <int, int>{
+    0: 0,
+    1: 1,
+    2: 2,
+    6: 3,
+  };
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -129,7 +136,9 @@ class SidebarNavigation extends StatelessWidget {
                 itemCount: _items.length,
                 itemBuilder: (context, index) {
                   final item = _items[index];
-                  final isSelected = index < 4 && index == selectedIndex;
+                  final branchIdx = _branchIndexForItem[index];
+                  final isBranchItem = branchIdx != null;
+                  final isSelected = isBranchItem && branchIdx == selectedIndex;
                   return ListTile(
                     leading: Icon(
                       item.icon,
@@ -150,8 +159,8 @@ class SidebarNavigation extends StatelessWidget {
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     onTap: () {
-                      if (index < 4) {
-                        onDestinationSelected?.call(index);
+                      if (isBranchItem) {
+                        onDestinationSelected?.call(branchIdx);
                       } else {
                         final route = item.route;
                         if (route.isNotEmpty) {

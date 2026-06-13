@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
 
@@ -223,13 +224,28 @@ class HttpClient {
         }
         await sink.close();
 
+        if (cancelled) {
+          try {
+            if (await file.exists()) await file.delete();
+          } on Object {
+            // Best-effort: ignore file deletion errors
+          }
+          throw HttpException(message: 'Cancelled', url: url);
+        }
+
         if (received == 0) {
           throw HttpException(message: 'Empty download', url: url);
         }
 
         final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
         if (contentType.contains('text/html') || contentType.contains('text/plain')) {
-          final body = await file.readAsString();
+          final bytes = await file.readAsBytes();
+          String body;
+          try {
+            body = utf8.decode(bytes, allowMalformed: true);
+          } on Object {
+            body = String.fromCharCodes(bytes);
+          }
           if (body.contains('Книга не найдена') || body.contains('<html')) {
             await file.delete();
             throw HttpException(message: 'Server returned HTML instead of book file', url: url);

@@ -24,15 +24,15 @@ class BookDeleteService {
   }
 
   Future<void> deleteBookCompletely(String bookId) async {
+    final download = await (_db.select(
+      _db.downloads,
+    )..where((d) => d.bookId.equals(bookId))).getSingleOrNull();
+
     await (_db.delete(_db.downloads)..where((d) => d.bookId.equals(bookId))).go();
     await (_db.delete(_db.readingProgress)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.quotes)..where((t) => t.bookId.equals(bookId))).go();
     await _db.bookDao.deleteBook(bookId);
-
-    final download = await (_db.select(
-      _db.downloads,
-    )..where((d) => d.bookId.equals(bookId))).getSingleOrNull();
 
     if (download?.targetPath != null) {
       try {

@@ -249,6 +249,8 @@ class DownloadQueue {
       await _repository.updateStatus(task.id, DownloadStatus.completed);
       await _notificationService.showCompleted(completed);
     } on Object {
+      final isCancelled = _cancelledIds.contains(task.id);
+      final status = isCancelled ? DownloadStatus.canceled : DownloadStatus.failed;
       final failed = DownloadTask(
         id: task.id,
         bookId: task.bookId,
@@ -256,14 +258,18 @@ class DownloadQueue {
         format: task.format,
         sourceUrl: task.sourceUrl,
         targetPath: task.targetPath,
-        status: DownloadStatus.failed,
+        status: status,
         downloadedBytes: task.downloadedBytes,
         totalBytes: task.totalBytes,
       );
       _tasks[task.id] = failed;
       _speedTrackers.remove(task.id);
-      await _repository.updateStatus(task.id, DownloadStatus.failed);
-      await _notificationService.showFailed(failed, null);
+      await _repository.updateStatus(task.id, status);
+      if (isCancelled) {
+        await _notificationService.cancel(task.id);
+      } else {
+        await _notificationService.showFailed(failed, null);
+      }
     } finally {
       _cancelCompleters.remove(task.id);
       _cancelledIds.remove(task.id);
