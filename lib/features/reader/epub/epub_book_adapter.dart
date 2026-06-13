@@ -90,13 +90,15 @@ class EpubBookAdapter {
     );
     if (!hasFormatting) return null;
     return spans
-        .map((s) => RichSpan(
-              text: s.text,
-              bold: s.bold,
-              italic: s.italic,
-              superscript: s.superscript,
-              href: s.href,
-            ))
+        .map(
+          (s) => RichSpan(
+            text: s.text,
+            bold: s.bold,
+            italic: s.italic,
+            superscript: s.superscript,
+            href: s.href,
+          ),
+        )
         .toList();
   }
 

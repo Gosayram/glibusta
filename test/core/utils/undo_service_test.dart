@@ -13,11 +13,13 @@ void main() {
 
     test('push adds action', () {
       final stack = UndoStack();
-      stack.push(UndoAction(
-        description: 'test',
-        undo: () async {},
-        timestamp: DateTime.now(),
-      ));
+      stack.push(
+        UndoAction(
+          description: 'test',
+          undo: () async {},
+          timestamp: DateTime.now(),
+        ),
+      );
       expect(stack.length, 1);
       expect(stack.isEmpty, isFalse);
       stack.dispose();
@@ -26,11 +28,13 @@ void main() {
     test('undoLast returns true and executes action', () async {
       var undone = false;
       final stack = UndoStack();
-      stack.push(UndoAction(
-        description: 'test',
-        undo: () async => undone = true,
-        timestamp: DateTime.now(),
-      ));
+      stack.push(
+        UndoAction(
+          description: 'test',
+          undo: () async => undone = true,
+          timestamp: DateTime.now(),
+        ),
+      );
       final result = await stack.undoLast();
       expect(result, isTrue);
       expect(undone, isTrue);
@@ -48,11 +52,13 @@ void main() {
     test('respects maxSize', () {
       final stack = UndoStack(maxSize: 2);
       for (var i = 0; i < 5; i++) {
-        stack.push(UndoAction(
-          description: 'item $i',
-          undo: () async {},
-          timestamp: DateTime.now(),
-        ));
+        stack.push(
+          UndoAction(
+            description: 'item $i',
+            undo: () async {},
+            timestamp: DateTime.now(),
+          ),
+        );
       }
       expect(stack.length, 2);
       expect(stack.actions.last.description, 'item 4');
@@ -61,11 +67,13 @@ void main() {
 
     test('clear empties stack', () {
       final stack = UndoStack();
-      stack.push(UndoAction(
-        description: 'test',
-        undo: () async {},
-        timestamp: DateTime.now(),
-      ));
+      stack.push(
+        UndoAction(
+          description: 'test',
+          undo: () async {},
+          timestamp: DateTime.now(),
+        ),
+      );
       stack.clear();
       expect(stack.isEmpty, isTrue);
       stack.dispose();
@@ -73,11 +81,13 @@ void main() {
 
     test('undoLast handles undo failure gracefully', () async {
       final stack = UndoStack();
-      stack.push(UndoAction(
-        description: 'fail',
-        undo: () async => throw Exception('fail'),
-        timestamp: DateTime.now(),
-      ));
+      stack.push(
+        UndoAction(
+          description: 'fail',
+          undo: () async => throw Exception('fail'),
+          timestamp: DateTime.now(),
+        ),
+      );
       final result = await stack.undoLast();
       expect(result, isFalse);
       expect(stack.isEmpty, isTrue);

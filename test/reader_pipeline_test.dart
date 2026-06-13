@@ -14,11 +14,9 @@ void main() {
   final testDir = p.join(Directory.current.path, 'test_results');
 
   group('EPUB → NormalizedBook → serialization roundtrip', () {
-    final epubFiles = Directory(testDir)
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.epub'))
-        .toList();
+    final epubFiles = Directory(
+      testDir,
+    ).listSync().whereType<File>().where((f) => f.path.endsWith('.epub')).toList();
 
     for (final file in epubFiles) {
       final name = p.basename(file.path);
@@ -56,14 +54,23 @@ void main() {
             final deser = deserialized.chapters[i];
             expect(deser.index, orig.index, reason: '$name: chapter $i index');
             expect(deser.title, orig.title, reason: '$name: chapter $i title');
-            expect(deser.blocks.length, orig.blocks.length,
-                reason: '$name: chapter $i block count');
+            expect(
+              deser.blocks.length,
+              orig.blocks.length,
+              reason: '$name: chapter $i block count',
+            );
 
             for (var j = 0; j < orig.blocks.length; j++) {
-              expect(deser.blocks[j].text, orig.blocks[j].text,
-                  reason: '$name: chapter $i block $j text');
-              expect(deser.blocks[j].type, orig.blocks[j].type,
-                  reason: '$name: chapter $i block $j type');
+              expect(
+                deser.blocks[j].text,
+                orig.blocks[j].text,
+                reason: '$name: chapter $i block $j text',
+              );
+              expect(
+                deser.blocks[j].type,
+                orig.blocks[j].type,
+                reason: '$name: chapter $i block $j type',
+              );
             }
           }
         } finally {
@@ -75,11 +82,9 @@ void main() {
 
   group('EPUB adapter preserves rich text formatting', () {
     test('at least one EPUB has blocks with richSpans', () async {
-      final epubFiles = Directory(testDir)
-          .listSync()
-          .whereType<File>()
-          .where((f) => f.path.endsWith('.epub'))
-          .toList();
+      final epubFiles = Directory(
+        testDir,
+      ).listSync().whereType<File>().where((f) => f.path.endsWith('.epub')).toList();
 
       var foundAny = false;
       for (final file in epubFiles) {
@@ -108,8 +113,7 @@ void main() {
         }
       }
 
-      expect(foundAny, isTrue,
-          reason: 'At least one EPUB should have paragraphs with formatting');
+      expect(foundAny, isTrue, reason: 'At least one EPUB should have paragraphs with formatting');
     });
   });
 
@@ -118,8 +122,6 @@ void main() {
       const span = RichSpan(
         text: 'Hello ',
         bold: true,
-        italic: false,
-        superscript: false,
         href: 'http://example.com',
       );
       final json = span.toJson();
@@ -150,11 +152,9 @@ void main() {
   });
 
   group('FB2 → NormalizedBook → serialization roundtrip', () {
-    final fb2Files = Directory(testDir)
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.fb2'))
-        .toList();
+    final fb2Files = Directory(
+      testDir,
+    ).listSync().whereType<File>().where((f) => f.path.endsWith('.fb2')).toList();
 
     for (final file in fb2Files) {
       final name = p.basename(file.path);
@@ -175,9 +175,11 @@ void main() {
         expect(deserialized.chapters.length, normalized.chapters.length);
 
         for (var i = 0; i < normalized.chapters.length; i++) {
-          expect(deserialized.chapters[i].blocks.length,
-              normalized.chapters[i].blocks.length,
-              reason: '$name: chapter $i block count');
+          expect(
+            deserialized.chapters[i].blocks.length,
+            normalized.chapters[i].blocks.length,
+            reason: '$name: chapter $i block count',
+          );
         }
       });
     }
@@ -208,8 +210,7 @@ void main() {
       expect(deserBlocks.length, origBlocks.length);
 
       for (var i = 0; i < origBlocks.length.clamp(0, 5); i++) {
-        expect(deserBlocks[i].text, origBlocks[i].text,
-            reason: 'block $i text mismatch');
+        expect(deserBlocks[i].text, origBlocks[i].text, reason: 'block $i text mismatch');
       }
     });
   });
@@ -220,7 +221,6 @@ void main() {
         id: 'empty',
         title: 'Empty',
         authors: [],
-        chapters: [],
       );
       final json = book.toJson();
       final restored = NormalizedBook.fromJson(json);

@@ -79,7 +79,7 @@ void main() {
 
     test('can return Failure from transform', () {
       const result = Success(0);
-      final flat = result.flatMap((v) => Failure<String>(ParserFailure('zero')));
+      final flat = result.flatMap((v) => const Failure<String>(ParserFailure('zero')));
       expect(flat.isFailure, isTrue);
       expect(flat.failure, isA<ParserFailure>());
     });
@@ -94,7 +94,7 @@ void main() {
 
     test('returns Failure on AppFailure', () async {
       final result = await guardFuture<int>(
-        () async => throw NetworkFailure('timeout'),
+        () async => throw const NetworkFailure('timeout'),
       );
       expect(result.isFailure, isTrue);
       expect(result.failure, isA<NetworkFailure>());

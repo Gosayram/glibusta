@@ -8,8 +8,7 @@ void main() {
     });
 
     test('clean Russian text scores high', () {
-      const text =
-          'Онегин жил на阆 Пукшин Пушкин как это книга глава в не на';
+      const text = 'Онегин жил на阆 Пукшин Пушкин как это книга глава в не на';
       final score = encodingQualityScore(text);
       expect(score, greaterThan(0.7));
     });
@@ -33,8 +32,7 @@ void main() {
     });
 
     test('common Russian words boost score', () {
-      const text =
-          'Это книга не как он она это его в на что глава книга';
+      const text = 'Это книга не как он она это его в на что глава книга';
       final score = encodingQualityScore(text);
       expect(score, greaterThan(0.8));
     });

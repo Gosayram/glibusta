@@ -4,7 +4,7 @@ import 'package:glibusta/shared/models/book.dart';
 void main() {
   group('Book', () {
     test('displayAuthor uses authorNames', () {
-      final book = Book(
+      const book = Book(
         id: '1',
         title: 'Test',
         authorIds: ['a1', 'a2'],
@@ -20,11 +20,10 @@ void main() {
     });
 
     test('displayAuthor falls back to first authorId', () {
-      final book = Book(
+      const book = Book(
         id: '1',
         title: 'Test',
         authorIds: ['a1'],
-        authorNames: [],
         genreIds: [],
         description: null,
         coverUrl: null,
@@ -36,11 +35,10 @@ void main() {
     });
 
     test('displayAuthor returns empty when no authors', () {
-      final book = Book(
+      const book = Book(
         id: '1',
         title: 'Test',
         authorIds: [],
-        authorNames: [],
         genreIds: [],
         description: null,
         coverUrl: null,
@@ -52,7 +50,7 @@ void main() {
     });
 
     test('readingStatusLabel returns correct Russian label', () {
-      final makeBook = (ReadingStatus s) => Book(
+      Book makeBook(ReadingStatus s) => Book(
         id: '1',
         title: 'T',
         authorIds: [],
@@ -61,7 +59,7 @@ void main() {
         coverUrl: null,
         publishDate: null,
         availableFormats: [],
-        source: BookSourceInfo(sourceId: 's', sourceUrl: 'u'),
+        source: const BookSourceInfo(sourceId: 's', sourceUrl: 'u'),
         readingStatus: s,
       );
 
@@ -123,7 +121,10 @@ void main() {
 
   group('BookSourceInfo', () {
     test('stores sourceId and sourceUrl', () {
-      const info = BookSourceInfo(sourceId: 'flibusta', sourceUrl: 'https://flibusta.example.com/b/1');
+      const info = BookSourceInfo(
+        sourceId: 'flibusta',
+        sourceUrl: 'https://flibusta.example.com/b/1',
+      );
       expect(info.sourceId, 'flibusta');
       expect(info.sourceUrl, contains('flibusta'));
     });

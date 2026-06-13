@@ -146,15 +146,17 @@ class BookOpenService {
       if (parser == null) {
         throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
       }
-      return await parser.parse(
-        bytes,
-        fileName: fileName,
-      ).timeout(
-        _parsingTimeout,
-        onTimeout: () => throw TimeoutException(
-          'Разбор ${bookFormat.name} занял слишком много времени.',
-        ),
-      );
+      return await parser
+          .parse(
+            bytes,
+            fileName: fileName,
+          )
+          .timeout(
+            _parsingTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Разбор ${bookFormat.name} занял слишком много времени.',
+            ),
+          );
     } on TimeoutException {
       rethrow;
     } on Object catch (e, st) {

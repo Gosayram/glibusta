@@ -3,11 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/encoding/encoding_utils.dart'
     as enc
-    show
-        decodeUtf16Le,
-        decodeUtf16Be,
-        detectDeclaredEncoding,
-        normalizeEncodingName;
+    show decodeUtf16Be, decodeUtf16Le, detectDeclaredEncoding, normalizeEncodingName;
 
 bool _startsWith(Uint8List bytes, List<int> prefix) {
   if (bytes.length < prefix.length) return false;
@@ -47,12 +43,18 @@ void main() {
 
     test('decodes Cyrillic text', () {
       final realBytes = <int>[
-        0x1F, 0x04,
-        0x40, 0x04,
-        0x38, 0x04,
-        0x32, 0x04,
-        0x35, 0x04,
-        0x42, 0x04,
+        0x1F,
+        0x04,
+        0x40,
+        0x04,
+        0x38,
+        0x04,
+        0x32,
+        0x04,
+        0x35,
+        0x04,
+        0x42,
+        0x04,
       ];
       final result = enc.decodeUtf16Le(Uint8List.fromList(realBytes));
       expect(result, 'Привет');
@@ -81,23 +83,19 @@ void main() {
 
   group('detectDeclaredEncoding', () {
     test('detects encoding from XML declaration', () {
-      final xml = '<?xml version="1.0" encoding="windows-1251"?>\n<root/>'
-          .codeUnits;
+      final xml = '<?xml version="1.0" encoding="windows-1251"?>\n<root/>'.codeUnits;
       final result = enc.detectDeclaredEncoding(Uint8List.fromList(xml));
       expect(result, 'windows-1251');
     });
 
     test('detects encoding from HTML meta charset', () {
-      final html = '<html><head><meta charset="utf-8"></head></html>'
-          .codeUnits;
+      final html = '<html><head><meta charset="utf-8"></head></html>'.codeUnits;
       final result = enc.detectDeclaredEncoding(Uint8List.fromList(html));
       expect(result, 'utf-8');
     });
 
     test('detects encoding from Content-Type meta', () {
-      final html =
-          '<meta http-equiv="Content-Type" content="text/html; charset=koi8-r">'
-              .codeUnits;
+      final html = '<meta http-equiv="Content-Type" content="text/html; charset=koi8-r">'.codeUnits;
       final result = enc.detectDeclaredEncoding(Uint8List.fromList(html));
       expect(result, 'koi8-r');
     });

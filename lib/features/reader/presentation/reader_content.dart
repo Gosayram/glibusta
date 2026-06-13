@@ -298,13 +298,23 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, _getReaderStyle(settings), textAlign, richSpans: block.richSpans),
+            child: _buildHighlightedText(
+              block.text,
+              _getReaderStyle(settings),
+              textAlign,
+              richSpans: block.richSpans,
+            ),
           ),
         );
     }
   }
 
-  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign, {List<RichSpan>? richSpans}) {
+  Widget _buildHighlightedText(
+    String text,
+    TextStyle style,
+    TextAlign textAlign, {
+    List<RichSpan>? richSpans,
+  }) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
       if (richSpans != null && richSpans.isNotEmpty) {
@@ -659,7 +669,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
   }
 
-  Widget _buildHighlightedText(String text, TextStyle style, TextAlign textAlign, {List<RichSpan>? richSpans}) {
+  Widget _buildHighlightedText(
+    String text,
+    TextStyle style,
+    TextAlign textAlign, {
+    List<RichSpan>? richSpans,
+  }) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
       if (richSpans != null && richSpans.isNotEmpty) {

@@ -215,11 +215,13 @@ void main() {
       final downloads = <BookDownloadedEvent>[];
       bus.on<BookDownloadedEvent>().listen(downloads.add);
       bus.fire(const BookImportedEvent(bookId: 'b1', format: 'epub'));
-      bus.fire(const BookDownloadedEvent(
-        bookId: 'b2',
-        filePath: '/f',
-        sizeBytes: 100,
-      ));
+      bus.fire(
+        const BookDownloadedEvent(
+          bookId: 'b2',
+          filePath: '/f',
+          sizeBytes: 100,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
       expect(downloads.length, 1);
       expect(downloads.first.bookId, 'b2');
