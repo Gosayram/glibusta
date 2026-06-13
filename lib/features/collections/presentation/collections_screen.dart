@@ -12,7 +12,7 @@ import 'smart_collections_provider.dart';
 
 final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
   final db = ref.watch(databaseProvider);
-  return db.getAllCollections();
+  return db.collectionDao.getAllCollections();
 });
 
 class CollectionsScreen extends ConsumerStatefulWidget {
@@ -192,7 +192,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     if (result != null && result.isNotEmpty && context.mounted) {
       final db = ref.read(databaseProvider);
-      await db.insertCollection(
+      await db.collectionDao.insertCollection(
         CollectionsCompanion.insert(
           id: const Uuid().v4(),
           name: result,
@@ -263,7 +263,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     if (confirmed == true && mounted) {
       final db = ref.read(databaseProvider);
-      await db.deleteCollection(id);
+      await db.collectionDao.deleteCollection(id);
       ref.invalidate(userCollectionsProvider);
     }
   }

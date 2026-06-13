@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -132,33 +133,70 @@ class BookOpenService {
               );
         } on TimeoutException {
           rethrow;
+        } on Object catch (e, st) {
+          _logger.severe(
+            'Legacy EPUB parser also failed: $e',
+            name: 'Reader',
+            error: e,
+            st: st,
+          );
+          rethrow;
         }
       }
     }
 
     try {
-      return await Isolate.run<NormalizedBook>(() {
-        return switch (bookFormat) {
-          BookFormat.fb2 => Fb2Parser().parseFile(filePath),
-          BookFormat.txt => TxtBookParser().parseFile(filePath),
-          BookFormat.epub => throw UnsupportedError('handled above'),
-          BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
-          BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
-          BookFormat.unknown => throw UnsupportedError('Unknown format'),
-        };
-      });
+      final file = File(filePath);
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw BookOpenFailure('Файл пуст: $filePath');
+      }
+      final fileName = filePath.split('/').last;
+
+      if (bookFormat == BookFormat.epub) {
+        final parser = _parsers[bookFormat];
+        if (parser == null) {
+          throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+        }
+        return await parser
+            .parse(bytes, fileName: fileName)
+            .timeout(
+              _parsingTimeout,
+              onTimeout: () => throw TimeoutException(
+                'Разбор ${bookFormat.name} занял слишком много времени.',
+              ),
+            );
+      }
+
+      final detector = BookEncodingDetector();
+      final detectionResult = await detector.detect(bytes, fileName: fileName);
+      final detectedText = detectionResult.text;
+
+      return await Isolate.run(() {
+        switch (bookFormat) {
+          case BookFormat.fb2:
+            return parseFb2FromText(detectedText, fileName: fileName);
+          case BookFormat.txt:
+            return parseTxtFromText(detectedText, fileName: fileName);
+          default:
+            throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+        }
+      }).timeout(
+        _parsingTimeout,
+        onTimeout: () => throw TimeoutException(
+          'Разбор ${bookFormat.name} занял слишком много времени.',
+        ),
+      );
+    } on TimeoutException {
+      rethrow;
     } on Object catch (e, st) {
       _logger.severe(
-        'Isolate parsing failed, trying sync fallback: $e',
+        'Parsing failed for $bookFormat: $e',
         name: 'Reader',
         error: e,
         st: st,
       );
-      final parser = _parsers[bookFormat];
-      if (parser == null) {
-        throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
-      }
-      return parser.parseFile(filePath);
+      rethrow;
     }
   }
 

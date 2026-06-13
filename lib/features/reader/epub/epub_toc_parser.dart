@@ -16,14 +16,16 @@ XmlElement? _findNav(XmlDocument doc) {
     final epubType = el.getAttribute('epub:type') ?? el.getAttribute('type') ?? '';
     if (epubType == 'toc') return el;
   }
-  return doc.findAllElements('nav').firstOrNull;
+  final navs = doc.findAllElements('nav');
+  if (navs.length == 1) return navs.first;
+  return null;
 }
 
 List<TocItem> _parseTocOl(XmlElement ol) {
   final items = <TocItem>[];
   for (final li in ol.findElements('li')) {
-    final a = li.findElements('a').firstOrNull;
-    final span = li.findElements('span').firstOrNull;
+    final a = _findDescendantElement(li, 'a');
+    final span = _findDescendantElement(li, 'span');
     final title = (a?.innerText ?? span?.innerText ?? '').trim();
     final href = a?.getAttribute('href') ?? '';
     final childOl = li.findElements('ol').firstOrNull;
@@ -38,6 +40,13 @@ List<TocItem> _parseTocOl(XmlElement ol) {
     }
   }
   return items;
+}
+
+XmlElement? _findDescendantElement(XmlElement parent, String localName) {
+  for (final el in parent.descendants) {
+    if (el is XmlElement && el.localName == localName) return el;
+  }
+  return null;
 }
 
 List<TocItem> parseNcx(String xmlText) {

@@ -19,7 +19,7 @@ class BookDeleteService {
   BookDeleteService(this._db) : _storage = AppFileStorageImpl();
 
   Future<void> removeFromLibrary(String bookId) async {
-    await _db.deleteBook(bookId);
+    await _db.bookDao.deleteBook(bookId);
     _logger.info('Removed from library: $bookId', name: 'BookDelete');
   }
 
@@ -28,19 +28,23 @@ class BookDeleteService {
       _db.downloads,
     )..where((d) => d.bookId.equals(bookId))).getSingleOrNull();
 
-    if (download?.targetPath != null) {
-      final file = File(download!.targetPath!);
-      if (await file.exists()) {
-        await file.delete();
-        _logger.info('Deleted file: ${download.targetPath}', name: 'BookDelete');
-      }
-    }
-
     await (_db.delete(_db.downloads)..where((d) => d.bookId.equals(bookId))).go();
     await (_db.delete(_db.readingProgress)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.quotes)..where((t) => t.bookId.equals(bookId))).go();
-    await _db.deleteBook(bookId);
+    await _db.bookDao.deleteBook(bookId);
+
+    if (download?.targetPath != null) {
+      try {
+        final file = File(download!.targetPath!);
+        if (await file.exists()) {
+          await file.delete();
+          _logger.info('Deleted file: ${download.targetPath}', name: 'BookDelete');
+        }
+      } on Object catch (e) {
+        _logger.warning('File deletion failed: $e', name: 'BookDelete', error: e);
+      }
+    }
 
     try {
       final cacheDir = await _storage.cacheDir();

@@ -79,6 +79,14 @@ class BookImportService {
     if (!_supportedExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return ImportResult.failure('Файл не найден: $filePath');
+    }
+    final size = await file.length();
+    if (size < 100) {
+      return ImportResult.failure('Файл слишком мал: $size байт');
+    }
     return _doImport(filePath);
   }
 
@@ -107,12 +115,14 @@ class BookImportService {
       return ImportResult.failure('Парсер для .$ext не найден');
     }
 
+    String? bookId;
     try {
       final book = await parser.parse(
         bytes,
         fileName: filePath.split('/').last,
         forcedEncoding: forcedEncoding,
       );
+      bookId = book.id;
 
       final targetFile = await _storage.bookFile(
         book.id,
@@ -163,6 +173,23 @@ class BookImportService {
       return ImportResult.success(book.title);
     } on Object catch (e) {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
+      if (bookId != null) {
+        try {
+          final ext = filePath.split('.').last.toLowerCase();
+          final targetFile = await _storage.bookFile(
+            bookId,
+            BookFormat.values.firstWhere(
+              (f) => f.name == ext,
+              orElse: () => BookFormat.epub,
+            ),
+          );
+          if (await targetFile.exists()) {
+            await targetFile.delete();
+          }
+        } on Object catch (_) {
+          // Best-effort cleanup: ignore if target file path can't be resolved
+        }
+      }
       return ImportResult.failure('Ошибка при импорте: $e');
     }
   }
@@ -347,5 +374,6 @@ class ImportBatchResult {
 
   int get successCount => results.where((r) => r.isSuccess).length;
   int get duplicateCount => results.where((r) => r.isDuplicate).length;
-  int get failureCount => results.where((r) => !r.isSuccess && !r.isDuplicate).length;
+  int get failureCount =>
+      results.where((r) => !r.isSuccess && !r.isDuplicate && !r.needsEncodingSelection).length;
 }

@@ -42,12 +42,12 @@ String? detectDeclaredEncoding(Uint8List bytes) {
 
   // HTML: <meta charset="windows-1251">
   // or: <meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
-  final htmlMeta = RegExp(
-    r'''charset\s*=\s*["']?([a-zA-Z0-9_\-]+)''',
+  final metaTag = RegExp(
+    r'''<meta[^>]+charset\s*=\s*["']?([a-zA-Z0-9_\-]+)''',
     caseSensitive: false,
   ).firstMatch(sample);
-  if (htmlMeta != null) {
-    return normalizeEncodingName(htmlMeta.group(1)!);
+  if (metaTag != null) {
+    return normalizeEncodingName(metaTag.group(1)!);
   }
 
   return null;

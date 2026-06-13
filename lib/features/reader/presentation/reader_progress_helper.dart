@@ -52,7 +52,7 @@ class ReaderProgressHelper {
     if (totalChapters == 0) return;
     final pos = position.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     unawaited(
-      _database.upsertReadingProgress(
+      _database.bookDao.upsertReadingProgress(
         ReadingProgressCompanion.insert(
           bookId: _bookId,
           currentPosition: Value(pos.chapterIndex),

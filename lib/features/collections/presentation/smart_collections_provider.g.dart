@@ -46,4 +46,4 @@ final class SmartCollectionsProvider
   }
 }
 
-String _$smartCollectionsHash() => r'7a09d1141d1dd45dbab9dc399dbad7c55d5ab41b';
+String _$smartCollectionsHash() => r'e2a79c8b3a3a06e3df565a1524fe7c6aa5cf5b18';

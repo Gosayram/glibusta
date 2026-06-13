@@ -1,11 +1,6 @@
 import '../data/parsers/normalized_book.dart';
 import 'epub_models.dart' as epub;
 
-/// Bridges the new EPUB engine models to the existing NormalizedBook model.
-///
-/// This allows the new CustomEpubParser to work with the existing reader
-/// infrastructure (BookOpenService, cache, controller, rendering) without
-/// breaking the data flow.
 class EpubBookAdapter {
   NormalizedBook toNormalizedBook(epub.EpubBook book, String bookId) {
     return NormalizedBook(
@@ -54,6 +49,7 @@ class EpubBookAdapter {
       epub.ParagraphBlock(:final spans) => ReaderBlock(
         index: index,
         text: spans.map((s) => s.text).join(),
+        richSpans: _toRichSpans(spans),
       ),
       epub.HeadingBlock(:final text) => ReaderBlock(
         index: index,
@@ -86,6 +82,24 @@ class EpubBookAdapter {
       ),
       epub.SectionBlock() => null,
     };
+  }
+
+  List<RichSpan>? _toRichSpans(List<epub.TextSpan> spans) {
+    final hasFormatting = spans.any(
+      (s) => s.bold || s.italic || s.superscript || s.href != null,
+    );
+    if (!hasFormatting) return null;
+    return spans
+        .map(
+          (s) => RichSpan(
+            text: s.text,
+            bold: s.bold,
+            italic: s.italic,
+            superscript: s.superscript,
+            href: s.href,
+          ),
+        )
+        .toList();
   }
 
   String _formatList(bool ordered, List<String> items) {

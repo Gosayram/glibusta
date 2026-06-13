@@ -248,8 +248,10 @@ final class EpubHtmlParser {
     final rows = <List<String>>[];
     for (final tr in el.findAllElements('tr')) {
       final cells = <String>[];
-      for (final cell in tr.findAllElements('td').followedBy(tr.findAllElements('th'))) {
-        cells.add(cell.innerText.trim());
+      for (final child in tr.childElements) {
+        if (child.localName == 'td' || child.localName == 'th') {
+          cells.add(child.innerText.trim());
+        }
       }
       if (cells.isNotEmpty) rows.add(cells);
     }
@@ -259,9 +261,7 @@ final class EpubHtmlParser {
   bool _isPageBreak(XmlElement el) {
     final epubType = el.getAttribute('epub:type');
     if (epubType == 'pagebreak') return true;
-    if (el.localName == 'span' && el.getAttribute('title') != null) {
-      return epubType == 'pagebreak';
-    }
+    if (el.localName == 'hr' && el.getAttribute('role') == 'separator') return true;
     return false;
   }
 }

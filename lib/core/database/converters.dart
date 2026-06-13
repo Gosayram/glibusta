@@ -8,7 +8,15 @@ class StringListConverter extends TypeConverter<List<String>, String> {
   @override
   List<String> fromSql(String fromDb) {
     if (fromDb.isEmpty) return [];
-    return List<String>.from(jsonDecode(fromDb) as List<dynamic>);
+    try {
+      final decoded = jsonDecode(fromDb);
+      if (decoded is List) {
+        return decoded.map((e) => e?.toString() ?? '').toList();
+      }
+      return [];
+    } on Object {
+      return [];
+    }
   }
 
   @override

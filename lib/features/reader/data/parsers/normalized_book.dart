@@ -131,6 +131,7 @@ class ReaderBlock {
   final BlockType type;
   final String? imageUrl;
   final String? noteRef;
+  final List<RichSpan>? richSpans;
 
   const ReaderBlock({
     required this.index,
@@ -138,6 +139,7 @@ class ReaderBlock {
     this.type = BlockType.paragraph,
     this.imageUrl,
     this.noteRef,
+    this.richSpans,
   });
 
   Map<String, dynamic> toJson() => {
@@ -146,6 +148,8 @@ class ReaderBlock {
     'type': type.name,
     'imageUrl': imageUrl,
     'noteRef': noteRef,
+    if (richSpans != null && richSpans!.isNotEmpty)
+      'richSpans': richSpans!.map((s) => s.toJson()).toList(),
   };
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
@@ -157,6 +161,41 @@ class ReaderBlock {
     ),
     imageUrl: json['imageUrl'] as String?,
     noteRef: json['noteRef'] as String?,
+    richSpans: (json['richSpans'] as List<dynamic>?)
+        ?.map((s) => RichSpan.fromJson(s as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
+class RichSpan {
+  final String text;
+  final bool bold;
+  final bool italic;
+  final bool superscript;
+  final String? href;
+
+  const RichSpan({
+    required this.text,
+    this.bold = false,
+    this.italic = false,
+    this.superscript = false,
+    this.href,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'text': text,
+    if (bold) 'bold': true,
+    if (italic) 'italic': true,
+    if (superscript) 'superscript': true,
+    if (href != null) 'href': href,
+  };
+
+  factory RichSpan.fromJson(Map<String, dynamic> json) => RichSpan(
+    text: json['text'] as String,
+    bold: json['bold'] as bool? ?? false,
+    italic: json['italic'] as bool? ?? false,
+    superscript: json['superscript'] as bool? ?? false,
+    href: json['href'] as String?,
   );
 }
 

@@ -130,6 +130,14 @@ class ReaderPosition {
   }
 
   ReaderPosition clamp({required int chapterCount}) {
+    if (chapterCount <= 0) {
+      return ReaderPosition(
+        bookId: bookId,
+        chapterIndex: 0,
+        paragraphIndex: 0,
+        updatedAt: updatedAt,
+      );
+    }
     final lastChapter = chapterCount <= 1 ? 0 : chapterCount - 1;
     return ReaderPosition(
       bookId: bookId,

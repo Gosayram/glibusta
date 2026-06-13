@@ -16,6 +16,7 @@ part 'search_controller.g.dart';
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
+  CancelToken? _authorToken;
   AppLogger get _logger => ref.read(appLoggerProvider);
 
   @override
@@ -23,6 +24,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     ref.onDispose(() {
       _currentToken?.cancel();
       _currentToken = null;
+      _authorToken?.cancel();
+      _authorToken = null;
     });
     return const SearchState();
   }
@@ -39,7 +42,10 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     _logger.info('Searching: "$normalized"', name: 'Search');
 
     _currentToken?.cancel();
+    _authorToken?.cancel();
     _currentToken = CancelToken();
+    _authorToken = CancelToken();
+    final localAuthorToken = _authorToken;
     state = state.copyWith(
       isLoading: true,
       lastQuery: normalized,
@@ -56,7 +62,6 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       SearchAuthorsResultPage authorResult;
 
       final bookToken = CancelToken();
-      final authorToken = CancelToken();
       _currentToken = bookToken;
 
       Object? bookError;
@@ -78,7 +83,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       if (!ref.mounted) return;
 
       try {
-        authorResult = await _source.searchAuthors(searchQuery, cancelToken: authorToken);
+        authorResult = await _source.searchAuthors(searchQuery, cancelToken: localAuthorToken);
       } on Object catch (e) {
         _logger.warning('Author search failed: $e', name: 'Search', error: e);
         authorResult = const SearchAuthorsResultPage(authors: []);
@@ -213,6 +218,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
   void clearResults() {
     _currentToken?.cancel();
     _currentToken = null;
+    _authorToken?.cancel();
+    _authorToken = null;
     state = state.copyWith(
       books: const [],
       authors: const [],

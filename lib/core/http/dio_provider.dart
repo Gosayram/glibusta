@@ -115,10 +115,12 @@ class _RetryInterceptor extends Interceptor {
     );
 
     try {
+      final requestOptions = err.requestOptions;
+      final uri = requestOptions.uri;
       final response = await _dio.request<dynamic>(
-        err.requestOptions.path,
-        data: err.requestOptions.data,
-        queryParameters: err.requestOptions.queryParameters,
+        uri.toString(),
+        data: requestOptions.data,
+        queryParameters: requestOptions.queryParameters,
         options: options,
       );
       _logger.info(

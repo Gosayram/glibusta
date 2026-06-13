@@ -574,7 +574,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Navigator.of(context).pop();
               unawaited(ref.read(storageModeProvider.notifier).updateMode(mode));
               if (mode == StorageMode.downloads || mode == StorageMode.external) {
-                unawaited(_pickFolder(context, ref, mode));
+                unawaited(_pickFolder(this.context, ref, mode));
               }
             },
             child: Row(

@@ -65,7 +65,7 @@ class HttpClient {
   Future<String> getUriWithFallback(Uri uri, {CancelToken? cancelToken}) async {
     try {
       return await getUri(uri, cancelToken: cancelToken);
-    } on Object catch (_) {
+    } on HttpException catch (_) {
       return _rawGet(uri);
     }
   }
@@ -161,6 +161,7 @@ class HttpClient {
     String url,
     String savePath, {
     void Function(int received, int total)? onProgress,
+    Future<void>? onCancel,
   }) async {
     final uri = Uri.parse(url);
     final client = io.HttpClient()
@@ -197,29 +198,56 @@ class HttpClient {
 
       final file = io.File(savePath);
       final sink = file.openWrite();
-      int received = 0;
-      final total = response.contentLength;
-
-      await for (final chunk in response) {
-        sink.add(chunk);
-        received += chunk.length;
-        if (onProgress != null) {
-          onProgress(received, total > 0 ? total : 0);
-        }
+      var cancelled = false;
+      if (onCancel != null) {
+        unawaited(
+          onCancel
+              .then((_) {
+                cancelled = true;
+              })
+              .catchError((_) {}),
+        );
       }
-      await sink.close();
+      try {
+        int received = 0;
+        final total = response.contentLength;
 
-      if (received == 0) {
-        throw HttpException(message: 'Empty download', url: url);
-      }
+        await for (final chunk in response) {
+          if (cancelled) break;
 
-      final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
-      if (contentType.contains('text/html') || contentType.contains('text/plain')) {
-        final body = await file.readAsString();
-        if (body.contains('Книга не найдена') || body.contains('<html')) {
-          await file.delete();
-          throw HttpException(message: 'Server returned HTML instead of book file', url: url);
+          sink.add(chunk);
+          received += chunk.length;
+          if (onProgress != null) {
+            onProgress(received, total);
+          }
         }
+        await sink.close();
+
+        if (cancelled) {
+          try {
+            if (await file.exists()) await file.delete();
+          } on Object {
+            // Best-effort: ignore file deletion errors
+          }
+          throw HttpException(message: 'Cancelled', url: url);
+        }
+
+        if (received == 0) {
+          throw HttpException(message: 'Empty download', url: url);
+        }
+
+        final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
+        if (contentType.contains('text/html') || contentType.contains('text/plain')) {
+          final bytes = await file.readAsBytes();
+          final result = await _encodingDetector.detect(bytes);
+          if (result.text.contains('Книга не найдена') || result.text.contains('<html')) {
+            await file.delete();
+            throw HttpException(message: 'Server returned HTML instead of book file', url: url);
+          }
+        }
+      } on Object {
+        await sink.close().catchError((_) {});
+        rethrow;
       }
     } finally {
       client.close(force: true);

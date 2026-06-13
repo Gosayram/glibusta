@@ -44,7 +44,7 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
   // Get all reading progress
   final progressMap = <String, ReadingProgressData>{};
   for (final book in allBooks) {
-    final progress = await db.getReadingProgress(book.id);
+    final progress = await db.bookDao.getReadingProgress(book.id);
     if (progress != null) {
       progressMap[book.id] = progress;
     }

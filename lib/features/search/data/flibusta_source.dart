@@ -220,8 +220,17 @@ class FlibustaHtmlSource extends BookSource {
     final hasNext = pager.querySelector('.pager-next') != null;
     final hasPrevious = pager.querySelector('.pager-previous') != null;
 
+    int totalPages = 1;
+    for (final item in pagerItems) {
+      final text = item.text.trim();
+      final pageNum = int.tryParse(text);
+      if (pageNum != null && pageNum > totalPages) {
+        totalPages = pageNum;
+      }
+    }
+
     return {
-      'total_pages': pagerItems.isNotEmpty ? pagerItems.length : 1,
+      'total_pages': totalPages,
       'has_next': hasNext,
       'has_previous': hasPrevious,
     };

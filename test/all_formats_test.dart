@@ -119,7 +119,7 @@ void main() {
       expect(detectBookFormat('book.txt'), BookFormat.txt);
       expect(detectBookFormat('book.pdf'), BookFormat.pdf);
       expect(detectBookFormat('book.mobi'), BookFormat.mobi);
-      expect(detectBookFormat('book.zip'), BookFormat.fb2);
+      expect(detectBookFormat('book.zip'), BookFormat.unknown);
     });
   });
 }
