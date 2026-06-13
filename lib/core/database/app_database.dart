@@ -62,43 +62,46 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       await _backupDatabase(from);
       await customStatement('PRAGMA foreign_keys = OFF');
-      await transaction(() async {
-        if (from < 2) {
-          await m.addColumn(savedBooks, savedBooks.contentHash);
-          await m.addColumn(savedBooks, savedBooks.fileSize);
-        }
-        if (from < 3) {
-          await m.addColumn(savedBooks, savedBooks.filePath);
-        }
-        if (from < 4) {
-          await m.createTable(readingSessions);
-        }
-        if (from < 5) {
-          await m.addColumn(readingProgress, readingProgress.chapterIndex);
-          await m.addColumn(readingProgress, readingProgress.paragraphIndex);
-          await m.addColumn(readingProgress, readingProgress.localOffset);
-          await m.addColumn(readingProgress, readingProgress.progressPercent);
-          await m.addColumn(readingProgress, readingProgress.updatedAt);
-        }
-        if (from < 6) {
-          await m.addColumn(savedBooks, savedBooks.readingStatus);
-        }
-        if (from < 7) {
-          await m.addColumn(savedBooks, savedBooks.detectedEncoding);
-          await m.addColumn(savedBooks, savedBooks.encodingConfidence);
-          await m.addColumn(savedBooks, savedBooks.encodingSource);
-          await m.addColumn(savedBooks, savedBooks.userForcedEncoding);
-        }
-        if (from < 8) {
-          await m.addColumn(savedBooks, savedBooks.storageMode);
-          await m.addColumn(savedBooks, savedBooks.externalUri);
-        }
-        if (from < 9) {
-          await m.addColumn(savedBooks, savedBooks.coverPath);
-          await m.addColumn(savedBooks, savedBooks.coverStatus);
-        }
-      });
-      await customStatement('PRAGMA foreign_keys = ON');
+      try {
+        await transaction(() async {
+          if (from < 2) {
+            await m.addColumn(savedBooks, savedBooks.contentHash);
+            await m.addColumn(savedBooks, savedBooks.fileSize);
+          }
+          if (from < 3) {
+            await m.addColumn(savedBooks, savedBooks.filePath);
+          }
+          if (from < 4) {
+            await m.createTable(readingSessions);
+          }
+          if (from < 5) {
+            await m.addColumn(readingProgress, readingProgress.chapterIndex);
+            await m.addColumn(readingProgress, readingProgress.paragraphIndex);
+            await m.addColumn(readingProgress, readingProgress.localOffset);
+            await m.addColumn(readingProgress, readingProgress.progressPercent);
+            await m.addColumn(readingProgress, readingProgress.updatedAt);
+          }
+          if (from < 6) {
+            await m.addColumn(savedBooks, savedBooks.readingStatus);
+          }
+          if (from < 7) {
+            await m.addColumn(savedBooks, savedBooks.detectedEncoding);
+            await m.addColumn(savedBooks, savedBooks.encodingConfidence);
+            await m.addColumn(savedBooks, savedBooks.encodingSource);
+            await m.addColumn(savedBooks, savedBooks.userForcedEncoding);
+          }
+          if (from < 8) {
+            await m.addColumn(savedBooks, savedBooks.storageMode);
+            await m.addColumn(savedBooks, savedBooks.externalUri);
+          }
+          if (from < 9) {
+            await m.addColumn(savedBooks, savedBooks.coverPath);
+            await m.addColumn(savedBooks, savedBooks.coverStatus);
+          }
+        });
+      } finally {
+        await customStatement('PRAGMA foreign_keys = ON');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA journal_mode = WAL');
