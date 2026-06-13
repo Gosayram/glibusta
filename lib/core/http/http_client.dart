@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
 
@@ -240,13 +239,8 @@ class HttpClient {
         final contentType = response.headers.value(io.HttpHeaders.contentTypeHeader) ?? '';
         if (contentType.contains('text/html') || contentType.contains('text/plain')) {
           final bytes = await file.readAsBytes();
-          String body;
-          try {
-            body = utf8.decode(bytes, allowMalformed: true);
-          } on Object {
-            body = String.fromCharCodes(bytes);
-          }
-          if (body.contains('Книга не найдена') || body.contains('<html')) {
+          final result = await _encodingDetector.detect(bytes);
+          if (result.text.contains('Книга не найдена') || result.text.contains('<html')) {
             await file.delete();
             throw HttpException(message: 'Server returned HTML instead of book file', url: url);
           }
