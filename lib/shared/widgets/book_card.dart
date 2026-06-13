@@ -262,9 +262,16 @@ class _BookCardState extends State<BookCard> {
     final container = ProviderScope.containerOf(context);
     final db = container.read(databaseProvider);
     unawaited(
-      db.bookDao.updateReadingStatus(widget.book.id, status.name).then((_) {
-        container.invalidate(libraryBooksProvider);
-      }),
+      db.bookDao
+          .updateReadingStatus(widget.book.id, status.name)
+          .then(
+            (_) {
+              container.invalidate(libraryBooksProvider);
+            },
+            onError: (_) {
+              container.invalidate(libraryBooksProvider);
+            },
+          ),
     );
   }
 
