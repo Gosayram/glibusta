@@ -24,20 +24,20 @@ class DownloadRepositoryImpl implements DownloadRepository {
 
   @override
   Stream<List<DownloadTask>> watchAllDownloads() {
-    return _db.watchAllDownloads().map((List<Download> rows) {
+    return _db.downloadDao.watchAllDownloads().map((List<Download> rows) {
       return rows.map(_rowToTask).toList();
     });
   }
 
   @override
   Future<List<DownloadTask>> getAllDownloads() async {
-    final rows = await _db.getAllDownloads();
+    final rows = await _db.downloadDao.getAllDownloads();
     return rows.map(_rowToTask).toList();
   }
 
   @override
   Future<DownloadTask?> getDownloadById(String id) async {
-    final row = await _db.getDownloadById(id);
+    final row = await _db.downloadDao.getDownloadById(id);
     if (row == null) return null;
     return _rowToTask(row);
   }
@@ -55,7 +55,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
     final bookFile = await _storage.bookFile(bookId, format);
     final targetPath = bookFile.path;
 
-    await _db.insertDownload(
+    await _db.downloadDao.insertDownload(
       DownloadsCompanion(
         id: Value(taskId),
         bookId: Value(bookId),
@@ -86,23 +86,23 @@ class DownloadRepositoryImpl implements DownloadRepository {
     int downloaded,
     int total,
   ) async {
-    await _db.updateDownloadProgress(taskId, downloaded, total);
+    await _db.downloadDao.updateDownloadProgress(taskId, downloaded, total);
   }
 
   @override
   Future<void> updateStatus(String taskId, DownloadStatus status) async {
     final driftStatus = _statusToDrift(status);
-    await _db.updateDownloadStatus(taskId, driftStatus);
+    await _db.downloadDao.updateDownloadStatus(taskId, driftStatus);
   }
 
   @override
   Future<void> cancelDownload(String taskId) async {
-    await _db.updateDownloadStatus(taskId, DownloadStatusDb.canceled);
+    await _db.downloadDao.updateDownloadStatus(taskId, DownloadStatusDb.canceled);
   }
 
   @override
   Future<void> removeDownload(String taskId) async {
-    await _db.deleteDownload(taskId);
+    await _db.downloadDao.deleteDownload(taskId);
   }
 
   DownloadTask _rowToTask(Download row) {

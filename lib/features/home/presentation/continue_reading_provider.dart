@@ -59,7 +59,7 @@ Future<List<ContinueReadingInfo>> continueReadingInfos(Ref ref) async {
   final infos = <ContinueReadingInfo>[];
 
   for (final book in books) {
-    final ReadingProgressData? progress = await db.getReadingProgress(book.id);
+    final ReadingProgressData? progress = await db.bookDao.getReadingProgress(book.id);
     if (progress == null) continue;
 
     final cachedBook = await bookOpenService.getCachedBook(book.id);

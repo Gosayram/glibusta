@@ -17,19 +17,19 @@ class BookRepositoryImpl implements BookRepository {
 
   @override
   Future<List<Book>> getAllBooks() async {
-    final rows = await _db.getAllBooks();
+    final rows = await _db.bookDao.getAllBooks();
     return _resolveAuthors(rows);
   }
 
   @override
   Future<List<Book>> getBooksWithProgress() async {
-    final rows = await _db.getBooksWithProgress();
+    final rows = await _db.bookDao.getBooksWithProgress();
     return _resolveAuthors(rows);
   }
 
   @override
   Future<Book?> getBookById(String id) async {
-    final row = await _db.getBookById(id);
+    final row = await _db.bookDao.getBookById(id);
     if (row == null) return null;
     final books = await _resolveAuthors([row]);
     return books.first;
@@ -37,7 +37,7 @@ class BookRepositoryImpl implements BookRepository {
 
   @override
   Future<void> saveBook(Book book) async {
-    await _db.insertBook(
+    await _db.bookDao.insertBook(
       SavedBooksCompanion(
         id: Value(book.id),
         title: Value(book.title),
@@ -54,12 +54,12 @@ class BookRepositoryImpl implements BookRepository {
 
   @override
   Future<void> deleteBook(String id) async {
-    await _db.deleteBook(id);
+    await _db.bookDao.deleteBook(id);
   }
 
   @override
   Future<bool> isBookInLibrary(String id) async {
-    final book = await _db.getBookById(id);
+    final book = await _db.bookDao.getBookById(id);
     return book != null;
   }
 
@@ -70,7 +70,7 @@ class BookRepositoryImpl implements BookRepository {
         allAuthorIds.addAll(row.authorIds);
       }
     }
-    final nameMap = await _db.getAuthorNamesByIds(allAuthorIds.toList());
+    final nameMap = await _db.authorDao.getAuthorNamesByIds(allAuthorIds.toList());
     return rows.map((row) => _rowToBook(row, nameMap)).toList();
   }
 

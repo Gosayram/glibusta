@@ -11,7 +11,7 @@ final seriesForBookProvider = FutureProvider.autoDispose.family<List<Sery>, Stri
   bookId,
 ) async {
   final db = ref.watch(databaseProvider);
-  return db.getSeriesForBook(bookId);
+  return db.seriesDao.getSeriesForBook(bookId);
 });
 
 final chaptersForBookProvider = FutureProvider.autoDispose.family<NormalizedBook?, String>((
@@ -31,7 +31,7 @@ final bookmarksForBookProvider = FutureProvider.autoDispose.family<List<Bookmark
   bookId,
 ) async {
   final db = ref.watch(databaseProvider);
-  return db.getBookmarksForBook(bookId);
+  return db.bookmarkDao.getBookmarksForBook(bookId);
 });
 
 final quotesForBookProvider = FutureProvider.autoDispose.family<List<Quote>, String>((
@@ -39,7 +39,7 @@ final quotesForBookProvider = FutureProvider.autoDispose.family<List<Quote>, Str
   bookId,
 ) async {
   final db = ref.watch(databaseProvider);
-  return db.getQuotesForBook(bookId);
+  return db.bookmarkDao.getQuotesForBook(bookId);
 });
 
 final commentsForBookProvider = FutureProvider.autoDispose.family<List<BookComment>, String>((

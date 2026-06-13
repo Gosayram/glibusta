@@ -9,19 +9,19 @@ part 'series_provider.g.dart';
 @riverpod
 Future<List<SeriesInfo>> allSeries(Ref ref) async {
   final db = ref.watch(databaseProvider);
-  final seriesList = await db.getAllSeries();
+  final seriesList = await db.seriesDao.getAllSeries();
   final infos = <SeriesInfo>[];
 
   for (final s in seriesList) {
-    final bookSeriesRows = await db.getBooksInSeries(s.id);
+    final bookSeriesRows = await db.seriesDao.getBooksInSeries(s.id);
     if (bookSeriesRows.isEmpty) continue;
     final bookIds = bookSeriesRows.map((r) => r.bookId).toList();
     final books = <Book>[];
     for (final id in bookIds) {
-      final row = await db.getBookById(id);
+      final row = await db.bookDao.getBookById(id);
       if (row != null) {
         final authorIds = row.authorIds;
-        final nameMap = await db.getAuthorNamesByIds(authorIds);
+        final nameMap = await db.authorDao.getAuthorNamesByIds(authorIds);
         books.add(
           Book(
             id: row.id,
@@ -59,10 +59,10 @@ Future<List<SeriesInfo>> allSeries(Ref ref) async {
 @riverpod
 Future<SeriesDetail?> seriesDetail(Ref ref, String seriesId) async {
   final db = ref.watch(databaseProvider);
-  final s = await db.getSeriesById(seriesId);
+  final s = await db.seriesDao.getSeriesById(seriesId);
   if (s == null) return null;
 
-  final bookSeriesRows = await db.getBooksInSeries(seriesId);
+  final bookSeriesRows = await db.seriesDao.getBooksInSeries(seriesId);
   if (bookSeriesRows.isEmpty) {
     return SeriesDetail(
       id: s.id,

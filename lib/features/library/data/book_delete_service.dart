@@ -19,7 +19,7 @@ class BookDeleteService {
   BookDeleteService(this._db) : _storage = AppFileStorageImpl();
 
   Future<void> removeFromLibrary(String bookId) async {
-    await _db.deleteBook(bookId);
+    await _db.bookDao.deleteBook(bookId);
     _logger.info('Removed from library: $bookId', name: 'BookDelete');
   }
 
@@ -28,7 +28,7 @@ class BookDeleteService {
     await (_db.delete(_db.readingProgress)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.quotes)..where((t) => t.bookId.equals(bookId))).go();
-    await _db.deleteBook(bookId);
+    await _db.bookDao.deleteBook(bookId);
 
     final download = await (_db.select(
       _db.downloads,

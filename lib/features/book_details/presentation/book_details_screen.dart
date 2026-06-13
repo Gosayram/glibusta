@@ -28,7 +28,7 @@ final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, 
   bookId,
 ) async {
   final db = ref.watch(databaseProvider);
-  return db.getReadingProgress(bookId);
+  return db.bookDao.getReadingProgress(bookId);
 });
 
 class BookDetailsScreen extends ConsumerWidget {

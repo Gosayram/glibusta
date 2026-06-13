@@ -46,7 +46,7 @@ final class AllSeriesProvider
   }
 }
 
-String _$allSeriesHash() => r'1dab956b98446f5d0e5bd55adf8b453ff4cafbd0';
+String _$allSeriesHash() => r'3c6061a387bf0ee6e633e0ab125432fe90c405e6';
 
 @ProviderFor(seriesDetail)
 final seriesDetailProvider = SeriesDetailFamily._();
@@ -98,7 +98,7 @@ final class SeriesDetailProvider
   }
 }
 
-String _$seriesDetailHash() => r'87164dd31d00dee75f221f0b5e17667aec2903ea';
+String _$seriesDetailHash() => r'112c8c19e070948b1a9fb7e6682c9141a6eb297e';
 
 final class SeriesDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<SeriesDetail?>, String> {
