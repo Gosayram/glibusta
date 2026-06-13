@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -150,21 +152,41 @@ class BookOpenService {
         throw BookOpenFailure('Файл пуст: $filePath');
       }
       final fileName = filePath.split('/').last;
-      final parser = _parsers[bookFormat];
-      if (parser == null) {
-        throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+
+      if (bookFormat == BookFormat.epub) {
+        final parser = _parsers[bookFormat];
+        if (parser == null) {
+          throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+        }
+        return await parser
+            .parse(bytes, fileName: fileName)
+            .timeout(
+              _parsingTimeout,
+              onTimeout: () => throw TimeoutException(
+                'Разбор ${bookFormat.name} занял слишком много времени.',
+              ),
+            );
       }
-      return await parser
-          .parse(
-            bytes,
-            fileName: fileName,
-          )
-          .timeout(
-            _parsingTimeout,
-            onTimeout: () => throw TimeoutException(
-              'Разбор ${bookFormat.name} занял слишком много времени.',
-            ),
-          );
+
+      final detector = BookEncodingDetector();
+      final detectionResult = await detector.detect(bytes, fileName: fileName);
+      final detectedText = detectionResult.text;
+
+      return await Isolate.run(() {
+        switch (bookFormat) {
+          case BookFormat.fb2:
+            return parseFb2FromText(detectedText, fileName: fileName);
+          case BookFormat.txt:
+            return parseTxtFromText(detectedText, fileName: fileName);
+          default:
+            throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+        }
+      }).timeout(
+        _parsingTimeout,
+        onTimeout: () => throw TimeoutException(
+          'Разбор ${bookFormat.name} занял слишком много времени.',
+        ),
+      );
     } on TimeoutException {
       rethrow;
     } on Object catch (e, st) {

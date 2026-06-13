@@ -73,33 +73,32 @@ final class TxtBookParser implements BookParser {
   }
 
   NormalizedBook _textToBook(String text, {required String fileName}) {
-    final paragraphs = text
-        .split(RegExp(r'\n\s*\n'))
-        .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    final blocks = <ReaderBlock>[];
-    for (var i = 0; i < paragraphs.length; i++) {
-      blocks.add(
-        ReaderBlock(
-          index: i,
-          text: paragraphs[i],
-        ),
-      );
-    }
-
-    return NormalizedBook(
-      id: fileName,
-      title: fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
-      authors: const [],
-      chapters: [
-        ReaderChapter(
-          index: 0,
-          title: 'Текст',
-          blocks: blocks,
-        ),
-      ],
-    );
+    return parseTxtFromText(text, fileName: fileName);
   }
+}
+
+NormalizedBook parseTxtFromText(String text, {required String fileName}) {
+  final paragraphs = text
+      .split(RegExp(r'\n\s*\n'))
+      .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  final blocks = <ReaderBlock>[];
+  for (var i = 0; i < paragraphs.length; i++) {
+    blocks.add(ReaderBlock(index: i, text: paragraphs[i]));
+  }
+
+  return NormalizedBook(
+    id: fileName,
+    title: fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
+    authors: const [],
+    chapters: [
+      ReaderChapter(
+        index: 0,
+        title: 'Текст',
+        blocks: blocks,
+      ),
+    ],
+  );
 }
