@@ -347,5 +347,6 @@ class ImportBatchResult {
 
   int get successCount => results.where((r) => r.isSuccess).length;
   int get duplicateCount => results.where((r) => r.isDuplicate).length;
-  int get failureCount => results.where((r) => !r.isSuccess && !r.isDuplicate).length;
+  int get failureCount =>
+      results.where((r) => !r.isSuccess && !r.isDuplicate && !r.needsEncodingSelection).length;
 }

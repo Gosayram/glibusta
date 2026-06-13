@@ -37,8 +37,8 @@ void main() {
       expect(sanitizeId('a|b'), 'a_b');
     });
 
-    test('replaces dots', () {
-      expect(sanitizeId('file.name'), 'file_name');
+    test('preserves dots (safe in filenames)', () {
+      expect(sanitizeId('file.name'), 'file.name');
     });
 
     test('leaves normal id unchanged', () {

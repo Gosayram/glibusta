@@ -246,6 +246,14 @@ void main() {
       );
     });
 
+    test('fire after dispose does not add to history', () {
+      final bus = EventBus();
+      bus.fire(const BookImportedEvent(bookId: 'a', format: 'epub'));
+      bus.dispose();
+      bus.fire(const BookImportedEvent(bookId: 'b', format: 'epub'));
+      expect(bus.history.length, 1);
+    });
+
     test('history returns events in order', () {
       final bus = EventBus(historySize: 5);
       bus.fire(const BookImportedEvent(bookId: '1', format: 'epub'));

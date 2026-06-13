@@ -205,26 +205,46 @@ class AppLogger {
 class _RingBuffer<T> {
   _RingBuffer(this._capacity);
   final int _capacity;
-  final List<T> _list = [];
-  int _start = 0;
+  late List<T?> _list = List<T?>.filled(_capacity, null);
+  int _head = 0;
+  int _count = 0;
 
-  int get length => _list.length;
-  bool get isFull => _list.length >= _capacity;
+  int get length => _count;
+  bool get isFull => _count >= _capacity;
 
   void add(T item) {
     if (isFull) {
-      _list[_start % _capacity] = item;
-      _start++;
+      _list[_head % _capacity] = item;
+      _head++;
     } else {
-      _list.add(item);
+      _list[_count] = item;
+      _count++;
     }
   }
 
-  List<T> toList() => List<T>.from(_list);
-  T? get last => _list.isEmpty ? null : _list.last;
+  List<T> toList() {
+    if (_count < _capacity) {
+      return List<T>.from(_list.sublist(0, _count));
+    }
+    final result = <T>[];
+    for (var i = 0; i < _capacity; i++) {
+      final idx = (_head + i) % _capacity;
+      final item = _list[idx];
+      if (item != null) result.add(item);
+    }
+    return result;
+  }
+
+  T? get last {
+    if (_count == 0) return null;
+    if (_count < _capacity) return _list[_count - 1];
+    return _list[(_head - 1 + _capacity) % _capacity];
+  }
+
   void clear() {
-    _list.clear();
-    _start = 0;
+    _list = List<T?>.filled(_capacity, null);
+    _head = 0;
+    _count = 0;
   }
 }
 

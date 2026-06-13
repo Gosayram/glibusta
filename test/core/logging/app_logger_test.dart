@@ -153,8 +153,38 @@ void main() {
         logger.log('INFO', 'msg $i');
       }
       expect(logger.entries.length, 10);
-      expect(logger.entries.first.message, 'msg 10');
-      expect(logger.entries.last.message, 'msg 9');
+      expect(logger.entries.first.message, 'msg 5');
+      expect(logger.entries.last.message, 'msg 14');
+    });
+
+    test('ring buffer wrap maintains chronological order in entries', () {
+      for (var i = 0; i < 25; i++) {
+        logger.log('INFO', 'item $i');
+      }
+      final messages = logger.entries.map((e) => e.message).toList();
+      expect(messages, [
+        'item 15', 'item 16', 'item 17', 'item 18', 'item 19',
+        'item 20', 'item 21', 'item 22', 'item 23', 'item 24',
+      ]);
+    });
+
+    test('ring buffer last is correct after wrap', () {
+      for (var i = 0; i < 20; i++) {
+        logger.log('INFO', 'item $i');
+      }
+      expect(logger.lastEntry?.message, 'item 19');
+    });
+
+    test('ring buffer toList order is chronological after wrap', () {
+      for (var i = 0; i < 15; i++) {
+        logger.log('INFO', 'item $i');
+      }
+      final list = logger.entries;
+      for (var i = 1; i < list.length; i++) {
+        final prev = int.parse(list[i - 1].message.split(' ')[1]);
+        final curr = int.parse(list[i].message.split(' ')[1]);
+        expect(curr, greaterThan(prev));
+      }
     });
 
     test('clear empties entries', () {

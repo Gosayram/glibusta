@@ -14,7 +14,7 @@ abstract interface class AppFileStorage {
   Future<Directory> cacheDir();
 }
 
-String sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|.]'), '_');
+String sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
 
 class AppFileStorageImpl implements AppFileStorage {
   @override

@@ -28,8 +28,8 @@ void main() {
       expect(detectBookFormat('BOOK.MOBI'), BookFormat.mobi);
     });
 
-    test('detects zip as fb2', () {
-      expect(detectBookFormat('book.zip'), BookFormat.fb2);
+    test('zip is unknown (cannot determine content without inspection)', () {
+      expect(detectBookFormat('book.zip'), BookFormat.unknown);
     });
 
     test('unknown format for unsupported extension', () {
@@ -41,7 +41,7 @@ void main() {
 
     test('handles paths with multiple dots', () {
       expect(detectBookFormat('my.book.name.epub'), BookFormat.epub);
-      expect(detectBookFormat('file.name.fb2.zip'), BookFormat.fb2);
+      expect(detectBookFormat('file.name.fb2.zip'), BookFormat.unknown);
     });
 
     test('handles no extension', () {

@@ -48,6 +48,22 @@ void main() {
       expect(clamped.chapterIndex, 0);
     });
 
+    test('clamp resets all fields when chapterCount is 0', () {
+      final pos = ReaderPosition(
+        bookId: 'b1',
+        chapterIndex: 5,
+        paragraphIndex: 3,
+        localOffset: 50.0,
+        progressPercent: 0.5,
+        updatedAt: DateTime(2026),
+      );
+      final clamped = pos.clamp(chapterCount: 0);
+      expect(clamped.chapterIndex, 0);
+      expect(clamped.paragraphIndex, 0);
+      expect(clamped.localOffset, 0.0);
+      expect(clamped.progressPercent, 0.0);
+    });
+
     test('clamp paragraphIndex minimum is 0', () {
       final pos = ReaderPosition(
         bookId: 'b1',

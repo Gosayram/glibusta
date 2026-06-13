@@ -190,10 +190,9 @@ class EventBus {
   AppEvent? get lastEvent => _history.last;
 
   void fire(AppEvent event) {
+    if (_controller.isClosed) return;
     _history.add(event);
-    if (!_controller.isClosed) {
-      _controller.add(event);
-    }
+    _controller.add(event);
   }
 
   Stream<T> on<T extends AppEvent>() {
