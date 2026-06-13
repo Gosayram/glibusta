@@ -131,6 +131,14 @@ class BookOpenService {
               );
         } on TimeoutException {
           rethrow;
+        } on Object catch (e, st) {
+          _logger.severe(
+            'Legacy EPUB parser also failed: $e',
+            name: 'Reader',
+            error: e,
+            st: st,
+          );
+          rethrow;
         }
       }
     }

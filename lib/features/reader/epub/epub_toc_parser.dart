@@ -16,7 +16,9 @@ XmlElement? _findNav(XmlDocument doc) {
     final epubType = el.getAttribute('epub:type') ?? el.getAttribute('type') ?? '';
     if (epubType == 'toc') return el;
   }
-  return doc.findAllElements('nav').firstOrNull;
+  final navs = doc.findAllElements('nav');
+  if (navs.length == 1) return navs.first;
+  return null;
 }
 
 List<TocItem> _parseTocOl(XmlElement ol) {

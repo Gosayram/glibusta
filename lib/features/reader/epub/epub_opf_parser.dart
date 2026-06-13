@@ -39,7 +39,7 @@ final class EpubOpfParser {
     final doc = XmlDocument.parse(opfText);
     final opfDir = p.posix.dirname(opfPath) == '.' ? '' : p.posix.dirname(opfPath);
 
-    // Metadata — EPUB 2 uses dc: namespace, EPUS 3 may use plain names
+    // Metadata — EPUB 2 uses dc: namespace, EPUB 3 may use plain names
     const dcNs = 'http://purl.org/dc/elements/1.1/';
     final metadata = doc.findAllElements('metadata').firstOrNull;
     String findMeta(String tag) {
@@ -48,7 +48,8 @@ final class EpubOpfParser {
           '';
     }
 
-    final title = findMeta('title').isNotEmpty ? findMeta('title') : 'Без названия';
+    final titleValue = findMeta('title');
+    final title = titleValue.isNotEmpty ? titleValue : 'Без названия';
     final allCreators =
         metadata?.findAllElements('creator', namespaceUri: dcNs).toList() ??
         metadata?.findAllElements('creator').toList() ??

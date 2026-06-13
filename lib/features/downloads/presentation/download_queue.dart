@@ -35,6 +35,7 @@ class DownloadQueue {
   final List<DownloadTask> _pendingQueue = [];
   final Map<String, DownloadTask> _tasks = {};
   final Map<String, _SpeedTracker> _speedTrackers = {};
+  final Map<String, Completer<void>> _cancelCompleters = {};
   final Set<String> _cancelledIds = {};
   List<DownloadTask> _latestTasks = [];
   int _maxConcurrent = 3;
@@ -130,6 +131,7 @@ class DownloadQueue {
     if (task == null) return;
 
     _cancelledIds.add(taskId);
+    _cancelCompleters[taskId]?.complete();
 
     final canceled = DownloadTask(
       id: task.id,
@@ -192,9 +194,14 @@ class DownloadQueue {
       if (targetPath == null) {
         throw StateError('No target path for download ${task.id}');
       }
+      final cancelCompleter = Completer<void>();
+      _cancelCompleters[task.id] = cancelCompleter;
+      final onCancel = cancelCompleter.future;
+
       await _httpClient.download(
         task.sourceUrl,
         targetPath,
+        onCancel: onCancel,
         onProgress: (int received, int total) {
           final speedTracker = _speedTrackers[task.id];
           final speed = speedTracker?.update(received) ?? 0;
@@ -208,14 +215,13 @@ class DownloadQueue {
             targetPath: task.targetPath,
             status: DownloadStatus.running,
             downloadedBytes: received,
-            totalBytes: total,
+            totalBytes: total > 0 ? total : null,
           );
           _tasks[task.id] = updated;
           _progressController.add(updated);
 
-          unawaited(_repository.updateProgress(task.id, received, total));
-
           if (speedTracker != null && speedTracker.shouldNotify()) {
+            unawaited(_repository.updateProgress(task.id, received, total));
             unawaited(
               _notificationService.showProgress(
                 task: updated,
@@ -259,6 +265,7 @@ class DownloadQueue {
       await _repository.updateStatus(task.id, DownloadStatus.failed);
       await _notificationService.showFailed(failed, null);
     } finally {
+      _cancelCompleters.remove(task.id);
       _cancelledIds.remove(task.id);
       _runningCount--;
       _emitUpdate();

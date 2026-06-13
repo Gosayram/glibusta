@@ -79,6 +79,14 @@ class BookImportService {
     if (!_supportedExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return ImportResult.failure('Файл не найден: $filePath');
+    }
+    final size = await file.length();
+    if (size < 100) {
+      return ImportResult.failure('Файл слишком мал: $size байт');
+    }
     return _doImport(filePath);
   }
 

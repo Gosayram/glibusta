@@ -161,6 +161,7 @@ class HttpClient {
     String url,
     String savePath, {
     void Function(int received, int total)? onProgress,
+    Future<void>? onCancel,
   }) async {
     final uri = Uri.parse(url);
     final client = io.HttpClient()
@@ -197,15 +198,27 @@ class HttpClient {
 
       final file = io.File(savePath);
       final sink = file.openWrite();
+      var cancelled = false;
+      if (onCancel != null) {
+        unawaited(
+          onCancel
+              .then((_) {
+                cancelled = true;
+              })
+              .catchError((_) {}),
+        );
+      }
       try {
         int received = 0;
         final total = response.contentLength;
 
         await for (final chunk in response) {
+          if (cancelled) break;
+
           sink.add(chunk);
           received += chunk.length;
           if (onProgress != null) {
-            onProgress(received, total > 0 ? total : 0);
+            onProgress(received, total);
           }
         }
         await sink.close();

@@ -16,11 +16,11 @@ final class EpubArchive {
     // ignore: use_raw_strings — r'\\' would match two backslashes, not one
     final normalized = path.replaceAll('\\', '/');
     for (final f in archive.files) {
-      if (f.name == normalized) return f;
+      if (f.isFile && f.name == normalized) return f;
     }
     final decoded = Uri.decodeFull(normalized);
     for (final f in archive.files) {
-      if (f.name == decoded) return f;
+      if (f.isFile && f.name == decoded) return f;
     }
     return null;
   }

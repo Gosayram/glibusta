@@ -198,7 +198,10 @@ class Fb2Parser implements BookParser {
           }
           break;
         case 'image':
-          final href = child.getAttribute('l:href');
+          final href =
+              child.getAttribute('l:href') ??
+              child.getAttribute('href') ??
+              child.getAttribute('xlink:href');
           if (href != null) {
             blocks.add(
               ReaderBlock(
