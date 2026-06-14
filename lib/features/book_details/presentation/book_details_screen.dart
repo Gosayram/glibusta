@@ -1066,6 +1066,20 @@ class _FormatSelectionSheet extends StatelessWidget {
           'Текстовый файл — универсальный',
           Color(0xFF9E9E9E),
         );
+      case BookFormat.rtf:
+        return const _FormatInfo(
+          Icons.article,
+          'RTF',
+          'Rich Text Format — текст с базовым форматированием',
+          Color(0xFF795548),
+        );
+      case BookFormat.djvu:
+        return const _FormatInfo(
+          Icons.image,
+          'DJVU',
+          'DjVu — сканы и документы',
+          Color(0xFF607D8B),
+        );
       case BookFormat.unknown:
         return _FormatInfo(
           Icons.help_outline,

@@ -16,6 +16,7 @@ import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
+import '../../reader/data/parsers/rtf_parser.dart';
 import '../../reader/data/parsers/txt_parser.dart';
 import '../data/cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
@@ -40,9 +41,10 @@ class BookImportService {
     'zip': Fb2Parser(),
     'epub': EpubParser(),
     'txt': TxtBookParser(),
+    'rtf': RtfBookParser(),
   };
 
-  static const _supportedExtensions = ['fb2', 'zip', 'epub', 'txt'];
+  static const _supportedExtensions = ['fb2', 'zip', 'epub', 'txt', 'rtf', 'mobi', 'djvu', 'djv'];
 
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
@@ -114,7 +116,7 @@ class BookImportService {
 
     final parser = _parsers[ext];
     if (parser == null) {
-      return ImportResult.failure('Парсер для .$ext не найден');
+      return ImportResult.failure(_unsupportedReaderMessage(ext));
     }
 
     String? bookId;
@@ -215,7 +217,7 @@ class BookImportService {
 
       final parser = _parsers[ext];
       if (parser == null) {
-        return ImportResult.failure('Парсер для .$ext не найден');
+        return ImportResult.failure(_unsupportedReaderMessage(ext));
       }
 
       final book = await parser.parse(
@@ -334,8 +336,16 @@ BookFormat bookFormatForImportExtension(String ext) {
     'fb2' || 'zip' => BookFormat.fb2,
     'epub' => BookFormat.epub,
     'txt' => BookFormat.txt,
+    'rtf' => BookFormat.rtf,
+    'mobi' => BookFormat.mobi,
+    'djvu' || 'djv' => BookFormat.djvu,
     _ => BookFormat.unknown,
   };
+}
+
+String _unsupportedReaderMessage(String ext) {
+  final upper = ext.toUpperCase();
+  return '$upper распознан, но чтение этого формата пока не поддерживается';
 }
 
 class ImportResult {

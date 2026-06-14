@@ -92,7 +92,7 @@ final class BookFileInspector {
       }
       return ImportDecision.importAsBook;
     }
-    if (format == BookFormat.txt) {
+    if (format == BookFormat.txt || format == BookFormat.rtf) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;

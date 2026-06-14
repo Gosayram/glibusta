@@ -20,6 +20,7 @@ import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
+import 'parsers/rtf_parser.dart';
 import 'parsers/txt_parser.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
@@ -44,6 +45,7 @@ class BookOpenService {
     BookFormat.epub: legacy_epub.EpubParser(),
     BookFormat.fb2: Fb2Parser(),
     BookFormat.txt: TxtBookParser(),
+    BookFormat.rtf: RtfBookParser(),
   };
 
   static Future<NormalizedBook> _parseEpubInWorker(
@@ -81,7 +83,7 @@ class BookOpenService {
       throw BookOpenFailure('Формат не поддерживается: ${download.format}');
     }
 
-    if (format == BookFormat.pdf || format == BookFormat.mobi) {
+    if (format == BookFormat.pdf || format == BookFormat.mobi || format == BookFormat.djvu) {
       throw const BookOpenFailure('Формат не поддерживается');
     }
 
@@ -187,6 +189,8 @@ class BookOpenService {
             return parseFb2FromText(detectedText, fileName: fileName);
           case BookFormat.txt:
             return parseTxtFromText(detectedText, fileName: fileName);
+          case BookFormat.rtf:
+            return parseTxtFromText(rtfToPlainText(detectedText), fileName: fileName);
           default:
             throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
         }
@@ -232,7 +236,10 @@ class BookOpenService {
     }
 
     final format = detectBookFormat(filePath);
-    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
+    if (format == BookFormat.unknown ||
+        format == BookFormat.pdf ||
+        format == BookFormat.mobi ||
+        format == BookFormat.djvu) {
       throw BookOpenFailure('Формат не поддерживается: ${format.name}');
     }
 

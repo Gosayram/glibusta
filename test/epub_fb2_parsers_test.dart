@@ -221,8 +221,17 @@ void main() {
       expect(detectBookFormat('book.pdf'), BookFormat.pdf);
     });
 
-    test('returns unknown for .mobi', () {
+    test('detects .mobi extension', () {
       expect(detectBookFormat('book.mobi'), BookFormat.mobi);
+    });
+
+    test('detects .rtf extension', () {
+      expect(detectBookFormat('book.rtf'), BookFormat.rtf);
+    });
+
+    test('detects .djvu extension', () {
+      expect(detectBookFormat('book.djvu'), BookFormat.djvu);
+      expect(detectBookFormat('book.djv'), BookFormat.djvu);
     });
   });
 }

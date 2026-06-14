@@ -80,7 +80,7 @@ class MainActivity : FlutterFragmentActivity() {
                 return
             }
 
-            val supportedExtensions = listOf("epub", "fb2", "txt", "pdf")
+            val supportedExtensions = listOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "djvu", "djv")
             val books = mutableListOf<Map<String, Any>>()
 
             for (file in root.listFiles()) {

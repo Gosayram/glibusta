@@ -297,15 +297,18 @@ class MacOSShell extends ConsumerWidget {
   }
 
   void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
-    final epubPaths = paths.where((p) => p.toLowerCase().endsWith('.epub')).toList();
-    if (epubPaths.isEmpty) {
+    const supportedExtensions = ['.epub', '.fb2', '.zip', '.txt', '.rtf', '.mobi', '.djvu', '.djv'];
+    final bookPaths = paths
+        .where((p) => supportedExtensions.any((ext) => p.toLowerCase().endsWith(ext)))
+        .toList();
+    if (bookPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Поддерживаются только .epub файлы')),
+        const SnackBar(content: Text('Поддерживаются EPUB, FB2, TXT, RTF, MOBI и DJVU')),
       );
       return;
     }
     final importService = ref.read(bookImportServiceProvider);
-    for (final path in epubPaths) {
+    for (final path in bookPaths) {
       unawaited(
         importService.importFile(path).then((result) {
           if (!context.mounted) return;

@@ -12,7 +12,8 @@ import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 
 class _FakeBookOpenService extends BookOpenService {
-  _FakeBookOpenService(super.database);
+  // ignore: use_super_parameters - super constructor stores a private field.
+  _FakeBookOpenService(AppDatabase database) : super(database);
 
   static const _chapter = ReaderChapter(
     index: 0,

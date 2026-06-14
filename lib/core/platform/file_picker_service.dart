@@ -6,7 +6,7 @@ import 'package:file_selector/file_selector.dart';
 /// Primary: `file_picker` (richer API, progress, cleanup, directory support)
 /// Fallback: `file_selector` (official Flutter team, security hardening)
 class BookFilePicker {
-  static const _bookExtensions = ['epub', 'fb2', 'txt'];
+  static const _bookExtensions = ['epub', 'fb2', 'zip', 'txt', 'rtf', 'mobi', 'djvu', 'djv'];
 
   /// Pick a single book file.
   /// Returns the file path or null if cancelled.
@@ -42,8 +42,11 @@ class BookFilePicker {
     final file = await openFile(
       acceptedTypeGroups: [
         const XTypeGroup(label: 'EPUB', extensions: ['epub']),
-        const XTypeGroup(label: 'FB2', extensions: ['fb2']),
+        const XTypeGroup(label: 'FB2', extensions: ['fb2', 'zip']),
         const XTypeGroup(label: 'TXT', extensions: ['txt']),
+        const XTypeGroup(label: 'RTF', extensions: ['rtf']),
+        const XTypeGroup(label: 'MOBI', extensions: ['mobi']),
+        const XTypeGroup(label: 'DJVU', extensions: ['djvu', 'djv']),
       ],
     );
     return file?.path;

@@ -28,6 +28,17 @@ void main() {
       expect(detectBookFormat('BOOK.MOBI'), BookFormat.mobi);
     });
 
+    test('detects rtf', () {
+      expect(detectBookFormat('book.rtf'), BookFormat.rtf);
+      expect(detectBookFormat('BOOK.RTF'), BookFormat.rtf);
+    });
+
+    test('detects djvu', () {
+      expect(detectBookFormat('book.djvu'), BookFormat.djvu);
+      expect(detectBookFormat('book.djv'), BookFormat.djvu);
+      expect(detectBookFormat('BOOK.DJVU'), BookFormat.djvu);
+    });
+
     test('zip is unknown (cannot determine content without inspection)', () {
       expect(detectBookFormat('book.zip'), BookFormat.unknown);
     });

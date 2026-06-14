@@ -208,6 +208,10 @@ class FlibustaApiSource extends BookSource {
         formats.add(BookFormat.pdf);
       } else if (lower.contains('mobi')) {
         formats.add(BookFormat.mobi);
+      } else if (lower.contains('rtf')) {
+        formats.add(BookFormat.rtf);
+      } else if (lower.contains('djvu') || lower.contains('djv')) {
+        formats.add(BookFormat.djvu);
       }
     }
     return formats;

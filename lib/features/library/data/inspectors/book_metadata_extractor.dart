@@ -5,6 +5,7 @@ import '../../../reader/data/parsers/book_parser.dart';
 import '../../../reader/data/parsers/epub_parser.dart';
 import '../../../reader/data/parsers/fb2_parser.dart';
 import '../../../reader/data/parsers/format_detector.dart';
+import '../../../reader/data/parsers/rtf_parser.dart';
 import '../../../reader/data/parsers/txt_parser.dart';
 
 final class BookMetadataExtractor {
@@ -12,6 +13,7 @@ final class BookMetadataExtractor {
     BookFormat.epub: EpubParser(),
     BookFormat.fb2: Fb2Parser(),
     BookFormat.txt: TxtBookParser(),
+    BookFormat.rtf: RtfBookParser(),
   };
 
   Future<BookMetadata> extract({
@@ -20,7 +22,10 @@ final class BookMetadataExtractor {
     required BookFormat format,
     required BookEncodingDetector encodingDetector,
   }) async {
-    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
+    if (format == BookFormat.unknown ||
+        format == BookFormat.pdf ||
+        format == BookFormat.mobi ||
+        format == BookFormat.djvu) {
       return const BookMetadata();
     }
 
