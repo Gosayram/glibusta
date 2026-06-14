@@ -17,8 +17,13 @@ class ShareHandler {
         if (!context.mounted) return;
         _handleSharedFiles(files, context, importService);
       },
-      onError: (Object e) {
-        // Share intent stream error — non-critical
+      onError: (Object e, StackTrace st) {
+        _logger.warning(
+          'Share intent stream error: $e',
+          name: 'Share',
+          error: e,
+          st: st,
+        );
       },
     );
 
@@ -27,6 +32,14 @@ class ShareHandler {
         (files) {
           if (!context.mounted) return;
           _handleSharedFiles(files, context, importService);
+        },
+        onError: (Object e, StackTrace st) {
+          _logger.warning(
+            'Initial share intent read failed: $e',
+            name: 'Share',
+            error: e,
+            st: st,
+          );
         },
       ),
     );
@@ -58,21 +71,31 @@ class ShareHandler {
       }
 
       unawaited(
-        importService.importFile(file.path).then((result) {
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                result.isSuccess
-                    ? 'Импортировано: ${result.title}'
-                    : result.isDuplicate
-                    ? 'Дубликат: ${result.title}'
-                    : 'Ошибка: ${result.error}',
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }),
+        importService
+            .importFile(file.path)
+            .then((result) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    result.isSuccess
+                        ? 'Импортировано: ${result.title}'
+                        : result.isDuplicate
+                        ? 'Дубликат: ${result.title}'
+                        : 'Ошибка: ${result.error}',
+                  ),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            })
+            .catchError((Object e, StackTrace st) {
+              _logger.warning(
+                'Shared file import failed: ${file.path}: $e',
+                name: 'Share',
+                error: e,
+                st: st,
+              );
+            }),
       );
     }
   }

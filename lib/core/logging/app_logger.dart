@@ -255,7 +255,7 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
   final eventBus = ref.watch(eventBusProvider);
 
   Logger.root.level = Level.ALL;
-  Logger.root.onRecord.listen((record) {
+  final rootLogSubscription = Logger.root.onRecord.listen((record) {
     logger.log(
       record.level.name,
       record.message,
@@ -265,7 +265,7 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
     );
   });
 
-  logger.addListener((entry) {
+  void publishSevereEvents(LogEntry entry) {
     if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
       eventBus.fire(
         ErrorOccurredEvent(
@@ -275,9 +275,15 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
         ),
       );
     }
-  });
+  }
 
-  ref.onDispose(logger.dispose);
+  logger.addListener(publishSevereEvents);
+
+  ref.onDispose(() {
+    logger.removeListener(publishSevereEvents);
+    unawaited(rootLogSubscription.cancel());
+    logger.dispose();
+  });
   return logger;
 });
 

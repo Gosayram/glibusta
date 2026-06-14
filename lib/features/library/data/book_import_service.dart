@@ -108,6 +108,18 @@ class BookImportService {
     if (size < 100) {
       return ImportResult.failure('Файл слишком мал: $size байт');
     }
+    final format = bookFormatForImportExtension(ext);
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+      return _doDocumentImport(
+        BookFileInspectionResult(
+          path: filePath,
+          format: format,
+          decision: ImportDecision.importAsDocument,
+          hash: '',
+          fileSize: size,
+        ),
+      );
+    }
     return _doImport(filePath);
   }
 
@@ -152,38 +164,42 @@ class BookImportService {
       await targetFile.parent.create(recursive: true);
       await file.copy(targetFile.path);
 
-      await _database
-          .into(_database.savedBooks)
-          .insertOnConflictUpdate(
-            SavedBooksCompanion.insert(
-              id: book.id,
-              title: book.title,
-              authorIds: Value(book.authors),
-              description: Value(book.description),
-              coverUrl: Value(book.coverUrl),
-              sourceUrl: Value(filePath),
-              contentHash: Value(contentHash),
-              fileSize: Value(fileSize),
-              filePath: Value(targetFile.path),
-              detectedEncoding: Value(forcedEncoding),
-              encodingSource: forcedEncoding != null ? const Value('manual') : const Value.absent(),
-              userForcedEncoding: Value(forcedEncoding),
-            ),
-          );
+      await _database.transaction(() async {
+        await _database
+            .into(_database.savedBooks)
+            .insertOnConflictUpdate(
+              SavedBooksCompanion.insert(
+                id: book.id,
+                title: book.title,
+                authorIds: Value(book.authors),
+                description: Value(book.description),
+                coverUrl: Value(book.coverUrl),
+                sourceUrl: Value(filePath),
+                contentHash: Value(contentHash),
+                fileSize: Value(fileSize),
+                filePath: Value(targetFile.path),
+                detectedEncoding: Value(forcedEncoding),
+                encodingSource: forcedEncoding != null
+                    ? const Value('manual')
+                    : const Value.absent(),
+                userForcedEncoding: Value(forcedEncoding),
+              ),
+            );
 
-      await _database
-          .into(_database.downloads)
-          .insertOnConflictUpdate(
-            DownloadsCompanion.insert(
-              id: book.id,
-              bookId: book.id,
-              bookTitle: Value(book.title),
-              format: ext,
-              sourceUrl: filePath,
-              targetPath: Value(targetFile.path),
-              status: DownloadStatusDb.completed,
-            ),
-          );
+        await _database
+            .into(_database.downloads)
+            .insertOnConflictUpdate(
+              DownloadsCompanion.insert(
+                id: book.id,
+                bookId: book.id,
+                bookTitle: Value(book.title),
+                format: ext,
+                sourceUrl: filePath,
+                targetPath: Value(targetFile.path),
+                status: DownloadStatusDb.completed,
+              ),
+            );
+      });
 
       // Background cover extraction — don't block import
       unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
@@ -201,6 +217,7 @@ class BookImportService {
           if (await targetFile.exists()) {
             await targetFile.delete();
           }
+          await _deletePartialImportRows(bookId);
         } on Object catch (_) {
           // Best-effort cleanup: ignore if target file path can't be resolved
         }
@@ -241,34 +258,36 @@ class BookImportService {
     await targetFile.parent.create(recursive: true);
     await file.copy(targetFile.path);
 
-    await _database
-        .into(_database.savedBooks)
-        .insertOnConflictUpdate(
-          SavedBooksCompanion.insert(
-            id: bookId,
-            title: title,
-            authorIds: const Value([]),
-            description: Value('${format.name.toUpperCase()} document'),
-            sourceUrl: Value(inspection.path),
-            contentHash: Value(contentHash),
-            fileSize: Value(bytes.length),
-            filePath: Value(targetFile.path),
-          ),
-        );
+    await _database.transaction(() async {
+      await _database
+          .into(_database.savedBooks)
+          .insertOnConflictUpdate(
+            SavedBooksCompanion.insert(
+              id: bookId,
+              title: title,
+              authorIds: const Value([]),
+              description: Value(_documentDescription(format)),
+              sourceUrl: Value(inspection.path),
+              contentHash: Value(contentHash),
+              fileSize: Value(bytes.length),
+              filePath: Value(targetFile.path),
+            ),
+          );
 
-    await _database
-        .into(_database.downloads)
-        .insertOnConflictUpdate(
-          DownloadsCompanion.insert(
-            id: bookId,
-            bookId: bookId,
-            bookTitle: Value(title),
-            format: format.name,
-            sourceUrl: inspection.path,
-            targetPath: Value(targetFile.path),
-            status: DownloadStatusDb.completed,
-          ),
-        );
+      await _database
+          .into(_database.downloads)
+          .insertOnConflictUpdate(
+            DownloadsCompanion.insert(
+              id: bookId,
+              bookId: bookId,
+              bookTitle: Value(title),
+              format: format.name,
+              sourceUrl: inspection.path,
+              targetPath: Value(targetFile.path),
+              status: DownloadStatusDb.completed,
+            ),
+          );
+    });
 
     return ImportResult.success(title);
   }
@@ -284,6 +303,7 @@ class BookImportService {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
 
+    String? bookId;
     try {
       final bytes = await bridge.readFile(external.uri);
       if (bytes.isEmpty) {
@@ -299,41 +319,44 @@ class BookImportService {
       final format = bookFormatForImportExtension(ext);
       if (format == BookFormat.pdf || format == BookFormat.djvu) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
-        final bookId = contentHash;
-        final targetFile = await _storage.bookFile(bookId, format);
+        final documentBookId = contentHash;
+        bookId = documentBookId;
+        final targetFile = await _storage.bookFile(documentBookId, format);
         await targetFile.parent.create(recursive: true);
         await targetFile.writeAsBytes(bytes, flush: true);
 
-        await _database
-            .into(_database.savedBooks)
-            .insertOnConflictUpdate(
-              SavedBooksCompanion.insert(
-                id: bookId,
-                title: title,
-                authorIds: const Value([]),
-                description: Value('${format.name.toUpperCase()} document'),
-                sourceUrl: Value(external.uri),
-                contentHash: Value(contentHash),
-                fileSize: Value(external.size),
-                filePath: Value(targetFile.path),
-                storageMode: const Value('external'),
-                externalUri: Value(external.uri),
-              ),
-            );
+        await _database.transaction(() async {
+          await _database
+              .into(_database.savedBooks)
+              .insertOnConflictUpdate(
+                SavedBooksCompanion.insert(
+                  id: documentBookId,
+                  title: title,
+                  authorIds: const Value([]),
+                  description: Value(_documentDescription(format)),
+                  sourceUrl: Value(external.uri),
+                  contentHash: Value(contentHash),
+                  fileSize: Value(external.size),
+                  filePath: Value(targetFile.path),
+                  storageMode: const Value('external'),
+                  externalUri: Value(external.uri),
+                ),
+              );
 
-        await _database
-            .into(_database.downloads)
-            .insertOnConflictUpdate(
-              DownloadsCompanion.insert(
-                id: bookId,
-                bookId: bookId,
-                bookTitle: Value(title),
-                format: format.name,
-                sourceUrl: external.uri,
-                targetPath: Value(targetFile.path),
-                status: DownloadStatusDb.completed,
-              ),
-            );
+          await _database
+              .into(_database.downloads)
+              .insertOnConflictUpdate(
+                DownloadsCompanion.insert(
+                  id: documentBookId,
+                  bookId: documentBookId,
+                  bookTitle: Value(title),
+                  format: format.name,
+                  sourceUrl: external.uri,
+                  targetPath: Value(targetFile.path),
+                  status: DownloadStatusDb.completed,
+                ),
+              );
+        });
 
         return ImportResult.success(title);
       }
@@ -347,6 +370,7 @@ class BookImportService {
         bytes,
         fileName: external.name,
       );
+      bookId = book.id;
 
       final targetFile = await _storage.bookFile(
         book.id,
@@ -355,42 +379,67 @@ class BookImportService {
       await targetFile.parent.create(recursive: true);
       await targetFile.writeAsBytes(bytes, flush: true);
 
-      await _database
-          .into(_database.savedBooks)
-          .insertOnConflictUpdate(
-            SavedBooksCompanion.insert(
-              id: book.id,
-              title: book.title,
-              authorIds: Value(book.authors),
-              description: Value(book.description),
-              coverUrl: Value(book.coverUrl),
-              sourceUrl: Value(external.uri),
-              contentHash: Value(contentHash),
-              fileSize: Value(external.size),
-              filePath: Value(targetFile.path),
-              storageMode: const Value('external'),
-              externalUri: Value(external.uri),
-            ),
-          );
+      await _database.transaction(() async {
+        await _database
+            .into(_database.savedBooks)
+            .insertOnConflictUpdate(
+              SavedBooksCompanion.insert(
+                id: book.id,
+                title: book.title,
+                authorIds: Value(book.authors),
+                description: Value(book.description),
+                coverUrl: Value(book.coverUrl),
+                sourceUrl: Value(external.uri),
+                contentHash: Value(contentHash),
+                fileSize: Value(external.size),
+                filePath: Value(targetFile.path),
+                storageMode: const Value('external'),
+                externalUri: Value(external.uri),
+              ),
+            );
 
-      await _database
-          .into(_database.downloads)
-          .insertOnConflictUpdate(
-            DownloadsCompanion.insert(
-              id: book.id,
-              bookId: book.id,
-              bookTitle: Value(book.title),
-              format: ext,
-              sourceUrl: external.uri,
-              targetPath: Value(targetFile.path),
-              status: DownloadStatusDb.completed,
-            ),
-          );
+        await _database
+            .into(_database.downloads)
+            .insertOnConflictUpdate(
+              DownloadsCompanion.insert(
+                id: book.id,
+                bookId: book.id,
+                bookTitle: Value(book.title),
+                format: ext,
+                sourceUrl: external.uri,
+                targetPath: Value(targetFile.path),
+                status: DownloadStatusDb.completed,
+              ),
+            );
+      });
 
       unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
+      _logger.warning(
+        'External import failed for ${external.name}: $e',
+        name: 'Import',
+        error: e,
+      );
+      if (bookId != null) {
+        try {
+          final targetFile = await _storage.bookFile(
+            bookId,
+            bookFormatForImportExtension(ext),
+          );
+          if (await targetFile.exists()) {
+            await targetFile.delete();
+          }
+          await _deletePartialImportRows(bookId);
+        } on Object catch (cleanupError) {
+          _logger.warning(
+            'External import cleanup failed for $bookId: $cleanupError',
+            name: 'Import',
+            error: cleanupError,
+          );
+        }
+      }
       return ImportResult.failure('Ошибка при импорте из внешней папки: $e');
     }
   }
@@ -426,6 +475,13 @@ class BookImportService {
       _database.savedBooks,
     )..where((t) => t.contentHash.equals(hash))).get();
     return rows.isNotEmpty ? rows.first : null;
+  }
+
+  Future<void> _deletePartialImportRows(String bookId) async {
+    await _database.transaction(() async {
+      await (_database.delete(_database.downloads)..where((row) => row.bookId.equals(bookId))).go();
+      await (_database.delete(_database.savedBooks)..where((row) => row.id.equals(bookId))).go();
+    });
   }
 
   Future<void> _extractCoverBackground(String bookId, String filePath, String format) async {
@@ -472,6 +528,14 @@ BookFormat bookFormatForImportExtension(String ext) {
 String _unsupportedReaderMessage(String ext) {
   final upper = ext.toUpperCase();
   return '$upper распознан, но чтение этого формата пока не поддерживается';
+}
+
+String _documentDescription(BookFormat format) {
+  return switch (format) {
+    BookFormat.pdf => 'PDF документ',
+    BookFormat.djvu => 'DjVu документ',
+    _ => '${format.name.toUpperCase()} документ',
+  };
 }
 
 class ImportResult {
