@@ -43,6 +43,7 @@ class BookOpenService {
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
   static const int _splitCacheVersion = 1;
+  static const int _parserCacheVersion = 1;
 
   static final Map<BookFormat, BookParser> _parsers = {
     BookFormat.epub: legacy_epub.EpubParser(),
@@ -322,6 +323,13 @@ class BookOpenService {
     return null;
   }
 
+  Future<SavedBook?> _findSavedBook(String bookId) async {
+    final rows = await (_database.select(
+      _database.savedBooks,
+    )..where((book) => book.id.equals(bookId))).get();
+    return rows.isNotEmpty ? rows.first : null;
+  }
+
   Future<String> get booksCacheDir async {
     final dir = await AppFileStorageImpl().cacheDir();
     return dir.path;
@@ -382,9 +390,23 @@ class BookOpenService {
         final json = await manifestFile.readAsString();
         final manifest = jsonDecode(json) as Map<String, dynamic>;
         final version = manifest['version'] as int?;
+        final parserVersion = manifest['parserVersion'] as int?;
+        final cachedFormat = manifest['format'] as String?;
+        final cachedFileSize = manifest['fileSize'] as int?;
+        final cachedFileMtime = manifest['fileMtime'] as int?;
+        final cachedContentHash = manifest['contentHash'] as String?;
         final chapterCount = manifest['chapterCount'] as int?;
         final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
+        final source = await _cacheSourceFingerprint(meta.id);
+        if (source == null) {
+          return false;
+        }
         if (version != _splitCacheVersion ||
+            parserVersion != _parserCacheVersion ||
+            cachedFormat != source.format ||
+            cachedFileSize != source.fileSize ||
+            cachedFileMtime != source.fileMtime ||
+            cachedContentHash != source.contentHash ||
             chapterCount != meta.chapterCount ||
             chapters.length != meta.chapterCount) {
           return false;
@@ -399,15 +421,13 @@ class BookOpenService {
       }
     }
 
-    for (var i = 0; i < meta.chapterCount; i++) {
-      if (!await _getChapterFile(bookDir, i).exists()) return false;
-    }
-    return true;
+    return false;
   }
 
   Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
     final bookDir = await _getBookDir(bookId);
     final metaFile = _getMetadataFile(bookDir);
+    final source = await _cacheSourceFingerprint(bookId);
     await _writeJsonAtomically(metaFile, book.toMetadata().toJson());
     for (final chapter in book.chapters) {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
@@ -417,10 +437,37 @@ class BookOpenService {
       _getManifestFile(bookDir),
       {
         'version': _splitCacheVersion,
+        'parserVersion': _parserCacheVersion,
         'bookId': bookId,
+        'format': source?.format,
+        'fileSize': source?.fileSize,
+        'fileMtime': source?.fileMtime,
+        'contentHash': source?.contentHash,
         'chapterCount': book.chapters.length,
         'chapters': book.chapters.map((chapter) => chapter.index).toList(),
       },
+    );
+  }
+
+  Future<_CacheSourceFingerprint?> _cacheSourceFingerprint(String bookId) async {
+    final download = await _findDownload(bookId);
+    final filePath = download?.targetPath;
+    if (filePath == null || filePath.isEmpty) {
+      return null;
+    }
+
+    final file = File(filePath);
+    if (!await file.exists()) {
+      return null;
+    }
+
+    final stat = await file.stat();
+    final savedBook = await _findSavedBook(bookId);
+    return _CacheSourceFingerprint(
+      format: detectBookFormat(filePath).name,
+      fileSize: stat.size,
+      fileMtime: stat.modified.millisecondsSinceEpoch,
+      contentHash: savedBook?.contentHash,
     );
   }
 
@@ -442,6 +489,21 @@ class BookOpenService {
     final bookDir = await _getBookDir(bookId);
     final chapterFile = _getChapterFile(bookDir, chapter.index);
     await _writeJsonAtomically(chapterFile, chapter.toJson());
+  }
+
+  Future<void> invalidateBookCache(String bookId) async {
+    final bookDir = await _getExistingBookDir(bookId);
+    if (!await bookDir.exists()) return;
+    try {
+      await bookDir.delete(recursive: true);
+      _logger.info('Reader cache invalidated for $bookId', name: 'Reader');
+    } on Object catch (e) {
+      _logger.warning(
+        'Failed to invalidate reader cache for $bookId: $e',
+        name: 'Reader',
+        error: e,
+      );
+    }
   }
 
   // Legacy monolithic cache — kept for migration fallback
@@ -554,8 +616,27 @@ class BookOpenService {
     }
 
     // Parse fresh and save as split cache
-    final book = await openBook(bookId);
-    await _saveSplitCache(bookId, book);
-    return book;
+    try {
+      final book = await openBook(bookId);
+      await _saveSplitCache(bookId, book);
+      return book;
+    } on TimeoutException {
+      await invalidateBookCache(bookId);
+      rethrow;
+    }
   }
+}
+
+final class _CacheSourceFingerprint {
+  const _CacheSourceFingerprint({
+    required this.format,
+    required this.fileSize,
+    required this.fileMtime,
+    required this.contentHash,
+  });
+
+  final String format;
+  final int fileSize;
+  final int fileMtime;
+  final String? contentHash;
 }

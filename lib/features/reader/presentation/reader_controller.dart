@@ -123,6 +123,7 @@ class ReaderController {
   bool _disposed = false;
   bool _loaded = false;
   bool _fullscreenEnabled = false;
+  int _loadGeneration = 0;
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -132,6 +133,7 @@ class ReaderController {
 
   void dispose() {
     _disposed = true;
+    _loadGeneration++;
     _progressDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
@@ -152,6 +154,7 @@ class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
+    final loadGeneration = ++_loadGeneration;
     _loaded = false;
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
@@ -169,8 +172,10 @@ class ReaderController {
     try {
       _updateState(_state.copyWith(loadingMessage: 'Разбор книги...'));
       final meta = await _content.loadMetadata();
+      if (!_isActiveLoad(loadGeneration)) return;
       _updateState(_state.copyWith(loadingMessage: 'Загрузка прогресса...'));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
+      if (!_isActiveLoad(loadGeneration)) return;
 
       _updateState(_state.copyWith(loadingMessage: 'Загрузка глав...'));
       _updateState(
@@ -185,6 +190,7 @@ class ReaderController {
       _scrollController = ScrollController()..addListener(_onScroll);
 
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
+      if (!_isActiveLoad(loadGeneration)) return;
       _loaded = true;
       _updateState(_state.copyWith(isLoading: false, clearLoadingMessage: true));
 
@@ -207,6 +213,7 @@ class ReaderController {
       _startHideTimer();
       _applyWakeLock();
     } on TimeoutException {
+      if (!_isActiveLoad(loadGeneration)) return;
       _updateState(
         _state.copyWith(
           isLoading: false,
@@ -218,11 +225,16 @@ class ReaderController {
         ),
       );
     } on Object catch (e) {
-      await _handleLoadError(e);
+      if (!_isActiveLoad(loadGeneration)) return;
+      await _handleLoadError(e, loadGeneration: loadGeneration);
     }
   }
 
-  Future<void> _handleLoadError(Object e) async {
+  bool _isActiveLoad(int loadGeneration) {
+    return !_disposed && loadGeneration == _loadGeneration;
+  }
+
+  Future<void> _handleLoadError(Object e, {required int loadGeneration}) async {
     String? filePath;
     String? format;
     int? fileSize;
@@ -249,6 +261,7 @@ class ReaderController {
         error: e,
       );
     }
+    if (!_isActiveLoad(loadGeneration)) return;
     _updateState(
       _state.copyWith(
         isLoading: false,
