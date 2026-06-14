@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
@@ -109,6 +110,9 @@ class BookImportService {
       return ImportResult.failure('Файл слишком мал: $size байт');
     }
     final format = bookFormatForImportExtension(ext);
+    if (isBookFileTooLarge(format, size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(format, size));
+    }
     if (format == BookFormat.pdf || format == BookFormat.djvu) {
       return _doDocumentImport(
         BookFileInspectionResult(
@@ -130,6 +134,11 @@ class BookImportService {
     }
 
     final ext = filePath.split('.').last.toLowerCase();
+    final format = bookFormatForImportExtension(ext);
+    final size = await file.length();
+    if (isBookFileTooLarge(format, size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(format, size));
+    }
     final bytes = await file.readAsBytes();
     final contentHash = sha256.convert(bytes).toString();
     final fileSize = bytes.length;
@@ -159,7 +168,7 @@ class BookImportService {
 
       final targetFile = await _storage.bookFile(
         book.id,
-        bookFormatForImportExtension(ext),
+        format,
       );
       await targetFile.parent.create(recursive: true);
       await file.copy(targetFile.path);
@@ -209,10 +218,9 @@ class BookImportService {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
       if (bookId != null) {
         try {
-          final ext = filePath.split('.').last.toLowerCase();
           final targetFile = await _storage.bookFile(
             bookId,
-            bookFormatForImportExtension(ext),
+            format,
           );
           if (await targetFile.exists()) {
             await targetFile.delete();
@@ -236,6 +244,10 @@ class BookImportService {
     final format = bookFormatForImportExtension(ext);
     if (format == BookFormat.unknown) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
+    }
+    final size = await file.length();
+    if (isBookFileTooLarge(format, size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
 
     final bytes = await file.readAsBytes();
@@ -302,6 +314,10 @@ class BookImportService {
     if (!_supportedExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
+    final format = bookFormatForImportExtension(ext);
+    if (external.size > 0 && isBookFileTooLarge(format, external.size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(format, external.size));
+    }
 
     String? bookId;
     try {
@@ -316,7 +332,9 @@ class BookImportService {
         return ImportResult.duplicate(existing.title, contentHash);
       }
 
-      final format = bookFormatForImportExtension(ext);
+      if (isBookFileTooLarge(format, bytes.length)) {
+        return ImportResult.failure(bookFileTooLargeMessage(format, bytes.length));
+      }
       if (format == BookFormat.pdf || format == BookFormat.djvu) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
         final documentBookId = contentHash;
@@ -374,7 +392,7 @@ class BookImportService {
 
       final targetFile = await _storage.bookFile(
         book.id,
-        bookFormatForImportExtension(ext),
+        format,
       );
       await targetFile.parent.create(recursive: true);
       await targetFile.writeAsBytes(bytes, flush: true);
@@ -452,17 +470,27 @@ class BookImportService {
       return ImportBatchResult(directory: dirPath, results: [], error: 'Директория не найдена');
     }
 
-    final results = <ImportResult>[];
+    final fileResults = <ImportFileResult>[];
     await for (final entity in dir.list(recursive: true)) {
       if (entity is File) {
         final ext = entity.path.split('.').last.toLowerCase();
         if (_supportedExtensions.contains(ext)) {
-          results.add(await importFile(entity.path));
+          final size = await entity.length();
+          final result = await importFile(entity.path);
+          fileResults.add(
+            ImportFileResult(path: entity.path, sizeBytes: size, result: result),
+          );
+          if (!result.isSuccess && !result.isDuplicate && !result.needsEncodingSelection) {
+            _logger.warning(
+              'Directory import failed for ${entity.path} (${formatBytes(size)}): ${result.error}',
+              name: 'Import',
+            );
+          }
         }
       }
     }
 
-    final batch = ImportBatchResult(directory: dirPath, results: results);
+    final batch = ImportBatchResult(directory: dirPath, fileResults: fileResults);
     _logger.info(
       'Directory import complete: ${batch.successCount} imported, ${batch.duplicateCount} duplicates, ${batch.failureCount} errors',
       name: 'Import',
@@ -570,13 +598,46 @@ class ImportResult {
 
 class ImportBatchResult {
   final String directory;
-  final List<ImportResult> results;
+  final List<ImportFileResult> fileResults;
   final String? error;
 
-  ImportBatchResult({required this.directory, required this.results, this.error});
+  ImportBatchResult({
+    required this.directory,
+    List<ImportResult>? results,
+    List<ImportFileResult>? fileResults,
+    this.error,
+  }) : fileResults =
+           fileResults ??
+           [
+             for (final result in results ?? const <ImportResult>[])
+               ImportFileResult(path: '', sizeBytes: null, result: result),
+           ];
+
+  List<ImportResult> get results => fileResults.map((item) => item.result).toList();
 
   int get successCount => results.where((r) => r.isSuccess).length;
   int get duplicateCount => results.where((r) => r.isDuplicate).length;
   int get failureCount =>
       results.where((r) => !r.isSuccess && !r.isDuplicate && !r.needsEncodingSelection).length;
+
+  List<ImportFileResult> get failures => fileResults
+      .where(
+        (item) =>
+            !item.result.isSuccess &&
+            !item.result.isDuplicate &&
+            !item.result.needsEncodingSelection,
+      )
+      .toList();
+}
+
+class ImportFileResult {
+  final String path;
+  final int? sizeBytes;
+  final ImportResult result;
+
+  const ImportFileResult({
+    required this.path,
+    required this.sizeBytes,
+    required this.result,
+  });
 }

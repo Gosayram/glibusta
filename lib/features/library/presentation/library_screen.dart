@@ -217,12 +217,14 @@ class LibraryScreen extends ConsumerWidget {
       final service = ref.read(bookImportServiceProvider);
       final batchResult = await service.importDirectory(dirPath);
       if (context.mounted) {
+        final firstFailure = batchResult.failures.firstOrNull;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Импортировано: ${batchResult.successCount}, '
               'дубликатов: ${batchResult.duplicateCount}, '
-              'ошибок: ${batchResult.failureCount}',
+              'ошибок: ${batchResult.failureCount}'
+              '${firstFailure != null ? '. Первая ошибка: ${_fileName(firstFailure.path)}' : ''}',
             ),
             duration: const Duration(seconds: 3),
           ),
@@ -232,6 +234,13 @@ class LibraryScreen extends ConsumerWidget {
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
+  }
+
+  String _fileName(String path) {
+    if (path.isEmpty) return 'unknown';
+    final normalized = path.replaceAll(r'\', '/');
+    final lastSlash = normalized.lastIndexOf('/');
+    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
   }
 
   void _showImportSheet(BuildContext context, WidgetRef ref) {

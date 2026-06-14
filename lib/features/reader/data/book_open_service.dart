@@ -10,6 +10,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -109,6 +110,9 @@ class BookOpenService {
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
       throw BookOpenFailure('Формат не поддерживается: ${download.format}');
+    }
+    if (isBookFileTooLarge(format, fileSize)) {
+      throw BookOpenFailure(bookFileTooLargeMessage(format, fileSize));
     }
 
     if (format == BookFormat.pdf || format == BookFormat.djvu) {
@@ -215,6 +219,10 @@ class BookOpenService {
 
     try {
       final file = File(filePath);
+      final fileSize = await file.length();
+      if (isBookFileTooLarge(bookFormat, fileSize)) {
+        throw BookOpenFailure(bookFileTooLargeMessage(bookFormat, fileSize));
+      }
       final bytes = await file.readAsBytes();
       if (bytes.isEmpty) {
         throw BookOpenFailure('Файл пуст: $filePath');

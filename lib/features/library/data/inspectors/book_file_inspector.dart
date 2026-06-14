@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../../../core/encoding/encoding_detection.dart';
+import '../../../../core/formats/book_file_size_policy.dart';
 import '../../../reader/data/parsers/format_detector.dart';
 import 'book_format_detector.dart';
 import 'book_inspection_result.dart';
@@ -35,9 +36,21 @@ final class BookFileInspector {
       );
     }
 
+    final fileSize = await file.length();
+    final format = formatDetector.detect(path: path, bytes: const []);
+    if (isBookFileTooLarge(format, fileSize)) {
+      return BookFileInspectionResult(
+        path: path,
+        format: format,
+        decision: ImportDecision.corrupted,
+        hash: '',
+        fileSize: fileSize,
+        reason: bookFileTooLargeMessage(format, fileSize),
+      );
+    }
+
     final bytes = await file.readAsBytes();
     final hash = sha256.convert(bytes).toString();
-    final fileSize = bytes.length;
 
     final isDuplicate = await duplicateChecker.exists(hash);
     if (isDuplicate) {
@@ -50,8 +63,6 @@ final class BookFileInspector {
         reason: 'Такая книга уже есть в библиотеке',
       );
     }
-
-    final format = formatDetector.detect(path: path, bytes: bytes);
 
     final metadata = await metadataExtractor.extract(
       path: path,
