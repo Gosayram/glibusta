@@ -18,17 +18,22 @@ class ReaderContentHelper {
       return cached;
     }
     _logger.info('Loading fresh metadata for $_bookId', name: 'Reader');
-    final book = await _service.openBookWithCache(_bookId);
+    final book = await _service.openBookWithCache(_bookId, loadChapters: false);
     return book.toMetadata();
   }
 
   Future<Map<int, ReaderChapter>> ensureChaptersLoaded(
     int centerIndex,
     Map<int, ReaderChapter> currentlyLoaded, {
+    required int chapterCount,
     int windowSize = chapterWindowSize,
   }) async {
-    final minIdx = (centerIndex - windowSize).clamp(0, centerIndex + windowSize);
-    final maxIdx = (centerIndex + windowSize);
+    if (chapterCount <= 0) return currentlyLoaded;
+
+    final lastIndex = chapterCount - 1;
+    final safeCenter = centerIndex.clamp(0, lastIndex);
+    final minIdx = (safeCenter - windowSize).clamp(0, lastIndex);
+    final maxIdx = (safeCenter + windowSize).clamp(0, lastIndex);
 
     final toLoad = <int>[];
     for (var i = minIdx; i <= maxIdx; i++) {

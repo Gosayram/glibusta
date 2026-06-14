@@ -152,13 +152,19 @@ class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
+    _loaded = false;
+    _hideTimer?.cancel();
+    _autoThemeTimer?.cancel();
+    _autoThemeTimer = null;
+    _scrollController?.removeListener(_onScroll);
+    _scrollController?.dispose();
+    _scrollController = null;
     _updateState(_state.copyWith(isLoading: true, loadingMessage: 'Открытие файла...'));
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);
     _content = ReaderContentHelper(service, _bookId);
     _progress = ReaderProgressHelper(db, _bookId);
-    _loaded = true;
 
     try {
       _updateState(_state.copyWith(loadingMessage: 'Разбор книги...'));
@@ -166,11 +172,10 @@ class ReaderController {
       _updateState(_state.copyWith(loadingMessage: 'Загрузка прогресса...'));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
 
+      _updateState(_state.copyWith(loadingMessage: 'Загрузка глав...'));
       _updateState(
         _state.copyWith(
           metadata: meta,
-          isLoading: false,
-          clearLoadingMessage: true,
           currentPosition: savedPosition.clamp(chapterCount: meta.chapterCount),
           clearHighlight: true,
         ),
@@ -180,6 +185,8 @@ class ReaderController {
       _scrollController = ScrollController()..addListener(_onScroll);
 
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
+      _loaded = true;
+      _updateState(_state.copyWith(isLoading: false, clearLoadingMessage: true));
 
       const wordsPerMinute = 200;
       final totalWords = _content.computeTotalWords(_state.loadedChapters);
@@ -256,7 +263,11 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
-    final updated = await _content.ensureChaptersLoaded(centerIndex, _state.loadedChapters);
+    final updated = await _content.ensureChaptersLoaded(
+      centerIndex,
+      _state.loadedChapters,
+      chapterCount: _state.chapterCount,
+    );
     if (!_disposed) {
       _updateState(_state.copyWith(loadedChapters: updated));
     }

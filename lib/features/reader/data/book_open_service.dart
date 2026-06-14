@@ -330,13 +330,19 @@ class BookOpenService {
     return bookDir;
   }
 
+  Future<Directory> _getExistingBookDir(String bookId) async {
+    final dir = await booksCacheDir;
+    return Directory('$dir/$bookId');
+  }
+
   File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
 
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
   Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
     try {
-      final bookDir = await _getBookDir(bookId);
+      final bookDir = await _getExistingBookDir(bookId);
+      if (!await bookDir.exists()) return null;
       final metaFile = _getMetadataFile(bookDir);
       if (!await metaFile.exists()) return null;
       final json = await metaFile.readAsString();
@@ -359,7 +365,8 @@ class BookOpenService {
 
   Future<ReaderChapter?> loadChapter(String bookId, int index) async {
     try {
-      final bookDir = await _getBookDir(bookId);
+      final bookDir = await _getExistingBookDir(bookId);
+      if (!await bookDir.exists()) return null;
       final chapterFile = _getChapterFile(bookDir, index);
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
@@ -394,10 +401,31 @@ class BookOpenService {
     await cacheFile.writeAsString(jsonEncode(book.toJson()));
   }
 
-  Future<NormalizedBook> openBookWithCache(String bookId) async {
+  Future<NormalizedBook> openBookWithCache(String bookId, {bool loadChapters = true}) async {
     // Try split cache first
     final cachedMeta = await getCachedMetadata(bookId);
     if (cachedMeta != null) {
+      if (!loadChapters) {
+        return NormalizedBook(
+          id: cachedMeta.id,
+          title: cachedMeta.title,
+          authors: cachedMeta.authors,
+          description: cachedMeta.description,
+          coverUrl: cachedMeta.coverUrl,
+          chapters: [
+            for (var i = 0; i < cachedMeta.chapterCount; i++)
+              ReaderChapter(
+                index: i,
+                title: i < cachedMeta.chapterTitles.length
+                    ? cachedMeta.chapterTitles[i]
+                    : 'Глава ${i + 1}',
+                blocks: const [],
+              ),
+          ],
+          metadata: cachedMeta.metadata,
+        );
+      }
+
       final chapters = <ReaderChapter>[];
       for (var i = 0; i < cachedMeta.chapterCount; i++) {
         final chapter = await loadChapter(bookId, i);
@@ -416,6 +444,25 @@ class BookOpenService {
           metadata: cachedMeta.metadata,
         );
       }
+
+      return NormalizedBook(
+        id: cachedMeta.id,
+        title: cachedMeta.title,
+        authors: cachedMeta.authors,
+        description: cachedMeta.description,
+        coverUrl: cachedMeta.coverUrl,
+        chapters: [
+          for (var i = 0; i < cachedMeta.chapterCount; i++)
+            ReaderChapter(
+              index: i,
+              title: i < cachedMeta.chapterTitles.length
+                  ? cachedMeta.chapterTitles[i]
+                  : 'Глава ${i + 1}',
+              blocks: const [],
+            ),
+        ],
+        metadata: cachedMeta.metadata,
+      );
     }
 
     // Try legacy monolithic cache
