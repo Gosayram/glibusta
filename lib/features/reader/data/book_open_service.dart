@@ -46,6 +46,15 @@ class BookOpenService {
     BookFormat.txt: TxtBookParser(),
   };
 
+  static Future<NormalizedBook> _parseEpubInWorker(
+    ({String filePath, String imagesDirPath, String bookId}) args,
+  ) async {
+    final imageStore = EpubImageStore(Directory(args.imagesDirPath));
+    final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+    final epubBook = await parser.parse(args.filePath);
+    return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
+  }
+
   Future<NormalizedBook> openBook(String bookId) async {
     final download = await _findDownload(bookId);
     if (download == null) {
@@ -91,24 +100,24 @@ class BookOpenService {
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
       }
-      final imageStore = EpubImageStore(imagesDir);
-      final parser = new_epub.CustomEpubParser(imageStore: imageStore);
 
       try {
-        final epubBook = await parser
-            .parse(filePath)
-            .timeout(
+        final normalized =
+            await Isolate.run(
+              () => _parseEpubInWorker((
+                filePath: filePath,
+                imagesDirPath: imagesDir.path,
+                bookId: effectiveBookId,
+              )),
+            ).timeout(
               _parsingTimeout,
               onTimeout: () => throw TimeoutException(
                 'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
                 'Попробуйте повторить.',
               ),
             );
-        final adapter = EpubBookAdapter();
-        final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
         _logger.info(
-          'EPUB parsed: ${epubBook.title}, ${epubBook.chapters.length} chapters, '
-          '${epubBook.toc?.length ?? 0} TOC items',
+          'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
           name: 'Reader',
         );
         return normalized;

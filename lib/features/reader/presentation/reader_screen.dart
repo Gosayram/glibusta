@@ -133,7 +133,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final readerState = _ctrl.state;
+    return StreamBuilder<ReaderState>(
+      stream: _ctrl.stateStream,
+      initialData: _ctrl.state,
+      builder: (context, snapshot) {
+        return _buildForState(context, snapshot.data ?? _ctrl.state);
+      },
+    );
+  }
+
+  Widget _buildForState(BuildContext context, ReaderState readerState) {
     final settings = ref.watch(readerSettingsProvider);
     final resolvedTheme = _resolveTheme(settings);
     final theme = _getThemeData(resolvedTheme);

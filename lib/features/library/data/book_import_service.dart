@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -36,11 +37,12 @@ class BookImportService {
 
   final Map<String, BookParser> _parsers = {
     'fb2': Fb2Parser(),
+    'zip': Fb2Parser(),
     'epub': EpubParser(),
     'txt': TxtBookParser(),
   };
 
-  static const _supportedExtensions = ['fb2', 'epub', 'txt'];
+  static const _supportedExtensions = ['fb2', 'zip', 'epub', 'txt'];
 
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
@@ -126,10 +128,7 @@ class BookImportService {
 
       final targetFile = await _storage.bookFile(
         book.id,
-        BookFormat.values.firstWhere(
-          (f) => f.name == ext,
-          orElse: () => BookFormat.epub,
-        ),
+        bookFormatForImportExtension(ext),
       );
       await targetFile.parent.create(recursive: true);
       await file.copy(targetFile.path);
@@ -178,10 +177,7 @@ class BookImportService {
           final ext = filePath.split('.').last.toLowerCase();
           final targetFile = await _storage.bookFile(
             bookId,
-            BookFormat.values.firstWhere(
-              (f) => f.name == ext,
-              orElse: () => BookFormat.epub,
-            ),
+            bookFormatForImportExtension(ext),
           );
           if (await targetFile.exists()) {
             await targetFile.delete();
@@ -229,10 +225,7 @@ class BookImportService {
 
       final targetFile = await _storage.bookFile(
         book.id,
-        BookFormat.values.firstWhere(
-          (f) => f.name == ext,
-          orElse: () => BookFormat.epub,
-        ),
+        bookFormatForImportExtension(ext),
       );
       await targetFile.parent.create(recursive: true);
       await targetFile.writeAsBytes(bytes, flush: true);
@@ -333,6 +326,16 @@ class BookImportService {
       _logger.warning('Cover extraction failed for $bookId: $e', name: 'Import', error: e);
     }
   }
+}
+
+@visibleForTesting
+BookFormat bookFormatForImportExtension(String ext) {
+  return switch (ext.toLowerCase()) {
+    'fb2' || 'zip' => BookFormat.fb2,
+    'epub' => BookFormat.epub,
+    'txt' => BookFormat.txt,
+    _ => BookFormat.unknown,
+  };
 }
 
 class ImportResult {

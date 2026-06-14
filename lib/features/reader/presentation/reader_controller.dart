@@ -211,7 +211,7 @@ class ReaderController {
         ),
       );
     } on Object catch (e) {
-      unawaited(_handleLoadError(e));
+      await _handleLoadError(e);
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
+import 'package:glibusta/shared/models/book.dart';
 
 void main() {
   late AppDatabase db;
@@ -42,6 +43,13 @@ void main() {
       final result = await service.importFile(file.path);
       expect(result.isSuccess, isFalse);
       expect(result.error, contains('слишком мал'));
+    });
+  });
+
+  group('bookFormatForImportExtension', () {
+    test('maps fb2.zip imports to fb2 storage format', () {
+      expect(bookFormatForImportExtension('zip'), BookFormat.fb2);
+      expect(bookFormatForImportExtension('ZIP'), BookFormat.fb2);
     });
   });
 
