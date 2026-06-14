@@ -42,6 +42,7 @@ class BookOpenService {
   BookOpenService(this._database);
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
+  static const int _splitCacheVersion = 1;
 
   static final Map<BookFormat, BookParser> _parsers = {
     BookFormat.epub: legacy_epub.EpubParser(),
@@ -65,6 +66,22 @@ class BookOpenService {
   static Future<NormalizedBook> _parseRtfInWorker(({String filePath, String bookId}) args) async {
     final document = await RtfFormatHandler().prepare(args.filePath);
     return document.toNormalizedBook(args.bookId);
+  }
+
+  static Future<NormalizedBook> _parseTextBasedInWorker(
+    ({BookFormat format, List<int> bytes, String fileName}) args,
+  ) async {
+    final typedBytes = args.bytes is Uint8List
+        ? args.bytes as Uint8List
+        : Uint8List.fromList(args.bytes);
+    final detector = BookEncodingDetector();
+    final detectionResult = await detector.detect(typedBytes, fileName: args.fileName);
+    final detectedText = detectionResult.text;
+    return switch (args.format) {
+      BookFormat.fb2 => parseFb2FromText(detectedText, fileName: args.fileName),
+      BookFormat.txt => parseTxtFromText(detectedText, fileName: args.fileName),
+      _ => throw BookOpenFailure('Формат не поддерживается: ${args.format.name}'),
+    };
   }
 
   Future<NormalizedBook> openBook(String bookId) async {
@@ -218,20 +235,11 @@ class BookOpenService {
             );
       }
 
-      final detector = BookEncodingDetector();
-      final detectionResult = await detector.detect(bytes, fileName: fileName);
-      final detectedText = detectionResult.text;
-
-      return await Isolate.run(() {
-        switch (bookFormat) {
-          case BookFormat.fb2:
-            return parseFb2FromText(detectedText, fileName: fileName);
-          case BookFormat.txt:
-            return parseTxtFromText(detectedText, fileName: fileName);
-          default:
-            throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
-        }
-      }).timeout(
+      return await Isolate.run(
+        () => _parseTextBasedInWorker(
+          (format: bookFormat, bytes: bytes, fileName: fileName),
+        ),
+      ).timeout(
         _parsingTimeout,
         onTimeout: () => throw TimeoutException(
           'Разбор ${bookFormat.name} занял слишком много времени.',
@@ -340,6 +348,8 @@ class BookOpenService {
 
   File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
 
+  File _getManifestFile(Directory bookDir) => File('${bookDir.path}/manifest.json');
+
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
   Future<void> _writeJsonAtomically(File target, Object? value) async {
@@ -365,6 +375,36 @@ class BookOpenService {
     }
   }
 
+  Future<bool> _isSplitCacheComplete(Directory bookDir, NormalizedBookMetadata meta) async {
+    final manifestFile = _getManifestFile(bookDir);
+    if (await manifestFile.exists()) {
+      try {
+        final json = await manifestFile.readAsString();
+        final manifest = jsonDecode(json) as Map<String, dynamic>;
+        final version = manifest['version'] as int?;
+        final chapterCount = manifest['chapterCount'] as int?;
+        final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
+        if (version != _splitCacheVersion ||
+            chapterCount != meta.chapterCount ||
+            chapters.length != meta.chapterCount) {
+          return false;
+        }
+        for (final index in chapters) {
+          if (!await _getChapterFile(bookDir, index).exists()) return false;
+        }
+        return true;
+      } on Object catch (e) {
+        _logger.warning('Failed to validate split cache manifest: $e', name: 'Reader', error: e);
+        return false;
+      }
+    }
+
+    for (var i = 0; i < meta.chapterCount; i++) {
+      if (!await _getChapterFile(bookDir, i).exists()) return false;
+    }
+    return true;
+  }
+
   Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
     final bookDir = await _getBookDir(bookId);
     final metaFile = _getMetadataFile(bookDir);
@@ -373,6 +413,15 @@ class BookOpenService {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
       await _writeJsonAtomically(chapterFile, chapter.toJson());
     }
+    await _writeJsonAtomically(
+      _getManifestFile(bookDir),
+      {
+        'version': _splitCacheVersion,
+        'bookId': bookId,
+        'chapterCount': book.chapters.length,
+        'chapters': book.chapters.map((chapter) => chapter.index).toList(),
+      },
+    );
   }
 
   Future<ReaderChapter?> loadChapter(String bookId, int index) async {
@@ -430,6 +479,8 @@ class BookOpenService {
     // Try split cache first
     final cachedMeta = await getCachedMetadata(bookId);
     if (cachedMeta != null) {
+      final bookDir = await _getExistingBookDir(bookId);
+      final isComplete = await _isSplitCacheComplete(bookDir, cachedMeta);
       if (!loadChapters) {
         return NormalizedBook(
           id: cachedMeta.id,
@@ -451,23 +502,27 @@ class BookOpenService {
         );
       }
 
-      final chapters = <ReaderChapter>[];
-      for (var i = 0; i < cachedMeta.chapterCount; i++) {
-        final chapter = await loadChapter(bookId, i);
-        if (chapter != null) {
-          chapters.add(chapter);
+      if (!isComplete) {
+        _logger.warning('Split cache is incomplete for $bookId', name: 'Reader');
+      } else {
+        final chapters = <ReaderChapter>[];
+        for (var i = 0; i < cachedMeta.chapterCount; i++) {
+          final chapter = await loadChapter(bookId, i);
+          if (chapter != null) {
+            chapters.add(chapter);
+          }
         }
-      }
-      if (chapters.length == cachedMeta.chapterCount) {
-        return NormalizedBook(
-          id: cachedMeta.id,
-          title: cachedMeta.title,
-          authors: cachedMeta.authors,
-          description: cachedMeta.description,
-          coverUrl: cachedMeta.coverUrl,
-          chapters: chapters,
-          metadata: cachedMeta.metadata,
-        );
+        if (chapters.length == cachedMeta.chapterCount) {
+          return NormalizedBook(
+            id: cachedMeta.id,
+            title: cachedMeta.title,
+            authors: cachedMeta.authors,
+            description: cachedMeta.description,
+            coverUrl: cachedMeta.coverUrl,
+            chapters: chapters,
+            metadata: cachedMeta.metadata,
+          );
+        }
       }
 
       return NormalizedBook(
