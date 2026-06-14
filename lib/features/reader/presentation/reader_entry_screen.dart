@@ -49,7 +49,7 @@ class ReaderEntryScreen extends ConsumerWidget {
           return const _ReaderOpenError(message: 'Путь к файлу не указан');
         }
         if (fileState == null || !fileState.exists) {
-          return _ReaderOpenError(message: 'Файл не найден: $path');
+          return const _ReaderOpenError(message: 'Файл книги не найден');
         }
 
         return switch (detectBookFormat(path)) {
@@ -62,7 +62,7 @@ class ReaderEntryScreen extends ConsumerWidget {
           BookFormat.mobi ||
           BookFormat.azw3 ||
           BookFormat.prc => ReaderScreen(bookId: bookId),
-          BookFormat.unknown => _ReaderOpenError(message: 'Формат не поддерживается: $path'),
+          BookFormat.unknown => const _ReaderOpenError(message: 'Формат не поддерживается'),
         };
       },
     );

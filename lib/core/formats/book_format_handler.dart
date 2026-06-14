@@ -9,6 +9,8 @@ import '../../features/reader/data/parsers/mobi_parser.dart';
 import '../../features/reader/data/parsers/normalized_book.dart';
 import '../../features/reader/data/parsers/rtf_parser.dart';
 
+enum BookFormatCapability { readable, partial, legacy, unsupported }
+
 abstract class BookFormatHandler {
   String get format;
   List<String> get supportedExtensions;
@@ -21,6 +23,14 @@ abstract class BookFormatHandler {
     final ext = filePath.split('.').last.toLowerCase();
     return supportedExtensions.contains(ext);
   }
+
+  BookFormatCapability capabilityForExtension(String extension) {
+    return supportedExtensions.contains(extension.toLowerCase())
+        ? BookFormatCapability.readable
+        : BookFormatCapability.unsupported;
+  }
+
+  String displayNameForExtension(String extension) => displayName;
 }
 
 class Fb2FormatHandler extends BookFormatHandler {
@@ -169,6 +179,26 @@ class MobiFormatHandler extends BookFormatHandler {
   String get displayName => 'MOBI / Kindle';
 
   @override
+  BookFormatCapability capabilityForExtension(String extension) {
+    return switch (extension.toLowerCase()) {
+      'mobi' || 'azw' => BookFormatCapability.readable,
+      'azw3' => BookFormatCapability.partial,
+      'prc' => BookFormatCapability.legacy,
+      _ => BookFormatCapability.unsupported,
+    };
+  }
+
+  @override
+  String displayNameForExtension(String extension) {
+    return switch (extension.toLowerCase()) {
+      'mobi' || 'azw' => 'MOBI',
+      'azw3' => 'AZW3 partial',
+      'prc' => 'PRC legacy',
+      _ => displayName,
+    };
+  }
+
+  @override
   Future<NormalizedBook> parse(Uint8List data) => _parser.parse(data);
   @override
   Future<NormalizedBook> parseFile(String filePath) => _parser.parseFile(filePath);
@@ -201,6 +231,18 @@ class BookFormatRegistry {
   }
 
   bool canHandle(String filePath) => handlerFor(filePath) != null;
+
+  BookFormatCapability capabilityFor(String filePath) {
+    final ext = filePath.split('.').last.toLowerCase();
+    final handler = _handlers[ext];
+    return handler?.capabilityForExtension(ext) ?? BookFormatCapability.unsupported;
+  }
+
+  String? displayNameFor(String filePath) {
+    final ext = filePath.split('.').last.toLowerCase();
+    final handler = _handlers[ext];
+    return handler?.displayNameForExtension(ext);
+  }
 
   List<BookFormatHandler> get allHandlers => _handlers.values.toSet().toList();
 

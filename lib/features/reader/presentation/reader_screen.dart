@@ -222,7 +222,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                 ),
                               const SizedBox(height: 4),
                               Text(
-                                'Путь: ${readerState.errorFilePath}',
+                                'Файл: ${_displayFileName(readerState.errorFilePath!)}',
                                 style: const TextStyle(fontSize: 11, color: Colors.grey),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -241,6 +241,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                             onPressed: () => _ctrl.loadBook(),
                             icon: const Icon(Icons.refresh),
                             label: const Text('Повторить'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              await _ctrl.clearCacheAndReload();
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Кеш очищен')),
+                              );
+                            },
+                            icon: const Icon(Icons.cleaning_services_outlined),
+                            label: const Text('Очистить кеш'),
                           ),
                           OutlinedButton.icon(
                             onPressed: () {
@@ -590,6 +601,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
       ),
     );
+  }
+
+  String _displayFileName(String path) {
+    final normalized = path.replaceAll(r'\', '/');
+    final lastSlash = normalized.lastIndexOf('/');
+    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
   }
 
   void _showDeleteConfirmDialog(BuildContext context) {

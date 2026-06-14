@@ -686,6 +686,12 @@ class ReaderController {
     _updateState(_state.copyWith(errorMessage: 'Файл удалён'));
   }
 
+  Future<void> clearCacheAndReload() async {
+    final service = _ref.read(bookOpenServiceProvider);
+    await service.invalidateBookCache(_bookId);
+    await loadBook();
+  }
+
   String buildDiagnostics() {
     final buffer = StringBuffer();
     buffer.writeln('=== Diagnostics ===');
