@@ -10,6 +10,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../epub/epub_book_adapter.dart';
@@ -36,6 +37,7 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 class BookOpenService {
   final AppDatabase _database;
   final _logger = AppLogger();
+  final _rtfHandler = RtfFormatHandler();
 
   BookOpenService(this._database);
 
@@ -156,6 +158,19 @@ class BookOpenService {
       }
     }
 
+    if (bookFormat == BookFormat.rtf) {
+      final effectiveBookId = bookId ?? _extractBookId(filePath);
+      final document = await _rtfHandler
+          .prepare(filePath)
+          .timeout(
+            _parsingTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Разбор RTF занял слишком много времени.',
+            ),
+          );
+      return document.toNormalizedBook(effectiveBookId);
+    }
+
     try {
       final file = File(filePath);
       final bytes = await file.readAsBytes();
@@ -189,8 +204,6 @@ class BookOpenService {
             return parseFb2FromText(detectedText, fileName: fileName);
           case BookFormat.txt:
             return parseTxtFromText(detectedText, fileName: fileName);
-          case BookFormat.rtf:
-            return parseTxtFromText(rtfToPlainText(detectedText), fileName: fileName);
           default:
             throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
         }

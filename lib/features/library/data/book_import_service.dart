@@ -63,9 +63,6 @@ class BookImportService {
     if (inspection.decision == ImportDecision.unsupported) {
       return ImportResult.failure(inspection.reason ?? 'Формат не поддерживается');
     }
-    if (inspection.decision == ImportDecision.openAsPdf) {
-      return ImportResult.failure('PDF открывается отдельным просмотрщиком');
-    }
     if (inspection.decision == ImportDecision.needsEncodingSelection) {
       return ImportResult.needsEncoding(
         inspection.title ?? 'Неизвестная кодировка',
@@ -73,7 +70,10 @@ class BookImportService {
       );
     }
 
-    // importAsBook
+    if (inspection.decision == ImportDecision.importAsDocument) {
+      return _doDocumentImport(inspection);
+    }
+
     return _doImport(inspection.path, forcedEncoding: inspection.encoding);
   }
 
@@ -192,6 +192,70 @@ class BookImportService {
     }
   }
 
+  Future<ImportResult> _doDocumentImport(BookFileInspectionResult inspection) async {
+    final file = File(inspection.path);
+    if (!await file.exists()) {
+      return ImportResult.failure('Файл не найден: ${inspection.path}');
+    }
+
+    final ext = inspection.path.split('.').last.toLowerCase();
+    final format = bookFormatForImportExtension(ext);
+    if (format == BookFormat.unknown) {
+      return ImportResult.failure('Формат не поддерживается: .$ext');
+    }
+
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
+      return ImportResult.failure('Файл пуст: ${inspection.path}');
+    }
+
+    final contentHash = inspection.hash.isNotEmpty
+        ? inspection.hash
+        : sha256.convert(bytes).toString();
+    final existing = await _findByHash(contentHash);
+    if (existing != null) {
+      return ImportResult.duplicate(existing.title, contentHash);
+    }
+
+    final fileName = inspection.path.split('/').last;
+    final title = inspection.title ?? fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
+    final bookId = contentHash;
+    final targetFile = await _storage.bookFile(bookId, format);
+    await targetFile.parent.create(recursive: true);
+    await file.copy(targetFile.path);
+
+    await _database
+        .into(_database.savedBooks)
+        .insertOnConflictUpdate(
+          SavedBooksCompanion.insert(
+            id: bookId,
+            title: title,
+            authorIds: const Value([]),
+            description: Value('${format.name.toUpperCase()} document'),
+            sourceUrl: Value(inspection.path),
+            contentHash: Value(contentHash),
+            fileSize: Value(bytes.length),
+            filePath: Value(targetFile.path),
+          ),
+        );
+
+    await _database
+        .into(_database.downloads)
+        .insertOnConflictUpdate(
+          DownloadsCompanion.insert(
+            id: bookId,
+            bookId: bookId,
+            bookTitle: Value(title),
+            format: format.name,
+            sourceUrl: inspection.path,
+            targetPath: Value(targetFile.path),
+            status: DownloadStatusDb.completed,
+          ),
+        );
+
+    return ImportResult.success(title);
+  }
+
   /// Import a book from an external SAF URI into the app library.
   Future<ImportResult> importFromExternal(
     ExternalBookFile external, {
@@ -213,6 +277,48 @@ class BookImportService {
       final existing = await _findByHash(contentHash);
       if (existing != null) {
         return ImportResult.duplicate(existing.title, contentHash);
+      }
+
+      final format = bookFormatForImportExtension(ext);
+      if (format == BookFormat.pdf || format == BookFormat.djvu) {
+        final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
+        final bookId = contentHash;
+        final targetFile = await _storage.bookFile(bookId, format);
+        await targetFile.parent.create(recursive: true);
+        await targetFile.writeAsBytes(bytes, flush: true);
+
+        await _database
+            .into(_database.savedBooks)
+            .insertOnConflictUpdate(
+              SavedBooksCompanion.insert(
+                id: bookId,
+                title: title,
+                authorIds: const Value([]),
+                description: Value('${format.name.toUpperCase()} document'),
+                sourceUrl: Value(external.uri),
+                contentHash: Value(contentHash),
+                fileSize: Value(external.size),
+                filePath: Value(targetFile.path),
+                storageMode: const Value('external'),
+                externalUri: Value(external.uri),
+              ),
+            );
+
+        await _database
+            .into(_database.downloads)
+            .insertOnConflictUpdate(
+              DownloadsCompanion.insert(
+                id: bookId,
+                bookId: bookId,
+                bookTitle: Value(title),
+                format: format.name,
+                sourceUrl: external.uri,
+                targetPath: Value(targetFile.path),
+                status: DownloadStatusDb.completed,
+              ),
+            );
+
+        return ImportResult.success(title);
       }
 
       final parser = _parsers[ext];
@@ -338,6 +444,7 @@ BookFormat bookFormatForImportExtension(String ext) {
     'txt' => BookFormat.txt,
     'rtf' => BookFormat.rtf,
     'mobi' => BookFormat.mobi,
+    'pdf' => BookFormat.pdf,
     'djvu' || 'djv' => BookFormat.djvu,
     _ => BookFormat.unknown,
   };

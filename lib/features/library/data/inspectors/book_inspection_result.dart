@@ -2,7 +2,7 @@ import '../../../reader/data/parsers/format_detector.dart';
 
 enum ImportDecision {
   importAsBook,
-  openAsPdf,
+  importAsDocument,
   unsupported,
   corrupted,
   duplicate,

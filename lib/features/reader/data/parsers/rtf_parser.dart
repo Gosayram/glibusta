@@ -63,6 +63,7 @@ String rtfToPlainText(String rtf) {
   var index = 0;
   var skipGroupDepth = 0;
   var groupDepth = 0;
+  var unicodeSkip = 1;
 
   while (index < rtf.length) {
     final char = rtf[index];
@@ -91,8 +92,9 @@ String rtfToPlainText(String rtf) {
     }
 
     if (char == r'\') {
-      final parsed = _parseControl(rtf, index);
+      final parsed = _parseControl(rtf, index, unicodeSkip: unicodeSkip);
       if (parsed.output != null) buffer.write(parsed.output);
+      unicodeSkip = parsed.unicodeSkip ?? unicodeSkip;
       index = parsed.nextIndex;
       continue;
     }
@@ -113,12 +115,18 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
   return index + 1 < text.length && text[index] == r'\' && text[index + 1] == symbol;
 }
 
-({int nextIndex, String? output}) _parseControl(String text, int start) {
-  if (start + 1 >= text.length) return (nextIndex: start + 1, output: null);
+({int nextIndex, String? output, int? unicodeSkip}) _parseControl(
+  String text,
+  int start, {
+  required int unicodeSkip,
+}) {
+  if (start + 1 >= text.length) {
+    return (nextIndex: start + 1, output: null, unicodeSkip: null);
+  }
 
   final next = text[start + 1];
   if (next == r'\' || next == '{' || next == '}') {
-    return (nextIndex: start + 2, output: next);
+    return (nextIndex: start + 2, output: next, unicodeSkip: null);
   }
 
   if (next == "'") {
@@ -126,10 +134,10 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
     if (hexEnd <= text.length) {
       final value = int.tryParse(text.substring(start + 2, hexEnd), radix: 16);
       if (value != null) {
-        return (nextIndex: hexEnd, output: String.fromCharCode(value));
+        return (nextIndex: hexEnd, output: String.fromCharCode(value), unicodeSkip: null);
       }
     }
-    return (nextIndex: (start + 2).clamp(0, text.length), output: null);
+    return (nextIndex: (start + 2).clamp(0, text.length), output: null, unicodeSkip: null);
   }
 
   var index = start + 1;
@@ -156,8 +164,12 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
     index++;
   }
 
-  if (word == 'u' && number != null && index < text.length) {
-    index++;
+  if (word == 'u' && number != null) {
+    var skipped = 0;
+    while (index < text.length && skipped < unicodeSkip) {
+      index++;
+      skipped++;
+    }
   }
 
   return (
@@ -167,9 +179,14 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
       'tab' => '\t',
       'emdash' => '-',
       'endash' => '-',
+      'lquote' => "'",
+      'rquote' => "'",
+      'ldblquote' => '"',
+      'rdblquote' => '"',
       'bullet' => '* ',
       'u' when number != null => String.fromCharCode(number < 0 ? number + 65536 : number),
       _ => null,
     },
+    unicodeSkip: word == 'uc' && number != null ? (number < 0 ? 0 : number) : null,
   );
 }

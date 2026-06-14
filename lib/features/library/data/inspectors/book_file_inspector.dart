@@ -83,8 +83,8 @@ final class BookFileInspector {
     if (metadata.isCorrupted) {
       return ImportDecision.corrupted;
     }
-    if (format == BookFormat.pdf) {
-      return ImportDecision.openAsPdf;
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+      return ImportDecision.importAsDocument;
     }
     if (format == BookFormat.epub || format == BookFormat.fb2) {
       if (metadata.encodingConfidence != null && metadata.encodingConfidence! < 0.55) {

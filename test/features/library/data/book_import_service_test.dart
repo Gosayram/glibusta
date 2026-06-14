@@ -51,6 +51,13 @@ void main() {
       expect(bookFormatForImportExtension('zip'), BookFormat.fb2);
       expect(bookFormatForImportExtension('ZIP'), BookFormat.fb2);
     });
+
+    test('maps document imports to document storage formats', () {
+      expect(bookFormatForImportExtension('pdf'), BookFormat.pdf);
+      expect(bookFormatForImportExtension('djvu'), BookFormat.djvu);
+      expect(bookFormatForImportExtension('djv'), BookFormat.djvu);
+      expect(bookFormatForImportExtension('rtf'), BookFormat.rtf);
+    });
   });
 
   group('importDirectory', () {

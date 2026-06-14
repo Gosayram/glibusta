@@ -14,6 +14,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterFragmentActivity() {
 
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
+    private val DJVU_CHANNEL = "glibusta/djvu"
     private var pendingResult: MethodChannel.Result? = null
 
     private val openTreeLauncher: ActivityResultLauncher<Uri?> =
@@ -39,6 +40,8 @@ class MainActivity : FlutterFragmentActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result -> handleMethodCall(call, result) }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DJVU_CHANNEL)
+            .setMethodCallHandler { call, result -> handleDjvuCall(call, result) }
     }
 
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -67,6 +70,24 @@ class MainActivity : FlutterFragmentActivity() {
                 val uris = contentResolver.persistedUriPermissions
                     .map { it.uri.toString() }
                 result.success(uris)
+            }
+            else -> result.notImplemented()
+        }
+    }
+
+    private fun handleDjvuCall(call: MethodCall, result: MethodChannel.Result) {
+        when (call.method) {
+            "open" -> {
+                result.success(mapOf("pageCount" to 0))
+            }
+            "renderPage" -> {
+                result.error("NOT_IMPLEMENTED", "DjVu renderer is not bundled yet", null)
+            }
+            "extractText" -> {
+                result.success(null)
+            }
+            "close" -> {
+                result.success(null)
             }
             else -> result.notImplemented()
         }

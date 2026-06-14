@@ -186,15 +186,6 @@ class LibraryScreen extends ConsumerWidget {
         return;
       }
 
-      if (inspection.decision == ImportDecision.openAsPdf) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PDF открывается отдельным просмотрщиком')),
-          );
-        }
-        return;
-      }
-
       final service = ref.read(bookImportServiceProvider);
       final importResult = await service.importFromInspection(inspection);
       if (context.mounted) {

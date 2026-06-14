@@ -16,7 +16,7 @@ import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
-import '../features/reader/presentation/reader_screen.dart';
+import '../features/reader/presentation/reader_entry_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/series/presentation/series_detail_screen.dart';
@@ -187,7 +187,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           final bookId = state.pathParameters['bookId']!;
           return CustomTransitionPage<void>(
             key: state.pageKey,
-            child: ReaderScreen(bookId: bookId),
+            child: ReaderEntryScreen(bookId: bookId),
             transitionsBuilder: (_, animation, second, child) {
               return FadeTransition(
                 opacity: animation,
