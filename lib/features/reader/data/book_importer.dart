@@ -7,6 +7,7 @@ import 'book_open_service.dart';
 import 'parsers/epub_parser.dart';
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
+import 'parsers/mobi_parser.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
 import 'parsers/rtf_parser.dart';
@@ -18,6 +19,7 @@ final bookParserRegistryProvider = Provider<BookParserRegistry>((ref) {
     Fb2Parser(),
     TxtBookParser(),
     RtfBookParser(),
+    MobiBookParser(),
   ]);
 });
 
@@ -52,7 +54,7 @@ final class BookImporter {
     if (format == BookFormat.unknown) {
       throw const BookOpenFailure('Неподдерживаемый формат файла');
     }
-    if (format == BookFormat.pdf || format == BookFormat.mobi || format == BookFormat.djvu) {
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
       throw const BookOpenFailure('Формат не поддерживается');
     }
 
@@ -63,7 +65,9 @@ final class BookImporter {
         BookFormat.txt => TxtBookParser().parseFile(filePath),
         BookFormat.rtf => RtfBookParser().parseFile(filePath),
         BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
-        BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
+        BookFormat.mobi => MobiBookParser().parseFile(filePath),
+        BookFormat.azw3 => MobiBookParser().parseFile(filePath),
+        BookFormat.prc => MobiBookParser().parseFile(filePath),
         BookFormat.djvu => throw UnsupportedError('DJVU not supported'),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),
       };

@@ -8,7 +8,9 @@ BookFormat detectBookFormat(String path) {
   if (lower.endsWith('.fb2')) return BookFormat.fb2;
   if (lower.endsWith('.pdf')) return BookFormat.pdf;
   if (lower.endsWith('.txt')) return BookFormat.txt;
-  if (lower.endsWith('.mobi')) return BookFormat.mobi;
+  if (lower.endsWith('.mobi') || lower.endsWith('.azw')) return BookFormat.mobi;
+  if (lower.endsWith('.azw3')) return BookFormat.azw3;
+  if (lower.endsWith('.prc')) return BookFormat.prc;
   if (lower.endsWith('.rtf')) return BookFormat.rtf;
   if (lower.endsWith('.djvu') || lower.endsWith('.djv')) return BookFormat.djvu;
   if (lower.endsWith('.zip')) return BookFormat.unknown;

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/reader/data/parsers/epub_parser.dart';
 import '../../features/reader/data/parsers/fb2_parser.dart';
+import '../../features/reader/data/parsers/mobi_parser.dart';
 import '../../features/reader/data/parsers/normalized_book.dart';
 import '../../features/reader/data/parsers/rtf_parser.dart';
 
@@ -157,12 +158,29 @@ class RtfFormatHandler extends BookFormatHandler {
   Future<NormalizedBook> parseFile(String filePath) => _parser.parseFile(filePath);
 }
 
+class MobiFormatHandler extends BookFormatHandler {
+  final _parser = MobiBookParser();
+
+  @override
+  String get format => 'mobi';
+  @override
+  List<String> get supportedExtensions => ['mobi', 'azw', 'azw3', 'prc'];
+  @override
+  String get displayName => 'MOBI / Kindle';
+
+  @override
+  Future<NormalizedBook> parse(Uint8List data) => _parser.parse(data);
+  @override
+  Future<NormalizedBook> parseFile(String filePath) => _parser.parseFile(filePath);
+}
+
 class BookFormatRegistry {
   BookFormatRegistry() {
     register(Fb2FormatHandler());
     register(EpubFormatHandler());
     register(TxtFormatHandler());
     register(RtfFormatHandler());
+    register(MobiFormatHandler());
   }
 
   final Map<String, BookFormatHandler> _handlers = {};

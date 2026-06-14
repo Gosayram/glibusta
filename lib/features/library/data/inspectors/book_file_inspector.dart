@@ -92,7 +92,11 @@ final class BookFileInspector {
       }
       return ImportDecision.importAsBook;
     }
-    if (format == BookFormat.txt || format == BookFormat.rtf) {
+    if (format == BookFormat.txt ||
+        format == BookFormat.rtf ||
+        format == BookFormat.mobi ||
+        format == BookFormat.azw3 ||
+        format == BookFormat.prc) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;

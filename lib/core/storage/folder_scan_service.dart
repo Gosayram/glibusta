@@ -12,6 +12,9 @@ final class FolderScanService {
     'txt',
     'rtf',
     'mobi',
+    'azw',
+    'azw3',
+    'prc',
     'djvu',
     'djv',
   ];

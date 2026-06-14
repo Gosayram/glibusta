@@ -16,6 +16,7 @@ import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
+import '../../reader/data/parsers/mobi_parser.dart';
 import '../../reader/data/parsers/rtf_parser.dart';
 import '../../reader/data/parsers/txt_parser.dart';
 import '../data/cover_extraction_service.dart';
@@ -42,9 +43,25 @@ class BookImportService {
     'epub': EpubParser(),
     'txt': TxtBookParser(),
     'rtf': RtfBookParser(),
+    'mobi': MobiBookParser(),
+    'azw': MobiBookParser(),
+    'azw3': MobiBookParser(),
+    'prc': MobiBookParser(),
   };
 
-  static const _supportedExtensions = ['fb2', 'zip', 'epub', 'txt', 'rtf', 'mobi', 'djvu', 'djv'];
+  static const _supportedExtensions = [
+    'fb2',
+    'zip',
+    'epub',
+    'txt',
+    'rtf',
+    'mobi',
+    'azw',
+    'azw3',
+    'prc',
+    'djvu',
+    'djv',
+  ];
 
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
@@ -443,7 +460,9 @@ BookFormat bookFormatForImportExtension(String ext) {
     'epub' => BookFormat.epub,
     'txt' => BookFormat.txt,
     'rtf' => BookFormat.rtf,
-    'mobi' => BookFormat.mobi,
+    'mobi' || 'azw' => BookFormat.mobi,
+    'azw3' => BookFormat.azw3,
+    'prc' => BookFormat.prc,
     'pdf' => BookFormat.pdf,
     'djvu' || 'djv' => BookFormat.djvu,
     _ => BookFormat.unknown,

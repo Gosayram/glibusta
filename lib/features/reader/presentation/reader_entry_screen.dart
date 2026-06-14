@@ -42,35 +42,16 @@ class ReaderEntryScreen extends ConsumerWidget {
         return switch (detectBookFormat(path)) {
           BookFormat.pdf => PdfReaderScreen(filePath: path),
           BookFormat.djvu => DjvuReaderScreen(filePath: path),
-          BookFormat.mobi => const _UnsupportedReaderFormat(format: 'MOBI'),
-          BookFormat.epub || BookFormat.fb2 || BookFormat.txt || BookFormat.rtf => ReaderScreen(
-            bookId: bookId,
-          ),
+          BookFormat.epub ||
+          BookFormat.fb2 ||
+          BookFormat.txt ||
+          BookFormat.rtf ||
+          BookFormat.mobi ||
+          BookFormat.azw3 ||
+          BookFormat.prc => ReaderScreen(bookId: bookId),
           BookFormat.unknown => _ReaderOpenError(message: 'Формат не поддерживается: $path'),
         };
       },
-    );
-  }
-}
-
-class _UnsupportedReaderFormat extends StatelessWidget {
-  const _UnsupportedReaderFormat({required this.format});
-
-  final String format;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(format)),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            '$format распознан, но встроенное чтение этого формата пока не поддерживается.',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
     );
   }
 }

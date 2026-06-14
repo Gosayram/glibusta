@@ -20,6 +20,7 @@ import 'parsers/book_parser.dart';
 import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
+import 'parsers/mobi_parser.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/rtf_parser.dart';
 import 'parsers/txt_parser.dart';
@@ -48,6 +49,9 @@ class BookOpenService {
     BookFormat.fb2: Fb2Parser(),
     BookFormat.txt: TxtBookParser(),
     BookFormat.rtf: RtfBookParser(),
+    BookFormat.mobi: MobiBookParser(),
+    BookFormat.azw3: MobiBookParser(),
+    BookFormat.prc: MobiBookParser(),
   };
 
   static Future<NormalizedBook> _parseEpubInWorker(
@@ -85,7 +89,7 @@ class BookOpenService {
       throw BookOpenFailure('Формат не поддерживается: ${download.format}');
     }
 
-    if (format == BookFormat.pdf || format == BookFormat.mobi || format == BookFormat.djvu) {
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
       throw const BookOpenFailure('Формат не поддерживается');
     }
 
@@ -171,6 +175,23 @@ class BookOpenService {
       return document.toNormalizedBook(effectiveBookId);
     }
 
+    if (bookFormat == BookFormat.mobi ||
+        bookFormat == BookFormat.azw3 ||
+        bookFormat == BookFormat.prc) {
+      final parser = _parsers[bookFormat];
+      if (parser == null) {
+        throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+      }
+      return parser
+          .parseFile(filePath)
+          .timeout(
+            _parsingTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Разбор ${bookFormat.name.toUpperCase()} занял слишком много времени.',
+            ),
+          );
+    }
+
     try {
       final file = File(filePath);
       final bytes = await file.readAsBytes();
@@ -252,6 +273,8 @@ class BookOpenService {
     if (format == BookFormat.unknown ||
         format == BookFormat.pdf ||
         format == BookFormat.mobi ||
+        format == BookFormat.azw3 ||
+        format == BookFormat.prc ||
         format == BookFormat.djvu) {
       throw BookOpenFailure('Формат не поддерживается: ${format.name}');
     }

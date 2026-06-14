@@ -297,13 +297,27 @@ class MacOSShell extends ConsumerWidget {
   }
 
   void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
-    const supportedExtensions = ['.epub', '.fb2', '.zip', '.txt', '.rtf', '.mobi', '.djvu', '.djv'];
+    const supportedExtensions = [
+      '.epub',
+      '.fb2',
+      '.zip',
+      '.txt',
+      '.rtf',
+      '.mobi',
+      '.azw',
+      '.azw3',
+      '.prc',
+      '.djvu',
+      '.djv',
+    ];
     final bookPaths = paths
         .where((p) => supportedExtensions.any((ext) => p.toLowerCase().endsWith(ext)))
         .toList();
     if (bookPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Поддерживаются EPUB, FB2, TXT, RTF, MOBI и DJVU')),
+        const SnackBar(
+          content: Text('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
+        ),
       );
       return;
     }

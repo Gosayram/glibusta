@@ -1052,6 +1052,20 @@ class _FormatSelectionSheet extends StatelessWidget {
           'Mobipocket — для Kindle',
           Color(0xFFFF9800),
         );
+      case BookFormat.azw3:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'AZW3',
+          'Kindle Format 8 — частичная поддержка',
+          Color(0xFFFFA726),
+        );
+      case BookFormat.prc:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'PRC',
+          'Palm/Mobipocket legacy',
+          Color(0xFFFFB74D),
+        );
       case BookFormat.pdf:
         return const _FormatInfo(
           Icons.picture_as_pdf,
