@@ -38,7 +38,6 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 class BookOpenService {
   final AppDatabase _database;
   final _logger = AppLogger();
-  final _rtfHandler = RtfFormatHandler();
 
   BookOpenService(this._database);
 
@@ -61,6 +60,11 @@ class BookOpenService {
     final parser = new_epub.CustomEpubParser(imageStore: imageStore);
     final epubBook = await parser.parse(args.filePath);
     return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
+  }
+
+  static Future<NormalizedBook> _parseRtfInWorker(({String filePath, String bookId}) args) async {
+    final document = await RtfFormatHandler().prepare(args.filePath);
+    return document.toNormalizedBook(args.bookId);
   }
 
   Future<NormalizedBook> openBook(String bookId) async {
@@ -164,15 +168,14 @@ class BookOpenService {
 
     if (bookFormat == BookFormat.rtf) {
       final effectiveBookId = bookId ?? _extractBookId(filePath);
-      final document = await _rtfHandler
-          .prepare(filePath)
-          .timeout(
-            _parsingTimeout,
-            onTimeout: () => throw TimeoutException(
-              'Разбор RTF занял слишком много времени.',
-            ),
-          );
-      return document.toNormalizedBook(effectiveBookId);
+      return Isolate.run(
+        () => _parseRtfInWorker((filePath: filePath, bookId: effectiveBookId)),
+      ).timeout(
+        _parsingTimeout,
+        onTimeout: () => throw TimeoutException(
+          'Разбор RTF занял слишком много времени.',
+        ),
+      );
     }
 
     if (bookFormat == BookFormat.mobi ||
@@ -339,6 +342,15 @@ class BookOpenService {
 
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
+  Future<void> _writeJsonAtomically(File target, Object? value) async {
+    final tmp = File('${target.path}.tmp');
+    await tmp.writeAsString(jsonEncode(value), flush: true);
+    if (await target.exists()) {
+      await target.delete();
+    }
+    await tmp.rename(target.path);
+  }
+
   Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
     try {
       final bookDir = await _getExistingBookDir(bookId);
@@ -356,10 +368,10 @@ class BookOpenService {
   Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
     final bookDir = await _getBookDir(bookId);
     final metaFile = _getMetadataFile(bookDir);
-    await metaFile.writeAsString(jsonEncode(book.toMetadata().toJson()));
+    await _writeJsonAtomically(metaFile, book.toMetadata().toJson());
     for (final chapter in book.chapters) {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
-      await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
+      await _writeJsonAtomically(chapterFile, chapter.toJson());
     }
   }
 
@@ -380,7 +392,7 @@ class BookOpenService {
   Future<void> saveChapter(String bookId, ReaderChapter chapter) async {
     final bookDir = await _getBookDir(bookId);
     final chapterFile = _getChapterFile(bookDir, chapter.index);
-    await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
+    await _writeJsonAtomically(chapterFile, chapter.toJson());
   }
 
   // Legacy monolithic cache — kept for migration fallback
@@ -399,6 +411,19 @@ class BookOpenService {
   Future<void> saveToCache(String bookId, NormalizedBook book) async {
     final cacheFile = await _getCacheFile(bookId);
     await cacheFile.writeAsString(jsonEncode(book.toJson()));
+  }
+
+  Future<void> _migrateLegacyCache(String bookId, NormalizedBook book) async {
+    try {
+      await _saveSplitCache(bookId, book);
+    } on Object catch (e, st) {
+      _logger.warning(
+        'Legacy cache migration failed for $bookId: $e',
+        name: 'Reader',
+        error: e,
+        st: st,
+      );
+    }
   }
 
   Future<NormalizedBook> openBookWithCache(String bookId, {bool loadChapters = true}) async {
@@ -469,7 +494,7 @@ class BookOpenService {
     final cached = await getCachedBook(bookId);
     if (cached != null) {
       // Migrate to split cache in background
-      unawaited(_saveSplitCache(bookId, cached));
+      unawaited(_migrateLegacyCache(bookId, cached));
       return cached;
     }
 

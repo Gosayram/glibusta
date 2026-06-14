@@ -10,14 +10,27 @@ import 'djvu_reader_screen.dart';
 import 'pdf_reader_screen.dart';
 import 'reader_screen.dart';
 
-final readerFileProvider = FutureProvider.family<Download?, String>((ref, bookId) async {
+final readerFileProvider = FutureProvider.family<_ReaderFileState?, String>((ref, bookId) async {
   final db = ref.watch(databaseProvider);
   final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(bookId))).get();
   for (final row in rows) {
-    if (row.status == DownloadStatusDb.completed) return row;
+    if (row.status == DownloadStatusDb.completed) {
+      final path = row.targetPath;
+      return _ReaderFileState(
+        download: row,
+        exists: path != null && path.isNotEmpty && await File(path).exists(),
+      );
+    }
   }
   return null;
 });
+
+class _ReaderFileState {
+  const _ReaderFileState({required this.download, required this.exists});
+
+  final Download download;
+  final bool exists;
+}
 
 class ReaderEntryScreen extends ConsumerWidget {
   const ReaderEntryScreen({super.key, required this.bookId});
@@ -30,12 +43,12 @@ class ReaderEntryScreen extends ConsumerWidget {
     return downloadAsync.when(
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => _ReaderOpenError(message: error.toString()),
-      data: (download) {
-        final path = download?.targetPath;
+      data: (fileState) {
+        final path = fileState?.download.targetPath;
         if (path == null || path.isEmpty) {
           return const _ReaderOpenError(message: 'Путь к файлу не указан');
         }
-        if (!File(path).existsSync()) {
+        if (fileState == null || !fileState.exists) {
           return _ReaderOpenError(message: 'Файл не найден: $path');
         }
 
