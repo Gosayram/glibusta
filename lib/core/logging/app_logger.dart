@@ -19,6 +19,7 @@ class LogEntry {
     this.loggerName,
     this.error,
     this.stackTrace,
+    this.correlationId,
   });
 
   final String level;
@@ -27,6 +28,7 @@ class LogEntry {
   final String? loggerName;
   final Object? error;
   final StackTrace? stackTrace;
+  final String? correlationId;
 
   String toLine() {
     final sb = StringBuffer()
@@ -36,8 +38,9 @@ class LogEntry {
       ..write(level.padRight(8))
       ..write(' ')
       ..write(loggerName ?? '')
-      ..write(': ')
-      ..write(message);
+      ..write(': ');
+    if (correlationId != null) sb.write('[$correlationId] ');
+    sb.write(message);
     if (error != null) {
       sb.write(' | ERROR: $error');
     }
@@ -49,6 +52,7 @@ class LogEntry {
     'message': message,
     'ts': time.toIso8601String(),
     if (loggerName != null) 'logger': loggerName,
+    if (correlationId != null) 'cid': correlationId,
     if (error != null) 'error': error.toString(),
   };
 }
@@ -74,6 +78,7 @@ class AppLogger {
     String? loggerName,
     Object? error,
     StackTrace? stackTrace,
+    String? correlationId,
   }) {
     final entry = LogEntry(
       level: level,
@@ -82,6 +87,7 @@ class AppLogger {
       loggerName: loggerName,
       error: error,
       stackTrace: stackTrace,
+      correlationId: correlationId,
     );
     _ringBuffer.add(entry);
     if (!_controller.isClosed) {
@@ -161,11 +167,12 @@ class AppLogger {
 
   void finest(String msg, {String? name}) => log('FINEST', msg, loggerName: name);
   void fine(String msg, {String? name}) => log('FINE', msg, loggerName: name);
-  void info(String msg, {String? name}) => log('INFO', msg, loggerName: name);
-  void warning(String msg, {String? name, Object? error, StackTrace? st}) =>
-      log('WARNING', msg, loggerName: name, error: error, stackTrace: st);
-  void severe(String msg, {String? name, Object? error, StackTrace? st}) =>
-      log('SEVERE', msg, loggerName: name, error: error, stackTrace: st);
+  void info(String msg, {String? name, String? cid}) =>
+      log('INFO', msg, loggerName: name, correlationId: cid);
+  void warning(String msg, {String? name, Object? error, StackTrace? st, String? cid}) =>
+      log('WARNING', msg, loggerName: name, error: error, stackTrace: st, correlationId: cid);
+  void severe(String msg, {String? name, Object? error, StackTrace? st, String? cid}) =>
+      log('SEVERE', msg, loggerName: name, error: error, stackTrace: st, correlationId: cid);
 
   void addListener(void Function(LogEntry) listener) {
     _listeners.add(listener);

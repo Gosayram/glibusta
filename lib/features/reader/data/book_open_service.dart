@@ -77,6 +77,8 @@ class BookOpenService {
   }
 
   Future<NormalizedBook> openBook(String bookId) async {
+    final cid = 'open-$bookId-${DateTime.now().millisecondsSinceEpoch}';
+    _logger.info('Opening book', name: 'Reader', cid: cid);
     final download = await _findDownload(bookId);
     if (download == null) {
       throw const BookMissingFailure('Книга не найдена в загрузках');
@@ -536,10 +538,15 @@ class BookOpenService {
   }
 
   Future<NormalizedBook> openBookWithCache(String bookId, {bool loadChapters = true}) async {
+    final cid = 'cache-$bookId-${DateTime.now().millisecondsSinceEpoch}';
     final sw = Stopwatch()..start();
     final cachedMeta = await getCachedMetadata(bookId);
     if (cachedMeta != null) {
-      _logger.info('Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms', name: 'Reader');
+      _logger.info(
+        'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
+        name: 'Reader',
+        cid: cid,
+      );
       final bookDir = await _getExistingBookDir(bookId);
       final isComplete = await _isSplitCacheComplete(bookDir, cachedMeta);
       if (!loadChapters) {
@@ -609,12 +616,16 @@ class BookOpenService {
     // Try legacy monolithic cache
     final cached = await getCachedBook(bookId);
     if (cached != null) {
-      _logger.info('Cache HIT (legacy) for $bookId in ${sw.elapsedMilliseconds}ms', name: 'Reader');
+      _logger.info(
+        'Cache HIT (legacy) for $bookId in ${sw.elapsedMilliseconds}ms',
+        name: 'Reader',
+        cid: cid,
+      );
       unawaited(_migrateLegacyCache(bookId, cached));
       return cached;
     }
 
-    _logger.info('Cache MISS for $bookId, parsing fresh', name: 'Reader');
+    _logger.info('Cache MISS for $bookId, parsing fresh', name: 'Reader', cid: cid);
     try {
       final book = await openBook(bookId);
       await _saveSplitCache(bookId, book);
