@@ -35,6 +35,8 @@ void main() {
       final state = ReaderState();
       expect(state.metadata, isNull);
       expect(state.isLoading, isTrue);
+      expect(state.loadingStage, ReaderLoadingStage.openingFile);
+      expect(state.loadingMessage, 'Открытие файла...');
       expect(state.errorMessage, isNull);
       expect(state.errorFilePath, isNull);
       expect(state.errorFormat, isNull);
@@ -49,7 +51,7 @@ void main() {
 
     test('copyWith preserves unchanged fields', () {
       final state = ReaderState(
-        isLoading: false,
+        loadingStage: null,
         errorMessage: 'error',
         errorFilePath: '/path/to/file.epub',
         errorFormat: 'epub',
@@ -57,8 +59,9 @@ void main() {
         scrollProgress: 0.5,
         estimatedMinutesLeft: 30,
       );
-      final updated = state.copyWith(isLoading: true);
+      final updated = state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata);
       expect(updated.isLoading, isTrue);
+      expect(updated.loadingStage, ReaderLoadingStage.readingMetadata);
       expect(updated.errorMessage, 'error');
       expect(updated.errorFilePath, '/path/to/file.epub');
       expect(updated.errorFormat, 'epub');
@@ -70,7 +73,7 @@ void main() {
     test('copyWith updates specified fields', () {
       final state = ReaderState();
       final updated = state.copyWith(
-        isLoading: false,
+        clearLoadingStage: true,
         errorMessage: 'test error',
         errorFilePath: '/test.epub',
         errorFormat: 'epub',
@@ -78,6 +81,7 @@ void main() {
         isSearchOpen: true,
       );
       expect(updated.isLoading, isFalse);
+      expect(updated.loadingStage, isNull);
       expect(updated.errorMessage, 'test error');
       expect(updated.errorFilePath, '/test.epub');
       expect(updated.errorFormat, 'epub');
@@ -116,7 +120,7 @@ void main() {
     test('ReaderState copyWith chain produces expected state', () {
       final state = ReaderState();
       final updated = state
-          .copyWith(isLoading: false)
+          .copyWith(clearLoadingStage: true)
           .copyWith(errorMessage: 'err')
           .copyWith(isSearchOpen: true);
       expect(updated.isLoading, isFalse);
@@ -125,7 +129,7 @@ void main() {
     });
 
     test('ReaderState inequality differs', () {
-      final a = ReaderState(isLoading: false);
+      final a = ReaderState(loadingStage: null);
       final b = ReaderState(isSearchOpen: true);
       expect(a.isSearchOpen, isNot(equals(b.isSearchOpen)));
     });

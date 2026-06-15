@@ -8,6 +8,16 @@ enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
 enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
 
+enum ReaderLoadingStage {
+  openingFile('Открытие файла...'),
+  readingMetadata('Разбор книги...'),
+  loadingChapters('Загрузка глав...'),
+  restoringPosition('Восстановление позиции...');
+
+  const ReaderLoadingStage(this.message);
+  final String message;
+}
+
 enum AutoThemeMode {
   off('Выкл'),
   system('Системная'),

@@ -50,20 +50,6 @@ class BookImportService {
     'prc': MobiBookParser(),
   };
 
-  static const _supportedExtensions = [
-    'fb2',
-    'zip',
-    'epub',
-    'txt',
-    'rtf',
-    'mobi',
-    'azw',
-    'azw3',
-    'prc',
-    'djvu',
-    'djv',
-  ];
-
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
     BookFileInspectionResult inspection,
@@ -98,7 +84,7 @@ class BookImportService {
   /// Import a file by path (runs full inspection + import).
   Future<ImportResult> importFile(String filePath) async {
     final ext = filePath.split('.').last.toLowerCase();
-    if (!_supportedExtensions.contains(ext)) {
+    if (!importableExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
     final file = File(filePath);
@@ -316,7 +302,7 @@ class BookImportService {
   }) async {
     _logger.info('Import from external: ${external.name} (${external.extension})', name: 'Import');
     final ext = external.extension.toLowerCase();
-    if (!_supportedExtensions.contains(ext)) {
+    if (!importableExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
     final format = bookFormatForImportExtension(ext);
@@ -484,7 +470,7 @@ class BookImportService {
     await for (final entity in dir.list(recursive: true)) {
       if (entity is File) {
         final ext = entity.path.split('.').last.toLowerCase();
-        if (_supportedExtensions.contains(ext)) {
+        if (importableExtensions.contains(ext)) {
           final size = await entity.length();
           final result = await importFile(entity.path);
           fileResults.add(
@@ -555,18 +541,9 @@ class BookImportService {
 
 @visibleForTesting
 BookFormat bookFormatForImportExtension(String ext) {
-  return switch (ext.toLowerCase()) {
-    'fb2' || 'zip' => BookFormat.fb2,
-    'epub' => BookFormat.epub,
-    'txt' => BookFormat.txt,
-    'rtf' => BookFormat.rtf,
-    'mobi' || 'azw' => BookFormat.mobi,
-    'azw3' => BookFormat.azw3,
-    'prc' => BookFormat.prc,
-    'pdf' => BookFormat.pdf,
-    'djvu' || 'djv' => BookFormat.djvu,
-    _ => BookFormat.unknown,
-  };
+  final lower = ext.toLowerCase();
+  if (lower == 'zip') return BookFormat.fb2;
+  return formatForExtension(lower);
 }
 
 String _unsupportedReaderMessage(String ext) {

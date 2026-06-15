@@ -2,17 +2,52 @@ import '../../../../shared/models/book.dart';
 
 export '../../../../shared/models/book.dart' show BookFormat;
 
+const Map<BookFormat, List<String>> extensionsByFormat = {
+  BookFormat.epub: ['epub'],
+  BookFormat.fb2: ['fb2'],
+  BookFormat.pdf: ['pdf'],
+  BookFormat.txt: ['txt'],
+  BookFormat.mobi: ['mobi', 'azw'],
+  BookFormat.azw3: ['azw3'],
+  BookFormat.prc: ['prc'],
+  BookFormat.rtf: ['rtf'],
+  BookFormat.djvu: ['djvu', 'djv'],
+};
+
+final Map<String, BookFormat> _extensionToFormat = {
+  for (final entry in extensionsByFormat.entries)
+    for (final ext in entry.value) ext: entry.key,
+};
+
+final Set<String> importableExtensions = {
+  for (final entry in extensionsByFormat.entries)
+    for (final ext in entry.value)
+      if (entry.key != BookFormat.pdf) ext,
+  'zip',
+};
+
+const Set<String> readableExtensions = {
+  'epub',
+  'fb2',
+  'txt',
+  'rtf',
+  'mobi',
+  'azw',
+  'azw3',
+  'prc',
+};
+
+BookFormat formatForExtension(String ext) {
+  return _extensionToFormat[ext.toLowerCase()] ?? BookFormat.unknown;
+}
+
 BookFormat detectBookFormat(String path) {
   final lower = path.toLowerCase();
-  if (lower.endsWith('.epub')) return BookFormat.epub;
-  if (lower.endsWith('.fb2')) return BookFormat.fb2;
-  if (lower.endsWith('.pdf')) return BookFormat.pdf;
-  if (lower.endsWith('.txt')) return BookFormat.txt;
-  if (lower.endsWith('.mobi') || lower.endsWith('.azw')) return BookFormat.mobi;
-  if (lower.endsWith('.azw3')) return BookFormat.azw3;
-  if (lower.endsWith('.prc')) return BookFormat.prc;
-  if (lower.endsWith('.rtf')) return BookFormat.rtf;
-  if (lower.endsWith('.djvu') || lower.endsWith('.djv')) return BookFormat.djvu;
+  for (final entry in extensionsByFormat.entries) {
+    for (final ext in entry.value) {
+      if (lower.endsWith('.$ext')) return entry.key;
+    }
+  }
   if (lower.endsWith('.zip')) return BookFormat.unknown;
   return BookFormat.unknown;
 }

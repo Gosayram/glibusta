@@ -54,7 +54,11 @@ class LogEntry {
 }
 
 class AppLogger {
-  AppLogger({int bufferSize = 500}) : _ringBuffer = _RingBuffer<LogEntry>(bufferSize);
+  static final AppLogger _singleton = AppLogger._internal();
+
+  factory AppLogger() => _singleton;
+
+  AppLogger._internal({int bufferSize = 500}) : _ringBuffer = _RingBuffer<LogEntry>(bufferSize);
 
   final _RingBuffer<LogEntry> _ringBuffer;
   final _controller = StreamController<LogEntry>.broadcast();
@@ -251,7 +255,7 @@ class _RingBuffer<T> {
 // --- Riverpod providers ---
 
 final appLoggerProvider = Provider<AppLogger>((ref) {
-  final logger = AppLogger(bufferSize: 1000);
+  final logger = AppLogger();
   final eventBus = ref.watch(eventBusProvider);
 
   Logger.root.level = Level.ALL;

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
 import '../../features/library/data/book_import_service.dart';
+import '../../features/reader/data/parsers/format_detector.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -297,21 +298,8 @@ class MacOSShell extends ConsumerWidget {
   }
 
   void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
-    const supportedExtensions = [
-      '.epub',
-      '.fb2',
-      '.zip',
-      '.txt',
-      '.rtf',
-      '.mobi',
-      '.azw',
-      '.azw3',
-      '.prc',
-      '.djvu',
-      '.djv',
-    ];
     final bookPaths = paths
-        .where((p) => supportedExtensions.any((ext) => p.toLowerCase().endsWith(ext)))
+        .where((p) => importableExtensions.any((ext) => p.toLowerCase().endsWith('.$ext')))
         .toList();
     if (bookPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

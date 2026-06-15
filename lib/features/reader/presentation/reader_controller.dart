@@ -24,8 +24,7 @@ import 'reader_providers.dart';
 class ReaderState {
   final NormalizedBookMetadata? metadata;
   final Map<int, ReaderChapter> loadedChapters;
-  final bool isLoading;
-  final String? loadingMessage;
+  final ReaderLoadingStage? loadingStage;
   final String? errorMessage;
   final String? errorFilePath;
   final String? errorFormat;
@@ -42,8 +41,7 @@ class ReaderState {
   ReaderState({
     this.metadata,
     this.loadedChapters = const {},
-    this.isLoading = true,
-    this.loadingMessage,
+    this.loadingStage = ReaderLoadingStage.openingFile,
     this.errorMessage,
     this.errorFilePath,
     this.errorFormat,
@@ -56,6 +54,10 @@ class ReaderState {
     this.isSearchOpen = false,
     this.highlightedQuery,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
+
+  bool get isLoading => loadingStage != null;
+
+  String? get loadingMessage => loadingStage?.message;
 
   int get chapterCount => metadata?.chapterCount ?? 0;
 
@@ -72,8 +74,8 @@ class ReaderState {
   ReaderState copyWith({
     NormalizedBookMetadata? metadata,
     Map<int, ReaderChapter>? loadedChapters,
-    bool? isLoading,
-    String? loadingMessage,
+    ReaderLoadingStage? loadingStage,
+    bool clearLoadingStage = false,
     String? errorMessage,
     String? errorFilePath,
     String? errorFormat,
@@ -91,8 +93,7 @@ class ReaderState {
     return ReaderState(
       metadata: metadata ?? this.metadata,
       loadedChapters: loadedChapters ?? this.loadedChapters,
-      isLoading: isLoading ?? this.isLoading,
-      loadingMessage: clearLoadingMessage ? null : (loadingMessage ?? this.loadingMessage),
+      loadingStage: clearLoadingStage ? null : (loadingStage ?? this.loadingStage),
       errorMessage: errorMessage ?? this.errorMessage,
       errorFilePath: errorFilePath ?? this.errorFilePath,
       errorFormat: errorFormat ?? this.errorFormat,
@@ -162,7 +163,7 @@ class ReaderController {
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _scrollController = null;
-    _updateState(_state.copyWith(isLoading: true, loadingMessage: 'Открытие файла...'));
+    _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.openingFile));
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);
@@ -170,14 +171,14 @@ class ReaderController {
     _progress = ReaderProgressHelper(db, _bookId);
 
     try {
-      _updateState(_state.copyWith(loadingMessage: 'Разбор книги...'));
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
       final meta = await _content.loadMetadata();
       if (!_isActiveLoad(loadGeneration)) return;
-      _updateState(_state.copyWith(loadingMessage: 'Загрузка прогресса...'));
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
 
-      _updateState(_state.copyWith(loadingMessage: 'Загрузка глав...'));
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       _updateState(
         _state.copyWith(
           metadata: meta,
@@ -192,7 +193,7 @@ class ReaderController {
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
       if (!_isActiveLoad(loadGeneration)) return;
       _loaded = true;
-      _updateState(_state.copyWith(isLoading: false, clearLoadingMessage: true));
+      _updateState(_state.copyWith(clearLoadingStage: true));
 
       const wordsPerMinute = 200;
       final totalWords = _content.computeTotalWords(_state.loadedChapters);
@@ -216,8 +217,7 @@ class ReaderController {
       if (!_isActiveLoad(loadGeneration)) return;
       _updateState(
         _state.copyWith(
-          isLoading: false,
-          clearLoadingMessage: true,
+          clearLoadingStage: true,
           errorMessage:
               'Открытие книги заняло слишком много времени.\n'
               'Возможно, файл повреждён или слишком большой.\n'
@@ -264,7 +264,7 @@ class ReaderController {
     if (!_isActiveLoad(loadGeneration)) return;
     _updateState(
       _state.copyWith(
-        isLoading: false,
+        clearLoadingStage: true,
         errorMessage: e.toString(),
         errorFilePath: filePath,
         errorFormat: format,
