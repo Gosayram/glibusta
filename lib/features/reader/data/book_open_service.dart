@@ -493,12 +493,29 @@ class BookOpenService {
     await _writeJsonAtomically(chapterFile, chapter.toJson());
   }
 
-  Future<void> invalidateBookCache(String bookId) async {
+  Future<void> invalidateBookCache(String bookId, {bool preserveImages = false}) async {
     final bookDir = await _getExistingBookDir(bookId);
     if (!await bookDir.exists()) return;
     try {
-      await bookDir.delete(recursive: true);
-      _logger.info('Reader cache invalidated for $bookId', name: 'Reader');
+      if (preserveImages) {
+        final imagesDir = Directory('${bookDir.path}/epub_images');
+        final hasImages = await imagesDir.exists();
+        final imagesBackup = hasImages
+            ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
+            : null;
+
+        await bookDir.delete(recursive: true);
+
+        if (imagesBackup != null) {
+          await imagesBackup.rename('${bookDir.path}/epub_images');
+        }
+      } else {
+        await bookDir.delete(recursive: true);
+      }
+      _logger.info(
+        'Reader cache invalidated for $bookId (preserveImages=$preserveImages)',
+        name: 'Reader',
+      );
     } on Object catch (e) {
       _logger.warning(
         'Failed to invalidate reader cache for $bookId: $e',
@@ -633,7 +650,7 @@ class BookOpenService {
       await _saveSplitCache(bookId, book);
       return book;
     } on TimeoutException {
-      await invalidateBookCache(bookId);
+      await invalidateBookCache(bookId, preserveImages: true);
       rethrow;
     }
   }

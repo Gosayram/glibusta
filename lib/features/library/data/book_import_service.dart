@@ -132,14 +132,13 @@ class BookImportService {
       return ImportResult.failure(_unsupportedReaderMessage(ext));
     }
 
-    String? bookId;
+    final bookId = contentHash;
     try {
       final book = await parser.parse(
         bytes,
         fileName: filePath.split('/').last,
         forcedEncoding: forcedEncoding,
       );
-      bookId = book.id;
 
       Uint8List? coverBytes;
       if (book.metadata != null) {
@@ -147,7 +146,7 @@ class BookImportService {
       }
 
       final targetFile = await _storage.bookFile(
-        book.id,
+        bookId,
         format,
       );
       await targetFile.parent.create(recursive: true);
@@ -158,7 +157,7 @@ class BookImportService {
             .into(_database.savedBooks)
             .insertOnConflictUpdate(
               SavedBooksCompanion.insert(
-                id: book.id,
+                id: bookId,
                 title: book.title,
                 authorIds: Value(book.authors),
                 description: Value(book.description),
@@ -179,8 +178,8 @@ class BookImportService {
             .into(_database.downloads)
             .insertOnConflictUpdate(
               DownloadsCompanion.insert(
-                id: book.id,
-                bookId: book.id,
+                id: bookId,
+                bookId: bookId,
                 bookTitle: Value(book.title),
                 format: formatToDbString(formatForExtension(ext)),
                 sourceUrl: filePath,
@@ -192,7 +191,7 @@ class BookImportService {
 
       // Background cover extraction — don't block import
       fireAndLog(
-        () => _extractCoverBackground(book.id, targetFile.path, ext, coverBytes: coverBytes),
+        () => _extractCoverBackground(bookId, targetFile.path, ext, coverBytes: coverBytes),
         name: 'Import',
         context: 'Cover extraction for $bookId',
       );
@@ -200,19 +199,17 @@ class BookImportService {
       return ImportResult.success(book.title);
     } on Object catch (e) {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
-      if (bookId != null) {
-        try {
-          final targetFile = await _storage.bookFile(
-            bookId,
-            format,
-          );
-          if (await targetFile.exists()) {
-            await targetFile.delete();
-          }
-          await _deletePartialImportRows(bookId);
-        } on Object catch (_) {
-          // Best-effort cleanup: ignore if target file path can't be resolved
+      try {
+        final targetFile = await _storage.bookFile(
+          bookId,
+          format,
+        );
+        if (await targetFile.exists()) {
+          await targetFile.delete();
         }
+        await _deletePartialImportRows(bookId);
+      } on Object catch (_) {
+        // Best-effort cleanup: ignore if target file path can't be resolved
       }
       return ImportResult.failure(_friendlyImportError(e));
     }
@@ -324,7 +321,7 @@ class BookImportService {
       return ImportResult.failure(bookFileTooLargeMessage(format, external.size));
     }
 
-    String? bookId;
+    late String bookId;
     try {
       final bytes = await bridge.readFile(external.uri);
       if (bytes.isEmpty) {
@@ -332,6 +329,7 @@ class BookImportService {
       }
 
       final contentHash = sha256.convert(bytes).toString();
+      bookId = contentHash;
       final existing = await _findByHash(contentHash);
       if (existing != null) {
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
@@ -395,7 +393,6 @@ class BookImportService {
         bytes,
         fileName: external.name,
       );
-      bookId = book.id;
 
       Uint8List? extCoverBytes;
       if (book.metadata != null) {
@@ -403,7 +400,7 @@ class BookImportService {
       }
 
       final targetFile = await _storage.bookFile(
-        book.id,
+        bookId,
         format,
       );
       await targetFile.parent.create(recursive: true);
@@ -414,7 +411,7 @@ class BookImportService {
             .into(_database.savedBooks)
             .insertOnConflictUpdate(
               SavedBooksCompanion.insert(
-                id: book.id,
+                id: bookId,
                 title: book.title,
                 authorIds: Value(book.authors),
                 description: Value(book.description),
@@ -432,8 +429,8 @@ class BookImportService {
             .into(_database.downloads)
             .insertOnConflictUpdate(
               DownloadsCompanion.insert(
-                id: book.id,
-                bookId: book.id,
+                id: bookId,
+                bookId: bookId,
                 bookTitle: Value(book.title),
                 format: formatToDbString(formatForExtension(ext)),
                 sourceUrl: external.uri,
@@ -444,7 +441,7 @@ class BookImportService {
       });
 
       fireAndLog(
-        () => _extractCoverBackground(book.id, targetFile.path, ext, coverBytes: extCoverBytes),
+        () => _extractCoverBackground(bookId, targetFile.path, ext, coverBytes: extCoverBytes),
         name: 'Import',
         context: 'Cover extraction for $bookId',
       );
@@ -456,23 +453,21 @@ class BookImportService {
         name: 'Import',
         error: e,
       );
-      if (bookId != null) {
-        try {
-          final targetFile = await _storage.bookFile(
-            bookId,
-            bookFormatForImportExtension(ext),
-          );
-          if (await targetFile.exists()) {
-            await targetFile.delete();
-          }
-          await _deletePartialImportRows(bookId);
-        } on Object catch (cleanupError) {
-          _logger.warning(
-            'External import cleanup failed for $bookId: $cleanupError',
-            name: 'Import',
-            error: cleanupError,
-          );
+      try {
+        final targetFile = await _storage.bookFile(
+          bookId,
+          bookFormatForImportExtension(ext),
+        );
+        if (await targetFile.exists()) {
+          await targetFile.delete();
         }
+        await _deletePartialImportRows(bookId);
+      } on Object catch (cleanupError) {
+        _logger.warning(
+          'External import cleanup failed for $bookId: $cleanupError',
+          name: 'Import',
+          error: cleanupError,
+        );
       }
       return ImportResult.failure(_friendlyImportError(e));
     }
