@@ -11,13 +11,15 @@ class ReaderContentHelper {
   final String _bookId;
   final _logger = AppLogger();
 
-  Future<NormalizedBookMetadata> loadMetadata() async {
+  Future<NormalizedBookMetadata> loadMetadata({void Function(String)? onCacheMode}) async {
     final cached = await _service.getCachedMetadata(_bookId);
     if (cached != null) {
       _logger.fine('Metadata cache hit for $_bookId', name: 'Reader');
+      onCacheMode?.call('split');
       return cached;
     }
     _logger.info('Loading fresh metadata for $_bookId', name: 'Reader');
+    onCacheMode?.call('fresh');
     final book = await _service.openBookWithCache(_bookId, loadChapters: false);
     return book.toMetadata();
   }

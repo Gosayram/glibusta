@@ -148,6 +148,7 @@ class ReaderController {
   bool _loaded = false;
   bool _fullscreenEnabled = false;
   int _loadGeneration = 0;
+  String _cacheMode = 'unknown';
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -195,7 +196,7 @@ class ReaderController {
 
     try {
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
-      final meta = await _content.loadMetadata();
+      final meta = await _content.loadMetadata(onCacheMode: (mode) => _cacheMode = mode);
       if (!_isActiveLoad(loadGeneration)) return;
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
@@ -758,6 +759,7 @@ class ReaderController {
     buffer.writeln('=== Diagnostics ===');
     buffer.writeln('Book ID: $_bookId');
     buffer.writeln('Error: ${_state.errorMessage ?? "none"}');
+    buffer.writeln('Error kind: ${_state.errorKind?.name ?? "none"}');
     buffer.writeln('File: ${_state.errorFilePath ?? "unknown"}');
     buffer.writeln('Format: ${_state.errorFormat ?? "unknown"}');
     buffer.writeln(
@@ -765,9 +767,27 @@ class ReaderController {
     );
     buffer.writeln('Chapters: ${_state.chapterCount}');
     buffer.writeln('Loaded chapters: ${_state.loadedChapters.length}');
+    buffer.writeln('Missing chapters: ${_missingChapterCount()}');
+    buffer.writeln('Cache mode: $_cacheMode');
+    buffer.writeln(
+      'Current position: ch${_state.currentPosition.chapterIndex}, p${_state.currentPosition.paragraphIndex}',
+    );
+    buffer.writeln('Scroll progress: ${(_state.scrollProgress * 100).toStringAsFixed(1)}%');
+    buffer.writeln('Loading stage: ${_state.loadingStage?.name ?? "ready"}');
+    buffer.writeln('Dynamic loading: ${_state.isDynamicallyLoading}');
+    buffer.writeln('Estimated minutes left: ${_state.estimatedMinutesLeft}');
     buffer.writeln('Platform: ${Platform.operatingSystem}');
     buffer.writeln('Time: ${DateTime.now().toIso8601String()}');
     return buffer.toString();
+  }
+
+  int _missingChapterCount() {
+    if (_state.chapterCount == 0) return 0;
+    var missing = 0;
+    for (var i = 0; i < _state.chapterCount; i++) {
+      if (!_state.loadedChapters.containsKey(i)) missing++;
+    }
+    return missing;
   }
 
   void copyDiagnostics() {

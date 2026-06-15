@@ -127,6 +127,14 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                 ],
               ),
             ),
+            if (_results.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text(
+                  '${_results.length} результатов в ${widget.searchService.totalParagraphs} абзацах',
+                  style: TextStyle(color: hintColor, fontSize: 12),
+                ),
+              ),
             if (_isSearching)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
