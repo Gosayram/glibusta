@@ -4,8 +4,8 @@ const int _mb = 1024 * 1024;
 
 int maxReadableBookBytes(BookFormat format) {
   return switch (format) {
-    BookFormat.txt => 20 * _mb,
-    BookFormat.fb2 || BookFormat.rtf => 50 * _mb,
+    BookFormat.txt => 10 * _mb,
+    BookFormat.fb2 || BookFormat.rtf => 20 * _mb,
     BookFormat.epub => 250 * _mb,
     BookFormat.mobi || BookFormat.azw3 || BookFormat.prc => 120 * _mb,
     BookFormat.pdf || BookFormat.djvu => 500 * _mb,

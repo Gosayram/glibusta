@@ -182,7 +182,7 @@ class BookImportService {
                 id: book.id,
                 bookId: book.id,
                 bookTitle: Value(book.title),
-                format: ext,
+                format: formatToDbString(formatForExtension(ext)),
                 sourceUrl: filePath,
                 targetPath: Value(targetFile.path),
                 status: DownloadStatusDb.completed,
@@ -251,49 +251,62 @@ class BookImportService {
     final title = inspection.title ?? fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
     final bookId = contentHash;
     final targetFile = await _storage.bookFile(bookId, format);
-    await targetFile.parent.create(recursive: true);
     try {
-      await file.copy(targetFile.path);
+      await targetFile.parent.create(recursive: true);
+      try {
+        await file.copy(targetFile.path);
+      } on Object catch (e) {
+        if (await targetFile.exists()) {
+          await targetFile.delete();
+        }
+        await _deletePartialImportRows(bookId);
+        return ImportResult.failure(_friendlyImportError(e));
+      }
+
+      await _database.transaction(() async {
+        await _database
+            .into(_database.savedBooks)
+            .insertOnConflictUpdate(
+              SavedBooksCompanion.insert(
+                id: bookId,
+                title: title,
+                authorIds: const Value([]),
+                description: Value(_documentDescription(format)),
+                sourceUrl: Value(inspection.path),
+                contentHash: Value(contentHash),
+                fileSize: Value(bytes.length),
+                filePath: Value(targetFile.path),
+              ),
+            );
+
+        await _database
+            .into(_database.downloads)
+            .insertOnConflictUpdate(
+              DownloadsCompanion.insert(
+                id: bookId,
+                bookId: bookId,
+                bookTitle: Value(title),
+                format: format.name,
+                sourceUrl: inspection.path,
+                targetPath: Value(targetFile.path),
+                status: DownloadStatusDb.completed,
+              ),
+            );
+      });
+
+      return ImportResult.success(title);
     } on Object catch (e) {
+      _logger.warning(
+        'Document import failed for ${inspection.path}: $e',
+        name: 'Import',
+        error: e,
+      );
       if (await targetFile.exists()) {
         await targetFile.delete();
       }
       await _deletePartialImportRows(bookId);
       return ImportResult.failure(_friendlyImportError(e));
     }
-
-    await _database.transaction(() async {
-      await _database
-          .into(_database.savedBooks)
-          .insertOnConflictUpdate(
-            SavedBooksCompanion.insert(
-              id: bookId,
-              title: title,
-              authorIds: const Value([]),
-              description: Value(_documentDescription(format)),
-              sourceUrl: Value(inspection.path),
-              contentHash: Value(contentHash),
-              fileSize: Value(bytes.length),
-              filePath: Value(targetFile.path),
-            ),
-          );
-
-      await _database
-          .into(_database.downloads)
-          .insertOnConflictUpdate(
-            DownloadsCompanion.insert(
-              id: bookId,
-              bookId: bookId,
-              bookTitle: Value(title),
-              format: format.name,
-              sourceUrl: inspection.path,
-              targetPath: Value(targetFile.path),
-              status: DownloadStatusDb.completed,
-            ),
-          );
-    });
-
-    return ImportResult.success(title);
   }
 
   /// Import a book from an external SAF URI into the app library.
@@ -422,7 +435,7 @@ class BookImportService {
                 id: book.id,
                 bookId: book.id,
                 bookTitle: Value(book.title),
-                format: ext,
+                format: formatToDbString(formatForExtension(ext)),
                 sourceUrl: external.uri,
                 targetPath: Value(targetFile.path),
                 status: DownloadStatusDb.completed,
@@ -479,7 +492,10 @@ class BookImportService {
     return 'Ошибка при импорте: $e';
   }
 
-  Future<ImportBatchResult> importDirectory(String dirPath) async {
+  Future<ImportBatchResult> importDirectory(
+    String dirPath, {
+    bool Function()? isCancelled,
+  }) async {
     _logger.info('Import directory: $dirPath', name: 'Import');
     final dir = Directory(dirPath);
     if (!await dir.exists()) {
@@ -490,6 +506,10 @@ class BookImportService {
     final fileResults = <ImportFileResult>[];
     try {
       await for (final entity in dir.list(recursive: true)) {
+        if (isCancelled != null && isCancelled()) {
+          _logger.info('Directory import cancelled', name: 'Import');
+          break;
+        }
         if (entity is File) {
           final ext = entity.path.split('.').last.toLowerCase();
           if (importableExtensions.contains(ext)) {

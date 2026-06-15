@@ -40,3 +40,14 @@ BookFormat detectBookFormat(String path) {
   if (lower.endsWith('.zip')) return BookFormat.unknown;
   return BookFormat.unknown;
 }
+
+String formatToDbString(BookFormat format) => format.name;
+
+BookFormat formatFromDbString(String? value) {
+  if (value == null || value.isEmpty) return BookFormat.unknown;
+  final lower = value.toLowerCase();
+  for (final f in BookFormat.values) {
+    if (f.name == lower) return f;
+  }
+  return formatForExtension(lower);
+}

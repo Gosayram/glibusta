@@ -101,7 +101,9 @@ class BookOpenService {
 
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
-      throw UnsupportedFormatFailure('Формат не поддерживается: ${download.format}');
+      throw UnsupportedFormatFailure(
+        'Формат не поддерживается: ${formatFromDbString(download.format).name}',
+      );
     }
     if (isBookFileTooLarge(format, fileSize)) {
       throw UnsupportedFormatFailure(bookFileTooLargeMessage(format, fileSize));

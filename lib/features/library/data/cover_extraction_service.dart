@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:xml/xml.dart';
 
 import '../../../core/platform/app_file_storage.dart';
+import '../../reader/data/parsers/format_detector.dart';
 
 class CoverExtractionService {
   final AppFileStorage _storage;
@@ -29,9 +30,10 @@ class CoverExtractionService {
         extracted = coverBytes;
       } else {
         final fileBytes = await File(filePath).readAsBytes();
-        extracted = switch (format) {
-          'epub' => _extractEpubCover(fileBytes),
-          'fb2' => _extractFb2Cover(fileBytes),
+        final fmt = formatFromDbString(format);
+        extracted = switch (fmt) {
+          BookFormat.epub => _extractEpubCover(fileBytes),
+          BookFormat.fb2 => _extractFb2Cover(fileBytes),
           _ => null,
         };
       }

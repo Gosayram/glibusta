@@ -22,6 +22,12 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<List<Book>> searchBooks(String query) async {
+    final rows = await _db.bookDao.searchBooks(query);
+    return _resolveAuthors(rows);
+  }
+
+  @override
   Future<List<Book>> getBooksWithProgress() async {
     final rows = await _db.bookDao.getBooksWithProgress();
     return _resolveAuthors(rows);

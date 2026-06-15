@@ -32,18 +32,63 @@ Future<List<Book>> libraryBooks(Ref ref) async {
   return repository.getAllBooks();
 }
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  bool _isSearchOpen = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final booksAsync = ref.watch(libraryBooksProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Библиотека'),
+        title: _isSearchOpen
+            ? TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск в библиотеке...',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() => _searchQuery = value);
+                },
+              )
+            : const Text('Библиотека'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
+            tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = !_isSearchOpen;
+                if (!_isSearchOpen) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
+            },
+          ),
           IconButton(
             icon: Icon(
               _viewModeIcon(
@@ -80,7 +125,20 @@ class LibraryScreen extends ConsumerWidget {
                     : 'data_${booksAsync.value?.length ?? 0}',
               ),
               child: booksAsync.when(
-                data: (List<Book> books) => _buildBooksGrid(context, ref, books),
+                data: (List<Book> books) {
+                  final query = _searchQuery.toLowerCase();
+                  final filtered = query.isEmpty
+                      ? books
+                      : books.where((b) {
+                          final titleMatch = b.title.toLowerCase().contains(query);
+                          final authorMatch = b.authorIds.any(
+                            (a) => a.toLowerCase().contains(query),
+                          );
+                          final descMatch = b.description?.toLowerCase().contains(query) ?? false;
+                          return titleMatch || authorMatch || descMatch;
+                        }).toList();
+                  return _buildBooksGrid(context, ref, filtered);
+                },
                 loading: () => Skeletonizer(
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),

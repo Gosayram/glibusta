@@ -64,9 +64,14 @@ final class BookFileInspector {
       );
     }
 
+    const maxMetadataBytes = 256 * 1024;
+    final metadataBytes = bytes.length <= maxMetadataBytes
+        ? bytes
+        : bytes.sublist(0, maxMetadataBytes);
+
     final metadata = await metadataExtractor.extract(
       path: path,
-      bytes: Uint8List.fromList(bytes),
+      bytes: Uint8List.fromList(metadataBytes),
       format: format,
       encodingDetector: encodingDetector,
     );
