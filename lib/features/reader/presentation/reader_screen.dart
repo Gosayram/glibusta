@@ -453,6 +453,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           metadata: readerState.metadata!,
                           currentChapterIndex: readerState.currentPosition.chapterIndex,
                           onJumpToPosition: _ctrl.jumpToPosition,
+                          loadedChapters: readerState.loadedChapters,
+                          isDynamicallyLoading: readerState.isDynamicallyLoading,
                         )
                       : () {},
                 ),

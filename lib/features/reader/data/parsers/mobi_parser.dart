@@ -100,6 +100,49 @@ final class MobiBookParser implements BookParser {
       throw ParserFailure('Не удалось прочитать файл MOBI/AZW3: ${e.message}');
     }
   }
+
+  MobiInspectResult inspectBytes(Uint8List bytes, {String? fileName}) {
+    if (bytes.length < 86) {
+      return const MobiInspectResult(supported: false, reason: 'Файл слишком мал');
+    }
+    try {
+      final palmDb = PalmDbParser().parse(bytes);
+      final record0 = _recordBytes(bytes, palmDb, 0);
+      final header = MobiHeaderParser().parse(record0);
+      final metadata = ExthParser().parse(record0, header);
+      final kf8 = isLikelyKf8(header, record0);
+      final compressionName = switch (header.compression) {
+        1 => 'none',
+        2 => 'PalmDOC',
+        17480 => 'Huff/CDIC (неподдерживается)',
+        _ => 'неизвестный (${header.compression})',
+      };
+      final readable = header.compression == 1 || header.compression == 2;
+      final warning = kf8
+          ? 'Файл может быть AZW3/KF8 — текст может отличаться от оригинала'
+          : (!readable ? 'Сжатие Huff/CDIC не поддерживается' : null);
+
+      return MobiInspectResult(
+        supported: readable,
+        title: _firstNonEmpty([
+          metadata.title,
+          _fullName(record0, header),
+          palmDb.name,
+          _stripExtension(fileName),
+        ]),
+        author: _splitAuthors(metadata.author).join(', '),
+        compression: compressionName,
+        recordCount: palmDb.records.length,
+        textRecordCount: header.textRecordCount,
+        exthPresent: metadata.hasExth,
+        firstImageRecordIndex: header.firstImageRecordIndex,
+        kf8Likely: kf8,
+        reason: warning,
+      );
+    } on Object catch (e) {
+      return MobiInspectResult(supported: false, reason: 'Ошибка чтения: $e');
+    }
+  }
 }
 
 final class BinaryReader {
@@ -1080,4 +1123,30 @@ String _descriptionFor(MobiHeader header) {
     return 'MOBI/AZW3 document: Huff/CDIC compression is not supported yet';
   }
   return 'MOBI document';
+}
+
+final class MobiInspectResult {
+  const MobiInspectResult({
+    required this.supported,
+    this.reason,
+    this.title,
+    this.author,
+    this.compression,
+    this.recordCount = 0,
+    this.textRecordCount = 0,
+    this.exthPresent = false,
+    this.firstImageRecordIndex = 0,
+    this.kf8Likely = false,
+  });
+
+  final bool supported;
+  final String? reason;
+  final String? title;
+  final String? author;
+  final String? compression;
+  final int recordCount;
+  final int textRecordCount;
+  final bool exthPresent;
+  final int firstImageRecordIndex;
+  final bool kf8Likely;
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../../features/library/data/book_import_service.dart';
+import '../../features/reader/data/parsers/format_detector.dart';
 import '../logging/app_logger.dart';
 
 class ShareHandler {
@@ -53,19 +54,7 @@ class ShareHandler {
     _logger.info('Shared ${files.length} files', name: 'Share');
     for (final file in files) {
       final ext = file.path.split('.').last.toLowerCase();
-      if (![
-        'epub',
-        'fb2',
-        'zip',
-        'txt',
-        'rtf',
-        'mobi',
-        'azw',
-        'azw3',
-        'prc',
-        'djvu',
-        'djv',
-      ].contains(ext)) {
+      if (!importableExtensions.contains(ext)) {
         _logger.info('Skipping unsupported: ${file.path}', name: 'Share');
         continue;
       }
