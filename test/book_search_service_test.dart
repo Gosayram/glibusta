@@ -23,12 +23,12 @@ NormalizedBook _makeBook(List<List<String>> chapterParagraphs) {
 void main() {
   group('BookSearchService', () {
     group('search', () {
-      test('finds matching paragraphs case-insensitively', () {
+      test('finds matching paragraphs case-insensitively', () async {
         final book = _makeBook([
           ['Hello World', 'Flutter is great', 'Dart language'],
         ]);
         final service = BookSearchService(book);
-        final results = service.search('flutter');
+        final results = await service.search('flutter');
         expect(results, hasLength(1));
         expect(results.first.matchText, 'Flutter is great');
         expect(results.first.chapterIndex, 0);
@@ -36,69 +36,69 @@ void main() {
         expect(results.first.chapterTitle, 'Chapter 0');
       });
 
-      test('returns empty for empty query', () {
+      test('returns empty for empty query', () async {
         final book = _makeBook([
           ['Hello World'],
         ]);
         final service = BookSearchService(book);
-        expect(service.search(''), isEmpty);
-        expect(service.search('   '), isEmpty);
+        expect(await service.search(''), isEmpty);
+        expect(await service.search('   '), isEmpty);
       });
 
-      test('returns empty when no matches', () {
+      test('returns empty when no matches', () async {
         final book = _makeBook([
           ['Hello World'],
         ]);
         final service = BookSearchService(book);
-        expect(service.search('xyz'), isEmpty);
+        expect(await service.search('xyz'), isEmpty);
       });
 
-      test('respects maxResults limit', () {
+      test('respects maxResults limit', () async {
         final paragraphs = List.generate(100, (i) => 'Match word in paragraph $i');
         final book = _makeBook([paragraphs]);
         final service = BookSearchService(book);
-        final results = service.search('match', maxResults: 5);
+        final results = await service.search('match', maxResults: 5);
         expect(results, hasLength(5));
       });
 
-      test('provides before and after context', () {
+      test('provides before and after context', () async {
         final book = _makeBook([
           ['Before paragraph', 'Target paragraph', 'After paragraph'],
         ]);
         final service = BookSearchService(book);
-        final results = service.search('Target');
+        final results = await service.search('Target');
         expect(results.first.beforeContext, 'Before paragraph');
         expect(results.first.afterContext, 'After paragraph');
       });
 
-      test('before context is empty for first paragraph', () {
+      test('before context is empty for first paragraph', () async {
         final book = _makeBook([
           ['First paragraph', 'Second paragraph'],
         ]);
         final service = BookSearchService(book);
-        final results = service.search('First');
+        final results = await service.search('First');
         expect(results.first.beforeContext, '');
         expect(results.first.afterContext, 'Second paragraph');
       });
 
-      test('after context is empty for last paragraph', () {
+      test('after context is empty for last paragraph', () async {
         final book = _makeBook([
           ['First paragraph', 'Last paragraph'],
         ]);
         final service = BookSearchService(book);
-        final results = service.search('Last');
+        final results = await service.search('Last');
         expect(results.first.beforeContext, 'First paragraph');
         expect(results.first.afterContext, '');
       });
 
-      test('searches across multiple chapters', () {
+      test('searches across multiple chapters', () async {
         final book = _makeBook([
           ['Chapter one text'],
           ['Chapter two text'],
           ['Chapter three text'],
         ]);
         final service = BookSearchService(book);
-        final results = service.search('text');
+        final results = await service.search('text');
         expect(results, hasLength(3));
         expect(results[0].chapterIndex, 0);
         expect(results[1].chapterIndex, 1);
@@ -111,6 +111,19 @@ void main() {
         ]);
         final service = BookSearchService(book);
         expect(service.totalParagraphs, 2);
+      });
+    });
+
+    group('cancel', () {
+      test('cancelPending stops stale search', () async {
+        final paragraphs = List.generate(10000, (i) => 'Word $i match');
+        final book = _makeBook([paragraphs]);
+        final service = BookSearchService(book);
+
+        final future = service.search('match');
+        service.cancelPending();
+        final results = await future;
+        expect(results, isEmpty);
       });
     });
 

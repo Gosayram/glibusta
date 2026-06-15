@@ -122,7 +122,7 @@ class BookImportService {
         'Duplicate detected: ${existing.title} (${contentHash.substring(0, 8)})',
         name: 'Import',
       );
-      return ImportResult.duplicate(existing.title, contentHash);
+      return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
     }
 
     final parser =
@@ -244,7 +244,7 @@ class BookImportService {
         : sha256.convert(bytes).toString();
     final existing = await _findByHash(contentHash);
     if (existing != null) {
-      return ImportResult.duplicate(existing.title, contentHash);
+      return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
     }
 
     final fileName = inspection.path.split('/').last;
@@ -313,7 +313,7 @@ class BookImportService {
       final contentHash = sha256.convert(bytes).toString();
       final existing = await _findByHash(contentHash);
       if (existing != null) {
-        return ImportResult.duplicate(existing.title, contentHash);
+        return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
       if (isBookFileTooLarge(format, bytes.length)) {
@@ -566,6 +566,7 @@ class ImportResult {
   final String? error;
   final String? hash;
   final String? suggestedEncoding;
+  final String? existingBookId;
 
   ImportResult._({
     this.isSuccess = false,
@@ -575,11 +576,12 @@ class ImportResult {
     this.error,
     this.hash,
     this.suggestedEncoding,
+    this.existingBookId,
   });
 
   factory ImportResult.success(String title) => ImportResult._(isSuccess: true, title: title);
-  factory ImportResult.duplicate(String title, String hash) =>
-      ImportResult._(isDuplicate: true, title: title, hash: hash);
+  factory ImportResult.duplicate(String title, String hash, {String? existingBookId}) =>
+      ImportResult._(isDuplicate: true, title: title, hash: hash, existingBookId: existingBookId);
   factory ImportResult.failure(String error) => ImportResult._(error: error);
   factory ImportResult.needsEncoding(String title, String? encoding) => ImportResult._(
     needsEncodingSelection: true,

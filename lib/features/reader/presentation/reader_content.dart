@@ -112,7 +112,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                     _buildChapterContent(chapter, settings, index)
                   else
                     _buildLoadingPlaceholder(settings, index),
-                  if (!isLast)
+                  if (!isLast && chapter != null && loadedChapters[index + 1] != null)
                     Padding(
                       padding: EdgeInsets.symmetric(
                         vertical: settings.paragraphSpacing * 3,

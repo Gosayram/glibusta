@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'parsers/normalized_book.dart';
 
 class BookSearchResult {
@@ -25,6 +27,8 @@ class BookSearchService {
   final List<int> _paragraphIndices = [];
   final List<String> _chapterTitles = [];
 
+  int _searchGeneration = 0;
+
   BookSearchService(this._book) {
     _buildIndex();
   }
@@ -43,12 +47,17 @@ class BookSearchService {
 
   int get totalParagraphs => _paragraphs.length;
 
-  List<BookSearchResult> search(String query, {int maxResults = 50}) {
+  Future<List<BookSearchResult>> search(String query, {int maxResults = 50}) async {
     if (query.trim().isEmpty) return const [];
+    final gen = ++_searchGeneration;
     final lowerQuery = query.toLowerCase();
     final results = <BookSearchResult>[];
 
     for (var i = 0; i < _paragraphs.length; i++) {
+      if (i % 500 == 0) {
+        await Future<void>.delayed(Duration.zero);
+        if (gen != _searchGeneration) return const [];
+      }
       final paragraph = _paragraphs[i];
       if (!paragraph.toLowerCase().contains(lowerQuery)) continue;
 
@@ -69,7 +78,12 @@ class BookSearchService {
       if (results.length >= maxResults) break;
     }
 
+    if (gen != _searchGeneration) return const [];
     return results;
+  }
+
+  void cancelPending() {
+    _searchGeneration++;
   }
 
   List<String> suggestions(String prefix, {int maxSuggestions = 8}) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/book_search_service.dart';
@@ -24,8 +26,10 @@ class BookSearchOverlay extends StatefulWidget {
 class _BookSearchOverlayState extends State<BookSearchOverlay> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _debounce = _SearchDebounce();
   List<BookSearchResult> _results = [];
   bool _hasSearched = false;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -37,16 +41,37 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
 
   @override
   void dispose() {
+    _debounce.cancel();
+    widget.searchService.cancelPending();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _performSearch(String query) {
-    final results = widget.searchService.search(query);
+  void _onQueryChanged(String query) {
+    _debounce.run(() => _performSearch(query));
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) {
+      widget.searchService.cancelPending();
+      setState(() {
+        _results = [];
+        _hasSearched = false;
+        _isSearching = false;
+      });
+      return;
+    }
+    widget.searchService.cancelPending();
+    setState(() {
+      _isSearching = true;
+      _hasSearched = true;
+    });
+    final results = await widget.searchService.search(query);
+    if (!mounted) return;
     setState(() {
       _results = results;
-      _hasSearched = query.trim().isNotEmpty;
+      _isSearching = false;
     });
   }
 
@@ -86,7 +111,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                         hintStyle: TextStyle(color: hintColor),
                         border: InputBorder.none,
                       ),
-                      onChanged: _performSearch,
+                      onChanged: _onQueryChanged,
                       onSubmitted: _performSearch,
                     ),
                   ),
@@ -96,13 +121,17 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       color: textColor,
                       onPressed: () {
                         _controller.clear();
-                        _performSearch('');
+                        unawaited(_performSearch(''));
                       },
                     ),
                 ],
               ),
             ),
-            if (_hasSearched && _results.isEmpty)
+            if (_isSearching)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_hasSearched && _results.isEmpty)
               Expanded(
                 child: Center(
                   child: Column(
@@ -198,5 +227,19 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
         ),
       ),
     );
+  }
+}
+
+class _SearchDebounce {
+  Timer? _timer;
+
+  void run(VoidCallback action) {
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 300), action);
+  }
+
+  void cancel() {
+    _timer?.cancel();
+    _timer = null;
   }
 }
