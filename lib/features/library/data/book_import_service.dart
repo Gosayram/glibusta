@@ -214,7 +214,7 @@ class BookImportService {
           // Best-effort cleanup: ignore if target file path can't be resolved
         }
       }
-      return ImportResult.failure('Ошибка при импорте: $e');
+      return ImportResult.failure(_friendlyImportError(e));
     }
   }
 
@@ -252,7 +252,15 @@ class BookImportService {
     final bookId = contentHash;
     final targetFile = await _storage.bookFile(bookId, format);
     await targetFile.parent.create(recursive: true);
-    await file.copy(targetFile.path);
+    try {
+      await file.copy(targetFile.path);
+    } on Object catch (e) {
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      await _deletePartialImportRows(bookId);
+      return ImportResult.failure(_friendlyImportError(e));
+    }
 
     await _database.transaction(() async {
       await _database
@@ -453,8 +461,22 @@ class BookImportService {
           );
         }
       }
-      return ImportResult.failure('Ошибка при импорте из внешней папки: $e');
+      return ImportResult.failure(_friendlyImportError(e));
     }
+  }
+
+  String _friendlyImportError(Object e) {
+    final msg = e.toString();
+    if (msg.contains('Permission denied') || msg.contains('EPERM')) {
+      return 'Нет доступа к файлу. Проверьте разрешения приложения.';
+    }
+    if (msg.contains('No space left') || msg.contains('ENOSPC')) {
+      return 'Недостаточно места на диске.';
+    }
+    if (msg.contains('FileSystemException')) {
+      return 'Ошибка файловой системы: $e';
+    }
+    return 'Ошибка при импорте: $e';
   }
 
   Future<ImportBatchResult> importDirectory(String dirPath) async {
@@ -466,23 +488,32 @@ class BookImportService {
     }
 
     final fileResults = <ImportFileResult>[];
-    await for (final entity in dir.list(recursive: true)) {
-      if (entity is File) {
-        final ext = entity.path.split('.').last.toLowerCase();
-        if (importableExtensions.contains(ext)) {
-          final size = await entity.length();
-          final result = await importFile(entity.path);
-          fileResults.add(
-            ImportFileResult(path: entity.path, sizeBytes: size, result: result),
-          );
-          if (!result.isSuccess && !result.isDuplicate && !result.needsEncodingSelection) {
-            _logger.warning(
-              'Directory import failed for ${entity.path} (${formatBytes(size)}): ${result.error}',
-              name: 'Import',
+    try {
+      await for (final entity in dir.list(recursive: true)) {
+        if (entity is File) {
+          final ext = entity.path.split('.').last.toLowerCase();
+          if (importableExtensions.contains(ext)) {
+            final size = await entity.length();
+            final result = await importFile(entity.path);
+            fileResults.add(
+              ImportFileResult(path: entity.path, sizeBytes: size, result: result),
             );
+            if (!result.isSuccess && !result.isDuplicate && !result.needsEncodingSelection) {
+              _logger.warning(
+                'Directory import failed for ${entity.path} (${formatBytes(size)}): ${result.error}',
+                name: 'Import',
+              );
+            }
           }
         }
       }
+    } on Object catch (e) {
+      _logger.warning('Directory scan failed for $dirPath: $e', name: 'Import', error: e);
+      return ImportBatchResult(
+        directory: dirPath,
+        fileResults: fileResults,
+        error: _friendlyImportError(e),
+      );
     }
 
     final batch = ImportBatchResult(directory: dirPath, fileResults: fileResults);

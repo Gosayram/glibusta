@@ -342,9 +342,7 @@ class _ReadingProgressIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final percent = progress.totalPages > 0
-        ? (progress.currentPosition / progress.totalPages).clamp(0.0, 1.0)
-        : 0.0;
+    final percent = progress.progressPercent > 0 ? progress.progressPercent.clamp(0.0, 1.0) : 0.0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),

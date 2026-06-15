@@ -425,7 +425,11 @@ class ReaderController {
 
   void saveProgress() {
     if (!_loaded) return;
-    _progress.saveProgress(_state.currentPosition, _state.chapterCount);
+    var totalBlocks = 0;
+    for (final chapter in _state.loadedChapters.values) {
+      totalBlocks += chapter.blocks.length;
+    }
+    _progress.saveProgress(_state.currentPosition, totalBlocks);
   }
 
   // ── Navigation ────────────────────────────────────────
