@@ -66,6 +66,14 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 readFile(Uri.parse(fileUri), result)
             }
+            "copyToCache" -> {
+                val fileUri = call.argument<String>("uri")
+                if (fileUri == null) {
+                    result.error("INVALID_ARG", "URI is required", null)
+                    return
+                }
+                copyToCache(Uri.parse(fileUri), result)
+            }
             "getPersistedUris" -> {
                 val uris = contentResolver.persistedUriPermissions
                     .map { it.uri.toString() }
@@ -152,6 +160,26 @@ class MainActivity : FlutterFragmentActivity() {
             lower.endsWith(".part") ||
             lower.endsWith(".crdownload") ||
             lower.endsWith("~")
+    }
+
+    private fun copyToCache(fileUri: Uri, result: MethodChannel.Result) {
+        try {
+            val input = contentResolver.openInputStream(fileUri)
+                ?: run {
+                    result.error("READ_ERROR", "Cannot open file", null)
+                    return
+                }
+            val cacheDir = cacheDir
+            val tempFile = java.io.File(cacheDir, "saf_${System.currentTimeMillis()}.tmp")
+            input.use { ins ->
+                tempFile.outputStream().use { out ->
+                    ins.copyTo(out, bufferSize = 8192)
+                }
+            }
+            result.success(tempFile.absolutePath)
+        } catch (e: Exception) {
+            result.error("READ_ERROR", e.message, null)
+        }
     }
 
     private fun readFile(fileUri: Uri, result: MethodChannel.Result) {

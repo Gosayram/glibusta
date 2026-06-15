@@ -21,6 +21,7 @@ import '../domain/reader.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_controller.dart';
+import 'reader_gesture_coordinator.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
@@ -39,6 +40,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
+  final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
@@ -69,6 +71,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       _syncFullscreen(ref.read(readerSettingsProvider).mode);
       ref.listenManual(readerSettingsProvider, (prev, next) {
         _syncFullscreen(next.mode);
+        if (prev != null) _handleLayoutChange(prev, next);
       });
     });
   }
@@ -81,6 +84,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       _ctrl.enableFullscreen();
     } else {
       _ctrl.disableFullscreen();
+    }
+  }
+
+  void _handleLayoutChange(ReaderSettings prev, ReaderSettings next) {
+    final layoutChanged =
+        prev.fontSize != next.fontSize ||
+        prev.lineHeight != next.lineHeight ||
+        prev.margin != next.margin ||
+        prev.paragraphSpacing != next.paragraphSpacing ||
+        prev.letterSpacing != next.letterSpacing ||
+        prev.textAlign != next.textAlign ||
+        prev.font != next.font ||
+        prev.paragraphFirstLineIndent != next.paragraphFirstLineIndent ||
+        prev.readerWidth != next.readerWidth ||
+        prev.hyphenation != next.hyphenation;
+    if (layoutChanged) {
+      _ctrl.reanchorAfterLayoutChange();
     }
   }
 
@@ -443,7 +463,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   bookTitle: readerState.metadata?.title ?? '',
                   onBack: () => Navigator.of(context).pop(),
                   onSettings: () => _showQuickSettings(context),
-                  onSearch: () => _ctrl.toggleSearch(),
+                  onSearch: () {
+                    _ctrl.toggleSearch();
+                    if (_ctrl.state.isSearchOpen) {
+                      _gestureCoordinator.onSearchOpened();
+                    } else {
+                      _gestureCoordinator.onSearchClosed();
+                    }
+                  },
                   onMore: readerState.metadata != null
                       ? () => TableOfContentsSheet.show(
                           context,
@@ -496,7 +523,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       position.copyWith(bookId: widget.bookId),
                     );
                   },
-                  onDismiss: () => _ctrl.closeSearch(),
+                  onDismiss: () {
+                    _ctrl.closeSearch();
+                    _gestureCoordinator.onSearchClosed();
+                  },
                   theme: settings.theme,
                 );
               },
@@ -534,13 +564,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         );
       },
       child: GestureDetector(
-        onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
-        onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
-        onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-        onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+        onVerticalDragStart:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragStart
+            : null,
+        onVerticalDragUpdate:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragUpdate
+            : null,
+        onVerticalDragEnd:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragEnd
+            : null,
+        onDoubleTap:
+            _gestureCoordinator.shouldHandleDoubleTap &&
+                settings.doubleTapAction != DoubleTapAction.disabled
             ? _ctrl.handleDoubleTap
             : null,
-        onLongPress: settings.longPressAction != LongPressAction.disabled
+        onLongPress:
+            _gestureCoordinator.shouldHandleLongPress &&
+                settings.longPressAction != LongPressAction.disabled
             ? () {
                 _ctrl.handleLongPress();
                 if (settings.longPressAction == LongPressAction.selectText) {
@@ -555,7 +598,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             loadedChapters: readerState.loadedChapters,
             settings: settings,
             scrollController: _ctrl.scrollController,
-            onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+            onTap: _gestureCoordinator.shouldHandleTap
+                ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
+                : (_) {},
             initialProgress: readerState.scrollProgress,
             initialPage: readerState.currentPosition.chapterIndex,
             highlightQuery: readerState.highlightedQuery,
@@ -685,12 +730,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _showQuickSettings(BuildContext context) {
     _ctrl.onBottomSheetOpen();
+    _gestureCoordinator.onBottomSheetOpened();
     unawaited(
       showAdaptivePanel<void>(
         context: context,
         child: ReaderQuickSettingsSheet(
           onDismiss: () {
             _ctrl.onBottomSheetClose();
+            _gestureCoordinator.onBottomSheetClosed();
             Navigator.of(context).pop();
           },
         ),

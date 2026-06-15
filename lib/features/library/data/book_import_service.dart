@@ -343,29 +343,42 @@ class BookImportService {
     }
 
     late String bookId;
+    File? cacheFile;
     try {
-      final bytes = await bridge.readFile(external.uri);
-      if (bytes.isEmpty) {
+      final cachedPath = await bridge.copyToCache(external.uri);
+      if (cachedPath == null) {
+        return ImportResult.failure('Не удалось прочитать файл: ${external.name}');
+      }
+      cacheFile = File(cachedPath);
+      if (!await cacheFile.exists() || await cacheFile.length() == 0) {
+        await cacheFile.exists().then((_) => _tryDelete(cachedPath));
         return ImportResult.failure('Файл пуст: ${external.name}');
       }
 
-      final contentHash = sha256.convert(bytes).toString();
+      final fileSize = await cacheFile.length();
+      if (isBookFileTooLarge(format, fileSize)) {
+        await _tryDelete(cachedPath);
+        return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
+      }
+
+      final digest = await sha256.bind(cacheFile.openRead()).first;
+      final contentHash = digest.toString();
       bookId = contentHash;
       final existing = await _findByHash(contentHash);
       if (existing != null) {
+        await _tryDelete(cachedPath);
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
-      if (isBookFileTooLarge(format, bytes.length)) {
-        return ImportResult.failure(bookFileTooLargeMessage(format, bytes.length));
-      }
+      final bytes = await cacheFile.readAsBytes();
+
       if (const FormatCapabilityService().isDocumentOnly(format)) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
         final documentBookId = contentHash;
         bookId = documentBookId;
         final targetFile = await _storage.bookFile(documentBookId, format);
         await targetFile.parent.create(recursive: true);
-        await targetFile.writeAsBytes(bytes, flush: true);
+        await cacheFile.rename(targetFile.path);
 
         await _database.transaction(() async {
           await _database
@@ -425,7 +438,12 @@ class BookImportService {
         format,
       );
       await targetFile.parent.create(recursive: true);
-      await targetFile.writeAsBytes(bytes, flush: true);
+      try {
+        await cacheFile.rename(targetFile.path);
+      } on Object catch (_) {
+        await cacheFile.copy(targetFile.path);
+        await _tryDelete(cacheFile.path);
+      }
 
       final extAuthorIds = <String>[];
       for (final authorName in book.authors) {
@@ -488,6 +506,9 @@ class BookImportService {
         name: 'Import',
         error: e,
       );
+      if (cacheFile != null) {
+        await _tryDelete(cacheFile.path);
+      }
       try {
         final targetFile = await _storage.bookFile(
           bookId,
@@ -586,6 +607,13 @@ class BookImportService {
       await (_database.delete(_database.downloads)..where((row) => row.bookId.equals(bookId))).go();
       await (_database.delete(_database.savedBooks)..where((row) => row.id.equals(bookId))).go();
     });
+  }
+
+  Future<void> _tryDelete(String path) async {
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } on Object catch (_) {}
   }
 
   Future<void> _extractCoverBackground(

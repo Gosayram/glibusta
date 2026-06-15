@@ -444,6 +444,23 @@ class ReaderController {
     _progress.saveProgress(_state.currentPosition, totalBlocks);
   }
 
+  void reanchorAfterLayoutChange() {
+    if (!_loaded || _scrollController == null || !_scrollController!.hasClients) return;
+    final savedPosition = _state.currentPosition;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+      final maxScroll = _scrollController!.position.maxScrollExtent;
+      if (maxScroll <= 0) return;
+      unawaited(
+        _scrollController!.animateTo(
+          (savedPosition.progressPercent * maxScroll).clamp(0.0, maxScroll),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
+  }
+
   // ── Navigation ────────────────────────────────────────
 
   void scrollToNext() {

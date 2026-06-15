@@ -54,6 +54,19 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
+  Future<String?> copyToCache(String fileUri) async {
+    try {
+      final path = await _channel.invokeMethod<String>(
+        'copyToCache',
+        {'uri': fileUri},
+      );
+      return path;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  @override
   Future<List<String>> getPersistedUris() async {
     try {
       final result = await _channel.invokeMethod<List<dynamic>>('getPersistedUris');
