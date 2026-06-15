@@ -15,25 +15,33 @@ class CoverExtractionService {
   CoverExtractionService([AppFileStorage? storage]) : _storage = storage ?? AppFileStorageImpl();
 
   /// Extract cover from book file and save normalized to covers dir.
-  /// Returns the saved file path, or null if no cover found.
+  /// [coverBytes] can be provided by the parser (e.g. MOBI) to skip
+  /// redundant extraction from the file.
   Future<String?> extractAndSaveCover({
     required String bookId,
     required String filePath,
     required String format,
+    Uint8List? coverBytes,
   }) async {
     try {
-      final bytes = await File(filePath).readAsBytes();
-      final coverBytes = switch (format) {
-        'epub' => _extractEpubCover(bytes),
-        'fb2' => _extractFb2Cover(bytes),
-        _ => null,
-      };
+      final Uint8List? extracted;
+      if (coverBytes != null) {
+        extracted = coverBytes;
+      } else {
+        final fileBytes = await File(filePath).readAsBytes();
+        extracted = switch (format) {
+          'epub' => _extractEpubCover(fileBytes),
+          'fb2' => _extractFb2Cover(fileBytes),
+          _ => null,
+        };
+      }
+      final bytes = extracted;
 
-      if (coverBytes == null || coverBytes.isEmpty) return null;
+      if (bytes == null || bytes.isEmpty) return null;
 
       return await _saveNormalizedCover(
         bookId: bookId,
-        coverBytes: coverBytes,
+        coverBytes: bytes,
       );
     } on Object catch (_) {
       return null;

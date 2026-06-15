@@ -166,6 +166,11 @@ class BookImportService {
       );
       bookId = book.id;
 
+      Uint8List? coverBytes;
+      if (book.metadata != null) {
+        coverBytes = book.metadata!['mobiCoverBytes'] as Uint8List?;
+      }
+
       final targetFile = await _storage.bookFile(
         book.id,
         format,
@@ -211,7 +216,7 @@ class BookImportService {
       });
 
       // Background cover extraction — don't block import
-      unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
+      unawaited(_extractCoverBackground(book.id, targetFile.path, ext, coverBytes: coverBytes));
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
@@ -390,6 +395,11 @@ class BookImportService {
       );
       bookId = book.id;
 
+      Uint8List? extCoverBytes;
+      if (book.metadata != null) {
+        extCoverBytes = book.metadata!['mobiCoverBytes'] as Uint8List?;
+      }
+
       final targetFile = await _storage.bookFile(
         book.id,
         format,
@@ -431,7 +441,7 @@ class BookImportService {
             );
       });
 
-      unawaited(_extractCoverBackground(book.id, targetFile.path, ext));
+      unawaited(_extractCoverBackground(book.id, targetFile.path, ext, coverBytes: extCoverBytes));
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
@@ -512,13 +522,19 @@ class BookImportService {
     });
   }
 
-  Future<void> _extractCoverBackground(String bookId, String filePath, String format) async {
+  Future<void> _extractCoverBackground(
+    String bookId,
+    String filePath,
+    String format, {
+    Uint8List? coverBytes,
+  }) async {
     try {
       _logger.info('Extracting cover for $bookId', name: 'Import');
       final coverPath = await _coverService.extractAndSaveCover(
         bookId: bookId,
         filePath: filePath,
         format: format,
+        coverBytes: coverBytes,
       );
       if (coverPath != null) {
         await (_database.update(_database.savedBooks)..where((t) => t.id.equals(bookId))).write(

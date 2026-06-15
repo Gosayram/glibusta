@@ -33,7 +33,8 @@ final class MobiBookParser implements BookParser {
       final record0 = _recordBytes(bytes, palmDb, 0);
       final header = MobiHeaderParser().parse(record0);
       final metadata = ExthParser().parse(record0, header);
-      final text = MobiTextExtractor().extractText(
+      final textExtractor = MobiTextExtractor();
+      final blocks = textExtractor.extractBlocks(
         fullBytes: bytes,
         palmDb: palmDb,
         header: header,
@@ -46,7 +47,15 @@ final class MobiBookParser implements BookParser {
       ]);
       final authors = _splitAuthors(metadata.author);
       final format = fileName == null ? BookFormat.mobi : detectBookFormat(fileName);
-      final chapters = _textToChapters(text);
+      final chapters = MobiChapterSplitter().split(blocks);
+
+      final coverExtractor = MobiCoverExtractor();
+      final coverBytes = coverExtractor.extract(
+        fullBytes: bytes,
+        palmDb: palmDb,
+        header: header,
+        metadata: metadata,
+      );
 
       return NormalizedBook(
         id: _stableId(fileName, bytes),
@@ -63,6 +72,8 @@ final class MobiBookParser implements BookParser {
           'mobiLanguage': metadata.language,
           'mobiFirstImageRecordIndex': header.firstImageRecordIndex,
           'mobiKf8Likely': isLikelyKf8(header, record0),
+          'mobiCoverBytes': ?coverBytes,
+          if (metadata.coverRecordIndex != null) 'mobiCoverRecordIndex': metadata.coverRecordIndex,
         },
       );
     } on Object catch (e) {
@@ -308,6 +319,589 @@ final class ExthParser {
   }
 }
 
+final class MobiHtmlParser {
+  static final _tagRe = RegExp(r'<[^>]*>');
+  static final _tagNameRe = RegExp(r'^<?/?([a-zA-Z][a-zA-Z0-9]*)');
+  static final _entityRe = RegExp(r'&(amp|lt|gt|nbsp|quot|apos|#\d+|#x[0-9a-fA-F]+);');
+  static final _wsRe = RegExp(r'[ \t]+');
+
+  List<ReaderBlock> parse(String html) {
+    final clean = html
+        .replaceAll(RegExp(r'<mbp:[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<!DOCTYPE[^>]*>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '')
+        .replaceAll(RegExp(r'<\?[\s\S]*?\?>'), '');
+
+    final blockChunks = _splitIntoBlockChunks(clean);
+    final blocks = <ReaderBlock>[];
+    var idx = 0;
+
+    for (final chunk in blockChunks) {
+      final trimmed = chunk.trim();
+      if (trimmed.isEmpty) continue;
+
+      final lower = trimmed.toLowerCase();
+      if (_isHeading(lower)) {
+        final text = _extractTextFromChunk(trimmed);
+        if (text.isNotEmpty) {
+          blocks.add(
+            ReaderBlock(
+              index: idx++,
+              text: text,
+              type: BlockType.heading,
+              richSpans: _parseInline(trimmed),
+            ),
+          );
+        }
+      } else if (lower.startsWith('<hr') || lower.startsWith('<hr/>') || lower == '<hr>') {
+        blocks.add(ReaderBlock(index: idx++, text: '', type: BlockType.separator));
+      } else if (_isBlockquote(lower)) {
+        final text = _extractTextFromChunk(trimmed);
+        if (text.isNotEmpty) {
+          blocks.add(
+            ReaderBlock(
+              index: idx++,
+              text: text,
+              type: BlockType.quote,
+              richSpans: _parseInline(trimmed),
+            ),
+          );
+        }
+      } else {
+        final inner = _stripOuterBlockTag(trimmed);
+        final spans = _parseInline(inner);
+        final text = _spansToText(spans);
+        if (text.isNotEmpty) {
+          blocks.add(ReaderBlock(index: idx++, text: text, richSpans: spans));
+        }
+      }
+    }
+
+    if (blocks.isEmpty) {
+      final plainText = _decodeEntities(html.replaceAll(_tagRe, ' ').replaceAll(_wsRe, ' ').trim());
+      if (plainText.isNotEmpty) {
+        blocks.add(ReaderBlock(index: 0, text: plainText));
+      }
+    }
+    return blocks;
+  }
+
+  List<String> _splitIntoBlockChunks(String html) {
+    final result = <String>[];
+    final buf = StringBuffer();
+    var i = 0;
+
+    while (i < html.length) {
+      if (html[i] == '<') {
+        final tagEnd = html.indexOf('>', i);
+        if (tagEnd == -1) {
+          buf.write(html.substring(i));
+          i = html.length;
+          continue;
+        }
+        final tag = html.substring(i, tagEnd + 1);
+        final lower = tag.toLowerCase();
+        final nameMatch = _tagNameRe.firstMatch(lower);
+        final name = nameMatch != null ? nameMatch.group(1) : '';
+        final isClosing = tag.length > 1 && tag[1] == '/';
+        final isSelfClosing = tag.endsWith('/>') || _voidElements.contains(name);
+
+        if (!isClosing && !isSelfClosing && _blockElements.contains(name)) {
+          if (buf.isNotEmpty) {
+            final s = buf.toString().trim();
+            if (s.isNotEmpty) result.add(s);
+            buf.clear();
+          }
+          buf.write(tag);
+          i = tagEnd + 1;
+          final remaining = html.substring(i).toLowerCase();
+          final closeTag = '</$name>';
+          final closeIdx = remaining.indexOf(closeTag);
+          if (closeIdx >= 0) {
+            buf.write(html.substring(i, i + closeIdx));
+            i = i + closeIdx + closeTag.length;
+          }
+          final s = buf.toString().trim();
+          if (s.isNotEmpty) result.add(s);
+          buf.clear();
+        } else if (name == 'br' || name == 'br/') {
+          buf.write('\n');
+          i = tagEnd + 1;
+        } else if (name == 'p' && !isClosing) {
+          if (buf.isNotEmpty) {
+            final s = buf.toString().trim();
+            if (s.isNotEmpty) result.add(s);
+            buf.clear();
+          }
+          buf.write(html.substring(i, tagEnd + 1));
+          i = tagEnd + 1;
+          final remaining = html.substring(i).toLowerCase();
+          final closeIdx = remaining.indexOf('</p>');
+          if (closeIdx >= 0) {
+            buf.write(html.substring(i, i + closeIdx));
+            i = i + closeIdx + 4;
+          }
+          final s = buf.toString().trim();
+          if (s.isNotEmpty) result.add(s);
+          buf.clear();
+        } else if (name == 'div' && !isClosing) {
+          if (buf.isNotEmpty) {
+            final s = buf.toString().trim();
+            if (s.isNotEmpty) result.add(s);
+            buf.clear();
+          }
+          final remaining = html.substring(i).toLowerCase();
+          final closeIdx = remaining.indexOf('</div>');
+          if (closeIdx >= 0) {
+            result.addAll(_splitIntoBlockChunks(html.substring(i, i + closeIdx)));
+            i = i + closeIdx + 6;
+          } else {
+            buf.write(tag);
+            i = tagEnd + 1;
+          }
+        } else {
+          buf.write(tag);
+          i = tagEnd + 1;
+        }
+      } else {
+        var nextTag = html.indexOf('<', i);
+        if (nextTag == -1) nextTag = html.length;
+        buf.write(html.substring(i, nextTag));
+        i = nextTag;
+      }
+    }
+
+    final remaining = buf.toString().trim();
+    if (remaining.isNotEmpty) result.add(remaining);
+    return result;
+  }
+
+  bool _isHeading(String lower) {
+    return RegExp(r'^<h[1-6]').firstMatch(lower) != null;
+  }
+
+  bool _isBlockquote(String lower) => lower.startsWith('<blockquote');
+
+  List<RichSpan> _parseInline(String chunk) {
+    final spans = <RichSpan>[];
+    final buf = StringBuffer();
+    var bold = false;
+    var italic = false;
+    var superscript = false;
+    String? href;
+    var i = 0;
+
+    while (i < chunk.length) {
+      if (chunk[i] == '<') {
+        final tagEnd = chunk.indexOf('>', i);
+        if (tagEnd == -1) {
+          buf.write(chunk.substring(i));
+          i = chunk.length;
+          continue;
+        }
+        final tag = chunk.substring(i, tagEnd + 1);
+        final lower = tag.toLowerCase();
+        final nameMatch = _tagNameRe.firstMatch(lower);
+        final name = nameMatch != null ? nameMatch.group(1) : '';
+        final isClosing = tag.length > 1 && tag[1] == '/';
+        final isSelfClosing = tag.endsWith('/>') || _voidElements.contains(name);
+
+        if (!isClosing && !isSelfClosing && _blockElements.contains(name)) {
+          if (buf.isNotEmpty) {
+            final t = _decodeEntities(buf.toString().replaceAll(_wsRe, ' ').trim());
+            if (t.isNotEmpty) {
+              spans.add(
+                RichSpan(text: t, bold: bold, italic: italic, superscript: superscript, href: href),
+              );
+            }
+            buf.clear();
+          }
+          i = tagEnd + 1;
+          continue;
+        }
+
+        if (!isClosing && !isSelfClosing) {
+          if (buf.isNotEmpty) {
+            final t = _decodeEntities(buf.toString().replaceAll(_wsRe, ' ').trim());
+            if (t.isNotEmpty) {
+              spans.add(
+                RichSpan(text: t, bold: bold, italic: italic, superscript: superscript, href: href),
+              );
+            }
+            buf.clear();
+          }
+          if (name == 'b' || name == 'strong') {
+            bold = true;
+          } else if (name == 'i' || name == 'em') {
+            italic = true;
+          } else if (name == 'sup') {
+            superscript = true;
+          } else if (name == 'a') {
+            final hrefMatch = RegExp(r'href="([^"]*)"').firstMatch(lower);
+            if (hrefMatch != null) href = hrefMatch.group(1);
+          }
+          i = tagEnd + 1;
+          continue;
+        }
+
+        if (isClosing) {
+          if (buf.isNotEmpty) {
+            final t = _decodeEntities(buf.toString().replaceAll(_wsRe, ' ').trim());
+            if (t.isNotEmpty) {
+              spans.add(
+                RichSpan(text: t, bold: bold, italic: italic, superscript: superscript, href: href),
+              );
+            }
+            buf.clear();
+          }
+          if (name == 'b' || name == 'strong') {
+            bold = false;
+          } else if (name == 'i' || name == 'em') {
+            italic = false;
+          } else if (name == 'sup') {
+            superscript = false;
+          } else if (name == 'a') {
+            href = null;
+          }
+          i = tagEnd + 1;
+          continue;
+        }
+
+        if (name == 'br' || name == 'br/') {
+          if (buf.isNotEmpty) {
+            final t = _decodeEntities(buf.toString().replaceAll(_wsRe, ' ').trim());
+            if (t.isNotEmpty) {
+              spans.add(
+                RichSpan(text: t, bold: bold, italic: italic, superscript: superscript, href: href),
+              );
+            }
+            buf.clear();
+          }
+          spans.add(
+            RichSpan(text: '\n', bold: bold, italic: italic, superscript: superscript, href: href),
+          );
+          i = tagEnd + 1;
+          continue;
+        }
+
+        buf.write(tag);
+        i = tagEnd + 1;
+      } else {
+        var nextTag = chunk.indexOf('<', i);
+        if (nextTag == -1) nextTag = chunk.length;
+        buf.write(chunk.substring(i, nextTag));
+        i = nextTag;
+      }
+    }
+
+    if (buf.isNotEmpty) {
+      final t = _decodeEntities(buf.toString().replaceAll(_wsRe, ' ').trim());
+      if (t.isNotEmpty) {
+        spans.add(
+          RichSpan(text: t, bold: bold, italic: italic, superscript: superscript, href: href),
+        );
+      }
+    }
+    return spans;
+  }
+
+  String _extractTextFromChunk(String chunk) {
+    final plain = chunk.replaceAll(_tagRe, ' ').replaceAll(_wsRe, ' ').trim();
+    return _decodeEntities(plain);
+  }
+
+  String _stripOuterBlockTag(String chunk) {
+    final match = RegExp(
+      r'^<(p|div|blockquote|pre|section|article)[^>]*>',
+      caseSensitive: false,
+    ).firstMatch(chunk);
+    if (match == null) return chunk;
+    final afterOpen = chunk.substring(match.end);
+    final closeTag = '</${match.group(1)}>';
+    final closeIdx = afterOpen.toLowerCase().lastIndexOf(closeTag);
+    if (closeIdx >= 0) {
+      return afterOpen.substring(0, closeIdx);
+    }
+    return afterOpen;
+  }
+
+  String _spansToText(List<RichSpan> spans) {
+    final buf = StringBuffer();
+    for (final span in spans) {
+      buf.write(span.text);
+    }
+    return buf.toString().trim();
+  }
+
+  String _decodeEntities(String input) {
+    return input
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAllMapped(_entityRe, (m) {
+          final entity = m.group(1)!;
+          if (entity.startsWith('#')) {
+            if (entity.startsWith('#x')) {
+              final code = int.tryParse(entity.substring(2), radix: 16);
+              return code != null ? String.fromCharCode(code) : m.group(0)!;
+            }
+            final code = int.tryParse(entity.substring(1));
+            return code != null ? String.fromCharCode(code) : m.group(0)!;
+          }
+          return _entityMap[entity] ?? m.group(0)!;
+        });
+  }
+
+  static const _blockElements = {
+    'p',
+    'div',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'blockquote',
+    'pre',
+    'table',
+    'ul',
+    'ol',
+    'li',
+    'tr',
+    'td',
+    'th',
+    'section',
+    'article',
+    'header',
+    'footer',
+    'figure',
+    'figcaption',
+  };
+
+  static const _voidElements = {
+    'br',
+    'hr',
+    'img',
+    'input',
+    'meta',
+    'link',
+    'area',
+    'base',
+    'col',
+    'embed',
+    'source',
+    'track',
+    'wbr',
+  };
+
+  static const _entityMap = {
+    'amp': '&',
+    'lt': '<',
+    'gt': '>',
+    'nbsp': ' ',
+    'quot': '"',
+    'apos': "'",
+  };
+}
+
+final class MobiChapterSplitter {
+  static final _chapterPatternRe = RegExp(
+    r'(?:^|\n)\s*(?:'
+    r'(?:глава|часть|раздел|пролог|эпилог|предисловие|послесловие)\s*[\d]*'
+    r'|(?:chapter|part|section|prologue|epilogue|preface|afterword)\s*[\d]*'
+    r')\s*(?:\n|$)',
+    caseSensitive: false,
+  );
+
+  List<ReaderChapter> split(List<ReaderBlock> blocks) {
+    if (blocks.isEmpty) {
+      return const [
+        ReaderChapter(
+          index: 0,
+          title: 'Документ',
+          blocks: [ReaderBlock(index: 0, text: 'Не удалось извлечь текст.')],
+        ),
+      ];
+    }
+
+    final chunks = _splitBlocksIntoChunks(blocks);
+    if (chunks.length <= 1) {
+      return [
+        ReaderChapter(
+          index: 0,
+          title: chunks.isNotEmpty ? chunks[0].title : 'Документ',
+          blocks: blocks,
+        ),
+      ];
+    }
+
+    return chunks
+        .asMap()
+        .entries
+        .map(
+          (entry) => ReaderChapter(
+            index: entry.key,
+            title: entry.value.title,
+            blocks: entry.value.blocks,
+          ),
+        )
+        .toList();
+  }
+
+  List<_ChapterChunk> _splitBlocksIntoChunks(List<ReaderBlock> blocks) {
+    final breaks = <int>[];
+    final titles = <int, String>{};
+
+    for (var i = 0; i < blocks.length; i++) {
+      final block = blocks[i];
+      if (block.type == BlockType.heading) {
+        breaks.add(i);
+        titles[i] = block.text;
+      } else if (block.type == BlockType.separator && i > 0 && i < blocks.length - 1) {
+        if (!_isNearbyHeading(blocks, i)) {
+          breaks.add(i);
+        }
+      } else if (block.type == BlockType.paragraph) {
+        final text = block.text;
+        final match = _chapterPatternRe.firstMatch('\n$text\n');
+        if (match != null) {
+          breaks.add(i);
+          titles[i] = text;
+        }
+      }
+    }
+
+    if (breaks.isEmpty) {
+      return _chunkBySize(blocks);
+    }
+
+    if (breaks.first != 0) {
+      breaks.insert(0, 0);
+      titles[0] = 'Документ';
+    }
+
+    if (breaks.length == 1) {
+      final title = titles[breaks[0]] ?? 'Документ';
+      return [_ChapterChunk(title: _cleanTitle(title), blocks: blocks)];
+    }
+
+    final chunks = <_ChapterChunk>[];
+    for (var b = 0; b < breaks.length; b++) {
+      final start = breaks[b];
+      final end = b + 1 < breaks.length ? breaks[b + 1] : blocks.length;
+      final chapterBlocks = blocks.sublist(start, end).where((bl) {
+        if (bl.type == BlockType.separator && breaks.contains(bl.index)) return false;
+        return true;
+      }).toList();
+      if (chapterBlocks.isEmpty) continue;
+
+      final title = titles[breaks[b]] ?? 'Часть ${chunks.length + 1}';
+      chunks.add(_ChapterChunk(title: _cleanTitle(title), blocks: chapterBlocks));
+    }
+
+    return chunks;
+  }
+
+  bool _isNearbyHeading(List<ReaderBlock> blocks, int index) {
+    for (var j = index - 2; j <= index + 2; j++) {
+      if (j >= 0 && j < blocks.length && blocks[j].type == BlockType.heading) return true;
+    }
+    return false;
+  }
+
+  List<_ChapterChunk> _chunkBySize(List<ReaderBlock> blocks) {
+    const chunkSize = 80;
+    final chunks = <_ChapterChunk>[];
+    for (var start = 0; start < blocks.length; start += chunkSize) {
+      final end = (start + chunkSize < blocks.length) ? start + chunkSize : blocks.length;
+      chunks.add(
+        _ChapterChunk(
+          title: 'Часть ${chunks.length + 1}',
+          blocks: blocks.sublist(start, end),
+        ),
+      );
+    }
+    return chunks;
+  }
+
+  String _cleanTitle(String raw) {
+    var title = raw.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    if (title.length > 80) title = '${title.substring(0, 80)}…';
+    return title.isNotEmpty ? title : 'Без названия';
+  }
+}
+
+class _ChapterChunk {
+  const _ChapterChunk({required this.title, required this.blocks});
+  final String title;
+  final List<ReaderBlock> blocks;
+}
+
+final class MobiCoverExtractor {
+  static const _jpegStart = [0xFF, 0xD8];
+  static const _pngSignature = [0x89, 0x50, 0x4E, 0x47];
+  static const _gifSignature = [0x47, 0x49, 0x46];
+
+  Uint8List? extract({
+    required Uint8List fullBytes,
+    required PalmDb palmDb,
+    required MobiHeader header,
+    required MobiMetadata metadata,
+  }) {
+    final recordIndex = _findCoverRecordIndex(header, metadata);
+    if (recordIndex == null || recordIndex < 0 || recordIndex >= palmDb.records.length) return null;
+
+    final bytes = _safeRecordBytes(fullBytes, palmDb, recordIndex);
+    if (bytes == null || bytes.length < 8) return null;
+
+    return _validateImageBytes(bytes);
+  }
+
+  int? _findCoverRecordIndex(MobiHeader header, MobiMetadata metadata) {
+    if (metadata.coverRecordIndex != null && metadata.coverRecordIndex! > 0) {
+      return metadata.coverRecordIndex;
+    }
+    if (header.firstImageRecordIndex > 0) return header.firstImageRecordIndex;
+    return null;
+  }
+
+  Uint8List? _safeRecordBytes(Uint8List fullBytes, PalmDb palmDb, int index) {
+    if (index < 0 || index >= palmDb.records.length) return null;
+    final start = palmDb.records[index].offset;
+    final end = index + 1 < palmDb.records.length
+        ? palmDb.records[index + 1].offset
+        : fullBytes.length;
+    if (start >= end || end > fullBytes.length) return null;
+    return Uint8List.sublistView(fullBytes, start, end);
+  }
+
+  Uint8List? _validateImageBytes(Uint8List bytes) {
+    if (_isJpeg(bytes)) return bytes;
+    if (_isPng(bytes)) return bytes;
+    if (_isGif(bytes)) return bytes;
+    return null;
+  }
+
+  bool _isJpeg(Uint8List bytes) =>
+      bytes.length >= 2 && bytes[0] == _jpegStart[0] && bytes[1] == _jpegStart[1];
+
+  bool _isPng(Uint8List bytes) =>
+      bytes.length >= 4 &&
+      bytes[0] == _pngSignature[0] &&
+      bytes[1] == _pngSignature[1] &&
+      bytes[2] == _pngSignature[2] &&
+      bytes[3] == _pngSignature[3];
+
+  bool _isGif(Uint8List bytes) =>
+      bytes.length >= 3 &&
+      bytes[0] == _gifSignature[0] &&
+      bytes[1] == _gifSignature[1] &&
+      bytes[2] == _gifSignature[2];
+}
+
 final class PalmDocDecompressor {
   Uint8List decompress(Uint8List input) {
     final out = <int>[];
@@ -374,7 +968,47 @@ final class MobiTextExtractor {
       }
     }
 
-    return _cleanup(_decodeText(Uint8List.fromList(chunks)));
+    return _decodeText(Uint8List.fromList(chunks));
+  }
+
+  List<ReaderBlock> extractBlocks({
+    required Uint8List fullBytes,
+    required PalmDb palmDb,
+    required MobiHeader header,
+  }) {
+    final text = extractText(
+      fullBytes: fullBytes,
+      palmDb: palmDb,
+      header: header,
+    );
+    if (_looksLikeHtml(text)) {
+      return MobiHtmlParser().parse(text);
+    }
+    return _plainTextToBlocks(text);
+  }
+
+  bool _looksLikeHtml(String text) {
+    final sample = text.length > 2000 ? text.substring(0, 2000) : text;
+    return sample.contains('<p') ||
+        sample.contains('<h') ||
+        sample.contains('<br') ||
+        sample.contains('<div') ||
+        sample.contains('<b>') ||
+        sample.contains('<i>');
+  }
+
+  List<ReaderBlock> _plainTextToBlocks(String text) {
+    final blocks = <ReaderBlock>[];
+    var idx = 0;
+    for (final line in text.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      blocks.add(ReaderBlock(index: idx++, text: trimmed));
+    }
+    if (blocks.isEmpty && text.trim().isNotEmpty) {
+      blocks.add(ReaderBlock(index: 0, text: text.trim()));
+    }
+    return blocks;
   }
 
   String _decodeText(Uint8List bytes) {
@@ -382,21 +1016,6 @@ final class MobiTextExtractor {
     final replacementCount = '\uFFFD'.allMatches(utf8Text).length;
     if (replacementCount < bytes.length * 0.02) return utf8Text;
     return latin1.decode(bytes, allowInvalid: true);
-  }
-
-  String _cleanup(String input) {
-    return input
-        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'</p>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'</h[1-6]>', caseSensitive: false), '\n\n')
-        .replaceAll(RegExp(r'<[^>]+>'), ' ')
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll(RegExp(r'[ \t]+'), ' ')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-        .trim();
   }
 }
 
@@ -441,41 +1060,6 @@ List<String> _splitAuthors(String? value) {
       .map((e) => e.trim())
       .where((e) => e.isNotEmpty)
       .toList();
-}
-
-List<ReaderChapter> _textToChapters(String text) {
-  final paragraphs = text
-      .split(RegExp(r'\n\s*\n'))
-      .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
-      .where((e) => e.isNotEmpty)
-      .toList();
-  if (paragraphs.isEmpty) {
-    return const [
-      ReaderChapter(
-        index: 0,
-        title: 'Документ',
-        blocks: [ReaderBlock(index: 0, text: 'Не удалось извлечь текст из MOBI.')],
-      ),
-    ];
-  }
-
-  final chapters = <ReaderChapter>[];
-  const chunkSize = 80;
-  for (var start = 0; start < paragraphs.length; start += chunkSize) {
-    final chunk = paragraphs.skip(start).take(chunkSize).toList();
-    chapters.add(
-      ReaderChapter(
-        index: chapters.length,
-        title: chapters.isEmpty ? 'Документ' : 'Часть ${chapters.length + 1}',
-        blocks: chunk
-            .asMap()
-            .entries
-            .map((entry) => ReaderBlock(index: entry.key, text: entry.value))
-            .toList(),
-      ),
-    );
-  }
-  return chapters;
 }
 
 String _stableId(String? fileName, Uint8List bytes) {
