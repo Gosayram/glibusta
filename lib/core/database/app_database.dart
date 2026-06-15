@@ -120,9 +120,29 @@ class AppDatabase extends _$AppDatabase {
         );
         await dbFile.copy(backupFile.path);
       }
+      await _cleanupOldBackups();
     } on Object catch (e) {
       AppLogger().warning('Database backup failed: $e', name: 'Database', error: e);
     }
+  }
+
+  static const int _maxBackups = 3;
+
+  Future<void> _cleanupOldBackups() async {
+    try {
+      final dbDir = Directory(p.dirname(await _databasePath));
+      if (!await dbDir.exists()) return;
+      final bakFiles = await dbDir
+          .list()
+          .where((e) => e.path.endsWith('.bak'))
+          .map((e) => File(e.path))
+          .toList();
+      if (bakFiles.length <= _maxBackups) return;
+      bakFiles.sort((a, b) => a.path.compareTo(b.path));
+      for (var i = 0; i < bakFiles.length - _maxBackups; i++) {
+        await bakFiles[i].delete();
+      }
+    } on Object catch (_) {}
   }
 
   static Future<String> get _databasePath async {

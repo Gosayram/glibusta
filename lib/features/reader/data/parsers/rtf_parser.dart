@@ -58,6 +58,10 @@ final class RtfBookParser implements BookParser {
   }
 }
 
+const int _maxGroupDepth = 200;
+const int _maxControlWordLength = 64;
+const int _maxRtfOutputChars = 5 * 1024 * 1024;
+
 String rtfToPlainText(String rtf) {
   final buffer = StringBuffer();
   var index = 0;
@@ -66,12 +70,15 @@ String rtfToPlainText(String rtf) {
   var unicodeSkip = 1;
 
   while (index < rtf.length) {
+    if (buffer.length > _maxRtfOutputChars) break;
     final char = rtf[index];
 
     if (char == '{') {
-      groupDepth++;
-      if (_startsWithControlSymbol(rtf, index + 1, '*')) {
-        skipGroupDepth = groupDepth;
+      if (groupDepth < _maxGroupDepth) {
+        groupDepth++;
+        if (_startsWithControlSymbol(rtf, index + 1, '*')) {
+          skipGroupDepth = groupDepth;
+        }
       }
       index++;
       continue;
@@ -115,6 +122,13 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
   return index + 1 < text.length && text[index] == r'\' && text[index + 1] == symbol;
 }
 
+String? _safeFromCharCode(int code) {
+  final resolved = code < 0 ? code + 65536 : code;
+  if (resolved < 0 || resolved > 0x10FFFF) return null;
+  if (resolved >= 0xD800 && resolved <= 0xDFFF) return null;
+  return String.fromCharCode(resolved);
+}
+
 ({int nextIndex, String? output, int? unicodeSkip}) _parseControl(
   String text,
   int start, {
@@ -141,10 +155,13 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
   }
 
   var index = start + 1;
-  while (index < text.length && RegExp('[a-zA-Z]').hasMatch(text[index])) {
+  final wordStart = index;
+  while (index < text.length &&
+      index - wordStart < _maxControlWordLength &&
+      RegExp('[a-zA-Z]').hasMatch(text[index])) {
     index++;
   }
-  final word = text.substring(start + 1, index);
+  final word = text.substring(wordStart, index);
 
   var negative = false;
   if (index < text.length && text[index] == '-') {
@@ -184,7 +201,7 @@ bool _startsWithControlSymbol(String text, int index, String symbol) {
       'ldblquote' => '"',
       'rdblquote' => '"',
       'bullet' => '* ',
-      'u' when number != null => String.fromCharCode(number < 0 ? number + 65536 : number),
+      'u' when number != null => _safeFromCharCode(number),
       _ => null,
     },
     unicodeSkip: word == 'uc' && number != null ? (number < 0 ? 0 : number) : null,

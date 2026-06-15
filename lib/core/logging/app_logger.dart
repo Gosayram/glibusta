@@ -129,25 +129,33 @@ class AppLogger {
         await sink.flush();
         await sink.close();
       }
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      developer.log('Log persist failed: $e', name: 'AppLogger', level: 900);
+    }
     if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
       try {
         final prefs = await SharedPreferences.getInstance();
         final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
         await prefs.setString('last_error', summary);
-      } on Object catch (_) {}
+      } on Object catch (e) {
+        developer.log('Prefs persist failed: $e', name: 'AppLogger', level: 900);
+      }
     }
   }
 
   Future<void> _rotateIfNeeded(File file) async {
-    if (!await file.exists()) return;
-    final stat = await file.stat();
-    if (stat.size > _maxPersistentLogBytes) {
-      final backup = File('${file.path}.old');
-      if (await backup.exists()) {
-        await backup.delete();
+    try {
+      if (!await file.exists()) return;
+      final stat = await file.stat();
+      if (stat.size > _maxPersistentLogBytes) {
+        final backup = File('${file.path}.old');
+        if (await backup.exists()) {
+          await backup.delete();
+        }
+        await file.rename(backup.path);
       }
-      await file.rename(backup.path);
+    } on Object catch (e) {
+      developer.log('Log rotation failed: $e', name: 'AppLogger', level: 900);
     }
   }
 

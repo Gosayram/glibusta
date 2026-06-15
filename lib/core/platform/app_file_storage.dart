@@ -14,7 +14,16 @@ abstract interface class AppFileStorage {
   Future<Directory> cacheDir();
 }
 
-String sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+String sanitizeId(String id) {
+  var sanitized = id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+  while (sanitized.startsWith('.')) {
+    sanitized = sanitized.substring(1);
+  }
+  sanitized = sanitized.trim();
+  if (sanitized.isEmpty) sanitized = 'unnamed';
+  if (sanitized.length > 200) sanitized = sanitized.substring(0, 200);
+  return sanitized;
+}
 
 class AppFileStorageImpl implements AppFileStorage {
   @override
