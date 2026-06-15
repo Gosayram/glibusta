@@ -9,10 +9,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/formats/book_file_size_policy.dart';
+import '../../../core/formats/format_capability.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
+import '../../../core/utils/fire_and_log.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/epub_parser.dart';
 import '../../reader/data/parsers/fb2_parser.dart';
@@ -99,7 +101,7 @@ class BookImportService {
     if (isBookFileTooLarge(format, size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
-    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+    if (const FormatCapabilityService().isDocumentOnly(format)) {
       return _doDocumentImport(
         BookFileInspectionResult(
           path: filePath,
@@ -202,7 +204,11 @@ class BookImportService {
       });
 
       // Background cover extraction — don't block import
-      unawaited(_extractCoverBackground(book.id, targetFile.path, ext, coverBytes: coverBytes));
+      fireAndLog(
+        () => _extractCoverBackground(book.id, targetFile.path, ext, coverBytes: coverBytes),
+        name: 'Import',
+        context: 'Cover extraction for $bookId',
+      );
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
@@ -326,7 +332,7 @@ class BookImportService {
       if (isBookFileTooLarge(format, bytes.length)) {
         return ImportResult.failure(bookFileTooLargeMessage(format, bytes.length));
       }
-      if (format == BookFormat.pdf || format == BookFormat.djvu) {
+      if (const FormatCapabilityService().isDocumentOnly(format)) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
         final documentBookId = contentHash;
         bookId = documentBookId;
@@ -427,7 +433,11 @@ class BookImportService {
             );
       });
 
-      unawaited(_extractCoverBackground(book.id, targetFile.path, ext, coverBytes: extCoverBytes));
+      fireAndLog(
+        () => _extractCoverBackground(book.id, targetFile.path, ext, coverBytes: extCoverBytes),
+        name: 'Import',
+        context: 'Cover extraction for $bookId',
+      );
 
       return ImportResult.success(book.title);
     } on Object catch (e) {

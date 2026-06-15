@@ -82,41 +82,41 @@ class BookOpenService {
     return switch (args.format) {
       BookFormat.fb2 => parseFb2FromText(detectedText, fileName: args.fileName),
       BookFormat.txt => parseTxtFromText(detectedText, fileName: args.fileName),
-      _ => throw BookOpenFailure('Формат не поддерживается: ${args.format.name}'),
+      _ => throw const UnsupportedFormatFailure(),
     };
   }
 
   Future<NormalizedBook> openBook(String bookId) async {
     final download = await _findDownload(bookId);
     if (download == null) {
-      throw const BookOpenFailure('Книга не найдена в загрузках');
+      throw const BookMissingFailure('Книга не найдена в загрузках');
     }
 
     final filePath = download.targetPath;
     if (filePath == null || filePath.isEmpty) {
-      throw const BookOpenFailure('Путь к файлу не указан');
+      throw const BookMissingFailure('Путь к файлу не указан');
     }
 
     final file = File(filePath);
     if (!await file.exists()) {
-      throw BookOpenFailure('Файл не найден: $filePath');
+      throw const BookMissingFailure('Файл книги не найден');
     }
 
     final fileSize = await file.length();
     if (fileSize == 0) {
-      throw BookOpenFailure('Файл пуст: $filePath');
+      throw const CacheCorruptedFailure('Файл пуст');
     }
 
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
-      throw BookOpenFailure('Формат не поддерживается: ${download.format}');
+      throw UnsupportedFormatFailure('Формат не поддерживается: ${download.format}');
     }
     if (isBookFileTooLarge(format, fileSize)) {
-      throw BookOpenFailure(bookFileTooLargeMessage(format, fileSize));
+      throw UnsupportedFormatFailure(bookFileTooLargeMessage(format, fileSize));
     }
 
     if (format == BookFormat.pdf || format == BookFormat.djvu) {
-      throw const BookOpenFailure('Формат не поддерживается');
+      throw const UnsupportedFormatFailure('Формат не поддерживается');
     }
 
     return _parseInIsolate(format, filePath, bookId);
@@ -205,7 +205,7 @@ class BookOpenService {
         bookFormat == BookFormat.prc) {
       final parser = _parsers[bookFormat];
       if (parser == null) {
-        throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+        throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
       }
       return parser
           .parseFile(filePath)
@@ -221,18 +221,18 @@ class BookOpenService {
       final file = File(filePath);
       final fileSize = await file.length();
       if (isBookFileTooLarge(bookFormat, fileSize)) {
-        throw BookOpenFailure(bookFileTooLargeMessage(bookFormat, fileSize));
+        throw UnsupportedFormatFailure(bookFileTooLargeMessage(bookFormat, fileSize));
       }
       final bytes = await file.readAsBytes();
       if (bytes.isEmpty) {
-        throw BookOpenFailure('Файл пуст: $filePath');
+        throw const CacheCorruptedFailure('Файл пуст');
       }
       final fileName = filePath.split('/').last;
 
       if (bookFormat == BookFormat.epub) {
         final parser = _parsers[bookFormat];
         if (parser == null) {
-          throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+          throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
         }
         return await parser
             .parse(bytes, fileName: fileName)
@@ -281,12 +281,12 @@ class BookOpenService {
     // Find the book file path from downloads
     final download = await _findDownload(bookId);
     if (download == null) {
-      throw BookOpenFailure('Книга не найдена: $bookId');
+      throw BookMissingFailure('Книга не найдена: $bookId');
     }
 
     final filePath = download.targetPath;
     if (filePath == null || !await File(filePath).exists()) {
-      throw BookOpenFailure('Файл книги не найден: $bookId');
+      throw BookMissingFailure('Файл книги не найден: $bookId');
     }
 
     final format = detectBookFormat(filePath);
@@ -296,12 +296,12 @@ class BookOpenService {
         format == BookFormat.azw3 ||
         format == BookFormat.prc ||
         format == BookFormat.djvu) {
-      throw BookOpenFailure('Формат не поддерживается: ${format.name}');
+      throw UnsupportedFormatFailure('Формат не поддерживается: ${format.name}');
     }
 
     final parser = _parsers[format];
     if (parser == null) {
-      throw BookOpenFailure('Парсер не найден: ${format.name}');
+      throw UnsupportedFormatFailure('Парсер не найден: ${format.name}');
     }
 
     // Parse with forced encoding

@@ -26,17 +26,6 @@ final Set<String> importableExtensions = {
   'zip',
 };
 
-const Set<String> readableExtensions = {
-  'epub',
-  'fb2',
-  'txt',
-  'rtf',
-  'mobi',
-  'azw',
-  'azw3',
-  'prc',
-};
-
 BookFormat formatForExtension(String ext) {
   return _extensionToFormat[ext.toLowerCase()] ?? BookFormat.unknown;
 }

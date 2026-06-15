@@ -176,6 +176,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     if (readerState.errorMessage != null) {
+      final kind = readerState.errorKind ?? ReaderErrorKind.unknown;
+      final showCacheButton = kind != ReaderErrorKind.bookMissing;
+      final showDeleteButton =
+          readerState.errorFilePath != null && kind != ReaderErrorKind.bookMissing;
       return AnimatedTheme(
         data: theme,
         duration: AppDuration.readerThemeTransition,
@@ -191,12 +195,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.orange),
-                      const SizedBox(height: 16),
+                      Icon(kind.icon, size: 48, color: Colors.orange),
+                      const SizedBox(height: 12),
+                      Text(
+                        kind.defaultTitle,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         readerState.errorMessage!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                       if (readerState.errorFilePath != null) ...[
                         const SizedBox(height: 12),
@@ -242,17 +251,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                             icon: const Icon(Icons.refresh),
                             label: const Text('Повторить'),
                           ),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              await _ctrl.clearCacheAndReload();
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Кеш очищен')),
-                              );
-                            },
-                            icon: const Icon(Icons.cleaning_services_outlined),
-                            label: const Text('Очистить кеш'),
-                          ),
+                          if (showCacheButton)
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await _ctrl.clearCacheAndReload();
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Кеш очищен')),
+                                );
+                              },
+                              icon: const Icon(Icons.cleaning_services_outlined),
+                              label: const Text('Очистить кеш'),
+                            ),
                           OutlinedButton.icon(
                             onPressed: () {
                               _ctrl.copyDiagnostics();
@@ -263,7 +273,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                             icon: const Icon(Icons.copy),
                             label: const Text('Копировать диагностику'),
                           ),
-                          if (readerState.errorFilePath != null)
+                          if (showDeleteButton)
                             OutlinedButton.icon(
                               onPressed: () => _showDeleteConfirmDialog(context),
                               icon: const Icon(Icons.delete_outline, color: Colors.red),

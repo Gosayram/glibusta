@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/formats/format_capability.dart';
 import '../data/parsers/format_detector.dart';
 import 'djvu_reader_screen.dart';
 import 'pdf_reader_screen.dart';
@@ -52,18 +53,18 @@ class ReaderEntryScreen extends ConsumerWidget {
           return const _ReaderOpenError(message: 'Файл книги не найден');
         }
 
-        return switch (detectBookFormat(path)) {
-          BookFormat.pdf => PdfReaderScreen(filePath: path),
-          BookFormat.djvu => DjvuReaderScreen(filePath: path),
-          BookFormat.epub ||
-          BookFormat.fb2 ||
-          BookFormat.txt ||
-          BookFormat.rtf ||
-          BookFormat.mobi ||
-          BookFormat.azw3 ||
-          BookFormat.prc => ReaderScreen(bookId: bookId),
-          BookFormat.unknown => const _ReaderOpenError(message: 'Формат не поддерживается'),
-        };
+        final format = detectBookFormat(path);
+        final capService = const FormatCapabilityService();
+        if (format == BookFormat.pdf) {
+          return PdfReaderScreen(filePath: path);
+        }
+        if (format == BookFormat.djvu) {
+          return DjvuReaderScreen(filePath: path);
+        }
+        if (capService.canReadInApp(format)) {
+          return ReaderScreen(bookId: bookId);
+        }
+        return const _ReaderOpenError(message: 'Формат не поддерживается');
       },
     );
   }

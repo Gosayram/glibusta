@@ -5,7 +5,7 @@ import 'package:crypto/crypto.dart';
 
 import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/formats/book_file_size_policy.dart';
-import '../../../reader/data/parsers/format_detector.dart';
+import '../../../../core/formats/format_capability.dart';
 import 'book_format_detector.dart';
 import 'book_inspection_result.dart';
 import 'book_metadata_extractor.dart';
@@ -94,20 +94,16 @@ final class BookFileInspector {
     if (metadata.isCorrupted) {
       return ImportDecision.corrupted;
     }
-    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+    final capService = const FormatCapabilityService();
+    if (capService.isDocumentOnly(format)) {
       return ImportDecision.importAsDocument;
     }
     if (format == BookFormat.epub || format == BookFormat.fb2) {
       if (metadata.encodingConfidence != null && metadata.encodingConfidence! < 0.55) {
         return ImportDecision.needsEncodingSelection;
       }
-      return ImportDecision.importAsBook;
     }
-    if (format == BookFormat.txt ||
-        format == BookFormat.rtf ||
-        format == BookFormat.mobi ||
-        format == BookFormat.azw3 ||
-        format == BookFormat.prc) {
+    if (capService.canReadInApp(format)) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;

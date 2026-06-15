@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart' show DownloadStatusDb;
+import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
@@ -20,12 +21,26 @@ import 'reader_content_helper.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 
+enum ReaderErrorKind {
+  bookMissing('Книга не найдена', Icons.search_off),
+  unsupportedFormat('Формат не поддерживается', Icons.block),
+  parserTimeout('Превышено время ожидания', Icons.hourglass_empty),
+  cacheCorrupted('Повреждённый кеш', Icons.broken_image_outlined),
+  invalidEncoding('Ошибка кодировки', Icons.text_fields),
+  unknown('Ошибка открытия книги', Icons.error_outline);
+
+  const ReaderErrorKind(this.defaultTitle, this.icon);
+  final String defaultTitle;
+  final IconData icon;
+}
+
 @immutable
 class ReaderState {
   final NormalizedBookMetadata? metadata;
   final Map<int, ReaderChapter> loadedChapters;
   final ReaderLoadingStage? loadingStage;
   final String? errorMessage;
+  final ReaderErrorKind? errorKind;
   final String? errorFilePath;
   final String? errorFormat;
   final int? errorFileSize;
@@ -43,6 +58,7 @@ class ReaderState {
     this.loadedChapters = const {},
     this.loadingStage = ReaderLoadingStage.openingFile,
     this.errorMessage,
+    this.errorKind,
     this.errorFilePath,
     this.errorFormat,
     this.errorFileSize,
@@ -77,6 +93,8 @@ class ReaderState {
     ReaderLoadingStage? loadingStage,
     bool clearLoadingStage = false,
     String? errorMessage,
+    ReaderErrorKind? errorKind,
+    bool clearError = false,
     String? errorFilePath,
     String? errorFormat,
     int? errorFileSize,
@@ -94,10 +112,11 @@ class ReaderState {
       metadata: metadata ?? this.metadata,
       loadedChapters: loadedChapters ?? this.loadedChapters,
       loadingStage: clearLoadingStage ? null : (loadingStage ?? this.loadingStage),
-      errorMessage: errorMessage ?? this.errorMessage,
-      errorFilePath: errorFilePath ?? this.errorFilePath,
-      errorFormat: errorFormat ?? this.errorFormat,
-      errorFileSize: errorFileSize ?? this.errorFileSize,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      errorKind: clearError ? null : (errorKind ?? this.errorKind),
+      errorFilePath: clearError ? null : (errorFilePath ?? this.errorFilePath),
+      errorFormat: clearError ? null : (errorFormat ?? this.errorFormat),
+      errorFileSize: clearError ? null : (errorFileSize ?? this.errorFileSize),
       currentPosition: currentPosition ?? this.currentPosition,
       uiVisible: uiVisible ?? this.uiVisible,
       isBottomSheetOpen: isBottomSheetOpen ?? this.isBottomSheetOpen,
@@ -193,7 +212,7 @@ class ReaderController {
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
       if (!_isActiveLoad(loadGeneration)) return;
       _loaded = true;
-      _updateState(_state.copyWith(clearLoadingStage: true));
+      _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
       const wordsPerMinute = 200;
       final totalWords = _content.computeTotalWords(_state.loadedChapters);
@@ -218,6 +237,7 @@ class ReaderController {
       _updateState(
         _state.copyWith(
           clearLoadingStage: true,
+          errorKind: ReaderErrorKind.parserTimeout,
           errorMessage:
               'Открытие книги заняло слишком много времени.\n'
               'Возможно, файл повреждён или слишком большой.\n'
@@ -234,7 +254,19 @@ class ReaderController {
     return !_disposed && loadGeneration == _loadGeneration;
   }
 
+  static ReaderErrorKind _classifyError(Object error) => switch (error) {
+    BookMissingFailure() => ReaderErrorKind.bookMissing,
+    UnsupportedFormatFailure() => ReaderErrorKind.unsupportedFormat,
+    ParserTimeoutFailure() => ReaderErrorKind.parserTimeout,
+    CacheCorruptedFailure() => ReaderErrorKind.cacheCorrupted,
+    InvalidEncodingFailure() => ReaderErrorKind.invalidEncoding,
+    TimeoutException() => ReaderErrorKind.parserTimeout,
+    BookOpenFailure() => ReaderErrorKind.unknown,
+    _ => ReaderErrorKind.unknown,
+  };
+
   Future<void> _handleLoadError(Object e, {required int loadGeneration}) async {
+    final errorKind = _classifyError(e);
     String? filePath;
     String? format;
     int? fileSize;
@@ -265,6 +297,7 @@ class ReaderController {
     _updateState(
       _state.copyWith(
         clearLoadingStage: true,
+        errorKind: errorKind,
         errorMessage: e.toString(),
         errorFilePath: filePath,
         errorFormat: format,

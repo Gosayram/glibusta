@@ -8,6 +8,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
+import '../../../core/formats/format_capability.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
@@ -1016,9 +1017,36 @@ class _FormatSelectionSheet extends StatelessWidget {
           const Divider(height: 1),
           ...formats.map((format) {
             final info = _formatInfo(format);
+            final capService = const FormatCapabilityService();
+            final cap = capService.capabilityOf(format);
+            final warning = capService.warningLabel(format);
             return ListTile(
               leading: Icon(info.icon, color: info.color),
-              title: Text(info.label),
+              title: Row(
+                children: [
+                  Text(info.label),
+                  if (warning != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cap == FormatCapability.partial
+                            ? const Color(0xFFFFA726).withValues(alpha: 0.2)
+                            : const Color(0xFF9E9E9E).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        cap.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cap == FormatCapability.partial
+                              ? const Color(0xFFFFA726)
+                              : const Color(0xFF9E9E9E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               subtitle: Text(info.description, style: theme.textTheme.bodySmall),
               onTap: () => Navigator.of(context).pop(format),
             );

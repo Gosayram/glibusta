@@ -52,10 +52,10 @@ final class BookImporter {
   Future<NormalizedBook> parseInBackground(String filePath) async {
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
-      throw const BookOpenFailure('Неподдерживаемый формат файла');
+      throw const UnsupportedFormatFailure('Неподдерживаемый формат файла');
     }
     if (format == BookFormat.pdf || format == BookFormat.djvu) {
-      throw const BookOpenFailure('Формат не поддерживается');
+      throw const UnsupportedFormatFailure('Формат не поддерживается');
     }
 
     return Isolate.run<NormalizedBook>(() {

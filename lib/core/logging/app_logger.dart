@@ -96,8 +96,8 @@ class AppLogger {
     final traceSuffix = stackTrace != null ? '\n$stackTrace' : '';
     developer.log('$level: $message$errorSuffix$traceSuffix', name: name, level: _levelInt(level));
 
-    if (level == 'SEVERE' || level == 'SHOUT') {
-      unawaited(_persistError(entry));
+    if (level == 'WARNING' || level == 'SEVERE' || level == 'SHOUT') {
+      unawaited(_persistLog(entry));
     }
   }
 
@@ -113,7 +113,9 @@ class AppLogger {
     };
   }
 
-  Future<void> _persistError(LogEntry entry) async {
+  static const int _maxPersistentLogBytes = 2 * 1024 * 1024;
+
+  Future<void> _persistLog(LogEntry entry) async {
     try {
       final line = entry.toLine();
       if (line.isNotEmpty) {
@@ -121,17 +123,32 @@ class AppLogger {
         final logDir = Directory('${dir.path}/logs');
         await logDir.create(recursive: true);
         final file = File('${logDir.path}/glibusta.log');
+        await _rotateIfNeeded(file);
         final sink = file.openWrite(mode: FileMode.append);
         sink.writeln(line);
         await sink.flush();
         await sink.close();
       }
     } on Object catch (_) {}
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
-      await prefs.setString('last_error', summary);
-    } on Object catch (_) {}
+    if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
+        await prefs.setString('last_error', summary);
+      } on Object catch (_) {}
+    }
+  }
+
+  Future<void> _rotateIfNeeded(File file) async {
+    if (!await file.exists()) return;
+    final stat = await file.stat();
+    if (stat.size > _maxPersistentLogBytes) {
+      final backup = File('${file.path}.old');
+      if (await backup.exists()) {
+        await backup.delete();
+      }
+      await file.rename(backup.path);
+    }
   }
 
   void finest(String msg, {String? name}) => log('FINEST', msg, loggerName: name);
@@ -167,8 +184,15 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
-      if (!await file.exists()) return '';
-      return await file.readAsString();
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
+      final parts = <String>[];
+      if (await oldFile.exists()) {
+        parts.add(await oldFile.readAsString());
+      }
+      if (await file.exists()) {
+        parts.add(await file.readAsString());
+      }
+      return parts.join();
     } on Object catch (_) {
       return '';
     }
@@ -178,9 +202,15 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
-      if (!await file.exists()) return 0;
-      final stat = await file.stat();
-      return stat.size;
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
+      var total = 0;
+      if (await file.exists()) {
+        total += (await file.stat()).size;
+      }
+      if (await oldFile.exists()) {
+        total += (await oldFile.stat()).size;
+      }
+      return total;
     } on Object catch (_) {
       return 0;
     }
@@ -190,8 +220,12 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
       if (await file.exists()) {
         await file.writeAsString('');
+      }
+      if (await oldFile.exists()) {
+        await oldFile.delete();
       }
     } on Object catch (_) {}
   }

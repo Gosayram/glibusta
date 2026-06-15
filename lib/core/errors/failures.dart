@@ -16,8 +16,32 @@ final class NotFoundFailure extends AppFailure {
   const NotFoundFailure([super.message]);
 }
 
-final class BookOpenFailure extends AppFailure {
+sealed class BookOpenFailure extends AppFailure {
   const BookOpenFailure([super.message]);
+}
+
+final class BookMissingFailure extends BookOpenFailure {
+  const BookMissingFailure([super.message]);
+}
+
+final class UnsupportedFormatFailure extends BookOpenFailure {
+  const UnsupportedFormatFailure([super.message]);
+}
+
+final class ParserTimeoutFailure extends BookOpenFailure {
+  const ParserTimeoutFailure([super.message]);
+}
+
+final class CacheCorruptedFailure extends BookOpenFailure {
+  const CacheCorruptedFailure([super.message]);
+}
+
+final class InvalidEncodingFailure extends BookOpenFailure {
+  const InvalidEncodingFailure([super.message]);
+}
+
+final class UnknownBookOpenFailure extends BookOpenFailure {
+  const UnknownBookOpenFailure([super.message]);
 }
 
 final class SourceUnavailableFailure extends AppFailure {
