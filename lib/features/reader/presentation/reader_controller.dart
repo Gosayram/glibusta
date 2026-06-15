@@ -400,7 +400,7 @@ class ReaderController {
       );
     }
     final lastChapter = total - 1;
-    final chapterIndex = (progress * lastChapter).round().clamp(0, lastChapter);
+    final chapterIndex = _estimateChapterIndex(progress, lastChapter);
     final chapter = _state.chapterAt(chapterIndex);
     final lastParagraph = (chapter?.blocks.isEmpty ?? true) ? 0 : chapter!.blocks.length - 1;
     final paragraphIndex = (progress * lastParagraph).round().clamp(0, lastParagraph);
@@ -414,6 +414,42 @@ class ReaderController {
     );
   }
 
+  int _estimateChapterIndex(double progress, int lastChapter) {
+    if (_state.loadedChapters.isEmpty) {
+      return (progress * lastChapter).round().clamp(0, lastChapter);
+    }
+
+    var avgBlocks = 0.0;
+    for (final ch in _state.loadedChapters.values) {
+      avgBlocks += ch.blocks.length;
+    }
+    avgBlocks /= _state.loadedChapters.length;
+    if (avgBlocks < 1) avgBlocks = 1;
+
+    final weights = List<double>.filled(lastChapter + 1, avgBlocks);
+    for (final entry in _state.loadedChapters.entries) {
+      if (entry.key >= 0 && entry.key <= lastChapter) {
+        final w = entry.value.blocks.length.toDouble();
+        weights[entry.key] = w > 0 ? w : 1;
+      }
+    }
+
+    var totalWeight = 0.0;
+    for (final w in weights) {
+      totalWeight += w;
+    }
+
+    final targetWeight = progress * totalWeight;
+    var cumulative = 0.0;
+    for (var i = 0; i < weights.length; i++) {
+      cumulative += weights[i];
+      if (cumulative >= targetWeight) {
+        return i;
+      }
+    }
+    return lastChapter;
+  }
+
   void _restoreSavedPosition(ReaderPosition position) {
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
@@ -421,6 +457,8 @@ class ReaderController {
       return;
     }
     if (_scrollController == null) return;
+    unawaited(_ensureChaptersLoaded(position.chapterIndex));
+    _evictDistantChapters(position.chapterIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
       final maxScroll = _scrollController!.position.maxScrollExtent;

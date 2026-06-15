@@ -116,6 +116,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           const _SectionHeader(title: 'Хранилище библиотеки'),
           _buildStorageModeTile(context, ref),
+          _SettingsTile(
+            icon: Icons.folder_copy_outlined,
+            title: 'Управление папками',
+            subtitle: 'Сохранённые папки и доступ',
+            onTap: () => _showPersistedUrisDialog(context),
+          ),
 
           const Divider(),
           const _SectionHeader(title: 'Отображение'),
@@ -640,6 +646,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _showPersistedUrisDialog(BuildContext context) async {
+    final bridge = StorageBridgeImpl();
+    final uris = await bridge.getPersistedUris();
+    final currentFolder = ref.read(externalFolderProvider);
+
+    if (!context.mounted) return;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('Сохранённые папки'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: uris.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Text('Нет сохранённых папок'),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: uris.length,
+                          itemBuilder: (context, index) {
+                            final uri = uris[index];
+                            final name = uri == currentFolder.uri
+                                ? '${currentFolder.name ?? uri} (активна)'
+                                : uri.split('/').last;
+                            final isActive = uri == currentFolder.uri;
+                            return ListTile(
+                              leading: Icon(
+                                isActive ? Icons.folder_open : Icons.folder_outlined,
+                                color: isActive ? Theme.of(context).colorScheme.primary : null,
+                              ),
+                              title: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                uri,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: 'Забыть',
+                                onPressed: () async {
+                                  final ok = await bridge.forgetUri(uri);
+                                  if (ok) {
+                                    setDialogState(() {
+                                      uris.removeAt(index);
+                                    });
+                                    if (isActive) {
+                                      await ref.read(externalFolderProvider.notifier).clearFolder();
+                                    }
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Закрыть'),
+                  ),
+                  TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Добавить'),
+                    onPressed: () async {
+                      final uri = await bridge.pickFolder();
+                      if (uri != null && context.mounted) {
+                        final scanned = await bridge.scanBooks(uri);
+                        final name = uri.split('/').last;
+                        await ref
+                            .read(externalFolderProvider.notifier)
+                            .updateFolder(uri: uri, name: name);
+                        setDialogState(() {
+                          if (!uris.contains(uri)) uris.add(uri);
+                        });
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Найдено книг: ${scanned.length}')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
 

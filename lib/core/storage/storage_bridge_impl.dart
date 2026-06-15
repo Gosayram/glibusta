@@ -76,4 +76,14 @@ class StorageBridgeImpl implements StorageBridge {
       return [];
     }
   }
+
+  @override
+  Future<bool> forgetUri(String uri) async {
+    try {
+      await _channel.invokeMethod<bool>('forgetUri', {'uri': uri});
+      return true;
+    } on PlatformException {
+      return false;
+    }
+  }
 }

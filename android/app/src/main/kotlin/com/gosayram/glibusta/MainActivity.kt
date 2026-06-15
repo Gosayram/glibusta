@@ -79,6 +79,21 @@ class MainActivity : FlutterFragmentActivity() {
                     .map { it.uri.toString() }
                 result.success(uris)
             }
+            "forgetUri" -> {
+                val fileUri = call.argument<String>("uri")
+                if (fileUri == null) {
+                    result.error("INVALID_ARG", "URI is required", null)
+                    return
+                }
+                try {
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    contentResolver.releasePersistableUriPermission(Uri.parse(fileUri), flags)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("FORGET_ERROR", e.message, null)
+                }
+            }
             else -> result.notImplemented()
         }
     }

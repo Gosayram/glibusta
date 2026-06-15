@@ -8,4 +8,5 @@ abstract interface class StorageBridge {
   Future<Uint8List> readFile(String fileUri);
   Future<String?> copyToCache(String fileUri);
   Future<List<String>> getPersistedUris();
+  Future<bool> forgetUri(String uri);
 }
