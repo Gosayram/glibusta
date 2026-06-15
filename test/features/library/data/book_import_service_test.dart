@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
+import 'package:glibusta/features/library/data/cover_extraction_service.dart';
 import 'package:glibusta/shared/models/book.dart';
 
 void main() {
@@ -13,7 +15,8 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    service = BookImportService(db);
+    final storage = AppFileStorageImpl();
+    service = BookImportService(db, storage, CoverExtractionService(storage));
     tempDir = await Directory.systemTemp.createTemp('import_test_');
   });
 

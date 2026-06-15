@@ -618,7 +618,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _doPickFolder(BuildContext context, WidgetRef ref, StorageMode mode) async {
     try {
-      final bridge = StorageBridgeImpl();
+      final bridge = ref.read(storageBridgeProvider);
       final uri = await bridge.pickFolder();
       if (uri == null) {
         if (context.mounted) {
@@ -649,7 +649,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _showPersistedUrisDialog(BuildContext context) async {
-    final bridge = StorageBridgeImpl();
+    final bridge = ref.read(storageBridgeProvider);
     final uris = await bridge.getPersistedUris();
     final currentFolder = ref.read(externalFolderProvider);
 

@@ -17,13 +17,16 @@ import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
 import '../../../core/utils/fire_and_log.dart';
 import '../../reader/data/parsers/format_detector.dart';
+import '../../reader/data/parsers/normalized_book.dart';
 import '../../reader/data/parsers/parser_registry.dart';
 import '../data/cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
 final bookImportServiceProvider = Provider<BookImportService>((ref) {
   final database = ref.watch(databaseProvider);
-  return BookImportService(database);
+  final storage = ref.watch(appFileStorageProvider);
+  final coverService = ref.watch(coverExtractionServiceProvider);
+  return BookImportService(database, storage, coverService);
 });
 
 class BookImportService {
@@ -32,9 +35,7 @@ class BookImportService {
   final CoverExtractionService _coverService;
   final _logger = AppLogger();
 
-  BookImportService(this._database)
-    : _storage = AppFileStorageImpl(),
-      _coverService = CoverExtractionService();
+  BookImportService(this._database, this._storage, this._coverService);
 
   final _registry = BookParserRegistry.defaultInstance;
 
@@ -108,223 +109,259 @@ class BookImportService {
   }
 
   Future<ImportResult> _doImport(String filePath, {String? forcedEncoding}) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      return ImportResult.failure('Файл не найден: $filePath');
-    }
+    final ctx = _ImportCtx(filePath: filePath, forcedEncoding: forcedEncoding);
 
-    final ext = filePath.split('.').last.toLowerCase();
-    final format = bookFormatForImportExtension(ext);
-    final size = await file.length();
-    if (isBookFileTooLarge(format, size)) {
-      return ImportResult.failure(bookFileTooLargeMessage(format, size));
-    }
-    final bytes = await file.readAsBytes();
-    final contentHash = sha256.convert(bytes).toString();
-    final fileSize = bytes.length;
+    final inspectResult = await _inspect(ctx);
+    if (inspectResult != null) return inspectResult;
 
-    final existing = await _findByHash(contentHash);
-    if (existing != null) {
-      _logger.info(
-        'Duplicate detected: ${existing.title} (${contentHash.substring(0, 8)})',
-        name: 'Import',
-      );
-      return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
-    }
+    await _readAndHash(ctx);
 
-    final parser =
-        _registry.parserForExtension(ext) ??
-        (ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
-    if (parser == null) {
-      return ImportResult.failure(_unsupportedReaderMessage(ext));
-    }
+    final dedupResult = await _deduplicate(ctx);
+    if (dedupResult != null) return dedupResult;
 
-    final bookId = contentHash;
+    final parseResult = await _parseMetadata(ctx);
+    if (parseResult != null) return parseResult;
+
     try {
-      final book = await parser.parse(
-        bytes,
-        fileName: filePath.split('/').last,
-        forcedEncoding: forcedEncoding,
-      );
-
-      Uint8List? coverBytes;
-      if (book.metadata != null) {
-        coverBytes = book.metadata!['mobiCoverBytes'] as Uint8List?;
-      }
-
-      final targetFile = await _storage.bookFile(
-        bookId,
-        format,
-      );
-      await targetFile.parent.create(recursive: true);
-      await file.copy(targetFile.path);
-
-      final authorIds = <String>[];
-      for (final authorName in book.authors) {
-        final authorId = generateAuthorId(authorName);
-        authorIds.add(authorId);
-        await _database
-            .into(_database.authors)
-            .insertOnConflictUpdate(
-              AuthorsCompanion.insert(
-                id: authorId,
-                name: authorName,
-              ),
-            );
-      }
-
-      await _database.transaction(() async {
-        await _database
-            .into(_database.savedBooks)
-            .insertOnConflictUpdate(
-              SavedBooksCompanion.insert(
-                id: bookId,
-                title: book.title,
-                authorIds: Value(authorIds),
-                description: Value(book.description),
-                coverUrl: Value(book.coverUrl),
-                sourceUrl: Value(filePath),
-                contentHash: Value(contentHash),
-                fileSize: Value(fileSize),
-                filePath: Value(targetFile.path),
-                detectedEncoding: Value(forcedEncoding),
-                encodingSource: forcedEncoding != null
-                    ? const Value('manual')
-                    : const Value.absent(),
-                userForcedEncoding: Value(forcedEncoding),
-              ),
-            );
-
-        await _database
-            .into(_database.downloads)
-            .insertOnConflictUpdate(
-              DownloadsCompanion.insert(
-                id: bookId,
-                bookId: bookId,
-                bookTitle: Value(book.title),
-                format: formatToDbString(formatForExtension(ext)),
-                sourceUrl: filePath,
-                targetPath: Value(targetFile.path),
-                status: DownloadStatusDb.completed,
-              ),
-            );
-      });
-
-      // Background cover extraction — don't block import
-      fireAndLog(
-        () => _extractCoverBackground(bookId, targetFile.path, ext, coverBytes: coverBytes),
-        name: 'Import',
-        context: 'Cover extraction for $bookId',
-      );
-
-      return ImportResult.success(book.title);
+      await _copyToStorage(ctx);
+      await _registerBookInDb(ctx);
     } on Object catch (e) {
       _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
-      try {
-        final targetFile = await _storage.bookFile(
-          bookId,
-          format,
-        );
-        if (await targetFile.exists()) {
-          await targetFile.delete();
-        }
-        await _deletePartialImportRows(bookId);
-      } on Object catch (_) {
-        // Best-effort cleanup: ignore if target file path can't be resolved
-      }
+      await _cleanupFailedImport(ctx);
       return ImportResult.failure(_friendlyImportError(e));
     }
+
+    _scheduleCoverExtraction(ctx);
+    return ImportResult.success(ctx.book!.title);
   }
 
   Future<ImportResult> _doDocumentImport(BookFileInspectionResult inspection) async {
-    final file = File(inspection.path);
-    if (!await file.exists()) {
-      return ImportResult.failure('Файл не найден: ${inspection.path}');
-    }
+    final ctx = _ImportCtx(filePath: inspection.path, inspection: inspection);
 
-    final ext = inspection.path.split('.').last.toLowerCase();
-    final format = bookFormatForImportExtension(ext);
-    if (format == BookFormat.unknown) {
-      return ImportResult.failure('Формат не поддерживается: .$ext');
-    }
-    final size = await file.length();
-    if (isBookFileTooLarge(format, size)) {
-      return ImportResult.failure(bookFileTooLargeMessage(format, size));
-    }
+    final inspectResult = await _inspectDocument(ctx);
+    if (inspectResult != null) return inspectResult;
 
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      return ImportResult.failure('Файл пуст: ${inspection.path}');
-    }
+    await _readAndHash(ctx);
 
-    final contentHash = inspection.hash.isNotEmpty
-        ? inspection.hash
-        : sha256.convert(bytes).toString();
-    final existing = await _findByHash(contentHash);
-    if (existing != null) {
-      return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
-    }
+    final dedupResult = await _deduplicate(ctx);
+    if (dedupResult != null) return dedupResult;
 
-    final fileName = inspection.path.split('/').last;
-    final title = inspection.title ?? fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
-    final bookId = contentHash;
-    final targetFile = await _storage.bookFile(bookId, format);
+    ctx.title =
+        inspection.title ?? inspection.path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
+
     try {
-      await targetFile.parent.create(recursive: true);
-      try {
-        await file.copy(targetFile.path);
-      } on Object catch (e) {
-        if (await targetFile.exists()) {
-          await targetFile.delete();
-        }
-        await _deletePartialImportRows(bookId);
-        return ImportResult.failure(_friendlyImportError(e));
-      }
-
-      await _database.transaction(() async {
-        await _database
-            .into(_database.savedBooks)
-            .insertOnConflictUpdate(
-              SavedBooksCompanion.insert(
-                id: bookId,
-                title: title,
-                authorIds: const Value([]),
-                description: Value(_documentDescription(format)),
-                sourceUrl: Value(inspection.path),
-                contentHash: Value(contentHash),
-                fileSize: Value(bytes.length),
-                filePath: Value(targetFile.path),
-              ),
-            );
-
-        await _database
-            .into(_database.downloads)
-            .insertOnConflictUpdate(
-              DownloadsCompanion.insert(
-                id: bookId,
-                bookId: bookId,
-                bookTitle: Value(title),
-                format: format.name,
-                sourceUrl: inspection.path,
-                targetPath: Value(targetFile.path),
-                status: DownloadStatusDb.completed,
-              ),
-            );
-      });
-
-      return ImportResult.success(title);
+      await _copyToStorage(ctx);
+      await _registerDocumentInDb(ctx);
     } on Object catch (e) {
       _logger.warning(
         'Document import failed for ${inspection.path}: $e',
         name: 'Import',
         error: e,
       );
-      if (await targetFile.exists()) {
-        await targetFile.delete();
-      }
-      await _deletePartialImportRows(bookId);
+      await _cleanupFailedImport(ctx);
       return ImportResult.failure(_friendlyImportError(e));
     }
+
+    return ImportResult.success(ctx.title!);
+  }
+
+  Future<ImportResult?> _inspect(_ImportCtx ctx) async {
+    ctx.file = File(ctx.filePath);
+    if (!await ctx.file.exists()) {
+      return ImportResult.failure('Файл не найден: ${ctx.filePath}');
+    }
+    ctx.ext = ctx.filePath.split('.').last.toLowerCase();
+    ctx.format = bookFormatForImportExtension(ctx.ext);
+    final size = await ctx.file.length();
+    if (isBookFileTooLarge(ctx.format, size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(ctx.format, size));
+    }
+    return null;
+  }
+
+  Future<ImportResult?> _inspectDocument(_ImportCtx ctx) async {
+    ctx.file = File(ctx.filePath);
+    if (!await ctx.file.exists()) {
+      return ImportResult.failure('Файл не найден: ${ctx.filePath}');
+    }
+    ctx.ext = ctx.filePath.split('.').last.toLowerCase();
+    ctx.format = bookFormatForImportExtension(ctx.ext);
+    if (ctx.format == BookFormat.unknown) {
+      return ImportResult.failure('Формат не поддерживается: .${ctx.ext}');
+    }
+    final size = await ctx.file.length();
+    if (isBookFileTooLarge(ctx.format, size)) {
+      return ImportResult.failure(bookFileTooLargeMessage(ctx.format, size));
+    }
+    return null;
+  }
+
+  Future<void> _readAndHash(_ImportCtx ctx) async {
+    ctx.bytes = await ctx.file.readAsBytes();
+    if (ctx.bytes.isEmpty) {
+      throw StateError('Файл пуст: ${ctx.filePath}');
+    }
+    ctx.fileSize = ctx.bytes.length;
+    ctx.contentHash = ctx.inspection != null && ctx.inspection!.hash.isNotEmpty
+        ? ctx.inspection!.hash
+        : sha256.convert(ctx.bytes).toString();
+    ctx.bookId = ctx.contentHash;
+  }
+
+  Future<ImportResult?> _deduplicate(_ImportCtx ctx) async {
+    final existing = await _findByHash(ctx.contentHash);
+    if (existing != null) {
+      _logger.info(
+        'Duplicate detected: ${existing.title} (${ctx.contentHash.substring(0, 8)})',
+        name: 'Import',
+      );
+      return ImportResult.duplicate(
+        existing.title,
+        ctx.contentHash,
+        existingBookId: existing.id,
+      );
+    }
+    return null;
+  }
+
+  Future<ImportResult?> _parseMetadata(_ImportCtx ctx) async {
+    final parser =
+        _registry.parserForExtension(ctx.ext) ??
+        (ctx.ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
+    if (parser == null) {
+      return ImportResult.failure(_unsupportedReaderMessage(ctx.ext));
+    }
+
+    try {
+      ctx.book = await parser.parse(
+        ctx.bytes,
+        fileName: ctx.filePath.split('/').last,
+        forcedEncoding: ctx.forcedEncoding,
+      );
+      if (ctx.book!.metadata != null) {
+        ctx.coverBytes = ctx.book!.metadata!['mobiCoverBytes'] as Uint8List?;
+      }
+    } on Object catch (e) {
+      return ImportResult.failure(_friendlyImportError(e));
+    }
+    return null;
+  }
+
+  Future<void> _copyToStorage(_ImportCtx ctx) async {
+    ctx.targetFile = await _storage.bookFile(ctx.bookId, ctx.format);
+    await ctx.targetFile!.parent.create(recursive: true);
+    await ctx.file.copy(ctx.targetFile!.path);
+  }
+
+  Future<void> _registerBookInDb(_ImportCtx ctx) async {
+    final book = ctx.book!;
+    ctx.authorIds = [];
+    for (final authorName in book.authors) {
+      final authorId = generateAuthorId(authorName);
+      ctx.authorIds.add(authorId);
+      await _database
+          .into(_database.authors)
+          .insertOnConflictUpdate(
+            AuthorsCompanion.insert(id: authorId, name: authorName),
+          );
+    }
+
+    await _database.transaction(() async {
+      await _database
+          .into(_database.savedBooks)
+          .insertOnConflictUpdate(
+            SavedBooksCompanion.insert(
+              id: ctx.bookId,
+              title: book.title,
+              authorIds: Value(ctx.authorIds),
+              description: Value(book.description),
+              coverUrl: Value(book.coverUrl),
+              sourceUrl: Value(ctx.sourceUrl ?? ctx.filePath),
+              contentHash: Value(ctx.contentHash),
+              fileSize: Value(ctx.fileSize),
+              filePath: Value(ctx.targetFile!.path),
+              detectedEncoding: Value(ctx.forcedEncoding),
+              encodingSource: ctx.forcedEncoding != null
+                  ? const Value('manual')
+                  : const Value.absent(),
+              userForcedEncoding: Value(ctx.forcedEncoding),
+              storageMode: Value(ctx.storageMode ?? 'internal'),
+              externalUri: Value(ctx.externalUri),
+            ),
+          );
+
+      await _database
+          .into(_database.downloads)
+          .insertOnConflictUpdate(
+            DownloadsCompanion.insert(
+              id: ctx.bookId,
+              bookId: ctx.bookId,
+              bookTitle: Value(book.title),
+              format: formatToDbString(formatForExtension(ctx.ext)),
+              sourceUrl: ctx.sourceUrl ?? ctx.filePath,
+              targetPath: Value(ctx.targetFile!.path),
+              status: DownloadStatusDb.completed,
+            ),
+          );
+    });
+  }
+
+  Future<void> _registerDocumentInDb(_ImportCtx ctx) async {
+    await _database.transaction(() async {
+      await _database
+          .into(_database.savedBooks)
+          .insertOnConflictUpdate(
+            SavedBooksCompanion.insert(
+              id: ctx.bookId,
+              title: ctx.title!,
+              authorIds: const Value([]),
+              description: Value(_documentDescription(ctx.format)),
+              sourceUrl: Value(ctx.sourceUrl ?? ctx.filePath),
+              contentHash: Value(ctx.contentHash),
+              fileSize: Value(ctx.fileSize),
+              filePath: Value(ctx.targetFile!.path),
+              storageMode: Value(ctx.storageMode ?? 'internal'),
+              externalUri: Value(ctx.externalUri),
+            ),
+          );
+
+      await _database
+          .into(_database.downloads)
+          .insertOnConflictUpdate(
+            DownloadsCompanion.insert(
+              id: ctx.bookId,
+              bookId: ctx.bookId,
+              bookTitle: Value(ctx.title!),
+              format: ctx.format.name,
+              sourceUrl: ctx.sourceUrl ?? ctx.filePath,
+              targetPath: Value(ctx.targetFile!.path),
+              status: DownloadStatusDb.completed,
+            ),
+          );
+    });
+  }
+
+  void _scheduleCoverExtraction(_ImportCtx ctx) {
+    fireAndLog(
+      () => _extractCoverBackground(
+        ctx.bookId,
+        ctx.targetFile!.path,
+        ctx.ext,
+        coverBytes: ctx.coverBytes,
+      ),
+      name: 'Import',
+      context: 'Cover extraction for ${ctx.bookId}',
+    );
+  }
+
+  Future<void> _cleanupFailedImport(_ImportCtx ctx) async {
+    try {
+      if (ctx.targetFile != null) {
+        final f = ctx.targetFile!;
+        if (await f.exists()) await f.delete();
+      }
+      await _deletePartialImportRows(ctx.bookId);
+    } on Object catch (_) {}
   }
 
   /// Import a book from an external SAF URI into the app library.
@@ -645,6 +682,34 @@ class BookImportService {
       _logger.warning('Cover extraction failed for $bookId: $e', name: 'Import', error: e);
     }
   }
+}
+
+class _ImportCtx {
+  _ImportCtx({
+    required this.filePath,
+    this.forcedEncoding,
+    this.inspection,
+  }) : sourceUrl = null : storageMode : externalUri;
+
+  final String filePath;
+  final String? forcedEncoding;
+  final BookFileInspectionResult? inspection;
+  final String? sourceUrl;
+  final String? storageMode;
+  final String? externalUri;
+
+  late final String ext;
+  late final BookFormat format;
+  late final File file;
+  late final Uint8List bytes;
+  late final int fileSize;
+  late final String contentHash;
+  String bookId = '';
+  String? title;
+  NormalizedBook? book;
+  File? targetFile;
+  List<String> authorIds = [];
+  Uint8List? coverBytes;
 }
 
 @visibleForTesting

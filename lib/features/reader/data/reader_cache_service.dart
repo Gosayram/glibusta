@@ -22,17 +22,21 @@ final class CacheSourceFingerprint {
 typedef CacheFingerprintProvider = Future<CacheSourceFingerprint?> Function(String bookId);
 
 class ReaderCacheService {
-  ReaderCacheService({required CacheFingerprintProvider fingerprintProvider})
-    : _fingerprintProvider = fingerprintProvider;
+  ReaderCacheService({
+    required CacheFingerprintProvider fingerprintProvider,
+    required AppFileStorage storage,
+  }) : _fingerprintProvider = fingerprintProvider,
+       _storage = storage;
 
   final CacheFingerprintProvider _fingerprintProvider;
+  final AppFileStorage _storage;
   final _logger = AppLogger();
 
   static const int _splitCacheVersion = 1;
   static const int _parserCacheVersion = 1;
 
   Future<String> get booksCacheDir async {
-    final dir = await AppFileStorageImpl().cacheDir();
+    final dir = await _storage.cacheDir();
     return dir.path;
   }
 

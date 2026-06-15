@@ -6,12 +6,13 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../../core/database/tables.dart';
 import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/platform/app_file_storage.dart';
+import '../../library/domain/book_file_repository.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
@@ -25,7 +26,9 @@ import 'reader_cache_service.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final database = ref.watch(databaseProvider);
-  return BookOpenService(database);
+  final storage = ref.watch(appFileStorageProvider);
+  final fileRepo = ref.watch(bookFileRepositoryProvider);
+  return BookOpenService(database, storage, fileRepo);
 });
 
 final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, bookId) async {
@@ -35,12 +38,14 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 
 class BookOpenService {
   final AppDatabase _database;
+  final BookFileRepository _fileRepo;
   final _logger = AppLogger();
   late final ReaderCacheService cache;
 
-  BookOpenService(this._database) {
+  BookOpenService(this._database, AppFileStorage storage, this._fileRepo) {
     cache = ReaderCacheService(
       fingerprintProvider: _computeCacheFingerprint,
+      storage: storage,
     );
   }
 
@@ -81,14 +86,9 @@ class BookOpenService {
   Future<NormalizedBook> openBook(String bookId) async {
     final cid = 'open-$bookId-${DateTime.now().millisecondsSinceEpoch}';
     _logger.info('Opening book', name: 'Reader', cid: cid);
-    final download = await _findDownload(bookId);
-    if (download == null) {
-      throw const BookMissingFailure('Книга не найдена в загрузках');
-    }
-
-    final filePath = download.targetPath;
+    final filePath = await _fileRepo.getFilePath(bookId);
     if (filePath == null || filePath.isEmpty) {
-      throw const BookMissingFailure('Путь к файлу не указан');
+      throw const BookMissingFailure('Книга не найдена в загрузках');
     }
 
     final file = File(filePath);
@@ -104,7 +104,7 @@ class BookOpenService {
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
       throw UnsupportedFormatFailure(
-        'Формат не поддерживается: ${formatFromDbString(download.format).name}',
+        'Формат не поддерживается: ${(await _fileRepo.getFormat(bookId)).name}',
       );
     }
     if (isBookFileTooLarge(format, fileSize)) {
@@ -274,13 +274,7 @@ class BookOpenService {
     String bookId,
     String encoding,
   ) async {
-    // Find the book file path from downloads
-    final download = await _findDownload(bookId);
-    if (download == null) {
-      throw BookMissingFailure('Книга не найдена: $bookId');
-    }
-
-    final filePath = download.targetPath;
+    final filePath = await _fileRepo.getFilePath(bookId);
     if (filePath == null || !await File(filePath).exists()) {
       throw BookMissingFailure('Файл книги не найден: $bookId');
     }
@@ -315,30 +309,10 @@ class BookOpenService {
     return book;
   }
 
-  Future<Download?> _findDownload(String bookId) async {
-    final rows = await (_database.select(
-      _database.downloads,
-    )..where((d) => d.bookId.equals(bookId))).get();
-    for (final row in rows) {
-      if (row.status == DownloadStatusDb.completed) {
-        return row;
-      }
-    }
-    return null;
-  }
-
-  Future<SavedBook?> _findSavedBook(String bookId) async {
-    final rows = await (_database.select(
-      _database.savedBooks,
-    )..where((book) => book.id.equals(bookId))).get();
-    return rows.isNotEmpty ? rows.first : null;
-  }
-
   Future<CacheSourceFingerprint?> _computeCacheFingerprint(
     String bookId,
   ) async {
-    final download = await _findDownload(bookId);
-    final filePath = download?.targetPath;
+    final filePath = await _fileRepo.getFilePath(bookId);
     if (filePath == null || filePath.isEmpty) {
       return null;
     }
@@ -349,12 +323,12 @@ class BookOpenService {
     }
 
     final stat = await file.stat();
-    final savedBook = await _findSavedBook(bookId);
+    final contentHash = await _fileRepo.getContentHash(bookId);
     return CacheSourceFingerprint(
       format: detectBookFormat(filePath).name,
       fileSize: stat.size,
       fileMtime: stat.modified.millisecondsSinceEpoch,
-      contentHash: savedBook?.contentHash,
+      contentHash: contentHash,
     );
   }
 

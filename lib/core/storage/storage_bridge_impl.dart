@@ -1,7 +1,12 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'external_book_file.dart';
 import 'storage_bridge.dart';
+
+final storageBridgeProvider = Provider<StorageBridge>((ref) {
+  return StorageBridgeImpl();
+});
 
 class StorageBridgeImpl implements StorageBridge {
   static const _channel = MethodChannel('com.gosayram.glibusta/storage_bridge');

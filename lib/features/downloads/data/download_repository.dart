@@ -13,14 +13,15 @@ import '../domain/download_repository.dart';
 
 final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  return DownloadRepositoryImpl(db);
+  final storage = ref.watch(appFileStorageProvider);
+  return DownloadRepositoryImpl(db, storage);
 });
 
 class DownloadRepositoryImpl implements DownloadRepository {
   final AppDatabase _db;
   final AppFileStorage _storage;
 
-  DownloadRepositoryImpl(this._db) : _storage = AppFileStorageImpl();
+  DownloadRepositoryImpl(this._db, this._storage);
 
   @override
   Stream<List<DownloadTask>> watchAllDownloads() {

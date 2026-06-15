@@ -10,6 +10,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/background_task_provider.dart';
+import '../../../core/services/task_queue_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
@@ -218,7 +219,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   ) async {
     try {
       final inspection = await ref.read(bookFileInspectionProvider(path).future);
-      final result = await service.importFromInspection(inspection);
+      final result = await ref
+          .read(taskQueueProvider)
+          .run<ImportResult>(
+            type: BackgroundTaskType.import,
+            message: 'Импорт: ${inspection.title ?? path.split('/').last}',
+            task: () => service.importFromInspection(inspection),
+          );
       if (result.isSuccess || result.needsEncodingSelection) {
         ref.invalidate(libraryBooksProvider);
       }
@@ -262,21 +269,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         return;
       }
 
-      final taskId = ref
-          .read(backgroundTaskProvider.notifier)
-          .start(
-            BackgroundTaskType.import,
-            'Импорт: ${inspection.title ?? filePath.split('/').last}',
-          );
       final service = ref.read(bookImportServiceProvider);
-      final importResult = await service.importFromInspection(inspection);
-      if (importResult.isSuccess) {
-        ref
-            .read(backgroundTaskProvider.notifier)
-            .complete(taskId, 'Импортировано: ${importResult.title}');
-      } else {
-        ref.read(backgroundTaskProvider.notifier).fail(taskId, 'Ошибка: ${importResult.error}');
-      }
+      final importResult = await ref
+          .read(taskQueueProvider)
+          .run<ImportResult>(
+            type: BackgroundTaskType.import,
+            message: 'Импорт: ${inspection.title ?? filePath.split('/').last}',
+            task: () => service.importFromInspection(inspection),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -303,19 +303,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       final dirPath = await picker.pickDirectory();
       if (dirPath == null) return;
 
-      final taskId = ref
-          .read(backgroundTaskProvider.notifier)
-          .start(
-            BackgroundTaskType.directoryScan,
-            'Импорт папки...',
-          );
       final service = ref.read(bookImportServiceProvider);
-      final batchResult = await service.importDirectory(dirPath);
-      ref
-          .read(backgroundTaskProvider.notifier)
-          .complete(
-            taskId,
-            'Импортировано: ${batchResult.successCount}',
+      final batchResult = await ref
+          .read(taskQueueProvider)
+          .run<ImportBatchResult>(
+            type: BackgroundTaskType.directoryScan,
+            message: 'Импорт папки...',
+            task: () => service.importDirectory(dirPath),
           );
       if (context.mounted) {
         final firstFailure = batchResult.failures.firstOrNull;

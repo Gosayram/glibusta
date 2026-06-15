@@ -8,7 +8,8 @@ import '../../../core/platform/app_file_storage.dart';
 
 final bookDeleteServiceProvider = Provider<BookDeleteService>((ref) {
   final db = ref.watch(databaseProvider);
-  return BookDeleteService(db);
+  final storage = ref.watch(appFileStorageProvider);
+  return BookDeleteService(db, storage);
 });
 
 class BookDeleteService {
@@ -16,7 +17,7 @@ class BookDeleteService {
   final AppFileStorage _storage;
   final _logger = AppLogger();
 
-  BookDeleteService(this._db) : _storage = AppFileStorageImpl();
+  BookDeleteService(this._db, this._storage);
 
   Future<void> removeFromLibrary(String bookId) async {
     await _db.bookDao.deleteBook(bookId);

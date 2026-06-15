@@ -14,7 +14,8 @@ import '../../../core/platform/app_file_storage.dart';
 
 final downloadServiceProvider = Provider<DownloadService>((ref) {
   final database = ref.watch(databaseProvider);
-  return DownloadService(database);
+  final storage = ref.watch(appFileStorageProvider);
+  return DownloadService(database, storage);
 });
 
 class DownloadBlockedException implements Exception {
@@ -30,7 +31,7 @@ class DownloadService {
   final AppFileStorage _storage;
   final _logger = AppLogger();
 
-  DownloadService(this._database) : _storage = AppFileStorageImpl();
+  DownloadService(this._database, this._storage);
 
   Future<String> get booksDirectory async {
     final dir = await _storage.booksDir();

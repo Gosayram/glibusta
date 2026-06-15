@@ -4,16 +4,21 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:collection/collection.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:xml/xml.dart';
 
 import '../../../core/platform/app_file_storage.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
+final coverExtractionServiceProvider = Provider<CoverExtractionService>((ref) {
+  return CoverExtractionService(ref.watch(appFileStorageProvider));
+});
+
 class CoverExtractionService {
   final AppFileStorage _storage;
 
-  CoverExtractionService([AppFileStorage? storage]) : _storage = storage ?? AppFileStorageImpl();
+  CoverExtractionService(this._storage);
 
   /// Extract cover from book file and save normalized to covers dir.
   /// [coverBytes] can be provided by the parser (e.g. MOBI) to skip

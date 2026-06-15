@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/features/library/domain/book_file_repository.dart';
 import 'package:glibusta/features/reader/data/book_open_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
@@ -12,8 +14,8 @@ import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 
 class _FakeBookOpenService extends BookOpenService {
-  // ignore: use_super_parameters - super constructor stores a private field.
-  _FakeBookOpenService(AppDatabase database) : super(database);
+  _FakeBookOpenService(AppDatabase database)
+    : super(database, AppFileStorageImpl(), BookFileRepositoryImpl(database, AppFileStorageImpl()));
 
   static const _chapter = ReaderChapter(
     index: 0,
