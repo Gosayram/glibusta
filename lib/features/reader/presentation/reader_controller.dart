@@ -139,6 +139,7 @@ class ReaderController {
   final WidgetRef _ref;
   final _autoThemeService = AutoThemeService();
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
+  final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -160,6 +161,7 @@ class ReaderController {
     _disposed = true;
     _loadGeneration++;
     _progressDebouncer.dispose();
+    _chapterLoadDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
@@ -357,6 +359,16 @@ class ReaderController {
       _updateState(_state.copyWith(scrollProgress: boundedProgress));
       _updatePositionFromScroll(boundedProgress);
       _progressDebouncer.call(saveProgress);
+
+      if (!_state.isLoading && _state.chapterCount > 0) {
+        final total = _state.chapterCount;
+        final chapterIndex = (boundedProgress * (total - 1)).round();
+        _chapterLoadDebouncer.call(() {
+          if (_disposed) return;
+          unawaited(_ensureChaptersLoaded(chapterIndex));
+          _evictDistantChapters(chapterIndex);
+        });
+      }
     }
   }
 

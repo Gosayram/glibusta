@@ -152,6 +152,17 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
               fontWeight: FontWeight.bold,
             ),
           ),
+          SizedBox(height: settings.paragraphSpacing * 3),
+          Center(
+            child: SizedBox(
+              width: settings.fontSize * 1.5,
+              height: settings.fontSize * 1.5,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _getReaderStyle(settings).color?.withValues(alpha: 0.3),
+              ),
+            ),
+          ),
           SizedBox(height: settings.paragraphSpacing * 2),
           ...List.generate(
             3,
@@ -551,6 +562,17 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             style: _getReaderStyle(settings).copyWith(
               fontSize: settings.fontSize * 1.4,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: settings.paragraphSpacing * 3),
+          Center(
+            child: SizedBox(
+              width: settings.fontSize * 1.5,
+              height: settings.fontSize * 1.5,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _getReaderStyle(settings).color?.withValues(alpha: 0.3),
+              ),
             ),
           ),
           SizedBox(height: settings.paragraphSpacing * 2),

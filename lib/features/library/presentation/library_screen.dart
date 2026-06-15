@@ -131,9 +131,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       ? books
                       : books.where((b) {
                           final titleMatch = b.title.toLowerCase().contains(query);
-                          final authorMatch = b.authorIds.any(
-                            (a) => a.toLowerCase().contains(query),
-                          );
+                          final authorMatch = b.displayAuthor.toLowerCase().contains(query);
                           final descMatch = b.description?.toLowerCase().contains(query) ?? false;
                           return titleMatch || authorMatch || descMatch;
                         }).toList();

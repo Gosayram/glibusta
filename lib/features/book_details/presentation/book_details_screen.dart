@@ -272,10 +272,10 @@ class _BookHeader extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (book.authorIds.isNotEmpty) ...[
+              if (book.displayAuthor.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  book.displayAuthor.isNotEmpty ? book.displayAuthor : book.authorIds.join(', '),
+                  book.displayAuthor,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w500,

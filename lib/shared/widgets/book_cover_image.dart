@@ -184,13 +184,13 @@ class BookCoverImage extends StatelessWidget {
   }
 
   String _getInitials() {
-    if (book.authorIds.isNotEmpty) {
-      final name = book.authorIds.first;
-      final parts = name.trim().split(RegExp(r'\s+'));
+    final author = book.displayAuthor;
+    if (author.isNotEmpty) {
+      final parts = author.trim().split(RegExp(r'\s+'));
       if (parts.length >= 2) {
         return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
       }
-      return name.substring(0, name.length.clamp(0, 2)).toUpperCase();
+      return author.substring(0, author.length.clamp(0, 2)).toUpperCase();
     }
     if (book.title.isNotEmpty) {
       return book.title.substring(0, book.title.length.clamp(0, 2)).toUpperCase();

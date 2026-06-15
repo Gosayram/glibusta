@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -36,6 +37,12 @@ class BookImportService {
       _coverService = CoverExtractionService();
 
   final _registry = BookParserRegistry.defaultInstance;
+
+  static String generateAuthorId(String name) {
+    final normalized = name.trim().toLowerCase();
+    final bytes = utf8.encode(normalized);
+    return 'author_${sha256.convert(bytes).toString().substring(0, 16)}';
+  }
 
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
@@ -152,6 +159,20 @@ class BookImportService {
       await targetFile.parent.create(recursive: true);
       await file.copy(targetFile.path);
 
+      final authorIds = <String>[];
+      for (final authorName in book.authors) {
+        final authorId = generateAuthorId(authorName);
+        authorIds.add(authorId);
+        await _database
+            .into(_database.authors)
+            .insertOnConflictUpdate(
+              AuthorsCompanion.insert(
+                id: authorId,
+                name: authorName,
+              ),
+            );
+      }
+
       await _database.transaction(() async {
         await _database
             .into(_database.savedBooks)
@@ -159,7 +180,7 @@ class BookImportService {
               SavedBooksCompanion.insert(
                 id: bookId,
                 title: book.title,
-                authorIds: Value(book.authors),
+                authorIds: Value(authorIds),
                 description: Value(book.description),
                 coverUrl: Value(book.coverUrl),
                 sourceUrl: Value(filePath),
@@ -406,6 +427,20 @@ class BookImportService {
       await targetFile.parent.create(recursive: true);
       await targetFile.writeAsBytes(bytes, flush: true);
 
+      final extAuthorIds = <String>[];
+      for (final authorName in book.authors) {
+        final authorId = generateAuthorId(authorName);
+        extAuthorIds.add(authorId);
+        await _database
+            .into(_database.authors)
+            .insertOnConflictUpdate(
+              AuthorsCompanion.insert(
+                id: authorId,
+                name: authorName,
+              ),
+            );
+      }
+
       await _database.transaction(() async {
         await _database
             .into(_database.savedBooks)
@@ -413,7 +448,7 @@ class BookImportService {
               SavedBooksCompanion.insert(
                 id: bookId,
                 title: book.title,
-                authorIds: Value(book.authors),
+                authorIds: Value(extAuthorIds),
                 description: Value(book.description),
                 coverUrl: Value(book.coverUrl),
                 sourceUrl: Value(external.uri),

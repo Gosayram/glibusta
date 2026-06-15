@@ -126,10 +126,10 @@ class _BookDetailsTab extends StatelessWidget {
           style: theme.textTheme.titleMedium,
           textAlign: TextAlign.center,
         ),
-        if (book.authorIds.isNotEmpty) ...[
+        if (book.displayAuthor.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            book.authorIds.join(', '),
+            book.displayAuthor,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

@@ -170,13 +170,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       fontSize: 14,
                     ),
                   ),
-                  if (readerState.isDynamicallyLoading)
-                    const Positioned(
-                      top: kToolbarHeight,
-                      left: 0,
-                      right: 0,
-                      child: LinearProgressIndicator(minHeight: 2),
-                    ),
+                  if (readerState.isDynamicallyLoading) ...[
+                    const SizedBox(height: 16),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
                 ],
               ],
             ),
@@ -507,7 +504,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
         if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
           Positioned(
-            bottom: 80,
+            bottom: MediaQuery.paddingOf(context).bottom + 80,
             left: 24,
             right: 24,
             child: ReaderSelectionToolbar(
@@ -573,13 +570,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderState readerState,
     ReaderSettings settings,
   ) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final maxContentWidth = isLandscape ? 720.0 : double.infinity;
+    final horizontalPadding = isLandscape
+        ? ((screenWidth - maxContentWidth) / 2).clamp(16.0, 48.0)
+        : 0.0;
+
     return Scaffold(
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
       body: _buildReaderContentStack(
         context,
         readerState,
         settings,
-        content: _buildGestureWrappedContent(context, readerState, settings),
+        content: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: _buildGestureWrappedContent(context, readerState, settings),
+        ),
       ),
     );
   }

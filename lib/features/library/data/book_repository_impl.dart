@@ -86,6 +86,9 @@ class BookRepositoryImpl implements BookRepository {
     final names = authorNames != null
         ? authorIds.map((id) => authorNames[id]).whereType<String>().toList()
         : <String>[];
+    if (names.isEmpty && authorIds.isNotEmpty) {
+      names.addAll(authorIds.where((id) => !id.startsWith('author_')));
+    }
 
     final statusStr = row.readingStatus;
     final readingStatus = ReadingStatus.values.firstWhere(
