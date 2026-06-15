@@ -546,9 +546,10 @@ class BookOpenService {
   }
 
   Future<NormalizedBook> openBookWithCache(String bookId, {bool loadChapters = true}) async {
-    // Try split cache first
+    final sw = Stopwatch()..start();
     final cachedMeta = await getCachedMetadata(bookId);
     if (cachedMeta != null) {
+      _logger.info('Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms', name: 'Reader');
       final bookDir = await _getExistingBookDir(bookId);
       final isComplete = await _isSplitCacheComplete(bookDir, cachedMeta);
       if (!loadChapters) {
@@ -618,12 +619,12 @@ class BookOpenService {
     // Try legacy monolithic cache
     final cached = await getCachedBook(bookId);
     if (cached != null) {
-      // Migrate to split cache in background
+      _logger.info('Cache HIT (legacy) for $bookId in ${sw.elapsedMilliseconds}ms', name: 'Reader');
       unawaited(_migrateLegacyCache(bookId, cached));
       return cached;
     }
 
-    // Parse fresh and save as split cache
+    _logger.info('Cache MISS for $bookId, parsing fresh', name: 'Reader');
     try {
       final book = await openBook(bookId);
       await _saveSplitCache(bookId, book);

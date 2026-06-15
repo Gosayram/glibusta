@@ -294,6 +294,42 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
+    if (!readerState.isLoading && readerState.metadata != null && readerState.chapterCount == 0) {
+      return AnimatedTheme(
+        data: theme,
+        duration: AppDuration.readerThemeTransition,
+        curve: Curves.easeOutCubic,
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Читалка')),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.menu_book_outlined, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Книга не содержит глав',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Содержимое не удалось разобрать или файл повреждён.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Назад'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return AnimatedTheme(
       data: theme,
       duration: AppDuration.readerThemeTransition,

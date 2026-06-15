@@ -32,6 +32,9 @@ class BookDeleteService {
     await (_db.delete(_db.readingProgress)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.quotes)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.notes)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.readingSessions)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.bookCollections)..where((t) => t.bookId.equals(bookId))).go();
     await _db.bookDao.deleteBook(bookId);
 
     if (download?.targetPath != null) {
@@ -55,6 +58,11 @@ class BookDeleteService {
       final legacyCache = File('${cacheDir.path}/$bookId.json');
       if (await legacyCache.exists()) {
         await legacyCache.delete();
+      }
+      final coversDir = await _storage.coversDir();
+      final coverFile = File('${coversDir.path}/$bookId.jpg');
+      if (await coverFile.exists()) {
+        await coverFile.delete();
       }
     } on Object catch (e) {
       _logger.warning('Cache cleanup failed for $bookId: $e', name: 'BookDelete', error: e);

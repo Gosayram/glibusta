@@ -503,9 +503,12 @@ class ReaderController {
 
   void jumpToProgress(double progress) {
     final bounded = progress.clamp(0.0, 1.0);
+    final position = _positionFromProgress(bounded);
     _updateState(
-      _state.copyWith(currentPosition: _positionFromProgress(bounded), scrollProgress: bounded),
+      _state.copyWith(currentPosition: position, scrollProgress: bounded),
     );
+    unawaited(_ensureChaptersLoaded(position.chapterIndex));
+    _evictDistantChapters(position.chapterIndex);
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
@@ -704,6 +707,13 @@ class ReaderController {
   Future<void> deleteBookFile() async {
     final filePath = _state.errorFilePath;
     if (filePath == null || filePath.isEmpty) return;
+    if (!_isAppOwnedPath(filePath)) {
+      AppLogger().warning(
+        'Refusing to delete non-app path: $filePath',
+        name: 'Reader',
+      );
+      return;
+    }
     try {
       final file = File(filePath);
       if (await file.exists()) {
@@ -717,6 +727,10 @@ class ReaderController {
       AppLogger().warning('Error during file deletion: $e', name: 'Reader', error: e);
     }
     _updateState(_state.copyWith(errorMessage: 'Файл удалён'));
+  }
+
+  static bool _isAppOwnedPath(String path) {
+    return path.contains('glibusta');
   }
 
   Future<void> clearCacheAndReload() async {

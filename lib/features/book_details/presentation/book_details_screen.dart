@@ -874,6 +874,12 @@ class _BottomActionBar extends ConsumerWidget {
     final isDownloading = downloadState == BookDownloadState.downloading;
     final isDownloaded = downloadState == BookDownloadState.downloaded;
     final hasFormats = details.availableFormats.isNotEmpty;
+    final capService = const FormatCapabilityService();
+    final bestFormat = book.availableFormats.isNotEmpty
+        ? book.availableFormats.first
+        : BookFormat.unknown;
+    final isDocumentOnly = capService.isDocumentOnly(bestFormat);
+    final readLabel = isDocumentOnly ? 'Документ' : 'Читать';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -888,8 +894,8 @@ class _BottomActionBar extends ConsumerWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Читать'),
+                icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
+                label: Text(readLabel),
               ),
             ),
             const SizedBox(width: 12),
@@ -897,8 +903,8 @@ class _BottomActionBar extends ConsumerWidget {
               child: isDownloaded
                   ? OutlinedButton.icon(
                       onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Открыть'),
+                      icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
+                      label: Text(isDocumentOnly ? 'Открыть документ' : 'Открыть'),
                     )
                   : OutlinedButton.icon(
                       onPressed: hasFormats && !isDownloading
