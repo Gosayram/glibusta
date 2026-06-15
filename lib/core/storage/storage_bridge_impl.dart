@@ -31,6 +31,8 @@ class StorageBridgeImpl implements StorageBridge {
           name: map['name'] as String,
           size: map['size'] as int,
           extension: map['extension'] as String,
+          mimeType: map['mimeType'] as String?,
+          lastModified: map['lastModified'] as int?,
         );
       }).toList();
     } on PlatformException {

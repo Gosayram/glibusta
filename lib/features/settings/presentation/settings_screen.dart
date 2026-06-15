@@ -614,7 +614,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final bridge = StorageBridgeImpl();
       final uri = await bridge.pickFolder();
-      if (uri == null) return;
+      if (uri == null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Выбор папки отменён')),
+          );
+        }
+        return;
+      }
 
       final scanned = await bridge.scanBooks(uri);
       final name = uri.split('/').last;

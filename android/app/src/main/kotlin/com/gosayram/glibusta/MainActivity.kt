@@ -101,27 +101,57 @@ class MainActivity : FlutterFragmentActivity() {
                 return
             }
 
-            val supportedExtensions = listOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
+            val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
             val books = mutableListOf<Map<String, Any>>()
 
-            for (file in root.listFiles()) {
-                if (!file.isFile) continue
-                val name = file.name ?: continue
-                val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext !in supportedExtensions) continue
-
-                books.add(mapOf(
-                    "uri" to file.uri.toString(),
-                    "name" to name,
-                    "size" to file.length(),
-                    "extension" to ext,
-                ))
-            }
+            collectBooks(root, supportedExtensions, books)
 
             result.success(books)
         } catch (e: Exception) {
             result.error("SCAN_ERROR", e.message, null)
         }
+    }
+
+    private fun collectBooks(
+        directory: DocumentFile,
+        supportedExtensions: Set<String>,
+        books: MutableList<Map<String, Any>>,
+    ) {
+        for (file in directory.listFiles()) {
+            if (file.isDirectory) {
+                collectBooks(file, supportedExtensions, books)
+                continue
+            }
+            if (!file.isFile) continue
+
+            val name = file.name ?: continue
+            if (isHiddenOrTemporary(name)) continue
+
+            val size = file.length()
+            if (size <= 0L) continue
+
+            val ext = name.substringAfterLast('.', "").lowercase()
+            if (ext !in supportedExtensions) continue
+
+            books.add(mapOf(
+                "uri" to file.uri.toString(),
+                "name" to name,
+                "size" to size,
+                "extension" to ext,
+                "mimeType" to (file.type ?: ""),
+                "lastModified" to file.lastModified(),
+            ))
+        }
+    }
+
+    private fun isHiddenOrTemporary(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower.startsWith(".") ||
+            lower.endsWith(".tmp") ||
+            lower.endsWith(".temp") ||
+            lower.endsWith(".part") ||
+            lower.endsWith(".crdownload") ||
+            lower.endsWith("~")
     }
 
     private fun readFile(fileUri: Uri, result: MethodChannel.Result) {
