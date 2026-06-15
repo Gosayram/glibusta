@@ -51,6 +51,7 @@ class ReaderState {
   final int estimatedMinutesLeft;
   final bool isSearchOpen;
   final String? highlightedQuery;
+  final bool isDynamicallyLoading;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -69,6 +70,7 @@ class ReaderState {
     this.estimatedMinutesLeft = 0,
     this.isSearchOpen = false,
     this.highlightedQuery,
+    this.isDynamicallyLoading = false,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;
@@ -107,6 +109,7 @@ class ReaderState {
     String? highlightedQuery,
     bool clearHighlight = false,
     bool clearLoadingMessage = false,
+    bool? isDynamicallyLoading,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
@@ -124,6 +127,7 @@ class ReaderState {
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
+      isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
     );
   }
 }
@@ -215,10 +219,17 @@ class ReaderController {
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
       const wordsPerMinute = 200;
-      final totalWords = _content.computeTotalWords(_state.loadedChapters);
+      final loadedWords = _content.computeTotalWords(_state.loadedChapters);
+      final loadedCount = _state.loadedChapters.length;
+      final totalCount = _state.chapterCount;
+      final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
+          ? (loadedWords / loadedCount * totalCount).round()
+          : loadedWords;
       _updateState(
         _state.copyWith(
-          estimatedMinutesLeft: totalWords > 0 ? (totalWords / wordsPerMinute).ceil() : 0,
+          estimatedMinutesLeft: estimatedTotalWords > 0
+              ? (estimatedTotalWords / wordsPerMinute).ceil()
+              : 0,
         ),
       );
 
@@ -309,13 +320,16 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
+    if (_loaded && !_state.isLoading) {
+      _updateState(_state.copyWith(isDynamicallyLoading: true));
+    }
     final updated = await _content.ensureChaptersLoaded(
       centerIndex,
       _state.loadedChapters,
       chapterCount: _state.chapterCount,
     );
     if (!_disposed) {
-      _updateState(_state.copyWith(loadedChapters: updated));
+      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
     }
   }
 

@@ -2,26 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../../../core/encoding/encoding_detection.dart';
-import '../../../reader/data/parsers/book_parser.dart';
-import '../../../reader/data/parsers/epub_parser.dart';
-import '../../../reader/data/parsers/fb2_parser.dart';
 import '../../../reader/data/parsers/format_detector.dart';
-import '../../../reader/data/parsers/mobi_parser.dart';
-import '../../../reader/data/parsers/rtf_parser.dart';
-import '../../../reader/data/parsers/txt_parser.dart';
+import '../../../reader/data/parsers/parser_registry.dart';
 
 final class BookMetadataExtractor {
   static const _metadataTimeout = Duration(seconds: 12);
 
-  final _parsers = <BookFormat, BookParser>{
-    BookFormat.epub: EpubParser(),
-    BookFormat.fb2: Fb2Parser(),
-    BookFormat.txt: TxtBookParser(),
-    BookFormat.rtf: RtfBookParser(),
-    BookFormat.mobi: MobiBookParser(),
-    BookFormat.azw3: MobiBookParser(),
-    BookFormat.prc: MobiBookParser(),
-  };
+  final _registry = BookParserRegistry.defaultInstance;
 
   Future<BookMetadata> extract({
     required String path,
@@ -33,7 +20,7 @@ final class BookMetadataExtractor {
       return const BookMetadata();
     }
 
-    final parser = _parsers[format];
+    final parser = _registry.parserForFormat(format);
     if (parser == null) {
       return const BookMetadata();
     }

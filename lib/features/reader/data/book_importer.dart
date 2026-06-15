@@ -14,13 +14,7 @@ import 'parsers/rtf_parser.dart';
 import 'parsers/txt_parser.dart';
 
 final bookParserRegistryProvider = Provider<BookParserRegistry>((ref) {
-  return BookParserRegistry([
-    EpubParser(),
-    Fb2Parser(),
-    TxtBookParser(),
-    RtfBookParser(),
-    MobiBookParser(),
-  ]);
+  return BookParserRegistry.defaultInstance;
 });
 
 final bookImporterProvider = Provider<BookImporter>((ref) {

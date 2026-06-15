@@ -15,13 +15,8 @@ import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
 import '../../../core/utils/fire_and_log.dart';
-import '../../reader/data/parsers/book_parser.dart';
-import '../../reader/data/parsers/epub_parser.dart';
-import '../../reader/data/parsers/fb2_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
-import '../../reader/data/parsers/mobi_parser.dart';
-import '../../reader/data/parsers/rtf_parser.dart';
-import '../../reader/data/parsers/txt_parser.dart';
+import '../../reader/data/parsers/parser_registry.dart';
 import '../data/cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
@@ -40,17 +35,7 @@ class BookImportService {
     : _storage = AppFileStorageImpl(),
       _coverService = CoverExtractionService();
 
-  final Map<String, BookParser> _parsers = {
-    'fb2': Fb2Parser(),
-    'zip': Fb2Parser(),
-    'epub': EpubParser(),
-    'txt': TxtBookParser(),
-    'rtf': RtfBookParser(),
-    'mobi': MobiBookParser(),
-    'azw': MobiBookParser(),
-    'azw3': MobiBookParser(),
-    'prc': MobiBookParser(),
-  };
+  final _registry = BookParserRegistry.defaultInstance;
 
   /// Import a file from its inspection result.
   Future<ImportResult> importFromInspection(
@@ -140,7 +125,9 @@ class BookImportService {
       return ImportResult.duplicate(existing.title, contentHash);
     }
 
-    final parser = _parsers[ext];
+    final parser =
+        _registry.parserForExtension(ext) ??
+        (ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
     if (parser == null) {
       return ImportResult.failure(_unsupportedReaderMessage(ext));
     }
@@ -376,7 +363,9 @@ class BookImportService {
         return ImportResult.success(title);
       }
 
-      final parser = _parsers[ext];
+      final parser =
+          _registry.parserForExtension(ext) ??
+          (ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
       if (parser == null) {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }

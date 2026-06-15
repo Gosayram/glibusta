@@ -17,13 +17,11 @@ import '../../../core/platform/app_file_storage.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
-import 'parsers/book_parser.dart';
 import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
-import 'parsers/mobi_parser.dart';
 import 'parsers/normalized_book.dart';
-import 'parsers/rtf_parser.dart';
+import 'parsers/parser_registry.dart';
 import 'parsers/txt_parser.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
@@ -46,15 +44,7 @@ class BookOpenService {
   static const int _splitCacheVersion = 1;
   static const int _parserCacheVersion = 1;
 
-  static final Map<BookFormat, BookParser> _parsers = {
-    BookFormat.epub: legacy_epub.EpubParser(),
-    BookFormat.fb2: Fb2Parser(),
-    BookFormat.txt: TxtBookParser(),
-    BookFormat.rtf: RtfBookParser(),
-    BookFormat.mobi: MobiBookParser(),
-    BookFormat.azw3: MobiBookParser(),
-    BookFormat.prc: MobiBookParser(),
-  };
+  static final _registry = BookParserRegistry.defaultInstance;
 
   static Future<NormalizedBook> _parseEpubInWorker(
     ({String filePath, String imagesDirPath, String bookId}) args,
@@ -203,7 +193,7 @@ class BookOpenService {
     if (bookFormat == BookFormat.mobi ||
         bookFormat == BookFormat.azw3 ||
         bookFormat == BookFormat.prc) {
-      final parser = _parsers[bookFormat];
+      final parser = _registry.parserForFormat(bookFormat);
       if (parser == null) {
         throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
       }
@@ -230,7 +220,7 @@ class BookOpenService {
       final fileName = filePath.split('/').last;
 
       if (bookFormat == BookFormat.epub) {
-        final parser = _parsers[bookFormat];
+        final parser = _registry.parserForFormat(bookFormat);
         if (parser == null) {
           throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
         }
@@ -299,7 +289,7 @@ class BookOpenService {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${format.name}');
     }
 
-    final parser = _parsers[format];
+    final parser = _registry.parserForFormat(format);
     if (parser == null) {
       throw UnsupportedFormatFailure('Парсер не найден: ${format.name}');
     }

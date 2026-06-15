@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
@@ -12,6 +14,7 @@ import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
+import '../../library/data/book_delete_service.dart';
 import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
@@ -167,6 +170,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       fontSize: 14,
                     ),
                   ),
+                  if (readerState.isDynamicallyLoading)
+                    const Positioned(
+                      top: kToolbarHeight,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
                 ],
               ],
             ),
@@ -281,6 +291,36 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                                 'Удалить файл',
                                 style: TextStyle(color: Colors.red),
                               ),
+                            ),
+                          if (showDeleteButton)
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final svc = ref.read(bookDeleteServiceProvider);
+                                await svc.removeFromLibrary(widget.bookId);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Удалено из библиотеки')),
+                                );
+                                if (context.mounted) Navigator.of(context).pop();
+                              },
+                              icon: const Icon(Icons.library_books_outlined, color: Colors.red),
+                              label: const Text(
+                                'Удалить из библиотеки',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ),
+                          if (readerState.errorFilePath != null)
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                final file = File(readerState.errorFilePath!);
+                                if (!await file.exists()) return;
+                                final uri = Uri.file(readerState.errorFilePath!);
+                                if (await canLaunchUrl(uri)) {
+                                  await launchUrl(uri);
+                                }
+                              },
+                              icon: const Icon(Icons.open_in_new),
+                              label: const Text('Открыть в другом приложении'),
                             ),
                         ],
                       ),
