@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -13,7 +12,6 @@ import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
-import '../../../core/platform/app_file_storage.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
@@ -23,6 +21,7 @@ import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
 import 'parsers/txt_parser.dart';
+import 'reader_cache_service.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final database = ref.watch(databaseProvider);
@@ -37,12 +36,15 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 class BookOpenService {
   final AppDatabase _database;
   final _logger = AppLogger();
+  late final ReaderCacheService cache;
 
-  BookOpenService(this._database);
+  BookOpenService(this._database) {
+    cache = ReaderCacheService(
+      fingerprintProvider: _computeCacheFingerprint,
+    );
+  }
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
-  static const int _splitCacheVersion = 1;
-  static const int _parserCacheVersion = 1;
 
   static final _registry = BookParserRegistry.defaultInstance;
 
@@ -123,7 +125,7 @@ class BookOpenService {
   ]) async {
     if (bookFormat == BookFormat.epub) {
       final effectiveBookId = bookId ?? _extractBookId(filePath);
-      final bookDir = await _getBookDir(effectiveBookId);
+      final bookDir = await cache.getBookDir(effectiveBookId);
       final imagesDir = Directory('${bookDir.path}/epub_images');
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
@@ -332,126 +334,9 @@ class BookOpenService {
     return rows.isNotEmpty ? rows.first : null;
   }
 
-  Future<String> get booksCacheDir async {
-    final dir = await AppFileStorageImpl().cacheDir();
-    return dir.path;
-  }
-
-  Future<File> _getCacheFile(String bookId) async {
-    final dir = await booksCacheDir;
-    return File('$dir/$bookId.json');
-  }
-
-  Future<Directory> _getBookDir(String bookId) async {
-    final dir = await booksCacheDir;
-    final bookDir = Directory('$dir/$bookId');
-    if (!await bookDir.exists()) {
-      await bookDir.create(recursive: true);
-    }
-    return bookDir;
-  }
-
-  Future<Directory> _getExistingBookDir(String bookId) async {
-    final dir = await booksCacheDir;
-    return Directory('$dir/$bookId');
-  }
-
-  File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
-
-  File _getManifestFile(Directory bookDir) => File('${bookDir.path}/manifest.json');
-
-  File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
-
-  Future<void> _writeJsonAtomically(File target, Object? value) async {
-    final tmp = File('${target.path}.tmp');
-    await tmp.writeAsString(jsonEncode(value), flush: true);
-    if (await target.exists()) {
-      await target.delete();
-    }
-    await tmp.rename(target.path);
-  }
-
-  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
-    try {
-      final bookDir = await _getExistingBookDir(bookId);
-      if (!await bookDir.exists()) return null;
-      final metaFile = _getMetadataFile(bookDir);
-      if (!await metaFile.exists()) return null;
-      final json = await metaFile.readAsString();
-      return NormalizedBookMetadata.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to read cached metadata: $e', name: 'Reader', error: e);
-      return null;
-    }
-  }
-
-  Future<bool> _isSplitCacheComplete(Directory bookDir, NormalizedBookMetadata meta) async {
-    final manifestFile = _getManifestFile(bookDir);
-    if (await manifestFile.exists()) {
-      try {
-        final json = await manifestFile.readAsString();
-        final manifest = jsonDecode(json) as Map<String, dynamic>;
-        final version = manifest['version'] as int?;
-        final parserVersion = manifest['parserVersion'] as int?;
-        final cachedFormat = manifest['format'] as String?;
-        final cachedFileSize = manifest['fileSize'] as int?;
-        final cachedFileMtime = manifest['fileMtime'] as int?;
-        final cachedContentHash = manifest['contentHash'] as String?;
-        final chapterCount = manifest['chapterCount'] as int?;
-        final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
-        final source = await _cacheSourceFingerprint(meta.id);
-        if (source == null) {
-          return false;
-        }
-        if (version != _splitCacheVersion ||
-            parserVersion != _parserCacheVersion ||
-            cachedFormat != source.format ||
-            cachedFileSize != source.fileSize ||
-            cachedFileMtime != source.fileMtime ||
-            cachedContentHash != source.contentHash ||
-            chapterCount != meta.chapterCount ||
-            chapters.length != meta.chapterCount) {
-          return false;
-        }
-        for (final index in chapters) {
-          if (!await _getChapterFile(bookDir, index).exists()) return false;
-        }
-        return true;
-      } on Object catch (e) {
-        _logger.warning('Failed to validate split cache manifest: $e', name: 'Reader', error: e);
-        return false;
-      }
-    }
-
-    return false;
-  }
-
-  Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
-    final bookDir = await _getBookDir(bookId);
-    final metaFile = _getMetadataFile(bookDir);
-    final source = await _cacheSourceFingerprint(bookId);
-    await _writeJsonAtomically(metaFile, book.toMetadata().toJson());
-    for (final chapter in book.chapters) {
-      final chapterFile = _getChapterFile(bookDir, chapter.index);
-      await _writeJsonAtomically(chapterFile, chapter.toJson());
-    }
-    await _writeJsonAtomically(
-      _getManifestFile(bookDir),
-      {
-        'version': _splitCacheVersion,
-        'parserVersion': _parserCacheVersion,
-        'bookId': bookId,
-        'format': source?.format,
-        'fileSize': source?.fileSize,
-        'fileMtime': source?.fileMtime,
-        'contentHash': source?.contentHash,
-        'chapterCount': book.chapters.length,
-        'chapters': book.chapters.map((chapter) => chapter.index).toList(),
-      },
-    );
-  }
-
-  Future<_CacheSourceFingerprint?> _cacheSourceFingerprint(String bookId) async {
+  Future<CacheSourceFingerprint?> _computeCacheFingerprint(
+    String bookId,
+  ) async {
     final download = await _findDownload(bookId);
     final filePath = download?.targetPath;
     if (filePath == null || filePath.isEmpty) {
@@ -465,7 +350,7 @@ class BookOpenService {
 
     final stat = await file.stat();
     final savedBook = await _findSavedBook(bookId);
-    return _CacheSourceFingerprint(
+    return CacheSourceFingerprint(
       format: detectBookFormat(filePath).name,
       fileSize: stat.size,
       fileMtime: stat.modified.millisecondsSinceEpoch,
@@ -473,101 +358,36 @@ class BookOpenService {
     );
   }
 
-  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
-    try {
-      final bookDir = await _getExistingBookDir(bookId);
-      if (!await bookDir.exists()) return null;
-      final chapterFile = _getChapterFile(bookDir, index);
-      if (!await chapterFile.exists()) return null;
-      final json = await chapterFile.readAsString();
-      return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to load chapter $index for $bookId: $e', name: 'Reader', error: e);
-      return null;
-    }
-  }
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) => cache.getMetadata(bookId);
 
-  Future<void> saveChapter(String bookId, ReaderChapter chapter) async {
-    final bookDir = await _getBookDir(bookId);
-    final chapterFile = _getChapterFile(bookDir, chapter.index);
-    await _writeJsonAtomically(chapterFile, chapter.toJson());
-  }
+  Future<ReaderChapter?> loadChapter(String bookId, int index) => cache.getChapter(bookId, index);
 
-  Future<void> invalidateBookCache(String bookId, {bool preserveImages = false}) async {
-    final bookDir = await _getExistingBookDir(bookId);
-    if (!await bookDir.exists()) return;
-    try {
-      if (preserveImages) {
-        final imagesDir = Directory('${bookDir.path}/epub_images');
-        final hasImages = await imagesDir.exists();
-        final imagesBackup = hasImages
-            ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
-            : null;
+  Future<void> saveChapter(String bookId, ReaderChapter chapter) =>
+      cache.putChapter(bookId, chapter);
 
-        await bookDir.delete(recursive: true);
+  Future<void> invalidateBookCache(
+    String bookId, {
+    bool preserveImages = false,
+  }) => cache.invalidate(bookId, preserveImages: preserveImages);
 
-        if (imagesBackup != null) {
-          await imagesBackup.rename('${bookDir.path}/epub_images');
-        }
-      } else {
-        await bookDir.delete(recursive: true);
-      }
-      _logger.info(
-        'Reader cache invalidated for $bookId (preserveImages=$preserveImages)',
-        name: 'Reader',
-      );
-    } on Object catch (e) {
-      _logger.warning(
-        'Failed to invalidate reader cache for $bookId: $e',
-        name: 'Reader',
-        error: e,
-      );
-    }
-  }
+  Future<NormalizedBook?> getCachedBook(String bookId) => cache.getCachedBook(bookId);
 
-  // Legacy monolithic cache — kept for migration fallback
-  Future<NormalizedBook?> getCachedBook(String bookId) async {
-    final cacheFile = await _getCacheFile(bookId);
-    if (!await cacheFile.exists()) return null;
-    try {
-      final json = await cacheFile.readAsString();
-      return NormalizedBook.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to read cached book: $e', name: 'Reader', error: e);
-      return null;
-    }
-  }
+  Future<void> saveToCache(String bookId, NormalizedBook book) => cache.saveToCache(bookId, book);
 
-  Future<void> saveToCache(String bookId, NormalizedBook book) async {
-    final cacheFile = await _getCacheFile(bookId);
-    await cacheFile.writeAsString(jsonEncode(book.toJson()));
-  }
-
-  Future<void> _migrateLegacyCache(String bookId, NormalizedBook book) async {
-    try {
-      await _saveSplitCache(bookId, book);
-    } on Object catch (e, st) {
-      _logger.warning(
-        'Legacy cache migration failed for $bookId: $e',
-        name: 'Reader',
-        error: e,
-        st: st,
-      );
-    }
-  }
-
-  Future<NormalizedBook> openBookWithCache(String bookId, {bool loadChapters = true}) async {
+  Future<NormalizedBook> openBookWithCache(
+    String bookId, {
+    bool loadChapters = true,
+  }) async {
     final cid = 'cache-$bookId-${DateTime.now().millisecondsSinceEpoch}';
     final sw = Stopwatch()..start();
-    final cachedMeta = await getCachedMetadata(bookId);
+    final cachedMeta = await cache.getMetadata(bookId);
     if (cachedMeta != null) {
       _logger.info(
         'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
         name: 'Reader',
         cid: cid,
       );
-      final bookDir = await _getExistingBookDir(bookId);
-      final isComplete = await _isSplitCacheComplete(bookDir, cachedMeta);
+      final isComplete = await cache.isCacheValid(bookId, cachedMeta);
       if (!loadChapters) {
         return NormalizedBook(
           id: cachedMeta.id,
@@ -590,11 +410,14 @@ class BookOpenService {
       }
 
       if (!isComplete) {
-        _logger.warning('Split cache is incomplete for $bookId', name: 'Reader');
+        _logger.warning(
+          'Split cache is incomplete for $bookId',
+          name: 'Reader',
+        );
       } else {
         final chapters = <ReaderChapter>[];
         for (var i = 0; i < cachedMeta.chapterCount; i++) {
-          final chapter = await loadChapter(bookId, i);
+          final chapter = await cache.getChapter(bookId, i);
           if (chapter != null) {
             chapters.add(chapter);
           }
@@ -632,40 +455,29 @@ class BookOpenService {
       );
     }
 
-    // Try legacy monolithic cache
-    final cached = await getCachedBook(bookId);
+    final cached = await cache.getCachedBook(bookId);
     if (cached != null) {
       _logger.info(
         'Cache HIT (legacy) for $bookId in ${sw.elapsedMilliseconds}ms',
         name: 'Reader',
         cid: cid,
       );
-      unawaited(_migrateLegacyCache(bookId, cached));
+      unawaited(cache.migrateLegacyCache(bookId, cached));
       return cached;
     }
 
-    _logger.info('Cache MISS for $bookId, parsing fresh', name: 'Reader', cid: cid);
+    _logger.info(
+      'Cache MISS for $bookId, parsing fresh',
+      name: 'Reader',
+      cid: cid,
+    );
     try {
       final book = await openBook(bookId);
-      await _saveSplitCache(bookId, book);
+      await cache.putBook(bookId, book);
       return book;
     } on TimeoutException {
-      await invalidateBookCache(bookId, preserveImages: true);
+      await cache.invalidate(bookId, preserveImages: true);
       rethrow;
     }
   }
-}
-
-final class _CacheSourceFingerprint {
-  const _CacheSourceFingerprint({
-    required this.format,
-    required this.fileSize,
-    required this.fileMtime,
-    required this.contentHash,
-  });
-
-  final String format;
-  final int fileSize;
-  final int fileMtime;
-  final String? contentHash;
 }

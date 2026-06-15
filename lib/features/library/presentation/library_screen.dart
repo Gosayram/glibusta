@@ -9,6 +9,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
+import '../../../core/services/background_task_provider.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
@@ -55,6 +56,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     final booksAsync = ref.watch(libraryBooksProvider);
+    final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,63 +110,81 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         ],
       ),
-      body: BookDropZone(
-        onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
-        child: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(libraryBooksProvider);
-          },
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: KeyedSubtree(
-              key: ValueKey(
-                booksAsync.isLoading
-                    ? 'loading'
-                    : booksAsync.hasError
-                    ? 'error'
-                    : 'data_${booksAsync.value?.length ?? 0}',
+      body: Column(
+        children: [
+          if (runningTasks.isNotEmpty)
+            Material(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: SizedBox(
+                height: 3,
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
-              child: booksAsync.when(
-                data: (List<Book> books) {
-                  final query = _searchQuery.toLowerCase();
-                  final filtered = query.isEmpty
-                      ? books
-                      : books.where((b) {
-                          final titleMatch = b.title.toLowerCase().contains(query);
-                          final authorMatch = b.displayAuthor.toLowerCase().contains(query);
-                          final descMatch = b.description?.toLowerCase().contains(query) ?? false;
-                          return titleMatch || authorMatch || descMatch;
-                        }).toList();
-                  return _buildBooksGrid(context, ref, filtered);
+            ),
+          Expanded(
+            child: BookDropZone(
+              onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(libraryBooksProvider);
                 },
-                loading: () => Skeletonizer(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.75,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: KeyedSubtree(
+                    key: ValueKey(
+                      booksAsync.isLoading
+                          ? 'loading'
+                          : booksAsync.hasError
+                          ? 'error'
+                          : 'data_${booksAsync.value?.length ?? 0}',
                     ),
-                    itemCount: 6,
-                    itemBuilder: (_, _) => const Card(
-                      child: ListTile(
-                        leading: Bone.circle(size: 48),
-                        title: Bone.text(words: 3),
-                        subtitle: Bone.text(words: 2),
+                    child: booksAsync.when(
+                      data: (List<Book> books) {
+                        final query = _searchQuery.toLowerCase();
+                        final filtered = query.isEmpty
+                            ? books
+                            : books.where((b) {
+                                final titleMatch = b.title.toLowerCase().contains(query);
+                                final authorMatch = b.displayAuthor.toLowerCase().contains(query);
+                                final descMatch =
+                                    b.description?.toLowerCase().contains(query) ?? false;
+                                return titleMatch || authorMatch || descMatch;
+                              }).toList();
+                        return _buildBooksGrid(context, ref, filtered);
+                      },
+                      loading: () => Skeletonizer(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.75,
+                          ),
+                          itemCount: 6,
+                          itemBuilder: (_, _) => const Card(
+                            child: ListTile(
+                              leading: Bone.circle(size: 48),
+                              title: Bone.text(words: 3),
+                              subtitle: Bone.text(words: 2),
+                            ),
+                          ),
+                        ),
+                      ),
+                      error: (Object e, _) => ErrorStateWidget(
+                        message: 'Не удалось загрузить библиотеку',
+                        details: e.toString(),
+                        onRetry: () => ref.invalidate(libraryBooksProvider),
                       ),
                     ),
                   ),
                 ),
-                error: (Object e, _) => ErrorStateWidget(
-                  message: 'Не удалось загрузить библиотеку',
-                  details: e.toString(),
-                  onRetry: () => ref.invalidate(libraryBooksProvider),
-                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -242,8 +262,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         return;
       }
 
+      final taskId = ref
+          .read(backgroundTaskProvider.notifier)
+          .start(
+            BackgroundTaskType.import,
+            'Импорт: ${inspection.title ?? filePath.split('/').last}',
+          );
       final service = ref.read(bookImportServiceProvider);
       final importResult = await service.importFromInspection(inspection);
+      if (importResult.isSuccess) {
+        ref
+            .read(backgroundTaskProvider.notifier)
+            .complete(taskId, 'Импортировано: ${importResult.title}');
+      } else {
+        ref.read(backgroundTaskProvider.notifier).fail(taskId, 'Ошибка: ${importResult.error}');
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -270,8 +303,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       final dirPath = await picker.pickDirectory();
       if (dirPath == null) return;
 
+      final taskId = ref
+          .read(backgroundTaskProvider.notifier)
+          .start(
+            BackgroundTaskType.directoryScan,
+            'Импорт папки...',
+          );
       final service = ref.read(bookImportServiceProvider);
       final batchResult = await service.importDirectory(dirPath);
+      ref
+          .read(backgroundTaskProvider.notifier)
+          .complete(
+            taskId,
+            'Импортировано: ${batchResult.successCount}',
+          );
       if (context.mounted) {
         final firstFailure = batchResult.failures.firstOrNull;
         ScaffoldMessenger.of(context).showSnackBar(
