@@ -53,7 +53,8 @@ class FormatCapabilityService {
   String? warningLabel(BookFormat format) {
     final cap = capabilityOf(format);
     return switch (cap) {
-      FormatCapability.readable || FormatCapability.documentOnly => null,
+      FormatCapability.readable => null,
+      FormatCapability.documentOnly => 'Только хранение/просмотр',
       FormatCapability.partial => 'Частичная поддержка (MOBI v1)',
       FormatCapability.legacy => 'Устаревший формат (legacy)',
       FormatCapability.unsupported => 'Формат не поддерживается',

@@ -111,9 +111,9 @@ void main() {
       expect(service.warningLabel(BookFormat.mobi), isNull);
     });
 
-    test('null for documentOnly formats', () {
-      expect(service.warningLabel(BookFormat.pdf), isNull);
-      expect(service.warningLabel(BookFormat.djvu), isNull);
+    test('non-null for documentOnly', () {
+      expect(service.warningLabel(BookFormat.pdf), isNotNull);
+      expect(service.warningLabel(BookFormat.djvu), isNotNull);
     });
 
     test('non-null for partial', () {

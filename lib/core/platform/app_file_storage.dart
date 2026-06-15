@@ -1,9 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../shared/models/book.dart';
+
+final appFileStorageProvider = Provider<AppFileStorage>((ref) {
+  return AppFileStorageImpl();
+});
 
 abstract interface class AppFileStorage {
   Future<File> bookFile(String bookId, BookFormat format);

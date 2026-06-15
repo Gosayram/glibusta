@@ -293,23 +293,37 @@ class _BookHeader extends StatelessWidget {
               ],
               if (details.availableFormats.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  children: details.availableFormats.map((f) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        f.name.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                        ),
-                      ),
+                Builder(
+                  builder: (context) {
+                    final capService = const FormatCapabilityService();
+                    return Wrap(
+                      spacing: 6,
+                      children: details.availableFormats.map((f) {
+                        final warning = capService.warningLabel(f);
+                        final isSupported = warning == null;
+                        return Tooltip(
+                          message: warning ?? f.name.toUpperCase(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSupported
+                                  ? theme.colorScheme.secondaryContainer
+                                  : theme.colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              f.name.toUpperCase(),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: isSupported
+                                    ? theme.colorScheme.onSecondaryContainer
+                                    : theme.colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
               ],
             ],
