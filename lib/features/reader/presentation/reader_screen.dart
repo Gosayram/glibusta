@@ -1,14 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
@@ -20,7 +15,9 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
+import 'reader_context_menu.dart';
 import 'reader_controller.dart';
+import 'reader_error_panel.dart';
 import 'reader_gesture_coordinator.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
@@ -201,151 +198,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     if (readerState.errorMessage != null) {
-      final kind = readerState.errorKind ?? ReaderErrorKind.unknown;
-      final showCacheButton = kind != ReaderErrorKind.bookMissing;
-      final showDeleteButton =
-          readerState.errorFilePath != null && kind != ReaderErrorKind.bookMissing;
-      return AnimatedTheme(
-        data: theme,
-        duration: AppDuration.readerThemeTransition,
-        curve: Curves.easeOutCubic,
-        child: Scaffold(
-          appBar: AppBar(title: const Text('Читалка')),
-          body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(kind.icon, size: 48, color: Colors.orange),
-                      const SizedBox(height: 12),
-                      Text(
-                        kind.defaultTitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        readerState.errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      if (readerState.errorFilePath != null) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (readerState.errorFormat != null)
-                                Text(
-                                  'Формат: ${readerState.errorFormat}',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              if (readerState.errorFileSize != null)
-                                Text(
-                                  'Размер: ${(readerState.errorFileSize! / 1024).toStringAsFixed(1)} KB',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Файл: ${_displayFileName(readerState.errorFilePath!)}',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: () => _ctrl.loadBook(),
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Повторить'),
-                          ),
-                          if (showCacheButton)
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                await _ctrl.clearCacheAndReload();
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Кеш очищен')),
-                                );
-                              },
-                              icon: const Icon(Icons.cleaning_services_outlined),
-                              label: const Text('Очистить кеш'),
-                            ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              _ctrl.copyDiagnostics();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Диагностика скопирована')),
-                              );
-                            },
-                            icon: const Icon(Icons.copy),
-                            label: const Text('Копировать диагностику'),
-                          ),
-                          if (showDeleteButton)
-                            OutlinedButton.icon(
-                              onPressed: () => _showDeleteConfirmDialog(context),
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              label: const Text(
-                                'Удалить файл',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          if (showDeleteButton)
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                final svc = ref.read(bookDeleteServiceProvider);
-                                await svc.removeFromLibrary(widget.bookId);
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Удалено из библиотеки')),
-                                );
-                                if (context.mounted) Navigator.of(context).pop();
-                              },
-                              icon: const Icon(Icons.library_books_outlined, color: Colors.red),
-                              label: const Text(
-                                'Удалить из библиотеки',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                          if (readerState.errorFilePath != null)
-                            OutlinedButton.icon(
-                              onPressed: () async {
-                                final file = File(readerState.errorFilePath!);
-                                if (!await file.exists()) return;
-                                final uri = Uri.file(readerState.errorFilePath!);
-                                if (await canLaunchUrl(uri)) {
-                                  await launchUrl(uri);
-                                }
-                              },
-                              icon: const Icon(Icons.open_in_new),
-                              label: const Text('Открыть в другом приложении'),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+      return ReaderErrorPanel(
+        controller: _ctrl,
+        readerState: readerState,
+        bookId: widget.bookId,
+        onDeleteFile: () => _showDeleteConfirmDialog(context),
+        onDeleteFromLibrary: () async {
+          final svc = ref.read(bookDeleteServiceProvider);
+          await svc.removeFromLibrary(widget.bookId);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Удалено из библиотеки')),
+          );
+          if (context.mounted) Navigator.of(context).pop();
+        },
       );
     }
 
@@ -554,7 +420,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (readerState.metadata == null) return const SizedBox.shrink();
     return SelectionAreaWrapper(
       contextMenuBuilder: (BuildContext context, SelectableRegionState state) {
-        return _ReaderContextMenu(
+        return ReaderContextMenu(
           state: state,
           bookId: widget.bookId,
           chapterIndex: readerState.currentPosition.chapterIndex,
@@ -743,12 +609,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  String _displayFileName(String path) {
-    final normalized = path.replaceAll(r'\', '/');
-    final lastSlash = normalized.lastIndexOf('/');
-    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
-  }
-
   void _showDeleteConfirmDialog(BuildContext context) {
     final rootContext = context;
     unawaited(
@@ -821,255 +681,5 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
       ),
     );
-  }
-}
-
-class _ReaderContextMenu extends StatelessWidget {
-  final SelectableRegionState state;
-  final String bookId;
-  final int chapterIndex;
-  final int paragraphIndex;
-
-  const _ReaderContextMenu({
-    required this.state,
-    required this.bookId,
-    required this.chapterIndex,
-    required this.paragraphIndex,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedText = _getSelectedText();
-    if (selectedText.isEmpty) return const SizedBox.shrink();
-
-    final buttonItems = <ContextMenuButtonItem>[
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(Clipboard.setData(ClipboardData(text: selectedText)));
-        },
-        label: 'Копировать',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveQuote(context, selectedText));
-        },
-        label: 'Цитата',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveBookmark(context, selectedText));
-        },
-        label: 'Закладка',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveNote(context, selectedText));
-        },
-        label: 'Заметка',
-      ),
-    ];
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: state.contextMenuAnchors,
-      buttonItems: buttonItems,
-    );
-  }
-
-  String _getSelectedText() {
-    // ignore: deprecated_member_use
-    final selection = state.textEditingValue.selection;
-    if (!selection.isCollapsed) {
-      // ignore: deprecated_member_use
-      return selection.textInside(state.textEditingValue.text);
-    }
-    return '';
-  }
-
-  Future<void> _saveQuote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final noteController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Цитата'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 3,
-                  ),
-                ),
-              ),
-              child: Text(
-                text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-            TextField(
-              controller: noteController,
-              autofocus: true,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Комментарий (необязательно)...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(noteController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.quotes)
-            .insert(
-              QuotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                selectedText: text,
-                note: Value(result.isEmpty ? null : result),
-              ),
-            );
-        AppLogger().fine('quote saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Цитата сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save quote: $e', name: 'Reader', error: e);
-      }
-    }
-  }
-
-  Future<void> _saveBookmark(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    try {
-      final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db
-          .into(db.bookmarks)
-          .insert(
-            BookmarksCompanion.insert(
-              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-              bookId: bookId,
-              chapterIndex: chapterIndex,
-              paragraphIndex: paragraphIndex,
-              selectedText: Value(text),
-            ),
-          );
-      AppLogger().fine('bookmark saved for chapter $chapterIndex', name: 'Reader');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Закладка сохранена')),
-        );
-      }
-    } on Object catch (e) {
-      AppLogger().warning('Failed to save bookmark: $e', name: 'Reader', error: e);
-    }
-  }
-
-  Future<void> _saveNote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final textController = TextEditingController(text: text);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Заметка'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (text.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  text,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Введите заметку...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.notes)
-            .insert(
-              NotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                content: result,
-              ),
-            );
-        AppLogger().fine('note saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Заметка сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save note: $e', name: 'Reader', error: e);
-      }
-    }
   }
 }
