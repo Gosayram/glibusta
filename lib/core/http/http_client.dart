@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_settings.dart';
 import '../encoding/encoding_detection.dart';
 import '../logging/app_logger.dart';
+import '../theme/app_duration.dart';
 import 'dio_provider.dart';
 
 part 'http_client.g.dart';
@@ -72,8 +73,8 @@ class HttpClient {
 
   Future<String> _rawGet(Uri uri) async {
     final client = io.HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15)
-      ..idleTimeout = Duration.zero
+      ..connectionTimeout = AppDuration.httpConnect
+      ..idleTimeout = AppDuration.httpIdle
       ..maxConnectionsPerHost = 1;
 
     try {
@@ -92,7 +93,7 @@ class HttpClient {
         request.headers.set(io.HttpHeaders.userAgentHeader, ua);
       }
 
-      final response = await request.close().timeout(const Duration(seconds: 30));
+      final response = await request.close().timeout(AppDuration.httpReceive);
 
       final completer = Completer<Uint8List>();
       final bytes = <int>[];
@@ -165,8 +166,8 @@ class HttpClient {
   }) async {
     final uri = Uri.parse(url);
     final client = io.HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15)
-      ..idleTimeout = const Duration(minutes: 5)
+      ..connectionTimeout = AppDuration.httpConnect
+      ..idleTimeout = AppDuration.httpDownloadIdle
       ..maxConnectionsPerHost = 1;
     try {
       final request = await client.getUrl(uri);
@@ -185,7 +186,7 @@ class HttpClient {
       }
 
       final response = await request.close().timeout(
-        const Duration(minutes: 10),
+        AppDuration.httpDownloadResponse,
       );
 
       if (response.statusCode < 200 || response.statusCode >= 400) {

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../theme/app_duration.dart';
+
 class RawHttpFallbackClient {
   RawHttpFallbackClient({String? userAgent}) : _userAgent = userAgent;
 
@@ -10,8 +12,8 @@ class RawHttpFallbackClient {
 
   Future<String> get(Uri uri) async {
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15)
-      ..idleTimeout = Duration.zero
+      ..connectionTimeout = AppDuration.httpConnect
+      ..idleTimeout = AppDuration.httpIdle
       ..maxConnectionsPerHost = 1
       ..userAgent =
           _userAgent ??
@@ -32,7 +34,7 @@ class RawHttpFallbackClient {
         ..set(HttpHeaders.connectionHeader, 'close');
 
       final response = await request.close().timeout(
-        const Duration(seconds: 30),
+        AppDuration.httpReceive,
       );
 
       final bytes = await _consolidateResponse(response);
@@ -44,8 +46,8 @@ class RawHttpFallbackClient {
 
   Future<Uint8List> getBytes(Uri uri) async {
     final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15)
-      ..idleTimeout = Duration.zero
+      ..connectionTimeout = AppDuration.httpConnect
+      ..idleTimeout = AppDuration.httpIdle
       ..maxConnectionsPerHost = 1
       ..userAgent =
           _userAgent ??
@@ -61,7 +63,7 @@ class RawHttpFallbackClient {
         ..set(HttpHeaders.connectionHeader, 'close');
 
       final response = await request.close().timeout(
-        const Duration(seconds: 30),
+        AppDuration.httpReceive,
       );
 
       return await _consolidateResponse(response);

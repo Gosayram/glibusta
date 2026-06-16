@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/theme/app_duration.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -64,7 +65,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Текст скопирован'),
-                        duration: Duration(seconds: 1),
+                        duration: AppDuration.snackbarShort,
                       ),
                     );
                   }
@@ -111,7 +112,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Закладка добавлена'),
-          duration: Duration(seconds: 1),
+          duration: AppDuration.snackbarShort,
         ),
       );
     }
@@ -187,7 +188,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Заметка сохранена'),
-            duration: Duration(seconds: 1),
+            duration: AppDuration.snackbarShort,
           ),
         );
       }
@@ -267,7 +268,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Цитата сохранена'),
-            duration: Duration(seconds: 1),
+            duration: AppDuration.snackbarShort,
           ),
         );
       }

@@ -388,7 +388,7 @@ class BookImportService {
       }
       cacheFile = File(cachedPath);
       if (!await cacheFile.exists() || await cacheFile.length() == 0) {
-        await cacheFile.exists().then((_) => _tryDelete(cachedPath));
+        await _tryDelete(cachedPath);
         return ImportResult.failure('Файл пуст: ${external.name}');
       }
 

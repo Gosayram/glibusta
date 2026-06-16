@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/theme/app_duration.dart';
+
 class ErrorStateWidget extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
@@ -63,7 +65,7 @@ class ErrorStateWidget extends StatelessWidget {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Ошибка скопирована'),
-                          duration: Duration(seconds: 2),
+                          duration: AppDuration.snackbarShort,
                         ),
                       );
                     },
