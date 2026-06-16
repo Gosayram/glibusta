@@ -15,7 +15,7 @@ import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 
 class _FakeBookOpenService extends BookOpenService {
   _FakeBookOpenService(AppDatabase database)
-    : super(database, AppFileStorageImpl(), BookFileRepositoryImpl(database, AppFileStorageImpl()));
+    : super(database, AppFileStorageImpl(), BookFileRepositoryImpl(database));
 
   static const _chapter = ReaderChapter(
     index: 0,

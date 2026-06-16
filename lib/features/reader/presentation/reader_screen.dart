@@ -63,8 +63,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       onStateChange: _handleAppLifecycleState,
     );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
-    _ctrl = ReaderController(widget.bookId, ref);
-    unawaited(_ctrl.loadBook());
+    _ctrl = ref.read(readerControllerProvider(widget.bookId));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -128,8 +127,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void dispose() {
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    _ctrl.disableFullscreen();
-    _ctrl.dispose();
     super.dispose();
   }
 
@@ -156,6 +153,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(readerControllerProvider(widget.bookId));
     return StreamBuilder<ReaderState>(
       stream: _ctrl.stateStream,
       initialData: _ctrl.state,

@@ -136,7 +136,8 @@ class ReaderController {
   ReaderController(this._bookId, this._ref);
 
   final String _bookId;
-  final WidgetRef _ref;
+  final Ref _ref;
+
   final _autoThemeService = AutoThemeService();
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
@@ -866,3 +867,13 @@ class ReaderController {
     unawaited(Clipboard.setData(ClipboardData(text: diagnostics)));
   }
 }
+
+final readerControllerProvider = Provider.autoDispose.family<ReaderController, String>((
+  ref,
+  bookId,
+) {
+  final controller = ReaderController(bookId, ref);
+  unawaited(controller.loadBook());
+  ref.onDispose(controller.dispose);
+  return controller;
+});

@@ -689,14 +689,14 @@ class _ImportCtx {
     required this.filePath,
     this.forcedEncoding,
     this.inspection,
-  }) : sourceUrl = null : storageMode : externalUri;
+  });
 
   final String filePath;
   final String? forcedEncoding;
   final BookFileInspectionResult? inspection;
-  final String? sourceUrl;
-  final String? storageMode;
-  final String? externalUri;
+  String? sourceUrl;
+  String? storageMode;
+  String? externalUri;
 
   late final String ext;
   late final BookFormat format;

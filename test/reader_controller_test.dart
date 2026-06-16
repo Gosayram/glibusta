@@ -1,35 +1,31 @@
-import 'package:flutter/material.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
 
-class _TestHost extends ConsumerStatefulWidget {
-  const _TestHost({required this.bookId, required this.onReady});
-  final String bookId;
-  final void Function(ReaderController ctrl) onReady;
-
-  @override
-  ConsumerState<_TestHost> createState() => _TestHostState();
-}
-
-class _TestHostState extends ConsumerState<_TestHost> {
-  late final ReaderController controller;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = ReaderController(widget.bookId, ref);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.onReady(controller);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => const SizedBox();
-}
-
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late AppDatabase db;
+
+  setUp(() {
+    db = AppDatabase(NativeDatabase.memory());
+  });
+
+  setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMessageHandler(
+      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+      (Object? message) async => const StandardMessageCodec().encodeMessage(<Object?>[]),
+    );
+  });
+
+  tearDown(() async {
+    await db.close();
+  });
+
   group('ReaderState', () {
     test('default values are correct', () {
       final state = ReaderState();
@@ -136,17 +132,23 @@ void main() {
   });
 
   group('ReaderController', () {
-    testWidgets('toggleSearch toggles isSearchOpen', (tester) async {
+    Future<ReaderController> createController(WidgetTester tester, String bookId) async {
       late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
+      final container = ProviderContainer(
+        overrides: [databaseProvider.overrideWithValue(db)],
       );
-      await tester.pumpAndSettle();
+      addTearDown(container.dispose);
+      await tester.runAsync(() async {
+        final refProvider = Provider<ReaderController>((ref) {
+          return ReaderController(bookId, ref);
+        });
+        ctrl = container.read(refProvider);
+      });
+      return ctrl;
+    }
+
+    testWidgets('toggleSearch toggles isSearchOpen', (tester) async {
+      final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.isSearchOpen, isFalse);
       ctrl.toggleSearch();
       expect(ctrl.state.isSearchOpen, isTrue);
@@ -156,16 +158,7 @@ void main() {
     });
 
     testWidgets('closeSearch sets isSearchOpen to false', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      final ctrl = await createController(tester, 'book1');
       ctrl.toggleSearch();
       expect(ctrl.state.isSearchOpen, isTrue);
       ctrl.closeSearch();
@@ -174,54 +167,29 @@ void main() {
     });
 
     testWidgets('toggleUi toggles uiVisible', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.uiVisible, isTrue);
       ctrl.toggleUi();
       expect(ctrl.state.uiVisible, isFalse);
       ctrl.toggleUi();
       expect(ctrl.state.uiVisible, isTrue);
       ctrl.dispose();
+      await tester.pump(const Duration(seconds: 60));
     });
 
     testWidgets('onBottomSheetOpen/close toggles isBottomSheetOpen', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.isBottomSheetOpen, isFalse);
       ctrl.onBottomSheetOpen();
       expect(ctrl.state.isBottomSheetOpen, isTrue);
       ctrl.onBottomSheetClose();
       expect(ctrl.state.isBottomSheetOpen, isFalse);
       ctrl.dispose();
+      await tester.pump(const Duration(seconds: 60));
     });
 
     testWidgets('buildDiagnostics contains book ID', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'test-book-123',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      final ctrl = await createController(tester, 'test-book-123');
       final diagnostics = ctrl.buildDiagnostics();
       expect(diagnostics, contains('test-book-123'));
       expect(diagnostics, contains('Diagnostics'));
@@ -231,32 +199,14 @@ void main() {
     });
 
     testWidgets('deleteBookFile with no errorFilePath does nothing', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await ctrl.deleteBookFile();
+      final ctrl = await createController(tester, 'book1');
+      await tester.runAsync(() => ctrl.deleteBookFile());
       expect(ctrl.state.errorMessage, isNull);
       ctrl.dispose();
     });
 
     testWidgets('dispose does not throw', (tester) async {
-      late ReaderController ctrl;
-      await tester.pumpWidget(
-        ProviderScope(
-          child: _TestHost(
-            bookId: 'book1',
-            onReady: (c) => ctrl = c,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      final ctrl = await createController(tester, 'book1');
       expect(() => ctrl.dispose(), returnsNormally);
     });
   });

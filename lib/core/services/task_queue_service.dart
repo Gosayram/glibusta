@@ -60,7 +60,7 @@ class TaskQueueService {
     while (_running < maxConcurrent && _queue.isNotEmpty) {
       final next = _queue.removeAt(0);
       _running++;
-      _execute(next);
+      unawaited(_execute(next));
     }
   }
 

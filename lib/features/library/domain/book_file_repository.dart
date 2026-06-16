@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
-import '../../../core/platform/app_file_storage.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
 abstract interface class BookFileRepository {
@@ -19,15 +18,13 @@ abstract interface class BookFileRepository {
 final bookFileRepositoryProvider = Provider<BookFileRepository>((ref) {
   return BookFileRepositoryImpl(
     ref.watch(databaseProvider),
-    ref.watch(appFileStorageProvider),
   );
 });
 
 class BookFileRepositoryImpl implements BookFileRepository {
-  BookFileRepositoryImpl(this._db, this._storage);
+  BookFileRepositoryImpl(this._db);
 
   final AppDatabase _db;
-  final AppFileStorage _storage;
 
   @override
   Future<File?> getFile(String bookId) async {
