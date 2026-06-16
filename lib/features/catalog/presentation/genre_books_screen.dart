@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../data/genre_providers.dart';
 
@@ -60,18 +61,15 @@ class GenreBooksScreen extends ConsumerWidget {
                   itemBuilder: (context, index) {
                     final book = response.books[index];
                     return ListTile(
-                          leading: CircleAvatar(child: Text('${index + 1}')),
-                          title: Text(
-                            book.name,
-                            style: const TextStyle(fontSize: 14),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onTap: () => context.push('/book/${book.id}'),
-                        )
-                        .animate()
-                        .fadeIn(delay: (index * 40).ms, duration: 300.ms)
-                        .slideX(begin: 0.05, duration: 300.ms);
+                      leading: CircleAvatar(child: Text('${index + 1}')),
+                      title: Text(
+                        book.name,
+                        style: const TextStyle(fontSize: 14),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () => context.push('/book/${book.id}'),
+                    ).animate().bookCardTransition(delay: (index * 40).ms);
                   },
                 ),
               ),

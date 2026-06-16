@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/note_repository.dart';
 
@@ -73,15 +74,12 @@ class NotesScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final note = notes[index];
               return NoteTile(
-                    note: note,
-                    onTap: () {
-                      _showNoteDialog(context, ref, note);
-                    },
-                    onDelete: () => _deleteNote(context, ref, note),
-                  )
-                  .animate()
-                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
-                  .slideX(begin: 0.03, duration: 300.ms);
+                note: note,
+                onTap: () {
+                  _showNoteDialog(context, ref, note);
+                },
+                onDelete: () => _deleteNote(context, ref, note),
+              ).animate().listTileTransition(delay: (index * 50).ms);
             },
           );
         },
@@ -89,16 +87,16 @@ class NotesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 5,
-            itemBuilder: (_, _) => const Card(
-              margin: EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Bone.text(words: 3),
-                    SizedBox(height: 8),
-                    Bone.text(words: 6),
+                    Text(BoneMock.title),
+                    const SizedBox(height: 8),
+                    Text(BoneMock.paragraph),
                   ],
                 ),
               ),

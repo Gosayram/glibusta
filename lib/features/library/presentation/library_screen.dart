@@ -165,11 +165,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             childAspectRatio: 0.75,
                           ),
                           itemCount: 6,
-                          itemBuilder: (_, _) => const Card(
+                          itemBuilder: (_, _) => Card(
                             child: ListTile(
-                              leading: Bone.circle(size: 48),
-                              title: Bone.text(words: 3),
-                              subtitle: Bone.text(words: 2),
+                              leading: const Bone.circle(size: 48),
+                              title: Text(BoneMock.name),
+                              subtitle: Text(BoneMock.subtitle),
                             ),
                           ),
                         ),

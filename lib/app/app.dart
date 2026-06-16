@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
@@ -137,10 +138,20 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
         final lightTheme = AppTheme.lightTheme.copyWith(
           colorScheme: lightColorScheme,
           pageTransitionsTheme: transitions,
+          extensions: [
+            const SkeletonizerConfigData(
+              enableSwitchAnimation: true,
+            ),
+          ],
         );
         final darkTheme = AppTheme.darkTheme.copyWith(
           colorScheme: darkColorScheme,
           pageTransitionsTheme: transitions,
+          extensions: [
+            const SkeletonizerConfigData(
+              enableSwitchAnimation: true,
+            ),
+          ],
         );
         return MaterialApp.router(
           title: 'Glibusta',

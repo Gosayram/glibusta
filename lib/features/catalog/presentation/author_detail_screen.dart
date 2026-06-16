@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_api_client.dart';
 import '../data/author_detail_provider.dart';
@@ -369,10 +370,7 @@ class _AuthorBookTile extends StatelessWidget {
       subtitle: _buildSubtitle(theme),
       trailing: _buildRatingBadge(theme),
       onTap: () => context.push('/book/${book.id}'),
-    ).animate().fadeIn(
-      delay: (index * 30).ms,
-      duration: 250.ms,
-    );
+    ).animate().authorListItemFadeIn(delay: (index * 30).ms);
   }
 
   Widget? _buildSubtitle(ThemeData theme) {

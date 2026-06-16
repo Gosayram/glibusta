@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/bookmark_repository.dart';
 
@@ -73,13 +74,10 @@ class BookmarksScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final bookmark = bookmarks[index];
               return BookmarkTile(
-                    bookmark: bookmark,
-                    onTap: () => context.push('/reader/${bookmark.bookId}'),
-                    onDelete: () => _deleteBookmark(context, ref, bookmark),
-                  )
-                  .animate()
-                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
-                  .slideX(begin: 0.03, duration: 300.ms);
+                bookmark: bookmark,
+                onTap: () => context.push('/reader/${bookmark.bookId}'),
+                onDelete: () => _deleteBookmark(context, ref, bookmark),
+              ).animate().listTileTransition(delay: (index * 50).ms);
             },
           );
         },
@@ -87,12 +85,12 @@ class BookmarksScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 5,
-            itemBuilder: (_, _) => const Card(
-              margin: EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: Bone.circle(size: 24),
-                title: Bone.text(words: 4),
-                subtitle: Bone.text(words: 2),
+                leading: const Bone.circle(size: 24),
+                title: Text(BoneMock.name),
+                subtitle: Text(BoneMock.subtitle),
               ),
             ),
           ),

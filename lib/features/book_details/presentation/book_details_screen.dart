@@ -12,6 +12,7 @@ import '../../../core/formats/format_capability.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../downloads/presentation/download_queue.dart';
 import '../../search/data/composite_source.dart';
@@ -45,35 +46,37 @@ class BookDetailsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => _BookDetailsContent(details: details, bookId: bookId),
-        loading: () => const Skeletonizer(
+        loading: () => Skeletonizer(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Bone(width: 120, height: 180),
-                    SizedBox(width: 16),
+                    const Skeleton.replace(
+                      child: Bone(width: 120, height: 180),
+                    ),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Bone.text(words: 4),
-                          SizedBox(height: 8),
-                          Bone.text(words: 2),
-                          SizedBox(height: 8),
-                          Bone.text(words: 3),
+                          Text(BoneMock.title),
+                          const SizedBox(height: 8),
+                          Text(BoneMock.subtitle),
+                          const SizedBox(height: 8),
+                          Text(BoneMock.name),
                         ],
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 24),
-                Bone(height: 40),
-                SizedBox(height: 16),
-                Bone(height: 100),
+                const SizedBox(height: 24),
+                const Bone(height: 40),
+                const SizedBox(height: 16),
+                const Bone(height: 100),
               ],
             ),
           ),
@@ -330,7 +333,7 @@ class _BookHeader extends StatelessWidget {
           ),
         ),
       ],
-    ).animate().fadeIn(duration: 400.ms);
+    ).animate().contentFadeIn();
   }
 }
 
