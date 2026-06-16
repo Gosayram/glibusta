@@ -17,6 +17,7 @@ const Map<BookFormat, List<String>> extensionsByFormat = {
 final Map<String, BookFormat> _extensionToFormat = {
   for (final entry in extensionsByFormat.entries)
     for (final ext in entry.value) ext: entry.key,
+  'zip': BookFormat.fb2,
 };
 
 final Set<String> importableExtensions = {
