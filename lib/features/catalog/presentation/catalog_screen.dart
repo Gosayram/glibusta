@@ -268,13 +268,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                           ),
                           Padding(
                             padding: const EdgeInsets.all(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(BoneMock.name),
-                                const SizedBox(height: 4),
-                                Text(BoneMock.subtitle),
-                              ],
+                            child: Skeleton.unite(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(BoneMock.name),
+                                  const SizedBox(height: 4),
+                                  Text(BoneMock.subtitle),
+                                ],
+                              ),
                             ),
                           ),
                         ],

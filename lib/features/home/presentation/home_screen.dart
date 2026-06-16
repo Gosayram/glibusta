@@ -102,14 +102,16 @@ class HomeScreen extends ConsumerWidget {
                                     const Skeleton.replace(child: Bone(width: 60, height: 90)),
                                     const SizedBox(width: 12),
                                     Expanded(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(BoneMock.name),
-                                          const SizedBox(height: 8),
-                                          Text(BoneMock.subtitle),
-                                        ],
+                                      child: Skeleton.unite(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(BoneMock.name),
+                                            const SizedBox(height: 8),
+                                            Text(BoneMock.subtitle),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -421,14 +423,16 @@ class _ReadingStatsSection extends ConsumerWidget {
           child: Skeletonizer(
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Bone.circle(size: 32),
-                    SizedBox(width: 8),
-                    Bone.circle(size: 32),
-                    SizedBox(width: 8),
-                    Bone.circle(size: 32),
-                  ],
+                Skeleton.unite(
+                  child: Row(
+                    children: [
+                      Bone.circle(size: 32),
+                      SizedBox(width: 8),
+                      Bone.circle(size: 32),
+                      SizedBox(width: 8),
+                      Bone.circle(size: 32),
+                    ],
+                  ),
                 ),
                 SizedBox(height: 16),
                 Bone(height: 100),

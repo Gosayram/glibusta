@@ -103,9 +103,16 @@ class SeriesDetailScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(BoneMock.name),
-                const SizedBox(height: 8),
-                Text(BoneMock.paragraph),
+                Skeleton.unite(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(BoneMock.name),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.paragraph),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   height: 180,

@@ -89,15 +89,17 @@ class QuotesScreen extends ConsumerWidget {
               margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(BoneMock.name),
-                    const SizedBox(height: 8),
-                    Text(BoneMock.paragraph),
-                    const SizedBox(height: 8),
-                    Text(BoneMock.title),
-                  ],
+                child: Skeleton.unite(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(BoneMock.name),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.paragraph),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.title),
+                    ],
+                  ),
                 ),
               ),
             ),

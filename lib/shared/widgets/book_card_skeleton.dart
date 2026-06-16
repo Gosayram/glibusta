@@ -18,13 +18,15 @@ class BookCardSkeleton extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(BoneMock.title),
-                const SizedBox(height: 4),
-                Text(BoneMock.subtitle),
-              ],
+            child: Skeleton.unite(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(BoneMock.title),
+                  const SizedBox(height: 4),
+                  Text(BoneMock.subtitle),
+                ],
+              ),
             ),
           ),
         ],

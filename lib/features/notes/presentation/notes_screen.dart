@@ -91,13 +91,15 @@ class NotesScreen extends ConsumerWidget {
               margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(BoneMock.title),
-                    const SizedBox(height: 8),
-                    Text(BoneMock.paragraph),
-                  ],
+                child: Skeleton.unite(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(BoneMock.title),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.paragraph),
+                    ],
+                  ),
                 ),
               ),
             ),

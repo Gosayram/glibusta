@@ -60,15 +60,17 @@ class BookDetailsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(BoneMock.title),
-                          const SizedBox(height: 8),
-                          Text(BoneMock.subtitle),
-                          const SizedBox(height: 8),
-                          Text(BoneMock.name),
-                        ],
+                      child: Skeleton.unite(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(BoneMock.title),
+                            const SizedBox(height: 8),
+                            Text(BoneMock.subtitle),
+                            const SizedBox(height: 8),
+                            Text(BoneMock.name),
+                          ],
+                        ),
                       ),
                     ),
                   ],
