@@ -741,6 +741,7 @@ class ReaderController {
   }
 
   void _checkAutoTheme() {
+    if (_disposed) return;
     final settings = _ref.read(readerSettingsProvider);
     if (settings.autoThemeMode == AutoThemeMode.off) return;
     final resolved = _autoThemeService.resolveTheme(
