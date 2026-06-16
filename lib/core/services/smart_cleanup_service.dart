@@ -50,12 +50,12 @@ class SmartCleanupService {
   final AppDatabase _db;
   final AppLogger _logger;
 
-  Future<int> cleanupTempFiles(String tempDir) async {
+  Future<(int count, int bytes)> cleanupTempFiles(String tempDir) async {
     int count = 0;
     int bytes = 0;
     try {
       final dir = Directory(tempDir);
-      if (!await dir.exists()) return 0;
+      if (!await dir.exists()) return (0, 0);
 
       await for (final entity in dir.list(recursive: true)) {
         if (entity is File) {
@@ -71,7 +71,7 @@ class SmartCleanupService {
       _logger.warning('Temp cleanup failed: $e', name: 'Cleanup');
     }
     _logger.info('Cleaned $count temp files ($bytes bytes)', name: 'Cleanup');
-    return count;
+    return (count, bytes);
   }
 
   Future<int> cleanupCacheFiles(String cacheDir) async {
@@ -157,23 +157,10 @@ class SmartCleanupService {
   }) async {
     _logger.info('Starting full cleanup...', name: 'Cleanup');
 
-    final tempCount = await cleanupTempFiles(tempDir);
+    final (tempCount, tempBytes) = await cleanupTempFiles(tempDir);
     final cacheCount = await cleanupCacheFiles(cacheDir);
     final orphans = await findOrphanFiles(booksDir);
     final heavy = await findHeavyBooks();
-
-    int bytesFreed = 0;
-    try {
-      final tempDirObj = Directory(tempDir);
-      if (await tempDirObj.exists()) {
-        await for (final entity in tempDirObj.list(recursive: true)) {
-          if (entity is File) {
-            final stat = await entity.stat();
-            bytesFreed += stat.size;
-          }
-        }
-      }
-    } on Object catch (_) {}
 
     _logger.info(
       'Cleanup complete: $tempCount temp, $cacheCount cache, ${orphans.length} orphans',
@@ -185,7 +172,7 @@ class SmartCleanupService {
       cacheFilesRemoved: cacheCount,
       orphanFilesFound: orphans.length,
       heavyBooks: heavy,
-      bytesFreed: bytesFreed,
+      bytesFreed: tempBytes,
     );
   }
 }

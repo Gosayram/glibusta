@@ -285,6 +285,16 @@ class DownloadQueue {
   }
 
   void dispose() {
+    for (final entry in _cancelCompleters.entries) {
+      if (!entry.value.isCompleted) {
+        _cancelledIds.add(entry.key);
+        entry.value.complete();
+      }
+    }
+    _cancelCompleters.clear();
+    _tasks.clear();
+    _speedTrackers.clear();
+    _pendingQueue.clear();
     unawaited(_downloadsController.close());
     unawaited(_progressController.close());
   }

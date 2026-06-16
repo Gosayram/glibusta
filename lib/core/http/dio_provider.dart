@@ -10,8 +10,6 @@ import 'user_agent.dart';
 
 part 'dio_provider.g.dart';
 
-void enableSslBypass() {}
-
 @riverpod
 Dio dio(Ref ref) {
   final settings = ref.watch(appSettingsControllerProvider);

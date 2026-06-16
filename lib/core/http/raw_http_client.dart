@@ -82,6 +82,6 @@ class RawHttpFallbackClient {
       onDone: () => completer.complete(Uint8List.fromList(bytes)),
       onError: completer.completeError,
     );
-    return completer.future;
+    return completer.future.timeout(AppDuration.httpReceive);
   }
 }
