@@ -37,7 +37,8 @@ BookFormat detectBookFormat(String path) {
       if (lower.endsWith('.$ext')) return entry.key;
     }
   }
-  if (lower.endsWith('.zip')) return BookFormat.unknown;
+  // ZIP files are treated as FB2 archives by the import service.
+  if (lower.endsWith('.zip')) return BookFormat.fb2;
   return BookFormat.unknown;
 }
 

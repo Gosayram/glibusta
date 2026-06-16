@@ -122,7 +122,7 @@ void main() {
       expect(detectBookFormat('book.rtf'), BookFormat.rtf);
       expect(detectBookFormat('book.djvu'), BookFormat.djvu);
       expect(detectBookFormat('book.djv'), BookFormat.djvu);
-      expect(detectBookFormat('book.zip'), BookFormat.unknown);
+      expect(detectBookFormat('book.zip'), BookFormat.fb2);
     });
   });
 }

@@ -27,12 +27,19 @@ final class BookMetadataExtractor {
 
     try {
       final fileName = path.split('/').last;
-      final detectedEncoding = await _detectTextEncoding(
-        bytes: bytes,
-        fileName: fileName,
-        format: format,
-        encodingDetector: encodingDetector,
-      );
+      EncodingDetectionResult? detectedEncoding;
+      try {
+        detectedEncoding = await _detectTextEncoding(
+          bytes: bytes,
+          fileName: fileName,
+          format: format,
+          encodingDetector: encodingDetector,
+        );
+      } on TimeoutException {
+        // Encoding detection timed out — proceed without forced encoding.
+      } on Object catch (_) {
+        // Encoding detection failed — proceed without forced encoding.
+      }
       final book = await parser
           .parse(
             bytes,

@@ -245,6 +245,7 @@ final class PalmDbParser {
 final class MobiHeader {
   const MobiHeader({
     required this.compression,
+    required this.textEncoding,
     required this.textRecordCount,
     required this.recordSize,
     required this.fullNameOffset,
@@ -254,6 +255,7 @@ final class MobiHeader {
   });
 
   final int compression;
+  final int textEncoding;
   final int textRecordCount;
   final int recordSize;
   final int fullNameOffset;
@@ -272,6 +274,7 @@ final class MobiHeaderParser {
 
     return MobiHeader(
       compression: reader.u16be(0),
+      textEncoding: reader.u16be(mobiOffset + 12),
       textRecordCount: reader.u16be(8),
       recordSize: reader.u16be(10),
       fullNameOffset: reader.u32be(mobiOffset + 84),
@@ -1011,7 +1014,7 @@ final class MobiTextExtractor {
       }
     }
 
-    return _decodeText(Uint8List.fromList(chunks));
+    return _decodeText(Uint8List.fromList(chunks), header.textEncoding);
   }
 
   List<ReaderBlock> extractBlocks({
@@ -1054,11 +1057,38 @@ final class MobiTextExtractor {
     return blocks;
   }
 
-  String _decodeText(Uint8List bytes) {
+  String _decodeText(Uint8List bytes, int textEncoding) {
+    // textEncoding values: 1252 = Windows-1252, 65001 = UTF-8, 65002 = UTF-16
+    if (textEncoding == 65001) {
+      return utf8.decode(bytes, allowMalformed: true);
+    }
+    if (textEncoding == 65002) {
+      return _decodeUtf16(bytes);
+    }
+    if (textEncoding == 1252) {
+      return latin1.decode(bytes, allowInvalid: true);
+    }
+    // Fallback: try UTF-8, fall back to latin1 if too many replacement chars.
     final utf8Text = utf8.decode(bytes, allowMalformed: true);
     final replacementCount = '\uFFFD'.allMatches(utf8Text).length;
     if (replacementCount < bytes.length * 0.02) return utf8Text;
     return latin1.decode(bytes, allowInvalid: true);
+  }
+
+  String _decodeUtf16(Uint8List bytes) {
+    if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+      return utf8.decode(bytes.sublist(2), allowMalformed: true);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      return utf8.decode(bytes.sublist(2), allowMalformed: true);
+    }
+    // No BOM — try LE first (most common on Windows-originated files).
+    final buf = StringBuffer();
+    for (var i = 0; i + 1 < bytes.length; i += 2) {
+      final code = bytes[i] | (bytes[i + 1] << 8);
+      buf.write(String.fromCharCode(code));
+    }
+    return buf.toString();
   }
 }
 

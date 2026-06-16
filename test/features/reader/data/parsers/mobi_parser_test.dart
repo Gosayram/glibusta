@@ -303,6 +303,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -340,6 +341,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -373,6 +375,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -406,6 +409,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -435,6 +439,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -464,6 +469,7 @@ void main() {
 
       final header = const MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,
@@ -489,6 +495,7 @@ void main() {
       final palmDb = const PalmDb(name: 'Test', records: []);
       const header = MobiHeader(
         compression: 2,
+        textEncoding: 1252,
         textRecordCount: 1,
         recordSize: 4096,
         fullNameOffset: 0,

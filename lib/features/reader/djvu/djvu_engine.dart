@@ -37,7 +37,11 @@ final class MethodChannelDjvuEngine implements DjvuEngine {
   @override
   Future<DjvuDocument> open(String path) async {
     final result = await _channel.invokeMapMethod<String, dynamic>('open', {'path': path});
-    return DjvuDocument(path: path, pageCount: result?['pageCount'] as int? ?? 0);
+    final pageCount = result?['pageCount'] as int?;
+    if (pageCount == null) {
+      throw StateError('DjVu open failed: missing pageCount');
+    }
+    return DjvuDocument(path: path, pageCount: pageCount);
   }
 
   @override

@@ -10,6 +10,10 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : FlutterFragmentActivity() {
 
@@ -56,7 +60,18 @@ class MainActivity : FlutterFragmentActivity() {
                     result.error("INVALID_ARG", "URI is required", null)
                     return
                 }
-                scanBooks(Uri.parse(folderUri), result)
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val books = scanBooks(Uri.parse(folderUri))
+                        withContext(Dispatchers.Main) {
+                            result.success(books)
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            result.error("SCAN_ERROR", e.message, null)
+                        }
+                    }
+                }
             }
             "readFile" -> {
                 val fileUri = call.argument<String>("uri")
@@ -116,23 +131,16 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    private fun scanBooks(treeUri: Uri, result: MethodChannel.Result) {
-        try {
-            val root = DocumentFile.fromTreeUri(this, treeUri)
-            if (root == null) {
-                result.error("SCAN_ERROR", "Cannot access folder", null)
-                return
-            }
+    private suspend fun scanBooks(treeUri: Uri): List<Map<String, Any>> {
+        val root = DocumentFile.fromTreeUri(this, treeUri)
+            ?: throw IllegalStateException("Cannot access folder")
 
-            val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
-            val books = mutableListOf<Map<String, Any>>()
+        val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
+        val books = mutableListOf<Map<String, Any>>()
 
-            collectBooks(root, supportedExtensions, books)
+        collectBooks(root, supportedExtensions, books)
 
-            result.success(books)
-        } catch (e: Exception) {
-            result.error("SCAN_ERROR", e.message, null)
-        }
+        return books
     }
 
     private fun collectBooks(
@@ -150,11 +158,10 @@ class MainActivity : FlutterFragmentActivity() {
             val name = file.name ?: continue
             if (isHiddenOrTemporary(name)) continue
 
-            val size = file.length()
-            if (size <= 0L) continue
-
             val ext = name.substringAfterLast('.', "").lowercase()
             if (ext !in supportedExtensions) continue
+
+            val size = file.length()
 
             books.add(mapOf(
                 "uri" to file.uri.toString(),

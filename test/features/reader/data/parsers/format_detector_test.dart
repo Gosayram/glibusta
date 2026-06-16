@@ -39,8 +39,8 @@ void main() {
       expect(detectBookFormat('BOOK.DJVU'), BookFormat.djvu);
     });
 
-    test('zip is unknown (cannot determine content without inspection)', () {
-      expect(detectBookFormat('book.zip'), BookFormat.unknown);
+    test('zip maps to fb2 (import service treats zip as fb2 archive)', () {
+      expect(detectBookFormat('book.zip'), BookFormat.fb2);
     });
 
     test('unknown format for unsupported extension', () {
@@ -52,7 +52,7 @@ void main() {
 
     test('handles paths with multiple dots', () {
       expect(detectBookFormat('my.book.name.epub'), BookFormat.epub);
-      expect(detectBookFormat('file.name.fb2.zip'), BookFormat.unknown);
+      expect(detectBookFormat('file.name.fb2.zip'), BookFormat.fb2);
     });
 
     test('handles no extension', () {

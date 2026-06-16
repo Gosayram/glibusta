@@ -1,24 +1,14 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 
+import '../../core/formats/supported_extensions.dart';
+
 /// Unified file picker that delegates to the best native picker per platform.
 ///
 /// Primary: `file_picker` (richer API, progress, cleanup, directory support)
 /// Fallback: `file_selector` (official Flutter team, security hardening)
 class BookFilePicker {
-  static const _bookExtensions = [
-    'epub',
-    'fb2',
-    'zip',
-    'txt',
-    'rtf',
-    'mobi',
-    'azw',
-    'azw3',
-    'prc',
-    'djvu',
-    'djv',
-  ];
+  static const _bookExtensions = supportedBookExtensions;
 
   /// Pick a single book file.
   /// Returns the file path or null if cancelled.
