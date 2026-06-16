@@ -10,6 +10,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
+import '../core/theme/app_colors.dart';
 import '../features/library/data/book_import_service.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
@@ -117,38 +118,30 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     final themeMode = ref.watch(themeModeProvider);
     return DynamicColorBuilder(
       builder: (ColorScheme? dynamicLight, ColorScheme? dynamicDark) {
-        final lightTheme = dynamicLight != null
-            ? AppTheme.lightTheme.copyWith(
-                colorScheme: dynamicLight,
-                pageTransitionsTheme: PageTransitionsTheme(
-                  builders: {
-                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
-                  },
-                ),
-              )
-            : AppTheme.lightTheme.copyWith(
-                pageTransitionsTheme: PageTransitionsTheme(
-                  builders: {
-                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
-                  },
-                ),
+        final lightColorScheme = dynamicLight != null
+            ? dynamicLight.harmonized()
+            : ColorScheme.fromSeed(
+                seedColor: AppColors.primary,
               );
-        final darkTheme = dynamicDark != null
-            ? AppTheme.darkTheme.copyWith(
-                colorScheme: dynamicDark,
-                pageTransitionsTheme: PageTransitionsTheme(
-                  builders: {
-                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
-                  },
-                ),
-              )
-            : AppTheme.darkTheme.copyWith(
-                pageTransitionsTheme: PageTransitionsTheme(
-                  builders: {
-                    for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
-                  },
-                ),
+        final darkColorScheme = dynamicDark != null
+            ? dynamicDark.harmonized()
+            : ColorScheme.fromSeed(
+                seedColor: AppColors.primary,
+                brightness: Brightness.dark,
               );
+        final transitions = PageTransitionsTheme(
+          builders: {
+            for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
+          },
+        );
+        final lightTheme = AppTheme.lightTheme.copyWith(
+          colorScheme: lightColorScheme,
+          pageTransitionsTheme: transitions,
+        );
+        final darkTheme = AppTheme.darkTheme.copyWith(
+          colorScheme: darkColorScheme,
+          pageTransitionsTheme: transitions,
+        );
         return MaterialApp.router(
           title: 'Glibusta',
           theme: lightTheme,

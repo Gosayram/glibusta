@@ -3,6 +3,17 @@ include: package:very_good_analysis/analysis_options.yaml
 analyzer:
   plugins:
     - riverpod_lint
+  exclude:
+    - test_results/**
+    - build/**
+    - .dart_tool/**
+    - docs/**
+    - node_modules/**
+    - dist/**
+    - coverage/**
+    - .kotlin/**
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
   language:
     strict-casts: true
     strict-raw-types: true
@@ -45,6 +56,11 @@ analyzer:
 formatter:
   page_width: 100
   trailing_commas: preserve
+  exclude:
+    - test_results/**
+    - build/**
+    - node_modules/**
+    - dist/**
 
 linter:
   rules:
