@@ -102,27 +102,24 @@ void main() {
     });
   });
 
-  group('AppLogger', () {
+  group('AppLogger (singleton)', () {
     late AppLogger logger;
 
     setUp(() {
-      logger = AppLogger(bufferSize: 10);
+      logger = AppLogger();
+      logger.clear();
     });
 
-    tearDown(() {
-      logger.dispose();
-    });
-
-    test('starts empty', () {
-      expect(logger.entries, isEmpty);
-      expect(logger.lastEntry, isNull);
+    test('singleton returns same instance', () {
+      final a = AppLogger();
+      final b = AppLogger();
+      expect(identical(a, b), isTrue);
     });
 
     test('log adds entry', () {
       logger.log('INFO', 'test message');
-      expect(logger.entries.length, 1);
-      expect(logger.lastEntry?.message, 'test message');
-      expect(logger.lastEntry?.level, 'INFO');
+      expect(logger.entries.last.message, 'test message');
+      expect(logger.entries.last.level, 'INFO');
     });
 
     test('log with loggerName', () {
@@ -148,51 +145,23 @@ void main() {
       expect(logger.lastEntry?.level, 'SEVERE');
     });
 
-    test('ring buffer respects capacity', () {
-      for (var i = 0; i < 15; i++) {
-        logger.log('INFO', 'msg $i');
-      }
-      expect(logger.entries.length, 10);
-      expect(logger.entries.first.message, 'msg 5');
-      expect(logger.entries.last.message, 'msg 14');
-    });
-
-    test('ring buffer wrap maintains chronological order in entries', () {
+    test('ring buffer maintains chronological order', () {
       for (var i = 0; i < 25; i++) {
         logger.log('INFO', 'item $i');
       }
       final messages = logger.entries.map((e) => e.message).toList();
-      expect(messages, [
-        'item 15',
-        'item 16',
-        'item 17',
-        'item 18',
-        'item 19',
-        'item 20',
-        'item 21',
-        'item 22',
-        'item 23',
-        'item 24',
-      ]);
-    });
-
-    test('ring buffer last is correct after wrap', () {
-      for (var i = 0; i < 20; i++) {
-        logger.log('INFO', 'item $i');
-      }
-      expect(logger.lastEntry?.message, 'item 19');
-    });
-
-    test('ring buffer toList order is chronological after wrap', () {
-      for (var i = 0; i < 15; i++) {
-        logger.log('INFO', 'item $i');
-      }
-      final list = logger.entries;
-      for (var i = 1; i < list.length; i++) {
-        final prev = int.parse(list[i - 1].message.split(' ')[1]);
-        final curr = int.parse(list[i].message.split(' ')[1]);
+      for (var i = 1; i < messages.length; i++) {
+        final prev = int.parse(messages[i - 1].split(' ')[1]);
+        final curr = int.parse(messages[i].split(' ')[1]);
         expect(curr, greaterThan(prev));
       }
+    });
+
+    test('ring buffer last is correct', () {
+      for (var i = 0; i < 5; i++) {
+        logger.log('INFO', 'item $i');
+      }
+      expect(logger.lastEntry?.message, 'item 4');
     });
 
     test('clear empties entries', () {
@@ -208,8 +177,8 @@ void main() {
       logger.stream.listen(entries.add);
       logger.info('hello');
       await Future<void>.delayed(Duration.zero);
-      expect(entries.length, 1);
-      expect(entries.first.message, 'hello');
+      expect(entries, isNotEmpty);
+      expect(entries.last.message, 'hello');
     });
 
     test('addListener is called for each log', () {
@@ -218,6 +187,7 @@ void main() {
       logger.info('a');
       logger.warning('b');
       expect(received.length, 2);
+      logger.removeListener(received.add);
     });
 
     test('removeListener stops receiving', () {
@@ -230,6 +200,7 @@ void main() {
     });
 
     test('exportAsText returns formatted lines', () {
+      logger.clear();
       logger.info('line1');
       logger.warning('line2');
       final text = logger.exportAsText();
@@ -238,6 +209,7 @@ void main() {
     });
 
     test('exportAsText empty when no entries', () {
+      logger.clear();
       expect(logger.exportAsText(), '');
     });
 

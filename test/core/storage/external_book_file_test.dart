@@ -45,5 +45,19 @@ void main() {
       );
       expect(file.name, 'My Book.fb2');
     });
+
+    test('stores optional platform metadata', () {
+      const file = ExternalBookFile(
+        uri: 'uri',
+        name: 'book.epub',
+        size: 100,
+        extension: 'epub',
+        mimeType: 'application/epub+zip',
+        lastModified: 123456789,
+      );
+
+      expect(file.mimeType, 'application/epub+zip');
+      expect(file.lastModified, 123456789);
+    });
   });
 }

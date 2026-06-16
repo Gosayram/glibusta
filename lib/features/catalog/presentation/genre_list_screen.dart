@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/app_animations.dart';
+
 import '../data/genre_providers.dart';
 
 class GenreListScreen extends ConsumerStatefulWidget {
@@ -118,7 +120,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
                     ),
                   ),
                 ),
-              ).animate().fadeIn(duration: 200.ms, delay: (index * 10).ms);
+              ).animate().genreCardFadeIn(delay: (index * 10).ms);
             },
           );
         },
@@ -131,11 +133,9 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
             childAspectRatio: 2.5,
           ),
           itemCount: 12,
-          itemBuilder: (_, _) => const Card(
+          itemBuilder: (_, _) => Card(
             child: Center(
-              child: Skeletonizer(
-                child: Bone.text(),
-              ),
+              child: Text(BoneMock.name),
             ),
           ),
         ),

@@ -26,8 +26,8 @@ class ReaderProgressHelper {
           updatedAt: DateTime.now(),
         );
       }
-      final progressPercent = row.progressPercent <= 0 && row.totalPages > 0
-          ? row.chapterIndex / row.totalPages
+      final progressPercent = row.progressPercent <= 0 && chapterCount > 0
+          ? row.chapterIndex / chapterCount
           : row.progressPercent;
       return ReaderPosition(
         bookId: _bookId,
@@ -48,8 +48,8 @@ class ReaderProgressHelper {
     }
   }
 
-  void saveProgress(ReaderPosition position, int totalChapters) {
-    if (totalChapters == 0) return;
+  void saveProgress(ReaderPosition position, int totalBlocks) {
+    if (totalBlocks == 0) return;
     final pos = position.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     unawaited(
       _database.bookDao.upsertReadingProgress(
@@ -60,7 +60,7 @@ class ReaderProgressHelper {
           paragraphIndex: Value(pos.paragraphIndex),
           localOffset: Value(pos.localOffset),
           progressPercent: Value(pos.progressPercent),
-          totalPages: Value(totalChapters),
+          totalPages: Value(totalBlocks),
           lastRead: Value(pos.updatedAt),
           updatedAt: Value(pos.updatedAt),
         ),

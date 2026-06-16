@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 
+const int _maxArchiveEntries = 1000;
+const int _maxDecompressedBytes = 500 * 1024 * 1024;
+
 final class EpubArchive {
   EpubArchive(this.archive);
   final Archive archive;
@@ -9,7 +12,34 @@ final class EpubArchive {
   static Future<EpubArchive> open(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
     final archive = ZipDecoder().decodeBytes(bytes);
+    _validateArchive(archive);
     return EpubArchive(archive);
+  }
+
+  static void _validateArchive(Archive archive) {
+    if (archive.files.length > _maxArchiveEntries) {
+      throw StateError(
+        'Archive has ${archive.files.length} entries, exceeds limit of $_maxArchiveEntries',
+      );
+    }
+    var totalSize = 0;
+    for (final f in archive.files) {
+      if (_hasZipSlip(f.name)) {
+        throw StateError('Unsafe path in archive: ${f.name}');
+      }
+      totalSize += f.size;
+      if (totalSize > _maxDecompressedBytes) {
+        throw StateError(
+          'Decompressed archive exceeds ${_maxDecompressedBytes ~/ 1024 ~/ 1024}MB limit',
+        );
+      }
+    }
+  }
+
+  static bool _hasZipSlip(String name) {
+    if (name.startsWith('/')) return true;
+    if (name.contains('..')) return true;
+    return false;
   }
 
   ArchiveFile? findFile(String path) {

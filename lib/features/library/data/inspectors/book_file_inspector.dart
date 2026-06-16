@@ -4,7 +4,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 
 import '../../../../core/encoding/encoding_detection.dart';
-import '../../../reader/data/parsers/format_detector.dart';
+import '../../../../core/formats/book_file_size_policy.dart';
+import '../../../../core/formats/format_capability.dart';
 import 'book_format_detector.dart';
 import 'book_inspection_result.dart';
 import 'book_metadata_extractor.dart';
@@ -35,9 +36,21 @@ final class BookFileInspector {
       );
     }
 
+    final fileSize = await file.length();
+    final format = formatDetector.detect(path: path, bytes: const []);
+    if (isBookFileTooLarge(format, fileSize)) {
+      return BookFileInspectionResult(
+        path: path,
+        format: format,
+        decision: ImportDecision.corrupted,
+        hash: '',
+        fileSize: fileSize,
+        reason: bookFileTooLargeMessage(format, fileSize),
+      );
+    }
+
     final bytes = await file.readAsBytes();
     final hash = sha256.convert(bytes).toString();
-    final fileSize = bytes.length;
 
     final isDuplicate = await duplicateChecker.exists(hash);
     if (isDuplicate) {
@@ -51,11 +64,14 @@ final class BookFileInspector {
       );
     }
 
-    final format = formatDetector.detect(path: path, bytes: bytes);
+    const maxMetadataBytes = 256 * 1024;
+    final metadataBytes = bytes.length <= maxMetadataBytes
+        ? bytes
+        : bytes.sublist(0, maxMetadataBytes);
 
     final metadata = await metadataExtractor.extract(
       path: path,
-      bytes: Uint8List.fromList(bytes),
+      bytes: Uint8List.fromList(metadataBytes),
       format: format,
       encodingDetector: encodingDetector,
     );
@@ -83,16 +99,16 @@ final class BookFileInspector {
     if (metadata.isCorrupted) {
       return ImportDecision.corrupted;
     }
-    if (format == BookFormat.pdf) {
-      return ImportDecision.openAsPdf;
+    final capService = const FormatCapabilityService();
+    if (capService.isDocumentOnly(format)) {
+      return ImportDecision.importAsDocument;
     }
     if (format == BookFormat.epub || format == BookFormat.fb2) {
       if (metadata.encodingConfidence != null && metadata.encodingConfidence! < 0.55) {
         return ImportDecision.needsEncodingSelection;
       }
-      return ImportDecision.importAsBook;
     }
-    if (format == BookFormat.txt) {
+    if (capService.canReadInApp(format)) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;

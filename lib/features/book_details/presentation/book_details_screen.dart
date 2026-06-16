@@ -8,9 +8,11 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
+import '../../../core/formats/format_capability.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../downloads/presentation/download_queue.dart';
 import '../../search/data/composite_source.dart';
@@ -44,35 +46,39 @@ class BookDetailsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => _BookDetailsContent(details: details, bookId: bookId),
-        loading: () => const Skeletonizer(
+        loading: () => Skeletonizer(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Bone(width: 120, height: 180),
-                    SizedBox(width: 16),
+                    const Skeleton.replace(
+                      child: Bone(width: 120, height: 180),
+                    ),
+                    const SizedBox(width: 16),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Bone.text(words: 4),
-                          SizedBox(height: 8),
-                          Bone.text(words: 2),
-                          SizedBox(height: 8),
-                          Bone.text(words: 3),
-                        ],
+                      child: Skeleton.unite(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(BoneMock.title),
+                            const SizedBox(height: 8),
+                            Text(BoneMock.subtitle),
+                            const SizedBox(height: 8),
+                            Text(BoneMock.name),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 24),
-                Bone(height: 40),
-                SizedBox(height: 16),
-                Bone(height: 100),
+                const SizedBox(height: 24),
+                const Bone(height: 40),
+                const SizedBox(height: 16),
+                const Bone(height: 100),
               ],
             ),
           ),
@@ -271,10 +277,10 @@ class _BookHeader extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-              if (book.authorIds.isNotEmpty) ...[
+              if (book.displayAuthor.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
-                  book.displayAuthor.isNotEmpty ? book.displayAuthor : book.authorIds.join(', '),
+                  book.displayAuthor,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w500,
@@ -292,30 +298,44 @@ class _BookHeader extends StatelessWidget {
               ],
               if (details.availableFormats.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  children: details.availableFormats.map((f) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        f.name.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSecondaryContainer,
-                        ),
-                      ),
+                Builder(
+                  builder: (context) {
+                    final capService = const FormatCapabilityService();
+                    return Wrap(
+                      spacing: 6,
+                      children: details.availableFormats.map((f) {
+                        final warning = capService.warningLabel(f);
+                        final isSupported = warning == null;
+                        return Tooltip(
+                          message: warning ?? f.name.toUpperCase(),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSupported
+                                  ? theme.colorScheme.secondaryContainer
+                                  : theme.colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              f.name.toUpperCase(),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: isSupported
+                                    ? theme.colorScheme.onSecondaryContainer
+                                    : theme.colorScheme.onErrorContainer,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
               ],
             ],
           ),
         ),
       ],
-    ).animate().fadeIn(duration: 400.ms);
+    ).animate().contentFadeIn();
   }
 }
 
@@ -327,9 +347,7 @@ class _ReadingProgressIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final percent = progress.totalPages > 0
-        ? (progress.currentPosition / progress.totalPages).clamp(0.0, 1.0)
-        : 0.0;
+    final percent = progress.progressPercent > 0 ? progress.progressPercent.clamp(0.0, 1.0) : 0.0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -873,6 +891,12 @@ class _BottomActionBar extends ConsumerWidget {
     final isDownloading = downloadState == BookDownloadState.downloading;
     final isDownloaded = downloadState == BookDownloadState.downloaded;
     final hasFormats = details.availableFormats.isNotEmpty;
+    final capService = const FormatCapabilityService();
+    final bestFormat = book.availableFormats.isNotEmpty
+        ? book.availableFormats.first
+        : BookFormat.unknown;
+    final isDocumentOnly = capService.isDocumentOnly(bestFormat);
+    final readLabel = isDocumentOnly ? 'Документ' : 'Читать';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -887,8 +911,8 @@ class _BottomActionBar extends ConsumerWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                icon: const Icon(Icons.play_arrow),
-                label: const Text('Читать'),
+                icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
+                label: Text(readLabel),
               ),
             ),
             const SizedBox(width: 12),
@@ -896,8 +920,8 @@ class _BottomActionBar extends ConsumerWidget {
               child: isDownloaded
                   ? OutlinedButton.icon(
                       onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Открыть'),
+                      icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
+                      label: Text(isDocumentOnly ? 'Открыть документ' : 'Открыть'),
                     )
                   : OutlinedButton.icon(
                       onPressed: hasFormats && !isDownloading
@@ -1016,9 +1040,36 @@ class _FormatSelectionSheet extends StatelessWidget {
           const Divider(height: 1),
           ...formats.map((format) {
             final info = _formatInfo(format);
+            final capService = const FormatCapabilityService();
+            final cap = capService.capabilityOf(format);
+            final warning = capService.warningLabel(format);
             return ListTile(
               leading: Icon(info.icon, color: info.color),
-              title: Text(info.label),
+              title: Row(
+                children: [
+                  Text(info.label),
+                  if (warning != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cap == FormatCapability.partial
+                            ? const Color(0xFFFFA726).withValues(alpha: 0.2)
+                            : const Color(0xFF9E9E9E).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        cap.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cap == FormatCapability.partial
+                              ? const Color(0xFFFFA726)
+                              : const Color(0xFF9E9E9E),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               subtitle: Text(info.description, style: theme.textTheme.bodySmall),
               onTap: () => Navigator.of(context).pop(format),
             );
@@ -1052,6 +1103,20 @@ class _FormatSelectionSheet extends StatelessWidget {
           'Mobipocket — для Kindle',
           Color(0xFFFF9800),
         );
+      case BookFormat.azw3:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'AZW3',
+          'Kindle Format 8 — частичная поддержка',
+          Color(0xFFFFA726),
+        );
+      case BookFormat.prc:
+        return const _FormatInfo(
+          Icons.tablet_mac,
+          'PRC',
+          'Palm/Mobipocket legacy',
+          Color(0xFFFFB74D),
+        );
       case BookFormat.pdf:
         return const _FormatInfo(
           Icons.picture_as_pdf,
@@ -1065,6 +1130,20 @@ class _FormatSelectionSheet extends StatelessWidget {
           'TXT',
           'Текстовый файл — универсальный',
           Color(0xFF9E9E9E),
+        );
+      case BookFormat.rtf:
+        return const _FormatInfo(
+          Icons.article,
+          'RTF',
+          'Rich Text Format — текст с базовым форматированием',
+          Color(0xFF795548),
+        );
+      case BookFormat.djvu:
+        return const _FormatInfo(
+          Icons.image,
+          'DJVU',
+          'DjVu — сканы и документы',
+          Color(0xFF607D8B),
         );
       case BookFormat.unknown:
         return _FormatInfo(

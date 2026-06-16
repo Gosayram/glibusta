@@ -22,6 +22,12 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<List<Book>> searchBooks(String query) async {
+    final rows = await _db.bookDao.searchBooks(query);
+    return _resolveAuthors(rows);
+  }
+
+  @override
   Future<List<Book>> getBooksWithProgress() async {
     final rows = await _db.bookDao.getBooksWithProgress();
     return _resolveAuthors(rows);
@@ -80,6 +86,9 @@ class BookRepositoryImpl implements BookRepository {
     final names = authorNames != null
         ? authorIds.map((id) => authorNames[id]).whereType<String>().toList()
         : <String>[];
+    if (names.isEmpty && authorIds.isNotEmpty) {
+      names.addAll(authorIds.where((id) => !id.startsWith('author_')));
+    }
 
     final statusStr = row.readingStatus;
     final readingStatus = ReadingStatus.values.firstWhere(

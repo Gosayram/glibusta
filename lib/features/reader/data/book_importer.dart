@@ -7,16 +7,14 @@ import 'book_open_service.dart';
 import 'parsers/epub_parser.dart';
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
+import 'parsers/mobi_parser.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
+import 'parsers/rtf_parser.dart';
 import 'parsers/txt_parser.dart';
 
 final bookParserRegistryProvider = Provider<BookParserRegistry>((ref) {
-  return BookParserRegistry([
-    EpubParser(),
-    Fb2Parser(),
-    TxtBookParser(),
-  ]);
+  return BookParserRegistry.defaultInstance;
 });
 
 final bookImporterProvider = Provider<BookImporter>((ref) {
@@ -48,10 +46,10 @@ final class BookImporter {
   Future<NormalizedBook> parseInBackground(String filePath) async {
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
-      throw const BookOpenFailure('Неподдерживаемый формат файла');
+      throw const UnsupportedFormatFailure('Неподдерживаемый формат файла');
     }
-    if (format == BookFormat.pdf || format == BookFormat.mobi) {
-      throw const BookOpenFailure('Формат не поддерживается');
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+      throw const UnsupportedFormatFailure('Формат не поддерживается');
     }
 
     return Isolate.run<NormalizedBook>(() {
@@ -59,8 +57,12 @@ final class BookImporter {
         BookFormat.epub => EpubParser().parseFile(filePath),
         BookFormat.fb2 => Fb2Parser().parseFile(filePath),
         BookFormat.txt => TxtBookParser().parseFile(filePath),
+        BookFormat.rtf => RtfBookParser().parseFile(filePath),
         BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
-        BookFormat.mobi => throw UnsupportedError('MOBI not supported'),
+        BookFormat.mobi => MobiBookParser().parseFile(filePath),
+        BookFormat.azw3 => MobiBookParser().parseFile(filePath),
+        BookFormat.prc => MobiBookParser().parseFile(filePath),
+        BookFormat.djvu => throw UnsupportedError('DJVU not supported'),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),
       };
     });

@@ -8,7 +8,8 @@ import '../../../core/platform/app_file_storage.dart';
 
 final bookDeleteServiceProvider = Provider<BookDeleteService>((ref) {
   final db = ref.watch(databaseProvider);
-  return BookDeleteService(db);
+  final storage = ref.watch(appFileStorageProvider);
+  return BookDeleteService(db, storage);
 });
 
 class BookDeleteService {
@@ -16,7 +17,7 @@ class BookDeleteService {
   final AppFileStorage _storage;
   final _logger = AppLogger();
 
-  BookDeleteService(this._db) : _storage = AppFileStorageImpl();
+  BookDeleteService(this._db, this._storage);
 
   Future<void> removeFromLibrary(String bookId) async {
     await _db.bookDao.deleteBook(bookId);
@@ -32,6 +33,9 @@ class BookDeleteService {
     await (_db.delete(_db.readingProgress)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.bookmarks)..where((t) => t.bookId.equals(bookId))).go();
     await (_db.delete(_db.quotes)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.notes)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.readingSessions)..where((t) => t.bookId.equals(bookId))).go();
+    await (_db.delete(_db.bookCollections)..where((t) => t.bookId.equals(bookId))).go();
     await _db.bookDao.deleteBook(bookId);
 
     if (download?.targetPath != null) {
@@ -55,6 +59,11 @@ class BookDeleteService {
       final legacyCache = File('${cacheDir.path}/$bookId.json');
       if (await legacyCache.exists()) {
         await legacyCache.delete();
+      }
+      final coversDir = await _storage.coversDir();
+      final coverFile = File('${coversDir.path}/$bookId.jpg');
+      if (await coverFile.exists()) {
+        await coverFile.delete();
       }
     } on Object catch (e) {
       _logger.warning('Cache cleanup failed for $bookId: $e', name: 'BookDelete', error: e);

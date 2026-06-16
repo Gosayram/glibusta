@@ -1,23 +1,24 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
+import '../../library/data/book_delete_service.dart';
 import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
+import 'reader_context_menu.dart';
 import 'reader_controller.dart';
+import 'reader_error_panel.dart';
+import 'reader_gesture_coordinator.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
@@ -36,6 +37,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
+  final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
@@ -58,14 +60,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       onStateChange: _handleAppLifecycleState,
     );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
-    _ctrl = ReaderController(widget.bookId, ref);
-    unawaited(_ctrl.loadBook());
+    _ctrl = ref.read(readerControllerProvider(widget.bookId));
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncFullscreen(ref.read(readerSettingsProvider).mode);
       ref.listenManual(readerSettingsProvider, (prev, next) {
         _syncFullscreen(next.mode);
+        if (prev != null) _handleLayoutChange(prev, next);
       });
     });
   }
@@ -78,6 +80,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       _ctrl.enableFullscreen();
     } else {
       _ctrl.disableFullscreen();
+    }
+  }
+
+  void _handleLayoutChange(ReaderSettings prev, ReaderSettings next) {
+    final layoutChanged =
+        prev.fontSize != next.fontSize ||
+        prev.lineHeight != next.lineHeight ||
+        prev.margin != next.margin ||
+        prev.paragraphSpacing != next.paragraphSpacing ||
+        prev.letterSpacing != next.letterSpacing ||
+        prev.textAlign != next.textAlign ||
+        prev.font != next.font ||
+        prev.paragraphFirstLineIndent != next.paragraphFirstLineIndent ||
+        prev.readerWidth != next.readerWidth ||
+        prev.hyphenation != next.hyphenation;
+    if (layoutChanged) {
+      _ctrl.reanchorAfterLayoutChange();
     }
   }
 
@@ -105,8 +124,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void dispose() {
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
-    _ctrl.disableFullscreen();
-    _ctrl.dispose();
     super.dispose();
   }
 
@@ -133,7 +150,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final readerState = _ctrl.state;
+    ref.watch(readerControllerProvider(widget.bookId));
+    return StreamBuilder<ReaderState>(
+      stream: _ctrl.stateStream,
+      initialData: _ctrl.state,
+      builder: (context, snapshot) {
+        return _buildForState(context, snapshot.data ?? _ctrl.state);
+      },
+    );
+  }
+
+  Widget _buildForState(BuildContext context, ReaderState readerState) {
     final settings = ref.watch(readerSettingsProvider);
     final resolvedTheme = _resolveTheme(settings);
     final theme = _getThemeData(resolvedTheme);
@@ -158,6 +185,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       fontSize: 14,
                     ),
                   ),
+                  if (readerState.isDynamicallyLoading) ...[
+                    const SizedBox(height: 16),
+                    const LinearProgressIndicator(minHeight: 2),
+                  ],
                 ],
               ],
             ),
@@ -167,6 +198,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     if (readerState.errorMessage != null) {
+      return ReaderErrorPanel(
+        controller: _ctrl,
+        readerState: readerState,
+        bookId: widget.bookId,
+        onDeleteFile: () => _showDeleteConfirmDialog(context),
+        onDeleteFromLibrary: () async {
+          final svc = ref.read(bookDeleteServiceProvider);
+          await svc.removeFromLibrary(widget.bookId);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Удалено из библиотеки')),
+          );
+          if (context.mounted) Navigator.of(context).pop();
+        },
+      );
+    }
+
+    if (!readerState.isLoading && readerState.metadata != null && readerState.chapterCount == 0) {
       return AnimatedTheme(
         data: theme,
         duration: AppDuration.readerThemeTransition,
@@ -174,90 +223,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         child: Scaffold(
           appBar: AppBar(title: const Text('Читалка')),
           body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline, size: 48, color: Colors.orange),
-                      const SizedBox(height: 16),
-                      Text(
-                        readerState.errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      if (readerState.errorFilePath != null) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (readerState.errorFormat != null)
-                                Text(
-                                  'Формат: ${readerState.errorFormat}',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              if (readerState.errorFileSize != null)
-                                Text(
-                                  'Размер: ${(readerState.errorFileSize! / 1024).toStringAsFixed(1)} KB',
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Путь: ${readerState.errorFilePath}',
-                                style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 20),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: () => _ctrl.loadBook(),
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Повторить'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              _ctrl.copyDiagnostics();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Диагностика скопирована')),
-                              );
-                            },
-                            icon: const Icon(Icons.copy),
-                            label: const Text('Копировать диагностику'),
-                          ),
-                          if (readerState.errorFilePath != null)
-                            OutlinedButton.icon(
-                              onPressed: () => _showDeleteConfirmDialog(context),
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              label: const Text(
-                                'Удалить файл',
-                                style: TextStyle(color: Colors.red),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.menu_book_outlined, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                const Text(
+                  'Книга не содержит глав',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
                 ),
-              ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Содержимое не удалось разобрать или файл повреждён.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Назад'),
+                ),
+              ],
             ),
           ),
         ),
@@ -340,13 +327,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   bookTitle: readerState.metadata?.title ?? '',
                   onBack: () => Navigator.of(context).pop(),
                   onSettings: () => _showQuickSettings(context),
-                  onSearch: () => _ctrl.toggleSearch(),
+                  onSearch: () {
+                    _ctrl.toggleSearch();
+                    if (_ctrl.state.isSearchOpen) {
+                      _gestureCoordinator.onSearchOpened();
+                    } else {
+                      _gestureCoordinator.onSearchClosed();
+                    }
+                  },
                   onMore: readerState.metadata != null
                       ? () => TableOfContentsSheet.show(
                           context,
                           metadata: readerState.metadata!,
                           currentChapterIndex: readerState.currentPosition.chapterIndex,
                           onJumpToPosition: _ctrl.jumpToPosition,
+                          loadedChapters: readerState.loadedChapters,
+                          isDynamicallyLoading: readerState.isDynamicallyLoading,
                         )
                       : () {},
                 ),
@@ -391,7 +387,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       position.copyWith(bookId: widget.bookId),
                     );
                   },
-                  onDismiss: () => _ctrl.closeSearch(),
+                  onDismiss: () {
+                    _ctrl.closeSearch();
+                    _gestureCoordinator.onSearchClosed();
+                  },
                   theme: settings.theme,
                 );
               },
@@ -399,7 +398,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
         if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
           Positioned(
-            bottom: 80,
+            bottom: MediaQuery.paddingOf(context).bottom + 80,
             left: 24,
             right: 24,
             child: ReaderSelectionToolbar(
@@ -421,7 +420,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (readerState.metadata == null) return const SizedBox.shrink();
     return SelectionAreaWrapper(
       contextMenuBuilder: (BuildContext context, SelectableRegionState state) {
-        return _ReaderContextMenu(
+        return ReaderContextMenu(
           state: state,
           bookId: widget.bookId,
           chapterIndex: readerState.currentPosition.chapterIndex,
@@ -429,13 +428,26 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         );
       },
       child: GestureDetector(
-        onVerticalDragStart: settings.verticalSwipeBrightness ? _handleVerticalDragStart : null,
-        onVerticalDragUpdate: settings.verticalSwipeBrightness ? _handleVerticalDragUpdate : null,
-        onVerticalDragEnd: settings.verticalSwipeBrightness ? _handleVerticalDragEnd : null,
-        onDoubleTap: settings.doubleTapAction != DoubleTapAction.disabled
+        onVerticalDragStart:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragStart
+            : null,
+        onVerticalDragUpdate:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragUpdate
+            : null,
+        onVerticalDragEnd:
+            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+            ? _handleVerticalDragEnd
+            : null,
+        onDoubleTap:
+            _gestureCoordinator.shouldHandleDoubleTap &&
+                settings.doubleTapAction != DoubleTapAction.disabled
             ? _ctrl.handleDoubleTap
             : null,
-        onLongPress: settings.longPressAction != LongPressAction.disabled
+        onLongPress:
+            _gestureCoordinator.shouldHandleLongPress &&
+                settings.longPressAction != LongPressAction.disabled
             ? () {
                 _ctrl.handleLongPress();
                 if (settings.longPressAction == LongPressAction.selectText) {
@@ -450,7 +462,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             loadedChapters: readerState.loadedChapters,
             settings: settings,
             scrollController: _ctrl.scrollController,
-            onTap: (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width),
+            onTap: _gestureCoordinator.shouldHandleTap
+                ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
+                : (_) {},
             initialProgress: readerState.scrollProgress,
             initialPage: readerState.currentPosition.chapterIndex,
             highlightQuery: readerState.highlightedQuery,
@@ -465,13 +479,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderState readerState,
     ReaderSettings settings,
   ) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final maxContentWidth = isLandscape ? 720.0 : double.infinity;
+    final horizontalPadding = isLandscape
+        ? ((screenWidth - maxContentWidth) / 2).clamp(16.0, 48.0)
+        : 0.0;
+
     return Scaffold(
       backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
       body: _buildReaderContentStack(
         context,
         readerState,
         settings,
-        content: _buildGestureWrappedContent(context, readerState, settings),
+        content: Padding(
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: _buildGestureWrappedContent(context, readerState, settings),
+        ),
       ),
     );
   }
@@ -570,12 +594,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _showQuickSettings(BuildContext context) {
     _ctrl.onBottomSheetOpen();
+    _gestureCoordinator.onBottomSheetOpened();
     unawaited(
       showAdaptivePanel<void>(
         context: context,
         child: ReaderQuickSettingsSheet(
           onDismiss: () {
             _ctrl.onBottomSheetClose();
+            _gestureCoordinator.onBottomSheetClosed();
             Navigator.of(context).pop();
           },
         ),
@@ -655,255 +681,5 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
       ),
     );
-  }
-}
-
-class _ReaderContextMenu extends StatelessWidget {
-  final SelectableRegionState state;
-  final String bookId;
-  final int chapterIndex;
-  final int paragraphIndex;
-
-  const _ReaderContextMenu({
-    required this.state,
-    required this.bookId,
-    required this.chapterIndex,
-    required this.paragraphIndex,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedText = _getSelectedText();
-    if (selectedText.isEmpty) return const SizedBox.shrink();
-
-    final buttonItems = <ContextMenuButtonItem>[
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(Clipboard.setData(ClipboardData(text: selectedText)));
-        },
-        label: 'Копировать',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveQuote(context, selectedText));
-        },
-        label: 'Цитата',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveBookmark(context, selectedText));
-        },
-        label: 'Закладка',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveNote(context, selectedText));
-        },
-        label: 'Заметка',
-      ),
-    ];
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: state.contextMenuAnchors,
-      buttonItems: buttonItems,
-    );
-  }
-
-  String _getSelectedText() {
-    // ignore: deprecated_member_use
-    final selection = state.textEditingValue.selection;
-    if (!selection.isCollapsed) {
-      // ignore: deprecated_member_use
-      return selection.textInside(state.textEditingValue.text);
-    }
-    return '';
-  }
-
-  Future<void> _saveQuote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final noteController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Цитата'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 3,
-                  ),
-                ),
-              ),
-              child: Text(
-                text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-            TextField(
-              controller: noteController,
-              autofocus: true,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Комментарий (необязательно)...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(noteController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.quotes)
-            .insert(
-              QuotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                selectedText: text,
-                note: Value(result.isEmpty ? null : result),
-              ),
-            );
-        AppLogger().fine('quote saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Цитата сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save quote: $e', name: 'Reader', error: e);
-      }
-    }
-  }
-
-  Future<void> _saveBookmark(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    try {
-      final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db
-          .into(db.bookmarks)
-          .insert(
-            BookmarksCompanion.insert(
-              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-              bookId: bookId,
-              chapterIndex: chapterIndex,
-              paragraphIndex: paragraphIndex,
-              selectedText: Value(text),
-            ),
-          );
-      AppLogger().fine('bookmark saved for chapter $chapterIndex', name: 'Reader');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Закладка сохранена')),
-        );
-      }
-    } on Object catch (e) {
-      AppLogger().warning('Failed to save bookmark: $e', name: 'Reader', error: e);
-    }
-  }
-
-  Future<void> _saveNote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final textController = TextEditingController(text: text);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Заметка'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (text.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  text,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Введите заметку...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.notes)
-            .insert(
-              NotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                content: result,
-              ),
-            );
-        AppLogger().fine('note saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Заметка сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save note: $e', name: 'Reader', error: e);
-      }
-    }
   }
 }

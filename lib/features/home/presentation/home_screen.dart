@@ -6,6 +6,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../collections/presentation/collections_screen.dart';
 import '../../library/data/book_repository_impl.dart';
@@ -77,12 +78,9 @@ class HomeScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final info = infos[index];
                           return ContinueReadingCard(
-                                info: info,
-                                onTap: () => context.push('/reader/${info.book.id}'),
-                              )
-                              .animate()
-                              .fadeIn(delay: (index * 80).ms, duration: 400.ms)
-                              .slideX(begin: 0.05, duration: 400.ms);
+                            info: info,
+                            onTap: () => context.push('/reader/${info.book.id}'),
+                          ).animate().bookCardTransition(delay: (index * 80).ms);
                         },
                       );
                     },
@@ -93,25 +91,27 @@ class HomeScreen extends ConsumerWidget {
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: 3,
-                          itemBuilder: (_, _) => const SizedBox(
+                          itemBuilder: (_, _) => SizedBox(
                             width: 280,
                             child: Card(
-                              margin: EdgeInsets.only(right: 12),
+                              margin: const EdgeInsets.only(right: 12),
                               child: Padding(
-                                padding: EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
-                                    Bone(width: 60, height: 90),
-                                    SizedBox(width: 12),
+                                    const Skeleton.replace(child: Bone(width: 60, height: 90)),
+                                    const SizedBox(width: 12),
                                     Expanded(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Bone.text(words: 3),
-                                          SizedBox(height: 8),
-                                          Bone.text(words: 2),
-                                        ],
+                                      child: Skeleton.unite(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(BoneMock.name),
+                                            const SizedBox(height: 8),
+                                            Text(BoneMock.subtitle),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -232,15 +232,15 @@ class HomeScreen extends ConsumerWidget {
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: 5,
-                          itemBuilder: (_, _) => const SizedBox(
+                          itemBuilder: (_, _) => SizedBox(
                             width: 120,
                             child: Card(
                               child: Column(
                                 children: [
-                                  Bone(height: 120),
+                                  const Skeleton.replace(child: Bone(height: 120)),
                                   Padding(
-                                    padding: EdgeInsets.all(8),
-                                    child: Bone.text(words: 2),
+                                    padding: const EdgeInsets.all(8),
+                                    child: Text(BoneMock.subtitle),
                                   ),
                                 ],
                               ),
@@ -300,7 +300,7 @@ class _SectionHeader extends StatelessWidget {
       style: Theme.of(context).textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.bold,
       ),
-    ).animate().fadeIn(duration: 300.ms);
+    ).animate().sectionFadeIn();
   }
 }
 
@@ -423,14 +423,16 @@ class _ReadingStatsSection extends ConsumerWidget {
           child: Skeletonizer(
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Bone.circle(size: 32),
-                    SizedBox(width: 8),
-                    Bone.circle(size: 32),
-                    SizedBox(width: 8),
-                    Bone.circle(size: 32),
-                  ],
+                Skeleton.unite(
+                  child: Row(
+                    children: [
+                      Bone.circle(size: 32),
+                      SizedBox(width: 8),
+                      Bone.circle(size: 32),
+                      SizedBox(width: 8),
+                      Bone.circle(size: 32),
+                    ],
+                  ),
                 ),
                 SizedBox(height: 16),
                 Bone(height: 100),

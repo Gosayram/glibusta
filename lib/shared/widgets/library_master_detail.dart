@@ -74,9 +74,9 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: book.authorIds.isNotEmpty
+          subtitle: book.displayAuthor.isNotEmpty
               ? Text(
-                  book.authorIds.join(', '),
+                  book.displayAuthor,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
@@ -126,10 +126,10 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
                     book.title,
                     style: theme.textTheme.headlineSmall,
                   ),
-                  if (book.authorIds.isNotEmpty) ...[
+                  if (book.displayAuthor.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      book.authorIds.join(', '),
+                      book.displayAuthor,
                       style: theme.textTheme.bodyLarge,
                     ),
                   ],

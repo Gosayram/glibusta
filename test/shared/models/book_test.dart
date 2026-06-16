@@ -88,6 +88,8 @@ void main() {
       expect(BookFormat.values, contains(BookFormat.pdf));
       expect(BookFormat.values, contains(BookFormat.txt));
       expect(BookFormat.values, contains(BookFormat.mobi));
+      expect(BookFormat.values, contains(BookFormat.rtf));
+      expect(BookFormat.values, contains(BookFormat.djvu));
       expect(BookFormat.values, contains(BookFormat.unknown));
     });
   });

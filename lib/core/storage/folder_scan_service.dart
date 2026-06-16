@@ -1,3 +1,4 @@
+import '../formats/supported_extensions.dart';
 import '../storage/external_book_file.dart';
 import '../storage/storage_bridge.dart';
 
@@ -8,12 +9,12 @@ final class FolderScanService {
 
   Future<List<ExternalBookFile>> scan(String folderUri) async {
     final files = await _bridge.scanBooks(folderUri);
-    return files.where((f) => ['epub', 'fb2', 'txt'].contains(f.extension)).toList();
+    return files.where((f) => supportedBookExtensions.contains(f.extension)).toList();
   }
 
   Future<List<ExternalBookFile>> scanWithFormats(
     String folderUri, {
-    List<String> formats = const ['epub', 'fb2', 'txt'],
+    List<String> formats = supportedBookExtensions,
   }) async {
     final files = await _bridge.scanBooks(folderUri);
     return files.where((f) => formats.contains(f.extension)).toList();

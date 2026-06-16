@@ -19,6 +19,7 @@ class LogEntry {
     this.loggerName,
     this.error,
     this.stackTrace,
+    this.correlationId,
   });
 
   final String level;
@@ -27,6 +28,7 @@ class LogEntry {
   final String? loggerName;
   final Object? error;
   final StackTrace? stackTrace;
+  final String? correlationId;
 
   String toLine() {
     final sb = StringBuffer()
@@ -36,8 +38,9 @@ class LogEntry {
       ..write(level.padRight(8))
       ..write(' ')
       ..write(loggerName ?? '')
-      ..write(': ')
-      ..write(message);
+      ..write(': ');
+    if (correlationId != null) sb.write('[$correlationId] ');
+    sb.write(message);
     if (error != null) {
       sb.write(' | ERROR: $error');
     }
@@ -49,12 +52,17 @@ class LogEntry {
     'message': message,
     'ts': time.toIso8601String(),
     if (loggerName != null) 'logger': loggerName,
+    if (correlationId != null) 'cid': correlationId,
     if (error != null) 'error': error.toString(),
   };
 }
 
 class AppLogger {
-  AppLogger({int bufferSize = 500}) : _ringBuffer = _RingBuffer<LogEntry>(bufferSize);
+  static final AppLogger _singleton = AppLogger._internal();
+
+  factory AppLogger() => _singleton;
+
+  AppLogger._internal({int bufferSize = 500}) : _ringBuffer = _RingBuffer<LogEntry>(bufferSize);
 
   final _RingBuffer<LogEntry> _ringBuffer;
   final _controller = StreamController<LogEntry>.broadcast();
@@ -70,6 +78,7 @@ class AppLogger {
     String? loggerName,
     Object? error,
     StackTrace? stackTrace,
+    String? correlationId,
   }) {
     final entry = LogEntry(
       level: level,
@@ -78,6 +87,7 @@ class AppLogger {
       loggerName: loggerName,
       error: error,
       stackTrace: stackTrace,
+      correlationId: correlationId,
     );
     _ringBuffer.add(entry);
     if (!_controller.isClosed) {
@@ -92,8 +102,8 @@ class AppLogger {
     final traceSuffix = stackTrace != null ? '\n$stackTrace' : '';
     developer.log('$level: $message$errorSuffix$traceSuffix', name: name, level: _levelInt(level));
 
-    if (level == 'SEVERE' || level == 'SHOUT') {
-      unawaited(_persistError(entry));
+    if (level == 'WARNING' || level == 'SEVERE' || level == 'SHOUT') {
+      unawaited(_persistLog(entry));
     }
   }
 
@@ -109,7 +119,9 @@ class AppLogger {
     };
   }
 
-  Future<void> _persistError(LogEntry entry) async {
+  static const int _maxPersistentLogBytes = 2 * 1024 * 1024;
+
+  Future<void> _persistLog(LogEntry entry) async {
     try {
       final line = entry.toLine();
       if (line.isNotEmpty) {
@@ -117,26 +129,50 @@ class AppLogger {
         final logDir = Directory('${dir.path}/logs');
         await logDir.create(recursive: true);
         final file = File('${logDir.path}/glibusta.log');
+        await _rotateIfNeeded(file);
         final sink = file.openWrite(mode: FileMode.append);
         sink.writeln(line);
         await sink.flush();
         await sink.close();
       }
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      developer.log('Log persist failed: $e', name: 'AppLogger', level: 900);
+    }
+    if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
+        await prefs.setString('last_error', summary);
+      } on Object catch (e) {
+        developer.log('Prefs persist failed: $e', name: 'AppLogger', level: 900);
+      }
+    }
+  }
+
+  Future<void> _rotateIfNeeded(File file) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final summary = entry.error != null ? '${entry.message} | ${entry.error}' : entry.message;
-      await prefs.setString('last_error', summary);
-    } on Object catch (_) {}
+      if (!await file.exists()) return;
+      final stat = await file.stat();
+      if (stat.size > _maxPersistentLogBytes) {
+        final backup = File('${file.path}.old');
+        if (await backup.exists()) {
+          await backup.delete();
+        }
+        await file.rename(backup.path);
+      }
+    } on Object catch (e) {
+      developer.log('Log rotation failed: $e', name: 'AppLogger', level: 900);
+    }
   }
 
   void finest(String msg, {String? name}) => log('FINEST', msg, loggerName: name);
   void fine(String msg, {String? name}) => log('FINE', msg, loggerName: name);
-  void info(String msg, {String? name}) => log('INFO', msg, loggerName: name);
-  void warning(String msg, {String? name, Object? error, StackTrace? st}) =>
-      log('WARNING', msg, loggerName: name, error: error, stackTrace: st);
-  void severe(String msg, {String? name, Object? error, StackTrace? st}) =>
-      log('SEVERE', msg, loggerName: name, error: error, stackTrace: st);
+  void info(String msg, {String? name, String? cid}) =>
+      log('INFO', msg, loggerName: name, correlationId: cid);
+  void warning(String msg, {String? name, Object? error, StackTrace? st, String? cid}) =>
+      log('WARNING', msg, loggerName: name, error: error, stackTrace: st, correlationId: cid);
+  void severe(String msg, {String? name, Object? error, StackTrace? st, String? cid}) =>
+      log('SEVERE', msg, loggerName: name, error: error, stackTrace: st, correlationId: cid);
 
   void addListener(void Function(LogEntry) listener) {
     _listeners.add(listener);
@@ -163,8 +199,15 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
-      if (!await file.exists()) return '';
-      return await file.readAsString();
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
+      final parts = <String>[];
+      if (await oldFile.exists()) {
+        parts.add(await oldFile.readAsString());
+      }
+      if (await file.exists()) {
+        parts.add(await file.readAsString());
+      }
+      return parts.join();
     } on Object catch (_) {
       return '';
     }
@@ -174,9 +217,15 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
-      if (!await file.exists()) return 0;
-      final stat = await file.stat();
-      return stat.size;
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
+      var total = 0;
+      if (await file.exists()) {
+        total += (await file.stat()).size;
+      }
+      if (await oldFile.exists()) {
+        total += (await oldFile.stat()).size;
+      }
+      return total;
     } on Object catch (_) {
       return 0;
     }
@@ -186,8 +235,12 @@ class AppLogger {
     try {
       final dir = await getApplicationSupportDirectory();
       final file = File('${dir.path}/logs/glibusta.log');
+      final oldFile = File('${dir.path}/logs/glibusta.log.old');
       if (await file.exists()) {
         await file.writeAsString('');
+      }
+      if (await oldFile.exists()) {
+        await oldFile.delete();
       }
     } on Object catch (_) {}
   }
@@ -251,11 +304,11 @@ class _RingBuffer<T> {
 // --- Riverpod providers ---
 
 final appLoggerProvider = Provider<AppLogger>((ref) {
-  final logger = AppLogger(bufferSize: 1000);
+  final logger = AppLogger();
   final eventBus = ref.watch(eventBusProvider);
 
   Logger.root.level = Level.ALL;
-  Logger.root.onRecord.listen((record) {
+  final rootLogSubscription = Logger.root.onRecord.listen((record) {
     logger.log(
       record.level.name,
       record.message,
@@ -265,7 +318,7 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
     );
   });
 
-  logger.addListener((entry) {
+  void publishSevereEvents(LogEntry entry) {
     if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
       eventBus.fire(
         ErrorOccurredEvent(
@@ -275,9 +328,15 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
         ),
       );
     }
-  });
+  }
 
-  ref.onDispose(logger.dispose);
+  logger.addListener(publishSevereEvents);
+
+  ref.onDispose(() {
+    logger.removeListener(publishSevereEvents);
+    unawaited(rootLogSubscription.cancel());
+    logger.dispose();
+  });
   return logger;
 });
 

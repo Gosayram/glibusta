@@ -3,7 +3,10 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
+import 'package:glibusta/features/library/data/cover_extraction_service.dart';
+import 'package:glibusta/shared/models/book.dart';
 
 void main() {
   late AppDatabase db;
@@ -12,7 +15,8 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    service = BookImportService(db);
+    final storage = AppFileStorageImpl();
+    service = BookImportService(db, storage, CoverExtractionService(storage));
     tempDir = await Directory.systemTemp.createTemp('import_test_');
   });
 
@@ -42,6 +46,20 @@ void main() {
       final result = await service.importFile(file.path);
       expect(result.isSuccess, isFalse);
       expect(result.error, contains('слишком мал'));
+    });
+  });
+
+  group('bookFormatForImportExtension', () {
+    test('maps fb2.zip imports to fb2 storage format', () {
+      expect(bookFormatForImportExtension('zip'), BookFormat.fb2);
+      expect(bookFormatForImportExtension('ZIP'), BookFormat.fb2);
+    });
+
+    test('maps document imports to document storage formats', () {
+      expect(bookFormatForImportExtension('pdf'), BookFormat.pdf);
+      expect(bookFormatForImportExtension('djvu'), BookFormat.djvu);
+      expect(bookFormatForImportExtension('djv'), BookFormat.djvu);
+      expect(bookFormatForImportExtension('rtf'), BookFormat.rtf);
     });
   });
 

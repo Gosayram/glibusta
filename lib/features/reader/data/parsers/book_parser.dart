@@ -17,3 +17,10 @@ abstract class BookParser {
     String? forcedEncoding,
   });
 }
+
+abstract class BookMetadataParser {
+  Future<NormalizedBookMetadata?> parseMetadata(
+    Uint8List bytes, {
+    String? fileName,
+  });
+}

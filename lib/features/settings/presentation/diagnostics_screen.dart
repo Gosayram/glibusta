@@ -13,6 +13,7 @@ import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../reader/data/parsers/format_detector.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
   const DiagnosticsScreen({super.key});
@@ -340,8 +341,8 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       final allBooks = await (db.select(db.savedBooks)).get();
       totalBooks = allBooks.length;
       final allDownloads = await (db.select(db.downloads)).get();
-      fb2Count = allDownloads.where((d) => d.format.toLowerCase() == 'fb2').length;
-      epubCount = allDownloads.where((d) => d.format.toLowerCase() == 'epub').length;
+      fb2Count = allDownloads.where((d) => formatFromDbString(d.format) == BookFormat.fb2).length;
+      epubCount = allDownloads.where((d) => formatFromDbString(d.format) == BookFormat.epub).length;
     } on Object catch (_) {
       dbOk = false;
     }

@@ -22,10 +22,42 @@ void main() {
       expect(f.toString(), contains('NotFoundFailure'));
     });
 
-    test('BookOpenFailure with message', () {
-      const f = BookOpenFailure('corrupt');
-      expect(f.message, 'corrupt');
-      expect(f.toString(), contains('BookOpenFailure'));
+    test('BookMissingFailure with message', () {
+      const f = BookMissingFailure('not found');
+      expect(f.message, 'not found');
+      expect(f.toString(), contains('BookMissingFailure'));
+      expect(f, isA<BookOpenFailure>());
+    });
+
+    test('UnsupportedFormatFailure with message', () {
+      const f = UnsupportedFormatFailure('pdf');
+      expect(f.message, 'pdf');
+      expect(f.toString(), contains('UnsupportedFormatFailure'));
+      expect(f, isA<BookOpenFailure>());
+    });
+
+    test('ParserTimeoutFailure with message', () {
+      const f = ParserTimeoutFailure('slow');
+      expect(f.message, 'slow');
+      expect(f, isA<BookOpenFailure>());
+    });
+
+    test('CacheCorruptedFailure with message', () {
+      const f = CacheCorruptedFailure('bad json');
+      expect(f.message, 'bad json');
+      expect(f, isA<BookOpenFailure>());
+    });
+
+    test('InvalidEncodingFailure with message', () {
+      const f = InvalidEncodingFailure('bad charset');
+      expect(f.message, 'bad charset');
+      expect(f, isA<BookOpenFailure>());
+    });
+
+    test('UnknownBookOpenFailure', () {
+      const f = UnknownBookOpenFailure();
+      expect(f, isA<BookOpenFailure>());
+      expect(f, isA<AppFailure>());
     });
 
     test('SourceUnavailableFailure with message', () {

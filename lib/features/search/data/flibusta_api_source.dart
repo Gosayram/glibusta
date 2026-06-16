@@ -206,8 +206,16 @@ class FlibustaApiSource extends BookSource {
         formats.add(BookFormat.txt);
       } else if (lower.contains('pdf')) {
         formats.add(BookFormat.pdf);
-      } else if (lower.contains('mobi')) {
+      } else if (lower.contains('azw3')) {
+        formats.add(BookFormat.azw3);
+      } else if (lower.contains('prc')) {
+        formats.add(BookFormat.prc);
+      } else if (lower.contains('mobi') || lower.contains('azw')) {
         formats.add(BookFormat.mobi);
+      } else if (lower.contains('rtf')) {
+        formats.add(BookFormat.rtf);
+      } else if (lower.contains('djvu') || lower.contains('djv')) {
+        formats.add(BookFormat.djvu);
       }
     }
     return formats;

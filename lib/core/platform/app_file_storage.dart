@@ -1,9 +1,14 @@
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../shared/models/book.dart';
+
+final appFileStorageProvider = Provider<AppFileStorage>((ref) {
+  return AppFileStorageImpl();
+});
 
 abstract interface class AppFileStorage {
   Future<File> bookFile(String bookId, BookFormat format);
@@ -14,7 +19,16 @@ abstract interface class AppFileStorage {
   Future<Directory> cacheDir();
 }
 
-String sanitizeId(String id) => id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+String sanitizeId(String id) {
+  var sanitized = id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+  while (sanitized.startsWith('.')) {
+    sanitized = sanitized.substring(1);
+  }
+  sanitized = sanitized.trim();
+  if (sanitized.isEmpty) sanitized = 'unnamed';
+  if (sanitized.length > 200) sanitized = sanitized.substring(0, 200);
+  return sanitized;
+}
 
 class AppFileStorageImpl implements AppFileStorage {
   @override

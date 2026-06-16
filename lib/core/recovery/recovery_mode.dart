@@ -150,11 +150,23 @@ class RecoveryMode {
   Future<int> rebuildIndex() async {
     _logger.info('Rebuilding index...', name: 'Recovery');
     int count = 0;
-    // Scan library directory and re-index books
     try {
       final books = await _db.select(_db.savedBooks).get();
-      count = books.length;
-      _logger.info('Index rebuilt: $count books', name: 'Recovery');
+      final validIds = <String>{};
+      for (final book in books) {
+        if (book.filePath.isNotEmpty && await File(book.filePath).exists()) {
+          validIds.add(book.id);
+        }
+      }
+      final staleIds = books.where((b) => !validIds.contains(b.id)).map((b) => b.id).toList();
+      if (staleIds.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.deleteWhere(_db.savedBooks, (t) => t.id.isIn(staleIds));
+        });
+        _logger.info('Removed ${staleIds.length} stale entries', name: 'Recovery');
+      }
+      count = validIds.length;
+      _logger.info('Index rebuilt: $count valid books', name: 'Recovery');
     } on Object catch (e) {
       _logger.severe('Index rebuild failed: $e', name: 'Recovery');
     }

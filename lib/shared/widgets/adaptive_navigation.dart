@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
 import '../../features/library/data/book_import_service.dart';
+import '../../features/reader/data/parsers/format_detector.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -297,15 +298,19 @@ class MacOSShell extends ConsumerWidget {
   }
 
   void _handleDrop(BuildContext context, WidgetRef ref, List<String> paths) {
-    final epubPaths = paths.where((p) => p.toLowerCase().endsWith('.epub')).toList();
-    if (epubPaths.isEmpty) {
+    final bookPaths = paths
+        .where((p) => importableExtensions.any((ext) => p.toLowerCase().endsWith('.$ext')))
+        .toList();
+    if (bookPaths.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Поддерживаются только .epub файлы')),
+        const SnackBar(
+          content: Text('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
+        ),
       );
       return;
     }
     final importService = ref.read(bookImportServiceProvider);
-    for (final path in epubPaths) {
+    for (final path in bookPaths) {
       unawaited(
         importService.importFile(path).then((result) {
           if (!context.mounted) return;

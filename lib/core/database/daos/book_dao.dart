@@ -11,6 +11,16 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
 
   Future<List<SavedBook>> getAllBooks() async => select(savedBooks).get();
 
+  Future<List<SavedBook>> searchBooks(String query) async {
+    final lower = '%$query%';
+    return (select(savedBooks)
+          ..where(
+            (t) => t.title.like(lower) | t.description.like(lower),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.title)]))
+        .get();
+  }
+
   Future<SavedBook?> getBookById(String id) async =>
       (select(savedBooks)..where((t) => t.id.equals(id))).getSingleOrNull();
 

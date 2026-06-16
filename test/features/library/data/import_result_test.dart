@@ -102,5 +102,41 @@ void main() {
       final batch = ImportBatchResult(directory: '/my/books', results: []);
       expect(batch.directory, '/my/books');
     });
+
+    test('fileResults preserve path, size, and result', () {
+      final batch = ImportBatchResult(
+        directory: '/books',
+        fileResults: [
+          ImportFileResult(
+            path: '/books/a.fb2',
+            sizeBytes: 1024,
+            result: ImportResult.success('A'),
+          ),
+          ImportFileResult(
+            path: '/books/b.fb2',
+            sizeBytes: 2048,
+            result: ImportResult.failure('bad file'),
+          ),
+        ],
+      );
+
+      expect(batch.results.length, 2);
+      expect(batch.successCount, 1);
+      expect(batch.failureCount, 1);
+      expect(batch.failures.single.path, '/books/b.fb2');
+      expect(batch.failures.single.sizeBytes, 2048);
+      expect(batch.failures.single.result.error, 'bad file');
+    });
+
+    test('legacy results constructor still creates file results', () {
+      final batch = ImportBatchResult(
+        directory: '/books',
+        results: [ImportResult.success('A')],
+      );
+
+      expect(batch.fileResults.single.path, '');
+      expect(batch.fileResults.single.sizeBytes, isNull);
+      expect(batch.fileResults.single.result.title, 'A');
+    });
   });
 }

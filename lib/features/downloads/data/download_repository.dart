@@ -7,20 +7,21 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/platform/app_file_storage.dart';
-import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../reader/data/parsers/format_detector.dart';
 import '../domain/download_repository.dart';
 
 final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  return DownloadRepositoryImpl(db);
+  final storage = ref.watch(appFileStorageProvider);
+  return DownloadRepositoryImpl(db, storage);
 });
 
 class DownloadRepositoryImpl implements DownloadRepository {
   final AppDatabase _db;
   final AppFileStorage _storage;
 
-  DownloadRepositoryImpl(this._db) : _storage = AppFileStorageImpl();
+  DownloadRepositoryImpl(this._db, this._storage);
 
   @override
   Stream<List<DownloadTask>> watchAllDownloads() {
@@ -110,10 +111,7 @@ class DownloadRepositoryImpl implements DownloadRepository {
       id: row.id,
       bookId: row.bookId,
       bookTitle: row.bookTitle,
-      format: BookFormat.values.firstWhere(
-        (BookFormat f) => f.name == row.format,
-        orElse: () => BookFormat.fb2,
-      ),
+      format: formatFromDbString(row.format),
       sourceUrl: row.sourceUrl,
       targetPath: row.targetPath,
       status: _driftToStatus(row.status),

@@ -1,10 +1,46 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/features/library/domain/book_file_repository.dart';
+import 'package:glibusta/features/reader/data/book_open_service.dart';
+import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
+import 'package:glibusta/features/reader/presentation/reader_screen.dart';
+
+class _FakeBookOpenService extends BookOpenService {
+  _FakeBookOpenService(AppDatabase database)
+    : super(database, AppFileStorageImpl(), BookFileRepositoryImpl(database));
+
+  static const _chapter = ReaderChapter(
+    index: 0,
+    title: 'Глава 1',
+    blocks: [
+      ReaderBlock(index: 0, text: 'Текст книги успешно загружен.'),
+    ],
+  );
+
+  @override
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    return const NormalizedBookMetadata(
+      id: 'book-1',
+      title: 'Тестовая книга',
+      authors: ['Автор'],
+      chapterCount: 1,
+      chapterTitles: ['Глава 1'],
+    );
+  }
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    return index == 0 ? _chapter : null;
+  }
+}
 
 void main() {
   setUpAll(() {
@@ -328,6 +364,39 @@ void main() {
         find.byType(LinearProgressIndicator),
       );
       expect(indicator.value, 0.75);
+    });
+  });
+
+  group('ReaderScreen', () {
+    late AppDatabase db;
+
+    setUp(() {
+      db = AppDatabase.forTesting(NativeDatabase.memory());
+    });
+
+    tearDown(() async {
+      await db.close();
+    });
+
+    testWidgets('rebuilds when controller finishes loading', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            bookOpenServiceProvider.overrideWithValue(_FakeBookOpenService(db)),
+          ],
+          child: const MaterialApp(
+            home: ReaderScreen(bookId: 'book-1'),
+          ),
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Текст книги успешно загружен.'), findsOneWidget);
     });
   });
 }

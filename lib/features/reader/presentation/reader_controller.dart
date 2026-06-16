@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart' show DownloadStatusDb;
+import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
@@ -20,13 +21,26 @@ import 'reader_content_helper.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 
+enum ReaderErrorKind {
+  bookMissing('Книга не найдена', Icons.search_off),
+  unsupportedFormat('Формат не поддерживается', Icons.block),
+  parserTimeout('Превышено время ожидания', Icons.hourglass_empty),
+  cacheCorrupted('Повреждённый кеш', Icons.broken_image_outlined),
+  invalidEncoding('Ошибка кодировки', Icons.text_fields),
+  unknown('Ошибка открытия книги', Icons.error_outline);
+
+  const ReaderErrorKind(this.defaultTitle, this.icon);
+  final String defaultTitle;
+  final IconData icon;
+}
+
 @immutable
 class ReaderState {
   final NormalizedBookMetadata? metadata;
   final Map<int, ReaderChapter> loadedChapters;
-  final bool isLoading;
-  final String? loadingMessage;
+  final ReaderLoadingStage? loadingStage;
   final String? errorMessage;
+  final ReaderErrorKind? errorKind;
   final String? errorFilePath;
   final String? errorFormat;
   final int? errorFileSize;
@@ -37,14 +51,15 @@ class ReaderState {
   final int estimatedMinutesLeft;
   final bool isSearchOpen;
   final String? highlightedQuery;
+  final bool isDynamicallyLoading;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
     this.metadata,
     this.loadedChapters = const {},
-    this.isLoading = true,
-    this.loadingMessage,
+    this.loadingStage = ReaderLoadingStage.openingFile,
     this.errorMessage,
+    this.errorKind,
     this.errorFilePath,
     this.errorFormat,
     this.errorFileSize,
@@ -55,7 +70,12 @@ class ReaderState {
     this.estimatedMinutesLeft = 0,
     this.isSearchOpen = false,
     this.highlightedQuery,
+    this.isDynamicallyLoading = false,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
+
+  bool get isLoading => loadingStage != null;
+
+  String? get loadingMessage => loadingStage?.message;
 
   int get chapterCount => metadata?.chapterCount ?? 0;
 
@@ -72,9 +92,11 @@ class ReaderState {
   ReaderState copyWith({
     NormalizedBookMetadata? metadata,
     Map<int, ReaderChapter>? loadedChapters,
-    bool? isLoading,
-    String? loadingMessage,
+    ReaderLoadingStage? loadingStage,
+    bool clearLoadingStage = false,
     String? errorMessage,
+    ReaderErrorKind? errorKind,
+    bool clearError = false,
     String? errorFilePath,
     String? errorFormat,
     int? errorFileSize,
@@ -87,16 +109,17 @@ class ReaderState {
     String? highlightedQuery,
     bool clearHighlight = false,
     bool clearLoadingMessage = false,
+    bool? isDynamicallyLoading,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
       loadedChapters: loadedChapters ?? this.loadedChapters,
-      isLoading: isLoading ?? this.isLoading,
-      loadingMessage: clearLoadingMessage ? null : (loadingMessage ?? this.loadingMessage),
-      errorMessage: errorMessage ?? this.errorMessage,
-      errorFilePath: errorFilePath ?? this.errorFilePath,
-      errorFormat: errorFormat ?? this.errorFormat,
-      errorFileSize: errorFileSize ?? this.errorFileSize,
+      loadingStage: clearLoadingStage ? null : (loadingStage ?? this.loadingStage),
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      errorKind: clearError ? null : (errorKind ?? this.errorKind),
+      errorFilePath: clearError ? null : (errorFilePath ?? this.errorFilePath),
+      errorFormat: clearError ? null : (errorFormat ?? this.errorFormat),
+      errorFileSize: clearError ? null : (errorFileSize ?? this.errorFileSize),
       currentPosition: currentPosition ?? this.currentPosition,
       uiVisible: uiVisible ?? this.uiVisible,
       isBottomSheetOpen: isBottomSheetOpen ?? this.isBottomSheetOpen,
@@ -104,6 +127,7 @@ class ReaderState {
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
+      isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
     );
   }
 }
@@ -112,9 +136,11 @@ class ReaderController {
   ReaderController(this._bookId, this._ref);
 
   final String _bookId;
-  final WidgetRef _ref;
+  final Ref _ref;
+
   final _autoThemeService = AutoThemeService();
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
+  final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -123,6 +149,8 @@ class ReaderController {
   bool _disposed = false;
   bool _loaded = false;
   bool _fullscreenEnabled = false;
+  int _loadGeneration = 0;
+  String _cacheMode = 'unknown';
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -132,7 +160,9 @@ class ReaderController {
 
   void dispose() {
     _disposed = true;
+    _loadGeneration++;
     _progressDebouncer.dispose();
+    _chapterLoadDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
@@ -152,25 +182,33 @@ class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
-    _updateState(_state.copyWith(isLoading: true, loadingMessage: 'Открытие файла...'));
+    final loadGeneration = ++_loadGeneration;
+    _loaded = false;
+    _hideTimer?.cancel();
+    _autoThemeTimer?.cancel();
+    _autoThemeTimer = null;
+    _scrollController?.removeListener(_onScroll);
+    _scrollController?.dispose();
+    _scrollController = null;
+    _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.openingFile));
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);
     _content = ReaderContentHelper(service, _bookId);
     _progress = ReaderProgressHelper(db, _bookId);
-    _loaded = true;
 
     try {
-      _updateState(_state.copyWith(loadingMessage: 'Разбор книги...'));
-      final meta = await _content.loadMetadata();
-      _updateState(_state.copyWith(loadingMessage: 'Загрузка прогресса...'));
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
+      final meta = await _content.loadMetadata(onCacheMode: (mode) => _cacheMode = mode);
+      if (!_isActiveLoad(loadGeneration)) return;
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
+      if (!_isActiveLoad(loadGeneration)) return;
 
+      _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       _updateState(
         _state.copyWith(
           metadata: meta,
-          isLoading: false,
-          clearLoadingMessage: true,
           currentPosition: savedPosition.clamp(chapterCount: meta.chapterCount),
           clearHighlight: true,
         ),
@@ -180,12 +218,22 @@ class ReaderController {
       _scrollController = ScrollController()..addListener(_onScroll);
 
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
+      if (!_isActiveLoad(loadGeneration)) return;
+      _loaded = true;
+      _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
       const wordsPerMinute = 200;
-      final totalWords = _content.computeTotalWords(_state.loadedChapters);
+      final loadedWords = _content.computeTotalWords(_state.loadedChapters);
+      final loadedCount = _state.loadedChapters.length;
+      final totalCount = _state.chapterCount;
+      final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
+          ? (loadedWords / loadedCount * totalCount).round()
+          : loadedWords;
       _updateState(
         _state.copyWith(
-          estimatedMinutesLeft: totalWords > 0 ? (totalWords / wordsPerMinute).ceil() : 0,
+          estimatedMinutesLeft: estimatedTotalWords > 0
+              ? (estimatedTotalWords / wordsPerMinute).ceil()
+              : 0,
         ),
       );
 
@@ -200,10 +248,11 @@ class ReaderController {
       _startHideTimer();
       _applyWakeLock();
     } on TimeoutException {
+      if (!_isActiveLoad(loadGeneration)) return;
       _updateState(
         _state.copyWith(
-          isLoading: false,
-          clearLoadingMessage: true,
+          clearLoadingStage: true,
+          errorKind: ReaderErrorKind.parserTimeout,
           errorMessage:
               'Открытие книги заняло слишком много времени.\n'
               'Возможно, файл повреждён или слишком большой.\n'
@@ -211,11 +260,28 @@ class ReaderController {
         ),
       );
     } on Object catch (e) {
-      unawaited(_handleLoadError(e));
+      if (!_isActiveLoad(loadGeneration)) return;
+      await _handleLoadError(e, loadGeneration: loadGeneration);
     }
   }
 
-  Future<void> _handleLoadError(Object e) async {
+  bool _isActiveLoad(int loadGeneration) {
+    return !_disposed && loadGeneration == _loadGeneration;
+  }
+
+  static ReaderErrorKind _classifyError(Object error) => switch (error) {
+    BookMissingFailure() => ReaderErrorKind.bookMissing,
+    UnsupportedFormatFailure() => ReaderErrorKind.unsupportedFormat,
+    ParserTimeoutFailure() => ReaderErrorKind.parserTimeout,
+    CacheCorruptedFailure() => ReaderErrorKind.cacheCorrupted,
+    InvalidEncodingFailure() => ReaderErrorKind.invalidEncoding,
+    TimeoutException() => ReaderErrorKind.parserTimeout,
+    BookOpenFailure() => ReaderErrorKind.unknown,
+    _ => ReaderErrorKind.unknown,
+  };
+
+  Future<void> _handleLoadError(Object e, {required int loadGeneration}) async {
+    final errorKind = _classifyError(e);
     String? filePath;
     String? format;
     int? fileSize;
@@ -242,9 +308,11 @@ class ReaderController {
         error: e,
       );
     }
+    if (!_isActiveLoad(loadGeneration)) return;
     _updateState(
       _state.copyWith(
-        isLoading: false,
+        clearLoadingStage: true,
+        errorKind: errorKind,
         errorMessage: e.toString(),
         errorFilePath: filePath,
         errorFormat: format,
@@ -256,9 +324,16 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
-    final updated = await _content.ensureChaptersLoaded(centerIndex, _state.loadedChapters);
+    if (_loaded && !_state.isLoading) {
+      _updateState(_state.copyWith(isDynamicallyLoading: true));
+    }
+    final updated = await _content.ensureChaptersLoaded(
+      centerIndex,
+      _state.loadedChapters,
+      chapterCount: _state.chapterCount,
+    );
     if (!_disposed) {
-      _updateState(_state.copyWith(loadedChapters: updated));
+      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
     }
   }
 
@@ -285,6 +360,16 @@ class ReaderController {
       _updateState(_state.copyWith(scrollProgress: boundedProgress));
       _updatePositionFromScroll(boundedProgress);
       _progressDebouncer.call(saveProgress);
+
+      if (!_state.isLoading && _state.chapterCount > 0) {
+        final total = _state.chapterCount;
+        final chapterIndex = (boundedProgress * (total - 1)).round();
+        _chapterLoadDebouncer.call(() {
+          if (_disposed) return;
+          unawaited(_ensureChaptersLoaded(chapterIndex));
+          _evictDistantChapters(chapterIndex);
+        });
+      }
     }
   }
 
@@ -316,7 +401,7 @@ class ReaderController {
       );
     }
     final lastChapter = total - 1;
-    final chapterIndex = (progress * lastChapter).round().clamp(0, lastChapter);
+    final chapterIndex = _estimateChapterIndex(progress, lastChapter);
     final chapter = _state.chapterAt(chapterIndex);
     final lastParagraph = (chapter?.blocks.isEmpty ?? true) ? 0 : chapter!.blocks.length - 1;
     final paragraphIndex = (progress * lastParagraph).round().clamp(0, lastParagraph);
@@ -330,6 +415,42 @@ class ReaderController {
     );
   }
 
+  int _estimateChapterIndex(double progress, int lastChapter) {
+    if (_state.loadedChapters.isEmpty) {
+      return (progress * lastChapter).round().clamp(0, lastChapter);
+    }
+
+    var avgBlocks = 0.0;
+    for (final ch in _state.loadedChapters.values) {
+      avgBlocks += ch.blocks.length;
+    }
+    avgBlocks /= _state.loadedChapters.length;
+    if (avgBlocks < 1) avgBlocks = 1;
+
+    final weights = List<double>.filled(lastChapter + 1, avgBlocks);
+    for (final entry in _state.loadedChapters.entries) {
+      if (entry.key >= 0 && entry.key <= lastChapter) {
+        final w = entry.value.blocks.length.toDouble();
+        weights[entry.key] = w > 0 ? w : 1;
+      }
+    }
+
+    var totalWeight = 0.0;
+    for (final w in weights) {
+      totalWeight += w;
+    }
+
+    final targetWeight = progress * totalWeight;
+    var cumulative = 0.0;
+    for (var i = 0; i < weights.length; i++) {
+      cumulative += weights[i];
+      if (cumulative >= targetWeight) {
+        return i;
+      }
+    }
+    return lastChapter;
+  }
+
   void _restoreSavedPosition(ReaderPosition position) {
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
@@ -337,6 +458,8 @@ class ReaderController {
       return;
     }
     if (_scrollController == null) return;
+    unawaited(_ensureChaptersLoaded(position.chapterIndex));
+    _evictDistantChapters(position.chapterIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
       final maxScroll = _scrollController!.position.maxScrollExtent;
@@ -353,7 +476,28 @@ class ReaderController {
 
   void saveProgress() {
     if (!_loaded) return;
-    _progress.saveProgress(_state.currentPosition, _state.chapterCount);
+    var totalBlocks = 0;
+    for (final chapter in _state.loadedChapters.values) {
+      totalBlocks += chapter.blocks.length;
+    }
+    _progress.saveProgress(_state.currentPosition, totalBlocks);
+  }
+
+  void reanchorAfterLayoutChange() {
+    if (!_loaded || _scrollController == null || !_scrollController!.hasClients) return;
+    final savedPosition = _state.currentPosition;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+      final maxScroll = _scrollController!.position.maxScrollExtent;
+      if (maxScroll <= 0) return;
+      unawaited(
+        _scrollController!.animateTo(
+          (savedPosition.progressPercent * maxScroll).clamp(0.0, maxScroll),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
   }
 
   // ── Navigation ────────────────────────────────────────
@@ -446,9 +590,12 @@ class ReaderController {
 
   void jumpToProgress(double progress) {
     final bounded = progress.clamp(0.0, 1.0);
+    final position = _positionFromProgress(bounded);
     _updateState(
-      _state.copyWith(currentPosition: _positionFromProgress(bounded), scrollProgress: bounded),
+      _state.copyWith(currentPosition: position, scrollProgress: bounded),
     );
+    unawaited(_ensureChaptersLoaded(position.chapterIndex));
+    _evictDistantChapters(position.chapterIndex);
     final settings = _ref.read(readerSettingsProvider);
     if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
@@ -594,6 +741,7 @@ class ReaderController {
   }
 
   void _checkAutoTheme() {
+    if (_disposed) return;
     final settings = _ref.read(readerSettingsProvider);
     if (settings.autoThemeMode == AutoThemeMode.off) return;
     final resolved = _autoThemeService.resolveTheme(
@@ -647,6 +795,13 @@ class ReaderController {
   Future<void> deleteBookFile() async {
     final filePath = _state.errorFilePath;
     if (filePath == null || filePath.isEmpty) return;
+    if (!_isAppOwnedPath(filePath)) {
+      AppLogger().warning(
+        'Refusing to delete non-app path: $filePath',
+        name: 'Reader',
+      );
+      return;
+    }
     try {
       final file = File(filePath);
       if (await file.exists()) {
@@ -662,11 +817,22 @@ class ReaderController {
     _updateState(_state.copyWith(errorMessage: 'Файл удалён'));
   }
 
+  static bool _isAppOwnedPath(String path) {
+    return path.contains('glibusta');
+  }
+
+  Future<void> clearCacheAndReload() async {
+    final service = _ref.read(bookOpenServiceProvider);
+    await service.invalidateBookCache(_bookId);
+    await loadBook();
+  }
+
   String buildDiagnostics() {
     final buffer = StringBuffer();
     buffer.writeln('=== Diagnostics ===');
     buffer.writeln('Book ID: $_bookId');
     buffer.writeln('Error: ${_state.errorMessage ?? "none"}');
+    buffer.writeln('Error kind: ${_state.errorKind?.name ?? "none"}');
     buffer.writeln('File: ${_state.errorFilePath ?? "unknown"}');
     buffer.writeln('Format: ${_state.errorFormat ?? "unknown"}');
     buffer.writeln(
@@ -674,9 +840,27 @@ class ReaderController {
     );
     buffer.writeln('Chapters: ${_state.chapterCount}');
     buffer.writeln('Loaded chapters: ${_state.loadedChapters.length}');
+    buffer.writeln('Missing chapters: ${_missingChapterCount()}');
+    buffer.writeln('Cache mode: $_cacheMode');
+    buffer.writeln(
+      'Current position: ch${_state.currentPosition.chapterIndex}, p${_state.currentPosition.paragraphIndex}',
+    );
+    buffer.writeln('Scroll progress: ${(_state.scrollProgress * 100).toStringAsFixed(1)}%');
+    buffer.writeln('Loading stage: ${_state.loadingStage?.name ?? "ready"}');
+    buffer.writeln('Dynamic loading: ${_state.isDynamicallyLoading}');
+    buffer.writeln('Estimated minutes left: ${_state.estimatedMinutesLeft}');
     buffer.writeln('Platform: ${Platform.operatingSystem}');
     buffer.writeln('Time: ${DateTime.now().toIso8601String()}');
     return buffer.toString();
+  }
+
+  int _missingChapterCount() {
+    if (_state.chapterCount == 0) return 0;
+    var missing = 0;
+    for (var i = 0; i < _state.chapterCount; i++) {
+      if (!_state.loadedChapters.containsKey(i)) missing++;
+    }
+    return missing;
   }
 
   void copyDiagnostics() {
@@ -684,3 +868,13 @@ class ReaderController {
     unawaited(Clipboard.setData(ClipboardData(text: diagnostics)));
   }
 }
+
+final readerControllerProvider = Provider.autoDispose.family<ReaderController, String>((
+  ref,
+  bookId,
+) {
+  final controller = ReaderController(bookId, ref);
+  unawaited(controller.loadBook());
+  ref.onDispose(controller.dispose);
+  return controller;
+});

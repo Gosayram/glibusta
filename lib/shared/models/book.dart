@@ -1,4 +1,4 @@
-enum BookFormat { fb2, epub, pdf, txt, mobi, unknown }
+enum BookFormat { fb2, epub, pdf, txt, mobi, azw3, prc, rtf, djvu, unknown }
 
 enum ReadingStatus {
   none,
@@ -45,20 +45,7 @@ class Book {
       ? authorIds.first
       : '';
 
-  String get readingStatusLabel {
-    switch (readingStatus) {
-      case ReadingStatus.none:
-        return '';
-      case ReadingStatus.wantToRead:
-        return 'Хочу прочитать';
-      case ReadingStatus.reading:
-        return 'Читаю';
-      case ReadingStatus.finished:
-        return 'Прочитано';
-      case ReadingStatus.dropped:
-        return 'Брошено';
-    }
-  }
+  String get readingStatusLabel => readingStatus.readingStatusLabel;
 }
 
 extension ReadingStatusExtension on ReadingStatus {
@@ -76,6 +63,8 @@ extension ReadingStatusExtension on ReadingStatus {
         return 'Брошено';
     }
   }
+
+  String get readingStatusLabel => this == ReadingStatus.none ? '' : label;
 }
 
 class BookSourceInfo {

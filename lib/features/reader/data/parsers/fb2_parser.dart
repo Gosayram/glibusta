@@ -46,12 +46,11 @@ class Fb2Parser implements BookParser {
   Uint8List _extractFromZipIfNeeded(Uint8List bytes) {
     if (bytes.length < 4) return bytes;
 
-    // Check ZIP magic bytes: PK\x03\x04
     if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
       try {
         final archive = ZipDecoder().decodeBytes(bytes);
         final fb2File = archive.files.cast<ArchiveFile?>().firstWhere(
-          (f) => f!.name.toLowerCase().endsWith('.fb2'),
+          (f) => f!.name.toLowerCase().endsWith('.fb2') && !_hasZipSlip(f.name),
           orElse: () => null,
         );
         if (fb2File == null) {
@@ -59,11 +58,16 @@ class Fb2Parser implements BookParser {
         }
         return Uint8List.fromList(fb2File.content as List<int>);
       } on Object catch (_) {
-        // If ZIP decoding fails, try raw bytes as plain FB2 XML
         return bytes;
       }
     }
     return bytes;
+  }
+
+  static bool _hasZipSlip(String name) {
+    if (name.startsWith('/')) return true;
+    if (name.contains('..')) return true;
+    return false;
   }
 
   @override

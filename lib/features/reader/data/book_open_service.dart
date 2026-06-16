@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -7,24 +6,29 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../../core/database/tables.dart';
 import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/formats/book_file_size_policy.dart';
+import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../library/domain/book_file_repository.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
-import 'parsers/book_parser.dart';
 import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
+import 'parsers/parser_registry.dart';
 import 'parsers/txt_parser.dart';
+import 'reader_cache_service.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final database = ref.watch(databaseProvider);
-  return BookOpenService(database);
+  final storage = ref.watch(appFileStorageProvider);
+  final fileRepo = ref.watch(bookFileRepositoryProvider);
+  return BookOpenService(database, storage, fileRepo);
 });
 
 final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, bookId) async {
@@ -34,46 +38,81 @@ final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, b
 
 class BookOpenService {
   final AppDatabase _database;
+  final BookFileRepository _fileRepo;
   final _logger = AppLogger();
+  late final ReaderCacheService cache;
 
-  BookOpenService(this._database);
+  BookOpenService(this._database, AppFileStorage storage, this._fileRepo) {
+    cache = ReaderCacheService(
+      fingerprintProvider: _computeCacheFingerprint,
+      storage: storage,
+    );
+  }
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
 
-  static final Map<BookFormat, BookParser> _parsers = {
-    BookFormat.epub: legacy_epub.EpubParser(),
-    BookFormat.fb2: Fb2Parser(),
-    BookFormat.txt: TxtBookParser(),
-  };
+  static final _registry = BookParserRegistry.defaultInstance;
+
+  static Future<NormalizedBook> _parseEpubInWorker(
+    ({String filePath, String imagesDirPath, String bookId}) args,
+  ) async {
+    final imageStore = EpubImageStore(Directory(args.imagesDirPath));
+    final parser = new_epub.CustomEpubParser(imageStore: imageStore);
+    final epubBook = await parser.parse(args.filePath);
+    return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
+  }
+
+  static Future<NormalizedBook> _parseRtfInWorker(({String filePath, String bookId}) args) async {
+    final document = await RtfFormatHandler().prepare(args.filePath);
+    return document.toNormalizedBook(args.bookId);
+  }
+
+  static Future<NormalizedBook> _parseTextBasedInWorker(
+    ({BookFormat format, List<int> bytes, String fileName}) args,
+  ) async {
+    final typedBytes = args.bytes is Uint8List
+        ? args.bytes as Uint8List
+        : Uint8List.fromList(args.bytes);
+    final detector = BookEncodingDetector();
+    final detectionResult = await detector.detect(typedBytes, fileName: args.fileName);
+    final detectedText = detectionResult.text;
+    return switch (args.format) {
+      BookFormat.fb2 => parseFb2FromText(detectedText, fileName: args.fileName),
+      BookFormat.txt => parseTxtFromText(detectedText, fileName: args.fileName),
+      _ => throw const UnsupportedFormatFailure(),
+    };
+  }
 
   Future<NormalizedBook> openBook(String bookId) async {
-    final download = await _findDownload(bookId);
-    if (download == null) {
-      throw const BookOpenFailure('Книга не найдена в загрузках');
-    }
-
-    final filePath = download.targetPath;
+    final cid = 'open-$bookId-${DateTime.now().millisecondsSinceEpoch}';
+    _logger.info('Opening book', name: 'Reader', cid: cid);
+    final filePath = await _fileRepo.getFilePath(bookId);
     if (filePath == null || filePath.isEmpty) {
-      throw const BookOpenFailure('Путь к файлу не указан');
+      throw const BookMissingFailure('Книга не найдена в загрузках');
     }
 
     final file = File(filePath);
     if (!await file.exists()) {
-      throw BookOpenFailure('Файл не найден: $filePath');
+      throw const BookMissingFailure('Файл книги не найден');
     }
 
     final fileSize = await file.length();
     if (fileSize == 0) {
-      throw BookOpenFailure('Файл пуст: $filePath');
+      throw const CacheCorruptedFailure('Файл пуст');
     }
 
     final format = detectBookFormat(filePath);
     if (format == BookFormat.unknown) {
-      throw BookOpenFailure('Формат не поддерживается: ${download.format}');
+      throw UnsupportedFormatFailure(
+        'Формат не поддерживается: ${(await _fileRepo.getFormat(bookId)).name}',
+      );
+    }
+    if (isBookFileTooLarge(format, fileSize)) {
+      throw UnsupportedFormatFailure(bookFileTooLargeMessage(format, fileSize));
     }
 
-    if (format == BookFormat.pdf || format == BookFormat.mobi) {
-      throw const BookOpenFailure('Формат не поддерживается');
+    if (format == BookFormat.pdf || format == BookFormat.djvu) {
+      throw const UnsupportedFormatFailure('Формат не поддерживается');
     }
 
     return _parseInIsolate(format, filePath, bookId);
@@ -86,29 +125,29 @@ class BookOpenService {
   ]) async {
     if (bookFormat == BookFormat.epub) {
       final effectiveBookId = bookId ?? _extractBookId(filePath);
-      final bookDir = await _getBookDir(effectiveBookId);
+      final bookDir = await cache.getBookDir(effectiveBookId);
       final imagesDir = Directory('${bookDir.path}/epub_images');
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
       }
-      final imageStore = EpubImageStore(imagesDir);
-      final parser = new_epub.CustomEpubParser(imageStore: imageStore);
 
       try {
-        final epubBook = await parser
-            .parse(filePath)
-            .timeout(
+        final normalized =
+            await Isolate.run(
+              () => _parseEpubInWorker((
+                filePath: filePath,
+                imagesDirPath: imagesDir.path,
+                bookId: effectiveBookId,
+              )),
+            ).timeout(
               _parsingTimeout,
               onTimeout: () => throw TimeoutException(
                 'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
                 'Попробуйте повторить.',
               ),
             );
-        final adapter = EpubBookAdapter();
-        final normalized = adapter.toNormalizedBook(epubBook, effectiveBookId);
         _logger.info(
-          'EPUB parsed: ${epubBook.title}, ${epubBook.chapters.length} chapters, '
-          '${epubBook.toc?.length ?? 0} TOC items',
+          'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
           name: 'Reader',
         );
         return normalized;
@@ -145,18 +184,51 @@ class BookOpenService {
       }
     }
 
+    if (bookFormat == BookFormat.rtf) {
+      final effectiveBookId = bookId ?? _extractBookId(filePath);
+      return Isolate.run(
+        () => _parseRtfInWorker((filePath: filePath, bookId: effectiveBookId)),
+      ).timeout(
+        _parsingTimeout,
+        onTimeout: () => throw TimeoutException(
+          'Разбор RTF занял слишком много времени.',
+        ),
+      );
+    }
+
+    if (bookFormat == BookFormat.mobi ||
+        bookFormat == BookFormat.azw3 ||
+        bookFormat == BookFormat.prc) {
+      final parser = _registry.parserForFormat(bookFormat);
+      if (parser == null) {
+        throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
+      }
+      return parser
+          .parseFile(filePath)
+          .timeout(
+            _parsingTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Разбор ${bookFormat.name.toUpperCase()} занял слишком много времени.',
+            ),
+          );
+    }
+
     try {
       final file = File(filePath);
+      final fileSize = await file.length();
+      if (isBookFileTooLarge(bookFormat, fileSize)) {
+        throw UnsupportedFormatFailure(bookFileTooLargeMessage(bookFormat, fileSize));
+      }
       final bytes = await file.readAsBytes();
       if (bytes.isEmpty) {
-        throw BookOpenFailure('Файл пуст: $filePath');
+        throw const CacheCorruptedFailure('Файл пуст');
       }
       final fileName = filePath.split('/').last;
 
       if (bookFormat == BookFormat.epub) {
-        final parser = _parsers[bookFormat];
+        final parser = _registry.parserForFormat(bookFormat);
         if (parser == null) {
-          throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
+          throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
         }
         return await parser
             .parse(bytes, fileName: fileName)
@@ -168,20 +240,11 @@ class BookOpenService {
             );
       }
 
-      final detector = BookEncodingDetector();
-      final detectionResult = await detector.detect(bytes, fileName: fileName);
-      final detectedText = detectionResult.text;
-
-      return await Isolate.run(() {
-        switch (bookFormat) {
-          case BookFormat.fb2:
-            return parseFb2FromText(detectedText, fileName: fileName);
-          case BookFormat.txt:
-            return parseTxtFromText(detectedText, fileName: fileName);
-          default:
-            throw BookOpenFailure('Формат не поддерживается: ${bookFormat.name}');
-        }
-      }).timeout(
+      return await Isolate.run(
+        () => _parseTextBasedInWorker(
+          (format: bookFormat, bytes: bytes, fileName: fileName),
+        ),
+      ).timeout(
         _parsingTimeout,
         onTimeout: () => throw TimeoutException(
           'Разбор ${bookFormat.name} занял слишком много времени.',
@@ -211,25 +274,24 @@ class BookOpenService {
     String bookId,
     String encoding,
   ) async {
-    // Find the book file path from downloads
-    final download = await _findDownload(bookId);
-    if (download == null) {
-      throw BookOpenFailure('Книга не найдена: $bookId');
-    }
-
-    final filePath = download.targetPath;
+    final filePath = await _fileRepo.getFilePath(bookId);
     if (filePath == null || !await File(filePath).exists()) {
-      throw BookOpenFailure('Файл книги не найден: $bookId');
+      throw BookMissingFailure('Файл книги не найден: $bookId');
     }
 
     final format = detectBookFormat(filePath);
-    if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.mobi) {
-      throw BookOpenFailure('Формат не поддерживается: ${format.name}');
+    if (format == BookFormat.unknown ||
+        format == BookFormat.pdf ||
+        format == BookFormat.mobi ||
+        format == BookFormat.azw3 ||
+        format == BookFormat.prc ||
+        format == BookFormat.djvu) {
+      throw UnsupportedFormatFailure('Формат не поддерживается: ${format.name}');
     }
 
-    final parser = _parsers[format];
+    final parser = _registry.parserForFormat(format);
     if (parser == null) {
-      throw BookOpenFailure('Парсер не найден: ${format.name}');
+      throw UnsupportedFormatFailure('Парсер не найден: ${format.name}');
     }
 
     // Parse with forced encoding
@@ -247,136 +309,149 @@ class BookOpenService {
     return book;
   }
 
-  Future<Download?> _findDownload(String bookId) async {
-    final rows = await (_database.select(
-      _database.downloads,
-    )..where((d) => d.bookId.equals(bookId))).get();
-    for (final row in rows) {
-      if (row.status == DownloadStatusDb.completed) {
-        return row;
-      }
-    }
-    return null;
-  }
-
-  Future<String> get booksCacheDir async {
-    final dir = await AppFileStorageImpl().cacheDir();
-    return dir.path;
-  }
-
-  Future<File> _getCacheFile(String bookId) async {
-    final dir = await booksCacheDir;
-    return File('$dir/$bookId.json');
-  }
-
-  Future<Directory> _getBookDir(String bookId) async {
-    final dir = await booksCacheDir;
-    final bookDir = Directory('$dir/$bookId');
-    if (!await bookDir.exists()) {
-      await bookDir.create(recursive: true);
-    }
-    return bookDir;
-  }
-
-  File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
-
-  File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
-
-  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
-    try {
-      final bookDir = await _getBookDir(bookId);
-      final metaFile = _getMetadataFile(bookDir);
-      if (!await metaFile.exists()) return null;
-      final json = await metaFile.readAsString();
-      return NormalizedBookMetadata.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to read cached metadata: $e', name: 'Reader', error: e);
+  Future<CacheSourceFingerprint?> _computeCacheFingerprint(
+    String bookId,
+  ) async {
+    final filePath = await _fileRepo.getFilePath(bookId);
+    if (filePath == null || filePath.isEmpty) {
       return null;
     }
-  }
 
-  Future<void> _saveSplitCache(String bookId, NormalizedBook book) async {
-    final bookDir = await _getBookDir(bookId);
-    final metaFile = _getMetadataFile(bookDir);
-    await metaFile.writeAsString(jsonEncode(book.toMetadata().toJson()));
-    for (final chapter in book.chapters) {
-      final chapterFile = _getChapterFile(bookDir, chapter.index);
-      await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
-    }
-  }
-
-  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
-    try {
-      final bookDir = await _getBookDir(bookId);
-      final chapterFile = _getChapterFile(bookDir, index);
-      if (!await chapterFile.exists()) return null;
-      final json = await chapterFile.readAsString();
-      return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to load chapter $index for $bookId: $e', name: 'Reader', error: e);
+    final file = File(filePath);
+    if (!await file.exists()) {
       return null;
     }
+
+    final stat = await file.stat();
+    final contentHash = await _fileRepo.getContentHash(bookId);
+    return CacheSourceFingerprint(
+      format: detectBookFormat(filePath).name,
+      fileSize: stat.size,
+      fileMtime: stat.modified.millisecondsSinceEpoch,
+      contentHash: contentHash,
+    );
   }
 
-  Future<void> saveChapter(String bookId, ReaderChapter chapter) async {
-    final bookDir = await _getBookDir(bookId);
-    final chapterFile = _getChapterFile(bookDir, chapter.index);
-    await chapterFile.writeAsString(jsonEncode(chapter.toJson()));
-  }
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) => cache.getMetadata(bookId);
 
-  // Legacy monolithic cache — kept for migration fallback
-  Future<NormalizedBook?> getCachedBook(String bookId) async {
-    final cacheFile = await _getCacheFile(bookId);
-    if (!await cacheFile.exists()) return null;
-    try {
-      final json = await cacheFile.readAsString();
-      return NormalizedBook.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } on Object catch (e) {
-      _logger.warning('Failed to read cached book: $e', name: 'Reader', error: e);
-      return null;
-    }
-  }
+  Future<ReaderChapter?> loadChapter(String bookId, int index) => cache.getChapter(bookId, index);
 
-  Future<void> saveToCache(String bookId, NormalizedBook book) async {
-    final cacheFile = await _getCacheFile(bookId);
-    await cacheFile.writeAsString(jsonEncode(book.toJson()));
-  }
+  Future<void> saveChapter(String bookId, ReaderChapter chapter) =>
+      cache.putChapter(bookId, chapter);
 
-  Future<NormalizedBook> openBookWithCache(String bookId) async {
-    // Try split cache first
-    final cachedMeta = await getCachedMetadata(bookId);
+  Future<void> invalidateBookCache(
+    String bookId, {
+    bool preserveImages = false,
+  }) => cache.invalidate(bookId, preserveImages: preserveImages);
+
+  Future<NormalizedBook?> getCachedBook(String bookId) => cache.getCachedBook(bookId);
+
+  Future<void> saveToCache(String bookId, NormalizedBook book) => cache.saveToCache(bookId, book);
+
+  Future<NormalizedBook> openBookWithCache(
+    String bookId, {
+    bool loadChapters = true,
+  }) async {
+    final cid = 'cache-$bookId-${DateTime.now().millisecondsSinceEpoch}';
+    final sw = Stopwatch()..start();
+    final cachedMeta = await cache.getMetadata(bookId);
     if (cachedMeta != null) {
-      final chapters = <ReaderChapter>[];
-      for (var i = 0; i < cachedMeta.chapterCount; i++) {
-        final chapter = await loadChapter(bookId, i);
-        if (chapter != null) {
-          chapters.add(chapter);
-        }
-      }
-      if (chapters.length == cachedMeta.chapterCount) {
+      _logger.info(
+        'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
+        name: 'Reader',
+        cid: cid,
+      );
+      final isComplete = await cache.isCacheValid(bookId, cachedMeta);
+      if (!loadChapters) {
         return NormalizedBook(
           id: cachedMeta.id,
           title: cachedMeta.title,
           authors: cachedMeta.authors,
           description: cachedMeta.description,
           coverUrl: cachedMeta.coverUrl,
-          chapters: chapters,
+          chapters: [
+            for (var i = 0; i < cachedMeta.chapterCount; i++)
+              ReaderChapter(
+                index: i,
+                title: i < cachedMeta.chapterTitles.length
+                    ? cachedMeta.chapterTitles[i]
+                    : 'Глава ${i + 1}',
+                blocks: const [],
+              ),
+          ],
           metadata: cachedMeta.metadata,
         );
       }
+
+      if (!isComplete) {
+        _logger.warning(
+          'Split cache is incomplete for $bookId',
+          name: 'Reader',
+        );
+      } else {
+        final chapters = <ReaderChapter>[];
+        for (var i = 0; i < cachedMeta.chapterCount; i++) {
+          final chapter = await cache.getChapter(bookId, i);
+          if (chapter != null) {
+            chapters.add(chapter);
+          }
+        }
+        if (chapters.length == cachedMeta.chapterCount) {
+          return NormalizedBook(
+            id: cachedMeta.id,
+            title: cachedMeta.title,
+            authors: cachedMeta.authors,
+            description: cachedMeta.description,
+            coverUrl: cachedMeta.coverUrl,
+            chapters: chapters,
+            metadata: cachedMeta.metadata,
+          );
+        }
+      }
+
+      return NormalizedBook(
+        id: cachedMeta.id,
+        title: cachedMeta.title,
+        authors: cachedMeta.authors,
+        description: cachedMeta.description,
+        coverUrl: cachedMeta.coverUrl,
+        chapters: [
+          for (var i = 0; i < cachedMeta.chapterCount; i++)
+            ReaderChapter(
+              index: i,
+              title: i < cachedMeta.chapterTitles.length
+                  ? cachedMeta.chapterTitles[i]
+                  : 'Глава ${i + 1}',
+              blocks: const [],
+            ),
+        ],
+        metadata: cachedMeta.metadata,
+      );
     }
 
-    // Try legacy monolithic cache
-    final cached = await getCachedBook(bookId);
+    final cached = await cache.getCachedBook(bookId);
     if (cached != null) {
-      // Migrate to split cache in background
-      unawaited(_saveSplitCache(bookId, cached));
+      _logger.info(
+        'Cache HIT (legacy) for $bookId in ${sw.elapsedMilliseconds}ms',
+        name: 'Reader',
+        cid: cid,
+      );
+      unawaited(cache.migrateLegacyCache(bookId, cached));
       return cached;
     }
 
-    // Parse fresh and save as split cache
-    final book = await openBook(bookId);
-    await _saveSplitCache(bookId, book);
-    return book;
+    _logger.info(
+      'Cache MISS for $bookId, parsing fresh',
+      name: 'Reader',
+      cid: cid,
+    );
+    try {
+      final book = await openBook(bookId);
+      await cache.putBook(bookId, book);
+      return book;
+    } on TimeoutException {
+      await cache.invalidate(bookId, preserveImages: true);
+      rethrow;
+    }
   }
 }

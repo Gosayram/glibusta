@@ -47,7 +47,21 @@ void main() {
     });
 
     test('handles empty string', () {
-      expect(sanitizeId(''), '');
+      expect(sanitizeId(''), 'unnamed');
+    });
+
+    test('strips leading dots', () {
+      expect(sanitizeId('.hidden'), 'hidden');
+      expect(sanitizeId('...dots'), 'dots');
+    });
+
+    test('truncates very long ids', () {
+      final long = 'a' * 300;
+      expect(sanitizeId(long).length, 200);
+    });
+
+    test('trims whitespace', () {
+      expect(sanitizeId('  book  '), 'book');
     });
 
     test('handles id with multiple special chars', () {

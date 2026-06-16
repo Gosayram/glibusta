@@ -86,6 +86,7 @@ class CacheManager {
   CacheManager(this._cacheDir);
   final Directory _cacheDir;
 
+  static const _maxIndexEntriesBeforeCleanup = 200;
   final Map<String, CachedEntry> _index = {};
   Timer? _cleanupTimer;
 
@@ -120,7 +121,7 @@ class CacheManager {
     final stat = await cachedFile.stat();
     final policy = CachePolicy.policies[type]!;
 
-    if (_index.length > 200) {
+    if (_index.length > _maxIndexEntriesBeforeCleanup) {
       unawaited(_cleanupExpired());
     }
 

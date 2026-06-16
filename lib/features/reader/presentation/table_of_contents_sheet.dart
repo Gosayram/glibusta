@@ -9,12 +9,16 @@ class TableOfContentsSheet extends StatelessWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final ValueChanged<ReaderPosition> onJumpToPosition;
+  final Map<int, ReaderChapter> loadedChapters;
+  final bool isDynamicallyLoading;
 
   const TableOfContentsSheet({
     super.key,
     required this.metadata,
     required this.currentChapterIndex,
     required this.onJumpToPosition,
+    this.loadedChapters = const {},
+    this.isDynamicallyLoading = false,
   });
 
   static void show(
@@ -22,6 +26,8 @@ class TableOfContentsSheet extends StatelessWidget {
     required NormalizedBookMetadata metadata,
     required int currentChapterIndex,
     required ValueChanged<ReaderPosition> onJumpToPosition,
+    Map<int, ReaderChapter> loadedChapters = const {},
+    bool isDynamicallyLoading = false,
   }) {
     unawaited(
       showModalBottomSheet<void>(
@@ -38,6 +44,8 @@ class TableOfContentsSheet extends StatelessWidget {
             currentChapterIndex: currentChapterIndex,
             onJumpToPosition: onJumpToPosition,
             scrollController: scrollController,
+            loadedChapters: loadedChapters,
+            isDynamicallyLoading: isDynamicallyLoading,
           ),
         ),
       ),
@@ -55,12 +63,16 @@ class _TableOfContentsContent extends StatelessWidget {
   final int currentChapterIndex;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final ScrollController scrollController;
+  final Map<int, ReaderChapter> loadedChapters;
+  final bool isDynamicallyLoading;
 
   const _TableOfContentsContent({
     required this.metadata,
     required this.currentChapterIndex,
     required this.onJumpToPosition,
     required this.scrollController,
+    this.loadedChapters = const {},
+    this.isDynamicallyLoading = false,
   });
 
   @override
@@ -114,29 +126,49 @@ class _TableOfContentsContent extends StatelessWidget {
                   ? metadata.chapterTitles[index]
                   : '';
               final isActive = index == currentChapterIndex;
+              final isLoaded = loadedChapters.containsKey(index);
+              final isUnloaded = !isLoaded && isDynamicallyLoading;
               return ListTile(
                 leading: CircleAvatar(
                   radius: 16,
                   backgroundColor: isActive
                       ? Theme.of(context).colorScheme.primary
                       : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: Text(
-                    '${index + 1}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isActive
-                          ? Theme.of(context).colorScheme.onPrimary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  child: isUnloaded
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isActive
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                 ),
                 title: Text(
                   title.isNotEmpty ? title : 'Глава ${index + 1}',
                   style: TextStyle(
                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                    color: isActive ? Theme.of(context).colorScheme.primary : null,
+                    color: isUnloaded
+                        ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                        : isActive
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
                   ),
                 ),
+                subtitle: isUnloaded
+                    ? Text(
+                        'загрузка...',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    : null,
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();

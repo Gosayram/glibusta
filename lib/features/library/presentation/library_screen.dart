@@ -9,6 +9,8 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
+import '../../../core/services/background_task_provider.dart';
+import '../../../core/services/task_queue_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
@@ -32,18 +34,64 @@ Future<List<Book>> libraryBooks(Ref ref) async {
   return repository.getAllBooks();
 }
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  bool _isSearchOpen = false;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final booksAsync = ref.watch(libraryBooksProvider);
+    final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Библиотека'),
+        title: _isSearchOpen
+            ? TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск в библиотеке...',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  setState(() => _searchQuery = value);
+                },
+              )
+            : const Text('Библиотека'),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
+            tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = !_isSearchOpen;
+                if (!_isSearchOpen) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
+            },
+          ),
           IconButton(
             icon: Icon(
               _viewModeIcon(
@@ -63,52 +111,81 @@ class LibraryScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: BookDropZone(
-        onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
-        child: RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(libraryBooksProvider);
-          },
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: KeyedSubtree(
-              key: ValueKey(
-                booksAsync.isLoading
-                    ? 'loading'
-                    : booksAsync.hasError
-                    ? 'error'
-                    : 'data_${booksAsync.value?.length ?? 0}',
+      body: Column(
+        children: [
+          if (runningTasks.isNotEmpty)
+            Material(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              child: SizedBox(
+                height: 3,
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.transparent,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
-              child: booksAsync.when(
-                data: (List<Book> books) => _buildBooksGrid(context, ref, books),
-                loading: () => Skeletonizer(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.75,
+            ),
+          Expanded(
+            child: BookDropZone(
+              onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(libraryBooksProvider);
+                },
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: KeyedSubtree(
+                    key: ValueKey(
+                      booksAsync.isLoading
+                          ? 'loading'
+                          : booksAsync.hasError
+                          ? 'error'
+                          : 'data_${booksAsync.value?.length ?? 0}',
                     ),
-                    itemCount: 6,
-                    itemBuilder: (_, _) => const Card(
-                      child: ListTile(
-                        leading: Bone.circle(size: 48),
-                        title: Bone.text(words: 3),
-                        subtitle: Bone.text(words: 2),
+                    child: booksAsync.when(
+                      data: (List<Book> books) {
+                        final query = _searchQuery.toLowerCase();
+                        final filtered = query.isEmpty
+                            ? books
+                            : books.where((b) {
+                                final titleMatch = b.title.toLowerCase().contains(query);
+                                final authorMatch = b.displayAuthor.toLowerCase().contains(query);
+                                final descMatch =
+                                    b.description?.toLowerCase().contains(query) ?? false;
+                                return titleMatch || authorMatch || descMatch;
+                              }).toList();
+                        return _buildBooksGrid(context, ref, filtered);
+                      },
+                      loading: () => Skeletonizer(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.75,
+                          ),
+                          itemCount: 6,
+                          itemBuilder: (_, _) => Card(
+                            child: ListTile(
+                              leading: const Bone.circle(size: 48),
+                              title: Text(BoneMock.name),
+                              subtitle: Text(BoneMock.subtitle),
+                            ),
+                          ),
+                        ),
+                      ),
+                      error: (Object e, _) => ErrorStateWidget(
+                        message: 'Не удалось загрузить библиотеку',
+                        details: e.toString(),
+                        onRetry: () => ref.invalidate(libraryBooksProvider),
                       ),
                     ),
                   ),
                 ),
-                error: (Object e, _) => ErrorStateWidget(
-                  message: 'Не удалось загрузить библиотеку',
-                  details: e.toString(),
-                  onRetry: () => ref.invalidate(libraryBooksProvider),
-                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -142,7 +219,13 @@ class LibraryScreen extends ConsumerWidget {
   ) async {
     try {
       final inspection = await ref.read(bookFileInspectionProvider(path).future);
-      final result = await service.importFromInspection(inspection);
+      final result = await ref
+          .read(taskQueueProvider)
+          .run<ImportResult>(
+            type: BackgroundTaskType.import,
+            message: 'Импорт: ${inspection.title ?? path.split('/').last}',
+            task: () => service.importFromInspection(inspection),
+          );
       if (result.isSuccess || result.needsEncodingSelection) {
         ref.invalidate(libraryBooksProvider);
       }
@@ -186,17 +269,14 @@ class LibraryScreen extends ConsumerWidget {
         return;
       }
 
-      if (inspection.decision == ImportDecision.openAsPdf) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PDF открывается отдельным просмотрщиком')),
-          );
-        }
-        return;
-      }
-
       final service = ref.read(bookImportServiceProvider);
-      final importResult = await service.importFromInspection(inspection);
+      final importResult = await ref
+          .read(taskQueueProvider)
+          .run<ImportResult>(
+            type: BackgroundTaskType.import,
+            message: 'Импорт: ${inspection.title ?? filePath.split('/').last}',
+            task: () => service.importFromInspection(inspection),
+          );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -224,14 +304,22 @@ class LibraryScreen extends ConsumerWidget {
       if (dirPath == null) return;
 
       final service = ref.read(bookImportServiceProvider);
-      final batchResult = await service.importDirectory(dirPath);
+      final batchResult = await ref
+          .read(taskQueueProvider)
+          .run<ImportBatchResult>(
+            type: BackgroundTaskType.directoryScan,
+            message: 'Импорт папки...',
+            task: () => service.importDirectory(dirPath),
+          );
       if (context.mounted) {
+        final firstFailure = batchResult.failures.firstOrNull;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               'Импортировано: ${batchResult.successCount}, '
               'дубликатов: ${batchResult.duplicateCount}, '
-              'ошибок: ${batchResult.failureCount}',
+              'ошибок: ${batchResult.failureCount}'
+              '${firstFailure != null ? '. Первая ошибка: ${_fileName(firstFailure.path)}' : ''}',
             ),
             duration: const Duration(seconds: 3),
           ),
@@ -241,6 +329,13 @@ class LibraryScreen extends ConsumerWidget {
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
+  }
+
+  String _fileName(String path) {
+    if (path.isEmpty) return 'unknown';
+    final normalized = path.replaceAll(r'\', '/');
+    final lastSlash = normalized.lastIndexOf('/');
+    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
   }
 
   void _showImportSheet(BuildContext context, WidgetRef ref) {

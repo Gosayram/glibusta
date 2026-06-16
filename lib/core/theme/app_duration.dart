@@ -20,6 +20,9 @@ class AppDuration {
   static const Duration httpConnect = Duration(seconds: 10);
   static const Duration httpReceive = Duration(seconds: 30);
   static const Duration httpRequest = Duration(seconds: 30);
+  static const Duration httpIdle = Duration.zero;
+  static const Duration httpDownloadResponse = Duration(minutes: 10);
+  static const Duration httpDownloadIdle = Duration(minutes: 5);
 
   // Reader
   static const Duration readerThemeTransition = Duration(milliseconds: 250);

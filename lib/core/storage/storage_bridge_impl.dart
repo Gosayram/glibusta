@@ -1,7 +1,12 @@
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'external_book_file.dart';
 import 'storage_bridge.dart';
+
+final storageBridgeProvider = Provider<StorageBridge>((ref) {
+  return StorageBridgeImpl();
+});
 
 class StorageBridgeImpl implements StorageBridge {
   static const _channel = MethodChannel('com.gosayram.glibusta/storage_bridge');
@@ -31,6 +36,8 @@ class StorageBridgeImpl implements StorageBridge {
           name: map['name'] as String,
           size: map['size'] as int,
           extension: map['extension'] as String,
+          mimeType: map['mimeType'] as String?,
+          lastModified: map['lastModified'] as int?,
         );
       }).toList();
     } on PlatformException {
@@ -52,6 +59,19 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
+  Future<String?> copyToCache(String fileUri) async {
+    try {
+      final path = await _channel.invokeMethod<String>(
+        'copyToCache',
+        {'uri': fileUri},
+      );
+      return path;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  @override
   Future<List<String>> getPersistedUris() async {
     try {
       final result = await _channel.invokeMethod<List<dynamic>>('getPersistedUris');
@@ -59,6 +79,16 @@ class StorageBridgeImpl implements StorageBridge {
       return result.cast<String>();
     } on PlatformException {
       return [];
+    }
+  }
+
+  @override
+  Future<bool> forgetUri(String uri) async {
+    try {
+      await _channel.invokeMethod<bool>('forgetUri', {'uri': uri});
+      return true;
+    } on PlatformException {
+      return false;
     }
   }
 }

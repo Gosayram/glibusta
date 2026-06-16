@@ -76,11 +76,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: 5,
-                        itemBuilder: (_, _) => const Card(
-                          margin: EdgeInsets.only(right: 8),
+                        itemBuilder: (_, _) => Card(
+                          margin: const EdgeInsets.only(right: 8),
                           child: SizedBox(
                             width: 100,
-                            child: Center(child: Bone.text(words: 1)),
+                            child: Center(child: Text(BoneMock.name)),
                           ),
                         ),
                       ),
@@ -153,11 +153,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                           childAspectRatio: 0.75,
                         ),
                         itemCount: 6,
-                        itemBuilder: (_, _) => const Card(
+                        itemBuilder: (_, _) => Card(
                           child: ListTile(
-                            leading: Bone.circle(size: 48),
-                            title: Bone.text(words: 3),
-                            subtitle: Bone.text(words: 2),
+                            leading: const Bone.circle(size: 48),
+                            title: Text(BoneMock.name),
+                            subtitle: Text(BoneMock.subtitle),
                           ),
                         ),
                       ),
@@ -259,20 +259,24 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       childAspectRatio: 0.62,
                     ),
                     itemCount: 4,
-                    itemBuilder: (_, _) => const Card(
+                    itemBuilder: (_, _) => Card(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Bone.square()),
+                          const Expanded(
+                            child: Skeleton.replace(child: Bone.square()),
+                          ),
                           Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Bone.text(words: 3),
-                                SizedBox(height: 4),
-                                Bone.text(words: 2),
-                              ],
+                            padding: const EdgeInsets.all(8),
+                            child: Skeleton.unite(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(BoneMock.name),
+                                  const SizedBox(height: 4),
+                                  Text(BoneMock.subtitle),
+                                ],
+                              ),
                             ),
                           ),
                         ],

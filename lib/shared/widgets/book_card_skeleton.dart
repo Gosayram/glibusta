@@ -6,23 +6,27 @@ class BookCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Bone(width: double.infinity, height: double.infinity),
+          const Expanded(
+            child: Skeleton.replace(
+              child: SizedBox.expand(),
+            ),
           ),
           Padding(
-            padding: EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Bone.text(words: 3),
-                SizedBox(height: 4),
-                Bone.text(words: 2),
-              ],
+            padding: const EdgeInsets.all(8),
+            child: Skeleton.unite(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(BoneMock.title),
+                  const SizedBox(height: 4),
+                  Text(BoneMock.subtitle),
+                ],
+              ),
             ),
           ),
         ],
@@ -43,10 +47,10 @@ class BookListSkeleton extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: itemCount,
         separatorBuilder: (_, _) => const SizedBox(height: 4),
-        itemBuilder: (_, _) => const ListTile(
-          leading: Bone.circle(size: 40),
-          title: Bone.text(words: 4),
-          subtitle: Bone.text(words: 2),
+        itemBuilder: (_, _) => ListTile(
+          leading: const Bone.circle(size: 40),
+          title: Text(BoneMock.name),
+          subtitle: Text(BoneMock.subtitle),
         ),
       ),
     );

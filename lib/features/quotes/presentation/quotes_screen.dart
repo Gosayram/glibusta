@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/quote_repository.dart';
 
@@ -73,13 +74,10 @@ class QuotesScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final quote = quotes[index];
               return QuoteTile(
-                    quote: quote,
-                    onTap: () => _showQuoteDetail(context, ref, quote),
-                    onDelete: () => _deleteQuote(context, ref, quote),
-                  )
-                  .animate()
-                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
-                  .slideX(begin: 0.03, duration: 300.ms);
+                quote: quote,
+                onTap: () => _showQuoteDetail(context, ref, quote),
+                onDelete: () => _deleteQuote(context, ref, quote),
+              ).animate().listTileTransition(delay: (index * 50).ms);
             },
           );
         },
@@ -87,19 +85,21 @@ class QuotesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 4,
-            itemBuilder: (_, _) => const Card(
-              margin: EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
               child: Padding(
-                padding: EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Bone.text(words: 2),
-                    SizedBox(height: 8),
-                    Bone.text(words: 8),
-                    SizedBox(height: 8),
-                    Bone.text(words: 4),
-                  ],
+                padding: const EdgeInsets.all(12),
+                child: Skeleton.unite(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(BoneMock.name),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.paragraph),
+                      const SizedBox(height: 8),
+                      Text(BoneMock.title),
+                    ],
+                  ),
                 ),
               ),
             ),

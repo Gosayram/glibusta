@@ -41,7 +41,7 @@ final class SearchControllerNotifierProvider
   }
 }
 
-String _$searchControllerNotifierHash() => r'f790628456a68ac8caebbb0b69b1ad72601317ef';
+String _$searchControllerNotifierHash() => r'01a63388273c78c82ba6c13be05d7ba0718dee9d';
 
 abstract class _$SearchControllerNotifier extends $Notifier<SearchState> {
   SearchState build();

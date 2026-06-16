@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/app_animations.dart';
+
 import 'series_provider.dart';
 
 class SeriesScreen extends ConsumerWidget {
@@ -48,10 +50,9 @@ class SeriesScreen extends ConsumerWidget {
             itemCount: seriesList.length,
             itemBuilder: (context, int index) {
               final series = seriesList[index];
-              return _SeriesTile(series: series)
-                  .animate()
-                  .fadeIn(delay: (index * 50).ms, duration: 300.ms)
-                  .slideX(begin: 0.03, duration: 300.ms);
+              return _SeriesTile(
+                series: series,
+              ).animate().listTileTransition(delay: (index * 50).ms);
             },
           );
         },
@@ -59,12 +60,12 @@ class SeriesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 6,
-            itemBuilder: (_, _) => const Card(
-              margin: EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: Bone.circle(size: 40),
-                title: Bone.text(words: 3),
-                subtitle: Bone.text(words: 2),
+                leading: const Bone.circle(size: 40),
+                title: Text(BoneMock.name),
+                subtitle: Text(BoneMock.subtitle),
               ),
             ),
           ),

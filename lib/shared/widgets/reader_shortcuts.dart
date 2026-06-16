@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-typedef VoidCallback = void Function();
-
 class ReaderShortcuts extends StatefulWidget {
   const ReaderShortcuts({
     super.key,
