@@ -67,9 +67,9 @@ extension AdaptiveContext on BuildContext {
 
   /// Max cross-axis extent for book grid cards based on window class.
   double get bookCardMaxExtent => switch (windowClass) {
-    WindowClass.compact => 180,
+    WindowClass.compact => 140,
     WindowClass.medium => 200,
-    WindowClass.expanded => 220,
+    WindowClass.expanded => 260,
   };
 
   /// Horizontal padding for reader based on window class.

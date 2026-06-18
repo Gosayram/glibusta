@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_database.dart';
 import '../tables.dart';
@@ -63,3 +64,8 @@ class TagDao extends DatabaseAccessor<AppDatabase> with _$TagDaoMixin {
     }
   }
 }
+
+final tagDaoProvider = Provider<TagDao>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.tagDao;
+});

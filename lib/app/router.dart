@@ -16,7 +16,9 @@ import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
+import '../features/reader/presentation/chapter_split_rules_screen.dart';
 import '../features/reader/presentation/reader_entry_screen.dart';
+import '../features/reader/presentation/reading_info_settings_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/series/presentation/series_detail_screen.dart';
@@ -154,6 +156,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings/tags',
             name: 'tags',
             builder: (BuildContext context, GoRouterState state) => const TagManagementScreen(),
+          ),
+          GoRoute(
+            path: '/settings/reading-info',
+            name: 'reading-info',
+            builder: (BuildContext context, GoRouterState state) =>
+                const ReadingInfoSettingsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/chapter-split-rules',
+            name: 'chapter-split-rules',
+            builder: (BuildContext context, GoRouterState state) => const ChapterSplitRulesScreen(),
           ),
           GoRoute(
             path: '/404',

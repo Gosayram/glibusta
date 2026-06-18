@@ -134,6 +134,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Управление тегами книг',
             onTap: () => context.push('/settings/tags'),
           ),
+          _SettingsTile(
+            icon: Icons.info_outline,
+            title: 'Reading Info Bar',
+            subtitle: 'Настройка header/footer в reader',
+            onTap: () => context.push('/settings/reading-info'),
+          ),
+          _SettingsTile(
+            icon: Icons.view_list,
+            title: 'Chapter Split Rules',
+            subtitle: 'Правила разделения TXT на главы',
+            onTap: () => context.push('/settings/chapter-split-rules'),
+          ),
 
           const Divider(),
           const _SectionHeader(title: 'Отображение'),
