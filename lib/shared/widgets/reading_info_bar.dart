@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/platform/platform_providers.dart';
+import '../../core/theme/app_duration.dart';
 import '../../features/reader/data/reading_info_model.dart';
 import '../../features/reader/presentation/reader_controller.dart';
 import 'minute_clock.dart';
@@ -12,11 +13,13 @@ class ReadingInfoBar extends ConsumerWidget {
     required this.config,
     required this.isHeader,
     required this.controller,
+    this.visible = true,
   });
 
   final ReadingInfoModel config;
   final bool isHeader;
   final ReaderController controller;
+  final bool visible;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -28,21 +31,32 @@ class ReadingInfoBar extends ConsumerWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
 
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: config.margin,
-        vertical: config.margin / 2,
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _buildSlot(isHeader ? config.headerLeft : config.footerLeft, textStyle)),
-          Expanded(
-            child: _buildSlot(isHeader ? config.headerCenter : config.footerCenter, textStyle),
+    return AnimatedSlide(
+      offset: visible ? Offset.zero : (isHeader ? const Offset(0, -1) : const Offset(0, 1)),
+      duration: AppDuration.fast,
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: visible ? 1.0 : 0.0,
+        duration: AppDuration.fast,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: config.margin,
+            vertical: config.margin / 2,
           ),
-          Expanded(
-            child: _buildSlot(isHeader ? config.headerRight : config.footerRight, textStyle),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildSlot(isHeader ? config.headerLeft : config.footerLeft, textStyle),
+              ),
+              Expanded(
+                child: _buildSlot(isHeader ? config.headerCenter : config.footerCenter, textStyle),
+              ),
+              Expanded(
+                child: _buildSlot(isHeader ? config.headerRight : config.footerRight, textStyle),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

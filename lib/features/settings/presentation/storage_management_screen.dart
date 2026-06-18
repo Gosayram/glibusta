@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/platform/app_file_storage.dart';
+import '../../../core/services/catalog_cover_cache_service.dart';
 import '../../../core/services/smart_cleanup_service.dart';
 import '../../../core/storage/storage_info_model.dart';
 
@@ -92,6 +93,20 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
               title: 'Тяжёлые книги',
               subtitle: 'Книги больше 5 МБ',
               onTap: _findHeavyBooks,
+              enabled: !_isCleaning,
+            ),
+            _ActionTile(
+              icon: Icons.image_not_supported,
+              title: 'Очистить кеш обложек каталога',
+              subtitle: 'Удалить все кешированные обложки',
+              onTap: _cleanCatalogCovers,
+              enabled: !_isCleaning,
+            ),
+            _ActionTile(
+              icon: Icons.timer,
+              title: 'Очистить устаревшие обложки',
+              subtitle: 'Обложки старше 30 дней',
+              onTap: _cleanExpiredCatalogCovers,
               enabled: !_isCleaning,
             ),
           ],
@@ -232,6 +247,36 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isCleaning = false);
+    }
+  }
+
+  Future<void> _cleanCatalogCovers() async {
+    setState(() => _isCleaning = true);
+    try {
+      final cacheService = ref.read(catalogCoverCacheServiceProvider);
+      await cacheService.clearAll();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Кеш обложек каталога очищен')),
+      );
+      ref.invalidate(storageInfoProvider);
+    } finally {
+      if (mounted) setState(() => _isCleaning = false);
+    }
+  }
+
+  Future<void> _cleanExpiredCatalogCovers() async {
+    setState(() => _isCleaning = true);
+    try {
+      final cacheService = ref.read(catalogCoverCacheServiceProvider);
+      await cacheService.clearExpired();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Устаревшие обложки удалены')),
+      );
+      ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
     }

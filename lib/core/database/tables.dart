@@ -218,3 +218,13 @@ class BookTags extends Table {
   @override
   Set<Column<Object>> get primaryKey => {bookId, tagId};
 }
+
+class ReadingTime extends Table {
+  TextColumn get bookId => text()();
+  DateTimeColumn get date => dateTime()();
+  IntColumn get readingTimeSeconds => integer().withDefault(const Constant(0))();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {bookId, date};
+}

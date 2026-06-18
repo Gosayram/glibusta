@@ -100,7 +100,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 180);
+      expect(delegate.maxCrossAxisExtent, 140);
     });
   });
 
@@ -129,7 +129,7 @@ void main() {
       expect(find.byType(NavigationRail), findsNothing);
     });
 
-    testWidgets('BookGrid renders with maxCrossAxisExtent 180', (tester) async {
+    testWidgets('BookGrid renders with maxCrossAxisExtent 140', (tester) async {
       setScreenSize(tester, 412, 915);
       final books = makeBooks(8);
 
@@ -141,7 +141,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 180);
+      expect(delegate.maxCrossAxisExtent, 140);
     });
   });
 
@@ -391,7 +391,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 220);
+      expect(delegate.maxCrossAxisExtent, 260);
     });
   });
 

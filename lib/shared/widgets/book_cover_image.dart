@@ -84,6 +84,7 @@ class BookCoverImage extends ConsumerWidget {
   final double? width;
   final double? height;
   final BoxFit fit;
+  final bool useHero;
 
   const BookCoverImage({
     super.key,
@@ -91,6 +92,7 @@ class BookCoverImage extends ConsumerWidget {
     this.width,
     this.height,
     this.fit = BoxFit.cover,
+    this.useHero = true,
   });
 
   @override
@@ -109,7 +111,7 @@ class BookCoverImage extends ConsumerWidget {
       future: cacheService.getCover(book.coverUrl!),
       builder: (context, snapshot) {
         final cachedFile = snapshot.data;
-        return Stack(
+        final imageWidget = Stack(
           fit: StackFit.expand,
           children: [
             placeholder,
@@ -138,6 +140,14 @@ class BookCoverImage extends ConsumerWidget {
               ),
           ],
         );
+
+        if (useHero) {
+          return Hero(
+            tag: 'book_cover_${book.id}',
+            child: imageWidget,
+          );
+        }
+        return imageWidget;
       },
     );
   }
