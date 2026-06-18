@@ -145,6 +145,32 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       _ctrl.scrollToNext();
       return true;
     }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _ctrl.scrollToPrevious();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+        event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _ctrl.scrollToNext();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+      _ctrl.scrollToPrevious();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+      _ctrl.scrollToNext();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space) {
+      _ctrl.scrollToNext();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return true;
+    }
     return false;
   }
 
@@ -599,6 +625,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       showAdaptivePanel<void>(
         context: context,
         child: ReaderQuickSettingsSheet(
+          bookId: widget.bookId,
           onDismiss: () {
             _ctrl.onBottomSheetClose();
             _gestureCoordinator.onBottomSheetClosed();

@@ -18,6 +18,7 @@ import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
+import '../../reader/data/per_book_settings_service.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
@@ -720,6 +721,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 leading: const Icon(Icons.bookmark_add),
                 title: const Text('Добавить закладку'),
                 onTap: () => Navigator.pop(ctx),
+              ),
+              ListTile(
+                leading: const Icon(Icons.tune),
+                title: const Text('Сбросить настройки чтения'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final svc = ref.read(perBookSettingsServiceProvider);
+                  await svc.resetToGlobal(book.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Настройки сброшены')),
+                    );
+                  }
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.delete),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -27,8 +28,9 @@ final class DocxParser implements BookParser {
       }
       final content = String.fromCharCodes(documentXml);
       final doc = XmlDocument.parse(content);
+      final rels = _buildRelationshipMap(archive);
       final title = _extractTitle(archive) ?? _titleFromFileName(fileName);
-      final blocks = _extractBlocks(doc);
+      final blocks = _extractBlocks(doc, archive, rels);
       return NormalizedBook(
         id: fileName ?? 'unknown.docx',
         title: title,
@@ -74,6 +76,23 @@ final class DocxParser implements BookParser {
       }
     }
     return null;
+  }
+
+  Map<String, String> _buildRelationshipMap(Archive archive) {
+    final map = <String, String>{};
+    final relsBytes = _findFile(archive, 'word/_rels/document.xml.rels');
+    if (relsBytes == null) return map;
+    try {
+      final relsDoc = XmlDocument.parse(String.fromCharCodes(relsBytes));
+      for (final rel in relsDoc.findAllElements('Relationship')) {
+        final id = rel.getAttribute('Id');
+        final target = rel.getAttribute('Target');
+        if (id != null && target != null) {
+          map[id] = 'word/$target';
+        }
+      }
+    } on Object catch (_) {}
+    return map;
   }
 
   String? _extractTitle(Archive archive) {
@@ -125,7 +144,11 @@ final class DocxParser implements BookParser {
     return fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
   }
 
-  List<ReaderBlock> _extractBlocks(XmlDocument doc) {
+  List<ReaderBlock> _extractBlocks(
+    XmlDocument doc,
+    Archive archive,
+    Map<String, String> rels,
+  ) {
     final blocks = <ReaderBlock>[];
     var index = 0;
     final body = doc.findAllElements('w:body');
@@ -144,19 +167,72 @@ final class DocxParser implements BookParser {
           text += runText;
         }
       }
-      if (text.trim().isEmpty) continue;
-      final pPr = paragraph.findAllElements('w:pPr').firstOrNull;
-      final outlineLevel = pPr?.findAllElements('w:outlineLvl').firstOrNull;
-      final isHeading = outlineLevel != null;
-      blocks.add(
-        ReaderBlock(
-          index: index++,
-          text: text.trim(),
-          type: isHeading ? BlockType.heading : BlockType.paragraph,
-          richSpans: runs.isNotEmpty ? runs : null,
-        ),
-      );
+      if (text.trim().isNotEmpty) {
+        final pPr = paragraph.findAllElements('w:pPr').firstOrNull;
+        final outlineLevel = pPr?.findAllElements('w:outlineLvl').firstOrNull;
+        final isHeading = outlineLevel != null;
+        blocks.add(
+          ReaderBlock(
+            index: index++,
+            text: text.trim(),
+            type: isHeading ? BlockType.heading : BlockType.paragraph,
+            richSpans: runs.isNotEmpty ? runs : null,
+          ),
+        );
+      }
+      for (final drawing in paragraph.findAllElements('w:drawing')) {
+        final imageBlock = _extractImageBlock(drawing, archive, rels, index);
+        if (imageBlock != null) {
+          blocks.add(imageBlock);
+          index++;
+        }
+      }
     }
     return blocks;
+  }
+
+  ReaderBlock? _extractImageBlock(
+    XmlElement drawing,
+    Archive archive,
+    Map<String, String> rels,
+    int index,
+  ) {
+    final blip = drawing.findAllElements('a:blip').firstOrNull;
+    if (blip == null) return null;
+    final embedId = blip.getAttribute('r:embed');
+    if (embedId == null) return null;
+    final targetPath = rels[embedId];
+    if (targetPath == null) return null;
+    final imageBytes = _findFile(archive, targetPath);
+    if (imageBytes == null) return null;
+    final ext = targetPath.split('.').last.toLowerCase();
+    final mimeType = _mimeTypeFor(ext);
+    final dataUri = 'data:$mimeType;base64,${base64Encode(imageBytes)}';
+    return ReaderBlock(
+      index: index,
+      text: '',
+      type: BlockType.image,
+      imageUrl: dataUri,
+    );
+  }
+
+  String _mimeTypeFor(String ext) {
+    switch (ext) {
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'bmp':
+        return 'image/bmp';
+      case 'tiff':
+      case 'tif':
+        return 'image/tiff';
+      case 'emf':
+        return 'image/emf';
+      case 'wmf':
+        return 'image/wmf';
+      default:
+        return 'image/jpeg';
+    }
   }
 }

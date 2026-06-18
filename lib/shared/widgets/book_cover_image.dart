@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/services/catalog_cover_cache_service.dart';
 import '../models/book.dart';
 
 const List<int> _transparentImageBytes = [
@@ -76,7 +79,7 @@ const List<int> _transparentImageBytes = [
   130,
 ];
 
-class BookCoverImage extends StatelessWidget {
+class BookCoverImage extends ConsumerWidget {
   final Book book;
   final double? width;
   final double? height;
@@ -91,33 +94,51 @@ class BookCoverImage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (book.coverUrl == null || book.coverUrl!.isEmpty) {
       return _buildPlaceholder(context);
     }
 
+    final cacheService = ref.read(catalogCoverCacheServiceProvider);
     final placeholder = _buildPlaceholder(context);
     final scale = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
     final targetWidth = width != null ? (width! * scale).round() : null;
     final targetHeight = height != null ? (height! * scale).round() : null;
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        placeholder,
-        FadeInImage(
-          placeholder: MemoryImage(Uint8List.fromList(_transparentImageBytes)),
-          image: ResizeImage(
-            NetworkImage(book.coverUrl!),
-            width: targetWidth,
-            height: targetHeight,
-          ),
-          width: width,
-          height: height,
-          fit: fit,
-          imageErrorBuilder: (_, _, _) => const SizedBox.shrink(),
-        ),
-      ],
+    return FutureBuilder<File?>(
+      future: cacheService.getCover(book.coverUrl!),
+      builder: (context, snapshot) {
+        final cachedFile = snapshot.data;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            placeholder,
+            if (cachedFile != null)
+              Image.file(
+                cachedFile,
+                width: width,
+                height: height,
+                fit: fit,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              )
+            else
+              FadeInImage(
+                placeholder: MemoryImage(
+                  Uint8List.fromList(_transparentImageBytes),
+                ),
+                image: ResizeImage(
+                  NetworkImage(book.coverUrl!),
+                  width: targetWidth,
+                  height: targetHeight,
+                ),
+                width: width,
+                height: height,
+                fit: fit,
+                imageErrorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -173,7 +194,12 @@ class BookCoverImage extends StatelessWidget {
   static (Color, Color) _generateColors(String id) {
     final hash = md5.convert(utf8.encode(id)).bytes;
     final hue = (hash[0] * 360 / 255).round();
-    final baseColor = HSLColor.fromAHSL(1.0, hue.toDouble(), 0.55, 0.45).toColor();
+    final baseColor = HSLColor.fromAHSL(
+      1.0,
+      hue.toDouble(),
+      0.55,
+      0.45,
+    ).toColor();
     final accentColor = HSLColor.fromAHSL(
       1.0,
       (hue + 30) % 360.toDouble(),

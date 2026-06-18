@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'reader_providers.dart';
 
 class ReaderQuickSettingsSheet extends ConsumerWidget {
-  const ReaderQuickSettingsSheet({super.key, this.onDismiss});
+  const ReaderQuickSettingsSheet({super.key, this.onDismiss, this.bookId});
 
   final VoidCallback? onDismiss;
+  final String? bookId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,6 +41,8 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
+
+              if (bookId != null) _buildPerBookSection(context, ref, bookId!),
 
               const Text('Тема', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -679,6 +683,56 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
           onSelected: (_) => notifier.updateForcedEncoding(encoding),
         );
       }).toList(),
+    );
+  }
+
+  static Widget _buildPerBookSection(
+    BuildContext context,
+    WidgetRef ref,
+    String bookId,
+  ) {
+    return FutureBuilder<bool>(
+      future: ref.read(perBookSettingsServiceProvider).hasPerBookSettings(bookId),
+      builder: (context, snapshot) {
+        final hasPerBook = snapshot.data ?? false;
+        if (!hasPerBook) return const SizedBox.shrink();
+        final theme = Theme.of(context);
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.bookmark,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Индивидуальные настройки',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await ref.read(perBookSettingsServiceProvider).resetToGlobal(bookId);
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                child: const Text('Сбросить'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
