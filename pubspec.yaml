@@ -69,6 +69,7 @@ dependencies:
 
   # Android-specific
   wakelock_plus: ^1.6.0
+  battery_plus: ^6.1.0
   dynamic_color: ^1.8.0
 
   # UI & Theming

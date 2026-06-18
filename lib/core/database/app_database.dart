@@ -16,6 +16,7 @@ import 'daos/download_dao.dart';
 import 'daos/genre_dao.dart';
 import 'daos/per_book_settings_dao.dart';
 import 'daos/series_dao.dart';
+import 'daos/tag_dao.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -37,6 +38,8 @@ part 'app_database.g.dart';
     BookCollections,
     ReadingSessions,
     PerBookSettings,
+    Tags,
+    BookTags,
   ],
   daos: [
     BookDao,
@@ -47,6 +50,7 @@ part 'app_database.g.dart';
     BookmarkDao,
     GenreDao,
     PerBookSettingsDao,
+    TagDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -55,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -103,6 +107,10 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 10) {
             await m.createTable(perBookSettings);
+          }
+          if (from < 11) {
+            await m.createTable(tags);
+            await m.createTable(bookTags);
           }
         });
       } finally {

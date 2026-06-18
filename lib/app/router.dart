@@ -25,6 +25,7 @@ import '../features/settings/presentation/diagnostics_screen.dart';
 import '../features/settings/presentation/font_download_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/storage_management_screen.dart';
+import '../features/settings/presentation/tag_management_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -148,6 +149,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings/storage',
             name: 'storage',
             builder: (BuildContext context, GoRouterState state) => const StorageManagementScreen(),
+          ),
+          GoRoute(
+            path: '/settings/tags',
+            name: 'tags',
+            builder: (BuildContext context, GoRouterState state) => const TagManagementScreen(),
           ),
           GoRoute(
             path: '/404',

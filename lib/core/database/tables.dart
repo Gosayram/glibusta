@@ -199,3 +199,22 @@ class PerBookSettings extends Table {
   @override
   Set<Column<Object>> get primaryKey => {bookId};
 }
+
+class Tags extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get color => text().withDefault(const Constant('#2196F3'))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class BookTags extends Table {
+  TextColumn get bookId => text()();
+  TextColumn get tagId => text()();
+  DateTimeColumn get addedAt => dateTime().clientDefault(DateTime.now)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {bookId, tagId};
+}

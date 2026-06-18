@@ -10,6 +10,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/background_task_provider.dart';
+import '../../../core/services/tag_service.dart';
 import '../../../core/services/task_queue_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
@@ -709,6 +710,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Подробности'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(context.push('/book/${book.id}'));
+                },
+              ),
+              ListTile(
                 leading: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
                 title: Text(isPinned ? 'Открепить' : 'Закрепить'),
                 subtitle: isPinned ? null : const Text('Максимум 5 книг'),
@@ -718,9 +727,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.bookmark_add),
-                title: const Text('Добавить закладку'),
-                onTap: () => Navigator.pop(ctx),
+                leading: const Icon(Icons.label_outline),
+                title: const Text('Теги'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showTagPicker(context, ref, book);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_open),
+                title: const Text('Переместить в папку'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFolderPicker(context, ref, book);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Поделиться'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _shareBook(context, book);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.tune),
@@ -749,6 +777,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
       ),
     );
+  }
+
+  void _showTagPicker(BuildContext context, WidgetRef ref, Book book) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _TagPickerSheet(book: book),
+    );
+  }
+
+  void _showFolderPicker(BuildContext context, WidgetRef ref, Book book) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Выбор папки将在 реализован')),
+    );
+  }
+
+  void _shareBook(BuildContext context, Book book) {
+    if (book.source.sourceUrl.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Поделиться «${book.title}»')),
+      );
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Book book) async {
@@ -839,5 +889,151 @@ class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(controller: _getController(), slivers: widget.slivers);
+  }
+}
+
+class _TagPickerSheet extends ConsumerStatefulWidget {
+  const _TagPickerSheet({required this.book});
+
+  final Book book;
+
+  @override
+  ConsumerState<_TagPickerSheet> createState() => _TagPickerSheetState();
+}
+
+class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
+  late Set<String> _selectedTagIds;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTagIds = {};
+    _loadTags();
+  }
+
+  Future<void> _loadTags() async {
+    final tagService = ref.read<TagService>(tagServiceProvider);
+    final bookTags = await tagService.getTagsForBook(widget.book.id);
+    if (mounted) {
+      setState(() {
+        _selectedTagIds = bookTags.map((t) => t.id).toSet();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tagsAsync = ref.watch(allTagsProvider);
+
+    return DraggableScrollableSheet(
+      minChildSize: 0.3,
+      maxChildSize: 0.8,
+      expand: false,
+      builder: (ctx, scrollController) => SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Теги',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: tagsAsync.when(
+                data: (tags) {
+                  if (tags.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.label_off, size: 48, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text('Нет тегов'),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              context.push('/settings/tags');
+                            },
+                            child: const Text('Создать тег'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: tags.length,
+                    itemBuilder: (_, index) {
+                      final tag = tags[index];
+                      final isSelected = _selectedTagIds.contains(tag.id);
+                      return CheckboxListTile(
+                        secondary: CircleAvatar(
+                          backgroundColor: _parseColor(tag.color),
+                          radius: 12,
+                        ),
+                        title: Text(tag.name),
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedTagIds.add(tag.id);
+                            } else {
+                              _selectedTagIds.remove(tag.id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Ошибка: $e')),
+              ),
+            ),
+            if (!_isLoading)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _saveTags(ctx),
+                    child: const Text('Сохранить'),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveTags(BuildContext ctx) async {
+    final tagService = ref.read(tagServiceProvider);
+    await tagService.setBookTags(widget.book.id, _selectedTagIds.toList());
+    if (ctx.mounted) {
+      Navigator.pop(ctx);
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Теги сохранены')),
+      );
+    }
+  }
+
+  Color _parseColor(String hex) {
+    final clean = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$clean', radix: 16));
   }
 }

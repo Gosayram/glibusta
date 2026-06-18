@@ -128,6 +128,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Размер данных, очистка кеша',
             onTap: () => context.push('/settings/storage'),
           ),
+          _SettingsTile(
+            icon: Icons.label,
+            title: 'Теги',
+            subtitle: 'Управление тегами книг',
+            onTap: () => context.push('/settings/tags'),
+          ),
 
           const Divider(),
           const _SectionHeader(title: 'Отображение'),
