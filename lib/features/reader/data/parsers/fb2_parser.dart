@@ -13,8 +13,8 @@ import 'normalized_book.dart';
 class Fb2Parser implements BookParser {
   final _detector = BookEncodingDetector();
 
-  /// Pattern matching <binary ...>...</binary> elements, including
-  /// those with a missing closing </binary> tag.
+  /// Pattern matching `<binary ...>...</binary>` elements, including
+  /// those with a missing closing `</binary>` tag.
   ///
   /// Matches from `<binary` to either `</binary>` or the next XML tag,
   /// since base64 content never contains `<` characters.
@@ -54,9 +54,9 @@ class Fb2Parser implements BookParser {
     }
   }
 
-  /// Remove <binary> elements before strict XML parsing.
+  /// Remove `<binary>` elements before strict XML parsing.
   ///
-  /// Some FB2 generators produce malformed <binary> blocks (missing closing
+  /// Some FB2 generators produce malformed `<binary>` blocks (missing closing
   /// tags, invalid base64, etc.). The binary data is only used for cover
   /// extraction in a separate code path that handles its own errors. Removing
   /// them here lets the rest of the document parse successfully.

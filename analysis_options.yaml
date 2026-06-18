@@ -56,11 +56,6 @@ analyzer:
 formatter:
   page_width: 100
   trailing_commas: preserve
-  exclude:
-    - test_results/**
-    - build/**
-    - node_modules/**
-    - dist/**
 
 linter:
   rules:
