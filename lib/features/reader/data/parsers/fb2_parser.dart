@@ -13,6 +13,17 @@ import 'normalized_book.dart';
 class Fb2Parser implements BookParser {
   final _detector = BookEncodingDetector();
 
+  /// Pattern matching <binary ...>...</binary> elements, including
+  /// those with a missing closing </binary> tag.
+  ///
+  /// Matches from `<binary` to either `</binary>` or the next XML tag,
+  /// since base64 content never contains `<` characters.
+  static final _binaryTagPattern = RegExp(
+    r'<binary[^>]*>(?:[^<]|<(?!/?binary))*(?:</binary>)?',
+    multiLine: true,
+    dotAll: true,
+  );
+
   @override
   bool supports(BookFormat format) => format == BookFormat.fb2;
 
@@ -31,7 +42,8 @@ class Fb2Parser implements BookParser {
         fileName: fileName,
         forcedEncoding: forcedEncoding,
       );
-      final document = XmlDocument.parse(result.text);
+      final sanitized = _sanitizeXml(result.text);
+      final document = XmlDocument.parse(sanitized);
       return _parseDocument(document);
     } on XmlException catch (e) {
       throw ParserFailure('Ошибка разбора FB2: ${e.message}');
@@ -40,6 +52,16 @@ class Fb2Parser implements BookParser {
     } on Object catch (e) {
       throw ParserFailure('Неожиданная ошибка при разборе FB2: $e');
     }
+  }
+
+  /// Remove <binary> elements before strict XML parsing.
+  ///
+  /// Some FB2 generators produce malformed <binary> blocks (missing closing
+  /// tags, invalid base64, etc.). The binary data is only used for cover
+  /// extraction in a separate code path that handles its own errors. Removing
+  /// them here lets the rest of the document parse successfully.
+  static String _sanitizeXml(String text) {
+    return text.replaceAll(_binaryTagPattern, '');
   }
 
   /// If bytes are a ZIP archive (FB2.ZIP), extract the first .fb2 file.
@@ -240,7 +262,8 @@ class Fb2Parser implements BookParser {
 }
 
 NormalizedBook parseFb2FromText(String text, {String? fileName}) {
-  final document = XmlDocument.parse(text);
+  final sanitized = Fb2Parser._sanitizeXml(text);
+  final document = XmlDocument.parse(sanitized);
 
   final description = <String, dynamic>{};
   final titleInfo = document.findAllElements('title-info');
