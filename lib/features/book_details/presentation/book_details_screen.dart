@@ -179,6 +179,42 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
       controller.index = 0;
     }
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 900;
+        if (isWide) {
+          return _buildWideLayout(
+            context,
+            book,
+            theme,
+            controller,
+            tabs,
+            tabViews,
+            progressAsync,
+          );
+        }
+        return _buildNarrowLayout(
+          context,
+          book,
+          theme,
+          controller,
+          tabs,
+          tabViews,
+          progressAsync,
+        );
+      },
+    );
+  }
+
+  Widget _buildNarrowLayout(
+    BuildContext context,
+    Book book,
+    ThemeData theme,
+    TabController controller,
+    List<Widget> tabs,
+    List<Widget> tabViews,
+    AsyncValue<ReadingProgressData?> progressAsync,
+  ) {
     return Column(
       children: [
         Expanded(
@@ -220,6 +256,67 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
           ),
         ),
         _BottomActionBar(book: book, details: widget.details),
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(
+    BuildContext context,
+    Book book,
+    ThemeData theme,
+    TabController controller,
+    List<Widget> tabs,
+    List<Widget> tabViews,
+    AsyncValue<ReadingProgressData?> progressAsync,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(24),
+                sliver: SliverToBoxAdapter(
+                  child: _BookHeader(book: book, details: widget.details),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverToBoxAdapter(
+                  child: _buildReadingProgress(progressAsync),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverToBoxAdapter(
+                  child: _SeriesInfoSection(bookId: widget.bookId),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const VerticalDivider(width: 1),
+        Expanded(
+          flex: 3,
+          child: Column(
+            children: [
+              Material(
+                child: TabBar(
+                  controller: controller,
+                  tabs: tabs,
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: controller,
+                  children: tabViews,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

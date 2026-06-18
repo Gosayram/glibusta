@@ -131,7 +131,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
+      _ctrl.pauseSession();
       _ctrl.saveProgress();
+    } else if (state == AppLifecycleState.resumed) {
+      _ctrl.resumeSession();
     }
   }
 

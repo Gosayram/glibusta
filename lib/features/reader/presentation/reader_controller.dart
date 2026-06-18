@@ -142,6 +142,9 @@ class ReaderController {
   final _autoThemeService = AutoThemeService();
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
+  final _sessionStopwatch = Stopwatch();
+  int _accumulatedSeconds = 0;
+  bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -169,9 +172,52 @@ class ReaderController {
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     disableFullscreen();
+    _flushSessionTime();
     saveProgress();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
+  }
+
+  void _flushSessionTime() {
+    if (_sessionStopwatch.isRunning) {
+      _sessionStopwatch.stop();
+    }
+    final totalSeconds = _accumulatedSeconds + (_sessionStopwatch.elapsed.inSeconds);
+    _accumulatedSeconds = 0;
+    _sessionStopwatch.reset();
+    if (totalSeconds > 0 && !_disposed) {
+      final db = _ref.read(databaseProvider);
+      unawaited(
+        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), totalSeconds),
+      );
+    }
+  }
+
+  void pauseSession() {
+    if (_paused || !_loaded) return;
+    _paused = true;
+    if (_sessionStopwatch.isRunning) {
+      _sessionStopwatch.stop();
+    }
+    _accumulatedSeconds += _sessionStopwatch.elapsed.inSeconds;
+    _sessionStopwatch.reset();
+    _flushAccumulatedTime();
+  }
+
+  void resumeSession() {
+    if (!_paused || !_loaded) return;
+    _paused = false;
+    _sessionStopwatch.start();
+  }
+
+  void _flushAccumulatedTime() {
+    if (_accumulatedSeconds > 0 && !_disposed) {
+      final db = _ref.read(databaseProvider);
+      unawaited(
+        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), _accumulatedSeconds),
+      );
+      _accumulatedSeconds = 0;
+    }
   }
 
   void _updateState(ReaderState newState) {
@@ -224,6 +270,7 @@ class ReaderController {
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
       if (!_isActiveLoad(loadGeneration)) return;
       _loaded = true;
+      _sessionStopwatch.start();
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
       const wordsPerMinute = 200;
