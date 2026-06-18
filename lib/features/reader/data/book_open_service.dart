@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/full_text_search.dart';
 import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
@@ -28,7 +29,8 @@ final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final database = ref.watch(databaseProvider);
   final storage = ref.watch(appFileStorageProvider);
   final fileRepo = ref.watch(bookFileRepositoryProvider);
-  return BookOpenService(database, storage, fileRepo);
+  final ftsService = ref.watch(fullTextSearchProvider);
+  return BookOpenService(database, storage, fileRepo, ftsService);
 });
 
 final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, bookId) async {
@@ -42,10 +44,16 @@ class BookOpenService {
   final _logger = AppLogger();
   late final ReaderCacheService cache;
 
-  BookOpenService(this._database, AppFileStorage storage, this._fileRepo) {
+  BookOpenService(
+    this._database,
+    AppFileStorage storage,
+    this._fileRepo, [
+    FullTextSearchService? ftsService,
+  ]) {
     cache = ReaderCacheService(
       fingerprintProvider: _computeCacheFingerprint,
       storage: storage,
+      ftsService: ftsService,
     );
   }
 

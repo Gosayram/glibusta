@@ -312,18 +312,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importDirectory(dirPath),
           );
       if (context.mounted) {
-        final firstFailure = batchResult.failures.firstOrNull;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Импортировано: ${batchResult.successCount}, '
-              'дубликатов: ${batchResult.duplicateCount}, '
-              'ошибок: ${batchResult.failureCount}'
-              '${firstFailure != null ? '. Первая ошибка: ${_fileName(firstFailure.path)}' : ''}',
-            ),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showImportSummaryDialog(context, batchResult);
       }
       ref.invalidate(libraryBooksProvider);
     } on Object catch (e) {
@@ -331,11 +320,126 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
-  String _fileName(String path) {
-    if (path.isEmpty) return 'unknown';
-    final normalized = path.replaceAll(r'\', '/');
-    final lastSlash = normalized.lastIndexOf('/');
-    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+  void _showImportSummaryDialog(BuildContext context, ImportBatchResult batch) {
+    final failures = batch.failures;
+    final hasErrors = failures.isNotEmpty;
+    final hasCircuitBroken = batch.circuitBroken;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            hasCircuitBroken
+                ? Icons.warning_amber_rounded
+                : hasErrors
+                ? Icons.info_outline
+                : Icons.check_circle_outline,
+            color: hasCircuitBroken
+                ? Theme.of(ctx).colorScheme.error
+                : hasErrors
+                ? Theme.of(ctx).colorScheme.secondary
+                : Theme.of(ctx).colorScheme.primary,
+            size: 32,
+          ),
+          title: Text(
+            hasCircuitBroken
+                ? 'Импорт приостановлен'
+                : hasErrors
+                ? 'Импорт завершён с ошибками'
+                : 'Импорт завершён',
+          ),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _summaryRow(
+                  Icons.check,
+                  'Импортировано',
+                  '${batch.successCount}',
+                  Theme.of(ctx).colorScheme.primary,
+                ),
+                _summaryRow(
+                  Icons.copy,
+                  'Дубликатов',
+                  '${batch.duplicateCount}',
+                  Theme.of(ctx).colorScheme.secondary,
+                ),
+                if (hasErrors)
+                  _summaryRow(
+                    Icons.error_outline,
+                    'Ошибок',
+                    '${batch.failureCount}',
+                    Theme.of(ctx).colorScheme.error,
+                  ),
+                if (hasCircuitBroken) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Импорт остановлен после 3 ошибок подряд. '
+                    'Возможно, повреждённые файлы или неподдерживаемый формат.',
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.error,
+                    ),
+                  ),
+                ],
+                if (hasErrors) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ошибки:',
+                    style: Theme.of(ctx).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  ...failures
+                      .take(5)
+                      .map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '  ${f.path.split('/').last}: ${f.result.error ?? "неизвестная ошибка"}',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                  if (failures.length > 5)
+                    Text(
+                      '  ... и ещё ${failures.length - 5}',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(label),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showImportSheet(BuildContext context, WidgetRef ref) {

@@ -11,6 +11,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
+import '../../../core/http/http_client.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
@@ -580,9 +581,94 @@ class BookImportService {
     return 'Ошибка при импорте: $e';
   }
 
+  /// Import a book from a network URL.
+  ///
+  /// Downloads the file to a temp location, then runs the standard import pipeline.
+  /// Supports direct links to .epub/.fb2/.txt/.mobi/.rtf files.
+  Future<ImportResult> importFromUrl(
+    String url, {
+    required HttpClient httpClient,
+    void Function(double progress)? onProgress,
+  }) async {
+    _logger.info('Import from URL: $url', name: 'Import');
+
+    // Extract filename from URL path
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) {
+      return ImportResult.failure('Некорректный URL: $url');
+    }
+
+    var fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
+    if (fileName.isEmpty) {
+      fileName = 'downloaded_book';
+    }
+
+    // Ensure we have an extension
+    if (!fileName.contains('.')) {
+      fileName = '$fileName.epub';
+    }
+
+    final ext = fileName.split('.').last.toLowerCase();
+    if (!importableExtensions.contains(ext)) {
+      return ImportResult.failure('Формат не поддерживается: .$ext');
+    }
+
+    File? tempFile;
+    try {
+      // Download to temp file
+      final tempDir = await Directory.systemTemp.createTemp('glibusta_import_');
+      tempFile = File('${tempDir.path}/$fileName');
+
+      final response = await httpClient.dio.download(
+        url,
+        tempFile.path,
+        onReceiveProgress: (received, total) {
+          if (total > 0 && onProgress != null) {
+            onProgress(received / total);
+          }
+        },
+      );
+
+      if (response.statusCode != 200) {
+        await _tryDelete(tempFile.path);
+        return ImportResult.failure('Ошибка загрузки: HTTP ${response.statusCode}');
+      }
+
+      final fileSize = await tempFile.length();
+      if (fileSize < 100) {
+        await _tryDelete(tempFile.path);
+        return ImportResult.failure('Файл слишком мал: $fileSize байт');
+      }
+
+      final format = bookFormatForImportExtension(ext);
+      if (isBookFileTooLarge(format, fileSize)) {
+        await _tryDelete(tempFile.path);
+        return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
+      }
+
+      // Run standard import pipeline
+      final result = await importFile(tempFile.path);
+
+      // If import failed, clean up temp file
+      if (!result.isSuccess) {
+        await _tryDelete(tempFile.path);
+      }
+
+      return result;
+    } on Object catch (e) {
+      _logger.warning('URL import failed for $url: $e', name: 'Import', error: e);
+      if (tempFile != null) {
+        await _tryDelete(tempFile.path);
+      }
+      return ImportResult.failure(_friendlyImportError(e));
+    }
+  }
+
   Future<ImportBatchResult> importDirectory(
     String dirPath, {
     bool Function()? isCancelled,
+    void Function(int current, int total, String fileName)? onProgress,
+    int circuitBreakerThreshold = 3,
   }) async {
     _logger.info('Import directory: $dirPath', name: 'Import');
     final dir = Directory(dirPath);
@@ -591,42 +677,73 @@ class BookImportService {
       return ImportBatchResult(directory: dirPath, results: [], error: 'Директория не найдена');
     }
 
-    final fileResults = <ImportFileResult>[];
-    try {
-      await for (final entity in dir.list(recursive: true)) {
-        if (isCancelled != null && isCancelled()) {
-          _logger.info('Directory import cancelled', name: 'Import');
-          break;
-        }
-        if (entity is File) {
-          final ext = entity.path.split('.').last.toLowerCase();
-          if (importableExtensions.contains(ext)) {
-            final size = await entity.length();
-            final result = await importFile(entity.path);
-            fileResults.add(
-              ImportFileResult(path: entity.path, sizeBytes: size, result: result),
-            );
-            if (!result.isSuccess && !result.isDuplicate && !result.needsEncodingSelection) {
-              _logger.warning(
-                'Directory import failed for ${entity.path} (${formatBytes(size)}): ${result.error}',
-                name: 'Import',
-              );
-            }
-          }
+    final importableFiles = <File>[];
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is File) {
+        final ext = entity.path.split('.').last.toLowerCase();
+        if (importableExtensions.contains(ext)) {
+          importableFiles.add(entity);
         }
       }
-    } on Object catch (e) {
-      _logger.warning('Directory scan failed for $dirPath: $e', name: 'Import', error: e);
-      return ImportBatchResult(
-        directory: dirPath,
-        fileResults: fileResults,
-        error: _friendlyImportError(e),
-      );
     }
 
-    final batch = ImportBatchResult(directory: dirPath, fileResults: fileResults);
+    if (importableFiles.isEmpty) {
+      return ImportBatchResult(directory: dirPath, results: []);
+    }
+
+    final fileResults = <ImportFileResult>[];
+    var consecutiveFailures = 0;
+    var circuitBroken = false;
+    final totalFiles = importableFiles.length;
+
+    for (var i = 0; i < importableFiles.length; i++) {
+      if (isCancelled != null && isCancelled()) {
+        _logger.info('Directory import cancelled', name: 'Import');
+        break;
+      }
+
+      if (circuitBroken) break;
+
+      final entity = importableFiles[i];
+      final fileName = entity.path.split('/').last;
+      onProgress?.call(i + 1, totalFiles, fileName);
+
+      final size = await entity.length();
+      final result = await importFile(entity.path);
+      fileResults.add(
+        ImportFileResult(path: entity.path, sizeBytes: size, result: result),
+      );
+
+      if (result.isSuccess || result.isDuplicate || result.needsEncodingSelection) {
+        consecutiveFailures = 0;
+      } else {
+        consecutiveFailures++;
+        if (consecutiveFailures >= circuitBreakerThreshold) {
+          circuitBroken = true;
+          _logger.warning(
+            'Circuit breaker triggered after $consecutiveFailures consecutive failures',
+            name: 'Import',
+          );
+        }
+      }
+
+      if (!result.isSuccess && !result.isDuplicate && !result.needsEncodingSelection) {
+        _logger.warning(
+          'Directory import failed for ${entity.path} (${formatBytes(size)}): ${result.error}',
+          name: 'Import',
+        );
+      }
+    }
+
+    final batch = ImportBatchResult(
+      directory: dirPath,
+      fileResults: fileResults,
+      circuitBroken: circuitBroken,
+    );
     _logger.info(
-      'Directory import complete: ${batch.successCount} imported, ${batch.duplicateCount} duplicates, ${batch.failureCount} errors',
+      'Directory import complete: ${batch.successCount} imported, '
+      '${batch.duplicateCount} duplicates, ${batch.failureCount} errors'
+      '${circuitBroken ? ' (circuit breaker)' : ''}',
       name: 'Import',
     );
     return batch;
@@ -768,12 +885,14 @@ class ImportBatchResult {
   final String directory;
   final List<ImportFileResult> fileResults;
   final String? error;
+  final bool circuitBroken;
 
   ImportBatchResult({
     required this.directory,
     List<ImportResult>? results,
     List<ImportFileResult>? fileResults,
     this.error,
+    this.circuitBroken = false,
   }) : fileResults =
            fileResults ??
            [
