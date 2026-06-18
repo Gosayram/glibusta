@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/failures.dart';
 import 'book_open_service.dart';
+import 'parsers/cbz_parser.dart';
+import 'parsers/docx_parser.dart';
 import 'parsers/epub_parser.dart';
 import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
@@ -63,6 +65,9 @@ final class BookImporter {
         BookFormat.azw3 => MobiBookParser().parseFile(filePath),
         BookFormat.prc => MobiBookParser().parseFile(filePath),
         BookFormat.djvu => throw UnsupportedError('DJVU not supported'),
+        BookFormat.docx => DocxParser().parseFile(filePath),
+        BookFormat.cbz => CbzParser().parseFile(filePath),
+        BookFormat.cbr => CbzParser().parseFile(filePath),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),
       };
     });

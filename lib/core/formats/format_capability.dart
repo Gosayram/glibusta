@@ -35,10 +35,13 @@ class FormatCapabilityService {
     BookFormat.fb2 ||
     BookFormat.txt ||
     BookFormat.rtf ||
-    BookFormat.mobi => FormatCapability.readable,
+    BookFormat.mobi ||
+    BookFormat.docx ||
+    BookFormat.cbz => FormatCapability.readable,
     BookFormat.azw3 => FormatCapability.partial,
     BookFormat.prc => FormatCapability.legacy,
     BookFormat.pdf || BookFormat.djvu => FormatCapability.documentOnly,
+    BookFormat.cbr => FormatCapability.readable,
     BookFormat.unknown => FormatCapability.unsupported,
   };
 

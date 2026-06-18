@@ -1,4 +1,18 @@
-enum BookFormat { fb2, epub, pdf, txt, mobi, azw3, prc, rtf, djvu, unknown }
+enum BookFormat {
+  fb2,
+  epub,
+  pdf,
+  txt,
+  mobi,
+  azw3,
+  prc,
+  rtf,
+  djvu,
+  docx,
+  cbz,
+  cbr,
+  unknown,
+}
 
 enum ReadingStatus {
   none,

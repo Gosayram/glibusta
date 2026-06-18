@@ -1145,6 +1145,27 @@ class _FormatSelectionSheet extends StatelessWidget {
           'DjVu — сканы и документы',
           Color(0xFF607D8B),
         );
+      case BookFormat.docx:
+        return const _FormatInfo(
+          Icons.description,
+          'DOCX',
+          'Microsoft Word Document',
+          Color(0xFF2B579A),
+        );
+      case BookFormat.cbz:
+        return const _FormatInfo(
+          Icons.book,
+          'CBZ',
+          'Comic Book ZIP — комиксы',
+          Color(0xFF9C27B0),
+        );
+      case BookFormat.cbr:
+        return const _FormatInfo(
+          Icons.book,
+          'CBR',
+          'Comic Book RAR — комиксы',
+          Color(0xFF7B1FA2),
+        );
       case BookFormat.unknown:
         return _FormatInfo(
           Icons.help_outline,

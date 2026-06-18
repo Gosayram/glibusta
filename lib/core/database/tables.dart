@@ -190,3 +190,12 @@ class ReadingSessions extends Table {
   DateTimeColumn get endedAt => dateTime().nullable()();
   IntColumn get chaptersRead => integer().withDefault(const Constant(0))();
 }
+
+class PerBookSettings extends Table {
+  TextColumn get bookId => text()();
+  TextColumn get settingsJson => text()();
+  DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {bookId};
+}

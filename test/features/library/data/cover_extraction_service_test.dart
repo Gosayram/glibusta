@@ -45,6 +45,13 @@ class _FakeAppFileStorage implements AppFileStorage {
     await dir.create(recursive: true);
     return dir;
   }
+
+  @override
+  Future<Directory> catalogCoversDir() async {
+    final dir = Directory(p.join(baseDir, 'catalog_covers'));
+    await dir.create(recursive: true);
+    return dir;
+  }
 }
 
 void main() {

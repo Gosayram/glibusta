@@ -72,7 +72,7 @@ void main() {
 
   group('Book model', () {
     test('supports all format types', () {
-      expect(BookFormat.values.length, 10);
+      expect(BookFormat.values.length, 13);
       expect(BookFormat.values, contains(BookFormat.fb2));
       expect(BookFormat.values, contains(BookFormat.epub));
       expect(BookFormat.values, contains(BookFormat.txt));
@@ -82,6 +82,9 @@ void main() {
       expect(BookFormat.values, contains(BookFormat.prc));
       expect(BookFormat.values, contains(BookFormat.rtf));
       expect(BookFormat.values, contains(BookFormat.djvu));
+      expect(BookFormat.values, contains(BookFormat.docx));
+      expect(BookFormat.values, contains(BookFormat.cbz));
+      expect(BookFormat.values, contains(BookFormat.cbr));
       expect(BookFormat.values, contains(BookFormat.unknown));
     });
   });

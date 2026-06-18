@@ -1,4 +1,6 @@
 import 'book_parser.dart';
+import 'cbz_parser.dart';
+import 'docx_parser.dart';
 import 'epub_parser.dart' as legacy_epub;
 import 'fb2_parser.dart';
 import 'format_detector.dart';
@@ -17,6 +19,8 @@ final class BookParserRegistry {
     TxtBookParser(),
     RtfBookParser(),
     MobiBookParser(),
+    DocxParser(),
+    CbzParser(),
   ]);
 
   BookParser parserFor(BookFormat format) {

@@ -16,6 +16,7 @@ import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/book_search_service.dart';
 import '../data/parsers/normalized_book.dart';
+import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
 import 'reader_content_helper.dart';
 import 'reader_progress_helper.dart';
@@ -201,6 +202,9 @@ class ReaderController {
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
       final meta = await _content.loadMetadata(onCacheMode: (mode) => _cacheMode = mode);
       if (!_isActiveLoad(loadGeneration)) return;
+
+      // Apply per-book settings if available
+      await _applyPerBookSettings();
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
@@ -718,6 +722,18 @@ class ReaderController {
   }
 
   // ── Theme / system ────────────────────────────────────
+
+  Future<void> _applyPerBookSettings() async {
+    try {
+      final service = _ref.read(perBookSettingsServiceProvider);
+      if (await service.hasPerBookSettings(_bookId)) {
+        final effective = await service.getEffectiveSettings(_bookId);
+        _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Failed to apply per-book settings: $e');
+    }
+  }
 
   void _applyWakeLock() {
     final keepAwake = _ref.read(readerSettingsProvider).keepScreenAwake;

@@ -9,6 +9,8 @@ int maxReadableBookBytes(BookFormat format) {
     BookFormat.epub => 250 * _mb,
     BookFormat.mobi || BookFormat.azw3 || BookFormat.prc => 120 * _mb,
     BookFormat.pdf || BookFormat.djvu => 500 * _mb,
+    BookFormat.docx => 50 * _mb,
+    BookFormat.cbz || BookFormat.cbr => 500 * _mb,
     BookFormat.unknown => 0,
   };
 }

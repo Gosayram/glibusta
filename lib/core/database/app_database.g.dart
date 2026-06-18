@@ -6484,6 +6484,274 @@ class ReadingSessionsCompanion extends UpdateCompanion<ReadingSession> {
   }
 }
 
+class $PerBookSettingsTable extends PerBookSettings
+    with TableInfo<$PerBookSettingsTable, PerBookSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PerBookSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _bookIdMeta = const VerificationMeta('bookId');
+  @override
+  late final GeneratedColumn<String> bookId = GeneratedColumn<String>(
+    'book_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _settingsJsonMeta = const VerificationMeta(
+    'settingsJson',
+  );
+  @override
+  late final GeneratedColumn<String> settingsJson = GeneratedColumn<String>(
+    'settings_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    clientDefault: DateTime.now,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [bookId, settingsJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'per_book_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PerBookSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('book_id')) {
+      context.handle(
+        _bookIdMeta,
+        bookId.isAcceptableOrUnknown(data['book_id']!, _bookIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_bookIdMeta);
+    }
+    if (data.containsKey('settings_json')) {
+      context.handle(
+        _settingsJsonMeta,
+        settingsJson.isAcceptableOrUnknown(
+          data['settings_json']!,
+          _settingsJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_settingsJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {bookId};
+  @override
+  PerBookSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PerBookSetting(
+      bookId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}book_id'],
+      )!,
+      settingsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}settings_json'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $PerBookSettingsTable createAlias(String alias) {
+    return $PerBookSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class PerBookSetting extends DataClass implements Insertable<PerBookSetting> {
+  final String bookId;
+  final String settingsJson;
+  final DateTime updatedAt;
+  const PerBookSetting({
+    required this.bookId,
+    required this.settingsJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['book_id'] = Variable<String>(bookId);
+    map['settings_json'] = Variable<String>(settingsJson);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  PerBookSettingsCompanion toCompanion(bool nullToAbsent) {
+    return PerBookSettingsCompanion(
+      bookId: Value(bookId),
+      settingsJson: Value(settingsJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory PerBookSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PerBookSetting(
+      bookId: serializer.fromJson<String>(json['bookId']),
+      settingsJson: serializer.fromJson<String>(json['settingsJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'bookId': serializer.toJson<String>(bookId),
+      'settingsJson': serializer.toJson<String>(settingsJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  PerBookSetting copyWith({
+    String? bookId,
+    String? settingsJson,
+    DateTime? updatedAt,
+  }) => PerBookSetting(
+    bookId: bookId ?? this.bookId,
+    settingsJson: settingsJson ?? this.settingsJson,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  PerBookSetting copyWithCompanion(PerBookSettingsCompanion data) {
+    return PerBookSetting(
+      bookId: data.bookId.present ? data.bookId.value : this.bookId,
+      settingsJson: data.settingsJson.present ? data.settingsJson.value : this.settingsJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PerBookSetting(')
+          ..write('bookId: $bookId, ')
+          ..write('settingsJson: $settingsJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(bookId, settingsJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PerBookSetting &&
+          other.bookId == this.bookId &&
+          other.settingsJson == this.settingsJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PerBookSettingsCompanion extends UpdateCompanion<PerBookSetting> {
+  final Value<String> bookId;
+  final Value<String> settingsJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const PerBookSettingsCompanion({
+    this.bookId = const Value.absent(),
+    this.settingsJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PerBookSettingsCompanion.insert({
+    required String bookId,
+    required String settingsJson,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : bookId = Value(bookId),
+       settingsJson = Value(settingsJson);
+  static Insertable<PerBookSetting> custom({
+    Expression<String>? bookId,
+    Expression<String>? settingsJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (bookId != null) 'book_id': bookId,
+      if (settingsJson != null) 'settings_json': settingsJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PerBookSettingsCompanion copyWith({
+    Value<String>? bookId,
+    Value<String>? settingsJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return PerBookSettingsCompanion(
+      bookId: bookId ?? this.bookId,
+      settingsJson: settingsJson ?? this.settingsJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (bookId.present) {
+      map['book_id'] = Variable<String>(bookId.value);
+    }
+    if (settingsJson.present) {
+      map['settings_json'] = Variable<String>(settingsJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PerBookSettingsCompanion(')
+          ..write('bookId: $bookId, ')
+          ..write('settingsJson: $settingsJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6505,6 +6773,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $ReadingSessionsTable readingSessions = $ReadingSessionsTable(
+    this,
+  );
+  late final $PerBookSettingsTable perBookSettings = $PerBookSettingsTable(
     this,
   );
   late final Index idxDownloadsBookId = Index(
@@ -6534,6 +6805,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final DownloadDao downloadDao = DownloadDao(this as AppDatabase);
   late final BookmarkDao bookmarkDao = BookmarkDao(this as AppDatabase);
   late final GenreDao genreDao = GenreDao(this as AppDatabase);
+  late final PerBookSettingsDao perBookSettingsDao = PerBookSettingsDao(
+    this as AppDatabase,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6553,6 +6827,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     collections,
     bookCollections,
     readingSessions,
+    perBookSettings,
     idxDownloadsBookId,
     idxBookmarksBookId,
     idxNotesBookId,
@@ -9867,6 +10142,170 @@ typedef $$ReadingSessionsTableProcessedTableManager =
       ReadingSession,
       PrefetchHooks Function()
     >;
+typedef $$PerBookSettingsTableCreateCompanionBuilder =
+    PerBookSettingsCompanion Function({
+      required String bookId,
+      required String settingsJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$PerBookSettingsTableUpdateCompanionBuilder =
+    PerBookSettingsCompanion Function({
+      Value<String> bookId,
+      Value<String> settingsJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$PerBookSettingsTableFilterComposer extends Composer<_$AppDatabase, $PerBookSettingsTable> {
+  $$PerBookSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get settingsJson => $composableBuilder(
+    column: $table.settingsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$PerBookSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PerBookSettingsTable> {
+  $$PerBookSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get bookId => $composableBuilder(
+    column: $table.bookId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get settingsJson => $composableBuilder(
+    column: $table.settingsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PerBookSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PerBookSettingsTable> {
+  $$PerBookSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get bookId =>
+      $composableBuilder(column: $table.bookId, builder: (column) => column);
+
+  GeneratedColumn<String> get settingsJson => $composableBuilder(
+    column: $table.settingsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PerBookSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PerBookSettingsTable,
+          PerBookSetting,
+          $$PerBookSettingsTableFilterComposer,
+          $$PerBookSettingsTableOrderingComposer,
+          $$PerBookSettingsTableAnnotationComposer,
+          $$PerBookSettingsTableCreateCompanionBuilder,
+          $$PerBookSettingsTableUpdateCompanionBuilder,
+          (
+            PerBookSetting,
+            BaseReferences<_$AppDatabase, $PerBookSettingsTable, PerBookSetting>,
+          ),
+          PerBookSetting,
+          PrefetchHooks Function()
+        > {
+  $$PerBookSettingsTableTableManager(
+    _$AppDatabase db,
+    $PerBookSettingsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PerBookSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PerBookSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PerBookSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> bookId = const Value.absent(),
+                Value<String> settingsJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PerBookSettingsCompanion(
+                bookId: bookId,
+                settingsJson: settingsJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String bookId,
+                required String settingsJson,
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PerBookSettingsCompanion.insert(
+                bookId: bookId,
+                settingsJson: settingsJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) =>
+              p0.map((e) => (e.readTable(table), BaseReferences(db, table, e))).toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PerBookSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PerBookSettingsTable,
+      PerBookSetting,
+      $$PerBookSettingsTableFilterComposer,
+      $$PerBookSettingsTableOrderingComposer,
+      $$PerBookSettingsTableAnnotationComposer,
+      $$PerBookSettingsTableCreateCompanionBuilder,
+      $$PerBookSettingsTableUpdateCompanionBuilder,
+      (
+        PerBookSetting,
+        BaseReferences<_$AppDatabase, $PerBookSettingsTable, PerBookSetting>,
+      ),
+      PerBookSetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9892,4 +10331,6 @@ class $AppDatabaseManager {
       $$BookCollectionsTableTableManager(_db, _db.bookCollections);
   $$ReadingSessionsTableTableManager get readingSessions =>
       $$ReadingSessionsTableTableManager(_db, _db.readingSessions);
+  $$PerBookSettingsTableTableManager get perBookSettings =>
+      $$PerBookSettingsTableTableManager(_db, _db.perBookSettings);
 }
