@@ -1,260 +1,255 @@
-import 'dart:async';
-
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/logging/app_logger.dart';
+enum ContextMenuAction {
+  copy,
+  highlight,
+  underline,
+  translate,
+  narrate,
+  share,
+  search,
+  ai,
+}
 
 class ReaderContextMenu extends StatelessWidget {
-  final SelectableRegionState state;
-  final String bookId;
-  final int chapterIndex;
-  final int paragraphIndex;
-
   const ReaderContextMenu({
+    this.selectedText = '',
+    this.onAction,
+    this.state,
+    this.bookId,
+    this.chapterIndex,
+    this.paragraphIndex,
     super.key,
-    required this.state,
-    required this.bookId,
-    required this.chapterIndex,
-    required this.paragraphIndex,
   });
+
+  final String selectedText;
+  final void Function(ContextMenuAction action)? onAction;
+  final dynamic state;
+  final String? bookId;
+  final int? chapterIndex;
+  final int? paragraphIndex;
+
+  static Future<void> show({
+    required BuildContext context,
+    required String selectedText,
+    required void Function(ContextMenuAction action) onAction,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      builder: (_) => ReaderContextMenu(
+        selectedText: selectedText,
+        onAction: (action) {
+          Navigator.of(context).pop();
+          onAction(action);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final selectedText = _getSelectedText();
-    if (selectedText.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
-    final buttonItems = <ContextMenuButtonItem>[
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(Clipboard.setData(ClipboardData(text: selectedText)));
-        },
-        label: 'Копировать',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveQuote(context, selectedText));
-        },
-        label: 'Цитата',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveBookmark(context, selectedText));
-        },
-        label: 'Закладка',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          state.hideToolbar(false);
-          unawaited(_saveNote(context, selectedText));
-        },
-        label: 'Заметка',
-      ),
-    ];
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: state.contextMenuAnchors,
-      buttonItems: buttonItems,
-    );
-  }
-
-  String _getSelectedText() {
-    // ignore: deprecated_member_use
-    final selection = state.textEditingValue.selection;
-    if (!selection.isCollapsed) {
-      // ignore: deprecated_member_use
-      return selection.textInside(state.textEditingValue.text);
-    }
-    return '';
-  }
-
-  Future<void> _saveQuote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final noteController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Цитата'),
-        content: Column(
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
+              width: 40,
+              height: 4,
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 3,
-                  ),
-                ),
-              ),
-              child: Text(
-                text,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                ),
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            TextField(
-              controller: noteController,
-              autofocus: true,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Комментарий (необязательно)...',
-                border: OutlineInputBorder(),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
               ),
+              child: Text(
+                selectedText.length > 200 ? '${selectedText.substring(0, 200)}...' : selectedText,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _ActionRow(
+              actions: const [
+                _ActionItem(icon: Icons.copy, label: 'Копировать', action: ContextMenuAction.copy),
+                _ActionItem(
+                  icon: Icons.highlight,
+                  label: 'Подсветка',
+                  action: ContextMenuAction.highlight,
+                ),
+                _ActionItem(
+                  icon: Icons.format_underlined,
+                  label: 'Подчёркивание',
+                  action: ContextMenuAction.underline,
+                ),
+                _ActionItem(
+                  icon: Icons.translate,
+                  label: 'Перевод',
+                  action: ContextMenuAction.translate,
+                ),
+                _ActionItem(
+                  icon: Icons.volume_up,
+                  label: 'Озвучить',
+                  action: ContextMenuAction.narrate,
+                ),
+                _ActionItem(
+                  icon: Icons.share,
+                  label: 'Поделиться',
+                  action: ContextMenuAction.share,
+                ),
+                _ActionItem(icon: Icons.search, label: 'Поиск', action: ContextMenuAction.search),
+                _ActionItem(icon: Icons.smart_toy, label: 'AI', action: ContextMenuAction.ai),
+              ],
+              onAction: onAction ?? (_) {},
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(noteController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
       ),
     );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.quotes)
-            .insert(
-              QuotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                selectedText: text,
-                note: Value(result.isEmpty ? null : result),
-              ),
-            );
-        AppLogger().fine('quote saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Цитата сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save quote: $e', name: 'Reader', error: e);
-      }
-    }
   }
+}
 
-  Future<void> _saveBookmark(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    try {
-      final db = ProviderScope.containerOf(context).read(databaseProvider);
-      await db
-          .into(db.bookmarks)
-          .insert(
-            BookmarksCompanion.insert(
-              id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-              bookId: bookId,
-              chapterIndex: chapterIndex,
-              paragraphIndex: paragraphIndex,
-              selectedText: Value(text),
+class _ActionItem {
+  const _ActionItem({
+    required this.icon,
+    required this.label,
+    required this.action,
+  });
+
+  final IconData icon;
+  final String label;
+  final ContextMenuAction action;
+}
+
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.actions,
+    required this.onAction,
+  });
+
+  final List<_ActionItem> actions;
+  final void Function(ContextMenuAction action) onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        children: actions.map((item) {
+          return InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => onAction(item.action),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(item.icon, size: 22, color: theme.colorScheme.primary),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
-      AppLogger().fine('bookmark saved for chapter $chapterIndex', name: 'Reader');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Закладка сохранена')),
-        );
-      }
-    } on Object catch (e) {
-      AppLogger().warning('Failed to save bookmark: $e', name: 'Reader', error: e);
-    }
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class HighlightColorPicker extends StatelessWidget {
+  const HighlightColorPicker({required this.onColorSelected, super.key});
+
+  final void Function(Color color) onColorSelected;
+
+  static const _colors = [
+    Color(0x40FFEB3B),
+    Color(0x40FF9800),
+    Color(0x404CAF50),
+    Color(0x402196F3),
+    Color(0x40E91E63),
+  ];
+
+  static const _colorNames = ['Жёлтый', 'Оранжевый', 'Зелёный', 'Синий', 'Розовый'];
+
+  static Future<void> show({
+    required BuildContext context,
+    required void Function(Color color) onColorSelected,
+  }) {
+    return showModalBottomSheet(
+      context: context,
+      builder: (_) => HighlightColorPicker(onColorSelected: onColorSelected),
+    );
   }
 
-  Future<void> _saveNote(BuildContext context, String text) async {
-    if (!context.mounted) return;
-    final textController = TextEditingController(text: text);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Заметка'),
-        content: Column(
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (text.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  text,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
+            const Text('Цвет подсветки', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(_colors.length, (i) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onColorSelected(_colors[i]);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: _colors[i],
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _colorNames[i],
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Введите заметку...',
-                border: OutlineInputBorder(),
-              ),
+                );
+              }),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
       ),
     );
-    if (result != null && context.mounted) {
-      try {
-        final db = ProviderScope.containerOf(context).read(databaseProvider);
-        await db
-            .into(db.notes)
-            .insert(
-              NotesCompanion.insert(
-                id: '$bookId-${DateTime.now().millisecondsSinceEpoch}',
-                bookId: bookId,
-                chapterIndex: chapterIndex,
-                paragraphIndex: paragraphIndex,
-                content: result,
-              ),
-            );
-        AppLogger().fine('note saved for chapter $chapterIndex', name: 'Reader');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Заметка сохранена')),
-          );
-        }
-      } on Object catch (e) {
-        AppLogger().warning('Failed to save note: $e', name: 'Reader', error: e);
-      }
-    }
   }
 }
