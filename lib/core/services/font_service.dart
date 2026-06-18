@@ -31,7 +31,7 @@ class FontModel {
     'name': name,
     'fileName': fileName,
     'family': family,
-    'weight': weight.index,
+    'weight': weight.value,
     'style': style.index,
     'isDownloaded': isDownloaded,
     'downloadUrl': downloadUrl,

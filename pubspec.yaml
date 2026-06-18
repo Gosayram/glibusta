@@ -85,6 +85,8 @@ dependencies:
   native_dio_adapter: ^1.6.0
   flutter_local_notifications: ^22.0.0
   flutter_tts: any
+  audio_service: ^0.18.17
+  rxdart: ^0.28.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

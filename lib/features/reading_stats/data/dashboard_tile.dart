@@ -68,6 +68,7 @@ class DashboardTileConfig {
 
   final List<DashboardTile> tiles;
 
+  // ignore: prefer_constructors_over_static_methods
   static DashboardTileConfig defaultConfig() {
     return const DashboardTileConfig(
       tiles: [

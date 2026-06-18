@@ -175,7 +175,7 @@ class TtsSleepTimer {
 
   void dispose() {
     _timer?.cancel();
-    _stateController.close();
+    unawaited(_stateController.close());
   }
 }
 

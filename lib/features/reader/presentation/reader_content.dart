@@ -20,6 +20,7 @@ class ReaderContentBody extends StatefulWidget {
     this.initialProgress = 0.0,
     this.initialPage = 0,
     this.highlightQuery,
+    this.ttsHighlightIndex,
   });
 
   final NormalizedBookMetadata metadata;
@@ -30,6 +31,7 @@ class ReaderContentBody extends StatefulWidget {
   final double initialProgress;
   final int initialPage;
   final String? highlightQuery;
+  final int? ttsHighlightIndex;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -57,6 +59,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         onTap: onTap,
         initialPage: initialPage,
         highlightQuery: highlightQuery,
+        ttsHighlightIndex: widget.ttsHighlightIndex,
       );
     }
 
@@ -467,6 +470,7 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.onTap,
     required this.initialPage,
     this.highlightQuery,
+    this.ttsHighlightIndex,
   });
 
   final NormalizedBookMetadata metadata;
@@ -475,6 +479,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final GestureTapUpCallback onTap;
   final int initialPage;
   final String? highlightQuery;
+  final int? ttsHighlightIndex;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();

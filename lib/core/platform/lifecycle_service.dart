@@ -1,8 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/sync_service.dart';
+
 final lifecycleServiceProvider = Provider<LifecycleService>((ref) {
-  return LifecycleService(ref);
+  final service = LifecycleService(ref);
+  service._setupAutoSync(ref);
+  return service;
 });
 
 class LifecycleService {
@@ -10,6 +16,24 @@ class LifecycleService {
   final _callbacks = <LifecycleEvent, List<VoidCallback>>{};
 
   LifecycleService(this.ref);
+
+  void _setupAutoSync(Ref ref) {
+    setCallback(LifecycleEvent.pause, () {
+      _triggerAutoSync(ref);
+    });
+    setCallback(LifecycleEvent.hide, () {
+      _triggerAutoSync(ref);
+    });
+  }
+
+  void _triggerAutoSync(Ref ref) {
+    try {
+      final syncService = ref.read(syncServiceProvider);
+      if (syncService.config?.autoSync == true && syncService.status != SyncStatus.syncing) {
+        unawaited(syncService.sync());
+      }
+    } on Object catch (_) {}
+  }
 
   void setCallback(LifecycleEvent event, VoidCallback callback) {
     _callbacks.putIfAbsent(event, () => []).add(callback);

@@ -1,8 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xml/xml.dart';
 
 enum SyncDirection { upload, download, both }
 
@@ -93,16 +96,16 @@ class WebDavClient extends SyncClientBase {
   @override
   Future<bool> ping() async {
     try {
-      await _dio.request(_config.url, options: _authOptions.copyWith(method: 'PROPFIND'));
+      await _dio.request<dynamic>(_config.url, options: _authOptions.copyWith(method: 'PROPFIND'));
       return true;
-    } catch (_) {
+    } on Object catch (_) {
       return false;
     }
   }
 
   @override
   Future<void> mkdir(String path) async {
-    await _dio.request(
+    await _dio.request<dynamic>(
       '${_config.url}/$path',
       options: _authOptions.copyWith(method: 'MKCOL'),
     );
@@ -110,7 +113,7 @@ class WebDavClient extends SyncClientBase {
 
   @override
   Future<List<String>> readDir(String path) async {
-    final response = await _dio.request(
+    final response = await _dio.request<dynamic>(
       '${_config.url}/$path',
       options: _authOptions.copyWith(
         method: 'PROPFIND',
@@ -133,7 +136,7 @@ class WebDavClient extends SyncClientBase {
   Future<void> upload(String localPath, String remotePath) async {
     final file = File(localPath);
     final bytes = await file.readAsBytes();
-    await _dio.put(
+    await _dio.put<dynamic>(
       '${_config.url}/$remotePath',
       data: Stream.fromIterable([bytes]),
       options: _authOptions.copyWith(
@@ -153,7 +156,7 @@ class WebDavClient extends SyncClientBase {
 
   @override
   Future<void> remove(String remotePath) async {
-    await _dio.request(
+    await _dio.request<dynamic>(
       '${_config.url}/$remotePath',
       options: _authOptions.copyWith(method: 'DELETE'),
     );
@@ -184,7 +187,7 @@ class SyncService {
             (Uri.dataFromString(json).data as Object?) as Map? ?? {},
           ),
         );
-      } catch (_) {}
+      } on Object catch (_) {}
     }
   }
 
@@ -203,7 +206,7 @@ class SyncService {
       await _client!.ping();
       _status = SyncStatus.idle;
       await _prefs.setString(_statusKey, SyncStatus.idle.index.toString());
-    } catch (e) {
+    } on Object catch (_) {
       _status = SyncStatus.error;
       await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
     }
@@ -212,7 +215,7 @@ class SyncService {
   void disable() {
     _config = null;
     _client = null;
-    _prefs.remove(_configKey);
+    unawaited(_prefs.remove(_configKey));
   }
 }
 

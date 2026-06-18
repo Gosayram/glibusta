@@ -110,16 +110,14 @@ class DocxEdgeCaseHandler {
   }
 
   static String resolveFootnoteMarkers(String text, List<String> footnotes) {
-    var result = text;
     final pattern = RegExp(r'\[(\d+)\]');
-    result = result.replaceAllMapped(pattern, (match) {
+    return text.replaceAllMapped(pattern, (match) {
       final index = int.tryParse(match.group(1) ?? '');
       if (index != null && index > 0 && index <= footnotes.length) {
         return '[${footnotes[index - 1]}]';
       }
       return match.group(0) ?? '';
     });
-    return result;
   }
 }
 

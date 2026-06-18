@@ -38,7 +38,7 @@ class GoogleWebTranslator extends TranslateServiceProvider {
     required String to,
   }) async {
     final url = 'https://translate.googleapis.com/translate_a/single';
-    final response = await _dio.get(
+    final response = await _dio.get<dynamic>(
       url,
       queryParameters: {
         'client': 'gtx',
@@ -81,7 +81,7 @@ class BingWebTranslator extends TranslateServiceProvider {
     required String to,
   }) async {
     final url = 'https://api.cognitive.microsofttranslator.com/translate';
-    final response = await _dio.post(
+    final response = await _dio.post<dynamic>(
       url,
       queryParameters: {
         'api-version': '3.0',
@@ -154,7 +154,7 @@ class TranslationService {
       _fromLang = map['fromLang'] as String? ?? 'auto';
       _toLang = map['toLang'] as String? ?? 'ru';
       _autoTranslate = map['autoTranslate'] as bool? ?? false;
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   Future<void> _saveSettings() async {

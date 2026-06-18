@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xml/xml.dart';
@@ -80,7 +82,7 @@ class OpdsService {
   final Dio _dio;
 
   Future<List<OpdsEntry>> fetchFeed(String url, {String? username, String? password}) async {
-    final response = await _dio.get(
+    final response = await _dio.get<dynamic>(
       url,
       options: username != null
           ? Options(

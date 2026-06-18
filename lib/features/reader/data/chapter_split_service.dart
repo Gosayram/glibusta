@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,7 +26,7 @@ class ChapterSplitService {
         final list = jsonDecode(json) as List;
         _rules = list.map((e) => ChapterSplitRule.fromJson(e as Map<String, dynamic>)).toList();
       }
-    } catch (_) {}
+    } on Object catch (_) {}
     _loaded = true;
   }
 
@@ -34,25 +35,25 @@ class ChapterSplitService {
       final prefs = await SharedPreferences.getInstance();
       final json = jsonEncode(_rules.map((r) => r.toJson()).toList());
       await prefs.setString(_key, json);
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   void addRule(ChapterSplitRule rule) {
     _rules.add(rule);
-    save();
+    unawaited(save());
   }
 
   void updateRule(ChapterSplitRule rule) {
     final index = _rules.indexWhere((r) => r.id == rule.id);
     if (index >= 0) {
       _rules[index] = rule;
-      save();
+      unawaited(save());
     }
   }
 
   void deleteRule(String id) {
     _rules.removeWhere((r) => r.id == id && !r.isPreset);
-    save();
+    unawaited(save());
   }
 
   ChapterSplitRule? detectPattern(String text) {

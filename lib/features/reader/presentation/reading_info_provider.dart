@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -13,7 +14,7 @@ const _key = 'reading_info_config';
 class ReadingInfoNotifier extends _$ReadingInfoNotifier {
   @override
   ReadingInfoModel build() {
-    _load();
+    unawaited(_load());
     return ReadingInfoModel.defaults;
   }
 
@@ -26,58 +27,58 @@ class ReadingInfoNotifier extends _$ReadingInfoNotifier {
           Map<String, dynamic>.from(jsonDecode(json) as Map),
         );
       }
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   Future<void> _save() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_key, jsonEncode(state.toJson()));
-    } catch (_) {}
+    } on Object catch (_) {}
   }
 
   void updateHeaderLeft(InfoSlotMode mode) {
     state = state.copyWith(headerLeft: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateHeaderCenter(InfoSlotMode mode) {
     state = state.copyWith(headerCenter: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateHeaderRight(InfoSlotMode mode) {
     state = state.copyWith(headerRight: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateFooterLeft(InfoSlotMode mode) {
     state = state.copyWith(footerLeft: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateFooterCenter(InfoSlotMode mode) {
     state = state.copyWith(footerCenter: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateFooterRight(InfoSlotMode mode) {
     state = state.copyWith(footerRight: mode);
-    _save();
+    unawaited(_save());
   }
 
   void updateFontSize(double size) {
     state = state.copyWith(fontSize: size);
-    _save();
+    unawaited(_save());
   }
 
   void updateMargin(double margin) {
     state = state.copyWith(margin: margin);
-    _save();
+    unawaited(_save());
   }
 
   void reset() {
     state = ReadingInfoModel.defaults;
-    _save();
+    unawaited(_save());
   }
 }

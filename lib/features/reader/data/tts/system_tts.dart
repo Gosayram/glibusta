@@ -6,7 +6,7 @@ import 'base_tts.dart';
 
 class SystemTts extends BaseTts {
   SystemTts() {
-    _init();
+    unawaited(_init());
   }
 
   final _tts = FlutterTts();
@@ -168,8 +168,8 @@ class SystemTts extends BaseTts {
 
   @override
   void dispose() {
-    _tts.stop();
-    _stateController.close();
-    _sentenceController.close();
+    unawaited(_tts.stop());
+    unawaited(_stateController.close());
+    unawaited(_sentenceController.close());
   }
 }

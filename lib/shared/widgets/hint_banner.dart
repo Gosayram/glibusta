@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -128,7 +130,7 @@ class _HintBannerState extends State<HintBanner> {
   @override
   void initState() {
     super.initState();
-    _loadHintState();
+    unawaited(_loadHintState());
   }
 
   Future<void> _loadHintState() async {

@@ -10,6 +10,7 @@ import '../features/catalog/presentation/author_detail_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
 import '../features/catalog/presentation/genre_list_screen.dart';
+import '../features/catalog/presentation/opds_catalog_screen.dart';
 import '../features/catalog/presentation/recent_books_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
@@ -136,6 +137,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/series',
             name: 'series',
             builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
+          ),
+          GoRoute(
+            path: '/opds',
+            name: 'opds',
+            builder: (BuildContext context, GoRouterState state) => const OpdsCatalogScreen(),
           ),
           GoRoute(
             path: '/settings/diagnostics',

@@ -91,7 +91,7 @@ class AiChatService {
     if (json == null) return const AiPanelSettings();
     try {
       return AiPanelSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } catch (_) {
+    } on Object catch (_) {
       return const AiPanelSettings();
     }
   }
@@ -109,7 +109,7 @@ class AiChatService {
             ),
           )
           .toList();
-    } catch (_) {
+    } on Object catch (_) {
       return [];
     }
   }
@@ -130,12 +130,12 @@ class AiChatService {
 
   void addCustomPrompt(String prompt) {
     final prompts = List<String>.from(_settings.customPrompts)..add(prompt);
-    updateSettings(_settings.copyWith(customPrompts: prompts));
+    unawaited(updateSettings(_settings.copyWith(customPrompts: prompts)));
   }
 
   void removeCustomPrompt(int index) {
     final prompts = List<String>.from(_settings.customPrompts)..removeAt(index);
-    updateSettings(_settings.copyWith(customPrompts: prompts));
+    unawaited(updateSettings(_settings.copyWith(customPrompts: prompts)));
   }
 
   String buildPrompt(
@@ -192,11 +192,11 @@ class AiChatService {
   void clearHistory() {
     _messages.clear();
     _messagesController.add(_messages);
-    _saveHistory();
+    unawaited(_saveHistory());
   }
 
   void dispose() {
-    _messagesController.close();
+    unawaited(_messagesController.close());
   }
 }
 

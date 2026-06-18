@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -132,53 +134,55 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
   void _showAddRuleDialog(BuildContext context) {
     final nameController = TextEditingController();
     final patternController = TextEditingController();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Custom Rule'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Add Custom Rule'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: patternController,
+                decoration: const InputDecoration(
+                  labelText: 'Pattern (regex)',
+                  border: OutlineInputBorder(),
+                  hintText: r'^Chapter\s+\d+',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: patternController,
-              decoration: const InputDecoration(
-                labelText: 'Pattern (regex)',
-                border: OutlineInputBorder(),
-                hintText: r'^Chapter\s+\d+',
-              ),
+            FilledButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
+                  _service.addRule(
+                    ChapterSplitRule(
+                      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                      name: nameController.text,
+                      pattern: patternController.text,
+                    ),
+                  );
+                  Navigator.pop(ctx);
+                  setState(() {});
+                }
+              },
+              child: const Text('Add'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                _service.addRule(
-                  ChapterSplitRule(
-                    id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-                    name: nameController.text,
-                    pattern: patternController.text,
-                  ),
-                );
-                Navigator.pop(ctx);
-                setState(() {});
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
       ),
     );
   }
@@ -186,53 +190,55 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
   void _showEditRuleDialog(BuildContext context, ChapterSplitRule rule) {
     final nameController = TextEditingController(text: rule.name);
     final patternController = TextEditingController(text: rule.pattern);
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Rule'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Edit Rule'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  border: OutlineInputBorder(),
+                ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: patternController,
+                decoration: const InputDecoration(
+                  labelText: 'Pattern (regex)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: patternController,
-              decoration: const InputDecoration(
-                labelText: 'Pattern (regex)',
-                border: OutlineInputBorder(),
-              ),
+            FilledButton(
+              onPressed: () {
+                if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
+                  _service.updateRule(
+                    ChapterSplitRule(
+                      id: rule.id,
+                      name: nameController.text,
+                      pattern: patternController.text,
+                      isPreset: rule.isPreset,
+                    ),
+                  );
+                  Navigator.pop(ctx);
+                  setState(() {});
+                }
+              },
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                _service.updateRule(
-                  ChapterSplitRule(
-                    id: rule.id,
-                    name: nameController.text,
-                    pattern: patternController.text,
-                    isPreset: rule.isPreset,
-                  ),
-                );
-                Navigator.pop(ctx);
-                setState(() {});
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }

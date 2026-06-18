@@ -23,8 +23,8 @@ class WindowPositionService {
         (map['width'] as num).toDouble(),
         (map['height'] as num).toDouble(),
       );
-    } catch (e) {
-      AppLogger.debug('Failed to parse window position: $e');
+    } on Object catch (e) {
+      AppLogger().fine('Failed to parse window position: $e');
       return null;
     }
   }

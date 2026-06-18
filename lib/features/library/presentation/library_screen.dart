@@ -780,10 +780,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _showTagPicker(BuildContext context, WidgetRef ref, Book book) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => _TagPickerSheet(book: book),
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => _TagPickerSheet(book: book),
+      ),
     );
   }
 
@@ -909,7 +911,7 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
   void initState() {
     super.initState();
     _selectedTagIds = {};
-    _loadTags();
+    unawaited(_loadTags());
   }
 
   Future<void> _loadTags() async {
@@ -966,7 +968,7 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
                           TextButton(
                             onPressed: () {
                               Navigator.pop(ctx);
-                              context.push('/settings/tags');
+                              unawaited(context.push('/settings/tags'));
                             },
                             child: const Text('Создать тег'),
                           ),

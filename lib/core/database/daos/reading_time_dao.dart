@@ -8,7 +8,7 @@ part 'reading_time_dao.g.dart';
 
 @DriftAccessor(tables: [ReadingTime])
 class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDaoMixin {
-  ReadingTimeDao(super.db);
+  ReadingTimeDao(super.attachedDatabase);
 
   Future<void> addReadingTime(String bookId, DateTime date, int seconds) async {
     final day = DateTime(date.year, date.month, date.day);

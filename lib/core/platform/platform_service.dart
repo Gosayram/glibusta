@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -14,7 +16,7 @@ class PlatformService {
     try {
       await WakelockPlus.enable();
       _wakelockEnabled = true;
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Failed to enable wakelock: $e');
     }
   }
@@ -23,7 +25,7 @@ class PlatformService {
     try {
       await WakelockPlus.disable();
       _wakelockEnabled = false;
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Failed to disable wakelock: $e');
     }
   }
@@ -39,7 +41,7 @@ class PlatformService {
   Future<int> getBatteryLevel() async {
     try {
       return await _battery.batteryLevel;
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Failed to get battery level: $e');
       return -1;
     }
@@ -51,7 +53,7 @@ class PlatformService {
     try {
       final state = await _battery.batteryState;
       return state == BatteryState.charging || state == BatteryState.full;
-    } catch (e) {
+    } on Object catch (e) {
       debugPrint('Failed to check charging state: $e');
       return false;
     }
@@ -59,7 +61,7 @@ class PlatformService {
 
   void dispose() {
     if (_wakelockEnabled) {
-      WakelockPlus.disable();
+      unawaited(WakelockPlus.disable());
     }
   }
 }

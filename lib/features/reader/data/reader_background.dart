@@ -239,6 +239,16 @@ class ReaderBackgroundSettings {
   }
 }
 
-final readerBackgroundProvider = StateProvider<ReaderBackgroundSettings>((ref) {
-  return const ReaderBackgroundSettings();
-});
+final readerBackgroundProvider =
+    NotifierProvider<ReaderBackgroundNotifier, ReaderBackgroundSettings>(
+      ReaderBackgroundNotifier.new,
+    );
+
+class ReaderBackgroundNotifier extends Notifier<ReaderBackgroundSettings> {
+  @override
+  ReaderBackgroundSettings build() => const ReaderBackgroundSettings();
+
+  void update(ReaderBackgroundSettings Function(ReaderBackgroundSettings) updater) {
+    state = updater(state);
+  }
+}

@@ -31,7 +31,7 @@ class TtsService {
     if (json == null) return const TtsSettings();
     try {
       return TtsSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } catch (_) {
+    } on Object catch (_) {
       return const TtsSettings();
     }
   }
@@ -83,9 +83,27 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   );
 });
 
-final ttsStateProvider = StateProvider<TtsState>((ref) => TtsState.stopped);
+final ttsStateProvider = NotifierProvider<TtsStateNotifier, TtsState>(
+  TtsStateNotifier.new,
+);
 
-final ttsSentenceProvider = StateProvider<int>((ref) => 0);
+class TtsStateNotifier extends Notifier<TtsState> {
+  @override
+  TtsState build() => TtsState.stopped;
+
+  void update(TtsState value) => state = value;
+}
+
+final ttsSentenceProvider = NotifierProvider<TtsSentenceNotifier, int>(
+  TtsSentenceNotifier.new,
+);
+
+class TtsSentenceNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void update(int value) => state = value;
+}
 
 final ttsSleepTimerProvider = Provider<TtsSleepTimer>((ref) {
   final timer = TtsSleepTimer();

@@ -21,7 +21,7 @@ class ConnectivitySyncService {
     _subscription = _connectivity.onConnectivityChanged.listen((results) {
       _evaluate(results);
     });
-    _connectivity.checkConnectivity().then(_evaluate);
+    unawaited(_connectivity.checkConnectivity().then(_evaluate));
   }
 
   void _evaluate(List<ConnectivityResult> results) {
@@ -37,11 +37,11 @@ class ConnectivitySyncService {
         _syncAllowed = false;
     }
 
-    AppLogger.debug('Connectivity changed: $results → syncAllowed=$_syncAllowed');
+    AppLogger().fine('Connectivity changed: $results → syncAllowed=$_syncAllowed');
   }
 
   void dispose() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel());
   }
 }
 

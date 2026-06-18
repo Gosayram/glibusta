@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,10 +25,12 @@ class _AiPanelState extends ConsumerState<AiPanel> {
     aiService.onMessagesChange.listen((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
+          unawaited(
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            ),
           );
         }
       });
@@ -245,45 +249,47 @@ class _AiPanelState extends ConsumerState<AiPanel> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
-    aiService.sendMessage(text);
+    unawaited(aiService.sendMessage(text));
   }
 
   void _sendPrompt(AiChatService aiService, AiPromptType type) {
     final prompt = aiService.buildPrompt(type);
-    aiService.sendMessage(prompt);
+    unawaited(aiService.sendMessage(prompt));
   }
 
   void _sendCustomPrompt(AiChatService aiService, String customPrompt) {
-    aiService.sendMessage(customPrompt);
+    unawaited(aiService.sendMessage(customPrompt));
   }
 
   void _showAddPromptDialog(BuildContext context, AiChatService aiService) {
     final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Добавить промпт'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Текст промпта'),
-          autofocus: true,
+    unawaited(
+      showDialog<bool?>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Добавить промпт'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(hintText: 'Текст промпта'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  aiService.addCustomPrompt(text);
+                }
+                Navigator.of(ctx).pop();
+              },
+              child: const Text('Добавить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () {
-              final text = controller.text.trim();
-              if (text.isNotEmpty) {
-                aiService.addCustomPrompt(text);
-              }
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Добавить'),
-          ),
-        ],
       ),
     );
   }

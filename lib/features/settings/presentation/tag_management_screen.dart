@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -85,46 +87,50 @@ class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
   void _showCreateTagDialog(BuildContext context) {
     final nameController = TextEditingController();
     String selectedColor = '#2196F3';
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Новый тег'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название',
-                  border: OutlineInputBorder(),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Новый тег'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 16),
-              _ColorPicker(
-                selectedColor: selectedColor,
-                onColorSelected: (c) => setDialogState(() => selectedColor = c),
+                const SizedBox(height: 16),
+                _ColorPicker(
+                  selectedColor: selectedColor,
+                  onColorSelected: (c) => setDialogState(() => selectedColor = c),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+              FilledButton(
+                onPressed: () {
+                  if (nameController.text.trim().isNotEmpty) {
+                    unawaited(
+                      ref
+                          .read(tagServiceProvider)
+                          .createTag(
+                            nameController.text.trim(),
+                            color: selectedColor,
+                          ),
+                    );
+                    Navigator.pop(ctx);
+                  }
+                },
+                child: const Text('Создать'),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-            FilledButton(
-              onPressed: () {
-                if (nameController.text.trim().isNotEmpty) {
-                  ref
-                      .read(tagServiceProvider)
-                      .createTag(
-                        nameController.text.trim(),
-                        color: selectedColor,
-                      );
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Создать'),
-            ),
-          ],
         ),
       ),
     );
@@ -133,65 +139,69 @@ class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
   void _showEditTagDialog(BuildContext context, Tag tag) {
     final nameController = TextEditingController(text: tag.name);
     String selectedColor = tag.color;
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Редактировать тег'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Название',
-                  border: OutlineInputBorder(),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: const Text('Редактировать тег'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _ColorPicker(
-                selectedColor: selectedColor,
-                onColorSelected: (c) => setDialogState(() => selectedColor = c),
+                const SizedBox(height: 16),
+                _ColorPicker(
+                  selectedColor: selectedColor,
+                  onColorSelected: (c) => setDialogState(() => selectedColor = c),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+              FilledButton(
+                onPressed: () {
+                  final service = ref.read(tagServiceProvider);
+                  if (nameController.text.trim().isNotEmpty) {
+                    unawaited(service.renameTag(tag.id, nameController.text.trim()));
+                  }
+                  if (selectedColor != tag.color) {
+                    unawaited(service.changeTagColor(tag.id, selectedColor));
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Сохранить'),
               ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-            FilledButton(
-              onPressed: () {
-                final service = ref.read(tagServiceProvider);
-                if (nameController.text.trim().isNotEmpty) {
-                  service.renameTag(tag.id, nameController.text.trim());
-                }
-                if (selectedColor != tag.color) {
-                  service.changeTagColor(tag.id, selectedColor);
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text('Сохранить'),
-            ),
-          ],
         ),
       ),
     );
   }
 
   void _confirmDeleteTag(BuildContext context, Tag tag) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Удалить тег?'),
-        content: Text('Тег "${tag.name}" будет удалён из всех книг.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
-          FilledButton(
-            onPressed: () {
-              ref.read(tagServiceProvider).deleteTag(tag.id);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Удалить'),
-          ),
-        ],
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Удалить тег?'),
+          content: Text('Тег "${tag.name}" будет удалён из всех книг.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+            FilledButton(
+              onPressed: () {
+                unawaited(ref.read(tagServiceProvider).deleteTag(tag.id));
+                Navigator.pop(ctx);
+              },
+              child: const Text('Удалить'),
+            ),
+          ],
+        ),
       ),
     );
   }

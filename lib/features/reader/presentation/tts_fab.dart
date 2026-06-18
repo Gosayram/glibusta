@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'base_tts.dart';
-import 'tts_service.dart';
+import '../data/tts/base_tts.dart';
+import '../data/tts/tts_service.dart';
 
 class TtsFab extends ConsumerStatefulWidget {
   const TtsFab({required this.text, super.key});
@@ -53,8 +55,8 @@ class _TtsFabState extends ConsumerState<TtsFab> {
                 heroTag: 'tts_stop',
                 backgroundColor: Theme.of(context).colorScheme.errorContainer,
                 onPressed: () {
-                  ttsService.stop();
-                  ref.read(ttsStateProvider.notifier).state = TtsState.stopped;
+                  unawaited(ttsService.stop());
+                  ref.read(ttsStateProvider.notifier).update(TtsState.stopped);
                 },
                 child: Icon(
                   Icons.stop,
@@ -72,13 +74,13 @@ class _TtsFabState extends ConsumerState<TtsFab> {
     final current = ref.read(ttsStateProvider);
     if (current == TtsState.playing) {
       await ttsService.pause();
-      ref.read(ttsStateProvider.notifier).state = TtsState.paused;
+      ref.read(ttsStateProvider.notifier).update(TtsState.paused);
     } else if (current == TtsState.paused) {
       await ttsService.resume();
-      ref.read(ttsStateProvider.notifier).state = TtsState.playing;
+      ref.read(ttsStateProvider.notifier).update(TtsState.playing);
     } else {
       await ttsService.speak(widget.text);
-      ref.read(ttsStateProvider.notifier).state = TtsState.playing;
+      ref.read(ttsStateProvider.notifier).update(TtsState.playing);
     }
   }
 
@@ -187,8 +189,8 @@ class _TtsFabState extends ConsumerState<TtsFab> {
           minutes,
           onExpire: () {
             final ttsService = ref.read(ttsServiceProvider);
-            ttsService.stop();
-            ref.read(ttsStateProvider.notifier).state = TtsState.stopped;
+            unawaited(ttsService.stop());
+            ref.read(ttsStateProvider.notifier).update(TtsState.stopped);
           },
         );
       },
