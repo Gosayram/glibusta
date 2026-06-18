@@ -48,7 +48,7 @@ RUFF_CHECK := $(RUFF) check
 RUFF_FORMAT := $(RUFF) format
 SHELLCHECK_RUN := $(SHELLCHECK)
 
-DART_FORMAT_PATHS ?= .
+DART_FORMAT_PATHS ?= lib test
 PRETTIER_GLOBS ?= **/*.{md,yml,yaml,json}
 PYTHON_PATHS ?= scripts
 SHELL_SCRIPT_PATHS ?= $(shell find scripts -type f -name '*.sh' 2>/dev/null)
