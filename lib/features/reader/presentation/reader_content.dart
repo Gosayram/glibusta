@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -261,29 +262,14 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          final uri = Uri.tryParse(block.imageUrl!);
-          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
-          if (!isLocal) {
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-              child: Center(
-                child: Icon(Icons.broken_image, size: 64, color: _getReaderStyle(settings).color),
-              ),
-            );
-          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(block.imageUrl!),
-                  fit: BoxFit.contain,
-                  errorBuilder: (ctx, e, s) => Icon(
-                    Icons.broken_image,
-                    size: 64,
-                    color: _getReaderStyle(settings).color,
-                  ),
+                child: _buildImageWidget(
+                  block.imageUrl!,
+                  _getReaderStyle(settings).color,
                 ),
               ),
             ),
@@ -426,6 +412,50 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       color: colors.text,
       letterSpacing: settings.letterSpacing,
     );
+  }
+
+  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        final bytes = base64Decode(data.last);
+        return InteractiveViewer(
+          maxScale: 4.0,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, e, s) => Icon(
+              Icons.broken_image,
+              size: 64,
+              color: errorColor,
+            ),
+          ),
+        );
+      }
+    }
+
+    if (isFileUri || isPlainPath) {
+      final filePath = isFileUri ? uri.path : imageUrl;
+      return InteractiveViewer(
+        maxScale: 4.0,
+        child: Image.file(
+          File(filePath),
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => Icon(
+            Icons.broken_image,
+            size: 64,
+            color: errorColor,
+          ),
+        ),
+      );
+    }
+
+    return Icon(Icons.broken_image, size: 64, color: errorColor);
   }
 }
 
@@ -639,28 +669,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          final uri = Uri.tryParse(block.imageUrl!);
-          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
-          if (!isLocal) {
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-              child: Center(child: Icon(Icons.broken_image, size: 64, color: style.color)),
-            );
-          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(block.imageUrl!),
-                  fit: BoxFit.contain,
-                  errorBuilder: (ctx, e, s) => Icon(
-                    Icons.broken_image,
-                    size: 64,
-                    color: style.color,
-                  ),
-                ),
+                child: _buildImageWidget(block.imageUrl!, style.color),
               ),
             ),
           );
@@ -943,5 +957,49 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ),
         );
     }
+  }
+
+  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        final bytes = base64Decode(data.last);
+        return InteractiveViewer(
+          maxScale: 4.0,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, e, s) => Icon(
+              Icons.broken_image,
+              size: 64,
+              color: errorColor,
+            ),
+          ),
+        );
+      }
+    }
+
+    if (isFileUri || isPlainPath) {
+      final filePath = isFileUri ? uri.path : imageUrl;
+      return InteractiveViewer(
+        maxScale: 4.0,
+        child: Image.file(
+          File(filePath),
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => Icon(
+            Icons.broken_image,
+            size: 64,
+            color: errorColor,
+          ),
+        ),
+      );
+    }
+
+    return Icon(Icons.broken_image, size: 64, color: errorColor);
   }
 }

@@ -39,6 +39,7 @@ class CoverExtractionService {
         extracted = switch (fmt) {
           BookFormat.epub => _extractEpubCover(fileBytes),
           BookFormat.fb2 => _extractFb2Cover(fileBytes),
+          BookFormat.cbz || BookFormat.cbr => _extractComicCover(fileBytes),
           _ => null,
         };
       }
@@ -112,6 +113,23 @@ class CoverExtractionService {
 
       final base64Data = binary.innerText.replaceAll(RegExp(r'\s+'), '');
       return base64Decode(base64Data);
+    } on Object catch (_) {
+      return null;
+    }
+  }
+
+  /// Extract first image from CBZ/CBR (ZIP archive) as cover.
+  Uint8List? _extractComicCover(Uint8List bytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final imageExts = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
+      final imageFiles =
+          archive.files
+              .where((f) => f.isFile && imageExts.any((ext) => f.name.toLowerCase().endsWith(ext)))
+              .toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+      if (imageFiles.isEmpty) return null;
+      return Uint8List.fromList(imageFiles.first.content as List<int>);
     } on Object catch (_) {
       return null;
     }
