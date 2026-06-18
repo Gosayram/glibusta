@@ -122,6 +122,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: 'Сохранённые папки и доступ',
             onTap: () => _showPersistedUrisDialog(context),
           ),
+          _SettingsTile(
+            icon: Icons.storage,
+            title: 'Управление хранилищем',
+            subtitle: 'Размер данных, очистка кеша',
+            onTap: () => context.push('/settings/storage'),
+          ),
 
           const Divider(),
           const _SectionHeader(title: 'Отображение'),

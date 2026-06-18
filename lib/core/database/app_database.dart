@@ -155,6 +155,108 @@ class AppDatabase extends _$AppDatabase {
     final dbFolder = await getApplicationDocumentsDirectory();
     return p.join(dbFolder.path, 'glibusta', 'glibusta.sqlite');
   }
+
+  Future<File> prepareUploadSnapshot() async {
+    final dbPath = await _databasePath;
+    final snapshotFile = File('$dbPath.upload');
+    try {
+      await customStatement('VACUUM INTO ?', [snapshotFile.path]);
+    } on Object catch (e) {
+      AppLogger().warning(
+        'VACUUM INTO failed, falling back to copy: $e',
+        name: 'Database',
+        error: e,
+      );
+      await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+      final dbFile = File(dbPath);
+      await dbFile.copy(snapshotFile.path);
+      final walFile = File('$dbPath-wal');
+      if (await walFile.exists()) {
+        await walFile.copy('${snapshotFile.path}-wal');
+      }
+      final shmFile = File('$dbPath-shm');
+      if (await shmFile.exists()) {
+        await shmFile.copy('${snapshotFile.path}-shm');
+      }
+    }
+    return snapshotFile;
+  }
+
+  Future<void> deleteUploadSnapshot() async {
+    final dbPath = await _databasePath;
+    for (final ext in ['', '-wal', '-shm', '.upload', '.upload-wal', '.upload-shm']) {
+      final f = File('$dbPath$ext');
+      if (await f.exists()) {
+        await f.delete();
+      }
+    }
+  }
+
+  Future<void> fixDatabaseHeader() async {
+    final dbPath = await _databasePath;
+    final dbFile = File(dbPath);
+    if (!await dbFile.exists()) return;
+
+    try {
+      final bytes = await dbFile.readAsBytes();
+      if (bytes.length < 20) return;
+
+      const walMagicOffset = 18;
+      final byte0 = bytes[0];
+      final byte1 = bytes[1];
+
+      if (byte0 == 0x37 && byte1 == 0x0f && bytes.length > walMagicOffset + 2) {
+        final walByte0 = bytes[walMagicOffset];
+        final walByte1 = bytes[walMagicOffset + 1];
+
+        if (walByte0 == 0x37 && walByte1 == 0x0f) {
+          AppLogger().info(
+            'Patching WAL header for legacy compatibility',
+            name: 'Database',
+          );
+          final patched = Uint8List.fromList(bytes);
+          patched[walMagicOffset] = 0x37;
+          patched[walMagicOffset + 1] = 0x0f;
+          patched[walMagicOffset + 2] = 0x10;
+          patched[walMagicOffset + 3] = 0x20;
+          await dbFile.writeAsBytes(patched);
+        }
+      }
+    } on Object catch (e) {
+      AppLogger().warning(
+        'Failed to fix database header: $e',
+        name: 'Database',
+        error: e,
+      );
+    }
+  }
+
+  Future<void> checkpointWal() async {
+    try {
+      await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+    } on Object catch (e) {
+      AppLogger().warning(
+        'WAL checkpoint failed: $e',
+        name: 'Database',
+        error: e,
+      );
+    }
+  }
+
+  Future<DateTime?> getLatestModTime() async {
+    final dbPath = await _databasePath;
+    DateTime? latest;
+    for (final ext in ['', '-wal']) {
+      final f = File('$dbPath$ext');
+      if (await f.exists()) {
+        final stat = await f.stat();
+        if (latest == null || stat.modified.isAfter(latest)) {
+          latest = stat.modified;
+        }
+      }
+    }
+    return latest;
+  }
 }
 
 QueryExecutor _openConnection() {

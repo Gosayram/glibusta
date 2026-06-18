@@ -31,6 +31,7 @@ final class DocxParser implements BookParser {
       final rels = _buildRelationshipMap(archive);
       final title = _extractTitle(archive) ?? _titleFromFileName(fileName);
       final blocks = _extractBlocks(doc, archive, rels);
+      final created = _extractCreatedDate(archive);
       return NormalizedBook(
         id: fileName ?? 'unknown.docx',
         title: title,
@@ -38,6 +39,9 @@ final class DocxParser implements BookParser {
         chapters: [
           ReaderChapter(index: 0, title: 'Текст', blocks: blocks),
         ],
+        metadata: {
+          if (created != null) 'created': created.toIso8601String(),
+        },
       );
     } on ParserFailure {
       rethrow;
@@ -137,6 +141,26 @@ final class DocxParser implements BookParser {
       } on Object catch (_) {}
     }
     return const [];
+  }
+
+  DateTime? _extractCreatedDate(Archive archive) {
+    final coreProps = _findFile(archive, 'docProps/core.xml');
+    if (coreProps != null) {
+      try {
+        final propsDoc = XmlDocument.parse(String.fromCharCodes(coreProps));
+        final dateEl = propsDoc.findAllElements(
+          'dcterms:created',
+          namespaceUri: 'http://purl.org/dc/terms/',
+        );
+        if (dateEl.isNotEmpty) {
+          final text = dateEl.first.innerText.trim();
+          if (text.isNotEmpty) {
+            return DateTime.tryParse(text);
+          }
+        }
+      } on Object catch (_) {}
+    }
+    return null;
   }
 
   String _titleFromFileName(String? fileName) {

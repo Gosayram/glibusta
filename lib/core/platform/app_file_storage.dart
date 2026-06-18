@@ -18,6 +18,7 @@ abstract interface class AppFileStorage {
   Future<Directory> coversDir();
   Future<Directory> cacheDir();
   Future<Directory> catalogCoversDir();
+  Future<Directory> dbDir();
 }
 
 String sanitizeId(String id) {
@@ -82,5 +83,13 @@ class AppFileStorageImpl implements AppFileStorage {
     final catalogDir = Directory(p.join(dir.path, 'glibusta', 'catalog_covers'));
     await catalogDir.create(recursive: true);
     return catalogDir;
+  }
+
+  @override
+  Future<Directory> dbDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final dbDir = Directory(p.join(dir.path, 'glibusta'));
+    await dbDir.create(recursive: true);
+    return dbDir;
   }
 }

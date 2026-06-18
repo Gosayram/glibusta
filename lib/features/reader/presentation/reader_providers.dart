@@ -13,14 +13,20 @@ part 'reader_providers.g.dart';
 // reasonable fallback — the flash is brief. Migrate if Riverpod adds auto-unwrapping.
 @riverpod
 class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
+  Timer? _saveDebouncer;
+
   @override
   ReaderSettings build() {
     _loadFromPrefs();
     listenSelf((prev, next) {
       if (prev != next) {
-        unawaited(ReaderSettingsPersistence.save(next));
+        _saveDebouncer?.cancel();
+        _saveDebouncer = Timer(const Duration(milliseconds: 300), () {
+          unawaited(ReaderSettingsPersistence.save(next));
+        });
       }
     });
+    ref.onDispose(() => _saveDebouncer?.cancel());
     return const ReaderSettings();
   }
 

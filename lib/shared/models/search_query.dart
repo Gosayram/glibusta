@@ -27,27 +27,38 @@ class SearchFilters {
   final BookFormat? format;
   final String? language;
   final String? genre;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
 
   const SearchFilters({
     this.format,
     this.language,
     this.genre,
+    this.dateFrom,
+    this.dateTo,
   });
 
-  bool get hasFilters => format != null || _hasText(language) || _hasText(genre);
+  bool get hasFilters =>
+      format != null || _hasText(language) || _hasText(genre) || dateFrom != null || dateTo != null;
 
   SearchFilters copyWith({
     BookFormat? format,
     String? language,
     String? genre,
+    DateTime? dateFrom,
+    DateTime? dateTo,
     bool clearFormat = false,
     bool clearLanguage = false,
     bool clearGenre = false,
+    bool clearDateFrom = false,
+    bool clearDateTo = false,
   }) {
     return SearchFilters(
       format: clearFormat ? null : (format ?? this.format),
       language: clearLanguage ? null : (language ?? this.language),
       genre: clearGenre ? null : (genre ?? this.genre),
+      dateFrom: clearDateFrom ? null : (dateFrom ?? this.dateFrom),
+      dateTo: clearDateTo ? null : (dateTo ?? this.dateTo),
     );
   }
 }

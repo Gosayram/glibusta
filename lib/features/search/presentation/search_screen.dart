@@ -93,6 +93,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref.read(searchControllerProvider.notifier).setFilters(const SearchFilters());
   }
 
+  void _setDateRange(DateTime? from, DateTime? to) {
+    final filters = ref.read(searchControllerProvider).filters;
+    ref
+        .read(searchControllerProvider.notifier)
+        .setFilters(
+          filters.copyWith(
+            dateFrom: from,
+            dateTo: to,
+            clearDateFrom: from == null,
+            clearDateTo: to == null,
+          ),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(searchControllerProvider);
@@ -360,6 +374,60 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 tooltip: 'Сбросить фильтры',
                 onPressed: _clearFilters,
               ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  filters.dateFrom != null
+                      ? 'С: ${filters.dateFrom!.day}.${filters.dateFrom!.month}.${filters.dateFrom!.year}'
+                      : 'Дата от',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: filters.dateFrom ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    _setDateRange(picked, filters.dateTo);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  filters.dateTo != null
+                      ? 'По: ${filters.dateTo!.day}.${filters.dateTo!.month}.${filters.dateTo!.year}'
+                      : 'Дата до',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: filters.dateTo ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    _setDateRange(filters.dateFrom, picked);
+                  }
+                },
+              ),
+            ),
           ],
         ),
       ],
