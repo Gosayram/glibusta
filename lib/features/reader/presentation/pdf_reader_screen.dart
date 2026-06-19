@@ -31,12 +31,6 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final file = File(widget.filePath);
     if (!file.existsSync()) {

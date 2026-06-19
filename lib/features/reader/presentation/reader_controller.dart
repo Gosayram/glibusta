@@ -154,6 +154,7 @@ class ReaderController {
   bool _loaded = false;
   bool _fullscreenEnabled = false;
   int _loadGeneration = 0;
+  int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
 
   late final ReaderContentHelper _content;
@@ -375,6 +376,7 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
+    final generation = ++_chapterLoadGeneration;
     if (_loaded && !_state.isLoading) {
       _updateState(_state.copyWith(isDynamicallyLoading: true));
     }
@@ -383,9 +385,9 @@ class ReaderController {
       _state.loadedChapters,
       chapterCount: _state.chapterCount,
     );
-    if (!_disposed) {
-      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
-    }
+    // Discard stale results if a newer chapter load superseded this one.
+    if (_disposed || generation != _chapterLoadGeneration) return;
+    _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
   }
 
   void _evictDistantChapters(int centerIndex) {
@@ -398,6 +400,11 @@ class ReaderController {
   // ── Scroll / progress ─────────────────────────────────
 
   ScrollController get scrollController {
+    if (_disposed) {
+      // Avoid creating (and leaking) a fresh controller after disposal;
+      // return the existing (disposed) instance when present.
+      if (_scrollController != null) return _scrollController!;
+    }
     _scrollController ??= ScrollController()..addListener(_onScroll);
     return _scrollController!;
   }

@@ -186,7 +186,7 @@ final class CurrentNetworkProvider
         argument: null,
         retry: null,
         name: r'currentNetworkProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );

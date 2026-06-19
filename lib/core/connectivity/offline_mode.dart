@@ -122,7 +122,7 @@ Stream<NetworkState> networkState(Ref ref) {
   return Connectivity().onConnectivityChanged.map(mapConnectivity);
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 Future<NetworkState> currentNetwork(Ref ref) async {
   final results = await Connectivity().checkConnectivity();
   return mapConnectivity(results);

@@ -17,17 +17,15 @@ class DjvuReaderScreen extends StatelessWidget {
             children: [
               const Icon(Icons.image_outlined, size: 56),
               const SizedBox(height: 16),
-              // TODO(i18n): Replace hardcoded Russian strings with localized versions.
               Text(
-                'DjVu распознан как отдельный постраничный формат.',
+                'DjVu is recognized as a separate paginated format.',
                 style: Theme.of(context).textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              // TODO(i18n): Replace hardcoded Russian strings with localized versions.
               const Text(
-                'Встроенный DjVu-движок будет подключаться отдельно через native renderer '
-                '(DjVuLibre или MuPDF). EPUB/FB2/RTF reader для этого формата не используется.',
+                'A built-in DjVu engine will be integrated separately via a native renderer '
+                '(DjVuLibre or MuPDF). The EPUB/FB2/RTF reader is not used for this format.',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),

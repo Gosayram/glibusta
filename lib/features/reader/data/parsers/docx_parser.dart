@@ -6,6 +6,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/logging/app_logger.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
@@ -95,7 +96,9 @@ final class DocxParser implements BookParser {
           map[id] = 'word/$target';
         }
       }
-    } on Object catch (_) {}
+    } on Object catch (e, stack) {
+      AppLogger().warning('DOCX parse error', error: e, st: stack);
+    }
     return map;
   }
 
@@ -112,7 +115,9 @@ final class DocxParser implements BookParser {
           final text = titleEl.first.innerText.trim();
           if (text.isNotEmpty) return text;
         }
-      } on Object catch (_) {}
+      } on Object catch (e, stack) {
+        AppLogger().warning('DOCX parse error', error: e, st: stack);
+      }
     }
     final appProps = _findFile(archive, 'docProps/app.xml');
     if (appProps != null) {
@@ -123,7 +128,9 @@ final class DocxParser implements BookParser {
           final text = titleEl.first.innerText.trim();
           if (text.isNotEmpty) return text;
         }
-      } on Object catch (_) {}
+      } on Object catch (e, stack) {
+        AppLogger().warning('DOCX parse error', error: e, st: stack);
+      }
     }
     return null;
   }
@@ -138,7 +145,9 @@ final class DocxParser implements BookParser {
           namespaceUri: 'http://purl.org/dc/elements/1.1/',
         );
         return authorEls.map((e) => e.innerText.trim()).where((e) => e.isNotEmpty).toList();
-      } on Object catch (_) {}
+      } on Object catch (e, stack) {
+        AppLogger().warning('DOCX parse error', error: e, st: stack);
+      }
     }
     return const [];
   }
@@ -158,7 +167,9 @@ final class DocxParser implements BookParser {
             return DateTime.tryParse(text);
           }
         }
-      } on Object catch (_) {}
+      } on Object catch (e, stack) {
+        AppLogger().warning('DOCX parse error', error: e, st: stack);
+      }
     }
     return null;
   }

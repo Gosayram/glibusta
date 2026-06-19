@@ -90,9 +90,6 @@ class TtsAudioService {
         androidNotificationChannelId: 'com.glibusta.tts',
         androidNotificationChannelName: 'TTS Reading',
         androidNotificationOngoing: true,
-        androidStopForegroundOnTaskRemoved: true,
-        fastForwardInterval: Duration(seconds: 10),
-        rewindInterval: Duration(seconds: 10),
       ),
     );
 

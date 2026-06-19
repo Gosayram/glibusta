@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
@@ -292,10 +293,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         appVersion: '${info.version}+${info.buildNumber}',
       );
       final json = await backupService.exportData();
-      // TODO: Use file picker or share to save the JSON
       if (kDebugMode) {
         AppLogger().fine('Exported data: ${json.length} bytes', name: 'Settings');
       }
+
+      // Write to a temporary file and share it via the system share sheet.
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final tempFile = File('${Directory.systemTemp.path}/glibusta_backup_$timestamp.json');
+      await tempFile.writeAsString(json);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(tempFile.path)],
+          text: 'Glibusta settings',
+        ),
+      );
 
       if (!context.mounted) return;
 

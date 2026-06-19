@@ -24,7 +24,21 @@ class FlibustaApiClient {
   Dio get dio => _dio;
   HttpClient get httpClient => _httpClient;
 
+  DateTime? _lastRequestTime;
+
+  Future<void> _enforceRateLimit() async {
+    if (_lastRequestTime != null) {
+      final elapsed = DateTime.now().difference(_lastRequestTime!);
+      const minInterval = Duration(milliseconds: 300);
+      if (elapsed < minInterval) {
+        await Future<void>.delayed(minInterval - elapsed);
+      }
+    }
+    _lastRequestTime = DateTime.now();
+  }
+
   Future<String> _getText(String relativePath, {CancelToken? cancelToken}) async {
+    await _enforceRateLimit();
     final base = _dio.options.baseUrl;
     final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
     return _httpClient.get('$normalizedBase/$relativePath', cancelToken: cancelToken);
@@ -794,6 +808,7 @@ class FlibustaApiClient {
     String? review,
     int? score,
   }) async {
+    await _enforceRateLimit();
     final data = <String, String>{
       'flag': 'on',
       'op': 'Сохранить',
@@ -809,6 +824,7 @@ class FlibustaApiClient {
   }
 
   Future<bool> watchBook(String bookId) async {
+    await _enforceRateLimit();
     try {
       final base = _dio.options.baseUrl;
       final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
@@ -855,6 +871,7 @@ class FlibustaApiClient {
     String subject,
     String body,
   ) async {
+    await _enforceRateLimit();
     final response = await _dio.post<String>(
       'messages/new',
       data: <String, String>{
