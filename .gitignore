@@ -191,3 +191,9 @@ tarpaulin-report.html
 # ==========================================
 
 /doc/
+
+# ==========================================
+# Flutter debug symbols (from --split-debug-info)
+# ==========================================
+
+build/symbols/

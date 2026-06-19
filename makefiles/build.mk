@@ -18,10 +18,13 @@ MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.zip
 
 MACOS_CODESIGN_IDENTITY ?= -
 
-FLUTTER_BUILD_APK := $(FLUTTER) build apk --release
-FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi
-FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release
-FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release
+DEBUG_INFO_ANDROID ?= $(BUILD_DIR)/symbols/android
+DEBUG_INFO_MACOS ?= $(BUILD_DIR)/symbols/macos
+
+FLUTTER_BUILD_APK := $(FLUTTER) build apk --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debug-info=$(DEBUG_INFO_MACOS)
 CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check
 

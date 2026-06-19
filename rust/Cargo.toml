@@ -72,4 +72,4 @@ opt-level = "z"       # aggressive size optimization
 lto = true            # Link Time Optimization — dead code elimination across crates
 codegen-units = 1     # single codegen unit = better optimization (slower build)
 panic = "abort"       # remove stack unwinding code on panic
-strip = true          # strip debug symbols from .so
+strip = "symbols"     # strip debug symbols from .so

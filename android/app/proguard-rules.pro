@@ -1,30 +1,64 @@
-# Flutter-specific ProGuard rules
+############################################
+# Flutter / Engine / Plugin registry
+############################################
 
-# Keep Flutter wrapper classes
 -keep class io.flutter.app.** { *; }
--keep class io.flutter.plugin.**  { *; }
--keep class io.flutter.util.**  { *; }
--keep class io.flutter.view.**  { *; }
--keep class io.flutter.**  { *; }
--keep class io.flutter.plugins.**  { *; }
+-keep class io.flutter.plugin.** { *; }
+-keep class io.flutter.embedding.** { *; }
+-keep class io.flutter.util.** { *; }
+-keep class io.flutter.view.** { *; }
+-keep class **.GeneratedPluginRegistrant { *; }
 
-# Keep Play Core deferred component classes (referenced by Flutter engine)
+
+############################################
+# JNI / Rust / flutter_rust_bridge
+############################################
+
+-keepclasseswithmembers class * {
+    native <methods>;
+}
+
+-keep class com.gosayram.glibusta.** { *; }
+
+
+############################################
+# Kotlin / Coroutines / Metadata
+############################################
+
+-keep class kotlin.Metadata { *; }
+-dontwarn kotlinx.coroutines.**
+
+
+############################################
+# Play Core deferred component
+############################################
+
 -dontwarn com.google.android.play.core.**
 -keep class com.google.android.play.core.** { *; }
 
-# Keep Drift database classes
--keep class com.gosayram.glibusta.core.database.** { *; }
 
-# Keep serialization models
--keep class **.freezed.** { *; }
--keep class **.g.dart { *; }
+############################################
+# Enum helpers
+############################################
 
-# Keep background_downloader
--keep class com.gosayram.glibusta.** { *; }
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
 
-# Flutter Rust Bridge — keep JNI native methods
--keep class com.gosayram.glibusta.** implements java.lang.reflect.InvocationHandler { *; }
--keep class com.gosayram.glibusta.** { <methods>; }
--keepclasseswithmembers class * {
-    native <methods>;
+
+############################################
+# Crashlytics / Sentry mapping friendliness
+############################################
+
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+
+############################################
+# WebView JS bridge (if used in reader)
+############################################
+
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
 }
