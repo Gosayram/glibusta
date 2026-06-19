@@ -93,4 +93,9 @@ require-shellcheck: ## Verify ShellCheck is available
 require-ruff: ## Verify Ruff is available
 	@$(call REQUIRE_TOOL,$(RUFF))
 
+.PHONY: require-rust
+require-rust: ## Verify Rust toolchain is available
+	@$(call REQUIRE_TOOL,cargo)
+	@$(call REQUIRE_TOOL,rustc)
+
 endif

@@ -22,29 +22,53 @@ FLUTTER_BUILD_APK := $(FLUTTER) build apk --release
 FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi
 FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release
+CARGO_BUILD_RELEASE := cd rust && cargo build --release
+CARGO_CHECK := cd rust && cargo check
 
 ##@ Build
 
+.PHONY: rust-build-release
+rust-build-release: require-rust ## Build Rust native library in release mode
+	@$(PRINT_STEP) "Building Rust library (release)"
+	$(CARGO_BUILD_RELEASE)
+	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || true
+	@$(PRINT_OK) "Rust release build complete"
+
+.PHONY: rust-build-check
+rust-build-check: require-rust ## Verify Rust code compiles
+	@$(PRINT_STEP) "Verifying Rust compilation"
+	$(CARGO_CHECK)
+	@$(PRINT_OK) "Rust compilation verified"
+
+.PHONY: rust-sync-version
+rust-sync-version: ## Sync Rust crate version with pubspec.yaml version
+	@$(PRINT_STEP) "Syncing Rust version from pubspec.yaml"
+	@CARGO_VER=$$($(PYTHON) -c "import re; \
+		v=re.search(r'version:\s*(.+)', open('pubspec.yaml').read()).group(1).strip(); \
+		ver=v.split('+')[0]; print(ver)"); \
+	perl -pi -e "s/^version = .*/version = \"$$CARGO_VER\"/" rust/Cargo.toml; \
+	echo "  Rust version: $$CARGO_VER"
+
 .PHONY: bump
-bump: require-python ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
+bump: require-python rust-sync-version ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
 	@$(PRINT_STEP) "Bumping patch version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py); \
 	echo "  $$NEW_VER"
 
 .PHONY: bump-minor
-bump-minor: require-python ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
+bump-minor: require-python rust-sync-version ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
 	@$(PRINT_STEP) "Bumping minor version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --minor); \
 	echo "  $$NEW_VER"
 
 .PHONY: bump-major
-bump-major: require-python ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
+bump-major: require-python rust-sync-version ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
 	@$(PRINT_STEP) "Bumping major version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --major); \
 	echo "  $$NEW_VER"
 
 .PHONY: bump-build
-bump-build: require-python ## Bump build number only: 0.1.5+3 → 0.1.5+4
+bump-build: require-python rust-sync-version ## Bump build number only: 0.1.5+3 → 0.1.5+4
 	@$(PRINT_STEP) "Bumping build number"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --build); \
 	echo "  $$NEW_VER"
@@ -81,6 +105,7 @@ clean-build: ## Remove all build artifacts and caches for a fresh build
 	rm -rf linux/flutter/ephemeral
 	rm -rf windows/flutter/ephemeral
 	rm -rf web/favicon.png
+	rm -rf rust/target
 	$(FLUTTER) pub get
 
 .PHONY: clean-all
