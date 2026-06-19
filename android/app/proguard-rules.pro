@@ -19,8 +19,12 @@
 -keep class **.freezed.** { *; }
 -keep class **.g.dart { *; }
 
-# Keep Sentry
--keep class io.sentry.** { *; }
-
 # Keep background_downloader
 -keep class com.gosayram.glibusta.** { *; }
+
+# Flutter Rust Bridge — keep JNI native methods
+-keep class com.gosayram.glibusta.** implements java.lang.reflect.InvocationHandler { *; }
+-keep class com.gosayram.glibusta.** { <methods>; }
+-keepclasseswithmembers class * {
+    native <methods>;
+}

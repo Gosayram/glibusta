@@ -133,6 +133,21 @@ rust-lints: ## Run ltrs spell-check on Rust comments/strings
 	@find rust/src -name "*.rs" ! -name "frb_generated*" -exec grep -l '"[^"]*[а-яА-ЯёЁ]' {} + 2>/dev/null | \
 		xargs -I{} ltrs check --language ru-RU "{}" 2>/dev/null || true
 
+.PHONY: rust-bloat
+rust-bloat: ## Analyze Rust binary size breakdown
+	@$(PRINT_STEP) "Analyzing Rust binary size"
+	cd rust && cargo bloat --release -n 30
+
+.PHONY: rust-size
+rust-size: ## Show Rust binary sizes
+	@$(PRINT_STEP) "Rust binary sizes:"
+	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || echo "Run 'cargo build --release' first"
+
+.PHONY: flutter-size
+flutter-size: ## Analyze APK/AAB size
+	@$(PRINT_STEP) "Analyzing Flutter build size"
+	flutter build apk --analyze-size --target-platform android-arm64 2>&1 | tail -5
+
 .PHONY: fix-all
 fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"

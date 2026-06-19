@@ -65,3 +65,11 @@ should_implement_trait = "allow"
 
 [build-dependencies]
 flutter_rust_bridge_codegen = "=2.11.0"
+
+# ─── Release profile: minimize .so size ────────────────────────────────
+[profile.release]
+opt-level = "z"       # aggressive size optimization
+lto = true            # Link Time Optimization — dead code elimination across crates
+codegen-units = 1     # single codegen unit = better optimization (slower build)
+panic = "abort"       # remove stack unwinding code on panic
+strip = true          # strip debug symbols from .so
