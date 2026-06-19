@@ -41,6 +41,14 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   bool _didScrollToProgress = false;
 
   @override
+  void didUpdateWidget(covariant ReaderContentBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialProgress != oldWidget.initialProgress) {
+      _didScrollToProgress = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final metadata = widget.metadata;
     final loadedChapters = widget.loadedChapters;

@@ -163,7 +163,6 @@ class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
-    _disposed = true;
     _loadGeneration++;
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
@@ -176,6 +175,7 @@ class ReaderController {
     saveProgress();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
+    _disposed = true;
   }
 
   void _flushSessionTime() {

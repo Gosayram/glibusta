@@ -257,17 +257,14 @@ class BookImportService {
   Future<void> _registerBookInDb(_ImportCtx ctx) async {
     final book = ctx.book!;
     ctx.authorIds = [];
+    final authorCompanions = <AuthorsCompanion>[];
     for (final authorName in book.authors) {
-      ctx.authorIds.add(generateAuthorId(authorName));
+      final authorId = generateAuthorId(authorName);
+      ctx.authorIds.add(authorId);
+      authorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
     }
     await _database.batch((batch) {
-      var i = 0;
-      for (final authorName in book.authors) {
-        batch.into(_database.authors).insertOnConflictUpdate(
-          AuthorsCompanion.insert(id: ctx.authorIds[i], name: authorName),
-        );
-        i++;
-      }
+      batch.insertAllOnConflictUpdate(_database.authors, authorCompanions);
     });
 
     await _database.transaction(() async {
@@ -487,18 +484,15 @@ class BookImportService {
       }
 
       final extAuthorIds = <String>[];
+      final extAuthorCompanions = <AuthorsCompanion>[];
       for (final authorName in book.authors) {
         final authorId = generateAuthorId(authorName);
         extAuthorIds.add(authorId);
-        await _database
-            .into(_database.authors)
-            .insertOnConflictUpdate(
-              AuthorsCompanion.insert(
-                id: authorId,
-                name: authorName,
-              ),
-            );
+        extAuthorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
       }
+      await _database.batch((batch) {
+        batch.insertAllOnConflictUpdate(_database.authors, extAuthorCompanions);
+      });
 
       await _database.transaction(() async {
         await _database
