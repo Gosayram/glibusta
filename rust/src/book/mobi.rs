@@ -53,6 +53,7 @@ impl<'a> BinaryReader<'a> {
             .collect()
     }
 
+    #[allow(dead_code)]
     fn slice(&self, start: usize, end: usize) -> &'a [u8] {
         if start > end || end > self.bytes.len() {
             panic!(
@@ -126,11 +127,7 @@ impl PalmDbParser {
             offset += 8;
         }
 
-        let name = reader
-            .ascii(0, 32)
-            .replace('\0', "")
-            .trim()
-            .to_string();
+        let name = reader.ascii(0, 32).replace('\0', "").trim().to_string();
 
         Ok(PalmDb { name, records })
     }
@@ -255,31 +252,17 @@ impl ExthParser {
             let data = &record0[pos + 8..pos + size];
             match rec_type {
                 100 => {
-                    author = Some(
-                        String::from_utf8_lossy(data)
-                            .trim()
-                            .to_string(),
-                    );
+                    author = Some(String::from_utf8_lossy(data).trim().to_string());
                 }
                 503 => {
-                    title = Some(
-                        String::from_utf8_lossy(data)
-                            .trim()
-                            .to_string(),
-                    );
+                    title = Some(String::from_utf8_lossy(data).trim().to_string());
                 }
                 524 => {
-                    language = Some(
-                        String::from_utf8_lossy(data)
-                            .trim()
-                            .to_string(),
-                    );
+                    language = Some(String::from_utf8_lossy(data).trim().to_string());
                 }
-                201 => {
-                    if data.len() >= 4 {
-                        let cr = BinaryReader::new(data);
-                        cover_record_index = Some(cr.u32be(0));
-                    }
+                201 if data.len() >= 4 => {
+                    let cr = BinaryReader::new(data);
+                    cover_record_index = Some(cr.u32be(0));
                 }
                 _ => {}
             }
@@ -296,16 +279,12 @@ impl ExthParser {
     }
 
     fn find_exth_offset(&self, record0: &[u8]) -> Option<usize> {
-        for i in 0..record0.len().saturating_sub(3) {
-            if record0[i] == 0x45
+        (0..record0.len().saturating_sub(3)).find(|&i| {
+            record0[i] == 0x45
                 && record0[i + 1] == 0x58
                 && record0[i + 2] == 0x54
                 && record0[i + 3] == 0x48
-            {
-                return Some(i);
-            }
-        }
-        None
+        })
     }
 }
 
@@ -327,8 +306,28 @@ impl MobiHtmlParser {
     fn new() -> Self {
         let mut block_elements = HashSet::new();
         for &name in &[
-            "p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre", "table", "ul",
-            "ol", "li", "tr", "td", "th", "section", "article", "header", "footer", "figure",
+            "p",
+            "div",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "blockquote",
+            "pre",
+            "table",
+            "ul",
+            "ol",
+            "li",
+            "tr",
+            "td",
+            "th",
+            "section",
+            "article",
+            "header",
+            "footer",
+            "figure",
             "figcaption",
         ] {
             block_elements.insert(name);
@@ -388,10 +387,7 @@ impl MobiHtmlParser {
                     });
                     idx += 1;
                 }
-            } else if lower.starts_with("<hr")
-                || lower.starts_with("<hr/>")
-                || lower == "<hr>"
-            {
+            } else if lower.starts_with("<hr") || lower.starts_with("<hr/>") || lower == "<hr>" {
                 blocks.push(ReaderBlock {
                     index: idx,
                     text: String::new(),
@@ -425,11 +421,7 @@ impl MobiHtmlParser {
                         block_type: BlockType::Paragraph,
                         image_url: None,
                         note_ref: None,
-                        rich_spans: if spans.is_empty() {
-                            None
-                        } else {
-                            Some(spans)
-                        },
+                        rich_spans: if spans.is_empty() { None } else { Some(spans) },
                     });
                     idx += 1;
                 }
@@ -490,7 +482,9 @@ impl MobiHtmlParser {
                     }
                 }
                 // Check for <!-- comment -->
-                if i + 4 < len && bytes[i + 1] == b'!' && bytes[i + 2] == b'-'
+                if i + 4 < len
+                    && bytes[i + 1] == b'!'
+                    && bytes[i + 2] == b'-'
                     && bytes[i + 3] == b'-'
                 {
                     // Look for -->
@@ -831,9 +825,9 @@ impl MobiHtmlParser {
                             chars.next();
                         }
                         continue;
-                    } else if entity.starts_with('#') {
-                        if entity.starts_with("#x") {
-                            if let Ok(code) = u32::from_str_radix(&entity[2..], 16) {
+                    } else if let Some(stripped) = entity.strip_prefix('#') {
+                        if let Some(hex_digits) = stripped.strip_prefix('x') {
+                            if let Ok(code) = u32::from_str_radix(hex_digits, 16) {
                                 if let Some(c) = char::from_u32(code) {
                                     result.push(c);
                                     for _ in 0..=semi_pos {
@@ -843,7 +837,7 @@ impl MobiHtmlParser {
                                 }
                             }
                         } else {
-                            if let Ok(code) = entity[1..].parse::<u32>() {
+                            if let Ok(code) = stripped.parse::<u32>() {
                                 if let Some(c) = char::from_u32(code) {
                                     result.push(c);
                                     for _ in 0..=semi_pos {
@@ -988,7 +982,7 @@ impl MobiChapterSplitter {
             }];
         }
 
-        let mut chunk_map: HashSet<usize> = breaks.iter().copied().collect();
+        let chunk_map: HashSet<usize> = breaks.iter().copied().collect();
         let mut chunks: Vec<ChapterChunk> = Vec::new();
 
         for (b, &brk) in breaks.iter().enumerate() {
@@ -1001,7 +995,8 @@ impl MobiChapterSplitter {
             let chapter_blocks: Vec<ReaderBlock> = blocks[start..end]
                 .iter()
                 .filter(|bl| {
-                    !(bl.block_type == BlockType::Separator && chunk_map.contains(&(bl.index as usize)))
+                    !(bl.block_type == BlockType::Separator
+                        && chunk_map.contains(&(bl.index as usize)))
                 })
                 .cloned()
                 .collect();
@@ -1022,10 +1017,10 @@ impl MobiChapterSplitter {
     }
 
     fn is_nearby_heading(&self, blocks: &[ReaderBlock], index: usize) -> bool {
-        let start = if index >= 2 { index - 2 } else { 0 };
+        let start = index.saturating_sub(2);
         let end = std::cmp::min(index + 2, blocks.len() - 1);
-        for j in start..=end {
-            if blocks[j].block_type == BlockType::Heading {
+        for block in blocks.iter().take(end + 1).skip(start) {
+            if block.block_type == BlockType::Heading {
                 return true;
             }
         }
@@ -1089,7 +1084,11 @@ impl MobiCoverExtractor {
         self.validate_image_bytes(bytes)
     }
 
-    fn find_cover_record_index(&self, header: &MobiHeader, metadata: &MobiMetadata) -> Option<usize> {
+    fn find_cover_record_index(
+        &self,
+        header: &MobiHeader,
+        metadata: &MobiMetadata,
+    ) -> Option<usize> {
         if let Some(idx) = metadata.cover_record_index {
             if idx > 0 {
                 return Some(idx as usize);
@@ -1391,12 +1390,10 @@ fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
 }
 
 fn first_non_empty(values: &[Option<&str>]) -> String {
-    for v in values {
-        if let Some(s) = v {
-            let trimmed = s.trim();
-            if !trimmed.is_empty() {
-                return trimmed.to_string();
-            }
+    for s in values.iter().flatten() {
+        let trimmed = s.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
         }
     }
     "MOBI document".to_string()
@@ -1528,16 +1525,10 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         serde_json::json!(is_likely_kf8(&header, record0)),
     );
     if let Some(ref cover) = cover_bytes {
-        meta.insert(
-            "mobiCoverBytes".to_string(),
-            serde_json::json!(cover.len()),
-        );
+        meta.insert("mobiCoverBytes".to_string(), serde_json::json!(cover.len()));
     }
     if let Some(idx) = metadata.cover_record_index {
-        meta.insert(
-            "mobiCoverRecordIndex".to_string(),
-            serde_json::json!(idx),
-        );
+        meta.insert("mobiCoverRecordIndex".to_string(), serde_json::json!(idx));
     }
 
     Ok(NormalizedBook {

@@ -3,7 +3,6 @@ use crate::book::archive::{self, ZipFile};
 use anyhow::{Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use std::io::BufRead;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
@@ -135,12 +134,10 @@ fn parse_core_properties(
                             current_text.clear();
                         }
                     }
-                    "dcterms:created" => {
-                        if in_created {
-                            created = current_text.trim().to_string();
-                            in_created = false;
-                            current_text.clear();
-                        }
+                    "dcterms:created" if in_created => {
+                        created = current_text.trim().to_string();
+                        in_created = false;
+                        current_text.clear();
                     }
                     _ => {}
                 }
@@ -165,8 +162,6 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
     let mut in_body = false;
     let mut in_paragraph = false;
     let mut in_run = false;
-    let mut in_bold = false;
-    let mut in_italic = false;
     let mut in_pstyle = false;
     let mut pstyle_val = String::new();
 
@@ -196,8 +191,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
                             if attr.key.as_ref() == b"val" {
-                                pstyle_val =
-                                    String::from_utf8_lossy(&attr.value).into_owned();
+                                pstyle_val = String::from_utf8_lossy(&attr.value).into_owned();
                             }
                         }
                         in_pstyle = true;
@@ -217,7 +211,6 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                                 current_span_bold = true;
                             }
                         }
-                        in_bold = true;
                     }
                     "w:i" if in_run => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
@@ -228,7 +221,6 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                                 current_span_italic = true;
                             }
                         }
-                        in_italic = true;
                     }
                     "w:tab" if in_run => {
                         current_span_text.push('\t');
@@ -252,8 +244,6 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 match tag.as_str() {
                     "w:body" => in_body = false,
                     "w:pStyle" => in_pstyle = false,
-                    "w:b" => in_bold = false,
-                    "w:i" => in_italic = false,
                     "w:r" if in_paragraph => {
                         if !current_span_text.is_empty() {
                             rich_spans.push(RichSpan {
@@ -269,7 +259,8 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                     }
                     "w:p" if in_paragraph => {
                         // Combine all span texts for the block text field
-                        let full_text: String = rich_spans.iter().map(|s| s.text.as_str()).collect();
+                        let full_text: String =
+                            rich_spans.iter().map(|s| s.text.as_str()).collect();
                         let trimmed = full_text.trim().to_string();
 
                         if !trimmed.is_empty() {

@@ -72,3 +72,20 @@ Future<Uint8List> extractZipEntry({
 
 Future<String> detectEncoding({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDetectEncoding(bytes: bytes);
+
+/// Compute SHA-256 hash of bytes (first `max_bytes` only for efficiency).
+Future<String> sha256Hash({required List<int> bytes, BigInt? maxBytes}) =>
+    RustLib.instance.api.crateApiApiSha256Hash(
+      bytes: bytes,
+      maxBytes: maxBytes,
+    );
+
+Future<NormalizedBook> parseBook({
+  required List<int> bytes,
+  required String format,
+  String? forcedEncoding,
+}) => RustLib.instance.api.crateApiApiParseBook(
+  bytes: bytes,
+  format: format,
+  forcedEncoding: forcedEncoding,
+);

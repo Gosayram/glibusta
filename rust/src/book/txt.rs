@@ -1,5 +1,5 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
@@ -8,7 +8,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
 
     let paragraphs: Vec<String> = text
         .split("\n\n")
-        .map(|p| normalize_whitespace(p))
+        .map(normalize_whitespace)
         .filter(|p| !p.is_empty())
         .collect();
 
@@ -57,10 +57,9 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
     if encoding_name.eq_ignore_ascii_case("utf-8") {
         Ok(String::from_utf8_lossy(bytes).into_owned())
     } else {
-        let (decoded, _, had_errors) =
-            encoding_rs::Encoding::for_label(encoding_name.as_bytes())
-                .unwrap_or(encoding_rs::UTF_8)
-                .decode(bytes);
+        let (decoded, _, had_errors) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
+            .unwrap_or(encoding_rs::UTF_8)
+            .decode(bytes);
         if had_errors {
             // Fallback to UTF-8 lossy
             Ok(String::from_utf8_lossy(bytes).into_owned())
@@ -100,8 +99,5 @@ fn normalize_whitespace(text: &str) -> String {
 }
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
-    blocks
-        .first()
-        .map(|b| b.text.clone())
-        .unwrap_or_default()
+    blocks.first().map(|b| b.text.clone()).unwrap_or_default()
 }

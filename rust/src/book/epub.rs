@@ -1,10 +1,9 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
+use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use crate::book::archive::{self, ZipFile};
 use anyhow::{Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::collections::HashMap;
-use std::io::BufRead;
 
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let zip = archive::decode_zip(bytes).context("Failed to open EPUB archive")?;
@@ -61,8 +60,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         };
 
         let xhtml_text = decode_bytes(xhtml_bytes, encoding_name);
-        let (mut blocks, mut next_block_index) =
-            parse_xhtml_to_blocks(&xhtml_text, block_index);
+        let (blocks, next_block_index) = parse_xhtml_to_blocks(&xhtml_text, block_index);
         block_index = next_block_index;
 
         if blocks.is_empty() {
@@ -118,7 +116,6 @@ fn parse_container_xml(text: &str) -> Result<String> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
-    let mut in_rootfile = false;
     let mut rootfile_path = None;
 
     loop {
@@ -128,19 +125,11 @@ fn parse_container_xml(text: &str) -> Result<String> {
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 if tag == "rootfile" {
-                    in_rootfile = true;
                     for attr in e.attributes().filter_map(|a| a.ok()) {
                         if attr.key.as_ref() == b"full-path" {
-                            rootfile_path =
-                                Some(String::from_utf8_lossy(&attr.value).into_owned());
+                            rootfile_path = Some(String::from_utf8_lossy(&attr.value).into_owned());
                         }
                     }
-                }
-            }
-            Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                if tag == "rootfile" {
-                    in_rootfile = false;
                 }
             }
             Err(e) => return Err(anyhow::anyhow!("Container XML error: {}", e)),
@@ -151,7 +140,13 @@ fn parse_container_xml(text: &str) -> Result<String> {
     rootfile_path.context("No rootfile found in container.xml")
 }
 
-fn parse_opf(text: &str) -> Result<(HashMap<String, String>, HashMap<String, ManifestItem>, Vec<String>)> {
+type OpfResult = (
+    HashMap<String, String>,
+    HashMap<String, ManifestItem>,
+    Vec<String>,
+);
+
+fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     let mut buf = Vec::new();
@@ -238,7 +233,9 @@ fn parse_opf(text: &str) -> Result<(HashMap<String, String>, HashMap<String, Man
                                     }
                                 })
                             });
-                            let properties: Vec<String> = e.attributes().filter_map(|a| a.ok())
+                            let properties: Vec<String> = e
+                                .attributes()
+                                .filter_map(|a| a.ok())
                                 .filter(|attr| attr.key.as_ref() == b"properties")
                                 .flat_map(|attr| {
                                     String::from_utf8_lossy(&attr.value)
@@ -319,7 +316,7 @@ fn extract_cover_url(
     manifest: &HashMap<String, ManifestItem>,
     metadata: &HashMap<String, String>,
     opf_dir: &str,
-    encoding_name: &str,
+    _encoding_name: &str,
 ) -> Option<String> {
     // Try cover-id from <meta name="cover" content="..."/>
     if let Some(cover_id) = metadata.get("cover-id") {
@@ -509,23 +506,24 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             current_text.clear();
                         }
                     }
-                    "blockquote" if in_body => {
-                        if tag_stack.last().map(|s| s.as_str()) == Some("blockquote") {
-                            tag_stack.pop();
-                            let t = current_text.trim().to_string();
-                            if !t.is_empty() {
-                                blocks.push(ReaderBlock {
-                                    index: block_index,
-                                    text: t,
-                                    block_type: BlockType::Quote,
-                                    image_url: None,
-                                    note_ref: None,
-                                    rich_spans: None,
-                                });
-                                block_index += 1;
-                            }
-                            current_text.clear();
+                    "blockquote"
+                        if in_body
+                            && tag_stack.last().map(|s| s.as_str()) == Some("blockquote") =>
+                    {
+                        tag_stack.pop();
+                        let t = current_text.trim().to_string();
+                        if !t.is_empty() {
+                            blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: t,
+                                block_type: BlockType::Quote,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                            });
+                            block_index += 1;
                         }
+                        current_text.clear();
                     }
                     _ => {}
                 }

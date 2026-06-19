@@ -1,5 +1,5 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
-use anyhow::{Context, Result};
+use anyhow::Result;
 
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let (text, _encoding) = decode_rtf(bytes, forced_encoding)?;
@@ -164,9 +164,7 @@ fn rtf_to_plain(text: &str) -> String {
                 }
                 let cmd_start = i;
                 while i < bytes.len()
-                    && (bytes[i].is_ascii_alphabetic()
-                        || bytes[i] == b'*'
-                        || bytes[i] == b'\'')
+                    && (bytes[i].is_ascii_alphabetic() || bytes[i] == b'*' || bytes[i] == b'\'')
                 {
                     i += 1;
                 }
@@ -190,8 +188,8 @@ fn rtf_to_plain(text: &str) -> String {
                     "fonttbl" | "colortbl" | "stylesheet" | "listtables" | "revtbl" => {
                         skip_group = true;
                     }
-                    "b" | "b0" | "i" | "i0" | "u" | "super" | "sub" | "ul" | "ulnone"
-                    | "strike" | "scaps" | "highlight" => {}
+                    "b" | "b0" | "i" | "i0" | "super" | "sub" | "ul" | "ulnone" | "strike"
+                    | "scaps" | "highlight" => {}
                     "fs" | "f" | "cf" | "cb" | "shd" | "lang" | "fcharset" | "pn" => {
                         while i < bytes.len() && bytes[i].is_ascii_digit() {
                             i += 1;
@@ -207,11 +205,10 @@ fn rtf_to_plain(text: &str) -> String {
                             i += 1;
                         }
                         if num_start < i {
-                            let num_str =
-                                std::str::from_utf8(&bytes[num_start..i]).unwrap_or("0");
+                            let num_str = std::str::from_utf8(&bytes[num_start..i]).unwrap_or("0");
                             if let Ok(mut code_point) = num_str.parse::<i32>() {
                                 if negative {
-                                    code_point = 65536 + code_point;
+                                    code_point += 65536;
                                 }
                                 if let Some(c) = char::from_u32(code_point as u32) {
                                     result.push(c);
@@ -239,10 +236,9 @@ fn rtf_to_plain(text: &str) -> String {
                     _ => {
                         if cmd.starts_with('\'') && i + 2 <= bytes.len() {
                             let hex = &bytes[i..i + 2];
-                            if let Ok(byte_val) = u8::from_str_radix(
-                                std::str::from_utf8(hex).unwrap_or("00"),
-                                16,
-                            ) {
+                            if let Ok(byte_val) =
+                                u8::from_str_radix(std::str::from_utf8(hex).unwrap_or("00"), 16)
+                            {
                                 if byte_val >= 0x20 {
                                     result.push(byte_val as char);
                                 }
@@ -308,7 +304,6 @@ fn text_to_book(text: String) -> NormalizedBook {
     let mut current_blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
     let mut current_text = String::new();
-    let mut chapter_index = 0i32;
 
     for line in &lines {
         let trimmed = line.trim();
@@ -346,11 +341,10 @@ fn text_to_book(text: String) -> NormalizedBook {
 
     if !current_blocks.is_empty() {
         chapters.push(ReaderChapter {
-            index: chapter_index,
+            index: 0,
             title: String::new(),
             blocks: current_blocks,
         });
-        chapter_index += 1;
     }
 
     NormalizedBook {

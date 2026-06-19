@@ -101,12 +101,44 @@ test: require-flutter ## Run Flutter tests
 	@$(PRINT_STEP) "Running Flutter tests"
 	$(FLUTTER_TEST)
 
+.PHONY: rustfmt
+rustfmt: ## Format Rust sources
+	@$(PRINT_STEP) "Formatting Rust sources"
+	cd rust && cargo fmt
+
+.PHONY: rustfmt-check
+rustfmt-check: ## Check Rust formatting
+	@$(PRINT_STEP) "Checking Rust formatting"
+	cd rust && cargo fmt -- --check
+
+.PHONY: rust-clippy
+rust-clippy: ## Run Clippy on Rust code
+	@$(PRINT_STEP) "Running Clippy on Rust code"
+	cd rust && cargo clippy --all-targets
+
+.PHONY: rust-clippy-fix
+rust-clippy-fix: ## Run Clippy and auto-fix
+	@$(PRINT_STEP) "Running Clippy auto-fix on Rust code"
+	cd rust && cargo clippy --fix --allow-dirty --allow-staged 2>&1
+	cd rust && cargo fmt
+
+.PHONY: rust-check
+rust-check: ## Full Rust build check
+	@$(PRINT_STEP) "Running cargo check"
+	cd rust && cargo check
+
+.PHONY: rust-lints
+rust-lints: ## Run ltrs spell-check on Rust comments/strings
+	@$(PRINT_STEP) "Checking Rust strings with LanguageTool"
+	@find rust/src -name "*.rs" ! -name "frb_generated*" -exec grep -l '"[^"]*[а-яА-ЯёЁ]' {} + 2>/dev/null | \
+		xargs -I{} ltrs check --language ru-RU "{}" 2>/dev/null || true
+
 .PHONY: fix-all
-fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix ## Apply all automatic fixes and formatting
+fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict ## Run all local linting and formatting checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

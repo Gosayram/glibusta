@@ -16,8 +16,7 @@ pub struct ZipFile {
 impl ZipFile {
     pub fn open(bytes: &[u8]) -> Result<Self> {
         let cursor = std::io::Cursor::new(bytes);
-        let mut archive =
-            ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
+        let mut archive = ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
         let mut entries = HashMap::new();
         let mut entry_names = Vec::new();
 

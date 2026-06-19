@@ -22,6 +22,7 @@ impl BlockType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s {
             "heading" => BlockType::Heading,

@@ -1,14 +1,15 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive;
 use anyhow::{Context, Result};
-use base64::Engine;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let raw_bytes = if looks_like_zip(bytes) {
         let zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
-        find_fb2_in_zip(&zip).context("No .fb2 file found in archive")?.to_vec()
+        find_fb2_in_zip(&zip)
+            .context("No .fb2 file found in archive")?
+            .to_vec()
     } else {
         bytes.to_vec()
     };
@@ -37,7 +38,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut cover_data: Option<String> = None;
     let mut body_blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
-    let mut chapter_index = 0i32;
+    let chapter_index = 0i32;
 
     // State tracking
     let mut in_title_info = false;
@@ -58,7 +59,6 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_coverpage = false;
     let mut in_binary = false;
     let mut in_text_author = false;
-    let mut in_stanza = false;
 
     let mut current_text = String::new();
     let mut current_author_parts: Vec<String> = Vec::new();
@@ -115,14 +115,15 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "empty-line" if in_body => in_empty_line = true,
                     "image" if in_body && !in_coverpage => in_image = true,
                     "text-author" if in_body => in_text_author = true,
-                    "stanza" if in_body => in_stanza = true,
                     "strong" if in_p || in_subtitle => current_span_bold = true,
                     "emphasis" if in_p || in_subtitle => current_span_italic = true,
                     "a" if in_p => {
                         if let Some(href) = e.attributes().find_map(|a| {
                             a.ok().and_then(|attr| {
                                 if attr.key.as_ref() == b"href" {
-                                    std::str::from_utf8(attr.value.as_ref()).ok().map(String::from)
+                                    std::str::from_utf8(attr.value.as_ref())
+                                        .ok()
+                                        .map(String::from)
                                 } else {
                                     None
                                 }
@@ -145,21 +146,12 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 let text = e.unescape().unwrap_or_default().to_string();
                 if in_book_title && title.is_empty() {
                     title = text.clone();
-                } else if in_first_name {
-                    current_author_parts.push(text.clone());
-                } else if in_middle_name {
-                    current_author_parts.push(text.clone());
-                } else if in_last_name {
+                } else if in_first_name || in_middle_name || in_last_name {
                     current_author_parts.push(text.clone());
                 } else if in_genre {
                     genres.push(text.clone());
                 } else if in_annotation {
-                    description = Some(
-                        description
-                            .take()
-                            .unwrap_or_default()
-                            + &text,
-                    );
+                    description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
                     current_text.push_str(&text);
                 } else if in_p && in_body {
@@ -172,9 +164,10 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     } else {
                         current_span_text.push_str(&text);
                     }
-                } else if (in_subtitle || in_epigraph || in_text_author) && in_body {
-                    current_text.push_str(&text);
-                } else if in_body && !in_section && !in_image && !in_empty_line {
+                } else if in_body
+                    && ((in_subtitle || in_epigraph || in_text_author)
+                        || (!in_section && !in_image && !in_empty_line))
+                {
                     current_text.push_str(&text);
                 }
             }
@@ -185,7 +178,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "book-title" => in_book_title = false,
                     "annotation" => {
                         in_annotation = false;
-                        description = Some(description.take().unwrap_or_default().trim().to_string());
+                        description =
+                            Some(description.take().unwrap_or_default().trim().to_string());
                     }
                     "first-name" => in_first_name = false,
                     "middle-name" => in_middle_name = false,
@@ -394,7 +388,7 @@ fn looks_like_zip(bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
 }
 
-fn find_fb2_in_zip<'a>(zip: &'a archive::ZipFile) -> Option<&'a [u8]> {
+fn find_fb2_in_zip(zip: &archive::ZipFile) -> Option<&[u8]> {
     zip.entry_names()
         .iter()
         .find(|name| name.ends_with(".fb2") && !name.ends_with(".fb2.zip"))
