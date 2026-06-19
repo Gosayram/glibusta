@@ -124,18 +124,20 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
             },
           );
         },
-        loading: () => GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 2.5,
-          ),
-          itemCount: 12,
-          itemBuilder: (_, _) => Card(
-            child: Center(
-              child: Text(BoneMock.name),
+        loading: () => Skeletonizer(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.5,
+            ),
+            itemCount: 12,
+            itemBuilder: (_, _) => Card(
+              child: Center(
+                child: Text(BoneMock.name),
+              ),
             ),
           ),
         ),

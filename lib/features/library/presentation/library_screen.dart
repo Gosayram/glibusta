@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -488,52 +489,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
     if (books.isEmpty) {
       return Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) => Opacity(
-            opacity: value,
-            child: child,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.library_books_outlined,
-                size: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.library_books_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Библиотека пуста',
+              style: TextStyle(
+                fontSize: 18,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Библиотека пуста',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Найдите и скачайте книги, или импортируйте файлы',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Найдите и скачайте книги, или импортируйте файлы',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              FilledButton.tonal(
-                onPressed: () => context.push('/catalog'),
-                child: const Text('Перейти в каталог'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => _importBook(context, ref),
-                child: const Text('Импортировать файл'),
-              ),
-            ],
-          ),
-        ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.tonal(
+              onPressed: () => context.push('/catalog'),
+              child: const Text('Перейти в каталог'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => _importBook(context, ref),
+              child: const Text('Импортировать файл'),
+            ),
+          ],
+        ).animate().fadeIn(duration: 250.ms),
       );
     }
 

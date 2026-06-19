@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -41,46 +42,37 @@ class DownloadsScreen extends ConsumerWidget {
         data: (List<DownloadTask> downloads) {
           if (downloads.isEmpty) {
             return Center(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.0, end: 1.0),
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, child) => Opacity(
-                  opacity: value,
-                  child: child,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.download_done,
-                      size: 64,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.download_done,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Нет загрузок',
+                    style: TextStyle(
+                      fontSize: 18,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Нет загрузок',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Скачайте книги из каталога',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Скачайте книги из каталога',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.tonal(
-                      onPressed: () => context.push('/catalog'),
-                      child: const Text('Перейти в каталог'),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.tonal(
+                    onPressed: () => context.push('/catalog'),
+                    child: const Text('Перейти в каталог'),
+                  ),
+                ],
+              ).animate().fadeIn(duration: 250.ms),
             );
           }
 

@@ -183,7 +183,8 @@ class HomeScreen extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        for (final col in collections.take(3)) _CollectionTile(collection: col),
+                        for (final col in collections.take(3))
+                          _CollectionTile(key: ValueKey(col.id), collection: col),
                         const SizedBox(height: 24),
                       ],
                     );
@@ -492,7 +493,7 @@ class _StatChip extends StatelessWidget {
 class _CollectionTile extends StatelessWidget {
   final Collection collection;
 
-  const _CollectionTile({required this.collection});
+  const _CollectionTile({super.key, required this.collection});
 
   @override
   Widget build(BuildContext context) {

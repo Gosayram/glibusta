@@ -210,6 +210,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             itemBuilder: (context, index) {
               final category = categories[index];
               return Padding(
+                key: ValueKey(category),
                 padding: const EdgeInsets.only(right: 8),
                 child: ActionChip(
                   label: Text(category, style: const TextStyle(fontSize: 13)),

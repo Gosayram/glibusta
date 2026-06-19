@@ -628,6 +628,7 @@ class _ChaptersTab extends ConsumerWidget {
           itemCount: chapters.length,
           itemBuilder: (context, index) {
             return ListTile(
+              key: ValueKey(chapters[index].index),
               leading: CircleAvatar(
                 radius: 14,
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
@@ -675,6 +676,7 @@ class _BookmarksTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final bookmark = bookmarks[index];
             return ListTile(
+              key: ValueKey(bookmark.id),
               leading: const Icon(Icons.bookmark, size: 20),
               title: Text(
                 bookmark.selectedText ?? 'Глава ${bookmark.chapterIndex + 1}',
@@ -720,6 +722,7 @@ class _QuotesTab extends ConsumerWidget {
           itemBuilder: (context, index) {
             final quote = quotes[index];
             return Padding(
+              key: ValueKey(quote.id),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Card(
                 child: Padding(
@@ -823,6 +826,7 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
                   itemBuilder: (context, index) {
                     final comment = comments[index];
                     return Card(
+                      key: ValueKey(comment.id),
                       margin: const EdgeInsets.only(bottom: 8),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
