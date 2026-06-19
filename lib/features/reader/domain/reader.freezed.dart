@@ -352,4 +352,276 @@ as String?,
 
 }
 
+/// @nodoc
+mixin _$ReaderPosition {
+
+ String get bookId; int get chapterIndex; int get paragraphIndex; double get localOffset; double get progressPercent; DateTime get updatedAt;
+/// Create a copy of ReaderPosition
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ReaderPositionCopyWith<ReaderPosition> get copyWith => _$ReaderPositionCopyWithImpl<ReaderPosition>(this as ReaderPosition, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,updatedAt);
+
+@override
+String toString() {
+  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, updatedAt: $updatedAt)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ReaderPositionCopyWith<$Res>  {
+  factory $ReaderPositionCopyWith(ReaderPosition value, $Res Function(ReaderPosition) _then) = _$ReaderPositionCopyWithImpl;
+@useResult
+$Res call({
+ String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, DateTime updatedAt
+});
+
+
+
+
+}
+/// @nodoc
+class _$ReaderPositionCopyWithImpl<$Res>
+    implements $ReaderPositionCopyWith<$Res> {
+  _$ReaderPositionCopyWithImpl(this._self, this._then);
+
+  final ReaderPosition _self;
+  final $Res Function(ReaderPosition) _then;
+
+/// Create a copy of ReaderPosition
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? updatedAt = null,}) {
+  return _then(_self.copyWith(
+bookId: null == bookId ? _self.bookId : bookId // ignore: cast_nullable_to_non_nullable
+as String,chapterIndex: null == chapterIndex ? _self.chapterIndex : chapterIndex // ignore: cast_nullable_to_non_nullable
+as int,paragraphIndex: null == paragraphIndex ? _self.paragraphIndex : paragraphIndex // ignore: cast_nullable_to_non_nullable
+as int,localOffset: null == localOffset ? _self.localOffset : localOffset // ignore: cast_nullable_to_non_nullable
+as double,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
+as double,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
+as DateTime,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ReaderPosition].
+extension ReaderPositionPatterns on ReaderPosition {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ReaderPosition value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ReaderPosition() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ReaderPosition value)  $default,){
+final _that = this;
+switch (_that) {
+case _ReaderPosition():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ReaderPosition value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ReaderPosition() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ReaderPosition() when $default != null:
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.updatedAt);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  DateTime updatedAt)  $default,) {final _that = this;
+switch (_that) {
+case _ReaderPosition():
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.updatedAt);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  DateTime updatedAt)?  $default,) {final _that = this;
+switch (_that) {
+case _ReaderPosition() when $default != null:
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.updatedAt);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _ReaderPosition extends ReaderPosition {
+  const _ReaderPosition({required this.bookId, required this.chapterIndex, required this.paragraphIndex, this.localOffset = 0.0, this.progressPercent = 0.0, required this.updatedAt}): super._();
+  
+
+@override final  String bookId;
+@override final  int chapterIndex;
+@override final  int paragraphIndex;
+@override@JsonKey() final  double localOffset;
+@override@JsonKey() final  double progressPercent;
+@override final  DateTime updatedAt;
+
+/// Create a copy of ReaderPosition
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ReaderPositionCopyWith<_ReaderPosition> get copyWith => __$ReaderPositionCopyWithImpl<_ReaderPosition>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,updatedAt);
+
+@override
+String toString() {
+  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, updatedAt: $updatedAt)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ReaderPositionCopyWith<$Res> implements $ReaderPositionCopyWith<$Res> {
+  factory _$ReaderPositionCopyWith(_ReaderPosition value, $Res Function(_ReaderPosition) _then) = __$ReaderPositionCopyWithImpl;
+@override @useResult
+$Res call({
+ String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, DateTime updatedAt
+});
+
+
+
+
+}
+/// @nodoc
+class __$ReaderPositionCopyWithImpl<$Res>
+    implements _$ReaderPositionCopyWith<$Res> {
+  __$ReaderPositionCopyWithImpl(this._self, this._then);
+
+  final _ReaderPosition _self;
+  final $Res Function(_ReaderPosition) _then;
+
+/// Create a copy of ReaderPosition
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? updatedAt = null,}) {
+  return _then(_ReaderPosition(
+bookId: null == bookId ? _self.bookId : bookId // ignore: cast_nullable_to_non_nullable
+as String,chapterIndex: null == chapterIndex ? _self.chapterIndex : chapterIndex // ignore: cast_nullable_to_non_nullable
+as int,paragraphIndex: null == paragraphIndex ? _self.paragraphIndex : paragraphIndex // ignore: cast_nullable_to_non_nullable
+as int,localOffset: null == localOffset ? _self.localOffset : localOffset // ignore: cast_nullable_to_non_nullable
+as double,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
+as double,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
+as DateTime,
+  ));
+}
+
+
+}
+
 // dart format on

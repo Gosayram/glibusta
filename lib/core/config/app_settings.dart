@@ -1,28 +1,21 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'app_settings.g.dart';
+part 'app_settings.freezed.dart';
 
-@immutable
-class AppSettings {
-  final String baseUrl;
-  final List<String> defaultMirrors;
-  final List<String> customMirrors;
-  final Duration requestTimeout;
-  final int maxConcurrentDownloads;
-  final bool enableLogging;
-
-  List<String> get mirrors => [...defaultMirrors, ...customMirrors];
-
-  const AppSettings({
-    required this.baseUrl,
-    this.defaultMirrors = const [],
-    this.customMirrors = const [],
-    this.requestTimeout = const Duration(seconds: 30),
-    this.maxConcurrentDownloads = 3,
-    this.enableLogging = false,
-  });
+@freezed
+abstract class AppSettings with _$AppSettings {
+  const factory AppSettings({
+    required String baseUrl,
+    @Default([]) List<String> defaultMirrors,
+    @Default([]) List<String> customMirrors,
+    @Default(Duration(seconds: 30)) Duration requestTimeout,
+    @Default(3) int maxConcurrentDownloads,
+    @Default(false) bool enableLogging,
+  }) = _AppSettings;
+  const AppSettings._();
 
   factory AppSettings.fromEnv() {
     final baseUrl = dotenv.env['BASE_URL'] ?? '';
@@ -38,21 +31,7 @@ class AppSettings {
     );
   }
 
-  AppSettings copyWith({
-    String? baseUrl,
-    List<String>? defaultMirrors,
-    List<String>? customMirrors,
-    Duration? requestTimeout,
-    int? maxConcurrentDownloads,
-    bool? enableLogging,
-  }) => AppSettings(
-    baseUrl: baseUrl ?? this.baseUrl,
-    defaultMirrors: defaultMirrors ?? this.defaultMirrors,
-    customMirrors: customMirrors ?? this.customMirrors,
-    requestTimeout: requestTimeout ?? this.requestTimeout,
-    maxConcurrentDownloads: maxConcurrentDownloads ?? this.maxConcurrentDownloads,
-    enableLogging: enableLogging ?? this.enableLogging,
-  );
+  List<String> get mirrors => [...defaultMirrors, ...customMirrors];
 }
 
 @riverpod

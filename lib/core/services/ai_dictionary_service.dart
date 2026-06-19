@@ -75,6 +75,7 @@ class AiDictionaryService {
           }
         }
       }
+    } on DioException catch (_) {
     } on Object catch (_) {}
 
     return AiDictionaryResult(word: word, definition: 'Could not look up "$word"');

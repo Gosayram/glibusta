@@ -817,7 +817,9 @@ class FlibustaApiClient {
         options: Options(responseType: ResponseType.plain),
       );
       return response.statusCode == 200 && !(response.data?.contains('user/login') ?? false);
-    } on Object {
+    } on DioException catch (_) {
+      return false;
+    } on Object catch (_) {
       return false;
     }
   }

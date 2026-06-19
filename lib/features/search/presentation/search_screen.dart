@@ -62,7 +62,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref
         .read(searchControllerProvider.notifier)
         .setFilters(
-          filters.copyWith(format: format, clearFormat: format == null),
+          filters.copyWith(format: format),
         );
   }
 
@@ -71,7 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref
         .read(searchControllerProvider.notifier)
         .setFilters(
-          filters.copyWith(genre: value.trim(), clearGenre: value.trim().isEmpty),
+          filters.copyWith(genre: value.trim().isEmpty ? null : value.trim()),
         );
   }
 
@@ -81,8 +81,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         .read(searchControllerProvider.notifier)
         .setFilters(
           filters.copyWith(
-            language: value.trim(),
-            clearLanguage: value.trim().isEmpty,
+            language: value.trim().isEmpty ? null : value.trim(),
           ),
         );
   }
@@ -102,8 +101,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           filters.copyWith(
             dateFrom: from,
             dateTo: to,
-            clearDateFrom: from == null,
-            clearDateTo: to == null,
           ),
         );
   }

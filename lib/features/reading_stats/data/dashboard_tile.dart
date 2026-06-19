@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'dashboard_tile.freezed.dart';
 
 enum DashboardTileType {
   totalTime,
@@ -9,24 +12,14 @@ enum DashboardTileType {
   randomHighlight,
 }
 
-class DashboardTile {
-  const DashboardTile({
-    required this.id,
-    required this.type,
-    this.order = 0,
-  });
-
-  final String id;
-  final DashboardTileType type;
-  final int order;
-
-  DashboardTile copyWith({int? order}) {
-    return DashboardTile(
-      id: id,
-      type: type,
-      order: order ?? this.order,
-    );
-  }
+@freezed
+abstract class DashboardTile with _$DashboardTile {
+  const factory DashboardTile({
+    required String id,
+    required DashboardTileType type,
+    @Default(0) int order,
+  }) = _DashboardTile;
+  const DashboardTile._();
 
   String get title {
     switch (type) {

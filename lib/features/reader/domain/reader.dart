@@ -95,7 +95,18 @@ abstract class ReaderSettings with _$ReaderSettings {
   }) = _ReaderSettings;
 }
 
-class ReaderPosition {
+@freezed
+abstract class ReaderPosition with _$ReaderPosition {
+  const factory ReaderPosition({
+    required String bookId,
+    required int chapterIndex,
+    required int paragraphIndex,
+    @Default(0.0) double localOffset,
+    @Default(0.0) double progressPercent,
+    required DateTime updatedAt,
+  }) = _ReaderPosition;
+  const ReaderPosition._();
+
   static final initial = ReaderPosition(
     bookId: '',
     chapterIndex: 0,
@@ -103,41 +114,7 @@ class ReaderPosition {
     updatedAt: DateTime(2000),
   );
 
-  final String bookId;
-  final int chapterIndex;
-  final int paragraphIndex;
-  final double localOffset;
-  final double progressPercent;
-  final DateTime updatedAt;
-
-  const ReaderPosition({
-    required this.bookId,
-    required this.chapterIndex,
-    required this.paragraphIndex,
-    this.localOffset = 0.0,
-    this.progressPercent = 0.0,
-    required this.updatedAt,
-  });
-
   int get currentPosition => chapterIndex;
-
-  ReaderPosition copyWith({
-    String? bookId,
-    int? chapterIndex,
-    int? paragraphIndex,
-    double? localOffset,
-    double? progressPercent,
-    DateTime? updatedAt,
-  }) {
-    return ReaderPosition(
-      bookId: bookId ?? this.bookId,
-      chapterIndex: chapterIndex ?? this.chapterIndex,
-      paragraphIndex: paragraphIndex ?? this.paragraphIndex,
-      localOffset: localOffset ?? this.localOffset,
-      progressPercent: progressPercent ?? this.progressPercent,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
 
   ReaderPosition clamp({required int chapterCount}) {
     if (chapterCount <= 0) {

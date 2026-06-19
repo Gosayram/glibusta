@@ -1,4 +1,8 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'book.dart';
+
+part 'search_query.freezed.dart';
 
 class SearchQuery {
   final String query;
@@ -23,44 +27,19 @@ class SearchQuery {
       filters.hasFilters || genre != null || author != null || title != null || series != null;
 }
 
-class SearchFilters {
-  final BookFormat? format;
-  final String? language;
-  final String? genre;
-  final DateTime? dateFrom;
-  final DateTime? dateTo;
-
-  const SearchFilters({
-    this.format,
-    this.language,
-    this.genre,
-    this.dateFrom,
-    this.dateTo,
-  });
-
-  bool get hasFilters =>
-      format != null || _hasText(language) || _hasText(genre) || dateFrom != null || dateTo != null;
-
-  SearchFilters copyWith({
+@freezed
+abstract class SearchFilters with _$SearchFilters {
+  const factory SearchFilters({
     BookFormat? format,
     String? language,
     String? genre,
     DateTime? dateFrom,
     DateTime? dateTo,
-    bool clearFormat = false,
-    bool clearLanguage = false,
-    bool clearGenre = false,
-    bool clearDateFrom = false,
-    bool clearDateTo = false,
-  }) {
-    return SearchFilters(
-      format: clearFormat ? null : (format ?? this.format),
-      language: clearLanguage ? null : (language ?? this.language),
-      genre: clearGenre ? null : (genre ?? this.genre),
-      dateFrom: clearDateFrom ? null : (dateFrom ?? this.dateFrom),
-      dateTo: clearDateTo ? null : (dateTo ?? this.dateTo),
-    );
-  }
+  }) = _SearchFilters;
+  const SearchFilters._();
+
+  bool get hasFilters =>
+      format != null || _hasText(language) || _hasText(genre) || dateFrom != null || dateTo != null;
 }
 
 bool _hasText(String? value) => value != null && value.trim().isNotEmpty;

@@ -24,19 +24,19 @@ void main() {
 
     test('clearFormat removes format', () {
       const f = SearchFilters(format: BookFormat.fb2);
-      final updated = f.copyWith(clearFormat: true);
+      final updated = f.copyWith(format: null);
       expect(updated.format, isNull);
     });
 
     test('clearLanguage removes language', () {
       const f = SearchFilters(language: 'ru');
-      final updated = f.copyWith(clearLanguage: true);
+      final updated = f.copyWith(language: null);
       expect(updated.language, isNull);
     });
 
     test('clearGenre removes genre', () {
       const f = SearchFilters(genre: 'detective');
-      final updated = f.copyWith(clearGenre: true);
+      final updated = f.copyWith(genre: null);
       expect(updated.genre, isNull);
     });
 

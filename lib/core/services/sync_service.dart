@@ -98,6 +98,8 @@ class WebDavClient extends SyncClientBase {
     try {
       await _dio.request<dynamic>(_config.url, options: _authOptions.copyWith(method: 'PROPFIND'));
       return true;
+    } on DioException catch (_) {
+      return false;
     } on Object catch (_) {
       return false;
     }
@@ -215,6 +217,9 @@ class SyncService {
       await _client!.ping();
       _status = SyncStatus.idle;
       await _prefs.setString(_statusKey, SyncStatus.idle.index.toString());
+    } on DioException catch (_) {
+      _status = SyncStatus.error;
+      await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
     } on Object catch (_) {
       _status = SyncStatus.error;
       await _prefs.setString(_statusKey, SyncStatus.error.index.toString());

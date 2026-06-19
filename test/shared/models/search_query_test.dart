@@ -76,19 +76,19 @@ void main() {
 
     test('copyWith clearFormat', () {
       const f = SearchFilters(format: BookFormat.epub);
-      final updated = f.copyWith(clearFormat: true);
+      final updated = f.copyWith(format: null);
       expect(updated.format, isNull);
     });
 
     test('copyWith clearLanguage', () {
       const f = SearchFilters(language: 'ru');
-      final updated = f.copyWith(clearLanguage: true);
+      final updated = f.copyWith(language: null);
       expect(updated.language, isNull);
     });
 
     test('copyWith clearGenre', () {
       const f = SearchFilters(genre: 'fiction');
-      final updated = f.copyWith(clearGenre: true);
+      final updated = f.copyWith(genre: null);
       expect(updated.genre, isNull);
     });
   });
