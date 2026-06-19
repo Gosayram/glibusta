@@ -120,6 +120,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     // Nothing needed
   }
 
+  void _goToNextPage() {
+    unawaited(HapticFeedback.lightImpact());
+    _ctrl.scrollToNext();
+  }
+
+  void _goToPreviousPage() {
+    unawaited(HapticFeedback.lightImpact());
+    _ctrl.scrollToPrevious();
+  }
+
   @override
   void dispose() {
     _lifecycleListener?.dispose();
@@ -141,33 +151,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      _ctrl.scrollToPrevious();
+      _goToPreviousPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      _ctrl.scrollToNext();
+      _goToNextPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
         event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      _ctrl.scrollToPrevious();
+      _goToPreviousPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
         event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      _ctrl.scrollToNext();
+      _goToNextPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.pageUp) {
-      _ctrl.scrollToPrevious();
+      _goToPreviousPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.pageDown) {
-      _ctrl.scrollToNext();
+      _goToNextPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.space) {
-      _ctrl.scrollToNext();
+      _goToNextPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.escape) {
@@ -289,8 +299,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           if (didPop) _ctrl.saveProgress();
         },
         child: ReaderShortcuts(
-          onNextPage: () => _ctrl.scrollToNext(),
-          onPreviousPage: () => _ctrl.scrollToPrevious(),
+          onNextPage: () => _goToNextPage(),
+          onPreviousPage: () => _goToPreviousPage(),
           onIncreaseFontSize: () {
             final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);

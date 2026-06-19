@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -683,6 +684,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(HapticFeedback.mediumImpact());
     final pinnedState = ref.read(pinnedBooksProvider.notifier);
     final isPinned = pinnedState.isPinned(book.id);
 

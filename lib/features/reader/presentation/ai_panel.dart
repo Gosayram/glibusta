@@ -101,39 +101,50 @@ class _AiPanelState extends ConsumerState<AiPanel> {
       (AiPromptType.mindMap, 'Mind map'),
     ];
 
+    final chips = <Widget>[];
+
+    for (final p in prompts) {
+      chips.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ActionChip(
+            label: Text(p.$2, style: const TextStyle(fontSize: 12)),
+            onPressed: () => _sendPrompt(aiService, p.$1),
+          ),
+        ),
+      );
+    }
+
+    for (final p in aiService.settings.customPrompts) {
+      chips.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ActionChip(
+            label: Text(p, style: const TextStyle(fontSize: 12)),
+            onPressed: () => _sendCustomPrompt(aiService, p),
+          ),
+        ),
+      );
+    }
+
+    chips.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ActionChip(
+          avatar: const Icon(Icons.add, size: 16),
+          label: const Text('Свой', style: TextStyle(fontSize: 12)),
+          onPressed: () => _showAddPromptDialog(context, aiService),
+        ),
+      ),
+    );
+
     return Container(
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView(
+      child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        children: [
-          ...prompts.map(
-            (p) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ActionChip(
-                label: Text(p.$2, style: const TextStyle(fontSize: 12)),
-                onPressed: () => _sendPrompt(aiService, p.$1),
-              ),
-            ),
-          ),
-          ...aiService.settings.customPrompts.map(
-            (p) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ActionChip(
-                label: Text(p, style: const TextStyle(fontSize: 12)),
-                onPressed: () => _sendCustomPrompt(aiService, p),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ActionChip(
-              avatar: const Icon(Icons.add, size: 16),
-              label: const Text('Свой', style: TextStyle(fontSize: 12)),
-              onPressed: () => _showAddPromptDialog(context, aiService),
-            ),
-          ),
-        ],
+        itemCount: chips.length,
+        itemBuilder: (context, index) => chips[index],
       ),
     );
   }

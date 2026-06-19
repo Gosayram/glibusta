@@ -1076,19 +1076,25 @@ final class MobiTextExtractor {
   }
 
   String _decodeUtf16(Uint8List bytes) {
+    // Detect BOM to determine endianness; strip it before decoding.
+    var offset = 0;
+    var bigEndian = false;
     if (bytes.length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
-      return utf8.decode(bytes.sublist(2), allowMalformed: true);
+      offset = 2;
+      bigEndian = false;
+    } else if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
+      offset = 2;
+      bigEndian = true;
     }
-    if (bytes.length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
-      return utf8.decode(bytes.sublist(2), allowMalformed: true);
+    // No BOM — default to little-endian (most common for Windows-originated files).
+    final codeUnits = <int>[];
+    for (var i = offset; i + 1 < bytes.length; i += 2) {
+      final code = bigEndian ? (bytes[i] << 8) | bytes[i + 1] : bytes[i] | (bytes[i + 1] << 8);
+      codeUnits.add(code);
     }
-    // No BOM — try LE first (most common on Windows-originated files).
-    final buf = StringBuffer();
-    for (var i = 0; i + 1 < bytes.length; i += 2) {
-      final code = bytes[i] | (bytes[i + 1] << 8);
-      buf.write(String.fromCharCode(code));
-    }
-    return buf.toString();
+    // String.fromCharCodes interprets the list as UTF-16 code units and
+    // correctly recombines surrogate pairs.
+    return String.fromCharCodes(codeUnits);
   }
 }
 

@@ -268,8 +268,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
                 child: _buildImageWidget(
                   block.imageUrl!,
                   _getReaderStyle(settings).color,
@@ -677,8 +677,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
                 child: _buildImageWidget(block.imageUrl!, style.color),
               ),
             ),

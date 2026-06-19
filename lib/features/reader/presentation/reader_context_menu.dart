@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 enum ContextMenuAction {
   copy,
@@ -155,7 +158,10 @@ class _ActionRow extends StatelessWidget {
         children: actions.map((item) {
           return InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: () => onAction(item.action),
+            onTap: () {
+              unawaited(HapticFeedback.selectionClick());
+              onAction(item.action);
+            },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Column(

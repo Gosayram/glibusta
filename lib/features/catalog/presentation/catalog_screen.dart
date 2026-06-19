@@ -449,7 +449,11 @@ class _RestorableListViewState extends State<_RestorableListView> with Restorati
 
   @override
   Widget build(BuildContext context) {
-    return ListView(controller: _getController(), children: widget.children);
+    return ListView.builder(
+      controller: _getController(),
+      itemCount: widget.children.length,
+      itemBuilder: (context, index) => widget.children[index],
+    );
   }
 }
 

@@ -258,14 +258,17 @@ class BookImportService {
     final book = ctx.book!;
     ctx.authorIds = [];
     for (final authorName in book.authors) {
-      final authorId = generateAuthorId(authorName);
-      ctx.authorIds.add(authorId);
-      await _database
-          .into(_database.authors)
-          .insertOnConflictUpdate(
-            AuthorsCompanion.insert(id: authorId, name: authorName),
-          );
+      ctx.authorIds.add(generateAuthorId(authorName));
     }
+    await _database.batch((batch) {
+      var i = 0;
+      for (final authorName in book.authors) {
+        batch.into(_database.authors).insertOnConflictUpdate(
+          AuthorsCompanion.insert(id: ctx.authorIds[i], name: authorName),
+        );
+        i++;
+      }
+    });
 
     await _database.transaction(() async {
       await _database

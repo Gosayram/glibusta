@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/database/daos/tag_dao.dart';
 import '../../../shared/models/book.dart';
 import '../data/book_repository_impl.dart';
@@ -83,6 +84,16 @@ Future<List<Book>> filteredLibraryBooks(Ref ref) async {
     books = await repository.getAllBooks();
   }
 
+  // Preload real last-read timestamps when sorting by lastRead.
+  final Map<String, DateTime> lastReadMap;
+  if (sortConfig.field == LibrarySortField.lastRead) {
+    final db = ref.read(databaseProvider);
+    final allProgress = await db.bookDao.getAllReadingProgress();
+    lastReadMap = {for (final p in allProgress) p.bookId: p.lastRead};
+  } else {
+    lastReadMap = const {};
+  }
+
   books.sort((a, b) {
     int comparison;
     switch (sortConfig.field) {
@@ -91,8 +102,8 @@ Future<List<Book>> filteredLibraryBooks(Ref ref) async {
       case LibrarySortField.author:
         comparison = a.displayAuthor.compareTo(b.displayAuthor);
       case LibrarySortField.lastRead:
-        final aDate = a.readingStatus == ReadingStatus.reading ? DateTime.now() : DateTime(2000);
-        final bDate = b.readingStatus == ReadingStatus.reading ? DateTime.now() : DateTime(2000);
+        final aDate = lastReadMap[a.id] ?? DateTime(2000);
+        final bDate = lastReadMap[b.id] ?? DateTime(2000);
         comparison = aDate.compareTo(bDate);
       case LibrarySortField.progress:
         comparison = 0;

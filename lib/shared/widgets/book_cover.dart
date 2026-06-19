@@ -23,8 +23,8 @@ class BookCover extends StatelessWidget {
     if (coverPath != null && coverPath.isNotEmpty) {
       return AspectRatio(
         aspectRatio: 2 / 3,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Image.file(
             File(coverPath),
             fit: BoxFit.cover,
@@ -41,8 +41,8 @@ class BookCover extends StatelessWidget {
     if (coverUrl != null && coverUrl.isNotEmpty && coverUrl != 'embedded') {
       return AspectRatio(
         aspectRatio: 2 / 3,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Image.network(
             coverUrl,
             fit: BoxFit.cover,

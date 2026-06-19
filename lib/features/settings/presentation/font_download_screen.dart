@@ -68,6 +68,7 @@ class _FontDownloadScreenState extends ConsumerState<FontDownloadScreen> {
         font,
         onProgress: (received, total) {
           if (total > 0) {
+            if (!mounted) return;
             setState(() {
               _progress[font.id] = received / total;
             });
