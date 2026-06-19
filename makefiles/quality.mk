@@ -148,12 +148,52 @@ flutter-size: ## Analyze APK/AAB size
 	@$(PRINT_STEP) "Analyzing Flutter build size"
 	flutter build apk --analyze-size --target-platform android-arm64 2>&1 | tail -5
 
+.PHONY: rust-audit
+rust-audit: ## Scan Rust dependencies for CVE vulnerabilities
+	@$(PRINT_STEP) "Scanning Rust dependencies for vulnerabilities"
+	cd rust && cargo audit
+
+.PHONY: rust-deny
+rust-deny: ## Check licenses, bans, advisories, sources via cargo-deny
+	@$(PRINT_STEP) "Checking Rust dependency policy"
+	cd rust && cargo deny check
+
+.PHONY: rust-outdated
+rust-outdated: ## Show outdated direct Rust dependencies
+	@$(PRINT_STEP) "Checking outdated Rust dependencies"
+	cd rust && cargo outdated --depth 1
+
+.PHONY: rust-upgrade-check
+rust-upgrade-check: ## Check available Rust dependency upgrades (dry run)
+	@$(PRINT_STEP) "Checking Rust upgrade candidates"
+	cd rust && cargo upgrade --dry-run
+
+.PHONY: rust-sort
+rust-sort: ## Sort Rust dependencies alphabetically
+	@$(PRINT_STEP) "Sorting Rust dependencies"
+	cd rust && cargo sort
+
+.PHONY: rust-sort-check
+rust-sort-check: ## Check Rust dependency sorting
+	@$(PRINT_STEP) "Checking Rust dependency sorting"
+	cd rust && cargo sort --check
+
+.PHONY: rust-nextest
+rust-nextest: ## Run Rust tests with cargo-nextest (faster)
+	@$(PRINT_STEP) "Running Rust tests with nextest"
+	cd rust && cargo nextest run
+
+.PHONY: rust-nextest-ci
+rust-nextest-ci: ## Run Rust tests with nextest (CI mode, no re-runs)
+	@$(PRINT_STEP) "Running Rust tests (CI mode)"
+	cd rust && cargo nextest run --failure-quick
+
 .PHONY: fix-all
 fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy ## Run all local linting and formatting checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

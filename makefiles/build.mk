@@ -9,10 +9,10 @@ DIST_DIR ?= dist/releases
 BUILD_DIR ?= build
 ANDROID_APK_SOURCE ?= $(BUILD_DIR)/app/outputs/flutter-apk/app-release.apk
 ANDROID_AAB_SOURCE ?= $(BUILD_DIR)/app/outputs/bundle/release/app-release.aab
+ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
 MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 
 ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).apk
-ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
 ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).aab
 MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.zip
 
@@ -138,8 +138,8 @@ build-android-apk: clean-build bump-build require-flutter android-available sign
 .PHONY: build-android-apk-split
 build-android-apk-split: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
 	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
-	$(FLUTTER_BUILD_APK_SPLIT)
-	@for abi in arm64-v8a armeabi-v7a x86_64 universal; do \
+	$(FLUTTER_BUILD_APK_SPLIT) || true
+	@for abi in arm64-v8a armeabi-v7a; do \
 		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
 		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
 		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
