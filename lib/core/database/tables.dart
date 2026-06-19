@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import 'converters.dart';
 
+@TableIndex(name: 'idx_saved_books_content_hash', columns: {#contentHash})
 class SavedBooks extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -173,6 +174,7 @@ class Collections extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_book_collections_collection_id', columns: {#collectionId})
 class BookCollections extends Table {
   TextColumn get bookId => text()();
   TextColumn get collectionId => text()();
@@ -210,6 +212,7 @@ class Tags extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex(name: 'idx_book_tags_tag_id', columns: {#tagId})
 class BookTags extends Table {
   TextColumn get bookId => text()();
   TextColumn get tagId => text()();

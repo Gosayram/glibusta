@@ -41,7 +41,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/library',
     onException: (context, state, router) {
       if (kDebugMode) {
-        AppLogger().warning('Router exception at ${state.uri.path}: ${state.error}', name: 'Router');
+        AppLogger().warning(
+          'Router exception at ${state.uri.path}: ${state.error}',
+          name: 'Router',
+        );
       }
       if (state.uri.path != '/error') {
         final message = state.error?.toString() ?? 'Unknown router error';

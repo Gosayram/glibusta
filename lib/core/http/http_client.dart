@@ -33,12 +33,6 @@ class HttpClient {
 
   void setSessionCookies(Map<String, String> cookies) {
     _sessionCookies = Map.from(cookies);
-    if (cookies.isNotEmpty) {
-      final cookieHeader = cookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
-      _dio.options.headers['Cookie'] = cookieHeader;
-    } else {
-      _dio.options.headers.remove('Cookie');
-    }
   }
 
   Map<String, String> get sessionCookies => Map.from(_sessionCookies);

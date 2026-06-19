@@ -246,7 +246,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             future: _downloadStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                AppLogger().warning('[Catalog] Failed to fetch download status: ${snapshot.error}', name: 'Catalog');
+                AppLogger().warning(
+                  '[Catalog] Failed to fetch download status: ${snapshot.error}',
+                  name: 'Catalog',
+                );
                 return const SizedBox.shrink();
               }
               if (snapshot.connectionState == ConnectionState.waiting) {

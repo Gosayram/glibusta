@@ -7656,6 +7656,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TagsTable tags = $TagsTable(this);
   late final $BookTagsTable bookTags = $BookTagsTable(this);
   late final $ReadingTimeTable readingTime = $ReadingTimeTable(this);
+  late final Index idxSavedBooksContentHash = Index(
+    'idx_saved_books_content_hash',
+    'CREATE INDEX idx_saved_books_content_hash ON saved_books (content_hash)',
+  );
   late final Index idxDownloadsBookId = Index(
     'idx_downloads_bookId',
     'CREATE INDEX idx_downloads_bookId ON downloads (book_id)',
@@ -7672,9 +7676,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_quotes_bookId',
     'CREATE INDEX idx_quotes_bookId ON quotes (book_id)',
   );
+  late final Index idxBookCollectionsCollectionId = Index(
+    'idx_book_collections_collection_id',
+    'CREATE INDEX idx_book_collections_collection_id ON book_collections (collection_id)',
+  );
   late final Index idxReadingSessionsBookId = Index(
     'idx_reading_sessions_bookId',
     'CREATE INDEX idx_reading_sessions_bookId ON reading_sessions (book_id)',
+  );
+  late final Index idxBookTagsTagId = Index(
+    'idx_book_tags_tag_id',
+    'CREATE INDEX idx_book_tags_tag_id ON book_tags (tag_id)',
   );
   late final BookDao bookDao = BookDao(this as AppDatabase);
   late final DownloadDao downloadDao = DownloadDao(this as AppDatabase);
@@ -7713,11 +7725,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     tags,
     bookTags,
     readingTime,
+    idxSavedBooksContentHash,
     idxDownloadsBookId,
     idxBookmarksBookId,
     idxNotesBookId,
     idxQuotesBookId,
+    idxBookCollectionsCollectionId,
     idxReadingSessionsBookId,
+    idxBookTagsTagId,
   ];
 }
 

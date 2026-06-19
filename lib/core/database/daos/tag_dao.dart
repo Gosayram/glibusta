@@ -68,9 +68,7 @@ class TagDao extends DatabaseAccessor<AppDatabase> with _$TagDaoMixin {
       await attachedDatabase.batch((batch) {
         batch.insertAll(
           bookTags,
-          tagIds
-              .map((tagId) => BookTagsCompanion.insert(bookId: bookId, tagId: tagId))
-              .toList(),
+          tagIds.map((tagId) => BookTagsCompanion.insert(bookId: bookId, tagId: tagId)).toList(),
           mode: InsertMode.insertOrReplace,
         );
       });

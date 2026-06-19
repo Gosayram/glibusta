@@ -222,8 +222,7 @@ class OfflineModeService {
       ),
     );
     (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      return io.HttpClient()
-        ..badCertificateCallback = kDebugMode ? (_, __, ___) => true : null;
+      return io.HttpClient()..badCertificateCallback = kDebugMode ? (_, _, _) => true : null;
     };
     try {
       final normalizedBase = baseUrl.endsWith('/')

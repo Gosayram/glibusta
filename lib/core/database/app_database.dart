@@ -73,6 +73,10 @@ class AppDatabase extends _$AppDatabase {
       await _backupDatabase(from);
       await customStatement('PRAGMA foreign_keys = OFF');
       try {
+        if (from > to) {
+          await _handleDowngrade(m, from, to);
+          return;
+        }
         await transaction(() async {
           if (from < 2) {
             await m.addColumn(savedBooks, savedBooks.contentHash);
@@ -144,6 +148,20 @@ class AppDatabase extends _$AppDatabase {
     } on Object catch (e) {
       AppLogger().warning('Database backup failed: $e', name: 'Database', error: e);
     }
+  }
+
+  Future<void> _handleDowngrade(Migrator m, int from, int to) async {
+    AppLogger().warning(
+      'Database downgraded from $from to $to — recreating all tables',
+      name: 'Database',
+    );
+    final reversedEntities = m.database.allSchemaEntities.toList().reversed;
+    await transaction(() async {
+      for (final entity in reversedEntities) {
+        await m.drop(entity);
+      }
+      await m.createAll();
+    });
   }
 
   static const int _maxBackups = 3;

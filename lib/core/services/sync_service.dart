@@ -151,7 +151,9 @@ class WebDavClient extends SyncClientBase {
       '${_config.url}/$remotePath',
       options: _authOptions.copyWith(responseType: ResponseType.bytes),
     );
-    await File(localPath).writeAsBytes(response.data!);
+    final data = response.data;
+    if (data == null) throw Exception('Download failed: empty response');
+    await File(localPath).writeAsBytes(data);
   }
 
   @override
@@ -193,11 +195,13 @@ class SyncService {
 
   Future<void> configure(SyncConfig config) async {
     _config = config;
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 30),
-    ));
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 30),
+      ),
+    );
     _client = WebDavClient(dio, config);
     await _prefs.setString(_configKey, Uri.encodeComponent('${config.toJson()}'));
   }

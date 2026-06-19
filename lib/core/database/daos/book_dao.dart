@@ -29,8 +29,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     return (select(savedBooks)..where((t) => t.id.isIn(ids))).get();
   }
 
-  Future<List<ReadingProgressData>> getAllReadingProgress() async =>
-      select(readingProgress).get();
+  Future<List<ReadingProgressData>> getAllReadingProgress() async => select(readingProgress).get();
 
   Future<int> insertBook(SavedBooksCompanion entry) =>
       into(savedBooks).insertOnConflictUpdate(entry);

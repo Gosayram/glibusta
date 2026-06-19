@@ -42,7 +42,9 @@ class ErrorStateWidget extends StatelessWidget {
                 child: Text(
                   details!,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.38)),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                  ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
