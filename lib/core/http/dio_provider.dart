@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:native_dio_adapter/native_dio_adapter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -99,7 +101,9 @@ class _RetryInterceptor extends Interceptor {
       name: 'Http',
     );
 
-    final delay = Duration(seconds: 1 << retryCount);
+    final delay = Duration(
+      milliseconds: (1 << retryCount) * 1000 + Random().nextInt(1000),
+    );
     await Future<void>.delayed(delay);
 
     final options = Options(
@@ -134,7 +138,13 @@ class _RetryInterceptor extends Interceptor {
   bool _shouldNotRetry(DioException err) {
     if (err.type == DioExceptionType.cancel) return true;
     final status = err.response?.statusCode;
-    if (status == 401 || status == 403 || status == 404) return true;
+    if (status == 400 ||
+        status == 401 ||
+        status == 403 ||
+        status == 404 ||
+        status == 422) {
+      return true;
+    }
     return false;
   }
 }

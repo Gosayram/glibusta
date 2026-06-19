@@ -2,53 +2,59 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:path_provider/path_provider.dart';
 
-class FontModel {
-  const FontModel({
-    required this.name,
-    required this.fileName,
-    this.family,
-    this.weight = FontWeight.normal,
-    this.style = FontStyle.normal,
-    this.isDownloaded = false,
-    this.downloadUrl,
-    this.fileSize = 0,
-  });
+part 'font_service.freezed.dart';
+part 'font_service.g.dart';
 
-  final String name;
-  final String fileName;
-  final String? family;
-  final FontWeight weight;
-  final FontStyle style;
-  final bool isDownloaded;
-  final String? downloadUrl;
-  final int fileSize;
+@freezed
+abstract class FontModel with _$FontModel {
+  const factory FontModel({
+    required String name,
+    required String fileName,
+    String? family,
+    @JsonKey(toJson: _fontWeightToJson, fromJson: _fontWeightFromJson)
+    @Default(FontWeight.normal)
+    FontWeight weight,
+    @JsonKey(toJson: _fontStyleToJson, fromJson: _fontStyleFromJson)
+    @Default(FontStyle.normal)
+    FontStyle style,
+    @Default(false) bool isDownloaded,
+    String? downloadUrl,
+    @Default(0) int fileSize,
+  }) = _FontModel;
+
+  const FontModel._();
 
   String get displayName => name;
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'fileName': fileName,
-    'family': family,
-    'weight': weight.value,
-    'style': style.index,
-    'isDownloaded': isDownloaded,
-    'downloadUrl': downloadUrl,
-    'fileSize': fileSize,
-  };
-
-  factory FontModel.fromJson(Map<String, dynamic> json) => FontModel(
-    name: json['name'] as String,
-    fileName: json['fileName'] as String,
-    family: json['family'] as String?,
-    weight: FontWeight.values[json['weight'] as int? ?? 3],
-    style: FontStyle.values[json['style'] as int? ?? 0],
-    isDownloaded: json['isDownloaded'] as bool? ?? false,
-    downloadUrl: json['downloadUrl'] as String?,
-    fileSize: json['fileSize'] as int? ?? 0,
-  );
+  factory FontModel.fromJson(Map<String, dynamic> json) => _$FontModelFromJson(json);
 }
+
+int _fontWeightToJson(FontWeight weight) => weight.value;
+
+FontWeight _fontWeightFromJson(Object? value) {
+  if (value is int) {
+    // Value form (e.g. 400 for normal).
+    if (value >= 100) {
+      final index = (value ~/ 100) - 1;
+      if (index >= 0 && index < FontWeight.values.length) {
+        return FontWeight.values[index];
+      }
+    }
+    // Legacy index form (0..8).
+    if (value >= 0 && value < FontWeight.values.length) {
+      return FontWeight.values[value];
+    }
+  }
+  return FontWeight.normal;
+}
+
+int _fontStyleToJson(FontStyle style) => style.index;
+
+FontStyle _fontStyleFromJson(int index) =>
+    index == FontStyle.italic.index ? FontStyle.italic : FontStyle.normal;
 
 class FontCacheService {
   FontCacheService(this._directory);

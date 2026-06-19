@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,15 +66,15 @@ class TtsService {
     await _tts.resume();
   }
 
-  void dispose() {
-    _tts.dispose();
+  Future<void> dispose() async {
+    await _tts.dispose();
   }
 }
 
 final ttsServiceProvider = Provider<TtsService>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   final service = TtsService(prefs);
-  ref.onDispose(service.dispose);
+  ref.onDispose(() => unawaited(service.dispose()));
   return service;
 });
 

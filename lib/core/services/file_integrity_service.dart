@@ -31,8 +31,8 @@ class FileIntegrityService {
   final AppLogger _logger;
 
   Future<String> computeHash(File file) async {
-    final bytes = await file.readAsBytes();
-    return sha256.convert(bytes).toString();
+    final digest = await sha256.bind(file.openRead()).last;
+    return digest.toString();
   }
 
   Future<String> computeHashBytes(Uint8List bytes) async {

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
@@ -27,6 +28,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void initState() {
     super.initState();
     _controller = PdfViewerController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -168,9 +175,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           },
           linkHandlerParams: PdfLinkHandlerParams(
             onLinkTap: (link) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Ссылка: ${link.url}')),
-              );
+              final url = link.url;
+              if (url != null) {
+                unawaited(launchUrl(url));
+              }
             },
           ),
           getPageRenderingScale: (context, page, controller, estimatedScale) {

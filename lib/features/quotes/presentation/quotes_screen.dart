@@ -203,68 +203,70 @@ class QuoteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(quote.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        return showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Удалить цитату?'),
-            content: const Text('Это действие можно отменить'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Удалить'),
-              ),
-            ],
-          ),
-        );
-      },
-      background: Container(
-        color: Theme.of(context).colorScheme.error,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
-      ),
-      onDismissed: (_) => onDelete?.call(),
-      child: ListTile(
-        leading: const Icon(Icons.format_quote),
-        title: Text(
-          quote.selectedText,
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Стр. ${quote.chapterIndex + 1}',
-              style: Theme.of(context).textTheme.bodySmall,
+    return RepaintBoundary(
+      child: Dismissible(
+        key: Key(quote.id),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) async {
+          return showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Удалить цитату?'),
+              content: const Text('Это действие можно отменить'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Удалить'),
+                ),
+              ],
             ),
-            if (quote.note != null && quote.note!.isNotEmpty) ...[
+          );
+        },
+        background: Container(
+          color: Theme.of(context).colorScheme.error,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 16),
+          child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
+        ),
+        onDismissed: (_) => onDelete?.call(),
+        child: ListTile(
+          leading: const Icon(Icons.format_quote),
+          title: Text(
+            quote.selectedText,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               const SizedBox(height: 4),
               Text(
-                quote.note!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+                'Стр. ${quote.chapterIndex + 1}',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
+              if (quote.note != null && quote.note!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  quote.note!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
+          isThreeLine: quote.note != null && quote.note!.isNotEmpty,
+          onTap: onTap,
         ),
-        isThreeLine: quote.note != null && quote.note!.isNotEmpty,
-        onTap: onTap,
       ),
     );
   }

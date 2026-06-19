@@ -42,9 +42,6 @@ dependencies:
   file_selector: ^1.0.4
   receive_sharing_intent: ^1.8.0
 
-  # Downloads
-  background_downloader: ^9.5.5
-
   # Reader formats
   pdfrx: ^2.4.3
   xml: ^7.0.1
@@ -78,7 +75,6 @@ dependencies:
   flutter_smart_dialog: ^4.9.0
 
   # Analytics & Monitoring
-  file: any
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.3.1
   share_plus: ^13.1.0
@@ -86,7 +82,6 @@ dependencies:
   flutter_local_notifications: ^22.0.0
   flutter_tts: any
   audio_service: ^0.18.17
-  rxdart: ^0.28.0
   cached_network_image: ^3.4.1
   flutter_rust_bridge: 2.11.0
   cupertino_icons: ^1.0.9

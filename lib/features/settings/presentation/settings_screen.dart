@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +13,7 @@ import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
@@ -338,12 +338,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !context.mounted) return;
 
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
-      final filePath = result.files.single.path;
+      final picker = BookFilePicker();
+      final filePath = await picker.pickFile(['json']);
       if (filePath == null) return;
 
       final db = ref.read(databaseProvider);

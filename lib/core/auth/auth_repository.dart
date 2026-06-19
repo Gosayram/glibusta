@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,6 +11,7 @@ import '../http/dio_provider.dart';
 import '../logging/app_logger.dart';
 
 part 'auth_repository.g.dart';
+part 'auth_repository.freezed.dart';
 
 const _kSessionNameKey = 'auth_session_name';
 const _kSessionMailKey = 'auth_session_mail';
@@ -135,6 +137,10 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(dio);
 });
 
+final flutterSecureStorageProvider = Provider<FlutterSecureStorage>(
+  (ref) => const FlutterSecureStorage(),
+);
+
 @riverpod
 class AuthStateNotifier extends _$AuthStateNotifier {
   @override
@@ -145,7 +151,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       return const AuthStateData();
     }
     final mail = prefs.getString(_kSessionMailKey);
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
         ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
@@ -190,7 +196,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionNameKey);
     await prefs.remove(_kSessionMailKey);
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     await secureStorage.delete(key: _kSessionCookiesKey);
     await secureStorage.delete(key: 'auth_username');
     await secureStorage.delete(key: 'auth_password');
@@ -200,12 +206,12 @@ class AuthStateNotifier extends _$AuthStateNotifier {
   void clearError() {
     final current = state.value;
     if (current != null) {
-      state = AsyncValue.data(current.copyWith(clearError: true));
+      state = AsyncValue.data(current.copyWith(error: null));
     }
   }
 
   Future<bool> tryAutoLogin() async {
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     final username = await secureStorage.read(key: 'auth_username');
     final password = await secureStorage.read(key: 'auth_password');
     if (username == null || password == null || username.isEmpty || password.isEmpty) {
@@ -239,7 +245,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     if (session.mail != null) {
       await prefs.setString(_kSessionMailKey, session.mail!);
     }
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     if (session.cookies.isNotEmpty) {
       final encoded = session.cookies.entries
           .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
@@ -249,31 +255,14 @@ class AuthStateNotifier extends _$AuthStateNotifier {
   }
 }
 
-class AuthStateData {
-  final bool isAuthenticated;
-  final UserSession? session;
-  final String? error;
-  final bool isLoading;
-
-  const AuthStateData({
-    this.isAuthenticated = false,
-    this.session,
-    this.error,
-    this.isLoading = false,
-  });
-
-  AuthStateData copyWith({
-    bool? isAuthenticated,
+@freezed
+abstract class AuthStateData with _$AuthStateData {
+  const factory AuthStateData({
+    @Default(false) bool isAuthenticated,
     UserSession? session,
     String? error,
-    bool isLoading = false,
-    bool clearError = false,
-  }) {
-    return AuthStateData(
-      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-      session: session ?? this.session,
-      error: clearError ? null : (error ?? this.error),
-      isLoading: isLoading,
-    );
-  }
+    @Default(false) bool isLoading,
+  }) = _AuthStateData;
+
+  const AuthStateData._();
 }

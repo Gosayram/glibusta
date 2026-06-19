@@ -17,7 +17,7 @@ abstract class BaseTts {
   Future<void> setPitch(double pitch);
   Future<void> setVoice(TtsVoice voice);
 
-  void dispose();
+  Future<void> dispose();
 }
 
 enum TtsState { playing, paused, stopped, error }

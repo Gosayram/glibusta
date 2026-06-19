@@ -84,6 +84,13 @@ class ShareHandler {
                 error: e,
                 st: st,
               );
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Не удалось импортировать: ${file.path}'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
             }),
       );
     }

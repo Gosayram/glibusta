@@ -175,50 +175,52 @@ class NoteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(note.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        return showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Удалить заметку?'),
-            content: const Text('Это действие можно отменить'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Удалить'),
-              ),
-            ],
+    return RepaintBoundary(
+      child: Dismissible(
+        key: Key(note.id),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) async {
+          return showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Удалить заметку?'),
+              content: const Text('Это действие можно отменить'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Удалить'),
+                ),
+              ],
+            ),
+          );
+        },
+        background: Container(
+          color: Theme.of(context).colorScheme.error,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 16),
+          child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
+        ),
+        onDismissed: (_) => onDelete?.call(),
+        child: ListTile(
+          leading: Icon(
+            Icons.note,
+            color: _parseColorSafe(note.highlightColor),
           ),
-        );
-      },
-      background: Container(
-        color: Theme.of(context).colorScheme.error,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
-      ),
-      onDismissed: (_) => onDelete?.call(),
-      child: ListTile(
-        leading: Icon(
-          Icons.note,
-          color: _parseColorSafe(note.highlightColor),
+          title: Text(
+            note.content,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            'Стр. ${note.chapterIndex + 1}, абзац ${note.paragraphIndex + 1}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          onTap: onTap,
         ),
-        title: Text(
-          note.content,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          'Стр. ${note.chapterIndex + 1}, абзац ${note.paragraphIndex + 1}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        onTap: onTap,
       ),
     );
   }

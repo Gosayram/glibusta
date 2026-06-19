@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_tts/flutter_tts.dart';
 
+import '../../../../core/logging/app_logger.dart';
 import 'base_tts.dart';
 
 class SystemTts extends BaseTts {
@@ -24,6 +25,8 @@ class SystemTts extends BaseTts {
   Stream<int> get onSentenceIndex => _sentenceController.stream;
 
   Future<void> _init() async {
+    await _tts.awaitSpeakCompletion(true);
+
     _tts.setStartHandler(() {
       _stateController.add(TtsState.playing);
     });
@@ -115,15 +118,20 @@ class SystemTts extends BaseTts {
   @override
   Future<List<TtsVoice>> voices() async {
     final raw = await _tts.getVoices;
-    return (raw as List).map((v) {
-      final map = v as Map<dynamic, dynamic>;
-      return TtsVoice(
-        id: map['id']?.toString() ?? '',
-        name: map['name']?.toString() ?? '',
-        language: map['locale']?.toString() ?? '',
-        gender: map['gender']?.toString(),
-      );
-    }).toList();
+    try {
+      return (raw as List).map((v) {
+        final map = v as Map<dynamic, dynamic>;
+        return TtsVoice(
+          id: map['id']?.toString() ?? '',
+          name: map['name']?.toString() ?? '',
+          language: map['locale']?.toString() ?? '',
+          gender: map['gender']?.toString(),
+        );
+      }).toList();
+    } on Object catch (e) {
+      AppLogger().warning('Failed to parse TTS voices: $e', name: 'SystemTts');
+      return [];
+    }
   }
 
   @override
@@ -167,9 +175,9 @@ class SystemTts extends BaseTts {
   TtsSettings get settings => _settings;
 
   @override
-  void dispose() {
-    unawaited(_tts.stop());
-    unawaited(_stateController.close());
-    unawaited(_sentenceController.close());
+  Future<void> dispose() async {
+    await _tts.stop();
+    await _stateController.close();
+    await _sentenceController.close();
   }
 }

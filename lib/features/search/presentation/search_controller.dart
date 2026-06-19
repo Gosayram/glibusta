@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
@@ -12,6 +13,7 @@ import '../data/composite_source.dart';
 import '../domain/book_source.dart';
 
 part 'search_controller.g.dart';
+part 'search_controller.freezed.dart';
 
 @riverpod
 class SearchControllerNotifier extends _$SearchControllerNotifier {
@@ -49,7 +51,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     state = state.copyWith(
       isLoading: true,
       lastQuery: normalized,
-      clearError: true,
+      error: null,
     );
 
     final searchQuery = SearchQuery(
@@ -113,7 +115,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         isLoading: false,
         hasMore: bookResult.hasNextPage,
         currentPage: bookResult.currentPage,
-        clearError: true,
+        error: null,
       );
     } on Object catch (e, st) {
       if (!ref.mounted) return;
@@ -147,7 +149,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         isLoading: false,
         hasMore: result.hasNextPage,
         currentPage: result.currentPage,
-        clearError: true,
+        error: null,
       );
     } on Object catch (e, st) {
       if (!ref.mounted) return;
@@ -165,7 +167,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       isLoading: false,
       hasMore: false,
       currentPage: 0,
-      clearError: true,
+      error: null,
     );
 
     if (query.isNotEmpty) {
@@ -224,58 +226,26 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       books: const [],
       authors: const [],
       isLoading: false,
-      clearError: true,
+      error: null,
       hasMore: false,
       lastQuery: '',
     );
   }
 }
 
-class SearchState {
-  final List<Book> books;
-  final List<SearchAuthorResult> authors;
-  final bool isLoading;
-  final String? error;
-  final bool hasMore;
-  final int currentPage;
-  final String lastQuery;
-  final List<String> history;
-  final SearchFilters filters;
-
-  const SearchState({
-    this.books = const [],
-    this.authors = const [],
-    this.isLoading = false,
-    this.error,
-    this.hasMore = false,
-    this.currentPage = 0,
-    this.lastQuery = '',
-    this.history = const [],
-    this.filters = const SearchFilters(),
-  });
-
-  SearchState copyWith({
-    List<Book>? books,
-    List<SearchAuthorResult>? authors,
-    bool? isLoading,
+@freezed
+abstract class SearchState with _$SearchState {
+  const factory SearchState({
+    @Default([]) List<Book> books,
+    @Default([]) List<SearchAuthorResult> authors,
+    @Default(false) bool isLoading,
     String? error,
-    bool? hasMore,
-    int? currentPage,
-    String? lastQuery,
-    List<String>? history,
-    SearchFilters? filters,
-    bool clearError = false,
-  }) {
-    return SearchState(
-      books: books ?? this.books,
-      authors: authors ?? this.authors,
-      isLoading: isLoading ?? this.isLoading,
-      error: clearError ? null : (error ?? this.error),
-      hasMore: hasMore ?? this.hasMore,
-      currentPage: currentPage ?? this.currentPage,
-      lastQuery: lastQuery ?? this.lastQuery,
-      history: history ?? this.history,
-      filters: filters ?? this.filters,
-    );
-  }
+    @Default(false) bool hasMore,
+    @Default(0) int currentPage,
+    @Default('') String lastQuery,
+    @Default([]) List<String> history,
+    @Default(SearchFilters()) SearchFilters filters,
+  }) = _SearchState;
+
+  const SearchState._();
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -26,9 +27,15 @@ class ExcerptShareService {
     final file = File('${tempDir.path}/excerpt_${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(imageBytes);
 
-    await SharePlus.instance.share(
-      ShareParams(files: [XFile(file.path)], text: '$bookTitle — $authorName'),
-    );
+    try {
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: '$bookTitle — $authorName'),
+      );
+    } finally {
+      if (file.existsSync()) {
+        unawaited(file.delete());
+      }
+    }
   }
 
   Future<Uint8List> _renderExcerptCard({

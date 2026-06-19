@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,10 +85,7 @@ class AiDictionaryService {
   Map<String, dynamic> _parseJson(String content) {
     try {
       final cleaned = content.replaceFirst('```json', '').replaceFirst('```', '').trim();
-      return Map<String, dynamic>.from(
-        // ignore: avoid_dynamic_calls
-        (Uri.dataFromString(cleaned).data as Object?) as Map? ?? {},
-      );
+      return jsonDecode(cleaned) as Map<String, dynamic>? ?? {};
     } on Object catch (_) {
       return {};
     }

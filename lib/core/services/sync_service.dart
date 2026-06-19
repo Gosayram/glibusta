@@ -4,8 +4,12 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
+
+part 'sync_service.freezed.dart';
+part 'sync_service.g.dart';
 
 enum SyncDirection { upload, download, both }
 
@@ -13,40 +17,18 @@ enum SyncStatus { idle, syncing, error, conflict }
 
 enum BookSyncStatus { localOnly, remoteOnly, both, downloading, uploading }
 
-class SyncConfig {
-  const SyncConfig({
-    required this.url,
-    this.username,
-    this.password,
-    this.direction = SyncDirection.both,
-    this.wifiOnly = true,
-    this.autoSync = true,
-  });
+@freezed
+abstract class SyncConfig with _$SyncConfig {
+  const factory SyncConfig({
+    required String url,
+    String? username,
+    String? password,
+    @Default(SyncDirection.both) SyncDirection direction,
+    @Default(true) bool wifiOnly,
+    @Default(true) bool autoSync,
+  }) = _SyncConfig;
 
-  final String url;
-  final String? username;
-  final String? password;
-  final SyncDirection direction;
-  final bool wifiOnly;
-  final bool autoSync;
-
-  Map<String, dynamic> toJson() => {
-    'url': url,
-    'username': username,
-    'password': password,
-    'direction': direction.index,
-    'wifiOnly': wifiOnly,
-    'autoSync': autoSync,
-  };
-
-  factory SyncConfig.fromJson(Map<String, dynamic> json) => SyncConfig(
-    url: json['url'] as String,
-    username: json['username'] as String?,
-    password: json['password'] as String?,
-    direction: SyncDirection.values[json['direction'] as int? ?? 2],
-    wifiOnly: json['wifiOnly'] as bool? ?? true,
-    autoSync: json['autoSync'] as bool? ?? true,
-  );
+  factory SyncConfig.fromJson(Map<String, dynamic> json) => _$SyncConfigFromJson(json);
 }
 
 class SyncConflict {
@@ -186,10 +168,7 @@ class SyncService {
     if (json != null) {
       try {
         _config = SyncConfig.fromJson(
-          Map<String, dynamic>.from(
-            // ignore: avoid_dynamic_calls
-            (Uri.dataFromString(json).data as Object?) as Map? ?? {},
-          ),
+          jsonDecode(json) as Map<String, dynamic>? ?? {},
         );
       } on Object catch (_) {}
     }

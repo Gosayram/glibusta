@@ -1,4 +1,5 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TtsAudioHandler extends BaseAudioHandler with SeekHandler {
   TtsAudioHandler() {
@@ -89,6 +90,9 @@ class TtsAudioService {
         androidNotificationChannelId: 'com.glibusta.tts',
         androidNotificationChannelName: 'TTS Reading',
         androidNotificationOngoing: true,
+        androidStopForegroundOnTaskRemoved: true,
+        fastForwardInterval: Duration(seconds: 10),
+        rewindInterval: Duration(seconds: 10),
       ),
     );
 
@@ -113,4 +117,4 @@ class TtsAudioService {
   }
 }
 
-final ttsAudioService = TtsAudioService();
+final ttsAudioServiceProvider = Provider<TtsAudioService>((ref) => TtsAudioService());

@@ -167,8 +167,8 @@ class OnlineTtsProviderImpl extends BaseTts {
   Future<void> setVoice(TtsVoice voice) async {}
 
   @override
-  void dispose() {
-    unawaited(_stateController.close());
-    unawaited(_sentenceController.close());
+  Future<void> dispose() async {
+    await _stateController.close();
+    await _sentenceController.close();
   }
 }
