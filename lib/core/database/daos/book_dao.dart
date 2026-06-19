@@ -24,6 +24,14 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<SavedBook?> getBookById(String id) async =>
       (select(savedBooks)..where((t) => t.id.equals(id))).getSingleOrNull();
 
+  Future<List<SavedBook>> getBooksByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    return (select(savedBooks)..where((t) => t.id.isIn(ids))).get();
+  }
+
+  Future<List<ReadingProgressData>> getAllReadingProgress() async =>
+      select(readingProgress).get();
+
   Future<int> insertBook(SavedBooksCompanion entry) =>
       into(savedBooks).insertOnConflictUpdate(entry);
 

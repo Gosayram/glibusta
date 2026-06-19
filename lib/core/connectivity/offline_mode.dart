@@ -4,6 +4,7 @@ import 'dart:io' as io;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -222,7 +223,7 @@ class OfflineModeService {
     );
     (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
       return io.HttpClient()
-        ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
+        ..badCertificateCallback = kDebugMode ? (_, __, ___) => true : null;
     };
     try {
       final normalizedBase = baseUrl.endsWith('/')

@@ -96,5 +96,9 @@ class AiDictionaryService {
 }
 
 final aiDictionaryServiceProvider = Provider<AiDictionaryService>((ref) {
-  return AiDictionaryService(Dio());
+  return AiDictionaryService(Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 60),
+    sendTimeout: const Duration(seconds: 30),
+  )));
 });

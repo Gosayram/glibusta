@@ -55,13 +55,26 @@ class TagDao extends DatabaseAccessor<AppDatabase> with _$TagDaoMixin {
     return results.map((bt) => bt.bookId).toList();
   }
 
+  Future<List<String>> getBookIdsForTags(List<String> tagIds) async {
+    if (tagIds.isEmpty) return [];
+    final query = select(bookTags)..where((bt) => bt.tagId.isIn(tagIds));
+    final results = await query.get();
+    return results.map((bt) => bt.bookId).toList();
+  }
+
   Future<void> setBookTags(String bookId, List<String> tagIds) async {
-    await (delete(bookTags)..where((bt) => bt.bookId.equals(bookId))).go();
-    for (final tagId in tagIds) {
-      await into(bookTags).insertOnConflictUpdate(
-        BookTagsCompanion.insert(bookId: bookId, tagId: tagId),
-      );
-    }
+    await transaction(() async {
+      await (delete(bookTags)..where((bt) => bt.bookId.equals(bookId))).go();
+      await attachedDatabase.batch((batch) {
+        batch.insertAll(
+          bookTags,
+          tagIds
+              .map((tagId) => BookTagsCompanion.insert(bookId: bookId, tagId: tagId))
+              .toList(),
+          mode: InsertMode.insertOrReplace,
+        );
+      });
+    });
   }
 }
 

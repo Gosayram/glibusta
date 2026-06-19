@@ -41,13 +41,11 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
   final now = DateTime.now();
   final collections = <SmartCollection>[];
 
-  // Get all reading progress
+  // Batch load all reading progress in one query
+  final allProgress = await db.bookDao.getAllReadingProgress();
   final progressMap = <String, ReadingProgressData>{};
-  for (final book in allBooks) {
-    final progress = await db.bookDao.getReadingProgress(book.id);
-    if (progress != null) {
-      progressMap[book.id] = progress;
-    }
+  for (final progress in allProgress) {
+    progressMap[progress.bookId] = progress;
   }
 
   // Currently reading: has progress

@@ -13,6 +13,7 @@ import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
@@ -293,7 +294,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final json = await backupService.exportData();
       // TODO: Use file picker or share to save the JSON
       if (kDebugMode) {
-        debugPrint('Exported data: ${json.length} bytes');
+        AppLogger().fine('Exported data: ${json.length} bytes', name: 'Settings');
       }
 
       if (!context.mounted) return;

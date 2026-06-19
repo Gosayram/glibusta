@@ -8,6 +8,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
@@ -245,7 +246,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             future: _downloadStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                debugPrint('[Catalog] Failed to fetch download status: ${snapshot.error}');
+                AppLogger().warning('[Catalog] Failed to fetch download status: ${snapshot.error}', name: 'Catalog');
                 return const SizedBox.shrink();
               }
               if (snapshot.connectionState == ConnectionState.waiting) {

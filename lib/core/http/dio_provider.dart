@@ -18,6 +18,7 @@ Dio dio(Ref ref) {
       baseUrl: settings.baseUrl,
       connectTimeout: AppDuration.httpConnect,
       receiveTimeout: AppDuration.httpReceive,
+      sendTimeout: const Duration(seconds: 30),
       responseType: ResponseType.plain,
       followRedirects: true,
       headers: {
@@ -33,11 +34,6 @@ Dio dio(Ref ref) {
 
   dio.interceptors.addAll([
     const _UserAgentInterceptor(),
-    LogInterceptor(
-      requestHeader: false,
-      responseHeader: false,
-      logPrint: (obj) => AppLogger().finest('$obj', name: 'Http'),
-    ),
     AuthInterceptor(ref),
     LoggingInterceptor(),
     ErrorMappingInterceptor(),

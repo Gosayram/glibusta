@@ -75,13 +75,10 @@ Future<List<Book>> filteredLibraryBooks(Ref ref) async {
 
   if (selectedTagIds.isNotEmpty) {
     final tagDao = ref.read(tagDaoProvider);
-    final bookIds = <String>{};
-    for (final tagId in selectedTagIds) {
-      final ids = await tagDao.getBookIdsWithTag(tagId);
-      bookIds.addAll(ids);
-    }
+    final bookIds = await tagDao.getBookIdsForTags(selectedTagIds);
+    final bookIdSet = bookIds.toSet();
     books = await repository.getAllBooks();
-    books = books.where((b) => bookIds.contains(b.id)).toList();
+    books = books.where((b) => bookIdSet.contains(b.id)).toList();
   } else {
     books = await repository.getAllBooks();
   }

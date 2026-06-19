@@ -28,6 +28,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void initState() {
     super.initState();
     unawaited(_loadSavedCredentials());
+    ref.listenManual(authStateProvider, (prev, next) {
+      final data = next.value;
+      if (data != null && data.isAuthenticated && mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Вход выполнен успешно')),
+        );
+      }
+      if (data != null && data.error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data.error!)),
+        );
+        ref.read(authStateProvider.notifier).clearError();
+      }
+    });
   }
 
   Future<void> _loadSavedCredentials() async {
@@ -52,22 +67,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(authStateProvider);
-
-    ref.listen(authStateProvider, (prev, next) {
-      final data = next.value;
-      if (data != null && data.isAuthenticated && mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Вход выполнен успешно')),
-        );
-      }
-      if (data != null && data.error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data.error!)),
-        );
-        ref.read(authStateProvider.notifier).clearError();
-      }
-    });
 
     return Scaffold(
       appBar: AppBar(

@@ -193,7 +193,12 @@ class SyncService {
 
   Future<void> configure(SyncConfig config) async {
     _config = config;
-    _client = WebDavClient(Dio(), config);
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+      sendTimeout: const Duration(seconds: 30),
+    ));
+    _client = WebDavClient(dio, config);
     await _prefs.setString(_configKey, Uri.encodeComponent('${config.toJson()}'));
   }
 
