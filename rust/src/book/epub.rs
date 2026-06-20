@@ -10,19 +10,19 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
-    let zip = archive::decode_zip(bytes).context("Failed to open EPUB archive")?;
+    let mut zip = archive::decode_zip(bytes).context("Failed to open EPUB archive")?;
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
     let container_xml = zip
         .find_file("META-INF/container.xml")
         .context("EPUB missing META-INF/container.xml")?;
-    let container_text = decode_bytes(container_xml, encoding_name);
+    let container_text = decode_bytes(&container_xml, encoding_name);
     let opf_path = parse_container_xml(&container_text)?;
 
     let opf_bytes = zip
         .find_file(&opf_path)
         .with_context(|| format!("OPF file not found: {}", opf_path))?;
-    let opf_text = decode_bytes(opf_bytes, encoding_name);
+    let opf_text = decode_bytes(&opf_bytes, encoding_name);
 
     let opf_dir = opf_path.rsplit('/').nth(1).unwrap_or("");
 
@@ -37,7 +37,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .collect();
     let description = metadata.get("description").cloned();
 
-    let cover_url = extract_cover_url(&zip, &manifest_items, &metadata, opf_dir, encoding_name);
+    let cover_url = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, encoding_name);
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     let mut chapter_index = 0i32;
@@ -54,16 +54,17 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         };
 
         let Some(xhtml_bytes) = zip.find_file(&item_href).or_else(|| {
-            // Try case-insensitive
-            zip.entry_names()
+            let name = zip
+                .entry_names()
                 .iter()
                 .find(|n| n.eq_ignore_ascii_case(&item_href))
-                .and_then(|n| zip.find_file(n))
+                .cloned()?;
+            zip.find_file(&name)
         }) else {
             continue;
         };
 
-        let xhtml_text = decode_bytes(xhtml_bytes, encoding_name);
+        let xhtml_text = decode_bytes(&xhtml_bytes, encoding_name);
         let (blocks, next_block_index) = parse_xhtml_to_blocks(&xhtml_text, block_index);
         block_index = next_block_index;
 
@@ -214,17 +215,17 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
             }
             Ok(Event::Text(ref e)) => {
                 if in_dc_tag {
-                    current_text.push_str(&e.decode().unwrap_or_default());
+                    current_text.push_str(&e.xml10_content().unwrap_or_default());
                 }
             }
             Ok(Event::CData(ref e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = e.xml10_content().unwrap_or_default();
                 if in_dc_tag {
                     current_text.push_str(&text);
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = e.xml10_content().unwrap_or_default();
                 if in_dc_tag {
                     current_text.push_str(&text);
                 }
@@ -265,7 +266,7 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
 }
 
 fn extract_cover_url(
-    zip: &ZipFile,
+    zip: &mut ZipFile,
     manifest: &HashMap<String, ManifestItem>,
     metadata: &HashMap<String, String>,
     opf_dir: &str,
@@ -280,7 +281,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, bytes));
+                return Some(encode_data_uri(&item.media_type, &bytes));
             }
         }
     }
@@ -294,7 +295,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, bytes));
+                return Some(encode_data_uri(&item.media_type, &bytes));
             }
         }
     }
@@ -308,7 +309,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, bytes));
+                return Some(encode_data_uri(&item.media_type, &bytes));
             }
         }
     }
@@ -396,19 +397,19 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
             }
             Ok(Event::Text(ref e)) => {
                 if in_body {
-                    let text = e.decode().unwrap_or_default();
+                    let text = e.xml10_content().unwrap_or_default();
                     current_text.push_str(&text);
                 }
             }
             Ok(Event::CData(ref e)) => {
                 if in_body {
-                    let text = e.decode().unwrap_or_default();
+                    let text = e.xml10_content().unwrap_or_default();
                     current_text.push_str(&text);
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
                 if in_body {
-                    let text = e.decode().unwrap_or_default();
+                    let text = e.xml10_content().unwrap_or_default();
                     current_text.push_str(&text);
                 }
             }
@@ -553,12 +554,12 @@ fn extract_chapter_title(text: &str) -> String {
             }
             Ok(Event::Text(ref e)) => {
                 if in_title {
-                    title.push_str(&e.decode().unwrap_or_default());
+                    title.push_str(&e.xml10_content().unwrap_or_default());
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
                 if in_title {
-                    title.push_str(&e.decode().unwrap_or_default());
+                    title.push_str(&e.xml10_content().unwrap_or_default());
                 }
             }
             Ok(Event::End(ref e)) => {

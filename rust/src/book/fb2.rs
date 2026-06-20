@@ -7,10 +7,8 @@ use quick_xml::Reader;
 
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let raw_bytes = if looks_like_zip(bytes) {
-        let zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
-        find_fb2_in_zip(&zip)
-            .context("No .fb2 file found in archive")?
-            .to_vec()
+        let mut zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
+        find_fb2_in_zip(&mut zip).context("No .fb2 file found in archive")?
     } else {
         bytes.to_vec()
     };
@@ -129,7 +127,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.decode().unwrap_or_default().to_string();
+                let text = e.xml10_content().unwrap_or_default().to_string();
                 if in_book_title && title.is_empty() {
                     title = text.clone();
                 } else if in_first_name || in_middle_name || in_last_name {
@@ -158,7 +156,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
-                let text = e.decode().unwrap_or_default().to_string();
+                let text = e.xml10_content().unwrap_or_default().to_string();
                 if in_book_title && title.is_empty() {
                     title = text.clone();
                 } else if in_first_name || in_middle_name || in_last_name {
@@ -187,7 +185,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 }
             }
             Ok(Event::CData(ref e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = e.xml10_content().unwrap_or_default();
                 if in_book_title && title.is_empty() {
                     title = text.to_string();
                 } else if in_first_name || in_middle_name || in_last_name {
@@ -427,11 +425,13 @@ fn looks_like_zip(bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
 }
 
-fn find_fb2_in_zip(zip: &archive::ZipFile) -> Option<&[u8]> {
-    zip.entry_names()
+fn find_fb2_in_zip(zip: &mut archive::ZipFile) -> Option<Vec<u8>> {
+    let name = zip
+        .entry_names()
         .iter()
         .find(|name| name.ends_with(".fb2") && !name.ends_with(".fb2.zip"))
-        .and_then(|name| zip.find_file(name))
+        .cloned()?;
+    zip.find_file(&name)
 }
 
 fn detect_fb2_encoding(bytes: &[u8]) -> String {

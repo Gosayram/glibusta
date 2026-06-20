@@ -7,15 +7,15 @@ use quick_xml::Reader;
 use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
-    let zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
+    let mut zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
-    let (title, authors, created_date) = parse_core_properties(&zip, encoding_name)?;
+    let (title, authors, created_date) = parse_core_properties(&mut zip, encoding_name)?;
 
     let document_xml = zip
         .find_file("word/document.xml")
         .context("DOCX missing word/document.xml")?;
-    let doc_text = decode_bytes(document_xml, encoding_name);
+    let doc_text = decode_bytes(&document_xml, encoding_name);
 
     let (blocks, chapter_title) = parse_document_xml(&doc_text);
 
@@ -63,13 +63,13 @@ struct CoreProps {
 }
 
 fn parse_core_properties(
-    zip: &ZipFile,
+    zip: &mut ZipFile,
     encoding_name: &str,
 ) -> Result<(String, Vec<String>, String)> {
     let props_bytes = zip
         .find_file("docProps/core.xml")
         .context("DOCX missing docProps/core.xml")?;
-    let props_text = decode_bytes(props_bytes, encoding_name);
+    let props_text = decode_bytes(&props_bytes, encoding_name);
 
     let core: CoreProps =
         quick_xml::de::from_str(&props_text).context("Failed to parse core.xml")?;
@@ -165,7 +165,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.decode().unwrap_or_default().to_string();
+                let text = e.xml10_content().unwrap_or_default().to_string();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
                 } else if in_pstyle {
@@ -173,7 +173,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::CData(ref e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = e.xml10_content().unwrap_or_default();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
                 } else if in_pstyle {
@@ -181,7 +181,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
-                let text = e.decode().unwrap_or_default();
+                let text = e.xml10_content().unwrap_or_default();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
                 } else if in_pstyle {

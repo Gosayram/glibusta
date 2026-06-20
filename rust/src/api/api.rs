@@ -34,9 +34,8 @@ pub fn decode_zip_entries(bytes: Vec<u8>) -> Result<Vec<String>> {
 }
 
 pub fn extract_zip_entry(bytes: Vec<u8>, entry_name: String) -> Result<Vec<u8>> {
-    let zip = crate::book::archive::decode_zip(&bytes).context("Failed to decode ZIP")?;
+    let mut zip = crate::book::archive::decode_zip(&bytes).context("Failed to decode ZIP")?;
     zip.find_file(&entry_name)
-        .map(|v| v.to_vec())
         .with_context(|| format!("Entry '{}' not found in ZIP", entry_name))
 }
 
