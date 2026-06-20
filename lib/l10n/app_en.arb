@@ -9,5 +9,49 @@
   "settingsTitle": "Settings",
   "collectionsTitle": "Collections",
   "annotationsTitle": "Annotations",
-  "statisticsTitle": "Statistics"
+  "statisticsTitle": "Statistics",
+
+  "catalogTitle": "Catalog",
+  "genresTitle": "Genres",
+  "genreTitle": "Genre",
+  "newLabel": "New",
+  "popularLabel": "Popular",
+  "popularSection": "Popular",
+  "allGenres": "All genres",
+  "recentlyAdded": "Recently added",
+  "onlineCatalogs": "Online Catalogs",
+
+  "filterHint": "Filter...",
+  "nothingFound": "Nothing found",
+  "noGenres": "No genres",
+  "noBooksInGenre": "No books in this genre",
+  "noRecentBooks": "No recently added books",
+  "noBooksByAuthor": "No books by this author",
+  "authorFallback": "Author",
+
+  "categoriesLoadError": "Failed to load categories",
+  "genresLoadError": "Failed to load genres",
+  "genreLoadError": "Failed to load genre",
+  "recentBooksLoadError": "Failed to load recent books",
+  "authorLoadError": "Failed to load author",
+  "opdsLoadError": "Load error",
+  "opdsSearchError": "Search error",
+
+  "retry": "Retry",
+  "cancel": "Cancel",
+  "add": "Add",
+  "collapse": "Collapse",
+  "readMore": "Read more",
+  "loading": "Loading",
+
+  "addCatalog": "Add catalog",
+  "nameLabel": "Name",
+  "opdsUrlLabel": "OPDS catalog URL",
+  "catalogSearchHint": "Search catalog...",
+  "opdsDownloading": "Downloading",
+
+  "bookCount": "{count,plural, =1{{count} book} other{{count} books}}",
+  "bookCountRu": "{count,plural, =0{no books} one{{count} book} few{{count} books} other{{count} books}}",
+  "seriesCount": "{count,plural, =1{{count} series} other{{count} series}}",
+  "pagesLabel": "{count} p."
 }

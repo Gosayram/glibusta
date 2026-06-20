@@ -151,6 +151,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Statistics'**
   String get statisticsTitle;
+
+  /// No description provided for @catalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog'**
+  String get catalogTitle;
+
+  /// No description provided for @genresTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Genres'**
+  String get genresTitle;
+
+  /// No description provided for @genreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Genre'**
+  String get genreTitle;
+
+  /// No description provided for @newLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get newLabel;
+
+  /// No description provided for @popularLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get popularLabel;
+
+  /// No description provided for @popularSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get popularSection;
+
+  /// No description provided for @allGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'All genres'**
+  String get allGenres;
+
+  /// No description provided for @recentlyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently added'**
+  String get recentlyAdded;
+
+  /// No description provided for @onlineCatalogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Online Catalogs'**
+  String get onlineCatalogs;
+
+  /// No description provided for @filterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter...'**
+  String get filterHint;
+
+  /// No description provided for @nothingFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing found'**
+  String get nothingFound;
+
+  /// No description provided for @noGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'No genres'**
+  String get noGenres;
+
+  /// No description provided for @noBooksInGenre.
+  ///
+  /// In en, this message translates to:
+  /// **'No books in this genre'**
+  String get noBooksInGenre;
+
+  /// No description provided for @noRecentBooks.
+  ///
+  /// In en, this message translates to:
+  /// **'No recently added books'**
+  String get noRecentBooks;
+
+  /// No description provided for @noBooksByAuthor.
+  ///
+  /// In en, this message translates to:
+  /// **'No books by this author'**
+  String get noBooksByAuthor;
+
+  /// No description provided for @authorFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Author'**
+  String get authorFallback;
+
+  /// No description provided for @categoriesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load categories'**
+  String get categoriesLoadError;
+
+  /// No description provided for @genresLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load genres'**
+  String get genresLoadError;
+
+  /// No description provided for @genreLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load genre'**
+  String get genreLoadError;
+
+  /// No description provided for @recentBooksLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load recent books'**
+  String get recentBooksLoadError;
+
+  /// No description provided for @authorLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load author'**
+  String get authorLoadError;
+
+  /// No description provided for @opdsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Load error'**
+  String get opdsLoadError;
+
+  /// No description provided for @opdsSearchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Search error'**
+  String get opdsSearchError;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @collapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get collapse;
+
+  /// No description provided for @readMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Read more'**
+  String get readMore;
+
+  /// No description provided for @loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get loading;
+
+  /// No description provided for @addCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Add catalog'**
+  String get addCatalog;
+
+  /// No description provided for @nameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameLabel;
+
+  /// No description provided for @opdsUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'OPDS catalog URL'**
+  String get opdsUrlLabel;
+
+  /// No description provided for @catalogSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search catalog...'**
+  String get catalogSearchHint;
+
+  /// No description provided for @opdsDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get opdsDownloading;
+
+  /// No description provided for @bookCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count,plural, =1{{count} book} other{{count} books}}'**
+  String bookCount(num count);
+
+  /// No description provided for @bookCountRu.
+  ///
+  /// In en, this message translates to:
+  /// **'{count,plural, =0{no books} one{{count} book} few{{count} books} other{{count} books}}'**
+  String bookCountRu(num count);
+
+  /// No description provided for @seriesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count,plural, =1{{count} series} other{{count} series}}'**
+  String seriesCount(num count);
+
+  /// No description provided for @pagesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} p.'**
+  String pagesLabel(Object count);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

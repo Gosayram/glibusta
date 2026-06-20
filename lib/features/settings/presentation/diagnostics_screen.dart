@@ -424,7 +424,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     } on Object catch (_) {}
 
     // App version
-    String appVersion = '0.1.0';
+    String appVersion = '';
     String buildNumber = '';
     try {
       final info = await PackageInfo.fromPlatform();

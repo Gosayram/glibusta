@@ -10,6 +10,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/app_breakpoints.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -44,12 +45,13 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final categoriesAsync = ref.watch(categoriesProvider);
     final popularAsync = ref.watch(popularBooksProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Каталог'),
+        title: Text(l10n.catalogTitle),
         automaticallyImplyLeading: false,
       ),
       body: RefreshIndicator(
@@ -92,7 +94,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   error: (Object e, _) => SizedBox(
                     height: 100,
                     child: ErrorStateWidget(
-                      message: 'Не удалось загрузить категории',
+                      message: l10n.categoriesLoadError,
                       details: e.toString(),
                       onRetry: () => ref.invalidate(categoriesProvider),
                     ),
@@ -108,7 +110,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.new_releases_outlined,
-                      label: 'Новые',
+                      label: l10n.newLabel,
                       onTap: () => context.push('/recent'),
                     ),
                   ),
@@ -116,7 +118,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.category_outlined,
-                      label: 'Жанры',
+                      label: l10n.genresTitle,
                       onTap: () => context.push('/genres'),
                     ),
                   ),
@@ -124,7 +126,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.trending_up,
-                      label: 'Популярные',
+                      label: l10n.popularLabel,
                       onTap: () => context.push('/catalog/popular'),
                     ),
                   ),
@@ -169,7 +171,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   error: (Object e, _) => SizedBox(
                     height: 200,
                     child: ErrorStateWidget(
-                      message: 'Не удалось загрузить популярные книги',
+                      message: l10n.recentBooksLoadError,
                       details: e.toString(),
                       onRetry: () => ref.invalidate(popularBooksProvider),
                     ),
@@ -184,6 +186,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Widget _buildCategories(BuildContext context, List<String> categories) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,15 +194,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Жанры',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              TextButton(
-                onPressed: () => context.push('/genres'),
-                child: const Text('Все жанры'),
-              ),
+              children: [
+                Text(
+                  l10n.genresTitle,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/genres'),
+                  child: Text(l10n.allGenres),
+                ),
             ],
           ),
         ),
@@ -229,6 +232,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Widget _buildPopularBooks(BuildContext context, WidgetRef ref, List<Book> books) {
+    final l10n = AppLocalizations.of(context);
     if (!identical(books, _lastBooks)) {
       _lastBooks = books;
       _downloadStatusFuture = _getDownloadStatusMap(ref, books);
@@ -236,11 +240,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'Популярное',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            l10n.popularSection,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(

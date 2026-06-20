@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_models.dart';
@@ -15,10 +16,11 @@ class GenreBooksScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final asyncBooks = ref.watch(genreBooksProvider(genreId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(asyncBooks.value?.name ?? 'Жанр')),
+      appBar: AppBar(title: Text(asyncBooks.value?.name ?? l10n.genreTitle)),
       body: asyncBooks.when(
         data: (GenreBooksResponse response) {
           if (response.books.isEmpty) {
@@ -33,7 +35,7 @@ class GenreBooksScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Нет книг в этом жанре',
+                    l10n.noBooksInGenre,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -48,7 +50,7 @@ class GenreBooksScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: Text(
-                  '${response.books.length} ${_bookCountText(response.books.length)}',
+                  l10n.bookCount(response.books.length),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -87,7 +89,7 @@ class GenreBooksScreen extends ConsumerWidget {
                 const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Не удалось загрузить жанр',
+                  l10n.genreLoadError,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -101,7 +103,7 @@ class GenreBooksScreen extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () => ref.invalidate(genreBooksProvider(genreId)),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Повторить'),
+                  label: Text(l10n.retry),
                 ),
               ],
             ),
@@ -111,12 +113,4 @@ class GenreBooksScreen extends ConsumerWidget {
     );
   }
 
-  String _bookCountText(int count) {
-    final mod100 = count % 100;
-    final mod10 = count % 10;
-    if (mod100 >= 11 && mod100 <= 14) return 'книг';
-    if (mod10 == 1) return 'книга';
-    if (mod10 >= 2 && mod10 <= 4) return 'книги';
-    return 'книг';
-  }
 }

@@ -1,36 +1,36 @@
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "daily"
-      time: "09:00"
-      timezone: "Asia/Tashkent"
+      interval: 'daily'
+      time: '09:00'
+      timezone: 'Asia/Tashkent'
     commit-message:
-      prefix: "[CI] - update"
+      prefix: '[CI] - update'
 
-  - package-ecosystem: "pub"
-    directory: "/"
+  - package-ecosystem: 'pub'
+    directory: '/'
     schedule:
-      interval: "daily"
-      time: "09:00"
-      timezone: "Asia/Tashkent"
+      interval: 'daily'
+      time: '09:00'
+      timezone: 'Asia/Tashkent'
     commit-message:
-      prefix: "[UPD] - update"
+      prefix: '[UPD] - update'
     ignore:
-      - dependency-name: "flutter_rust_bridge"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: 'flutter_rust_bridge'
+        update-types: ['version-update:semver-major']
 
-  - package-ecosystem: "cargo"
-    directory: "/rust"
+  - package-ecosystem: 'cargo'
+    directory: '/rust'
     schedule:
-      interval: "daily"
-      time: "09:00"
-      timezone: "Asia/Tashkent"
+      interval: 'daily'
+      time: '09:00'
+      timezone: 'Asia/Tashkent'
     commit-message:
-      prefix: "[UPD] - update"
+      prefix: '[UPD] - update'
     ignore:
-      - dependency-name: "flutter_rust_bridge"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "flutter_rust_bridge_codegen"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: 'flutter_rust_bridge'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'flutter_rust_bridge_codegen'
+        update-types: ['version-update:semver-major']

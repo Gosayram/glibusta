@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../search/data/flibusta_models.dart';
 
@@ -28,6 +29,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final asyncList = ref.watch(genreListProvider);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final crossAxisCount = screenWidth < 600
@@ -38,7 +40,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Жанры'),
+        title: Text(l10n.genresTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
@@ -46,7 +48,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
             child: TextField(
               controller: _filterController,
               decoration: InputDecoration(
-                hintText: 'Фильтр...',
+                hintText: l10n.filterHint,
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: _filter.isNotEmpty
                     ? IconButton(
@@ -85,7 +87,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    _filter.isNotEmpty ? 'Ничего не найдено' : 'Нет жанров',
+                    _filter.isNotEmpty ? l10n.nothingFound : l10n.noGenres,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -150,11 +152,11 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
             children: [
               const Icon(Icons.error_outline, size: 48),
               const SizedBox(height: 16),
-              const Text('Ошибка загрузки жанров'),
+              Text(l10n.genresLoadError),
               const SizedBox(height: 8),
               FilledButton.tonal(
                 onPressed: () => ref.invalidate(genreListProvider),
-                child: const Text('Повторить'),
+                child: Text(l10n.retry),
               ),
             ],
           ),

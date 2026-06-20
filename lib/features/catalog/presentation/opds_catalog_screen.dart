@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/services/opds_service.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 final opdsCatalogsProvider = Provider<List<OpdsCatalog>>((ref) {
   return builtInCatalogs;
@@ -49,8 +50,9 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
       }
     } on Object catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _error = 'Ошибка загрузки: $e';
+          _error = '${l10n.opdsLoadError}: $e';
           _isLoading = false;
         });
       }
@@ -76,8 +78,9 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
       }
     } on Object catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _error = 'Ошибка поиска: $e';
+          _error = '${l10n.opdsSearchError}: $e';
           _isLoading = false;
         });
       }
@@ -86,6 +89,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final catalogs = ref.watch(opdsCatalogsProvider);
     final theme = Theme.of(context);
 
@@ -108,7 +112,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Поиск в каталоге...',
+                  hintText: l10n.catalogSearchHint,
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -157,6 +161,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
   }
 
   Widget _buildEntriesList(ThemeData theme) {
+    final l10n = AppLocalizations.of(context);
     return ListView.builder(
       padding: const EdgeInsets.all(8),
       itemCount: _entries.length,
@@ -185,7 +190,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
                 ? IconButton(
                     icon: const Icon(Icons.download),
                     onPressed: () {
-                      unawaited(SmartDialog.showToast('Загрузка: ${entry.title}'));
+                      unawaited(SmartDialog.showToast('${l10n.loading}: ${entry.title}'));
                     },
                   )
                 : null,
@@ -196,6 +201,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
   }
 
   void _showAddCatalogDialog() {
+    final l10n = AppLocalizations.of(context);
     final urlController = TextEditingController();
     final nameController = TextEditingController();
 
@@ -203,25 +209,25 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
       showDialog<bool?>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Добавить каталог'),
+          title: Text(l10n.addCatalog),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(hintText: 'Название'),
+                decoration: InputDecoration(hintText: l10n.nameLabel),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: urlController,
-                decoration: const InputDecoration(hintText: 'URL OPDS каталога'),
+                decoration: InputDecoration(hintText: l10n.opdsUrlLabel),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отмена'),
+              child: Text(l10n.cancel),
             ),
             TextButton(
               onPressed: () {
@@ -231,7 +237,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
                   unawaited(_loadFeed(url));
                 }
               },
-              child: const Text('Добавить'),
+              child: Text(l10n.add),
             ),
           ],
         ),

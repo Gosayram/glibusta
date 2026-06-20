@@ -40,9 +40,7 @@ class FlibustaApiClient {
 
   Future<String> _getText(String relativePath, {CancelToken? cancelToken}) async {
     await _enforceRateLimit();
-    final base = _dio.options.baseUrl;
-    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
-    return _httpClient.get('$normalizedBase/$relativePath', cancelToken: cancelToken);
+    return _httpClient.getWithMirror(relativePath, cancelToken: cancelToken);
   }
 
   // ── Search: Books (HTML) ────────────────────────────────────────────────────

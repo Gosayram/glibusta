@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
-import 'package:pdfrx/pdfrx.dart';
 
 import '../logging/app_logger.dart';
 
@@ -19,7 +18,6 @@ class AppBootstrap {
         'Check your .env file.',
       );
     }
-    unawaited(pdfrxFlutterInitialize());
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();
