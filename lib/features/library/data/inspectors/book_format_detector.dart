@@ -1,7 +1,3 @@
-import 'dart:typed_data';
-
-import 'package:archive/archive.dart';
-
 import '../../../reader/data/parsers/format_detector.dart';
 
 final class BookFormatDetector {
@@ -45,8 +41,8 @@ final class BookFormatDetector {
 
   BookFormat _detectZipContent(List<int> bytes) {
     try {
-      final archive = ZipDecoder().decodeBytes(Uint8List.fromList(bytes));
-      final fileNames = archive.files.map((f) => f.name).toList();
+      final fileNames = _readZipFileNames(bytes);
+      if (fileNames.isEmpty) return BookFormat.unknown;
 
       // EPUB: has META-INF/container.xml
       if (fileNames.any((n) => n == 'META-INF/container.xml')) {
@@ -88,6 +84,61 @@ final class BookFormatDetector {
     }
 
     return BookFormat.unknown;
+  }
+
+  /// Read file names from the ZIP central directory without decompressing.
+  static List<String> _readZipFileNames(List<int> bytes) {
+    if (bytes.length < 22) return []; // EOCD minimum size
+
+    // Find EOCD (End of Central Directory) signature 0x06054b50
+    final length = bytes.length;
+    final searchLimit = length - 22;
+    var eocdPos = -1;
+    for (var i = searchLimit >= 0 ? searchLimit : 0; i >= 0; i--) {
+      if (bytes[i] == 0x50 &&
+          bytes[i + 1] == 0x4B &&
+          bytes[i + 2] == 0x05 &&
+          bytes[i + 3] == 0x06) {
+        eocdPos = i;
+        break;
+      }
+    }
+    if (eocdPos < 0) return [];
+
+    final cdOffset =
+        bytes[eocdPos + 16] |
+        (bytes[eocdPos + 17] << 8) |
+        (bytes[eocdPos + 18] << 16) |
+        (bytes[eocdPos + 19] << 24);
+    final cdSize =
+        bytes[eocdPos + 12] |
+        (bytes[eocdPos + 13] << 8) |
+        (bytes[eocdPos + 14] << 16) |
+        (bytes[eocdPos + 15] << 24);
+
+    if (cdOffset + cdSize > length) return [];
+
+    // Parse central directory entries (signature 0x02014b50)
+    final names = <String>[];
+    var pos = cdOffset;
+    final cdEnd = cdOffset + cdSize;
+    while (pos + 46 <= cdEnd && pos + 46 <= length) {
+      if (bytes[pos] != 0x50 ||
+          bytes[pos + 1] != 0x4B ||
+          bytes[pos + 2] != 0x01 ||
+          bytes[pos + 3] != 0x02) {
+        break;
+      }
+      final fnameLen = bytes[pos + 28] | (bytes[pos + 29] << 8);
+      final extraLen = bytes[pos + 30] | (bytes[pos + 31] << 8);
+      final commentLen = bytes[pos + 32] | (bytes[pos + 33] << 8);
+      if (pos + 46 + fnameLen > length) break;
+      names.add(
+        String.fromCharCodes(bytes.sublist(pos + 46, pos + 46 + fnameLen)),
+      );
+      pos += 46 + fnameLen + extraLen + commentLen;
+    }
+    return names;
   }
 
   bool _isFb2Xml(List<int> bytes) {

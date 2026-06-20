@@ -108,15 +108,17 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         'Search returned ${bookResult.books.length} books, ${authorResult.authors.length} authors',
         name: 'Search',
       );
-      unawaited(_rememberSearch(normalized));
       state = state.copyWith(
         books: bookResult.books,
         authors: authorResult.authors,
         isLoading: false,
         hasMore: bookResult.hasNextPage,
         currentPage: bookResult.currentPage,
-        error: null,
+        error: bookError != null && bookResult.books.isEmpty ? bookError.toString() : null,
       );
+      if (bookResult.books.isNotEmpty || authorResult.authors.isNotEmpty) {
+        unawaited(_rememberSearch(normalized));
+      }
     } on Object catch (e, st) {
       if (!ref.mounted) return;
       _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);

@@ -72,7 +72,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   data: (List<String> categories) => _buildCategories(context, categories),
                   loading: () => SizedBox(
                     height: 100,
-                    child: Skeletonizer(
+                    child: Skeletonizer.zone(
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -144,7 +144,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   data: (List<Book> books) => _buildPopularBooks(context, ref, books),
                   loading: () => SizedBox(
                     height: 200,
-                    child: Skeletonizer(
+                    child: Skeletonizer.zone(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -254,7 +254,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 return const SizedBox.shrink();
               }
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return Skeletonizer(
+                return Skeletonizer.zone(
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

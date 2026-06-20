@@ -198,7 +198,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookDetails',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: BookDetailsScreen(bookId: bookId),
@@ -220,7 +220,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'reader',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: ReaderEntryScreen(bookId: bookId),
@@ -238,7 +238,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'seriesDetail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final seriesId = state.pathParameters['seriesId']!;
+          final seriesId = state.pathParameters['seriesId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: SeriesDetailScreen(seriesId: seriesId),
@@ -260,7 +260,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'quotes',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return QuotesScreen(bookId: bookId);
         },
       ),
@@ -269,7 +269,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookAnnotations',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return AnnotationsScreen(bookId: bookId);
         },
       ),
@@ -278,7 +278,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'authorDetail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final authorId = state.pathParameters['authorId']!;
+          final authorId = state.pathParameters['authorId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: AuthorDetailScreen(authorId: authorId),
@@ -307,7 +307,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'genreBooks',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final genreId = state.pathParameters['genreId']!;
+          final genreId = state.pathParameters['genreId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: GenreBooksScreen(genreId: genreId),
@@ -336,7 +336,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookmarks',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return BookmarksScreen(bookId: bookId);
         },
       ),
@@ -345,7 +345,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'notes',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return NotesScreen(bookId: bookId);
         },
       ),

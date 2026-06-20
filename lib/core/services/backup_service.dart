@@ -212,8 +212,8 @@ class BackupService {
     return BookmarksCompanion.insert(
       id: map['id'] as String,
       bookId: map['bookId'] as String,
-      chapterIndex: map['chapterIndex'] as int,
-      paragraphIndex: map['paragraphIndex'] as int,
+      chapterIndex: (map['chapterIndex'] as num?)?.toInt() ?? 0,
+      paragraphIndex: (map['paragraphIndex'] as num?)?.toInt() ?? 0,
       localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
       selectedText: Value(map['selectedText'] as String?),
       note: Value(map['note'] as String?),
@@ -241,8 +241,8 @@ class BackupService {
     return NotesCompanion.insert(
       id: map['id'] as String,
       bookId: map['bookId'] as String,
-      chapterIndex: map['chapterIndex'] as int,
-      paragraphIndex: map['paragraphIndex'] as int,
+      chapterIndex: (map['chapterIndex'] as num?)?.toInt() ?? 0,
+      paragraphIndex: (map['paragraphIndex'] as num?)?.toInt() ?? 0,
       localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
       content: map['content'] as String,
       highlightColor: Value(map['highlightColor'] as String? ?? '#FFEB3B'),
@@ -273,8 +273,8 @@ class BackupService {
     return QuotesCompanion.insert(
       id: map['id'] as String,
       bookId: map['bookId'] as String,
-      chapterIndex: map['chapterIndex'] as int,
-      paragraphIndex: map['paragraphIndex'] as int,
+      chapterIndex: (map['chapterIndex'] as num?)?.toInt() ?? 0,
+      paragraphIndex: (map['paragraphIndex'] as num?)?.toInt() ?? 0,
       selectedText: map['selectedText'] as String,
       beforeContext: Value(map['beforeContext'] as String?),
       afterContext: Value(map['afterContext'] as String?),
@@ -300,12 +300,20 @@ class BackupService {
       name: map['name'] as String,
       bookIds: Value(
         map['bookIds'] is String
-            ? List<String>.from((jsonDecode(map['bookIds'] as String) as List<dynamic>))
+            ? _safeDecodeBookIds(map['bookIds'] as String)
             : (map['bookIds'] as List<dynamic>?)?.cast<String>() ?? [],
       ),
       createdAt: Value(
         map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),
     );
+  }
+
+  static List<String> _safeDecodeBookIds(String raw) {
+    try {
+      return List<String>.from(jsonDecode(raw) as List<dynamic>);
+    } on Object catch (_) {
+      return [];
+    }
   }
 }

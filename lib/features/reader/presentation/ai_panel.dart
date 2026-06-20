@@ -24,6 +24,7 @@ class _AiPanelState extends ConsumerState<AiPanel> {
     final aiService = ref.read(aiChatServiceProvider);
     aiService.onMessagesChange.listen((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         if (_scrollController.hasClients) {
           unawaited(
             _scrollController.animateTo(

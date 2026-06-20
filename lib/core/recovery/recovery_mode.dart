@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/reader/data/tts/tts_service.dart' show sharedPreferencesProvider;
 import '../database/app_database.dart';
 import '../logging/app_logger.dart';
 import '../services/file_integrity_service.dart';
@@ -35,29 +36,27 @@ class RecoveryReport {
 }
 
 class RecoveryMode {
-  RecoveryMode(this._db, this._logger, this._integrityService);
+  RecoveryMode(this._db, this._logger, this._integrityService, this._prefs);
   final AppDatabase _db;
   final AppLogger _logger;
   final FileIntegrityService _integrityService;
+  final SharedPreferences _prefs;
 
   static const _recoveryKey = 'last_recovery_status';
   static const _crashCountKey = 'consecutive_crash_count';
 
   Future<bool> shouldEnterRecoveryMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final crashCount = prefs.getInt(_crashCountKey) ?? 0;
+    final crashCount = _prefs.getInt(_crashCountKey) ?? 0;
     return crashCount >= 3;
   }
 
   Future<void> recordCrash() async {
-    final prefs = await SharedPreferences.getInstance();
-    final count = prefs.getInt(_crashCountKey) ?? 0;
-    await prefs.setInt(_crashCountKey, count + 1);
+    final count = _prefs.getInt(_crashCountKey) ?? 0;
+    await _prefs.setInt(_crashCountKey, count + 1);
   }
 
   Future<void> clearCrashCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_crashCountKey);
+    await _prefs.remove(_crashCountKey);
   }
 
   Future<RecoveryReport> runDiagnostics() async {
@@ -124,27 +123,23 @@ class RecoveryMode {
       orphanFiles: orphanFiles,
     );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_recoveryKey, status.name);
+    await _prefs.setString(_recoveryKey, status.name);
 
     return report;
   }
 
   Future<void> enterSafeMode() async {
     _logger.info('Entering safe mode...', name: 'Recovery');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('safe_mode', true);
+    await _prefs.setBool('safe_mode', true);
   }
 
   Future<void> exitSafeMode() async {
     _logger.info('Exiting safe mode', name: 'Recovery');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('safe_mode', false);
+    await _prefs.setBool('safe_mode', false);
   }
 
   Future<bool> isInSafeMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('safe_mode') ?? false;
+    return _prefs.getBool('safe_mode') ?? false;
   }
 
   Future<int> rebuildIndex() async {
@@ -210,15 +205,18 @@ class RecoveryMode {
   }
 
   Future<String?> getLastRecoveryStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_recoveryKey);
+    return _prefs.getString(_recoveryKey);
   }
 }
 
 // --- Riverpod providers ---
 
 final recoveryModeProvider = Provider<RecoveryMode>((ref) {
-  throw UnimplementedError('Override in main');
+  final db = ref.watch(databaseProvider);
+  final logger = ref.watch(appLoggerProvider);
+  final integrity = ref.watch(fileIntegrityServiceProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return RecoveryMode(db, logger, integrity, prefs);
 });
 
 final recoveryReportProvider = FutureProvider<RecoveryReport>((ref) async {

@@ -18,11 +18,10 @@ abstract class AppSettings with _$AppSettings {
   const AppSettings._();
 
   factory AppSettings.fromEnv() {
-    final baseUrl = dotenv.env['BASE_URL'] ?? '';
-    final mirrorsRaw = dotenv.env['MIRRORS'] ?? '';
+    final baseUrl = dotenv.get('BASE_URL', fallback: '');
+    final mirrorsRaw = dotenv.get('MIRRORS', fallback: '');
     final mirrors = mirrorsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    final concurrentStr = dotenv.env['CONCURRENT_DOWNLOADS'] ?? '3';
-    final maxConcurrentDownloads = int.tryParse(concurrentStr) ?? 3;
+    final maxConcurrentDownloads = dotenv.getInt('CONCURRENT_DOWNLOADS', fallback: 3);
 
     return AppSettings(
       baseUrl: baseUrl,

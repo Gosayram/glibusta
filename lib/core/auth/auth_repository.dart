@@ -91,9 +91,10 @@ class AuthRepository {
     final setCookies = response.headers['set-cookie'];
     if (setCookies != null) {
       for (final cookie in setCookies) {
-        final parts = cookie.split(';').first.split('=');
-        if (parts.length >= 2) {
-          cookies[parts[0].trim()] = parts.sublist(1).join('=').trim();
+        final firstPart = cookie.split(';').first;
+        final eqIndex = firstPart.indexOf('=');
+        if (eqIndex > 0) {
+          cookies[firstPart.substring(0, eqIndex).trim()] = firstPart.substring(eqIndex + 1).trim();
         }
       }
     }
@@ -132,6 +133,77 @@ class AuthException implements Exception {
   String toString() => 'AuthException: $message';
 }
 
+/// Dio interceptor that detects 401 responses and attempts auto re-login.
+///
+/// On 401, it tries [AuthStateNotifier.tryAutoLogin] with stored credentials.
+/// If successful, retries the original request; otherwise passes the error.
+class SessionRefreshInterceptor extends Interceptor {
+  final Ref _ref;
+  Completer<bool>? _pendingRefresh;
+
+  SessionRefreshInterceptor(this._ref);
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode != 401 ||
+        err.requestOptions.path.contains('/user/login') ||
+        err.requestOptions.extra['sessionRefreshed'] == true) {
+      handler.next(err);
+      return;
+    }
+
+    // If a refresh is already in progress, wait for it
+    if (_pendingRefresh != null) {
+      final success = await _pendingRefresh!.future;
+      if (!success) {
+        handler.next(err);
+        return;
+      }
+      await _retryRequest(err.requestOptions, handler);
+      return;
+    }
+
+    _pendingRefresh = Completer<bool>();
+    try {
+      final success = await _ref.read(authStateProvider.notifier).tryAutoLogin();
+      _pendingRefresh!.complete(success);
+
+      if (success) {
+        await _retryRequest(err.requestOptions, handler);
+      } else {
+        handler.next(err);
+      }
+    } on Object catch (e) {
+      _pendingRefresh!.complete(false);
+      AppLogger().warning('Session refresh failed: $e', name: 'Auth', error: e);
+      handler.next(err);
+    } finally {
+      _pendingRefresh = null;
+    }
+  }
+
+  Future<void> _retryRequest(
+    RequestOptions options,
+    ErrorInterceptorHandler handler,
+  ) async {
+    try {
+      final response = await _ref
+          .read(dioProvider)
+          .fetch<dynamic>(
+            options.copyWith(
+              headers: options.headers,
+              extra: {...options.extra, 'sessionRefreshed': true},
+            ),
+          );
+      handler.resolve(response);
+    } on DioException catch (e) {
+      handler.next(e);
+    } on Object catch (e) {
+      handler.next(DioException(requestOptions: options, error: e));
+    }
+  }
+}
+
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return AuthRepository(dio);
@@ -154,7 +226,9 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final secureStorage = ref.read(flutterSecureStorageProvider);
     final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
-        ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
+        ? Map<String, String>.from(
+            Uri.splitQueryString(cookiesRaw).map((k, v) => MapEntry(k, Uri.decodeComponent(v))),
+          )
         : <String, String>{};
     if (cookies.isEmpty) {
       return const AuthStateData();
@@ -197,9 +271,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     await prefs.remove(_kSessionNameKey);
     await prefs.remove(_kSessionMailKey);
     final secureStorage = ref.read(flutterSecureStorageProvider);
-    await secureStorage.delete(key: _kSessionCookiesKey);
-    await secureStorage.delete(key: 'auth_username');
-    await secureStorage.delete(key: 'auth_password');
+    await secureStorage.deleteAll();
     state = const AsyncValue.data(AuthStateData());
   }
 
@@ -246,12 +318,14 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       await prefs.setString(_kSessionMailKey, session.mail!);
     }
     final secureStorage = ref.read(flutterSecureStorageProvider);
-    if (session.cookies.isNotEmpty) {
-      final encoded = session.cookies.entries
-          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-          .join('&');
-      await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
+    if (session.cookies.isEmpty) {
+      await secureStorage.delete(key: _kSessionCookiesKey);
+      return;
     }
+    final encoded = session.cookies.entries
+        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
   }
 }
 

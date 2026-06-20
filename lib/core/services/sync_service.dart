@@ -156,6 +156,7 @@ class SyncService {
   static const _configKey = 'sync_config';
   static const _statusKey = 'sync_status';
 
+  bool _isSyncing = false;
   SyncConfig? _config;
   SyncStatus _status = SyncStatus.idle;
   SyncClientBase? _client;
@@ -189,19 +190,25 @@ class SyncService {
 
   Future<void> sync() async {
     if (_config == null || _client == null) return;
-    _status = SyncStatus.syncing;
-    await _prefs.setString(_statusKey, SyncStatus.syncing.index.toString());
-
+    if (_isSyncing) return;
+    _isSyncing = true;
     try {
-      await _client!.ping();
-      _status = SyncStatus.idle;
-      await _prefs.setString(_statusKey, SyncStatus.idle.index.toString());
-    } on DioException catch (_) {
-      _status = SyncStatus.error;
-      await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
-    } on Object catch (_) {
-      _status = SyncStatus.error;
-      await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
+      _status = SyncStatus.syncing;
+      await _prefs.setString(_statusKey, SyncStatus.syncing.index.toString());
+
+      try {
+        await _client!.ping();
+        _status = SyncStatus.idle;
+        await _prefs.setString(_statusKey, SyncStatus.idle.index.toString());
+      } on DioException catch (_) {
+        _status = SyncStatus.error;
+        await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
+      } on Object catch (_) {
+        _status = SyncStatus.error;
+        await _prefs.setString(_statusKey, SyncStatus.error.index.toString());
+      }
+    } finally {
+      _isSyncing = false;
     }
   }
 

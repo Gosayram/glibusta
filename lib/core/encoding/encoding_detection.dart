@@ -46,6 +46,9 @@ final class EncodingDetectionResult {
 /// 6. fl_charset fallback (windows-1251, koi8-r, cp866, iso-8859-5)
 /// 7. Quality scoring picks best candidate
 final class BookEncodingDetector {
+  /// Cache for CharsetDetector.autoDecode() results keyed by bytes hashCode.
+  static final Map<int, ({String text, String charset})> _autoDecodeCache = {};
+
   /// Detect encoding and decode bytes to text.
   Future<EncodingDetectionResult> detect(
     Uint8List bytes, {
@@ -157,9 +160,18 @@ final class BookEncodingDetector {
     Uint8List bytes,
   ) async {
     try {
-      final decoded = await CharsetDetector.autoDecode(bytes);
-      final text = decoded.string;
-      final encoding = normalizeEncodingName(decoded.charset);
+      final cached = _autoDecodeCache[bytes.hashCode];
+      final String text;
+      final String encoding;
+      if (cached != null) {
+        text = cached.text;
+        encoding = cached.charset;
+      } else {
+        final decoded = await CharsetDetector.autoDecode(bytes);
+        text = decoded.string;
+        encoding = normalizeEncodingName(decoded.charset);
+        _autoDecodeCache[bytes.hashCode] = (text: text, charset: encoding);
+      }
       final score = encodingQualityScore(text);
       return EncodingDetectionResult(
         text: text,
@@ -236,9 +248,15 @@ final class BookEncodingDetector {
         if (enc != null) {
           return enc.decode(bytes);
         }
-        // Last resort: native detector
+        // Last resort: native detector (cached)
+        final cached = _autoDecodeCache[bytes.hashCode];
+        if (cached != null) return cached.text;
         try {
           final decoded = await CharsetDetector.autoDecode(bytes);
+          _autoDecodeCache[bytes.hashCode] = (
+            text: decoded.string,
+            charset: normalizeEncodingName(decoded.charset),
+          );
           return decoded.string;
         } on Object catch (_) {
           return utf8.decode(bytes, allowMalformed: true);

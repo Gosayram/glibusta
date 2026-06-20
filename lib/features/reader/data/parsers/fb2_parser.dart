@@ -24,6 +24,21 @@ class Fb2Parser implements BookParser {
     dotAll: true,
   );
 
+  /// Pattern for DOCTYPE declarations containing ENTITY definitions.
+  /// Prevents billion laughs XML entity expansion attacks.
+  static final _doctypeEntityPattern = RegExp(
+    r'<!DOCTYPE[^>]*\[[\s\S]*?\]>',
+    multiLine: true,
+    caseSensitive: false,
+  );
+
+  /// Pattern for standalone ENTITY declarations outside DOCTYPE.
+  static final _entityDeclPattern = RegExp(
+    r'<!ENTITY\s+\S+\s+[^>]*>',
+    multiLine: true,
+    caseSensitive: false,
+  );
+
   @override
   bool supports(BookFormat format) => format == BookFormat.fb2;
 
@@ -43,7 +58,11 @@ class Fb2Parser implements BookParser {
         forcedEncoding: forcedEncoding,
       );
       final sanitized = _sanitizeXml(result.text);
-      final document = XmlDocument.parse(sanitized);
+      if (sanitized.length > 50 * 1024 * 1024) {
+        throw const ParserFailure('FB2: размер XML превышает 50 МБ');
+      }
+      final safeXml = _stripDtdEntities(sanitized);
+      final document = XmlDocument.parse(safeXml);
       return _parseDocument(document);
     } on XmlException catch (e) {
       throw ParserFailure('Ошибка разбора FB2: ${e.message}');
@@ -64,6 +83,11 @@ class Fb2Parser implements BookParser {
     return text.replaceAll(_binaryTagPattern, '');
   }
 
+  /// Strip DOCTYPE with ENTITY declarations to prevent billion laughs attack.
+  static String _stripDtdEntities(String text) {
+    return text.replaceAll(_doctypeEntityPattern, '').replaceAll(_entityDeclPattern, '');
+  }
+
   /// If bytes are a ZIP archive (FB2.ZIP), extract the first .fb2 file.
   Uint8List _extractFromZipIfNeeded(Uint8List bytes) {
     if (bytes.length < 4) return bytes;
@@ -71,6 +95,18 @@ class Fb2Parser implements BookParser {
     if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
       try {
         final archive = ZipDecoder().decodeBytes(bytes);
+        var totalDecompressed = 0;
+        const maxDecompressedSize = 500 * 1024 * 1024; // 500 MB
+        for (final file in archive) {
+          if (file.isFile) {
+            totalDecompressed += file.content.length;
+            if (totalDecompressed > maxDecompressedSize) {
+              throw const FormatException(
+                'FB2.ZIP: суммарный размер распакованных файлов превышает 500 МБ',
+              );
+            }
+          }
+        }
         final fb2File = archive.files.cast<ArchiveFile?>().firstWhere(
           (f) => f!.name.toLowerCase().endsWith('.fb2') && !_hasZipSlip(f.name),
           orElse: () => null,
@@ -263,7 +299,8 @@ class Fb2Parser implements BookParser {
 
 NormalizedBook parseFb2FromText(String text, {String? fileName}) {
   final sanitized = Fb2Parser._sanitizeXml(text);
-  final document = XmlDocument.parse(sanitized);
+  final safeXml = Fb2Parser._stripDtdEntities(sanitized);
+  final document = XmlDocument.parse(safeXml);
 
   final description = <String, dynamic>{};
   final titleInfo = document.findAllElements('title-info');

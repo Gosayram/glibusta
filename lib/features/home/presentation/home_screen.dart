@@ -86,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
                     },
                     loading: () => SizedBox(
                       height: 160,
-                      child: Skeletonizer(
+                      child: Skeletonizer.zone(
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -228,7 +228,7 @@ class HomeScreen extends ConsumerWidget {
                     },
                     loading: () => SizedBox(
                       height: 180,
-                      child: Skeletonizer(
+                      child: Skeletonizer.zone(
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -421,7 +421,7 @@ class _ReadingStatsSection extends ConsumerWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Skeletonizer(
+          child: Skeletonizer.zone(
             child: Column(
               children: [
                 Skeleton.unite(

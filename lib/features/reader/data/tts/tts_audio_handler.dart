@@ -20,12 +20,13 @@ class TtsAudioHandler extends BaseAudioHandler with SeekHandler {
     );
   }
 
-  Future<void> playTts(String title, String author) async {
+  Future<void> playTts(String title, String author, {Duration? duration}) async {
     mediaItem.add(
       MediaItem(
         id: 'tts_${DateTime.now().millisecondsSinceEpoch}',
         title: title,
         artist: author,
+        duration: duration,
       ),
     );
 
@@ -96,9 +97,9 @@ class TtsAudioService {
     return _handler!;
   }
 
-  Future<void> play(String title, String author) async {
+  Future<void> play(String title, String author, {Duration? duration}) async {
     final handler = await getHandler();
-    await handler.playTts(title, author);
+    await handler.playTts(title, author, duration: duration);
   }
 
   void updateProgress({required bool isPlaying, required bool isPaused}) {

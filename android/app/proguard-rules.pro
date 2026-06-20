@@ -1,12 +1,9 @@
 ############################################
-# Flutter / Engine / Plugin registry
+# Flutter Engine Embedding
 ############################################
 
--keep class io.flutter.app.** { *; }
--keep class io.flutter.plugin.** { *; }
 -keep class io.flutter.embedding.** { *; }
--keep class io.flutter.util.** { *; }
--keep class io.flutter.view.** { *; }
+-keep class io.flutter.plugin.** { *; }
 -keep class **.GeneratedPluginRegistrant { *; }
 
 
@@ -18,11 +15,11 @@
     native <methods>;
 }
 
--keep class com.gosayram.glibusta.** { *; }
+-keep class com.gosayram.glibusta.MainActivity { *; }
 
 
 ############################################
-# Kotlin / Coroutines / Metadata
+# Kotlin Metadata
 ############################################
 
 -keep class kotlin.Metadata { *; }
@@ -34,7 +31,6 @@
 ############################################
 
 -dontwarn com.google.android.play.core.**
--keep class com.google.android.play.core.** { *; }
 
 
 ############################################
@@ -48,7 +44,7 @@
 
 
 ############################################
-# Crashlytics / Sentry mapping friendliness
+# Crashlytics / mapping friendliness
 ############################################
 
 -keepattributes SourceFile,LineNumberTable

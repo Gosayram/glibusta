@@ -154,11 +154,9 @@ class NotesScreen extends ConsumerWidget {
 
 Color _parseColorSafe(String? hex) {
   if (hex == null || hex.isEmpty || hex.length < 7) return Colors.amber;
-  try {
-    return Color(int.parse('0xFF${hex.substring(1)}'));
-  } on Object catch (_) {
-    return Colors.amber;
-  }
+  final parsed = int.tryParse('0xFF${hex.substring(1)}');
+  if (parsed == null) return Colors.amber;
+  return Color(parsed);
 }
 
 class NoteTile extends StatelessWidget {

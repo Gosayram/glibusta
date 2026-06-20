@@ -6,11 +6,11 @@ import android.provider.DocumentsContract
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.lifecycleScope
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -60,7 +60,7 @@ class MainActivity : FlutterFragmentActivity() {
                     result.error("INVALID_ARG", "URI is required", null)
                     return
                 }
-                CoroutineScope(Dispatchers.IO).launch {
+                lifecycleScope.launch(Dispatchers.IO) {
                     try {
                         val books = scanBooks(Uri.parse(folderUri))
                         withContext(Dispatchers.Main) {
@@ -116,13 +116,13 @@ class MainActivity : FlutterFragmentActivity() {
     private fun handleDjvuCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "open" -> {
-                result.success(mapOf("pageCount" to 0))
+                result.error("NOT_SUPPORTED", "DjVu format is not supported. Convert to EPUB or PDF first.", null)
             }
             "renderPage" -> {
-                result.error("NOT_IMPLEMENTED", "DjVu renderer is not bundled yet", null)
+                result.error("NOT_SUPPORTED", "DjVu format is not supported. Convert to EPUB or PDF first.", null)
             }
             "extractText" -> {
-                result.success(null)
+                result.error("NOT_SUPPORTED", "DjVu format is not supported. Convert to EPUB or PDF first.", null)
             }
             "close" -> {
                 result.success(null)

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -182,10 +183,10 @@ class _AuthorHeader extends StatelessWidget {
                   child: SizedBox(
                     width: 80,
                     height: 80,
-                    child: Image.network(
-                      avatarUrl!.startsWith('http') ? avatarUrl! : '$baseUrl$avatarUrl',
+                    child: CachedNetworkImage(
+                      imageUrl: avatarUrl!.startsWith('http') ? avatarUrl! : '$baseUrl$avatarUrl',
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                      errorWidget: (context, error, stackTrace) => Container(
                         width: 80,
                         height: 80,
                         color: theme.colorScheme.surfaceContainerHighest,

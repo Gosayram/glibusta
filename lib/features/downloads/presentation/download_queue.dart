@@ -61,12 +61,21 @@ class DownloadQueue {
     _processQueue();
   }
 
-  Future<void> enqueue({
+  Future<String> enqueue({
     required String bookId,
     required String bookTitle,
     required BookFormat format,
     required String sourceUrl,
   }) async {
+    for (final existing in _tasks.values) {
+      if (existing.bookId == bookId &&
+          existing.format == format &&
+          existing.status != DownloadStatus.canceled &&
+          existing.status != DownloadStatus.failed) {
+        return existing.id;
+      }
+    }
+
     final task = await _repository.startDownload(
       bookId: bookId,
       bookTitle: bookTitle,
@@ -78,6 +87,7 @@ class DownloadQueue {
     _pendingQueue.add(task);
     _emitUpdate();
     _processQueue();
+    return task.id;
   }
 
   Future<void> pause(String taskId) async {

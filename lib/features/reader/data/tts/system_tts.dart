@@ -17,6 +17,7 @@ class SystemTts extends BaseTts {
   TtsSettings _settings = const TtsSettings();
   List<TtsSegment> _segments = [];
   int _currentSegmentIndex = 0;
+  String _currentText = '';
 
   @override
   Stream<TtsState> get onStateChange => _stateController.stream;
@@ -26,6 +27,10 @@ class SystemTts extends BaseTts {
 
   Future<void> _init() async {
     await _tts.awaitSpeakCompletion(true);
+    await _tts.setIosAudioCategory(
+      IosTextToSpeechAudioCategory.playback,
+      [IosTextToSpeechAudioCategoryOptions.defaultToSpeaker],
+    );
 
     _tts.setStartHandler(() {
       _stateController.add(TtsState.playing);
@@ -71,6 +76,7 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> speak(String text) async {
+    _currentText = text;
     _segments = TtsSentenceSegmenter.segment(text);
     _currentSegmentIndex = 0;
     await _applySettings();
@@ -91,6 +97,14 @@ class SystemTts extends BaseTts {
 
   @override
   Future<void> resume() async {
+    if (_currentText.isNotEmpty) {
+      final remaining = _segments.skip(_currentSegmentIndex).map((s) => s.text).join(' ');
+      if (remaining.isNotEmpty) {
+        await _applySettings();
+        await _tts.speak(remaining);
+        return;
+      }
+    }
     await _tts.awaitSpeakCompletion(true);
     _stateController.add(TtsState.playing);
   }

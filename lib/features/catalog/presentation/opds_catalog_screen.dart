@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -165,12 +166,12 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
             leading: entry.coverUrl != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      entry.coverUrl!,
+                    child: CachedNetworkImage(
+                      imageUrl: entry.coverUrl!,
                       width: 40,
                       height: 60,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Icon(
+                      errorWidget: (_, _, _) => Icon(
                         Icons.book,
                         color: theme.colorScheme.primary,
                       ),

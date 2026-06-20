@@ -368,11 +368,9 @@ Color _parseColor(String? hexString) {
   if (hexString == null || hexString.isEmpty) return Colors.amber;
   final cleaned = hexString.startsWith('#') ? hexString.substring(1) : hexString;
   if (cleaned.length != 6 && cleaned.length != 8) return Colors.amber;
-  try {
-    return Color(int.parse('0xFF$cleaned'));
-  } on Object catch (_) {
-    return Colors.amber;
-  }
+  final parsed = int.tryParse('0xFF$cleaned');
+  if (parsed == null) return Colors.amber;
+  return Color(parsed);
 }
 
 class _EmptyState extends StatelessWidget {

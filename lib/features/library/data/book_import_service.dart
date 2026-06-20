@@ -362,7 +362,13 @@ class BookImportService {
         if (await f.exists()) await f.delete();
       }
       await _deletePartialImportRows(ctx.bookId);
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      _logger.warning(
+        'Failed to cleanup failed import for ${ctx.bookId}: $e',
+        name: 'Import',
+        error: e,
+      );
+    }
   }
 
   /// Import a book from an external SAF URI into the app library.
@@ -651,6 +657,13 @@ class BookImportService {
         await _tryDelete(tempFile.path);
       }
 
+      // Clean up temp directory
+      try {
+        await tempDir.delete(recursive: true);
+      } on Object {
+        // Best-effort cleanup
+      }
+
       return result;
     } on Object catch (e) {
       _logger.warning('URL import failed for $url: $e', name: 'Import', error: e);
@@ -764,7 +777,9 @@ class BookImportService {
     try {
       final f = File(path);
       if (await f.exists()) await f.delete();
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      _logger.warning('Failed to delete file $path: $e', name: 'Import', error: e);
+    }
   }
 
   Future<void> _extractCoverBackground(

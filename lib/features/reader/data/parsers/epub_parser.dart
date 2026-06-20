@@ -26,6 +26,18 @@ class EpubParser implements BookParser {
   }) async {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      var totalDecompressed = 0;
+      const maxDecompressedSize = 500 * 1024 * 1024; // 500 MB
+      for (final file in archive) {
+        if (file.isFile) {
+          totalDecompressed += file.content.length;
+          if (totalDecompressed > maxDecompressedSize) {
+            throw const ParserFailure(
+              'EPUB: суммарный размер распакованных файлов превышает 500 МБ',
+            );
+          }
+        }
+      }
       return _parseArchive(archive, forcedEncoding: forcedEncoding);
     } on Object catch (e) {
       throw ParserFailure('Ошибка при разборе EPUB: $e');

@@ -149,7 +149,14 @@ class ReaderCacheService {
             ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
             : null;
 
-        await bookDir.delete(recursive: true);
+        try {
+          await bookDir.delete(recursive: true);
+        } on Object {
+          if (imagesBackup != null) {
+            await imagesBackup.rename('${bookDir.path}/epub_images');
+          }
+          rethrow;
+        }
 
         if (imagesBackup != null) {
           await imagesBackup.rename('${bookDir.path}/epub_images');

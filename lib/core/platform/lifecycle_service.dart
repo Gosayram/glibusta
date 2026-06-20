@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../logging/app_logger.dart';
 import '../services/sync_service.dart';
 
 final lifecycleServiceProvider = Provider<LifecycleService>((ref) {
@@ -32,7 +33,9 @@ class LifecycleService {
       if (syncService.config?.autoSync == true && syncService.status != SyncStatus.syncing) {
         unawaited(syncService.sync());
       }
-    } on Object catch (_) {}
+    } on Object catch (e) {
+      AppLogger().warning('Failed to trigger auto-sync', error: e);
+    }
   }
 
   void setCallback(LifecycleEvent event, VoidCallback callback) {

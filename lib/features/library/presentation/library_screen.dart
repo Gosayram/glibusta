@@ -159,7 +159,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               }).toList();
                         return _buildBooksGrid(context, ref, filtered);
                       },
-                      loading: () => Skeletonizer(
+                      loading: () => Skeletonizer.zone(
                         child: GridView.builder(
                           padding: const EdgeInsets.all(16),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -801,6 +801,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final result = await DeleteBookDialog.show(context, bookTitle: book.title);
     if (result == null || !context.mounted) return;
 
+    unawaited(HapticFeedback.heavyImpact());
+
     final service = ref.read(bookDeleteServiceProvider);
     if (result.deleteFile) {
       await service.deleteBookCompletely(book.id);
@@ -1030,6 +1032,8 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
 
   Color _parseColor(String hex) {
     final clean = hex.replaceFirst('#', '');
-    return Color(int.parse('FF$clean', radix: 16));
+    final parsed = int.tryParse(clean, radix: 16);
+    if (parsed == null) return const Color(0xFFFFEB3B);
+    return Color(0xFF000000 | parsed);
   }
 }
