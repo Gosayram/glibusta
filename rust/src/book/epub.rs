@@ -284,11 +284,7 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     "manifest" => in_manifest = false,
                     "spine" => in_spine = false,
                     _ => {
-                        let tag_name = if tag.starts_with("dc:") {
-                            &tag[3..]
-                        } else {
-                            tag.as_str()
-                        };
+                        let tag_name = tag.strip_prefix("dc:").unwrap_or(&tag);
                         if in_dc_tag && tag_name == current_dc_tag {
                             let val = current_text.trim().to_string();
                             if !val.is_empty() {

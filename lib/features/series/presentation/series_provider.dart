@@ -132,7 +132,9 @@ Future<SeriesDetail?> seriesDetail(Ref ref, String seriesId) async {
 
   final repository = ref.watch(bookRepositoryProvider);
   final bookIds = bookSeriesRows.map((r) => r.bookId).toList();
-  final books = await repository.getBooksByIds(bookIds);
+  final fetchedBooks = await repository.getBooksByIds(bookIds);
+  final byId = {for (final b in fetchedBooks) b.id: b};
+  final books = [for (final id in bookIds) if (byId[id] != null) byId[id]!];
 
   return SeriesDetail(
     id: s.id,

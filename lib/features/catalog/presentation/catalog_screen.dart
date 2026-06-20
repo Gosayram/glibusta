@@ -39,6 +39,7 @@ class CatalogScreen extends ConsumerStatefulWidget {
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Future<Map<String, bool>>? _downloadStatusFuture;
   List<Book> _lastBooks = const [];
+  String? _lastLoggedError;
 
   @override
   Widget build(BuildContext context) {
@@ -210,7 +211,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             itemBuilder: (context, index) {
               final category = categories[index];
               return Padding(
-                key: ValueKey(category),
+                key: ValueKey('$category-$index'),
                 padding: const EdgeInsets.only(right: 8),
                 child: ActionChip(
                   label: Text(category, style: const TextStyle(fontSize: 13)),
@@ -247,10 +248,14 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             future: _downloadStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                AppLogger().warning(
-                  '[Catalog] Failed to fetch download status: ${snapshot.error}',
-                  name: 'Catalog',
-                );
+                final errorStr = '${snapshot.error}';
+                if (errorStr != _lastLoggedError) {
+                  _lastLoggedError = errorStr;
+                  AppLogger().warning(
+                    '[Catalog] Failed to fetch download status: $errorStr',
+                    name: 'Catalog',
+                  );
+                }
                 return const SizedBox.shrink();
               }
               if (snapshot.connectionState == ConnectionState.waiting) {

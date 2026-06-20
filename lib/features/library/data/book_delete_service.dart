@@ -25,6 +25,8 @@ class BookDeleteService {
   }
 
   Future<void> deleteBookCompletely(String bookId) async {
+    String? targetPath;
+
     await _db.transaction(() async {
       final download = await (_db.select(
         _db.downloads,
@@ -39,38 +41,40 @@ class BookDeleteService {
       await (_db.delete(_db.bookCollections)..where((t) => t.bookId.equals(bookId))).go();
       await _db.bookDao.deleteBook(bookId);
 
-      if (download?.targetPath != null) {
-        try {
-          final file = File(download!.targetPath!);
-          if (await file.exists()) {
-            await file.delete();
-            _logger.info('Deleted file: ${download.targetPath}', name: 'BookDelete');
-          }
-        } on Object catch (e) {
-          _logger.warning('File deletion failed: $e', name: 'BookDelete', error: e);
-        }
-      }
-
-      try {
-        final cacheDir = await _storage.cacheDir();
-        final bookDir = Directory('${cacheDir.path}/$bookId');
-        if (await bookDir.exists()) {
-          await bookDir.delete(recursive: true);
-        }
-        final legacyCache = File('${cacheDir.path}/$bookId.json');
-        if (await legacyCache.exists()) {
-          await legacyCache.delete();
-        }
-        final coversDir = await _storage.coversDir();
-        final coverFile = File('${coversDir.path}/$bookId.jpg');
-        if (await coverFile.exists()) {
-          await coverFile.delete();
-        }
-      } on Object catch (e) {
-        _logger.warning('Cache cleanup failed for $bookId: $e', name: 'BookDelete', error: e);
-      }
+      targetPath = download?.targetPath;
 
       _logger.info('Deleted completely: $bookId', name: 'BookDelete');
     });
+
+    if (targetPath != null) {
+      try {
+        final file = File(targetPath!);
+        if (await file.exists()) {
+          await file.delete();
+          _logger.info('Deleted file: $targetPath', name: 'BookDelete');
+        }
+      } on Object catch (e) {
+        _logger.warning('File deletion failed: $e', name: 'BookDelete', error: e);
+      }
+    }
+
+    try {
+      final cacheDir = await _storage.cacheDir();
+      final bookDir = Directory('${cacheDir.path}/$bookId');
+      if (await bookDir.exists()) {
+        await bookDir.delete(recursive: true);
+      }
+      final legacyCache = File('${cacheDir.path}/$bookId.json');
+      if (await legacyCache.exists()) {
+        await legacyCache.delete();
+      }
+      final coversDir = await _storage.coversDir();
+      final coverFile = File('${coversDir.path}/$bookId.jpg');
+      if (await coverFile.exists()) {
+        await coverFile.delete();
+      }
+    } on Object catch (e) {
+      _logger.warning('Cache cleanup failed for $bookId: $e', name: 'BookDelete', error: e);
+    }
   }
 }

@@ -83,7 +83,8 @@ class ShareHandler {
                 st: st,
               );
               if (!context.mounted) return;
-              unawaited(SmartDialog.showToast('Не удалось импортировать: ${file.path}'));
+              final fileName = file.path.split(RegExp(r'[\\/]')).last;
+              unawaited(SmartDialog.showToast('Не удалось импортировать: $fileName'));
             }),
       );
     }

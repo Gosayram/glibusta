@@ -138,6 +138,10 @@ class _RetryInterceptor extends Interceptor {
 
   bool _shouldNotRetry(DioException err) {
     if (err.type == DioExceptionType.cancel) return true;
+    final method = err.requestOptions.method.toUpperCase();
+    final isSafeRetryMethod = method == 'GET' || method == 'HEAD' || method == 'OPTIONS';
+    final retryOptIn = err.requestOptions.extra['retryable'] == true;
+    if (!isSafeRetryMethod && !retryOptIn) return true;
     final status = err.response?.statusCode;
     if (status == 400 || status == 401 || status == 403 || status == 404 || status == 422) {
       return true;
