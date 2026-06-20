@@ -8,18 +8,23 @@ import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_comments_service.dart';
 import '../data/book_details_repository_impl.dart';
 
-final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
+final bookDetailsProvider = FutureProvider.autoDispose.family<BookDetails, String>((
+  ref,
+  bookId,
+) async {
   final repository = ref.watch(bookDetailsRepositoryProvider);
   return repository.getBookDetails(bookId);
 });
 
-final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((
-  ref,
-  bookId,
-) async {
-  final db = ref.watch(databaseProvider);
-  return db.bookDao.getReadingProgress(bookId);
-});
+final bookReadingProgressProvider = FutureProvider.autoDispose.family<ReadingProgressData?, String>(
+  (
+    ref,
+    bookId,
+  ) async {
+    final db = ref.watch(databaseProvider);
+    return db.bookDao.getReadingProgress(bookId);
+  },
+);
 
 final seriesForBookProvider = FutureProvider.autoDispose.family<List<Sery>, String>((
   ref,

@@ -112,85 +112,90 @@ final routerProvider = Provider<GoRouter>((ref) {
           return null;
         },
       ),
-      // Catalog (not a main tab, but within shell for nav)
-      ShellRoute(
-        builder: (BuildContext context, GoRouterState state, Widget child) {
-          return child;
-        },
-        routes: [
-          GoRoute(
-            path: '/catalog',
-            name: 'catalog',
-            builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
-          ),
-          GoRoute(
-            path: '/collections',
-            name: 'collections',
-            builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
-          ),
-          GoRoute(
-            path: '/annotations',
-            name: 'annotations',
-            builder: (BuildContext context, GoRouterState state) => const AnnotationsScreen(),
-          ),
-          GoRoute(
-            path: '/stats',
-            name: 'stats',
-            builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
-          ),
-          GoRoute(
-            path: '/series',
-            name: 'series',
-            builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
-          ),
-          GoRoute(
-            path: '/opds',
-            name: 'opds',
-            builder: (BuildContext context, GoRouterState state) => const OpdsCatalogScreen(),
-          ),
-          GoRoute(
-            path: '/settings/diagnostics',
-            name: 'diagnostics',
-            builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
-          ),
-          GoRoute(
-            path: '/settings/fonts',
-            name: 'fonts',
-            builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
-          ),
-          GoRoute(
-            path: '/settings/storage',
-            name: 'storage',
-            builder: (BuildContext context, GoRouterState state) => const StorageManagementScreen(),
-          ),
-          GoRoute(
-            path: '/settings/tags',
-            name: 'tags',
-            builder: (BuildContext context, GoRouterState state) => const TagManagementScreen(),
-          ),
-          GoRoute(
-            path: '/settings/reading-info',
-            name: 'reading-info',
-            builder: (BuildContext context, GoRouterState state) =>
-                const ReadingInfoSettingsScreen(),
-          ),
-          GoRoute(
-            path: '/settings/chapter-split-rules',
-            name: 'chapter-split-rules',
-            builder: (BuildContext context, GoRouterState state) => const ChapterSplitRulesScreen(),
-          ),
-          GoRoute(
-            path: '/404',
-            redirect: (_, state) => '/error',
-          ),
-          GoRoute(
-            path: '/error',
-            name: 'error',
-            builder: (BuildContext context, GoRouterState state) => _ErrorRoute(
-              message: state.uri.queryParameters['message'],
-            ),
-          ),
-        ],
+      // Full-screen routes (outside shell)
+      GoRoute(
+        path: '/catalog',
+        name: 'catalog',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
+      ),
+      GoRoute(
+        path: '/collections',
+        name: 'collections',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
+      ),
+      GoRoute(
+        path: '/annotations',
+        name: 'annotations',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const AnnotationsScreen(),
+      ),
+      GoRoute(
+        path: '/stats',
+        name: 'stats',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
+      ),
+      GoRoute(
+        path: '/series',
+        name: 'series',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
+      ),
+      GoRoute(
+        path: '/opds',
+        name: 'opds',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const OpdsCatalogScreen(),
+      ),
+      GoRoute(
+        path: '/settings/diagnostics',
+        name: 'diagnostics',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/fonts',
+        name: 'fonts',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
+      ),
+      GoRoute(
+        path: '/settings/storage',
+        name: 'storage',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const StorageManagementScreen(),
+      ),
+      GoRoute(
+        path: '/settings/tags',
+        name: 'tags',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const TagManagementScreen(),
+      ),
+      GoRoute(
+        path: '/settings/reading-info',
+        name: 'reading-info',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ReadingInfoSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/chapter-split-rules',
+        name: 'chapter-split-rules',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ChapterSplitRulesScreen(),
+      ),
+      GoRoute(
+        path: '/404',
+        redirect: (_, state) => '/error',
+      ),
+      GoRoute(
+        path: '/error',
+        name: 'error',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => _ErrorRoute(
+          message: state.uri.queryParameters['message'],
+        ),
       ),
       // Detail routes outside shell (full-screen)
       GoRoute(
