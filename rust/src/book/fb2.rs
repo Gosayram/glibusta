@@ -1,5 +1,6 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive;
+use crate::book::encoding::get_xml_attr;
 use anyhow::{Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
@@ -118,17 +119,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "strong" if in_p || in_subtitle => current_span_bold = true,
                     "emphasis" if in_p || in_subtitle => current_span_italic = true,
                     "a" if in_p => {
-                        if let Some(href) = e.attributes().find_map(|a| {
-                            a.ok().and_then(|attr| {
-                                if attr.key.as_ref() == b"href" {
-                                    std::str::from_utf8(attr.value.as_ref())
-                                        .ok()
-                                        .map(String::from)
-                                } else {
-                                    None
-                                }
-                            })
-                        }) {
+                        if let Some(href) = get_xml_attr(e, b"href") {
                             current_rich_spans.push(RichSpan {
                                 text: String::new(),
                                 bold: current_span_bold,
@@ -366,12 +357,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         }]
     };
 
-    let id = {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        format!("{:x}", hasher.finalize())
-    };
+    let id = crate::book::sha256_hex(bytes);
 
     Ok(NormalizedBook {
         id,

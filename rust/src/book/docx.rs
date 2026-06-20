@@ -1,8 +1,10 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive::{self, ZipFile};
+use crate::book::encoding::decode_bytes;
 use anyhow::{Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
@@ -17,12 +19,7 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
     let (blocks, chapter_title) = parse_document_xml(&doc_text);
 
-    let id = {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        format!("{:x}", hasher.finalize())
-    };
+    let id = crate::book::sha256_hex(bytes);
 
     let final_title = if title.is_empty() {
         chapter_title
@@ -55,15 +52,14 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     })
 }
 
-fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
-    if encoding_name.eq_ignore_ascii_case("utf-8") {
-        String::from_utf8_lossy(bytes).into_owned()
-    } else {
-        let (decoded, _, _) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(bytes);
-        decoded.into_owned()
-    }
+#[derive(Deserialize)]
+struct CoreProps {
+    #[serde(rename = "title", default)]
+    title: Option<String>,
+    #[serde(rename = "creator", default)]
+    creator: Vec<String>,
+    #[serde(rename = "created", default)]
+    created: Option<String>,
 }
 
 fn parse_core_properties(
@@ -75,77 +71,17 @@ fn parse_core_properties(
         .context("DOCX missing docProps/core.xml")?;
     let props_text = decode_bytes(props_bytes, encoding_name);
 
-    let mut reader = Reader::from_str(&props_text);
-    reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
+    let core: CoreProps =
+        quick_xml::de::from_str(&props_text).context("Failed to parse core.xml")?;
 
-    let mut title = String::new();
-    let mut authors: Vec<String> = Vec::new();
-    let mut created = String::new();
-
-    let mut in_title = false;
-    let mut in_creator = false;
-    let mut in_created = false;
-    let mut current_text = String::new();
-
-    loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Eof) => break,
-            Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                match tag.as_str() {
-                    "dc:title" => {
-                        in_title = true;
-                        current_text.clear();
-                    }
-                    "dc:creator" => {
-                        in_creator = true;
-                        current_text.clear();
-                    }
-                    "dcterms:created" => {
-                        in_created = true;
-                        current_text.clear();
-                    }
-                    _ => {}
-                }
-            }
-            Ok(Event::Text(ref e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
-                current_text.push_str(&text);
-            }
-            Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                match tag.as_str() {
-                    "dc:title" => {
-                        if in_title {
-                            title = current_text.trim().to_string();
-                            in_title = false;
-                            current_text.clear();
-                        }
-                    }
-                    "dc:creator" => {
-                        if in_creator {
-                            let name = current_text.trim().to_string();
-                            if !name.is_empty() {
-                                authors.push(name);
-                            }
-                            in_creator = false;
-                            current_text.clear();
-                        }
-                    }
-                    "dcterms:created" if in_created => {
-                        created = current_text.trim().to_string();
-                        in_created = false;
-                        current_text.clear();
-                    }
-                    _ => {}
-                }
-            }
-            Err(_) => break,
-            _ => {}
-        }
-    }
+    let title = core.title.unwrap_or_default();
+    let authors: Vec<String> = core
+        .creator
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let created = core.created.unwrap_or_default();
 
     Ok((title, authors, created))
 }

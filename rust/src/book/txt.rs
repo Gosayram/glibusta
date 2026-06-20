@@ -1,6 +1,5 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use anyhow::Result;
-use sha2::{Digest, Sha256};
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let encoding_name = forced_encoding.unwrap_or("utf-8");
@@ -24,11 +23,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         });
     }
 
-    let id = {
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        format!("{:x}", hasher.finalize())
-    };
+    let id = crate::book::sha256_hex(bytes);
 
     let title = extract_title_from_first_line(&blocks);
 

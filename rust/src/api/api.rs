@@ -1,6 +1,5 @@
 use crate::api::models::NormalizedBook;
 use anyhow::{Context, Result};
-use sha2::{Digest, Sha256};
 
 pub fn parse_fb2(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
     crate::book::fb2::parse_fb2(&bytes, forced_encoding.as_deref()).context("Failed to parse FB2")
@@ -48,11 +47,9 @@ pub fn detect_encoding(bytes: Vec<u8>) -> Result<String> {
 
 /// Compute SHA-256 hash of bytes (first `max_bytes` only for efficiency).
 pub fn sha256_hash(bytes: Vec<u8>, max_bytes: Option<usize>) -> Result<String> {
-    let mut hasher = Sha256::new();
     let limit = max_bytes.unwrap_or(bytes.len());
     let to_hash = &bytes[..bytes.len().min(limit)];
-    hasher.update(to_hash);
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(crate::book::sha256_hex(to_hash))
 }
 
 pub fn parse_book(

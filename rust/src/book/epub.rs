@@ -1,8 +1,10 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use crate::book::archive::{self, ZipFile};
+use crate::book::encoding::{decode_bytes, get_xml_attr};
 use anyhow::{Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
+use serde::Deserialize;
 use std::collections::HashMap;
 
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
@@ -77,12 +79,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         chapter_index += 1;
     }
 
-    let id = {
-        use sha2::{Digest, Sha256};
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        format!("{:x}", hasher.finalize())
-    };
+    let id = crate::book::sha256_hex(bytes);
 
     Ok(NormalizedBook {
         id,
@@ -95,49 +92,40 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     })
 }
 
-fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
-    if encoding_name.eq_ignore_ascii_case("utf-8") {
-        String::from_utf8_lossy(bytes).into_owned()
-    } else {
-        let (decoded, _, _) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(bytes);
-        decoded.into_owned()
-    }
-}
-
 struct ManifestItem {
     href: String,
     media_type: String,
     properties: Vec<String>,
 }
 
+#[derive(Deserialize)]
+struct Container {
+    #[serde(rename = "rootfiles", default)]
+    rootfiles: Rootfiles,
+}
+
+#[derive(Default, Deserialize)]
+struct Rootfiles {
+    #[serde(rename = "rootfile", default)]
+    rootfile: Vec<Rootfile>,
+}
+
+#[derive(Deserialize)]
+struct Rootfile {
+    #[serde(rename = "@full-path")]
+    full_path: String,
+}
+
 fn parse_container_xml(text: &str) -> Result<String> {
-    let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
-    let mut rootfile_path = None;
-
-    loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Eof) => break,
-            Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                if tag == "rootfile" {
-                    for attr in e.attributes().filter_map(|a| a.ok()) {
-                        if attr.key.as_ref() == b"full-path" {
-                            rootfile_path = Some(String::from_utf8_lossy(&attr.value).into_owned());
-                        }
-                    }
-                }
-            }
-            Err(e) => return Err(anyhow::anyhow!("Container XML error: {}", e)),
-            _ => {}
-        }
-    }
-
-    rootfile_path.context("No rootfile found in container.xml")
+    let container: Container =
+        quick_xml::de::from_str(text).context("Failed to parse container.xml")?;
+    container
+        .rootfiles
+        .rootfile
+        .into_iter()
+        .next()
+        .map(|r| r.full_path)
+        .context("No rootfile found in container.xml")
 }
 
 type OpfResult = (
@@ -181,24 +169,8 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                         }
                         if in_metadata && tag == "meta" {
                             // Handle <meta name="cover" content="cover-id"/>
-                            let name = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"name" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
-                            let content = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"content" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
+                            let name = get_xml_attr(e, b"name");
+                            let content = get_xml_attr(e, b"content");
                             if let (Some(n), Some(c)) = (name, content) {
                                 if n == "cover" {
                                     metadata.insert("cover-id".to_string(), c);
@@ -206,33 +178,9 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                             }
                         }
                         if in_manifest && tag == "item" {
-                            let id = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"id" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
-                            let href = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"href" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
-                            let media_type = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"media-type" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            });
+                            let id = get_xml_attr(e, b"id");
+                            let href = get_xml_attr(e, b"href");
+                            let media_type = get_xml_attr(e, b"media-type");
                             let properties: Vec<String> = e
                                 .attributes()
                                 .filter_map(|a| a.ok())
@@ -257,15 +205,7 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                             }
                         }
                         if in_spine && tag == "itemref" {
-                            if let Some(idref) = e.attributes().find_map(|a| {
-                                a.ok().and_then(|attr| {
-                                    if attr.key.as_ref() == b"idref" {
-                                        Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                    } else {
-                                        None
-                                    }
-                                })
-                            }) {
+                            if let Some(idref) = get_xml_attr(e, b"idref") {
                                 spine_ids.push(idref);
                             }
                         }
@@ -441,15 +381,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         block_index += 1;
                     }
                     "img" if in_body => {
-                        let src = e.attributes().find_map(|a| {
-                            a.ok().and_then(|attr| {
-                                if attr.key.as_ref() == b"src" {
-                                    Some(String::from_utf8_lossy(&attr.value).into_owned())
-                                } else {
-                                    None
-                                }
-                            })
-                        });
+                        let src = get_xml_attr(e, b"src");
                         blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
@@ -542,15 +474,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     });
                     block_index += 1;
                 } else if tag == "img" && in_body {
-                    let src = e.attributes().find_map(|a| {
-                        a.ok().and_then(|attr| {
-                            if attr.key.as_ref() == b"src" {
-                                Some(String::from_utf8_lossy(&attr.value).into_owned())
-                            } else {
-                                None
-                            }
-                        })
-                    });
+                    let src = get_xml_attr(e, b"src");
                     blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
