@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_settings.dart';
-import '../../../core/connectivity/offline_mode.dart';
+import '../../../core/connectivity/offline_mode.dart' show currentNetworkProvider;
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../reader/data/parsers/format_detector.dart';
@@ -376,11 +379,12 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     bool connectivityOk = true;
     String connectivityType = 'Неизвестно';
     try {
-      final service = ref.read(offlineModeServiceProvider);
-      connectivityType = service.state.kind.name;
+      final networkAsync = ref.read(currentNetworkProvider.future);
+      final network = await networkAsync;
+      connectivityType = network.kind.name;
       // Probe the actual server, not just network interface
       final settings = ref.read(appSettingsControllerProvider);
-      connectivityOk = await OfflineModeService.probeServer(settings.baseUrl);
+      connectivityOk = await _probeServer(settings.baseUrl);
       if (!connectivityOk) {
         connectivityType = 'Сервер недоступен';
       }
@@ -644,4 +648,48 @@ class DiagnosticsInfo {
     required this.paddingBottom,
     required this.viewInsetsBottom,
   });
+}
+
+Future<bool> _probeServer(
+  String baseUrl, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  String ua;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString('device_user_agent');
+    ua =
+        cached ??
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+  } on Object {
+    ua =
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
+  }
+  final dio = Dio(
+    BaseOptions(
+      connectTimeout: timeout,
+      receiveTimeout: timeout,
+      headers: {
+        'User-Agent': ua,
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+    ),
+  );
+  (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+    return HttpClient()..badCertificateCallback = kDebugMode ? (_, _, _) => true : null;
+  };
+  try {
+    final normalizedBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final response = await dio.head<dynamic>('$normalizedBase/opds/');
+    return response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 500;
+  } on Object catch (_) {
+    return false;
+  } finally {
+    dio.close(force: true);
+  }
 }

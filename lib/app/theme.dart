@@ -78,36 +78,6 @@ class AppTheme {
     blendOnLevel: 20,
   );
 
-  static final lightTheme = FlexThemeData.light(
-    keyColors: const FlexKeyColors(
-      useSecondary: true,
-      useTertiary: true,
-      useError: true,
-    ),
-    scheme: _scheme,
-    surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
-    blendLevel: 7,
-    subThemesData: _subThemesData,
-    visualDensity: FlexColorScheme.comfortablePlatformDensity,
-    swapLegacyOnMaterial3: true,
-    fontFamily: 'Inter',
-  );
-
-  static final darkTheme = FlexThemeData.dark(
-    keyColors: const FlexKeyColors(
-      useSecondary: true,
-      useTertiary: true,
-      useError: true,
-    ),
-    scheme: _scheme,
-    surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
-    blendLevel: 13,
-    subThemesData: _darkSubThemesData,
-    visualDensity: FlexColorScheme.comfortablePlatformDensity,
-    swapLegacyOnMaterial3: true,
-    fontFamily: 'Inter',
-  );
-
   static final readerDayTheme =
       FlexThemeData.light(
         scheme: _scheme,

@@ -211,13 +211,3 @@ final eventBusProvider = Provider<EventBus>((ref) {
   ref.onDispose(bus.dispose);
   return bus;
 });
-
-final eventHistoryProvider = Provider<List<AppEvent>>((ref) {
-  final bus = ref.watch(eventBusProvider);
-  return bus.history;
-});
-
-final lastEventProvider = Provider<AppEvent?>((ref) {
-  final bus = ref.watch(eventBusProvider);
-  return bus.lastEvent;
-});
