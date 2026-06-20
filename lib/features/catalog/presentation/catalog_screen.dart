@@ -13,6 +13,7 @@ import '../../../core/utils/app_breakpoints.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../data/catalog_repository_impl.dart';
 
 part 'catalog_screen.g.dart';
@@ -56,7 +57,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           ref.invalidate(categoriesProvider);
           ref.invalidate(popularBooksProvider);
         },
-        child: _RestorableListView(
+        child: RestorableListView(
           restorationId: 'catalog-scroll',
           children: [
             AnimatedSwitcher(
@@ -390,75 +391,6 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       }
     }
     return downloadedMap;
-  }
-}
-
-class _RestorableListView extends StatefulWidget {
-  final String restorationId;
-  final List<Widget> children;
-
-  const _RestorableListView({
-    required this.restorationId,
-    required this.children,
-  });
-
-  @override
-  State<_RestorableListView> createState() => _RestorableListViewState();
-}
-
-class _RestorableListViewState extends State<_RestorableListView> with RestorationMixin {
-  final RestorableDouble _offset = RestorableDouble(0);
-  ScrollController? _controller;
-
-  @override
-  String? get restorationId => widget.restorationId;
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
-    registerForRestoration(_offset, 'scroll_offset');
-  }
-
-  @override
-  void dispose() {
-    _controller?.removeListener(_saveOffset);
-    _controller?.dispose();
-    _offset.dispose();
-    super.dispose();
-  }
-
-  ScrollController _getController() {
-    if (_controller != null) return _controller!;
-    _controller = ScrollController(
-      initialScrollOffset: _offset.value,
-      keepScrollOffset: false,
-    )..addListener(_saveOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
-    return _controller!;
-  }
-
-  void _saveOffset() {
-    final controller = _controller;
-    if (controller == null || !controller.hasClients) return;
-    _offset.value = controller.position.pixels;
-  }
-
-  void _restoreOffset() {
-    final controller = _controller;
-    if (!mounted || controller == null || !controller.hasClients) return;
-    final maxOffset = controller.position.maxScrollExtent;
-    final offset = _offset.value.clamp(0.0, maxOffset);
-    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
-      controller.jumpTo(offset);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      controller: _getController(),
-      itemCount: widget.children.length,
-      itemBuilder: (context, index) => widget.children[index],
-    );
   }
 }
 

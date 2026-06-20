@@ -203,14 +203,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             key: state.pageKey,
             child: BookDetailsScreen(bookId: bookId),
             transitionsBuilder: (_, animation, second, child) {
-              final offset = Tween(
-                begin: const Offset(0.05, 0),
-                end: Offset.zero,
-              ).animate(animation);
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: offset, child: child),
-              );
+              return FadeTransition(opacity: animation, child: child);
             },
           );
         },
@@ -243,14 +236,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             key: state.pageKey,
             child: SeriesDetailScreen(seriesId: seriesId),
             transitionsBuilder: (_, animation, second, child) {
-              final offset = Tween(
-                begin: const Offset(0.05, 0),
-                end: Offset.zero,
-              ).animate(animation);
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: offset, child: child),
-              );
+              return FadeTransition(opacity: animation, child: child);
             },
           );
         },

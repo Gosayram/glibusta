@@ -22,6 +22,7 @@ import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
+import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../../reader/data/per_book_settings_service.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
@@ -535,7 +536,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
-    return _RestorableCustomScrollView(
+    return RestorableCustomScrollView(
       restorationId: 'library-books-scroll',
       slivers: [
         // Pinned section
@@ -805,72 +806,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ),
       );
     }
-  }
-}
-
-class _RestorableCustomScrollView extends StatefulWidget {
-  final String restorationId;
-  final List<Widget> slivers;
-
-  const _RestorableCustomScrollView({
-    required this.restorationId,
-    required this.slivers,
-  });
-
-  @override
-  State<_RestorableCustomScrollView> createState() => _RestorableCustomScrollViewState();
-}
-
-class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView>
-    with RestorationMixin {
-  final RestorableDouble _offset = RestorableDouble(0);
-  ScrollController? _controller;
-
-  @override
-  String? get restorationId => widget.restorationId;
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
-    registerForRestoration(_offset, 'scroll_offset');
-  }
-
-  @override
-  void dispose() {
-    _controller?.removeListener(_saveOffset);
-    _controller?.dispose();
-    _offset.dispose();
-    super.dispose();
-  }
-
-  ScrollController _getController() {
-    if (_controller != null) return _controller!;
-    _controller = ScrollController(
-      initialScrollOffset: _offset.value,
-      keepScrollOffset: false,
-    )..addListener(_saveOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
-    return _controller!;
-  }
-
-  void _saveOffset() {
-    final controller = _controller;
-    if (controller == null || !controller.hasClients) return;
-    _offset.value = controller.position.pixels;
-  }
-
-  void _restoreOffset() {
-    final controller = _controller;
-    if (!mounted || controller == null || !controller.hasClients) return;
-    final maxOffset = controller.position.maxScrollExtent;
-    final offset = _offset.value.clamp(0.0, maxOffset);
-    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
-      controller.jumpTo(offset);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomScrollView(controller: _getController(), slivers: widget.slivers);
   }
 }
 

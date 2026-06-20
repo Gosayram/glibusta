@@ -34,7 +34,7 @@ analyzer:
     use_setters_to_change_properties: ignore
     specify_nonobvious_property_types: ignore
     avoid_positional_boolean_parameters: ignore
-    avoid_slow_async_io: ignore
+    avoid_slow_async_io: true
     unnecessary_lambdas: ignore
     prefer_int_literals: ignore
     no_runtimetype_tostring: ignore
@@ -42,7 +42,7 @@ analyzer:
     omit_local_variable_types: ignore
     document_ignores: ignore
     unnecessary_ignore: ignore
-    avoid_dynamic_calls: ignore
+    avoid_dynamic_calls: true
     unnecessary_breaks: ignore
     unnecessary_raw_strings: ignore
     prefer_foreach: ignore

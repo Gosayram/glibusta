@@ -669,6 +669,23 @@ class ReaderController {
         curve: Curves.easeInOut,
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+      final actualMax = _scrollController!.position.maxScrollExtent;
+      if ((actualMax - maxScroll).abs() > 1) {
+        final clampedTarget = (bounded * actualMax).clamp(0.0, actualMax);
+        final currentOffset = _scrollController!.offset;
+        if ((currentOffset - clampedTarget).abs() > 1) {
+          unawaited(
+            _scrollController!.animateTo(
+              clampedTarget,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            ),
+          );
+        }
+      }
+    });
   }
 
   // ── Gestures ──────────────────────────────────────────
