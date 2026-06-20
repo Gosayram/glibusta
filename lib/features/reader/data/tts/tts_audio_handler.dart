@@ -70,6 +70,22 @@ class TtsAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
+  Future<void> seek(Duration position) async {
+    final duration = mediaItem.value?.duration;
+    if (duration == null || duration.inMilliseconds <= 0) return;
+
+    final clamped = position.isNegative
+        ? Duration.zero
+        : position > duration
+            ? duration
+            : position;
+
+    playbackState.add(
+      playbackState.value.copyWith(updatePosition: clamped),
+    );
+  }
+
+  @override
   Future<void> stop() async {
     await playbackState.firstWhere(
       (state) => state.processingState == AudioProcessingState.idle,

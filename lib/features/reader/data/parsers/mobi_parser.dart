@@ -370,13 +370,19 @@ final class MobiHtmlParser {
   static final _tagNameRe = RegExp(r'^<?/?([a-zA-Z][a-zA-Z0-9]*)');
   static final _entityRe = RegExp(r'&(amp|lt|gt|nbsp|quot|apos|#\d+|#x[0-9a-fA-F]+);');
   static final _wsRe = RegExp(r'[ \t]+');
+  static final _mbpRe = RegExp(r'<mbp:[^>]*>', caseSensitive: false);
+  static final _doctypeRe = RegExp(r'<!DOCTYPE[^>]*>', caseSensitive: false);
+  static final _htmlCommentRe = RegExp(r'<!--[\s\S]*?-->');
+  static final _piRe = RegExp(r'<\?[\s\S]*?\?>');
+  static final _hTagRe = RegExp(r'^<h[1-6]', caseSensitive: false);
+  static final _hrefRe = RegExp(r'href="([^"]*)"', caseSensitive: false);
 
   List<ReaderBlock> parse(String html) {
     final clean = html
-        .replaceAll(RegExp(r'<mbp:[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'<!DOCTYPE[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'<!--[\s\S]*?-->'), '')
-        .replaceAll(RegExp(r'<\?[\s\S]*?\?>'), '');
+        .replaceAll(_mbpRe, '')
+        .replaceAll(_doctypeRe, '')
+        .replaceAll(_htmlCommentRe, '')
+        .replaceAll(_piRe, '');
 
     final blockChunks = _splitIntoBlockChunks(clean);
     final blocks = <ReaderBlock>[];
@@ -523,7 +529,7 @@ final class MobiHtmlParser {
   }
 
   bool _isHeading(String lower) {
-    return RegExp(r'^<h[1-6]').firstMatch(lower) != null;
+    return _hTagRe.firstMatch(lower) != null;
   }
 
   bool _isBlockquote(String lower) => lower.startsWith('<blockquote');
@@ -583,7 +589,7 @@ final class MobiHtmlParser {
           } else if (name == 'sup') {
             superscript = true;
           } else if (name == 'a') {
-            final hrefMatch = RegExp(r'href="([^"]*)"').firstMatch(lower);
+            final hrefMatch = _hrefRe.firstMatch(lower);
             if (hrefMatch != null) href = hrefMatch.group(1);
           }
           i = tagEnd + 1;
@@ -874,7 +880,7 @@ final class MobiChapterSplitter {
   }
 
   String _cleanTitle(String raw) {
-    var title = raw.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    var title = raw.replaceAll(MobiHtmlParser._tagRe, '').trim();
     if (title.length > 80) title = '${title.substring(0, 80)}…';
     return title.isNotEmpty ? title : 'Без названия';
   }

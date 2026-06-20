@@ -9,9 +9,11 @@ class RawHttpFallbackClient {
   RawHttpFallbackClient({String? userAgent}) : _userAgent = userAgent;
 
   final String? _userAgent;
+  HttpClient? _client;
 
-  Future<String> get(Uri uri) async {
-    final client = HttpClient()
+  HttpClient get _getClient {
+    if (_client != null) return _client!;
+    _client = HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpIdle
       ..maxConnectionsPerHost = 1
@@ -20,56 +22,50 @@ class RawHttpFallbackClient {
           'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
               'AppleWebKit/537.36 (KHTML, like Gecko) '
               'Chrome/131.0.6778.81 Mobile Safari/537.36';
+    return _client!;
+  }
 
-    try {
-      final request = await client.getUrl(uri);
+  void dispose() {
+    _client?.close(force: true);
+    _client = null;
+  }
 
-      request.headers
-        ..set(
-          HttpHeaders.acceptHeader,
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        )
-        ..set(HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
-        ..set(HttpHeaders.acceptEncodingHeader, 'identity')
-        ..set(HttpHeaders.connectionHeader, 'close');
+  Future<String> get(Uri uri) async {
+    final client = _getClient;
 
-      final response = await request.close().timeout(
-        AppDuration.httpReceive,
-      );
+    final request = await client.getUrl(uri);
 
-      final bytes = await _consolidateResponse(response);
-      return utf8.decode(bytes, allowMalformed: true);
-    } finally {
-      client.close(force: true);
-    }
+    request.headers
+      ..set(
+        HttpHeaders.acceptHeader,
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      )
+      ..set(HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
+      ..set(HttpHeaders.acceptEncodingHeader, 'identity')
+      ..set(HttpHeaders.connectionHeader, 'close');
+
+    final response = await request.close().timeout(
+      AppDuration.httpReceive,
+    );
+
+    final bytes = await _consolidateResponse(response);
+    return utf8.decode(bytes, allowMalformed: true);
   }
 
   Future<Uint8List> getBytes(Uri uri) async {
-    final client = HttpClient()
-      ..connectionTimeout = AppDuration.httpConnect
-      ..idleTimeout = AppDuration.httpIdle
-      ..maxConnectionsPerHost = 1
-      ..userAgent =
-          _userAgent ??
-          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-              'AppleWebKit/537.36 (KHTML, like Gecko) '
-              'Chrome/131.0.6778.81 Mobile Safari/537.36';
+    final client = _getClient;
 
-    try {
-      final request = await client.getUrl(uri);
+    final request = await client.getUrl(uri);
 
-      request.headers
-        ..set(HttpHeaders.acceptHeader, '*/*')
-        ..set(HttpHeaders.connectionHeader, 'close');
+    request.headers
+      ..set(HttpHeaders.acceptHeader, '*/*')
+      ..set(HttpHeaders.connectionHeader, 'close');
 
-      final response = await request.close().timeout(
-        AppDuration.httpReceive,
-      );
+    final response = await request.close().timeout(
+      AppDuration.httpReceive,
+    );
 
-      return await _consolidateResponse(response);
-    } finally {
-      client.close(force: true);
-    }
+    return _consolidateResponse(response);
   }
 
   static Future<Uint8List> _consolidateResponse(

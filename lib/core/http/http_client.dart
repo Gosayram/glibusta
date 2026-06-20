@@ -157,6 +157,7 @@ class HttpClient {
     String savePath, {
     void Function(int received, int total)? onProgress,
     Future<void>? onCancel,
+    int startBytes = 0,
   }) async {
     final uri = Uri.parse(url);
     final client = io.HttpClient()
@@ -168,6 +169,10 @@ class HttpClient {
       request.headers
         ..set(io.HttpHeaders.acceptHeader, '*/*')
         ..set(io.HttpHeaders.connectionHeader, 'close');
+
+      if (startBytes > 0) {
+        request.headers.set(io.HttpHeaders.rangeHeader, 'bytes=$startBytes-');
+      }
 
       if (_sessionCookies.isNotEmpty) {
         final cookieHeader = _sessionCookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
@@ -192,7 +197,7 @@ class HttpClient {
       }
 
       final file = io.File(savePath);
-      final sink = file.openWrite();
+      final sink = file.openWrite(mode: startBytes > 0 ? io.FileMode.append : io.FileMode.write);
       var cancelled = false;
       if (onCancel != null) {
         unawaited(
@@ -219,11 +224,6 @@ class HttpClient {
         await sink.close();
 
         if (cancelled) {
-          try {
-            if (await file.exists()) await file.delete();
-          } on Object {
-            // Best-effort: ignore file deletion errors
-          }
           throw HttpException(message: 'Cancelled', url: url);
         }
 
@@ -240,8 +240,13 @@ class HttpClient {
             throw HttpException(message: 'Server returned HTML instead of book file', url: url);
           }
         }
-      } on Object {
+      } on Object catch (_) {
         await sink.close().catchError((_) {});
+        try {
+          if (await file.exists()) await file.delete();
+        } on Object {
+          // Best-effort: ignore file deletion errors
+        }
         rethrow;
       }
     } finally {

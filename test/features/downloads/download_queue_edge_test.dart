@@ -147,7 +147,7 @@ void main() {
   });
 
   group('download failure', () {
-    test('marks task as failed on error', () async {
+    test('marks task as failed after retries on error', () async {
       const task = DownloadTask(
         id: 'fail-1',
         bookId: 'b1',
@@ -180,7 +180,8 @@ void main() {
         sourceUrl: 'https://example.com/b1.epub',
       );
 
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      // Retry delays: 1s + 2s + 4s = 7s, plus margin
+      await Future<void>.delayed(const Duration(seconds: 8));
       verify(() => mockNotificationService.showFailed(any(), any())).called(1);
       queue.dispose();
     });

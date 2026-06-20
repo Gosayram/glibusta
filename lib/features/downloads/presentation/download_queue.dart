@@ -37,9 +37,12 @@ class DownloadQueue {
   final Map<String, _SpeedTracker> _speedTrackers = {};
   final Map<String, Completer<void>> _cancelCompleters = {};
   final Set<String> _cancelledIds = {};
+  final Map<String, int> _retryAttempts = {};
   List<DownloadTask> _latestTasks = [];
   int _maxConcurrent = 3;
   int _runningCount = 0;
+  bool _disposed = false;
+  static const int maxRetryAttempts = 3;
 
   DownloadQueue(
     this._repository,
@@ -157,6 +160,7 @@ class DownloadQueue {
 
     _tasks[taskId] = canceled;
     _speedTrackers.remove(taskId);
+    _retryAttempts.remove(taskId);
     _pendingQueue.removeWhere((t) => t.id == taskId);
     await _notificationService.cancel(taskId);
     await _repository.cancelDownload(taskId);
@@ -166,6 +170,7 @@ class DownloadQueue {
   Future<void> remove(String taskId) async {
     _tasks.remove(taskId);
     _speedTrackers.remove(taskId);
+    _retryAttempts.remove(taskId);
     _pendingQueue.removeWhere((t) => t.id == taskId);
     await _notificationService.cancel(taskId);
     await _repository.removeDownload(taskId);
@@ -256,10 +261,39 @@ class DownloadQueue {
       );
       _tasks[task.id] = completed;
       _speedTrackers.remove(task.id);
+      _retryAttempts.remove(task.id);
       await _repository.updateStatus(task.id, DownloadStatus.completed);
       await _notificationService.showCompleted(completed);
     } on Object {
       final isCancelled = _cancelledIds.contains(task.id);
+      if (!isCancelled) {
+        final attempts = _retryAttempts[task.id] ?? 0;
+        if (attempts < maxRetryAttempts && !_disposed) {
+          _retryAttempts[task.id] = attempts + 1;
+          final delayMs = 1000 * (1 << attempts); // 1s, 2s, 4s
+          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          if (_cancelledIds.contains(task.id) || _disposed) {
+            _retryAttempts.remove(task.id);
+          } else {
+            final retried = DownloadTask(
+              id: task.id,
+              bookId: task.bookId,
+              bookTitle: task.bookTitle,
+              format: task.format,
+              sourceUrl: task.sourceUrl,
+              targetPath: task.targetPath,
+              status: DownloadStatus.queued,
+              downloadedBytes: task.downloadedBytes,
+              totalBytes: task.totalBytes,
+            );
+            _tasks[task.id] = retried;
+            _pendingQueue.add(retried);
+            _emitUpdate();
+            return; // don't process as failed
+          }
+        }
+      }
+      _retryAttempts.remove(task.id);
       final status = isCancelled ? DownloadStatus.canceled : DownloadStatus.failed;
       final failed = DownloadTask(
         id: task.id,
@@ -290,11 +324,13 @@ class DownloadQueue {
   }
 
   void _emitUpdate() {
+    if (_disposed) return;
     _latestTasks = _tasks.values.toList();
     _downloadsController.add(_latestTasks);
   }
 
   void dispose() {
+    _disposed = true;
     for (final entry in _cancelCompleters.entries) {
       if (!entry.value.isCompleted) {
         _cancelledIds.add(entry.key);

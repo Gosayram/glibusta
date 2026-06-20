@@ -39,6 +39,7 @@ class BookImportService {
   BookImportService(this._database, this._storage, this._coverService);
 
   final _registry = BookParserRegistry.defaultInstance;
+  final Map<String, Completer<void>> _importLocks = {};
 
   static String generateAuthorId(String name) {
     final normalized = name.trim().toLowerCase();
@@ -70,11 +71,22 @@ class BookImportService {
       );
     }
 
-    if (inspection.decision == ImportDecision.importAsDocument) {
-      return _doDocumentImport(inspection);
+    final normalizedPath = inspection.path.replaceAll(r'\', '/');
+    final existingLock = _importLocks[normalizedPath];
+    if (existingLock != null) {
+      await existingLock.future;
     }
-
-    return _doImport(inspection.path, forcedEncoding: inspection.encoding);
+    final lock = Completer<void>();
+    _importLocks[normalizedPath] = lock;
+    try {
+      if (inspection.decision == ImportDecision.importAsDocument) {
+        return _doDocumentImport(inspection);
+      }
+      return _doImport(inspection.path, forcedEncoding: inspection.encoding);
+    } finally {
+      lock.complete();
+      _importLocks.remove(normalizedPath);
+    }
   }
 
   /// Import a file by path (runs full inspection + import).
@@ -95,18 +107,30 @@ class BookImportService {
     if (isBookFileTooLarge(format, size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
-    if (const FormatCapabilityService().isDocumentOnly(format)) {
-      return _doDocumentImport(
-        BookFileInspectionResult(
-          path: filePath,
-          format: format,
-          decision: ImportDecision.importAsDocument,
-          hash: '',
-          fileSize: size,
-        ),
-      );
+    final normalizedPath = filePath.replaceAll(r'\', '/');
+    final existingLock = _importLocks[normalizedPath];
+    if (existingLock != null) {
+      await existingLock.future;
     }
-    return _doImport(filePath);
+    final lock = Completer<void>();
+    _importLocks[normalizedPath] = lock;
+    try {
+      if (const FormatCapabilityService().isDocumentOnly(format)) {
+        return _doDocumentImport(
+          BookFileInspectionResult(
+            path: filePath,
+            format: format,
+            decision: ImportDecision.importAsDocument,
+            hash: '',
+            fileSize: size,
+          ),
+        );
+      }
+      return _doImport(filePath);
+    } finally {
+      lock.complete();
+      _importLocks.remove(normalizedPath);
+    }
   }
 
   Future<ImportResult> _doImport(String filePath, {String? forcedEncoding}) async {

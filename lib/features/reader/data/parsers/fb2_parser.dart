@@ -166,7 +166,7 @@ class Fb2Parser implements BookParser {
     );
   }
 
-  Map<String, dynamic> _parseDescription(XmlDocument document) {
+  static Map<String, dynamic> _parseDescription(XmlDocument document) {
     final result = <String, dynamic>{};
 
     final titleInfo = document.findAllElements('title-info');
@@ -209,7 +209,7 @@ class Fb2Parser implements BookParser {
     return result;
   }
 
-  List<ReaderChapter> _parseBody(XmlDocument document) {
+  static List<ReaderChapter> _parseBody(XmlDocument document) {
     final chapters = <ReaderChapter>[];
     int chapterIndex = 0;
 
@@ -230,7 +230,7 @@ class Fb2Parser implements BookParser {
     return chapters;
   }
 
-  List<ReaderBlock> _parseSection(XmlElement element, int chapterIndex) {
+  static List<ReaderBlock> _parseSection(XmlElement element, int chapterIndex) {
     final blocks = <ReaderBlock>[];
     int blockIndex = 0;
 
@@ -302,59 +302,8 @@ NormalizedBook parseFb2FromText(String text, {String? fileName}) {
   final safeXml = Fb2Parser._stripDtdEntities(sanitized);
   final document = XmlDocument.parse(safeXml);
 
-  final description = <String, dynamic>{};
-  final titleInfo = document.findAllElements('title-info');
-  if (titleInfo.isNotEmpty) {
-    final title = titleInfo.first.findAllElements('book-title');
-    if (title.isNotEmpty) {
-      description['title'] = title.first.innerText;
-    }
-
-    final authors = <String>[];
-    for (final author in titleInfo.first.findAllElements('author')) {
-      final firstName = author.findAllElements('first-name');
-      final lastName = author.findAllElements('last-name');
-      if (firstName.isNotEmpty && lastName.isNotEmpty) {
-        authors.add('${firstName.first.innerText} ${lastName.first.innerText}');
-      }
-    }
-    description['authors'] = authors;
-
-    final annotation = titleInfo.first.findAllElements('annotation');
-    if (annotation.isNotEmpty) {
-      description['annotation'] = annotation.first.innerText;
-    }
-
-    final genres = <String>[];
-    for (final genre in titleInfo.first.findAllElements('genre')) {
-      genres.add(genre.innerText);
-    }
-    description['genres'] = genres;
-  }
-
-  final documentInfo = document.findAllElements('document-info');
-  if (documentInfo.isNotEmpty) {
-    final id = documentInfo.first.findAllElements('id');
-    if (id.isNotEmpty) {
-      description['id'] = id.first.innerText;
-    }
-  }
-
-  final chapters = <ReaderChapter>[];
-  int chapterIndex = 0;
-  final bodies = document.findAllElements('body');
-  for (final body in bodies) {
-    final blocks = _parseFb2Section(body, chapterIndex);
-    if (blocks.isNotEmpty) {
-      chapters.add(
-        ReaderChapter(
-          index: chapterIndex++,
-          title: 'Chapter $chapterIndex',
-          blocks: blocks,
-        ),
-      );
-    }
-  }
+  final description = Fb2Parser._parseDescription(document);
+  final chapters = Fb2Parser._parseBody(document);
 
   return NormalizedBook(
     id: description['id'] as String? ?? fileName ?? 'unknown',
@@ -370,48 +319,4 @@ NormalizedBook parseFb2FromText(String text, {String? fileName}) {
       'genres': description['genres'],
     },
   );
-}
-
-List<ReaderBlock> _parseFb2Section(XmlElement element, int chapterIndex) {
-  final blocks = <ReaderBlock>[];
-  int blockIndex = 0;
-
-  for (final child in element.childElements) {
-    switch (child.name.local) {
-      case 'p':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text));
-        }
-        break;
-      case 'subtitle':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text, type: BlockType.heading));
-        }
-        break;
-      case 'image':
-        final href =
-            child.getAttribute('l:href') ??
-            child.getAttribute('href') ??
-            child.getAttribute('xlink:href');
-        if (href != null) {
-          blocks.add(
-            ReaderBlock(index: blockIndex++, text: '', type: BlockType.image, imageUrl: href),
-          );
-        }
-        break;
-      case 'cite':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text, type: BlockType.quote));
-        }
-        break;
-      case 'section':
-        blocks.addAll(_parseFb2Section(child, chapterIndex));
-        break;
-    }
-  }
-
-  return blocks;
 }
