@@ -7,12 +7,11 @@ pub(crate) fn get_xml_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<String> {
 }
 
 pub(crate) fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
-    if encoding_name.eq_ignore_ascii_case("utf-8") {
-        String::from_utf8_lossy(bytes).into_owned()
+    let encoding = if encoding_name.eq_ignore_ascii_case("utf-8") {
+        encoding_rs::UTF_8
     } else {
-        let (decoded, _, _) = Encoding::for_label(encoding_name.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(bytes);
-        decoded.into_owned()
-    }
+        Encoding::for_label(encoding_name.as_bytes()).unwrap_or(encoding_rs::UTF_8)
+    };
+    let (decoded, _) = encoding.decode_without_bom_handling(bytes);
+    decoded.into_owned()
 }

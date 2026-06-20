@@ -15,15 +15,13 @@ pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         bytes.to_vec()
     };
 
-    let encoding_name = forced_encoding.unwrap_or_else(|| detect_fb2_encoding(&raw_bytes));
-    let xml_text = if encoding_name.eq_ignore_ascii_case("utf-8") {
-        String::from_utf8_lossy(&raw_bytes).into_owned()
-    } else {
-        let (decoded, _, _) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
-            .unwrap_or(encoding_rs::UTF_8)
-            .decode(&raw_bytes);
-        decoded.into_owned()
-    };
+    let encoding_name = forced_encoding
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| detect_fb2_encoding(&raw_bytes));
+    let encoding =
+        encoding_rs::Encoding::for_label(encoding_name.as_bytes()).unwrap_or(encoding_rs::UTF_8);
+    let (xml_text, _) = encoding.decode_without_bom_handling(&raw_bytes);
+    let xml_text = xml_text.into_owned();
 
     parse_fb2_xml(&xml_text, &raw_bytes)
 }
@@ -131,7 +129,36 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                let text = e.decode().unwrap_or_default().to_string();
+                if in_book_title && title.is_empty() {
+                    title = text.clone();
+                } else if in_first_name || in_middle_name || in_last_name {
+                    current_author_parts.push(text.clone());
+                } else if in_genre {
+                    genres.push(text.clone());
+                } else if in_annotation {
+                    description = Some(description.take().unwrap_or_default() + &text);
+                } else if in_binary {
+                    current_text.push_str(&text);
+                } else if in_p && in_body {
+                    if let Some(last) = current_rich_spans.last_mut() {
+                        if last.text.is_empty() && last.href.is_some() {
+                            last.text = text.clone();
+                        } else {
+                            current_span_text.push_str(&text);
+                        }
+                    } else {
+                        current_span_text.push_str(&text);
+                    }
+                } else if in_body
+                    && ((in_subtitle || in_epigraph || in_text_author)
+                        || (!in_section && !in_image && !in_empty_line))
+                {
+                    current_text.push_str(&text);
+                }
+            }
+            Ok(Event::GeneralRef(ref e)) => {
+                let text = e.decode().unwrap_or_default().to_string();
                 if in_book_title && title.is_empty() {
                     title = text.clone();
                 } else if in_first_name || in_middle_name || in_last_name {
@@ -407,24 +434,30 @@ fn find_fb2_in_zip(zip: &archive::ZipFile) -> Option<&[u8]> {
         .and_then(|name| zip.find_file(name))
 }
 
-fn detect_fb2_encoding(bytes: &[u8]) -> &str {
-    let head_len = bytes.len().min(500);
-    let head = &bytes[..head_len];
-    // Search for encoding in XML declaration: <?xml ... encoding="..."?>
-    if let Some(pos) = memchr::memchr(b'<', head) {
-        let region_len = (head_len - pos).min(200);
-        let region = std::str::from_utf8(&head[pos..pos + region_len]).unwrap_or("");
-        if let Some(enc_start) = region.find("encoding=\"") {
-            let start = pos + enc_start + 10;
-            if let Some(enc_end_pos) = region[enc_start + 10..].find('"') {
-                let end = start + enc_end_pos;
-                if end <= head_len {
-                    if let Ok(enc) = std::str::from_utf8(&bytes[start..end]) {
-                        return enc;
+fn detect_fb2_encoding(bytes: &[u8]) -> String {
+    if bytes.starts_with(b"\xef\xbb\xbf") {
+        return "utf-8".to_string();
+    }
+    if bytes.starts_with(b"\xff\xfe") {
+        return "utf-16le".to_string();
+    }
+    if bytes.starts_with(b"\xfe\xff") {
+        return "utf-16be".to_string();
+    }
+    let snippet = &bytes[..bytes.len().min(200)];
+    if let Some(pos) = snippet.windows(15).position(|w| w == b"encoding=") {
+        let after = &snippet[pos + 10..];
+        if let Some(q) = after.first() {
+            if *q == b'"' || *q == b'\'' {
+                let quote = *q;
+                if let Some(end) = after[1..].iter().position(|&b| b == quote) {
+                    let label = std::str::from_utf8(&after[1..1 + end]).unwrap_or("utf-8");
+                    if encoding_rs::Encoding::for_label_no_replacement(label.as_bytes()).is_some() {
+                        return label.to_lowercase();
                     }
                 }
             }
         }
     }
-    "utf-8"
+    "utf-8".to_string()
 }

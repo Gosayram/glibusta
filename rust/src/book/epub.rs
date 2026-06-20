@@ -139,6 +139,7 @@ type OpfResult = (
 fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
+    reader.config_mut().allow_dangling_amp = true;
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut manifest_items: HashMap<String, ManifestItem> = HashMap::new();
     let mut spine_ids: Vec<String> = Vec::new();
@@ -213,10 +214,16 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
             }
             Ok(Event::Text(ref e)) => {
                 if in_dc_tag {
-                    current_text.push_str(&e.unescape().unwrap_or_default());
+                    current_text.push_str(&e.decode().unwrap_or_default());
                 }
             }
             Ok(Event::CData(ref e)) => {
+                let text = e.decode().unwrap_or_default();
+                if in_dc_tag {
+                    current_text.push_str(&text);
+                }
+            }
+            Ok(Event::GeneralRef(ref e)) => {
                 let text = e.decode().unwrap_or_default();
                 if in_dc_tag {
                     current_text.push_str(&text);
@@ -316,6 +323,7 @@ fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {
 fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>, i32) {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
+    reader.config_mut().allow_dangling_amp = true;
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut current_text = String::new();
     let mut in_body = false;
@@ -388,11 +396,17 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
             }
             Ok(Event::Text(ref e)) => {
                 if in_body {
-                    let text = e.unescape().unwrap_or_default().to_string();
+                    let text = e.decode().unwrap_or_default();
                     current_text.push_str(&text);
                 }
             }
             Ok(Event::CData(ref e)) => {
+                if in_body {
+                    let text = e.decode().unwrap_or_default();
+                    current_text.push_str(&text);
+                }
+            }
+            Ok(Event::GeneralRef(ref e)) => {
                 if in_body {
                     let text = e.decode().unwrap_or_default();
                     current_text.push_str(&text);
@@ -523,6 +537,7 @@ fn flush_block(
 fn extract_chapter_title(text: &str) -> String {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
+    reader.config_mut().allow_dangling_amp = true;
     let mut in_title = false;
     let mut title = String::new();
 
@@ -538,7 +553,12 @@ fn extract_chapter_title(text: &str) -> String {
             }
             Ok(Event::Text(ref e)) => {
                 if in_title {
-                    title.push_str(&e.unescape().unwrap_or_default());
+                    title.push_str(&e.decode().unwrap_or_default());
+                }
+            }
+            Ok(Event::GeneralRef(ref e)) => {
+                if in_title {
+                    title.push_str(&e.decode().unwrap_or_default());
                 }
             }
             Ok(Event::End(ref e)) => {

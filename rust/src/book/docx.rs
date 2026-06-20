@@ -165,7 +165,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::Text(ref e)) => {
-                let text = e.unescape().unwrap_or_default().to_string();
+                let text = e.decode().unwrap_or_default().to_string();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
                 } else if in_pstyle {
@@ -173,6 +173,14 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::CData(ref e)) => {
+                let text = e.decode().unwrap_or_default();
+                if in_run && in_paragraph {
+                    current_span_text.push_str(&text);
+                } else if in_pstyle {
+                    pstyle_val.push_str(&text);
+                }
+            }
+            Ok(Event::GeneralRef(ref e)) => {
                 let text = e.decode().unwrap_or_default();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
