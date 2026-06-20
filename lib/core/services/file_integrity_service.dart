@@ -166,5 +166,7 @@ class FileIntegrityService {
 // --- Riverpod providers ---
 
 final fileIntegrityServiceProvider = Provider<FileIntegrityService>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'fileIntegrityServiceProvider must be overridden at startup with a configured FileIntegrityService instance.',
+  );
 });

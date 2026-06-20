@@ -210,7 +210,12 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 });
 
 final flutterSecureStorageProvider = Provider<FlutterSecureStorage>(
-  (ref) => const FlutterSecureStorage(),
+  (ref) => const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  ),
 );
 
 @riverpod

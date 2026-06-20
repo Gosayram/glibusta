@@ -175,5 +175,7 @@ class QuoteExportService {
 // --- Riverpod providers ---
 
 final quoteExportServiceProvider = Provider<QuoteExportService>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'quoteExportServiceProvider must be overridden at startup with a configured QuoteExportService instance.',
+  );
 });

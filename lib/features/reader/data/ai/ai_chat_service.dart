@@ -209,5 +209,7 @@ final aiChatServiceProvider = Provider<AiChatService>((ref) {
 });
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('sharedPreferencesProvider must be overridden at startup.');
+  throw StateError(
+    'sharedPreferencesProvider must be overridden at startup with a SharedPreferences instance.',
+  );
 });

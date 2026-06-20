@@ -220,5 +220,7 @@ class SyncService {
 }
 
 final syncServiceProvider = Provider<SyncService>((ref) {
-  throw UnimplementedError('syncServiceProvider must be overridden at startup.');
+  throw StateError(
+    'syncServiceProvider must be overridden at startup with a configured SyncService instance.',
+  );
 });

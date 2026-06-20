@@ -11,6 +11,19 @@ part 'per_book_settings_dao.g.dart';
 class PerBookSettingsDao extends DatabaseAccessor<AppDatabase> with _$PerBookSettingsDaoMixin {
   PerBookSettingsDao(super.attachedDatabase);
 
+  Stream<Map<String, dynamic>?> watchForBook(String bookId) {
+    return (select(
+      perBookSettings,
+    )..where((t) => t.bookId.equals(bookId))).watchSingleOrNull().map((row) {
+      if (row == null) return null;
+      try {
+        return jsonDecode(row.settingsJson) as Map<String, dynamic>;
+      } on Object catch (_) {
+        return null;
+      }
+    });
+  }
+
   Future<Map<String, dynamic>?> getSettings(String bookId) async {
     final row = await (select(
       perBookSettings,

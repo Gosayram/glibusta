@@ -16,10 +16,10 @@ class CbrParser implements BookParser {
     String? fileName,
     String? forcedEncoding,
   }) {
-    throw UnimplementedError(
+    throw UnsupportedError(
       'CBR (RAR) format is not supported yet. '
       'The archive package v4.x does not include RAR decoder. '
-      'Use CBZ (ZIP) format instead, or wait for RAR support.',
+      'Use CBZ (ZIP) format instead.',
     );
   }
 
@@ -28,10 +28,10 @@ class CbrParser implements BookParser {
     String filePath, {
     String? forcedEncoding,
   }) {
-    throw UnimplementedError(
+    throw UnsupportedError(
       'CBR (RAR) format is not supported yet. '
       'The archive package v4.x does not include RAR decoder. '
-      'Use CBZ (ZIP) format instead, or wait for RAR support.',
+      'Use CBZ (ZIP) format instead.',
     );
   }
 

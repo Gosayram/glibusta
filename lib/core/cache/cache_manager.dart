@@ -229,7 +229,9 @@ class CacheManager {
 // --- Riverpod providers ---
 
 final cacheManagerProvider = Provider<CacheManager>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'cacheManagerProvider must be overridden at startup with a configured CacheManager instance.',
+  );
 });
 
 final cacheSizeProvider = Provider<int>((ref) {

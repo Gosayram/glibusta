@@ -199,5 +199,7 @@ class BackgroundIndexer {
 // --- Riverpod providers ---
 
 final backgroundIndexerProvider = Provider<BackgroundIndexer>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'backgroundIndexerProvider must be overridden at startup with a configured BackgroundIndexer instance.',
+  );
 });

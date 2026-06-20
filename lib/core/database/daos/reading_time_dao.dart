@@ -71,6 +71,25 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
     return dailySeconds;
   }
 
+  Stream<List<ReadingTimeRow>> watchAll() {
+    final query = readingTime.readingTimeSeconds;
+    return (selectOnly(readingTime)
+          ..addColumns([readingTime.bookId, query.sum()])
+          ..groupBy([readingTime.bookId])
+          ..orderBy([OrderingTerm.desc(query.sum())]))
+        .watch()
+        .map(
+          (rows) => rows
+              .map(
+                (row) => ReadingTimeRow(
+                  bookId: row.read(readingTime.bookId)!,
+                  totalSeconds: row.read(query.sum()) ?? 0,
+                ),
+              )
+              .toList(),
+        );
+  }
+
   Future<List<ReadingTimeRow>> getTopBooksByReadingTime({int limit = 10}) async {
     final query = readingTime.readingTimeSeconds;
     final results =

@@ -103,7 +103,9 @@ class FeatureFlagService {
 }
 
 final featureFlagServiceProvider = Provider<FeatureFlagService>((ref) {
-  throw UnimplementedError('Override in main with SharedPreferences instance');
+  throw StateError(
+    'featureFlagServiceProvider must be overridden at startup with a SharedPreferences-backed instance.',
+  );
 });
 
 final featureFlagsProvider = Provider<Map<FeatureFlag, bool>>((ref) {

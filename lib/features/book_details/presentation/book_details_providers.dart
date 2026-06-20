@@ -46,20 +46,20 @@ final chaptersForBookProvider = FutureProvider.autoDispose.family<NormalizedBook
   }
 });
 
-final bookmarksForBookProvider = FutureProvider.autoDispose.family<List<Bookmark>, String>((
+final bookmarksForBookProvider = StreamProvider.autoDispose.family<List<Bookmark>, String>((
   ref,
   bookId,
-) async {
+) {
   final db = ref.watch(databaseProvider);
-  return db.bookmarkDao.getBookmarksForBook(bookId);
+  return db.bookmarkDao.watchBookmarksForBook(bookId);
 });
 
-final quotesForBookProvider = FutureProvider.autoDispose.family<List<Quote>, String>((
+final quotesForBookProvider = StreamProvider.autoDispose.family<List<Quote>, String>((
   ref,
   bookId,
-) async {
+) {
   final db = ref.watch(databaseProvider);
-  return db.bookmarkDao.getQuotesForBook(bookId);
+  return db.bookmarkDao.watchQuotesForBook(bookId);
 });
 
 final commentsForBookProvider = FutureProvider.autoDispose.family<List<BookComment>, String>((

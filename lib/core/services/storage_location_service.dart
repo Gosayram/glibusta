@@ -98,5 +98,7 @@ class StorageLocationService {
 }
 
 final storageLocationServiceProvider = Provider<StorageLocationService>((ref) {
-  throw UnimplementedError('storageLocationServiceProvider must be overridden at startup.');
+  throw StateError(
+    'storageLocationServiceProvider must be overridden at startup with a configured StorageLocationService instance.',
+  );
 });
