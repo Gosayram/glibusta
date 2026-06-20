@@ -16,16 +16,13 @@ wildcards = "allow"
 allow = [
     "MIT",
     "Apache-2.0",
-    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "Zlib",
     "BSL-1.0",
     "0BSD",
     "MPL-2.0",
-    "OpenSSL",
     "CC0-1.0",
 ]
 

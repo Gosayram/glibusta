@@ -12,6 +12,7 @@ import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
 import '../features/library/data/book_import_service.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -156,6 +157,8 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
           themeMode: themeMode,
           routerConfig: router,
           restorationScopeId: 'app',
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) {
             final wrappedChild = _GlobalKeyboardShortcuts(
               key: const Key('global-keyboard-shortcuts'),

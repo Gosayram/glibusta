@@ -6,5 +6,8 @@
   "libraryTitle": "Library",
   "downloadsTitle": "Downloads",
   "readerTitle": "Reader",
-  "settingsTitle": "Settings"
+  "settingsTitle": "Settings",
+  "collectionsTitle": "Collections",
+  "annotationsTitle": "Annotations",
+  "statisticsTitle": "Statistics"
 }

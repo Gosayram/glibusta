@@ -9,12 +9,10 @@ import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/bookmarks/presentation/bookmarks_screen.dart';
 import '../features/catalog/presentation/author_detail_screen.dart';
-import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
 import '../features/catalog/presentation/genre_list_screen.dart';
 import '../features/catalog/presentation/opds_catalog_screen.dart';
 import '../features/catalog/presentation/recent_books_screen.dart';
-import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notes/presentation/notes_screen.dart';
@@ -22,7 +20,6 @@ import '../features/quotes/presentation/quotes_screen.dart';
 import '../features/reader/presentation/chapter_split_rules_screen.dart';
 import '../features/reader/presentation/reader_entry_screen.dart';
 import '../features/reader/presentation/reading_info_settings_screen.dart';
-import '../features/reading_stats/presentation/reading_stats_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/series/presentation/series_detail_screen.dart';
 import '../features/series/presentation/series_screen.dart';
@@ -32,6 +29,7 @@ import '../features/settings/presentation/settings_screen.dart';
 import '../features/settings/presentation/storage_management_screen.dart';
 import '../features/settings/presentation/tag_management_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
+import 'routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -112,31 +110,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return null;
         },
       ),
-      // Full-screen routes (outside shell)
-      GoRoute(
-        path: '/catalog',
-        name: 'catalog',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
-      ),
-      GoRoute(
-        path: '/collections',
-        name: 'collections',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
-      ),
-      GoRoute(
-        path: '/annotations',
-        name: 'annotations',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const AnnotationsScreen(),
-      ),
-      GoRoute(
-        path: '/stats',
-        name: 'stats',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
-      ),
+      // Full-screen routes (outside shell) — typed routes
+      ...$appRoutes,
       GoRoute(
         path: '/series',
         name: 'series',

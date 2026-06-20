@@ -6,5 +6,8 @@
   "libraryTitle": "Библиотека",
   "downloadsTitle": "Загрузки",
   "readerTitle": "Читалка",
-  "settingsTitle": "Настройки"
+  "settingsTitle": "Настройки",
+  "collectionsTitle": "Коллекции",
+  "annotationsTitle": "Аннотации",
+  "statisticsTitle": "Статистика"
 }

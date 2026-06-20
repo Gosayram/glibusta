@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+part 'feature_flags.g.dart';
 
 class FeatureFlag {
   const FeatureFlag({
@@ -108,12 +111,14 @@ final featureFlagServiceProvider = Provider<FeatureFlagService>((ref) {
   );
 });
 
-final featureFlagsProvider = Provider<Map<FeatureFlag, bool>>((ref) {
+@riverpod
+Map<FeatureFlag, bool> featureFlags(Ref ref) {
   final service = ref.watch(featureFlagServiceProvider);
   return service.getAllFlags();
-});
+}
 
-final isFlagEnabledProvider = Provider.family<bool, FeatureFlag>((ref, flag) {
+@riverpod
+bool isFlagEnabled(Ref ref, FeatureFlag flag) {
   final service = ref.watch(featureFlagServiceProvider);
   return service.isEnabled(flag);
-});
+}

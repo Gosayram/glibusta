@@ -1,16 +1,19 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../logging/app_logger.dart';
 import '../services/sync_service.dart';
 
-final lifecycleServiceProvider = Provider<LifecycleService>((ref) {
+part 'lifecycle_service.g.dart';
+
+@riverpod
+LifecycleService lifecycleService(Ref ref) {
   final service = LifecycleService(ref);
   service._setupAutoSync(ref);
   return service;
-});
+}
 
 class LifecycleService {
   final Ref ref;

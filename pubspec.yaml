@@ -25,6 +25,8 @@ dependencies:
   html: ^0.15.1
 
   # Localization
+  flutter_localizations:
+    sdk: flutter
   intl: ^0.20.2
 
   # Local database
@@ -96,16 +98,16 @@ dev_dependencies:
   build_runner: ^2.15.0
   drift_dev: ^2.34.0
   mocktail: ^1.0.4
+  go_router_builder: ^4.3.0
   integration_test:
     sdk: flutter
 
 flutter:
+  generate: true
   uses-material-design: true
 
   assets:
     - .env
-    - lib/l10n/app_ru.arb
-    - lib/l10n/app_en.arb
 
   fonts:
     - family: Inter
