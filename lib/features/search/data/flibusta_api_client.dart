@@ -915,7 +915,10 @@ class FlibustaApiClient {
 
   // ── Recommendations ─────────────────────────────────────────────────────────
 
-  Future<RecommendationsResponse> getRecommendations({String? userId, CancelToken? cancelToken}) async {
+  Future<RecommendationsResponse> getRecommendations({
+    String? userId,
+    CancelToken? cancelToken,
+  }) async {
     final url = userId != null ? 'rec?view=recs&user=$userId' : 'rec';
     final response = await _getText(url, cancelToken: cancelToken);
     return _parseRecommendationsResponse(response);

@@ -77,8 +77,8 @@ class TtsAudioHandler extends BaseAudioHandler with SeekHandler {
     final clamped = position.isNegative
         ? Duration.zero
         : position > duration
-            ? duration
-            : position;
+        ? duration
+        : position;
 
     playbackState.add(
       playbackState.value.copyWith(updatePosition: clamped),

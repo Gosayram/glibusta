@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/recent_books_provider.dart';
 
 class RecentBooksScreen extends ConsumerWidget {
@@ -16,7 +17,7 @@ class RecentBooksScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Недавно добавленные')),
       body: asyncBooks.when(
-        data: (response) {
+        data: (RecentBooksResponse response) {
           if (response.books.isEmpty) {
             return Center(
               child: Column(

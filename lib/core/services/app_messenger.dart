@@ -1,9 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
-import '../theme/app_colors.dart';
 import '../theme/app_duration.dart';
 
 abstract interface class AppMessenger {
@@ -14,26 +12,26 @@ abstract interface class AppMessenger {
 }
 
 class ScaffoldMessengerService implements AppMessenger {
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey;
-
-  ScaffoldMessengerService(this._scaffoldMessengerKey);
-
-  ScaffoldMessengerState? get _messenger => _scaffoldMessengerKey.currentState;
+  ScaffoldMessengerService();
 
   @override
   void showSuccess(String message) {
-    unawaited(SmartDialog.showToast(
-      message,
-      displayDuration: AppDuration.snackbarShort,
-    ));
+    unawaited(
+      SmartDialog.showToast(
+        message,
+        displayTime: AppDuration.snackbarShort,
+      ),
+    );
   }
 
   @override
   void showError(String message) {
-    unawaited(SmartDialog.showToast(
-      message,
-      displayDuration: AppDuration.snackbarNormal,
-    ));
+    unawaited(
+      SmartDialog.showToast(
+        message,
+        displayTime: AppDuration.snackbarNormal,
+      ),
+    );
   }
 
   @override

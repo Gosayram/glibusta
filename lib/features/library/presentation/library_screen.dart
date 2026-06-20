@@ -277,13 +277,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importFromInspection(inspection),
           );
       if (context.mounted) {
-        unawaited(SmartDialog.showToast(
-          importResult.isSuccess
-              ? 'Импортировано: ${importResult.title}'
-              : importResult.needsEncodingSelection
-              ? 'Нужен выбор кодировки'
-              : 'Ошибка: ${importResult.error}',
-        ));
+        unawaited(
+          SmartDialog.showToast(
+            importResult.isSuccess
+                ? 'Импортировано: ${importResult.title}'
+                : importResult.needsEncodingSelection
+                ? 'Нужен выбор кодировки'
+                : 'Ошибка: ${importResult.error}',
+          ),
+        );
       }
       ref.invalidate(libraryBooksProvider);
     } on Object catch (e) {
@@ -795,11 +797,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     ref.invalidate(libraryBooksProvider);
     if (context.mounted) {
-      unawaited(SmartDialog.showToast(
-        result.deleteFile
-            ? '«${book.title}» удалена с диска'
-            : '«${book.title}» удалена из списка',
-      ));
+      unawaited(
+        SmartDialog.showToast(
+          result.deleteFile
+              ? '«${book.title}» удалена с диска'
+              : '«${book.title}» удалена из списка',
+        ),
+      );
     }
   }
 }

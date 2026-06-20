@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/genre_providers.dart';
 
 class GenreBooksScreen extends ConsumerWidget {
@@ -19,7 +20,7 @@ class GenreBooksScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(asyncBooks.value?.name ?? 'Жанр')),
       body: asyncBooks.when(
-        data: (response) {
+        data: (GenreBooksResponse response) {
           if (response.books.isEmpty) {
             return Center(
               child: Column(

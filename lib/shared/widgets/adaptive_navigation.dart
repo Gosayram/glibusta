@@ -303,7 +303,9 @@ class MacOSShell extends ConsumerWidget {
         .where((p) => importableExtensions.any((ext) => p.toLowerCase().endsWith('.$ext')))
         .toList();
     if (bookPaths.isEmpty) {
-      unawaited(SmartDialog.showToast('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'));
+      unawaited(
+        SmartDialog.showToast('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
+      );
       return;
     }
     final importService = ref.read(bookImportServiceProvider);

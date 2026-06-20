@@ -362,12 +362,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!context.mounted) return;
 
       if (importResult.success) {
-        unawaited(SmartDialog.showToast(
-          'Импортировано: ${importResult.progressImported} прогрессов, '
-          '${importResult.bookmarksImported} закладок, '
-          '${importResult.notesImported} заметок, '
-          '${importResult.quotesImported} цитат',
-        ));
+        unawaited(
+          SmartDialog.showToast(
+            'Импортировано: ${importResult.progressImported} прогрессов, '
+            '${importResult.bookmarksImported} закладок, '
+            '${importResult.notesImported} заметок, '
+            '${importResult.quotesImported} цитат',
+          ),
+        );
       } else {
         unawaited(SmartDialog.showToast('Ошибка: ${importResult.error}'));
       }

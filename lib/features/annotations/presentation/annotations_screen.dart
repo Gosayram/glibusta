@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -276,9 +278,6 @@ class _QuoteList extends ConsumerWidget {
             final repo = ref.read(_quoteRepoProvider);
             await repo.deleteQuote(quote.id);
             unawaited(SmartDialog.showToast('Цитата удалена'));
-            return true;
-          },
-            );
             return true;
           },
           child: ListTile(

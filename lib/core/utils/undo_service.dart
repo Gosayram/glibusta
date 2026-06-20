@@ -93,7 +93,7 @@ class UndoHelper {
     required Future<void> Function() onUndo,
     Duration duration = const Duration(seconds: 4),
   }) {
-    unawaited(SmartDialog.showToast(message, displayDuration: duration));
+    unawaited(SmartDialog.showToast(message, displayTime: duration));
   }
 }
 

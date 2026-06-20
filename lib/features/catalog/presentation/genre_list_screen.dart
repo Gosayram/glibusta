@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../shared/widgets/app_animations.dart';
+import '../../search/data/flibusta_models.dart';
 
 import '../data/genre_providers.dart';
 
@@ -65,10 +66,12 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
         ),
       ),
       body: asyncList.when(
-        data: (response) {
+        data: (GenreListResponse response) {
           final genres = _filter.isEmpty
               ? response.genres
-              : response.genres.where((g) => g.name.toLowerCase().contains(_filter)).toList();
+              : response.genres
+                    .where((SearchGenreItem g) => g.name.toLowerCase().contains(_filter))
+                    .toList();
 
           if (genres.isEmpty) {
             return Center(

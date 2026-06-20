@@ -517,21 +517,23 @@ class ReaderController {
     }
     if (_scrollController == null) return;
     _evictDistantChapters(position.chapterIndex);
-    unawaited(_ensureChaptersLoaded(position.chapterIndex).then((_) {
-      if (_disposed || _scrollController == null) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
-        final maxScroll = _scrollController!.position.maxScrollExtent;
-        if (maxScroll <= 0) return;
-        unawaited(
-          _scrollController!.animateTo(
-            (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          ),
-        );
-      });
-    }));
+    unawaited(
+      _ensureChaptersLoaded(position.chapterIndex).then((_) {
+        if (_disposed || _scrollController == null) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+          final maxScroll = _scrollController!.position.maxScrollExtent;
+          if (maxScroll <= 0) return;
+          unawaited(
+            _scrollController!.animateTo(
+              (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+            ),
+          );
+        });
+      }),
+    );
   }
 
   void saveProgress() {

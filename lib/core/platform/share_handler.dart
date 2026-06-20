@@ -65,13 +65,15 @@ class ShareHandler {
             .importFile(file.path)
             .then((result) {
               if (!context.mounted) return;
-              unawaited(SmartDialog.showToast(
-                result.isSuccess
-                    ? 'Импортировано: ${result.title}'
-                    : result.isDuplicate
-                    ? 'Дубликат: ${result.title}'
-                    : 'Ошибка: ${result.error}',
-              ));
+              unawaited(
+                SmartDialog.showToast(
+                  result.isSuccess
+                      ? 'Импортировано: ${result.title}'
+                      : result.isDuplicate
+                      ? 'Дубликат: ${result.title}'
+                      : 'Ошибка: ${result.error}',
+                ),
+              );
             })
             .catchError((Object e, StackTrace st) {
               _logger.warning(

@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
-import '../../search/data/flibusta_api_client.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/author_detail_provider.dart';
 
 class AuthorDetailScreen extends ConsumerWidget {
@@ -19,7 +19,7 @@ class AuthorDetailScreen extends ConsumerWidget {
     final asyncDetail = ref.watch(authorDetailProvider(authorId));
     return Scaffold(
       body: asyncDetail.when(
-        data: (detail) {
+        data: (AuthorDetailResponse detail) {
           if (detail.books.isEmpty && detail.seriesGroups.isEmpty) {
             return CustomScrollView(
               slivers: [
@@ -324,7 +324,7 @@ class _SeriesHeader extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 4,
-              children: series.genres.map<Widget>((g) {
+              children: series.genres.map<Widget>((AuthorGenreItem g) {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
