@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_duration.dart';
@@ -111,9 +112,7 @@ class ReaderErrorPanel extends StatelessWidget {
                             onPressed: () async {
                               await controller.clearCacheAndReload();
                               if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Кеш очищен')),
-                              );
+                              unawaited(SmartDialog.showToast('Кеш очищен'));
                             },
                             icon: const Icon(Icons.cleaning_services_outlined),
                             label: const Text('Очистить кеш'),
@@ -121,9 +120,7 @@ class ReaderErrorPanel extends StatelessWidget {
                         OutlinedButton.icon(
                           onPressed: () {
                             controller.copyDiagnostics();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Диагностика скопирована')),
-                            );
+                            unawaited(SmartDialog.showToast('Диагностика скопирована'));
                           },
                           icon: const Icon(Icons.copy),
                           label: const Text('Копировать диагностику'),

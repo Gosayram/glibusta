@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/services/opds_service.dart';
 
@@ -184,9 +185,7 @@ class _OpdsCatalogScreenState extends ConsumerState<OpdsCatalogScreen> {
                 ? IconButton(
                     icon: const Icon(Icons.download),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Загрузка: ${entry.title}')),
-                      );
+                      unawaited(SmartDialog.showToast('Загрузка: ${entry.title}'));
                     },
                   )
                 : null,

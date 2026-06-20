@@ -4,9 +4,9 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../../core/theme/app_duration.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -62,12 +62,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 if (_selectedText != null) {
                   await Clipboard.setData(ClipboardData(text: _selectedText!));
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Текст скопирован'),
-                        duration: AppDuration.snackbarShort,
-                      ),
-                    );
+                    unawaited(SmartDialog.showToast('Текст скопирован'));
                   }
                 }
                 widget.onDismiss();
@@ -109,12 +104,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
           ),
         );
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Закладка добавлена'),
-          duration: AppDuration.snackbarShort,
-        ),
-      );
+      unawaited(SmartDialog.showToast('Закладка добавлена'));
     }
     widget.onDismiss();
   }
@@ -185,12 +175,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
             ),
           );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Заметка сохранена'),
-            duration: AppDuration.snackbarShort,
-          ),
-        );
+        unawaited(SmartDialog.showToast('Заметка сохранена'));
       }
     }
     widget.onDismiss();
@@ -265,12 +250,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
             ),
           );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Цитата сохранена'),
-            duration: AppDuration.snackbarShort,
-          ),
-        );
+        unawaited(SmartDialog.showToast('Цитата сохранена'));
       }
     }
     widget.onDismiss();

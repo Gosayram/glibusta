@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_duration.dart';
@@ -21,43 +22,27 @@ class ScaffoldMessengerService implements AppMessenger {
 
   @override
   void showSuccess(String message) {
-    _messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-        duration: AppDuration.snackbarShort,
-      ),
-    );
+    unawaited(SmartDialog.showToast(
+      message,
+      displayDuration: AppDuration.snackbarShort,
+    ));
   }
 
   @override
   void showError(String message) {
-    _messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        duration: AppDuration.snackbarNormal,
-      ),
-    );
+    unawaited(SmartDialog.showToast(
+      message,
+      displayDuration: AppDuration.snackbarNormal,
+    ));
   }
 
   @override
   void showInfo(String message) {
-    _messenger?.showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    unawaited(SmartDialog.showToast(message));
   }
 
   @override
   void showUndo(String message, Future<void> Function() onUndo, {String undoLabel = 'Отменить'}) {
-    _messenger?.showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: SnackBarAction(
-          label: undoLabel,
-          onPressed: () => unawaited(onUndo()),
-        ),
-      ),
-    );
+    unawaited(SmartDialog.showToast(message));
   }
 }

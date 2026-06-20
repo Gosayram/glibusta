@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
@@ -156,24 +157,8 @@ class _BookmarkList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             final repo = ref.read(_bookmarkRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
             await repo.deleteBookmark(bookmark.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Закладка удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertBookmark(bookmark);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
-              ),
-            );
+            unawaited(SmartDialog.showToast('Закладка удалена'));
             return true;
           },
           child: ListTile(
@@ -230,24 +215,8 @@ class _NoteList extends ConsumerWidget {
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
             final repo = ref.read(_noteRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
             await repo.deleteNote(note.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Заметка удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertNote(note);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
-              ),
-            );
+            unawaited(SmartDialog.showToast('Заметка удалена'));
             return true;
           },
           child: ListTile(
@@ -305,23 +274,10 @@ class _QuoteList extends ConsumerWidget {
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
             final repo = ref.read(_quoteRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
             await repo.deleteQuote(quote.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Цитата удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertQuote(quote);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
-              ),
+            unawaited(SmartDialog.showToast('Цитата удалена'));
+            return true;
+          },
             );
             return true;
           },

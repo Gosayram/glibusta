@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
@@ -302,11 +303,7 @@ class MacOSShell extends ConsumerWidget {
         .where((p) => importableExtensions.any((ext) => p.toLowerCase().endsWith('.$ext')))
         .toList();
     if (bookPaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
-        ),
-      );
+      unawaited(SmartDialog.showToast('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'));
       return;
     }
     final importService = ref.read(bookImportServiceProvider);
@@ -319,7 +316,7 @@ class MacOSShell extends ConsumerWidget {
               : result.isDuplicate
               ? 'Дубликат: ${result.title}'
               : 'Ошибка: ${result.error}';
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          unawaited(SmartDialog.showToast(msg));
         }),
       );
     }

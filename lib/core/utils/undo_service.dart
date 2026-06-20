@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class UndoAction {
   const UndoAction({
@@ -92,23 +93,7 @@ class UndoHelper {
     required Future<void> Function() onUndo,
     Duration duration = const Duration(seconds: 4),
   }) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: duration,
-        action: SnackBarAction(
-          label: 'Отменить',
-          onPressed: () async {
-            await onUndo();
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Действие отменено')),
-              );
-            }
-          },
-        ),
-      ),
-    );
+    unawaited(SmartDialog.showToast(message, displayDuration: duration));
   }
 }
 

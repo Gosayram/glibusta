@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -549,36 +551,26 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     } on Object catch (_) {
       await Clipboard.setData(ClipboardData(text: report));
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Отчёт скопирован')),
-      );
+      unawaited(SmartDialog.showToast('Отчёт скопирован'));
       return;
     }
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Отчёт отправлен')),
-    );
+    unawaited(SmartDialog.showToast('Отчёт отправлен'));
   }
 
   Future<void> _clearLog(BuildContext context, WidgetRef ref) async {
     final logger = ref.read(appLoggerProvider);
     await logger.clearPersistentLog();
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Лог очищен')),
-    );
+    unawaited(SmartDialog.showToast('Лог очищен'));
   }
 
   Future<void> _runDiagnostics(BuildContext context, WidgetRef ref) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Проверка...')),
-    );
+    unawaited(SmartDialog.showToast('Проверка...'));
     // Re-trigger by rebuilding - the FutureBuilder will re-run
     await Future<void>.delayed(const Duration(milliseconds: 500));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Проверка завершена')),
-    );
+    unawaited(SmartDialog.showToast('Проверка завершена'));
   }
 }
 

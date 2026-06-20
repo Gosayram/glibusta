@@ -13,6 +13,12 @@ class AppBootstrap {
 
   static Future<void> init() async {
     await dotenv.load();
+    if (!dotenv.isEveryDefined(['BASE_URL'])) {
+      throw StateError(
+        'Required environment variable BASE_URL is not defined. '
+        'Check your .env file.',
+      );
+    }
     unawaited(pdfrxFlutterInitialize());
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/services/catalog_cover_cache_service.dart';
@@ -144,9 +147,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final (count, bytes) = await cleanup.cleanupTempFiles(tempDir);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Удалено $count файлов (${formatBytes(bytes)})')),
-      );
+      unawaited(SmartDialog.showToast('Удалено $count файлов (${formatBytes(bytes)})'));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -161,9 +162,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final count = await cleanup.cleanupCacheFiles(cacheDir);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Очищено $count файлов кеша')),
-      );
+      unawaited(SmartDialog.showToast('Очищено $count файлов кеша'));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -179,9 +178,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final orphans = await cleanup.findOrphanFiles(booksDir);
       if (!mounted) return;
       if (orphans.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Сиротские файлы не найдены')),
-        );
+        unawaited(SmartDialog.showToast('Сиротские файлы не найдены'));
       } else {
         await showDialog<void>(
           context: context,
@@ -221,9 +218,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final heavy = await cleanup.findHeavyBooks();
       if (!mounted) return;
       if (heavy.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Тяжёлых книг не найдено')),
-        );
+        unawaited(SmartDialog.showToast('Тяжёлых книг не найдено'));
       } else {
         await showDialog<void>(
           context: context,
@@ -258,9 +253,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cacheService = ref.read(catalogCoverCacheServiceProvider);
       await cacheService.clearAll();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Кеш обложек каталога очищен')),
-      );
+      unawaited(SmartDialog.showToast('Кеш обложек каталога очищен'));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -273,9 +266,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cacheService = ref.read(catalogCoverCacheServiceProvider);
       await cacheService.clearExpired();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Устаревшие обложки удалены')),
-      );
+      unawaited(SmartDialog.showToast('Устаревшие обложки удалены'));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);

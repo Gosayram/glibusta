@@ -20,6 +20,12 @@ class CoverExtractionService {
 
   CoverExtractionService(this._storage);
 
+  static final Map<String, Archive> _archiveCache = {};
+  static const int _maxCacheEntries = 3;
+
+  static Archive? getCachedArchive(String key) => _archiveCache[key];
+  static void evictArchive(String key) => _archiveCache.remove(key);
+
   /// Extract cover from book file and save normalized to covers dir.
   /// [coverBytes] can be provided by the parser (e.g. MOBI) to skip
   /// redundant extraction from the file.
@@ -37,7 +43,7 @@ class CoverExtractionService {
         final fileBytes = await File(filePath).readAsBytes();
         final fmt = formatFromDbString(format);
         extracted = switch (fmt) {
-          BookFormat.epub => _extractEpubCover(fileBytes),
+          BookFormat.epub => _extractEpubCover(fileBytes, cacheKey: bookId),
           BookFormat.fb2 => _extractFb2Cover(fileBytes),
           BookFormat.cbz || BookFormat.cbr => _extractComicCover(fileBytes),
           _ => null,
@@ -57,9 +63,20 @@ class CoverExtractionService {
   }
 
   /// Extract cover bytes from EPUB file.
-  Uint8List? _extractEpubCover(Uint8List bytes) {
+  Uint8List? _extractEpubCover(Uint8List bytes, {String? cacheKey}) {
     try {
-      final archive = ZipDecoder().decodeBytes(bytes);
+      Archive archive;
+      if (cacheKey != null && _archiveCache.containsKey(cacheKey)) {
+        archive = _archiveCache[cacheKey]!;
+      } else {
+        archive = ZipDecoder().decodeBytes(bytes);
+        if (cacheKey != null) {
+          if (_archiveCache.length >= _maxCacheEntries) {
+            _archiveCache.remove(_archiveCache.keys.first);
+          }
+          _archiveCache[cacheKey] = archive;
+        }
+      }
 
       // Find cover from metadata
       final opfFile = _findOpfFile(archive);

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -174,18 +175,7 @@ class QuotesScreen extends ConsumerWidget {
     final repository = QuoteRepository(database);
     await repository.deleteQuote(quote.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Цитата удалена'),
-        action: SnackBarAction(
-          label: 'Отмена',
-          onPressed: () {
-            unawaited(repository.insertQuote(quote));
-          },
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    unawaited(SmartDialog.showToast('Цитата удалена'));
   }
 }
 

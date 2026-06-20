@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../data/chapter_split_rule.dart';
 import '../data/chapter_split_service.dart';
@@ -126,9 +127,7 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
     setState(() {
       _testResult = rule;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Pattern "${rule.name}" matches ${matches.length} lines')),
-    );
+    unawaited(SmartDialog.showToast('Pattern "${rule.name}" matches ${matches.length} lines'));
   }
 
   void _showAddRuleDialog(BuildContext context) {

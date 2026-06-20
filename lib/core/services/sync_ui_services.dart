@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../core/services/sync_service.dart';
 
@@ -283,9 +284,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
     if (mounted) {
       setState(() => _isBackingUp = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Backup создан успешно')),
-      );
+      unawaited(SmartDialog.showToast('Backup создан успешно'));
     }
   }
 
@@ -311,9 +310,7 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     await Future<void>.delayed(const Duration(seconds: 2));
     if (mounted) {
       setState(() => _isRestoring = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Данные восстановлены')),
-      );
+      unawaited(SmartDialog.showToast('Данные восстановлены'));
     }
   }
 }

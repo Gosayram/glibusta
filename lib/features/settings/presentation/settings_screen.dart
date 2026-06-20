@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
@@ -310,14 +311,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Данные экспортированы')),
-      );
+      unawaited(SmartDialog.showToast('Данные экспортированы'));
     } on Exception catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка экспорта: $e')),
-      );
+      unawaited(SmartDialog.showToast('Ошибка экспорта: $e'));
     }
   }
 
@@ -365,26 +362,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!context.mounted) return;
 
       if (importResult.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Импортировано: ${importResult.progressImported} прогрессов, '
-              '${importResult.bookmarksImported} закладок, '
-              '${importResult.notesImported} заметок, '
-              '${importResult.quotesImported} цитат',
-            ),
-          ),
-        );
+        unawaited(SmartDialog.showToast(
+          'Импортировано: ${importResult.progressImported} прогрессов, '
+          '${importResult.bookmarksImported} закладок, '
+          '${importResult.notesImported} заметок, '
+          '${importResult.quotesImported} цитат',
+        ));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: ${importResult.error}')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка: ${importResult.error}'));
       }
     } on Object catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка импорта: $e')),
-      );
+      unawaited(SmartDialog.showToast('Ошибка импорта: $e'));
     }
   }
 
@@ -634,15 +623,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _pickFolder(BuildContext context, WidgetRef ref, StorageMode mode) async {
     final folder = ref.read(externalFolderProvider);
     if (folder.uri != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Текущая папка: ${folder.name ?? folder.uri}'),
-          action: SnackBarAction(
-            label: 'Выбрать другую',
-            onPressed: () => _doPickFolder(context, ref, mode),
-          ),
-        ),
-      );
+      unawaited(SmartDialog.showToast('Текущая папка: ${folder.name ?? folder.uri}'));
     } else {
       await _doPickFolder(context, ref, mode);
     }
@@ -654,9 +635,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final uri = await bridge.pickFolder();
       if (uri == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Выбор папки отменён')),
-          );
+          unawaited(SmartDialog.showToast('Выбор папки отменён'));
         }
         return;
       }
@@ -667,15 +646,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await ref.read(externalFolderProvider.notifier).updateFolder(uri: uri, name: name);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Найдено книг: ${scanned.length}')),
-        );
+        unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
       }
     } on Object catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка: $e'));
       }
     }
   }
@@ -766,9 +741,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (!uris.contains(uri)) uris.add(uri);
                         });
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Найдено книг: ${scanned.length}')),
-                          );
+                          unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
                         }
                       }
                     },

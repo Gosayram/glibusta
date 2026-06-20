@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
@@ -246,9 +247,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           final svc = ref.read(bookDeleteServiceProvider);
           await svc.removeFromLibrary(widget.bookId);
           if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Удалено из библиотеки')),
-          );
+          unawaited(SmartDialog.showToast('Удалено из библиотеки'));
           if (context.mounted) Navigator.of(context).pop();
         },
       );
@@ -671,9 +670,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 Navigator.of(dialogContext).pop();
                 await _ctrl.deleteBookFile();
                 if (rootContext.mounted) {
-                  ScaffoldMessenger.of(rootContext).showSnackBar(
-                    const SnackBar(content: Text('Файл удалён')),
-                  );
+                  unawaited(SmartDialog.showToast('Файл удалён'));
                 }
                 if (rootContext.mounted && Navigator.of(rootContext).canPop()) {
                   Navigator.of(rootContext).pop();

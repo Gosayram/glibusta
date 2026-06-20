@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/stats_export_service.dart';
@@ -176,9 +179,7 @@ class ReadingStatsScreen extends ConsumerWidget {
       }
     } on Object catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка экспорта: $e')),
-      );
+      unawaited(SmartDialog.showToast('Ошибка экспорта: $e'));
     }
   }
 }

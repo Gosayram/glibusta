@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -939,20 +940,14 @@ class _CommentsTabState extends ConsumerState<_CommentsTab> {
       );
       if (success && mounted) {
         _commentController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Комментарий отправлен')),
-        );
+        unawaited(SmartDialog.showToast('Комментарий отправлен'));
         ref.invalidate(commentsForBookProvider(widget.bookId));
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось отправить комментарий')),
-        );
+        unawaited(SmartDialog.showToast('Не удалось отправить комментарий'));
       }
     } on Object catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ошибка отправки')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка отправки'));
       }
     } finally {
       if (mounted) setState(() => _isPosting = false);
@@ -1077,16 +1072,12 @@ class _BottomActionBar extends ConsumerWidget {
       );
       ref.invalidate(bookDownloadStateProvider(book.id));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Загрузка ${book.title} (${selectedFormat.name})')),
-        );
+        unawaited(SmartDialog.showToast('Загрузка ${book.title} (${selectedFormat.name})'));
       }
     } on Object catch (e) {
       AppLogger().severe('Download failed: $e', name: 'BookDetails', error: e);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки: $e')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка загрузки: $e'));
       }
     }
   }

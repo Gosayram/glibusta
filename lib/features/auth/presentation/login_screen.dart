@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_repository.dart';
@@ -16,8 +16,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  static const _secureStorage = FlutterSecureStorage();
-
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,22 +30,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final data = next.value;
       if (data != null && data.isAuthenticated && mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Вход выполнен успешно')),
-        );
+        unawaited(SmartDialog.showToast('Вход выполнен успешно'));
       }
       if (data != null && data.error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data.error!)),
-        );
+        unawaited(SmartDialog.showToast(data.error!));
         ref.read(authStateProvider.notifier).clearError();
       }
     });
   }
 
   Future<void> _loadSavedCredentials() async {
-    final username = await _secureStorage.read(key: 'auth_username');
-    final password = await _secureStorage.read(key: 'auth_password');
+    final secureStorage = ref.read(flutterSecureStorageProvider);
+    final username = await secureStorage.read(key: 'auth_username');
+    final password = await secureStorage.read(key: 'auth_password');
     if (username != null && mounted) {
       _nameController.text = username;
     }
@@ -206,11 +201,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             if (_persistent && mounted) {
               final authState = ref.read(authStateProvider);
               if (authState.hasValue && authState.value!.isAuthenticated) {
+                final secureStorage = ref.read(flutterSecureStorageProvider);
                 unawaited(
-                  _secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
+                  secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
                 );
                 unawaited(
-                  _secureStorage.write(key: 'auth_password', value: _passwordController.text),
+                  secureStorage.write(key: 'auth_password', value: _passwordController.text),
                 );
               }
             }

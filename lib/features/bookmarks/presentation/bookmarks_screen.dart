@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -109,18 +110,7 @@ class BookmarksScreen extends ConsumerWidget {
     final repository = BookmarkRepository(database);
     await repository.deleteBookmark(bookmark.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Закладка удалена'),
-        action: SnackBarAction(
-          label: 'Отмена',
-          onPressed: () {
-            unawaited(repository.insertBookmark(bookmark));
-          },
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    unawaited(SmartDialog.showToast('Закладка удалена'));
   }
 }
 

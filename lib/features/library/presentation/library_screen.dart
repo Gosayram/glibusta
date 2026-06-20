@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -248,27 +249,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
       if (inspection.decision == ImportDecision.duplicate) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Дубликат: ${inspection.title ?? inspection.reason}')),
-          );
+          unawaited(SmartDialog.showToast('Дубликат: ${inspection.title ?? inspection.reason}'));
         }
         return;
       }
 
       if (inspection.decision == ImportDecision.corrupted) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка: ${inspection.reason}')),
-          );
+          unawaited(SmartDialog.showToast('Ошибка: ${inspection.reason}'));
         }
         return;
       }
 
       if (inspection.decision == ImportDecision.unsupported) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Формат не поддерживается')),
-          );
+          unawaited(SmartDialog.showToast('Формат не поддерживается'));
         }
         return;
       }
@@ -282,18 +277,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importFromInspection(inspection),
           );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              importResult.isSuccess
-                  ? 'Импортировано: ${importResult.title}'
-                  : importResult.needsEncodingSelection
-                  ? 'Нужен выбор кодировки'
-                  : 'Ошибка: ${importResult.error}',
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        unawaited(SmartDialog.showToast(
+          importResult.isSuccess
+              ? 'Импортировано: ${importResult.title}'
+              : importResult.needsEncodingSelection
+              ? 'Нужен выбор кодировки'
+              : 'Ошибка: ${importResult.error}',
+        ));
       }
       ref.invalidate(libraryBooksProvider);
     } on Object catch (e) {
@@ -752,9 +742,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   final svc = ref.read(perBookSettingsServiceProvider);
                   await svc.resetToGlobal(book.id);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Настройки сброшены')),
-                    );
+                    unawaited(SmartDialog.showToast('Настройки сброшены'));
                   }
                 },
               ),
@@ -784,16 +772,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _showFolderPicker(BuildContext context, WidgetRef ref, Book book) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Выбор папки将在 реализован')),
-    );
+    unawaited(SmartDialog.showToast('Выбор папки将在 реализован'));
   }
 
   void _shareBook(BuildContext context, Book book) {
     if (book.source.sourceUrl.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Поделиться «${book.title}»')),
-      );
+      unawaited(SmartDialog.showToast('Поделиться «${book.title}»'));
     }
   }
 
@@ -811,15 +795,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     ref.invalidate(libraryBooksProvider);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.deleteFile
-                ? '«${book.title}» удалена с диска'
-                : '«${book.title}» удалена из списка',
-          ),
-        ),
-      );
+      unawaited(SmartDialog.showToast(
+        result.deleteFile
+            ? '«${book.title}» удалена с диска'
+            : '«${book.title}» удалена из списка',
+      ));
     }
   }
 }
@@ -1024,9 +1004,7 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
     await tagService.setBookTags(widget.book.id, _selectedTagIds.toList());
     if (ctx.mounted) {
       Navigator.pop(ctx);
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('Теги сохранены')),
-      );
+      unawaited(SmartDialog.showToast('Теги сохранены'));
     }
   }
 

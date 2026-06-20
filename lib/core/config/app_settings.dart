@@ -18,6 +18,12 @@ abstract class AppSettings with _$AppSettings {
   const AppSettings._();
 
   factory AppSettings.fromEnv() {
+    if (!dotenv.isEveryDefined(['BASE_URL'])) {
+      throw StateError(
+        'Required environment variable BASE_URL is not defined. '
+        'Check your .env file.',
+      );
+    }
     final baseUrl = dotenv.get('BASE_URL', fallback: '');
     final mirrorsRaw = dotenv.get('MIRRORS', fallback: '');
     final mirrors = mirrorsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
