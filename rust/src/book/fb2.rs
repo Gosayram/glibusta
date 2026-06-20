@@ -1,7 +1,7 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive;
 use crate::book::encoding::get_xml_attr;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
@@ -69,11 +69,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut current_span_italic = false;
     let mut section_depth = 0i32;
 
-    let mut buf = Vec::new();
-
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
                 let tag_name = String::from_utf8_lossy(e.name().as_ref()).to_string();
@@ -149,6 +146,35 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
                             last.text = text.clone();
+                        } else {
+                            current_span_text.push_str(&text);
+                        }
+                    } else {
+                        current_span_text.push_str(&text);
+                    }
+                } else if in_body
+                    && ((in_subtitle || in_epigraph || in_text_author)
+                        || (!in_section && !in_image && !in_empty_line))
+                {
+                    current_text.push_str(&text);
+                }
+            }
+            Ok(Event::CData(ref e)) => {
+                let text = e.decode().unwrap_or_default();
+                if in_book_title && title.is_empty() {
+                    title = text.to_string();
+                } else if in_first_name || in_middle_name || in_last_name {
+                    current_author_parts.push(text.to_string());
+                } else if in_genre {
+                    genres.push(text.to_string());
+                } else if in_annotation {
+                    description = Some(description.take().unwrap_or_default() + &text);
+                } else if in_binary {
+                    current_text.push_str(&text);
+                } else if in_p && in_body {
+                    if let Some(last) = current_rich_spans.last_mut() {
+                        if last.text.is_empty() && last.href.is_some() {
+                            last.text = text.to_string();
                         } else {
                             current_span_text.push_str(&text);
                         }
@@ -339,7 +365,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 }
             }
             Err(e) => {
-                return Err(anyhow::anyhow!("FB2 XML parse error: {}", e));
+                bail!("FB2 XML parse error: {}", e);
             }
             _ => {}
         }

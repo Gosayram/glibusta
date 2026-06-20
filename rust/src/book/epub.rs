@@ -1,7 +1,9 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{decode_bytes, get_xml_attr};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use serde::Deserialize;
@@ -137,8 +139,6 @@ type OpfResult = (
 fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
-
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut manifest_items: HashMap<String, ManifestItem> = HashMap::new();
     let mut spine_ids: Vec<String> = Vec::new();
@@ -151,11 +151,10 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut current_text = String::new();
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "metadata" => in_metadata = true,
                     "manifest" => in_manifest = true,
@@ -217,8 +216,14 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     current_text.push_str(&e.unescape().unwrap_or_default());
                 }
             }
+            Ok(Event::CData(ref e)) => {
+                let text = e.decode().unwrap_or_default();
+                if in_dc_tag {
+                    current_text.push_str(&text);
+                }
+            }
             Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "metadata" => in_metadata = false,
                     "manifest" => in_manifest = false,
@@ -244,7 +249,7 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     }
                 }
             }
-            Err(e) => return Err(anyhow::anyhow!("OPF parse error: {}", e)),
+            Err(e) => bail!("OPF parse error: {}", e),
             _ => {}
         }
     }
@@ -268,12 +273,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                let mime = &item.media_type;
-                return Some(format!(
-                    "data:{};base64,{}",
-                    mime,
-                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
-                ));
+                return Some(encode_data_uri(&item.media_type, bytes));
             }
         }
     }
@@ -287,12 +287,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                let mime = &item.media_type;
-                return Some(format!(
-                    "data:{};base64,{}",
-                    mime,
-                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
-                ));
+                return Some(encode_data_uri(&item.media_type, bytes));
             }
         }
     }
@@ -306,12 +301,7 @@ fn extract_cover_url(
                 format!("{}/{}", opf_dir, item.href)
             };
             if let Some(bytes) = zip.find_file(&href) {
-                let mime = &item.media_type;
-                return Some(format!(
-                    "data:{};base64,{}",
-                    mime,
-                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
-                ));
+                return Some(encode_data_uri(&item.media_type, bytes));
             }
         }
     }
@@ -319,22 +309,23 @@ fn extract_cover_url(
     None
 }
 
+fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {
+    format!("data:{};base64,{}", mime, STANDARD.encode(bytes))
+}
+
 fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>, i32) {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
-
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut current_text = String::new();
     let mut in_body = false;
     let mut tag_stack: Vec<String> = Vec::new();
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = true,
                     "p" if in_body => {
@@ -401,8 +392,14 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     current_text.push_str(&text);
                 }
             }
+            Ok(Event::CData(ref e)) => {
+                if in_body {
+                    let text = e.decode().unwrap_or_default();
+                    current_text.push_str(&text);
+                }
+            }
             Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = false,
                     "p" if in_body && tag_stack.last().map(|s| s.as_str()) == Some("p") => {
@@ -462,7 +459,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                 }
             }
             Ok(Event::Empty(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if tag == "hr" && in_body {
                     blocks.push(ReaderBlock {
                         index: block_index,
@@ -526,16 +523,14 @@ fn flush_block(
 fn extract_chapter_title(text: &str) -> String {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
     let mut in_title = false;
     let mut title = String::new();
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) | Err(_) => break,
             Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if tag == "title" {
                     in_title = true;
                     title.clear();
@@ -547,7 +542,7 @@ fn extract_chapter_title(text: &str) -> String {
                 }
             }
             Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if tag == "title" && in_title {
                     break;
                 }

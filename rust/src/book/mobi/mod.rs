@@ -43,12 +43,12 @@ impl<'a> BinaryReader<'a> {
 
     fn check(&self, offset: usize, length: usize) -> Result<()> {
         if offset + length > self.bytes.len() {
-            return Err(anyhow::anyhow!(
+            bail!(
                 "BinaryReader: offset {} + length {} out of range (len {})",
                 offset,
                 length,
                 self.bytes.len()
-            ));
+            );
         }
         Ok(())
     }
@@ -77,12 +77,12 @@ impl<'a> BinaryReader<'a> {
     #[allow(dead_code)]
     fn slice(&self, start: usize, end: usize) -> Result<&'a [u8]> {
         if start > end || end > self.bytes.len() {
-            return Err(anyhow::anyhow!(
+            bail!(
                 "BinaryReader::slice: start {} end {} out of range (len {})",
                 start,
                 end,
                 self.bytes.len()
-            ));
+            );
         }
         Ok(&self.bytes[start..end])
     }

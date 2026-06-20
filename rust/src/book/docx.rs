@@ -89,8 +89,6 @@ fn parse_core_properties(
 fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
-    let mut buf = Vec::new();
-
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
     let mut chapter_title = String::new();
@@ -108,8 +106,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
     let mut current_span_italic = false;
 
     loop {
-        buf.clear();
-        match reader.read_event_into(&mut buf) {
+        match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
@@ -169,6 +166,14 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
             }
             Ok(Event::Text(ref e)) => {
                 let text = e.unescape().unwrap_or_default().to_string();
+                if in_run && in_paragraph {
+                    current_span_text.push_str(&text);
+                } else if in_pstyle {
+                    pstyle_val.push_str(&text);
+                }
+            }
+            Ok(Event::CData(ref e)) => {
+                let text = e.decode().unwrap_or_default();
                 if in_run && in_paragraph {
                     current_span_text.push_str(&text);
                 } else if in_pstyle {

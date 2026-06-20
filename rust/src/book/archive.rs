@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::io::Read;
 use zip::ZipArchive;
 
+const MAX_DECOMPRESSED_SIZE: u128 = 100 * 1024 * 1024; // 100MB
+
 pub struct ZipEntry {
     pub name: String,
     pub content: Vec<u8>,
@@ -17,12 +19,34 @@ impl ZipFile {
     pub fn open(bytes: &[u8]) -> Result<Self> {
         let cursor = std::io::Cursor::new(bytes);
         let mut archive = ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
+
+        // Reject zip bombs with overlapping file entries
+        if archive.has_overlapping_files().unwrap_or(false) {
+            anyhow::bail!("ZIP archive contains overlapping files (potential zip bomb)");
+        }
+
+        // Reject archives exceeding safe decompressed size
+        let mut total_size: u128 = 0;
+        for i in 0..archive.len() {
+            let file = archive.by_index(i).context("Failed to read ZIP entry")?;
+            total_size += file.size() as u128;
+            if total_size > MAX_DECOMPRESSED_SIZE {
+                anyhow::bail!(
+                    "ZIP archive exceeds maximum decompressed size ({}MB)",
+                    MAX_DECOMPRESSED_SIZE / 1024 / 1024
+                );
+            }
+        }
+
         let mut entries = HashMap::new();
         let mut entry_names = Vec::new();
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).context("Failed to read ZIP entry")?;
-            let name = file.name().to_string();
+            let name = file
+                .enclosed_name()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_else(|| file.name().to_string());
             let mut content = Vec::new();
             file.read_to_end(&mut content)
                 .context("Failed to read ZIP entry content")?;
@@ -51,6 +75,10 @@ impl ZipFile {
     pub fn find_file_flexible(&self, name: &str) -> Option<&[u8]> {
         self.find_file(name)
             .or_else(|| self.find_file_case_insensitive(name))
+    }
+
+    pub fn has_entry(&self, name: &str) -> bool {
+        self.entries.contains_key(name)
     }
 
     pub fn entry_names(&self) -> &[String] {
