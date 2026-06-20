@@ -52,6 +52,12 @@
 
 
 ############################################
+# audio_service — keep MediaBrowserService
+############################################
+
+-keep class com.ryanheise.audioservice.** { *; }
+
+############################################
 # WebView JS bridge (if used in reader)
 ############################################
 

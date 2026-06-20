@@ -44,13 +44,17 @@ rust-build-check: require-rust ## Verify Rust code compiles
 	@$(PRINT_OK) "Rust compilation verified"
 
 .PHONY: rust-sync-version
-rust-sync-version: ## Sync Rust crate version with pubspec.yaml version
-	@$(PRINT_STEP) "Syncing Rust version from pubspec.yaml"
+rust-sync-version: ## Sync Rust crate version + edition with pubspec.yaml
+	@$(PRINT_STEP) "Syncing Rust version + edition from pubspec.yaml"
 	@CARGO_VER=$$($(PYTHON) -c "import re; \
 		v=re.search(r'version:\s*(.+)', open('pubspec.yaml').read()).group(1).strip(); \
 		ver=v.split('+')[0]; print(ver)"); \
+	CARGO_EDITION=$$($(PYTHON) -c "import re; \
+		v=re.search(r'version:\s*(.+)', open('pubspec.yaml').read()).group(1).strip(); \
+		ed=v.split('+')[1] if '+' in v else '2021'; print(ed)"); \
 	perl -pi -e "s/^version = .*/version = \"$$CARGO_VER\"/" rust/Cargo.toml; \
-	echo "  Rust version: $$CARGO_VER"
+	perl -pi -e "s/^edition = .*/edition = \"$$CARGO_EDITION\"/" rust/Cargo.toml; \
+	echo "  Rust version: $$CARGO_VER  edition: $$CARGO_EDITION"
 
 .PHONY: bump
 bump: require-python ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
