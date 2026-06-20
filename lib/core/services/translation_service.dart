@@ -52,7 +52,10 @@ class GoogleWebTranslator extends TranslateServiceProvider {
     final data = response.data;
     if (data is List && data.isNotEmpty) {
       final sentences = data[0] as List;
-      final translated = sentences.map((s) => s[0] as String? ?? '').join();
+      final translated = sentences.map((s) {
+        final row = s as List;
+        return row[0] as String? ?? '';
+      }).join();
       return TranslationResult(
         translatedText: translated,
         detectedLanguage: data[2] as String?,
@@ -95,11 +98,14 @@ class BingWebTranslator extends TranslateServiceProvider {
 
     final data = response.data;
     if (data is List && data.isNotEmpty) {
-      final translations = data[0]['translations'] as List;
+      final first = data[0] as Map<String, dynamic>;
+      final translations = first['translations'] as List;
       if (translations.isNotEmpty) {
+        final entry = translations[0] as Map<String, dynamic>;
         return TranslationResult(
-          translatedText: translations[0]['text'] as String,
-          detectedLanguage: data[0]['detectedLanguage']?['language'] as String?,
+          translatedText: entry['text'] as String,
+          detectedLanguage:
+              (first['detectedLanguage'] as Map<String, dynamic>?)?['language'] as String?,
           originalText: text,
         );
       }

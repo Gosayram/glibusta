@@ -63,7 +63,8 @@ class AiDictionaryService {
       if (data is Map && data['choices'] is List) {
         final choices = data['choices'] as List;
         if (choices.isNotEmpty) {
-          final content = choices[0]['message']?['content'];
+          final message = choices[0] as Map<String, dynamic>;
+          final content = (message['message'] as Map<String, dynamic>?)?['content'];
           if (content is String) {
             final json = _parseJson(content);
             return AiDictionaryResult(

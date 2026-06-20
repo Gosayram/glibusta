@@ -101,14 +101,15 @@ class AiChatService {
     if (json == null) return [];
     try {
       final list = jsonDecode(json) as List;
-      return list
-          .map(
-            (e) => AiMessage(
-              role: e['role'] as String,
-              content: e['content'] as String,
-            ),
-          )
-          .toList();
+      return list.map(
+        (e) {
+          final map = e as Map<String, dynamic>;
+          return AiMessage(
+            role: map['role'] as String,
+            content: map['content'] as String,
+          );
+        },
+      ).toList();
     } on Object catch (_) {
       return [];
     }

@@ -1,3 +1,8 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'chapter_split_rule.g.dart';
+
+@JsonSerializable()
 class ChapterSplitRule {
   const ChapterSplitRule({
     required this.id,
@@ -64,23 +69,9 @@ class ChapterSplitRule {
     ),
   ];
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'pattern': pattern,
-    'isPreset': isPreset,
-    'isRegex': isRegex,
-  };
+  factory ChapterSplitRule.fromJson(Map<String, dynamic> json) => _$ChapterSplitRuleFromJson(json);
 
-  factory ChapterSplitRule.fromJson(Map<String, dynamic> json) {
-    return ChapterSplitRule(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      pattern: json['pattern'] as String,
-      isPreset: json['isPreset'] as bool? ?? false,
-      isRegex: json['isRegex'] as bool? ?? true,
-    );
-  }
+  Map<String, dynamic> toJson() => _$ChapterSplitRuleToJson(this);
 
   bool matchesLine(String line) {
     if (isRegex) {

@@ -43,7 +43,7 @@ class LifecycleService {
   }
 
   void handleEvent(LifecycleEvent event) {
-    for (final callback in _callbacks[event] ?? []) {
+    for (final callback in _callbacks[event] ?? <VoidCallback>[]) {
       callback();
     }
   }

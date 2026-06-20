@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'package:json_annotation/json_annotation.dart';
+
+part 'base_tts.g.dart';
+
 abstract class BaseTts {
   Future<void> speak(String text);
   Future<void> stop();
@@ -20,8 +24,10 @@ abstract class BaseTts {
   Future<void> dispose();
 }
 
+@JsonEnum(fieldRename: FieldRename.snake)
 enum TtsState { playing, paused, stopped, error }
 
+@JsonSerializable(explicitToJson: true)
 class TtsVoice {
   const TtsVoice({
     required this.id,
@@ -35,28 +41,19 @@ class TtsVoice {
   final String language;
   final String? gender;
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'language': language,
-    'gender': gender,
-  };
+  factory TtsVoice.fromJson(Map<String, dynamic> json) => _$TtsVoiceFromJson(json);
 
-  factory TtsVoice.fromJson(Map<String, dynamic> json) => TtsVoice(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    language: json['language'] as String,
-    gender: json['gender'] as String?,
-  );
+  Map<String, dynamic> toJson() => _$TtsVoiceToJson(this);
 }
 
+@JsonSerializable()
 class TtsSettings {
   const TtsSettings({
-    this.volume = 1.0,
-    this.rate = 0.5,
-    this.pitch = 1.0,
+    @JsonKey(defaultValue: 1.0) this.volume = 1.0,
+    @JsonKey(defaultValue: 0.5) this.rate = 0.5,
+    @JsonKey(defaultValue: 1.0) this.pitch = 1.0,
     this.voiceId,
-    this.language = 'ru-RU',
+    @JsonKey(defaultValue: 'ru-RU') this.language = 'ru-RU',
   });
 
   final double volume;
@@ -81,21 +78,9 @@ class TtsSettings {
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'volume': volume,
-    'rate': rate,
-    'pitch': pitch,
-    'voiceId': voiceId,
-    'language': language,
-  };
+  factory TtsSettings.fromJson(Map<String, dynamic> json) => _$TtsSettingsFromJson(json);
 
-  factory TtsSettings.fromJson(Map<String, dynamic> json) => TtsSettings(
-    volume: (json['volume'] as num?)?.toDouble() ?? 1.0,
-    rate: (json['rate'] as num?)?.toDouble() ?? 0.5,
-    pitch: (json['pitch'] as num?)?.toDouble() ?? 1.0,
-    voiceId: json['voiceId'] as String?,
-    language: json['language'] as String? ?? 'ru-RU',
-  );
+  Map<String, dynamic> toJson() => _$TtsSettingsToJson(this);
 }
 
 class TtsSegment {

@@ -122,8 +122,9 @@ class AiAgentService {
     if (data is Map && data['choices'] is List) {
       final choices = data['choices'] as List;
       if (choices.isNotEmpty) {
-        final message = choices[0]['message'];
-        if (message is Map && message['content'] is String) {
+        final choice = choices[0] as Map<String, dynamic>;
+        final message = choice['message'] as Map<String, dynamic>;
+        if (message['content'] is String) {
           yield message['content'] as String;
         }
       }

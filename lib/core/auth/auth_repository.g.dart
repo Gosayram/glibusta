@@ -3,6 +3,26 @@
 part of 'auth_repository.dart';
 
 // **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+UserSession _$UserSessionFromJson(Map<String, dynamic> json) => UserSession(
+  name: json['name'] as String,
+  mail: json['mail'] as String?,
+  cookies:
+      (json['cookies'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ) ??
+      const {},
+);
+
+Map<String, dynamic> _$UserSessionToJson(UserSession instance) => <String, dynamic>{
+  'name': instance.name,
+  'mail': instance.mail,
+  'cookies': instance.cookies,
+};
+
+// **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 

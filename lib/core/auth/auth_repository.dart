@@ -17,6 +17,7 @@ const _kSessionNameKey = 'auth_session_name';
 const _kSessionMailKey = 'auth_session_mail';
 const _kSessionCookiesKey = 'auth_session_cookies';
 
+@JsonSerializable()
 class UserSession {
   final String name;
   final String? mail;
@@ -28,17 +29,9 @@ class UserSession {
     this.cookies = const {},
   });
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'mail': mail,
-    'cookies': cookies,
-  };
+  factory UserSession.fromJson(Map<String, dynamic> json) => _$UserSessionFromJson(json);
 
-  factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
-    name: json['name'] as String,
-    mail: json['mail'] as String?,
-    cookies: Map<String, String>.from(json['cookies'] as Map? ?? {}),
-  );
+  Map<String, dynamic> toJson() => _$UserSessionToJson(this);
 }
 
 class AuthRepository {
@@ -211,7 +204,6 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final flutterSecureStorageProvider = Provider<FlutterSecureStorage>(
   (ref) => const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
