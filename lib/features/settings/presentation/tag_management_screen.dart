@@ -243,7 +243,8 @@ class _ColorPicker extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: _colors.map((hex) {
-        final color = Color(int.parse('FF$hex', radix: 16));
+        final clean = hex.startsWith('#') ? hex.substring(1) : hex;
+        final color = Color(int.parse('FF$clean', radix: 16));
         final isSelected = hex == selectedColor;
         return GestureDetector(
           onTap: () => onColorSelected(hex),

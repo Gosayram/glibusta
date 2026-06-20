@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../features/reader/data/tts/tts_service.dart' show sharedPreferencesProvider;
 import '../logging/app_logger.dart';
 
 class WindowPositionService {
@@ -60,8 +61,6 @@ class WindowPositionService {
 }
 
 final windowPositionServiceProvider = Provider<WindowPositionService>((ref) {
-  throw UnimplementedError(
-    'windowPositionServiceProvider must be overridden at startup. '
-    'Requires window_manager package to be added to pubspec.yaml.',
-  );
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return WindowPositionService(prefs);
 });

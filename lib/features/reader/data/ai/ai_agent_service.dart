@@ -114,7 +114,7 @@ class AiAgentService {
         'model': 'gpt-4o-mini',
         'messages': messages,
         'tools': _tools.map((t) => {'type': 'function', 'function': t.toFunctionSchema()}).toList(),
-        'stream': true,
+        'stream': false,
       }),
     );
 
@@ -122,9 +122,9 @@ class AiAgentService {
     if (data is Map && data['choices'] is List) {
       final choices = data['choices'] as List;
       if (choices.isNotEmpty) {
-        final delta = choices[0]['delta'];
-        if (delta is Map && delta['content'] is String) {
-          yield delta['content'] as String;
+        final message = choices[0]['message'];
+        if (message is Map && message['content'] is String) {
+          yield message['content'] as String;
         }
       }
     }
@@ -143,7 +143,8 @@ class AiAgentService {
       case 'analyze_characters':
         return _analyzeCharacters(args['character_name'] as String? ?? '', bookText);
       case 'summarize':
-        return _summarize(bookText);
+        final maxLength = args['max_length'] as int? ?? 200;
+        return _summarize(bookText, maxLength);
       default:
         return AiToolResult(
           toolName: toolName,
@@ -201,9 +202,9 @@ class AiAgentService {
     return AiToolResult(toolName: 'analyze_characters', content: buffer.toString());
   }
 
-  AiToolResult _summarize(String bookText) {
+  AiToolResult _summarize(String bookText, [int maxLength = 200]) {
     final words = bookText.split(RegExp(r'\s+'));
-    final summaryWords = words.take(200).join(' ');
+    final summaryWords = words.take(maxLength).join(' ');
     return AiToolResult(toolName: 'summarize', content: '$summaryWords...');
   }
 }

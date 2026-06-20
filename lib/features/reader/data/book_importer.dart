@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/failures.dart';
 import 'book_open_service.dart';
+import 'parsers/cbr_parser.dart';
 import 'parsers/cbz_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
@@ -59,7 +60,8 @@ final class BookImporter {
         BookFormat.azw3 ||
         BookFormat.prc ||
         BookFormat.docx => RustBookParser().parseFile(filePath),
-        BookFormat.cbz || BookFormat.cbr => CbzParser().parseFile(filePath),
+        BookFormat.cbz => CbzParser().parseFile(filePath),
+        BookFormat.cbr => CbrParser().parseFile(filePath),
         BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
         BookFormat.djvu => throw UnsupportedError('DJVU not supported'),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),

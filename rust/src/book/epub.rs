@@ -284,7 +284,12 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     "manifest" => in_manifest = false,
                     "spine" => in_spine = false,
                     _ => {
-                        if in_dc_tag && tag == current_dc_tag {
+                        let tag_name = if tag.starts_with("dc:") {
+                            &tag[3..]
+                        } else {
+                            tag.as_str()
+                        };
+                        if in_dc_tag && tag_name == current_dc_tag {
                             let val = current_text.trim().to_string();
                             if !val.is_empty() {
                                 // Append to support multiple dc:creator tags

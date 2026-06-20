@@ -10,7 +10,7 @@ ADB_LOGS_RUN_WAIT ?= 6
 # Does NOT depend on a live PID, so it still captures the crash trail after the
 # process dies (AndroidRuntime FATAL, DEBUG tombstones, libc fatal signals, etc.).
 # Set ADB_LOGS_FILTER= to capture everything (unfiltered).
-ADB_LOGS_FILTER ?= $(ANDROID_PACKAGE)|flutter|AndroidRuntime|FATAL|DEBUG|libc|tombstone
+ADB_LOGS_FILTER ?= $(subst .,\.,$(ANDROID_PACKAGE))|flutter|AndroidRuntime|FATAL|DEBUG|libc|tombstone
 
 # Markers scanned in adb-logs-run to detect a crash/failure.
 ADB_CRASH_MARKERS ?= FATAL EXCEPTION|E/flutter|AndroidRuntime|signal [0-9]|SIGSEGV|SIGABRT|tombstone|has died|Force finishing|[0-9]+ fatal

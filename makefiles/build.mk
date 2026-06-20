@@ -53,28 +53,32 @@ rust-sync-version: ## Sync Rust crate version with pubspec.yaml version
 	echo "  Rust version: $$CARGO_VER"
 
 .PHONY: bump
-bump: require-python rust-sync-version ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
+bump: require-python ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
 	@$(PRINT_STEP) "Bumping patch version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-minor
-bump-minor: require-python rust-sync-version ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
+bump-minor: require-python ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
 	@$(PRINT_STEP) "Bumping minor version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --minor); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-major
-bump-major: require-python rust-sync-version ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
+bump-major: require-python ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
 	@$(PRINT_STEP) "Bumping major version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --major); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-build
-bump-build: require-python rust-sync-version ## Bump build number only: 0.1.5+3 → 0.1.5+4
+bump-build: require-python ## Bump build number only: 0.1.5+3 → 0.1.5+4
 	@$(PRINT_STEP) "Bumping build number"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --build); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: clean-artifacts
 clean-artifacts: ## Remove generated release artifacts
@@ -142,8 +146,9 @@ build-android-apk-split: clean-build bump-build require-flutter android-availabl
 	@for abi in arm64-v8a armeabi-v7a; do \
 		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
 		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
-		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
+		if [ -f "$$src" ]; then cp "$$src" "$$dst"; else echo "Warning: Missing $$abi APK"; fi; \
 	done
+	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab

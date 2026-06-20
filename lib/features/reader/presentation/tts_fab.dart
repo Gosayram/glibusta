@@ -185,12 +185,14 @@ class _TtsFabState extends ConsumerState<TtsFab> {
     return ActionChip(
       label: Text(label),
       onPressed: () {
+        final ttsService = ref.read(ttsServiceProvider);
+        final ttsStateNotifier = ref.read(ttsStateProvider.notifier);
         sleepTimer.start(
           minutes,
           onExpire: () {
-            final ttsService = ref.read(ttsServiceProvider);
+            if (!mounted) return;
             unawaited(ttsService.stop());
-            ref.read(ttsStateProvider.notifier).update(TtsState.stopped);
+            ttsStateNotifier.update(TtsState.stopped);
           },
         );
       },

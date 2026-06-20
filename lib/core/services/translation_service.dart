@@ -22,8 +22,8 @@ class TranslationResult {
 }
 
 abstract class TranslateServiceProvider {
-  Future<TranslationResult> translate(String text, {required String from, required String to});
-  Stream<String> translateStream(String text, {required String from, required String to});
+  Future<TranslationResult> translate(String text, {String? from, String? to});
+  Stream<String> translateStream(String text, {String? from, String? to});
 }
 
 class GoogleWebTranslator extends TranslateServiceProvider {
@@ -34,16 +34,16 @@ class GoogleWebTranslator extends TranslateServiceProvider {
   @override
   Future<TranslationResult> translate(
     String text, {
-    required String from,
-    required String to,
+    String? from,
+    String? to,
   }) async {
     final url = 'https://translate.googleapis.com/translate_a/single';
     final response = await _dio.get<dynamic>(
       url,
       queryParameters: {
         'client': 'gtx',
-        'sl': from,
-        'tl': to,
+        'sl': from ?? 'auto',
+        'tl': to ?? 'ru',
         'dt': 't',
         'q': text,
       },
@@ -63,7 +63,7 @@ class GoogleWebTranslator extends TranslateServiceProvider {
   }
 
   @override
-  Stream<String> translateStream(String text, {required String from, required String to}) async* {
+  Stream<String> translateStream(String text, {String? from, String? to}) async* {
     final result = await translate(text, from: from, to: to);
     yield result.translatedText;
   }
@@ -77,16 +77,16 @@ class BingWebTranslator extends TranslateServiceProvider {
   @override
   Future<TranslationResult> translate(
     String text, {
-    required String from,
-    required String to,
+    String? from,
+    String? to,
   }) async {
     final url = 'https://api.cognitive.microsofttranslator.com/translate';
     final response = await _dio.post<dynamic>(
       url,
       queryParameters: {
         'api-version': '3.0',
-        'from': from,
-        'to': to,
+        'from': from ?? 'en',
+        'to': to ?? 'ru',
       },
       data: [
         {'Text': text},
@@ -108,7 +108,7 @@ class BingWebTranslator extends TranslateServiceProvider {
   }
 
   @override
-  Stream<String> translateStream(String text, {required String from, required String to}) async* {
+  Stream<String> translateStream(String text, {String? from, String? to}) async* {
     final result = await translate(text, from: from, to: to);
     yield result.translatedText;
   }
@@ -217,6 +217,26 @@ const supportedLanguages = [
   ('vi', 'Вьетнамский'),
 ];
 
-final translationServiceProvider = Provider<TranslationService>((ref) {
-  throw UnimplementedError('translationServiceProvider must be overridden at startup.');
+final translationServiceProvider = Provider<TranslateServiceProvider>((ref) {
+  return _NoOpTranslationService();
 });
+
+class _NoOpTranslationService extends TranslateServiceProvider {
+  @override
+  Future<TranslationResult> translate(
+    String text, {
+    String? from,
+    String? to,
+  }) async {
+    return TranslationResult(translatedText: text, originalText: text);
+  }
+
+  @override
+  Stream<String> translateStream(
+    String text, {
+    String? from,
+    String? to,
+  }) {
+    return Stream.value(text);
+  }
+}

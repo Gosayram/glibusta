@@ -23,9 +23,10 @@ class AiDictionaryResult {
 }
 
 class AiDictionaryService {
-  AiDictionaryService(this._dio);
+  AiDictionaryService(this._dio, {String? apiKey}) : _apiKey = apiKey;
 
   final Dio _dio;
+  final String? _apiKey;
 
   Future<AiDictionaryResult> lookup(String word, {String? bookContext}) async {
     try {
@@ -33,7 +34,7 @@ class AiDictionaryService {
         'https://api.openai.com/v1/chat/completions',
         options: Options(
           headers: {
-            'Authorization': 'Bearer ${_getApiKey()}',
+            'Authorization': 'Bearer ${_apiKey ?? ''}',
             'Content-Type': 'application/json',
           },
         ),
@@ -90,8 +91,6 @@ class AiDictionaryService {
       return {};
     }
   }
-
-  String? _getApiKey() => null;
 }
 
 final aiDictionaryServiceProvider = Provider<AiDictionaryService>((ref) {

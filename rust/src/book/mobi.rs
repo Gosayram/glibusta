@@ -21,49 +21,50 @@ impl<'a> BinaryReader<'a> {
         Self { bytes }
     }
 
-    fn check(&self, offset: usize, length: usize) {
+    fn check(&self, offset: usize, length: usize) -> Result<()> {
         if offset + length > self.bytes.len() {
-            panic!(
+            return Err(anyhow::anyhow!(
                 "BinaryReader: offset {} + length {} out of range (len {})",
                 offset,
                 length,
                 self.bytes.len()
-            );
+            ));
         }
+        Ok(())
     }
 
-    fn u16be(&self, offset: usize) -> u16 {
-        self.check(offset, 2);
-        ((self.bytes[offset] as u16) << 8) | (self.bytes[offset + 1] as u16)
+    fn u16be(&self, offset: usize) -> Result<u16> {
+        self.check(offset, 2)?;
+        Ok(((self.bytes[offset] as u16) << 8) | (self.bytes[offset + 1] as u16))
     }
 
-    fn u32be(&self, offset: usize) -> u32 {
-        self.check(offset, 4);
-        ((self.bytes[offset] as u32) << 24)
+    fn u32be(&self, offset: usize) -> Result<u32> {
+        self.check(offset, 4)?;
+        Ok(((self.bytes[offset] as u32) << 24)
             | ((self.bytes[offset + 1] as u32) << 16)
             | ((self.bytes[offset + 2] as u32) << 8)
-            | (self.bytes[offset + 3] as u32)
+            | (self.bytes[offset + 3] as u32))
     }
 
-    fn ascii(&self, offset: usize, length: usize) -> String {
-        self.check(offset, length);
-        self.bytes[offset..offset + length]
+    fn ascii(&self, offset: usize, length: usize) -> Result<String> {
+        self.check(offset, length)?;
+        Ok(self.bytes[offset..offset + length]
             .iter()
             .map(|&b| b as char)
-            .collect()
+            .collect())
     }
 
     #[allow(dead_code)]
-    fn slice(&self, start: usize, end: usize) -> &'a [u8] {
+    fn slice(&self, start: usize, end: usize) -> Result<&'a [u8]> {
         if start > end || end > self.bytes.len() {
-            panic!(
+            return Err(anyhow::anyhow!(
                 "BinaryReader::slice: start {} end {} out of range (len {})",
                 start,
                 end,
                 self.bytes.len()
-            );
+            ));
         }
-        &self.bytes[start..end]
+        Ok(&self.bytes[start..end])
     }
 }
 
@@ -97,7 +98,7 @@ struct PalmDbParser;
 impl PalmDbParser {
     fn parse(&self, bytes: &[u8]) -> Result<PalmDb> {
         let reader = BinaryReader::new(bytes);
-        let record_count = reader.u16be(76) as usize;
+        let record_count = reader.u16be(76)? as usize;
         let table_end = 78 + record_count * 8;
 
         if record_count == 0 || table_end > bytes.len() {
@@ -109,7 +110,7 @@ impl PalmDbParser {
         let mut previous_record_offset: i64 = -1;
 
         for _ in 0..record_count {
-            let record_offset = reader.u32be(offset) as i64;
+            let record_offset = reader.u32be(offset)? as i64;
             if record_offset < table_end as i64 || record_offset >= bytes.len() as i64 {
                 bail!("Invalid PalmDB record offset: {}", record_offset);
             }
@@ -127,7 +128,7 @@ impl PalmDbParser {
             offset += 8;
         }
 
-        let name = reader.ascii(0, 32).replace('\0', "").trim().to_string();
+        let name = reader.ascii(0, 32)?.replace('\0', "").trim().to_string();
 
         Ok(PalmDb { name, records })
     }
@@ -162,19 +163,19 @@ impl MobiHeaderParser {
         let reader = BinaryReader::new(record0);
         let mobi_offset = Self::MOBI_OFFSET;
 
-        if reader.ascii(mobi_offset, 4) != "MOBI" {
+        if reader.ascii(mobi_offset, 4)? != "MOBI" {
             bail!("Invalid MOBI header");
         }
 
         Ok(MobiHeader {
-            compression: reader.u16be(0),
-            text_encoding: reader.u16be(mobi_offset + 12),
-            text_record_count: reader.u16be(8),
-            record_size: reader.u16be(10),
-            full_name_offset: reader.u32be(mobi_offset + 84),
-            full_name_length: reader.u32be(mobi_offset + 88),
-            exth_flags: reader.u32be(mobi_offset + 128),
-            first_image_record_index: reader.u32be(mobi_offset + 108),
+            compression: reader.u16be(0)?,
+            text_encoding: reader.u16be(mobi_offset + 12)?,
+            text_record_count: reader.u16be(8)?,
+            record_size: reader.u16be(10)?,
+            full_name_offset: reader.u32be(mobi_offset + 84)?,
+            full_name_length: reader.u32be(mobi_offset + 88)?,
+            exth_flags: reader.u32be(mobi_offset + 128)?,
+            first_image_record_index: reader.u32be(mobi_offset + 108)?,
         })
     }
 }
@@ -210,26 +211,26 @@ impl MobiMetadata {
 struct ExthParser;
 
 impl ExthParser {
-    fn parse(&self, record0: &[u8], header: &MobiHeader) -> MobiMetadata {
+    fn parse(&self, record0: &[u8], header: &MobiHeader) -> Result<MobiMetadata> {
         if (header.exth_flags & 0x40) == 0 {
-            return MobiMetadata::default();
+            return Ok(MobiMetadata::default());
         }
 
         let exth_offset = match self.find_exth_offset(record0) {
             Some(o) => o,
-            None => return MobiMetadata::default(),
+            None => return Ok(MobiMetadata::default()),
         };
 
         let reader = BinaryReader::new(record0);
-        let length = reader.u32be(exth_offset + 4) as usize;
-        let count = reader.u32be(exth_offset + 8) as usize;
+        let length = reader.u32be(exth_offset + 4)? as usize;
+        let count = reader.u32be(exth_offset + 8)? as usize;
         let exth_end = exth_offset + length;
 
         if length < 12 || exth_end > record0.len() {
-            return MobiMetadata {
+            return Ok(MobiMetadata {
                 has_exth: true,
                 ..MobiMetadata::default()
-            };
+            });
         }
 
         let mut title: Option<String> = None;
@@ -243,8 +244,8 @@ impl ExthParser {
                 break;
             }
             let r = BinaryReader::new(record0);
-            let rec_type = r.u32be(pos);
-            let size = r.u32be(pos + 4) as usize;
+            let rec_type = r.u32be(pos)?;
+            let size = r.u32be(pos + 4)? as usize;
             if size < 8 || pos + size > exth_end {
                 break;
             }
@@ -262,20 +263,20 @@ impl ExthParser {
                 }
                 201 if data.len() >= 4 => {
                     let cr = BinaryReader::new(data);
-                    cover_record_index = Some(cr.u32be(0));
+                    cover_record_index = Some(cr.u32be(0)?);
                 }
                 _ => {}
             }
             pos += size;
         }
 
-        MobiMetadata {
+        Ok(MobiMetadata {
             title,
             author,
             language,
             cover_record_index,
             has_exth: true,
-        }
+        })
     }
 
     fn find_exth_offset(&self, record0: &[u8]) -> Option<usize> {
@@ -1268,7 +1269,15 @@ impl MobiTextExtractor {
 
     fn looks_like_html(&self, text: &str) -> bool {
         let sample_len = std::cmp::min(text.len(), 2000);
-        let sample = &text[..sample_len];
+        let sample = if sample_len == text.len() {
+            text
+        } else {
+            let mut end = sample_len;
+            while end > 0 && !text.is_char_boundary(end) {
+                end -= 1;
+            }
+            &text[..end]
+        };
         sample.contains("<p")
             || sample.contains("<h")
             || sample.contains("<br")
@@ -1332,10 +1341,18 @@ impl MobiTextExtractor {
 
     fn decode_utf16(&self, bytes: &[u8]) -> String {
         if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
-            return String::from_utf8_lossy(&bytes[2..]).into_owned();
+            let units: Vec<u16> = bytes[2..]
+                .chunks_exact(2)
+                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .collect();
+            return String::from_utf16_lossy(&units);
         }
         if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-            return String::from_utf8_lossy(&bytes[2..]).into_owned();
+            let units: Vec<u16> = bytes[2..]
+                .chunks_exact(2)
+                .map(|c| u16::from_be_bytes([c[0], c[1]]))
+                .collect();
+            return String::from_utf16_lossy(&units);
         }
         // No BOM — try LE first (most common on Windows-originated files).
         let mut buf = String::with_capacity(bytes.len() / 2);
@@ -1470,7 +1487,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     let palm_db = PalmDbParser.parse(bytes)?;
     let record0 = record_bytes(bytes, &palm_db, 0)?;
     let header = MobiHeaderParser.parse(record0)?;
-    let metadata = ExthParser.parse(record0, &header);
+    let metadata = ExthParser.parse(record0, &header)?;
 
     let text_extractor = MobiTextExtractor::new();
     let blocks = text_extractor.extract_blocks(bytes, &palm_db, &header)?;

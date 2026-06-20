@@ -146,7 +146,15 @@ rust-size: ## Show Rust binary sizes
 .PHONY: flutter-size
 flutter-size: ## Analyze APK/AAB size
 	@$(PRINT_STEP) "Analyzing Flutter build size"
-	flutter build apk --analyze-size --target-platform android-arm64 2>&1 | tail -5
+	@TMP_LOG=$$(mktemp); \
+	if flutter build apk --analyze-size --target-platform android-arm64 > "$$TMP_LOG" 2>&1; then \
+		tail -5 "$$TMP_LOG"; \
+		rm -f "$$TMP_LOG"; \
+	else \
+		tail -20 "$$TMP_LOG"; \
+		rm -f "$$TMP_LOG"; \
+		exit 1; \
+	fi
 
 .PHONY: rust-audit
 rust-audit: ## Scan Rust dependencies for CVE vulnerabilities

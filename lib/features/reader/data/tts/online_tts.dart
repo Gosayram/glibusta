@@ -77,6 +77,10 @@ class OnlineTtsProviderImpl extends BaseTts {
   }
 
   Future<void> _synthesizeSegment(String text) async {
+    if (_config.provider == OnlineTtsProvider.azure &&
+        (_config.endpoint == null || _config.endpoint!.isEmpty)) {
+      throw ArgumentError('Azure TTS requires a non-empty endpoint.');
+    }
     final endpoint = _config.endpoint ?? _getDefaultEndpoint();
     await _dio.post<dynamic>(
       endpoint,
@@ -104,7 +108,7 @@ class OnlineTtsProviderImpl extends BaseTts {
       case OnlineTtsProvider.openai:
         return 'https://api.openai.com/v1/audio/speech';
       case OnlineTtsProvider.azure:
-        return '${_config.endpoint}/cognitiveservices/v1';
+        throw UnsupportedError('Azure endpoint must be configured explicitly.');
       case OnlineTtsProvider.aliyun:
         return 'https://nls-gateway.cn-shanghai.aliyuncs.com/v1/tts/convert';
     }

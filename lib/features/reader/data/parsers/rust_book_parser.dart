@@ -42,7 +42,10 @@ class RustBookParser implements BookParser {
     String? fileName,
     String? forcedEncoding,
   }) async {
-    final format = fileName != null ? detectBookFormat(fileName) : BookFormat.fb2;
+    if (fileName == null) {
+      throw const ParserFailure('fileName is required to detect format');
+    }
+    final format = detectBookFormat(fileName);
     if (!supports(format)) {
       throw UnsupportedError('Rust parser does not support $format');
     }

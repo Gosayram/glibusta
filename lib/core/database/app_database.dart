@@ -216,8 +216,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> deleteUploadSnapshot() async {
     final dbPath = await _databasePath;
-    for (final ext in ['', '-wal', '-shm', '.upload', '.upload-wal', '.upload-shm']) {
-      final f = File('$dbPath$ext');
+    final snapshotPath = '$dbPath.upload';
+    for (final path in [snapshotPath, '$snapshotPath-wal', '$snapshotPath-shm']) {
+      final f = File(path);
       if (await f.exists()) {
         await f.delete();
       }
