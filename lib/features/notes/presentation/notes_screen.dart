@@ -11,12 +11,7 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/note_repository.dart';
-
-final notesStreamProvider = StreamProvider.family<List<Note>, String>((ref, bookId) {
-  final database = ref.watch(databaseProvider);
-  final repository = NoteRepository(database);
-  return repository.watchNotes(bookId);
-});
+import '../data/notes_providers.dart';
 
 class NotesScreen extends ConsumerWidget {
   final String bookId;

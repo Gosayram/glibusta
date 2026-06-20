@@ -11,12 +11,7 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/bookmark_repository.dart';
-
-final bookmarksStreamProvider = StreamProvider.family<List<Bookmark>, String>((ref, bookId) {
-  final database = ref.watch(databaseProvider);
-  final repository = BookmarkRepository(database);
-  return repository.watchBookmarks(bookId);
-});
+import '../data/bookmarks_providers.dart';
 
 class BookmarksScreen extends ConsumerWidget {
   final String bookId;

@@ -2,9 +2,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../shared/models/download_task.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_comments_service.dart';
+import '../data/book_details_repository_impl.dart';
+
+final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
+  final repository = ref.watch(bookDetailsRepositoryProvider);
+  return repository.getBookDetails(bookId);
+});
+
+final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((
+  ref,
+  bookId,
+) async {
+  final db = ref.watch(databaseProvider);
+  return db.bookDao.getReadingProgress(bookId);
+});
 
 final seriesForBookProvider = FutureProvider.autoDispose.family<List<Sery>, String>((
   ref,

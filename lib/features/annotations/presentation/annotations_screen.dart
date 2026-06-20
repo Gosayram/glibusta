@@ -7,62 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
-import '../../bookmarks/data/bookmark_repository.dart';
-import '../../notes/data/note_repository.dart';
-import '../../quotes/data/quote_repository.dart';
-
-enum AnnotationType { bookmarks, notes, quotes }
-
-class AnnotationData {
-  final List<Bookmark> bookmarks;
-  final List<Note> notes;
-  final List<Quote> quotes;
-
-  const AnnotationData({
-    required this.bookmarks,
-    required this.notes,
-    required this.quotes,
-  });
-}
-
-final _bookmarkRepoProvider = Provider<BookmarkRepository>((ref) {
-  return BookmarkRepository(ref.watch(databaseProvider));
-});
-
-final _noteRepoProvider = Provider<NoteRepository>((ref) {
-  return NoteRepository(ref.watch(databaseProvider));
-});
-
-final _quoteRepoProvider = Provider<QuoteRepository>((ref) {
-  return QuoteRepository(ref.watch(databaseProvider));
-});
-
-final allAnnotationsProvider = FutureProvider.family<AnnotationData, String?>((ref, bookId) async {
-  final db = ref.watch(databaseProvider);
-  final bookmarkRepo = ref.watch(_bookmarkRepoProvider);
-  final noteRepo = ref.watch(_noteRepoProvider);
-  final quoteRepo = ref.watch(_quoteRepoProvider);
-
-  final List<Bookmark> bookmarks;
-  final List<Note> notes;
-  final List<Quote> quotes;
-
-  if (bookId != null) {
-    bookmarks = await bookmarkRepo.getAllBookmarks(bookId);
-    notes = await noteRepo.getAllNotes(bookId);
-    quotes = await quoteRepo.getAllQuotes(bookId);
-  } else {
-    bookmarks = await db.select(db.bookmarks).get();
-    notes = await db.select(db.notes).get();
-    quotes = await db.select(db.quotes).get();
-  }
-
-  return AnnotationData(
-    bookmarks: bookmarks,
-    notes: notes,
-    quotes: quotes,
-  );
-});
+import '../data/annotations_providers.dart';
 
 class AnnotationsScreen extends ConsumerStatefulWidget {
   final String? bookId;
@@ -158,7 +103,7 @@ class _BookmarkList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
-            final repo = ref.read(_bookmarkRepoProvider);
+            final repo = ref.read(bookmarkRepoProvider);
             await repo.deleteBookmark(bookmark.id);
             unawaited(SmartDialog.showToast('Закладка удалена'));
             return true;
@@ -216,7 +161,7 @@ class _NoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
-            final repo = ref.read(_noteRepoProvider);
+            final repo = ref.read(noteRepoProvider);
             await repo.deleteNote(note.id);
             unawaited(SmartDialog.showToast('Заметка удалена'));
             return true;
@@ -275,7 +220,7 @@ class _QuoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
-            final repo = ref.read(_quoteRepoProvider);
+            final repo = ref.read(quoteRepoProvider);
             await repo.deleteQuote(quote.id);
             unawaited(SmartDialog.showToast('Цитата удалена'));
             return true;

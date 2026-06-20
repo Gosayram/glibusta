@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -9,30 +8,14 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
-import '../../../core/formats/format_capability.dart';
-import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
-import '../../../shared/widgets/app_animations.dart';
-import '../../../shared/widgets/book_cover_image.dart';
-import '../../downloads/presentation/download_queue.dart';
-import '../../search/data/composite_source.dart';
 import '../data/book_comments_service.dart';
-import '../data/book_details_repository_impl.dart';
 import 'book_details_providers.dart';
-
-final bookDetailsProvider = FutureProvider.family<BookDetails, String>((ref, bookId) async {
-  final repository = ref.watch(bookDetailsRepositoryProvider);
-  return repository.getBookDetails(bookId);
-});
-
-final bookReadingProgressProvider = FutureProvider.family<ReadingProgressData?, String>((
-  ref,
-  bookId,
-) async {
-  final db = ref.watch(databaseProvider);
-  return db.bookDao.getReadingProgress(bookId);
-});
+import 'widgets/book_header.dart';
+import 'widgets/bottom_action_bar.dart';
+import 'widgets/reading_progress_indicator.dart';
+import 'widgets/series_info_section.dart';
 
 class BookDetailsScreen extends ConsumerWidget {
   final String bookId;
@@ -46,7 +29,7 @@ class BookDetailsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('О книге')),
       body: detailsAsync.when(
-        data: (BookDetails details) => _BookDetailsContent(details: details, bookId: bookId),
+        data: (BookDetails details) => BookDetailsContent(details: details, bookId: bookId),
         loading: () => Skeletonizer(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -104,17 +87,17 @@ class BookDetailsScreen extends ConsumerWidget {
   }
 }
 
-class _BookDetailsContent extends ConsumerStatefulWidget {
+class BookDetailsContent extends ConsumerStatefulWidget {
   final BookDetails details;
   final String bookId;
 
-  const _BookDetailsContent({required this.details, required this.bookId});
+  const BookDetailsContent({super.key, required this.details, required this.bookId});
 
   @override
-  ConsumerState<_BookDetailsContent> createState() => _BookDetailsContentState();
+  ConsumerState<BookDetailsContent> createState() => BookDetailsContentState();
 }
 
-class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
+class BookDetailsContentState extends ConsumerState<BookDetailsContent>
     with SingleTickerProviderStateMixin {
   TabController? _tabController;
   int _lastTabCount = 0;
@@ -224,7 +207,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverToBoxAdapter(
-                  child: _BookHeader(book: book, details: widget.details),
+                  child: BookHeader(book: book, details: widget.details),
                 ),
               ),
               SliverPadding(
@@ -236,7 +219,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
-                  child: _SeriesInfoSection(bookId: widget.bookId),
+                  child: SeriesInfoSection(bookId: widget.bookId),
                 ),
               ),
               SliverPersistentHeader(
@@ -256,7 +239,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
             ],
           ),
         ),
-        _BottomActionBar(book: book, details: widget.details),
+        BottomActionBar(book: book, details: widget.details),
       ],
     );
   }
@@ -280,7 +263,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.all(24),
                 sliver: SliverToBoxAdapter(
-                  child: _BookHeader(book: book, details: widget.details),
+                  child: BookHeader(book: book, details: widget.details),
                 ),
               ),
               SliverPadding(
@@ -292,7 +275,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverToBoxAdapter(
-                  child: _SeriesInfoSection(bookId: widget.bookId),
+                  child: SeriesInfoSection(bookId: widget.bookId),
                 ),
               ),
             ],
@@ -326,228 +309,7 @@ class _BookDetailsContentState extends ConsumerState<_BookDetailsContent>
     if (progressAsync.isLoading || progressAsync.hasError) return null;
     final progress = progressAsync.value;
     if (progress == null) return null;
-    return _ReadingProgressIndicator(progress: progress);
-  }
-}
-
-class _BookHeader extends StatelessWidget {
-  final Book book;
-  final BookDetails details;
-
-  const _BookHeader({required this.book, required this.details});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 130,
-              height: 190,
-              child: BookCoverImage(book: book),
-            ),
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              Text(
-                book.title,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (book.displayAuthor.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  book.displayAuthor,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-              if (book.publishDate != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  book.publishDate!.year.toString(),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              if (details.availableFormats.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Builder(
-                  builder: (context) {
-                    final capService = const FormatCapabilityService();
-                    return Wrap(
-                      spacing: 6,
-                      children: details.availableFormats.map((f) {
-                        final warning = capService.warningLabel(f);
-                        final isSupported = warning == null;
-                        return Tooltip(
-                          message: warning ?? f.name.toUpperCase(),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isSupported
-                                  ? theme.colorScheme.secondaryContainer
-                                  : theme.colorScheme.errorContainer,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              f.name.toUpperCase(),
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: isSupported
-                                    ? theme.colorScheme.onSecondaryContainer
-                                    : theme.colorScheme.onErrorContainer,
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    ).animate().contentFadeIn();
-  }
-}
-
-class _ReadingProgressIndicator extends StatelessWidget {
-  final ReadingProgressData progress;
-
-  const _ReadingProgressIndicator({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final percent = progress.progressPercent > 0 ? progress.progressPercent.clamp(0.0, 1.0) : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Прогресс чтения',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              Text(
-                '${(percent * 100).round()}%',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: percent, minHeight: 6),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SeriesInfoSection extends ConsumerWidget {
-  final String bookId;
-
-  const _SeriesInfoSection({required this.bookId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final seriesAsync = ref.watch(seriesForBookProvider(bookId));
-
-    return seriesAsync.when(
-      data: (seriesList) {
-        if (seriesList.isEmpty) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final s in seriesList)
-                Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () => context.push('/series/${s.id}'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.collections_bookmark,
-                            size: 20,
-                            color: theme.colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  s.name,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Серия',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, _) => const SizedBox.shrink(),
-    );
+    return ReadingProgressIndicator(progress: progress);
   }
 }
 
@@ -971,309 +733,4 @@ class _LoginPlaceholder extends StatelessWidget {
       ),
     );
   }
-}
-
-class _BottomActionBar extends ConsumerWidget {
-  final Book book;
-  final BookDetails details;
-
-  const _BottomActionBar({required this.book, required this.details});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final downloadStateAsync = ref.watch(bookDownloadStateProvider(book.id));
-    final downloadState = downloadStateAsync.value ?? BookDownloadState.notDownloaded;
-    final isDownloading = downloadState == BookDownloadState.downloading;
-    final isDownloaded = downloadState == BookDownloadState.downloaded;
-    final hasFormats = details.availableFormats.isNotEmpty;
-    final capService = const FormatCapabilityService();
-    final bestFormat = book.availableFormats.isNotEmpty
-        ? book.availableFormats.first
-        : BookFormat.unknown;
-    final isDocumentOnly = capService.isDocumentOnly(bestFormat);
-    final readLabel = isDocumentOnly ? 'Документ' : 'Читать';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
-                label: Text(readLabel),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: isDownloaded
-                  ? OutlinedButton.icon(
-                      onPressed: () => unawaited(context.push('/reader/${book.id}')),
-                      icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
-                      label: Text(isDocumentOnly ? 'Открыть документ' : 'Открыть'),
-                    )
-                  : OutlinedButton.icon(
-                      onPressed: hasFormats && !isDownloading
-                          ? () => _startDownload(context, ref, book, details)
-                          : null,
-                      icon: isDownloading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.download),
-                      label: Text(isDownloading ? 'Загрузка...' : 'Скачать'),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _startDownload(
-    BuildContext context,
-    WidgetRef ref,
-    Book book,
-    BookDetails details,
-  ) async {
-    final formats = details.availableFormats;
-    if (formats.isEmpty) return;
-
-    // Show format selection bottom sheet
-    final selectedFormat = await showModalBottomSheet<BookFormat>(
-      context: context,
-      builder: (context) => _FormatSelectionSheet(
-        bookTitle: book.title,
-        formats: formats,
-      ),
-    );
-
-    if (selectedFormat == null || !context.mounted) return;
-
-    final source = ref.read(bookSourceProvider);
-    final queue = ref.read(downloadQueueProvider);
-
-    try {
-      final url = await source.getDownloadUrl(book.id, selectedFormat);
-      await queue.enqueue(
-        bookId: book.id,
-        bookTitle: book.title,
-        format: selectedFormat,
-        sourceUrl: url,
-      );
-      ref.invalidate(bookDownloadStateProvider(book.id));
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Загрузка ${book.title} (${selectedFormat.name})'));
-      }
-    } on Object catch (e) {
-      AppLogger().severe('Download failed: $e', name: 'BookDetails', error: e);
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Ошибка загрузки: $e'));
-      }
-    }
-  }
-}
-
-// ── Format Selection Bottom Sheet ─────────────────────────────────────────────
-
-class _FormatSelectionSheet extends StatelessWidget {
-  final String bookTitle;
-  final List<BookFormat> formats;
-
-  const _FormatSelectionSheet({required this.bookTitle, required this.formats});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 32,
-            height: 4,
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Text(
-              'Скачать в формате',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          if (bookTitle.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                bookTitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          const Divider(height: 1),
-          ...formats.map((format) {
-            final info = _formatInfo(format);
-            final capService = const FormatCapabilityService();
-            final cap = capService.capabilityOf(format);
-            final warning = capService.warningLabel(format);
-            return ListTile(
-              leading: Icon(info.icon, color: info.color),
-              title: Row(
-                children: [
-                  Text(info.label),
-                  if (warning != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: cap == FormatCapability.partial
-                            ? const Color(0xFFFFA726).withValues(alpha: 0.2)
-                            : const Color(0xFF9E9E9E).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        cap.label,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cap == FormatCapability.partial
-                              ? const Color(0xFFFFA726)
-                              : const Color(0xFF9E9E9E),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              subtitle: Text(info.description, style: theme.textTheme.bodySmall),
-              onTap: () => Navigator.of(context).pop(format),
-            );
-          }),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-
-  _FormatInfo _formatInfo(BookFormat format) {
-    switch (format) {
-      case BookFormat.fb2:
-        return const _FormatInfo(
-          Icons.description,
-          'FB2',
-          'FictionBook 2 — стандарт Флибусты',
-          Color(0xFF4CAF50),
-        );
-      case BookFormat.epub:
-        return const _FormatInfo(
-          Icons.menu_book,
-          'EPUB',
-          'Universal Publication — для большинства ридеров',
-          Color(0xFF2196F3),
-        );
-      case BookFormat.mobi:
-        return const _FormatInfo(
-          Icons.tablet_mac,
-          'MOBI',
-          'Mobipocket — для Kindle',
-          Color(0xFFFF9800),
-        );
-      case BookFormat.azw3:
-        return const _FormatInfo(
-          Icons.tablet_mac,
-          'AZW3',
-          'Kindle Format 8 — частичная поддержка',
-          Color(0xFFFFA726),
-        );
-      case BookFormat.prc:
-        return const _FormatInfo(
-          Icons.tablet_mac,
-          'PRC',
-          'Palm/Mobipocket legacy',
-          Color(0xFFFFB74D),
-        );
-      case BookFormat.pdf:
-        return const _FormatInfo(
-          Icons.picture_as_pdf,
-          'PDF',
-          'Portable Document — для печати и экрана',
-          Color(0xFFF44336),
-        );
-      case BookFormat.txt:
-        return const _FormatInfo(
-          Icons.text_snippet,
-          'TXT',
-          'Текстовый файл — универсальный',
-          Color(0xFF9E9E9E),
-        );
-      case BookFormat.rtf:
-        return const _FormatInfo(
-          Icons.article,
-          'RTF',
-          'Rich Text Format — текст с базовым форматированием',
-          Color(0xFF795548),
-        );
-      case BookFormat.djvu:
-        return const _FormatInfo(
-          Icons.image,
-          'DJVU',
-          'DjVu — сканы и документы',
-          Color(0xFF607D8B),
-        );
-      case BookFormat.docx:
-        return const _FormatInfo(
-          Icons.description,
-          'DOCX',
-          'Microsoft Word Document',
-          Color(0xFF2B579A),
-        );
-      case BookFormat.cbz:
-        return const _FormatInfo(
-          Icons.book,
-          'CBZ',
-          'Comic Book ZIP — комиксы',
-          Color(0xFF9C27B0),
-        );
-      case BookFormat.cbr:
-        return const _FormatInfo(
-          Icons.book,
-          'CBR',
-          'Comic Book RAR — комиксы',
-          Color(0xFF7B1FA2),
-        );
-      case BookFormat.unknown:
-        return _FormatInfo(
-          Icons.help_outline,
-          format.name.toUpperCase(),
-          'Неизвестный формат',
-          const Color(0xFF757575),
-        );
-    }
-  }
-}
-
-class _FormatInfo {
-  final IconData icon;
-  final String label;
-  final String description;
-  final Color color;
-
-  const _FormatInfo(this.icon, this.label, this.description, this.color);
 }

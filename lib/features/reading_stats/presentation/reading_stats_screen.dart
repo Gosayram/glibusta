@@ -11,11 +11,7 @@ import '../../home/presentation/reading_heatmap.dart';
 import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
-
-final bookStatsListProvider = FutureProvider<Map<String, telemetry.BookStats>>((ref) async {
-  final telemetryRepo = ref.watch(telemetry.readerTelemetryProvider);
-  return telemetryRepo.getAllStats();
-});
+import '../data/reading_stats_providers.dart';
 
 class ReadingStatsScreen extends ConsumerWidget {
   const ReadingStatsScreen({super.key});
