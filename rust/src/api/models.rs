@@ -8,6 +8,13 @@ pub enum BlockType {
     Quote,
     Footnote,
     Separator,
+    Table,
+    List,
+    Epigraph,
+    Poem,
+    Cite,
+    TextAuthor,
+    Subtitle,
 }
 
 impl BlockType {
@@ -19,6 +26,13 @@ impl BlockType {
             BlockType::Quote => "quote",
             BlockType::Footnote => "footnote",
             BlockType::Separator => "separator",
+            BlockType::Table => "table",
+            BlockType::List => "list",
+            BlockType::Epigraph => "epigraph",
+            BlockType::Poem => "poem",
+            BlockType::Cite => "cite",
+            BlockType::TextAuthor => "textAuthor",
+            BlockType::Subtitle => "subtitle",
         }
     }
 
@@ -30,6 +44,13 @@ impl BlockType {
             "quote" => BlockType::Quote,
             "footnote" => BlockType::Footnote,
             "separator" => BlockType::Separator,
+            "table" => BlockType::Table,
+            "list" => BlockType::List,
+            "epigraph" => BlockType::Epigraph,
+            "poem" => BlockType::Poem,
+            "cite" => BlockType::Cite,
+            "textAuthor" => BlockType::TextAuthor,
+            "subtitle" => BlockType::Subtitle,
             _ => BlockType::Paragraph,
         }
     }
@@ -41,7 +62,10 @@ pub struct RichSpan {
     pub bold: bool,
     pub italic: bool,
     pub superscript: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,
+    #[serde(default)]
+    pub line_break: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +80,22 @@ pub struct ReaderBlock {
     pub note_ref: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rich_spans: Option<Vec<RichSpan>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heading_level: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ordered: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list_items: Option<Vec<ReaderBlock>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub table_rows: Option<Vec<Vec<String>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_alt: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_indent: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_align: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

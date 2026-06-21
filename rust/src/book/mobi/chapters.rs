@@ -38,6 +38,14 @@ impl MobiChapterSplitter {
                     image_url: None,
                     note_ref: None,
                     rich_spans: None,
+                    heading_level: None,
+                    ordered: None,
+                    list_items: None,
+                    table_rows: None,
+                    image_alt: None,
+                    text_indent: None,
+                    text_align: None,
+                    note_id: None,
                 }],
             }];
         }

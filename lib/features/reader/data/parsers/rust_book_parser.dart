@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' show TextAlign;
 
 import '../../../../core/errors/failures.dart';
 import '../../../../src/rust/api/api/api.dart' as rust_api;
@@ -119,9 +120,33 @@ class RustBookParser implements BookParser {
                               italic: rs.italic,
                               superscript: rs.superscript,
                               href: rs.href,
+                              lineBreak: rs.lineBreak,
                             ),
                           )
                           .toList(),
+                      headingLevel: rb.headingLevel,
+                      ordered: rb.ordered,
+                      listItems: rb.listItems
+                          ?.map(
+                            (item) => local.ReaderBlock(
+                              index: item.index,
+                              text: item.text,
+                              type: _toBlockType(item.blockType),
+                            ),
+                          )
+                          .toList(),
+                      tableRows: rb.tableRows
+                          ?.map((row) => row.cast<String>())
+                          .toList(),
+                      imageAlt: rb.imageAlt,
+                      textIndent: rb.textIndent,
+                      textAlign: rb.textAlign != null
+                          ? TextAlign.values.firstWhere(
+                              (e) => e.name == rb.textAlign,
+                              orElse: () => TextAlign.left,
+                            )
+                          : null,
+                      noteId: rb.noteId,
                     ),
                   )
                   .toList(),
@@ -133,11 +158,20 @@ class RustBookParser implements BookParser {
   }
 
   static local.BlockType _toBlockType(rust_models.BlockType rbt) {
-    if (rbt == rust_models.BlockType.heading) return local.BlockType.heading;
-    if (rbt == rust_models.BlockType.image) return local.BlockType.image;
-    if (rbt == rust_models.BlockType.quote) return local.BlockType.quote;
-    if (rbt == rust_models.BlockType.footnote) return local.BlockType.footnote;
-    if (rbt == rust_models.BlockType.separator) return local.BlockType.separator;
-    return local.BlockType.paragraph;
+    return switch (rbt) {
+      rust_models.BlockType.heading => local.BlockType.heading,
+      rust_models.BlockType.image => local.BlockType.image,
+      rust_models.BlockType.quote => local.BlockType.quote,
+      rust_models.BlockType.footnote => local.BlockType.footnote,
+      rust_models.BlockType.separator => local.BlockType.separator,
+      rust_models.BlockType.table => local.BlockType.table,
+      rust_models.BlockType.list => local.BlockType.list,
+      rust_models.BlockType.epigraph => local.BlockType.epigraph,
+      rust_models.BlockType.poem => local.BlockType.poem,
+      rust_models.BlockType.cite => local.BlockType.cite,
+      rust_models.BlockType.textAuthor => local.BlockType.textAuthor,
+      rust_models.BlockType.subtitle => local.BlockType.subtitle,
+      rust_models.BlockType.paragraph => local.BlockType.paragraph,
+    };
   }
 }

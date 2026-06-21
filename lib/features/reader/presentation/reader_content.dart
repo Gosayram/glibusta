@@ -232,6 +232,30 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   ) {
     switch (block.type) {
       case BlockType.heading:
+        final level = block.headingLevel ?? 2;
+        final scale = switch (level) {
+          1 => 1.6,
+          2 => 1.4,
+          3 => 1.2,
+          _ => 1.1,
+        };
+        final spacing = switch (level) {
+          1 => settings.paragraphSpacing * 3,
+          2 => settings.paragraphSpacing * 2,
+          _ => settings.paragraphSpacing * 1.5,
+        };
+        return Padding(
+          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * scale,
+              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+            ),
+            block.textAlign ?? textAlign,
+          ),
+        );
+      case BlockType.subtitle:
         return Padding(
           padding: EdgeInsets.only(
             top: settings.paragraphSpacing * 2,
@@ -240,10 +264,77 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           child: _buildHighlightedText(
             block.text,
             _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 1.2,
-              fontWeight: FontWeight.bold,
+              fontSize: settings.fontSize * 1.1,
+              fontStyle: FontStyle.italic,
             ),
-            textAlign,
+            block.textAlign ?? TextAlign.center,
+          ),
+        );
+      case BlockType.epigraph:
+        return Container(
+          margin: EdgeInsets.symmetric(
+            vertical: settings.paragraphSpacing * 2,
+            horizontal: settings.margin * 0.5,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildHighlightedText(
+                block.text,
+                _getReaderStyle(settings).copyWith(
+                  fontStyle: FontStyle.italic,
+                  fontSize: settings.fontSize * 0.95,
+                ),
+                TextAlign.right,
+              ),
+            ],
+          ),
+        );
+      case BlockType.poem:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+            TextAlign.center,
+          ),
+        );
+      case BlockType.cite:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
+            TextAlign.left,
+          ),
+        );
+      case BlockType.textAuthor:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing,
+            left: settings.margin,
+          ),
+          child: Text(
+            '— ${block.text}',
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 0.9,
+              fontStyle: FontStyle.italic,
+              color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.right,
           ),
         );
       case BlockType.quote:
@@ -260,9 +351,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           ),
           child: _buildHighlightedText(
             block.text,
-            _getReaderStyle(settings).copyWith(
-              fontStyle: FontStyle.italic,
-            ),
+            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
             textAlign,
           ),
         );
@@ -276,11 +365,14 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-                child: _buildImageWidget(
-                  block.imageUrl!,
-                  _getReaderStyle(settings).color,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                  child: _buildImageWidget(
+                    block.imageUrl!,
+                    _getReaderStyle(settings).color,
+                  ),
                 ),
               ),
             ),
@@ -298,10 +390,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             textAlign,
           ),
         );
+      case BlockType.table:
+        return _buildTable(block, settings);
+      case BlockType.list:
+        return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = settings.paragraphFirstLineIndent > 0
-            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-            : EdgeInsets.zero;
+        final indent = (block.textIndent != null && block.textIndent! > 0)
+            ? EdgeInsets.only(left: block.textIndent!)
+            : (settings.paragraphFirstLineIndent > 0
+                ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
@@ -309,7 +407,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             child: _buildHighlightedText(
               block.text,
               _getReaderStyle(settings),
-              textAlign,
+              block.textAlign ?? textAlign,
               richSpans: block.richSpans,
             ),
           ),
@@ -342,7 +440,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
     final linkColor = Theme.of(context).colorScheme.primary;
-    return richSpans.map((span) {
+    final spans = <InlineSpan>[];
+    for (final span in richSpans) {
+      if (span.lineBreak) {
+        spans.add(const TextSpan(text: '\n'));
+        continue;
+      }
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
@@ -357,8 +460,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           decoration: TextDecoration.underline,
         );
       }
-      return TextSpan(text: span.text, style: spanStyle);
-    }).toList();
+      spans.add(TextSpan(text: span.text, style: spanStyle));
+    }
+    return spans;
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
@@ -467,6 +571,78 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     }
 
     return Icon(Icons.broken_image, size: 64, color: errorColor);
+  }
+
+  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
+    final rows = block.tableRows;
+    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+    final baseStyle = _getReaderStyle(settings);
+    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
+    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const IntrinsicColumnWidth(),
+          border: TableBorder.all(
+            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
+            width: 1,
+          ),
+          children: rows.asMap().entries.map((entry) {
+            final isHeader = entry.key == 0;
+            return TableRow(
+              children: entry.value.map((cell) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
+    final items = block.listItems;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final isOrdered = block.ordered ?? false;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
+          return Padding(
+            padding: const EdgeInsets.only(left: 24, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$bullet ',
+                  style: _getReaderStyle(settings),
+                ),
+                Expanded(
+                  child: _buildHighlightedText(
+                    item.text,
+                    _getReaderStyle(settings),
+                    textAlign,
+                    richSpans: item.richSpans,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -643,6 +819,30 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
     switch (block.type) {
       case BlockType.heading:
+        final level = block.headingLevel ?? 2;
+        final scale = switch (level) {
+          1 => 1.6,
+          2 => 1.4,
+          3 => 1.2,
+          _ => 1.1,
+        };
+        final spacing = switch (level) {
+          1 => settings.paragraphSpacing * 3,
+          2 => settings.paragraphSpacing * 2,
+          _ => settings.paragraphSpacing * 1.5,
+        };
+        return Padding(
+          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(
+              fontSize: settings.fontSize * scale,
+              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+            ),
+            block.textAlign ?? textAlign,
+          ),
+        );
+      case BlockType.subtitle:
         return Padding(
           padding: EdgeInsets.only(
             top: settings.paragraphSpacing * 2,
@@ -651,10 +851,75 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: _buildHighlightedText(
             block.text,
             style.copyWith(
-              fontSize: settings.fontSize * 1.2,
-              fontWeight: FontWeight.bold,
+              fontSize: settings.fontSize * 1.1,
+              fontStyle: FontStyle.italic,
             ),
-            textAlign,
+            block.textAlign ?? TextAlign.center,
+          ),
+        );
+      case BlockType.epigraph:
+        return Container(
+          margin: EdgeInsets.symmetric(
+            vertical: settings.paragraphSpacing * 2,
+            horizontal: settings.margin * 0.5,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildHighlightedText(
+                block.text,
+                style.copyWith(
+                  fontStyle: FontStyle.italic,
+                  fontSize: settings.fontSize * 0.95,
+                ),
+                TextAlign.right,
+              ),
+            ],
+          ),
+        );
+      case BlockType.poem:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(fontStyle: FontStyle.italic),
+            TextAlign.center,
+          ),
+        );
+      case BlockType.cite:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: (style.color ?? Colors.black).withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(fontStyle: FontStyle.italic),
+            TextAlign.left,
+          ),
+        );
+      case BlockType.textAuthor:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing,
+            left: settings.margin,
+          ),
+          child: Text(
+            '— ${block.text}',
+            style: style.copyWith(
+              fontSize: settings.fontSize * 0.9,
+              fontStyle: FontStyle.italic,
+              color: (style.color ?? Colors.black).withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.right,
           ),
         );
       case BlockType.quote:
@@ -685,9 +950,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: DecoratedBox(
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-                child: _buildImageWidget(block.imageUrl!, style.color),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                  child: _buildImageWidget(block.imageUrl!, style.color),
+                ),
               ),
             ),
           );
@@ -698,21 +966,25 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
           child: _buildHighlightedText(
             block.text,
-            style.copyWith(
-              fontSize: settings.fontSize * 0.85,
-            ),
+            style.copyWith(fontSize: settings.fontSize * 0.85),
             textAlign,
           ),
         );
+      case BlockType.table:
+        return _buildTable(block, settings);
+      case BlockType.list:
+        return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = settings.paragraphFirstLineIndent > 0
-            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-            : EdgeInsets.zero;
+        final indent = (block.textIndent != null && block.textIndent! > 0)
+            ? EdgeInsets.only(left: block.textIndent!)
+            : (settings.paragraphFirstLineIndent > 0
+                ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, style, textAlign, richSpans: block.richSpans),
+            child: _buildHighlightedText(block.text, style, block.textAlign ?? textAlign, richSpans: block.richSpans),
           ),
         );
     }
@@ -743,7 +1015,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
     final linkColor = Theme.of(context).colorScheme.primary;
-    return richSpans.map((span) {
+    final spans = <InlineSpan>[];
+    for (final span in richSpans) {
+      if (span.lineBreak) {
+        spans.add(const TextSpan(text: '\n'));
+        continue;
+      }
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
@@ -758,8 +1035,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           decoration: TextDecoration.underline,
         );
       }
-      return TextSpan(text: span.text, style: spanStyle);
-    }).toList();
+      spans.add(TextSpan(text: span.text, style: spanStyle));
+    }
+    return spans;
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
@@ -1014,5 +1292,74 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
 
     return Icon(Icons.broken_image, size: 64, color: errorColor);
+  }
+
+  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
+    final rows = block.tableRows;
+    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+    final baseStyle = _getReaderStyle(settings);
+    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
+    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const IntrinsicColumnWidth(),
+          border: TableBorder.all(
+            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
+            width: 1,
+          ),
+          children: rows.asMap().entries.map((entry) {
+            final isHeader = entry.key == 0;
+            return TableRow(
+              children: entry.value.map((cell) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
+    final items = block.listItems;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final isOrdered = block.ordered ?? false;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
+          return Padding(
+            padding: const EdgeInsets.only(left: 24, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$bullet ', style: _getReaderStyle(settings)),
+                Expanded(
+                  child: _buildHighlightedText(
+                    item.text,
+                    _getReaderStyle(settings),
+                    textAlign,
+                    richSpans: item.richSpans,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

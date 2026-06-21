@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart' show TextAlign;
+
 class NormalizedBook {
   final String id;
   final String title;
@@ -132,6 +134,14 @@ class ReaderBlock {
   final String? imageUrl;
   final String? noteRef;
   final List<RichSpan>? richSpans;
+  final int? headingLevel;
+  final bool? ordered;
+  final List<ReaderBlock>? listItems;
+  final List<List<String>>? tableRows;
+  final String? imageAlt;
+  final double? textIndent;
+  final TextAlign? textAlign;
+  final String? noteId;
 
   const ReaderBlock({
     required this.index,
@@ -140,6 +150,14 @@ class ReaderBlock {
     this.imageUrl,
     this.noteRef,
     this.richSpans,
+    this.headingLevel,
+    this.ordered,
+    this.listItems,
+    this.tableRows,
+    this.imageAlt,
+    this.textIndent,
+    this.textAlign,
+    this.noteId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -150,6 +168,16 @@ class ReaderBlock {
     'noteRef': noteRef,
     if (richSpans != null && richSpans!.isNotEmpty)
       'richSpans': richSpans!.map((s) => s.toJson()).toList(),
+    if (headingLevel != null) 'headingLevel': headingLevel,
+    if (ordered != null) 'ordered': ordered,
+    if (listItems != null && listItems!.isNotEmpty)
+      'listItems': listItems!.map((b) => b.toJson()).toList(),
+    if (tableRows != null && tableRows!.isNotEmpty)
+      'tableRows': tableRows,
+    if (imageAlt != null) 'imageAlt': imageAlt,
+    if (textIndent != null) 'textIndent': textIndent,
+    if (textAlign != null) 'textAlign': textAlign!.name,
+    if (noteId != null) 'noteId': noteId,
   };
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
@@ -164,6 +192,23 @@ class ReaderBlock {
     richSpans: (json['richSpans'] as List<dynamic>?)
         ?.map((s) => RichSpan.fromJson(s as Map<String, dynamic>))
         .toList(),
+    headingLevel: json['headingLevel'] as int?,
+    ordered: json['ordered'] as bool?,
+    listItems: (json['listItems'] as List<dynamic>?)
+        ?.map((b) => ReaderBlock.fromJson(b as Map<String, dynamic>))
+        .toList(),
+    tableRows: (json['tableRows'] as List<dynamic>?)
+        ?.map((row) => (row as List<dynamic>).cast<String>())
+        .toList(),
+    imageAlt: json['imageAlt'] as String?,
+    textIndent: (json['textIndent'] as num?)?.toDouble(),
+    textAlign: json['textAlign'] != null
+        ? TextAlign.values.firstWhere(
+            (e) => e.name == json['textAlign'],
+            orElse: () => TextAlign.left,
+          )
+        : null,
+    noteId: json['noteId'] as String?,
   );
 }
 
@@ -172,6 +217,7 @@ class RichSpan {
   final bool bold;
   final bool italic;
   final bool superscript;
+  final bool lineBreak;
   final String? href;
 
   const RichSpan({
@@ -179,6 +225,7 @@ class RichSpan {
     this.bold = false,
     this.italic = false,
     this.superscript = false,
+    this.lineBreak = false,
     this.href,
   });
 
@@ -187,6 +234,7 @@ class RichSpan {
     if (bold) 'bold': true,
     if (italic) 'italic': true,
     if (superscript) 'superscript': true,
+    if (lineBreak) 'lineBreak': true,
     if (href != null) 'href': href,
   };
 
@@ -195,6 +243,7 @@ class RichSpan {
     bold: json['bold'] as bool? ?? false,
     italic: json['italic'] as bool? ?? false,
     superscript: json['superscript'] as bool? ?? false,
+    lineBreak: json['lineBreak'] as bool? ?? false,
     href: json['href'] as String?,
   );
 }
@@ -206,4 +255,11 @@ enum BlockType {
   quote,
   footnote,
   separator,
+  table,
+  list,
+  epigraph,
+  poem,
+  cite,
+  textAuthor,
+  subtitle,
 }

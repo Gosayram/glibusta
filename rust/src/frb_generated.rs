@@ -27,7 +27,7 @@
 
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -644,6 +644,13 @@ impl SseDecode for crate::api::models::BlockType {
             3 => crate::api::models::BlockType::Quote,
             4 => crate::api::models::BlockType::Footnote,
             5 => crate::api::models::BlockType::Separator,
+            6 => crate::api::models::BlockType::Table,
+            7 => crate::api::models::BlockType::List,
+            8 => crate::api::models::BlockType::Epigraph,
+            9 => crate::api::models::BlockType::Poem,
+            10 => crate::api::models::BlockType::Cite,
+            11 => crate::api::models::BlockType::TextAuthor,
+            12 => crate::api::models::BlockType::Subtitle,
             _ => unreachable!("Invalid variant for BlockType: {}", inner),
         };
     }
@@ -653,6 +660,13 @@ impl SseDecode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u8().unwrap() != 0
+    }
+}
+
+impl SseDecode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_f64::<NativeEndian>().unwrap()
     }
 }
 
@@ -670,6 +684,18 @@ impl SseDecode for Vec<String> {
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
             ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<Vec<String>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<Vec<String>>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -769,11 +795,68 @@ impl SseDecode for Option<Value> {
     }
 }
 
+impl SseDecode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<bool>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<f64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<i32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<usize> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<usize>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<Vec<Vec<String>>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<Vec<String>>>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<Vec<crate::api::models::ReaderBlock>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<crate::api::models::ReaderBlock>>::sse_decode(
+                deserializer,
+            ));
         } else {
             return None;
         }
@@ -803,6 +886,15 @@ impl SseDecode for crate::api::models::ReaderBlock {
         let mut var_noteRef = <Option<String>>::sse_decode(deserializer);
         let mut var_richSpans =
             <Option<Vec<crate::api::models::RichSpan>>>::sse_decode(deserializer);
+        let mut var_headingLevel = <Option<i32>>::sse_decode(deserializer);
+        let mut var_ordered = <Option<bool>>::sse_decode(deserializer);
+        let mut var_listItems =
+            <Option<Vec<crate::api::models::ReaderBlock>>>::sse_decode(deserializer);
+        let mut var_tableRows = <Option<Vec<Vec<String>>>>::sse_decode(deserializer);
+        let mut var_imageAlt = <Option<String>>::sse_decode(deserializer);
+        let mut var_textIndent = <Option<f64>>::sse_decode(deserializer);
+        let mut var_textAlign = <Option<String>>::sse_decode(deserializer);
+        let mut var_noteId = <Option<String>>::sse_decode(deserializer);
         return crate::api::models::ReaderBlock {
             index: var_index,
             text: var_text,
@@ -810,6 +902,14 @@ impl SseDecode for crate::api::models::ReaderBlock {
             image_url: var_imageUrl,
             note_ref: var_noteRef,
             rich_spans: var_richSpans,
+            heading_level: var_headingLevel,
+            ordered: var_ordered,
+            list_items: var_listItems,
+            table_rows: var_tableRows,
+            image_alt: var_imageAlt,
+            text_indent: var_textIndent,
+            text_align: var_textAlign,
+            note_id: var_noteId,
         };
     }
 }
@@ -836,12 +936,14 @@ impl SseDecode for crate::api::models::RichSpan {
         let mut var_italic = <bool>::sse_decode(deserializer);
         let mut var_superscript = <bool>::sse_decode(deserializer);
         let mut var_href = <Option<String>>::sse_decode(deserializer);
+        let mut var_lineBreak = <bool>::sse_decode(deserializer);
         return crate::api::models::RichSpan {
             text: var_text,
             bold: var_bold,
             italic: var_italic,
             superscript: var_superscript,
             href: var_href,
+            line_break: var_lineBreak,
         };
     }
 }
@@ -942,6 +1044,13 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::BlockType {
             Self::Quote => 3.into_dart(),
             Self::Footnote => 4.into_dart(),
             Self::Separator => 5.into_dart(),
+            Self::Table => 6.into_dart(),
+            Self::List => 7.into_dart(),
+            Self::Epigraph => 8.into_dart(),
+            Self::Poem => 9.into_dart(),
+            Self::Cite => 10.into_dart(),
+            Self::TextAuthor => 11.into_dart(),
+            Self::Subtitle => 12.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -990,6 +1099,14 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::ReaderBlock {
             self.image_url.into_into_dart().into_dart(),
             self.note_ref.into_into_dart().into_dart(),
             self.rich_spans.into_into_dart().into_dart(),
+            self.heading_level.into_into_dart().into_dart(),
+            self.ordered.into_into_dart().into_dart(),
+            self.list_items.into_into_dart().into_dart(),
+            self.table_rows.into_into_dart().into_dart(),
+            self.image_alt.into_into_dart().into_dart(),
+            self.text_indent.into_into_dart().into_dart(),
+            self.text_align.into_into_dart().into_dart(),
+            self.note_id.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1036,6 +1153,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::RichSpan {
             self.italic.into_into_dart().into_dart(),
             self.superscript.into_into_dart().into_dart(),
             self.href.into_into_dart().into_dart(),
+            self.line_break.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1093,6 +1211,13 @@ impl SseEncode for crate::api::models::BlockType {
                 crate::api::models::BlockType::Quote => 3,
                 crate::api::models::BlockType::Footnote => 4,
                 crate::api::models::BlockType::Separator => 5,
+                crate::api::models::BlockType::Table => 6,
+                crate::api::models::BlockType::List => 7,
+                crate::api::models::BlockType::Epigraph => 8,
+                crate::api::models::BlockType::Poem => 9,
+                crate::api::models::BlockType::Cite => 10,
+                crate::api::models::BlockType::TextAuthor => 11,
+                crate::api::models::BlockType::Subtitle => 12,
                 _ => {
                     unimplemented!("");
                 }
@@ -1109,6 +1234,13 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for f64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_f64::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1122,6 +1254,16 @@ impl SseEncode for Vec<String> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <String>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<Vec<String>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <Vec<String>>::sse_encode(item, serializer);
         }
     }
 }
@@ -1199,12 +1341,62 @@ impl SseEncode for Option<Value> {
     }
 }
 
+impl SseEncode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <bool>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<f64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <f64>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <i32>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<usize> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <usize>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<Vec<Vec<String>>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<Vec<String>>>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<Vec<crate::api::models::ReaderBlock>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<crate::api::models::ReaderBlock>>::sse_encode(value, serializer);
         }
     }
 }
@@ -1228,6 +1420,14 @@ impl SseEncode for crate::api::models::ReaderBlock {
         <Option<String>>::sse_encode(self.image_url, serializer);
         <Option<String>>::sse_encode(self.note_ref, serializer);
         <Option<Vec<crate::api::models::RichSpan>>>::sse_encode(self.rich_spans, serializer);
+        <Option<i32>>::sse_encode(self.heading_level, serializer);
+        <Option<bool>>::sse_encode(self.ordered, serializer);
+        <Option<Vec<crate::api::models::ReaderBlock>>>::sse_encode(self.list_items, serializer);
+        <Option<Vec<Vec<String>>>>::sse_encode(self.table_rows, serializer);
+        <Option<String>>::sse_encode(self.image_alt, serializer);
+        <Option<f64>>::sse_encode(self.text_indent, serializer);
+        <Option<String>>::sse_encode(self.text_align, serializer);
+        <Option<String>>::sse_encode(self.note_id, serializer);
     }
 }
 
@@ -1248,6 +1448,7 @@ impl SseEncode for crate::api::models::RichSpan {
         <bool>::sse_encode(self.italic, serializer);
         <bool>::sse_encode(self.superscript, serializer);
         <Option<String>>::sse_encode(self.href, serializer);
+        <bool>::sse_encode(self.line_break, serializer);
     }
 }
 
@@ -1285,7 +1486,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -1324,7 +1525,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
+    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

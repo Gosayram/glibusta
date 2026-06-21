@@ -2,8 +2,8 @@ use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, 
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::decode_bytes;
 use anyhow::{Context, Result};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
@@ -201,6 +201,7 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                                 italic: current_span_italic,
                                 superscript: false,
                                 href: None,
+                                line_break: false,
                             });
                         }
                         current_span_text.clear();
@@ -242,6 +243,14 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                                 } else {
                                     None
                                 },
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }

@@ -89,6 +89,7 @@ impl MobiHtmlParser {
             if self.is_heading(&lower) {
                 let text = self.extract_text_from_chunk(trimmed);
                 if !text.is_empty() {
+                    let level = self.extract_heading_level(&lower);
                     blocks.push(ReaderBlock {
                         index: idx,
                         text,
@@ -96,6 +97,14 @@ impl MobiHtmlParser {
                         image_url: None,
                         note_ref: None,
                         rich_spans: Some(self.parse_inline(trimmed)),
+                        heading_level: Some(level),
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     idx += 1;
                 }
@@ -107,6 +116,14 @@ impl MobiHtmlParser {
                     image_url: None,
                     note_ref: None,
                     rich_spans: None,
+                    heading_level: None,
+                    ordered: None,
+                    list_items: None,
+                    table_rows: None,
+                    image_alt: None,
+                    text_indent: None,
+                    text_align: None,
+                    note_id: None,
                 });
                 idx += 1;
             } else if self.is_blockquote(&lower) {
@@ -119,6 +136,14 @@ impl MobiHtmlParser {
                         image_url: None,
                         note_ref: None,
                         rich_spans: Some(self.parse_inline(trimmed)),
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     idx += 1;
                 }
@@ -134,6 +159,14 @@ impl MobiHtmlParser {
                         image_url: None,
                         note_ref: None,
                         rich_spans: if spans.is_empty() { None } else { Some(spans) },
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     idx += 1;
                 }
@@ -152,6 +185,14 @@ impl MobiHtmlParser {
                     image_url: None,
                     note_ref: None,
                     rich_spans: None,
+                    heading_level: None,
+                    ordered: None,
+                    list_items: None,
+                    table_rows: None,
+                    image_alt: None,
+                    text_indent: None,
+                    text_align: None,
+                    note_id: None,
                 });
             }
         }
@@ -363,6 +404,24 @@ impl MobiHtmlParser {
             || lower.starts_with("<h6")
     }
 
+    fn extract_heading_level(&self, lower: &str) -> i32 {
+        if lower.starts_with("<h1") {
+            1
+        } else if lower.starts_with("<h2") {
+            2
+        } else if lower.starts_with("<h3") {
+            3
+        } else if lower.starts_with("<h4") {
+            4
+        } else if lower.starts_with("<h5") {
+            5
+        } else if lower.starts_with("<h6") {
+            6
+        } else {
+            1
+        }
+    }
+
     fn is_blockquote(&self, lower: &str) -> bool {
         lower.starts_with("<blockquote")
     }
@@ -448,6 +507,7 @@ impl MobiHtmlParser {
                         italic,
                         superscript,
                         href: href.clone(),
+                        line_break: true,
                     });
                     i = tag_end + 1;
                     continue;
@@ -489,6 +549,7 @@ impl MobiHtmlParser {
                 italic,
                 superscript,
                 href: href.clone(),
+                line_break: false,
             });
         }
         buf.clear();

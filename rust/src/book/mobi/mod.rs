@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use regex::Regex;
 
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock};
@@ -251,6 +251,14 @@ impl MobiTextExtractor {
                 image_url: None,
                 note_ref: None,
                 rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
             });
             idx += 1;
         }
@@ -262,6 +270,14 @@ impl MobiTextExtractor {
                 image_url: None,
                 note_ref: None,
                 rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
             });
         }
         blocks
@@ -299,11 +315,7 @@ fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
     let name = String::from_utf8_lossy(&record0[header.full_name_offset as usize..end])
         .trim()
         .to_string();
-    if name.is_empty() {
-        None
-    } else {
-        Some(name)
-    }
+    if name.is_empty() { None } else { Some(name) }
 }
 
 fn first_non_empty(values: &[Option<&str>]) -> String {

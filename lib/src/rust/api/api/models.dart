@@ -17,6 +17,13 @@ enum BlockType {
   quote,
   footnote,
   separator,
+  table,
+  list,
+  epigraph,
+  poem,
+  cite,
+  textAuthor,
+  subtitle,
   ;
 
   Future<void> asStr() => RustLib.instance.api.crateApiModelsBlockTypeAsStr(
@@ -49,9 +56,10 @@ class NormalizedBook {
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 
-  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-    that: this,
-  );
+  Future<String> toJsonString() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+        that: this,
+      );
 
   @override
   int get hashCode =>
@@ -84,6 +92,14 @@ class ReaderBlock {
   final String? imageUrl;
   final String? noteRef;
   final List<RichSpan>? richSpans;
+  final int? headingLevel;
+  final bool? ordered;
+  final List<ReaderBlock>? listItems;
+  final List<List<String>>? tableRows;
+  final String? imageAlt;
+  final double? textIndent;
+  final String? textAlign;
+  final String? noteId;
 
   const ReaderBlock({
     required this.index,
@@ -92,6 +108,14 @@ class ReaderBlock {
     this.imageUrl,
     this.noteRef,
     this.richSpans,
+    this.headingLevel,
+    this.ordered,
+    this.listItems,
+    this.tableRows,
+    this.imageAlt,
+    this.textIndent,
+    this.textAlign,
+    this.noteId,
   });
 
   @override
@@ -101,7 +125,15 @@ class ReaderBlock {
       blockType.hashCode ^
       imageUrl.hashCode ^
       noteRef.hashCode ^
-      richSpans.hashCode;
+      richSpans.hashCode ^
+      headingLevel.hashCode ^
+      ordered.hashCode ^
+      listItems.hashCode ^
+      tableRows.hashCode ^
+      imageAlt.hashCode ^
+      textIndent.hashCode ^
+      textAlign.hashCode ^
+      noteId.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -113,7 +145,15 @@ class ReaderBlock {
           blockType == other.blockType &&
           imageUrl == other.imageUrl &&
           noteRef == other.noteRef &&
-          richSpans == other.richSpans;
+          richSpans == other.richSpans &&
+          headingLevel == other.headingLevel &&
+          ordered == other.ordered &&
+          listItems == other.listItems &&
+          tableRows == other.tableRows &&
+          imageAlt == other.imageAlt &&
+          textIndent == other.textIndent &&
+          textAlign == other.textAlign &&
+          noteId == other.noteId;
 }
 
 class ReaderChapter {
@@ -146,6 +186,7 @@ class RichSpan {
   final bool italic;
   final bool superscript;
   final String? href;
+  final bool lineBreak;
 
   const RichSpan({
     required this.text,
@@ -153,11 +194,17 @@ class RichSpan {
     required this.italic,
     required this.superscript,
     this.href,
+    required this.lineBreak,
   });
 
   @override
   int get hashCode =>
-      text.hashCode ^ bold.hashCode ^ italic.hashCode ^ superscript.hashCode ^ href.hashCode;
+      text.hashCode ^
+      bold.hashCode ^
+      italic.hashCode ^
+      superscript.hashCode ^
+      href.hashCode ^
+      lineBreak.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -168,5 +215,6 @@ class RichSpan {
           bold == other.bold &&
           italic == other.italic &&
           superscript == other.superscript &&
-          href == other.href;
+          href == other.href &&
+          lineBreak == other.lineBreak;
 }

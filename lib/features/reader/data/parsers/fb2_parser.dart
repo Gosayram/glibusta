@@ -254,7 +254,7 @@ class Fb2Parser implements BookParser {
               ReaderBlock(
                 index: blockIndex++,
                 text: text,
-                type: BlockType.heading,
+                type: BlockType.subtitle,
               ),
             );
           }
@@ -282,7 +282,31 @@ class Fb2Parser implements BookParser {
               ReaderBlock(
                 index: blockIndex++,
                 text: text,
-                type: BlockType.quote,
+                type: BlockType.cite,
+              ),
+            );
+          }
+          break;
+        case 'epigraph':
+          final text = child.innerText.trim();
+          if (text.isNotEmpty) {
+            blocks.add(
+              ReaderBlock(
+                index: blockIndex++,
+                text: text,
+                type: BlockType.epigraph,
+              ),
+            );
+          }
+          break;
+        case 'text-author':
+          final text = child.innerText.trim();
+          if (text.isNotEmpty) {
+            blocks.add(
+              ReaderBlock(
+                index: blockIndex++,
+                text: text,
+                type: BlockType.textAuthor,
               ),
             );
           }

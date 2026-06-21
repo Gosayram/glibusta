@@ -1,11 +1,11 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{decode_bytes, get_xml_attr};
-use anyhow::{bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, bail};
 use base64::Engine;
-use quick_xml::events::Event;
+use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -329,6 +329,11 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
     let mut current_text = String::new();
     let mut in_body = false;
     let mut tag_stack: Vec<String> = Vec::new();
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    let mut current_row: Vec<String> = Vec::new();
+    let mut in_table = false;
+    let mut in_list = false;
+    let mut list_items: Vec<String> = Vec::new();
 
     loop {
         match reader.read_event() {
@@ -369,6 +374,56 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         current_text.clear();
                         tag_stack.push("blockquote".to_string());
                     }
+                    "table" if in_body => {
+                        flush_block(
+                            &mut blocks,
+                            &mut current_text,
+                            &mut block_index,
+                            BlockType::Paragraph,
+                        );
+                        current_text.clear();
+                        in_table = true;
+                        table_rows.clear();
+                        tag_stack.push("table".to_string());
+                    }
+                    "tr" if in_table => {
+                        current_row.clear();
+                        tag_stack.push("tr".to_string());
+                    }
+                    "td" | "th"
+                        if in_table && tag_stack.last().map(|s| s.as_str()) == Some("tr") =>
+                    {
+                        current_text.clear();
+                        tag_stack.push(tag.clone());
+                    }
+                    "ul" if in_body => {
+                        flush_block(
+                            &mut blocks,
+                            &mut current_text,
+                            &mut block_index,
+                            BlockType::Paragraph,
+                        );
+                        current_text.clear();
+                        in_list = true;
+                        list_items.clear();
+                        tag_stack.push("ul".to_string());
+                    }
+                    "ol" if in_body => {
+                        flush_block(
+                            &mut blocks,
+                            &mut current_text,
+                            &mut block_index,
+                            BlockType::Paragraph,
+                        );
+                        current_text.clear();
+                        in_list = true;
+                        list_items.clear();
+                        tag_stack.push("ol".to_string());
+                    }
+                    "li" if in_list => {
+                        current_text.clear();
+                        tag_stack.push("li".to_string());
+                    }
                     "hr" if in_body => {
                         blocks.push(ReaderBlock {
                             index: block_index,
@@ -377,11 +432,20 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             image_url: None,
                             note_ref: None,
                             rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
                         });
                         block_index += 1;
                     }
                     "img" if in_body => {
                         let src = get_xml_attr(e, b"src");
+                        let alt = get_xml_attr(e, b"alt");
                         blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
@@ -389,6 +453,14 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             image_url: src,
                             note_ref: None,
                             rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: alt,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
                         });
                         block_index += 1;
                     }
@@ -428,6 +500,14 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
@@ -438,6 +518,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             tag_stack.pop();
                             let t_text = current_text.trim().to_string();
                             if !t_text.is_empty() {
+                                let level = t.as_bytes()[1] as i32 - '0' as i32;
                                 blocks.push(ReaderBlock {
                                     index: block_index,
                                     text: t_text,
@@ -445,6 +526,14 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                     image_url: None,
                                     note_ref: None,
                                     rich_spans: None,
+                                    heading_level: Some(level),
+                                    ordered: None,
+                                    list_items: None,
+                                    table_rows: None,
+                                    image_alt: None,
+                                    text_indent: None,
+                                    text_align: None,
+                                    note_id: None,
                                 });
                                 block_index += 1;
                             }
@@ -465,10 +554,160 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
                         current_text.clear();
+                    }
+                    "td" | "th" if in_table => {
+                        let t = current_text.trim().to_string();
+                        current_row.push(t);
+                        current_text.clear();
+                        tag_stack.pop();
+                    }
+                    "tr" if in_table && tag_stack.last().map(|s| s.as_str()) == Some("tr") => {
+                        tag_stack.pop();
+                        if !current_row.is_empty() {
+                            table_rows.push(current_row.clone());
+                            current_row.clear();
+                        }
+                    }
+                    "table"
+                        if in_table && tag_stack.last().map(|s| s.as_str()) == Some("table") =>
+                    {
+                        tag_stack.pop();
+                        in_table = false;
+                        if !table_rows.is_empty() {
+                            let text = table_rows
+                                .iter()
+                                .map(|r| r.join(" | "))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::Table,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: Some(table_rows.clone()),
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                            table_rows.clear();
+                        }
+                    }
+                    "li" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("li") => {
+                        tag_stack.pop();
+                        let t = current_text.trim().to_string();
+                        if !t.is_empty() {
+                            list_items.push(t);
+                        }
+                        current_text.clear();
+                    }
+                    "ul" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("ul") => {
+                        tag_stack.pop();
+                        in_list = false;
+                        if !list_items.is_empty() {
+                            let text = list_items.join("\n");
+                            let items = list_items
+                                .iter()
+                                .enumerate()
+                                .map(|(i, item)| ReaderBlock {
+                                    index: block_index + i as i32,
+                                    text: item.clone(),
+                                    block_type: BlockType::Paragraph,
+                                    image_url: None,
+                                    note_ref: None,
+                                    rich_spans: None,
+                                    heading_level: None,
+                                    ordered: None,
+                                    list_items: None,
+                                    table_rows: None,
+                                    image_alt: None,
+                                    text_indent: None,
+                                    text_align: None,
+                                    note_id: None,
+                                })
+                                .collect();
+                            blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::List,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: Some(false),
+                                list_items: Some(items),
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                            list_items.clear();
+                        }
+                    }
+                    "ol" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("ol") => {
+                        tag_stack.pop();
+                        in_list = false;
+                        if !list_items.is_empty() {
+                            let text = list_items.join("\n");
+                            let items = list_items
+                                .iter()
+                                .enumerate()
+                                .map(|(i, item)| ReaderBlock {
+                                    index: block_index + i as i32,
+                                    text: item.clone(),
+                                    block_type: BlockType::Paragraph,
+                                    image_url: None,
+                                    note_ref: None,
+                                    rich_spans: None,
+                                    heading_level: None,
+                                    ordered: None,
+                                    list_items: None,
+                                    table_rows: None,
+                                    image_alt: None,
+                                    text_indent: None,
+                                    text_align: None,
+                                    note_id: None,
+                                })
+                                .collect();
+                            blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::List,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: Some(true),
+                                list_items: Some(items),
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                            list_items.clear();
+                        }
                     }
                     _ => {}
                 }
@@ -483,10 +722,19 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         image_url: None,
                         note_ref: None,
                         rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     block_index += 1;
                 } else if tag == "img" && in_body {
                     let src = get_xml_attr(e, b"src");
+                    let alt = get_xml_attr(e, b"alt");
                     blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
@@ -494,8 +742,18 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         image_url: src,
                         note_ref: None,
                         rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: alt,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     block_index += 1;
+                } else if tag == "br" && in_body {
+                    current_text.push('\n');
                 }
             }
             Err(_) => break,
@@ -529,6 +787,14 @@ fn flush_block(
             image_url: None,
             note_ref: None,
             rich_spans: None,
+            heading_level: None,
+            ordered: None,
+            list_items: None,
+            table_rows: None,
+            image_alt: None,
+            text_indent: None,
+            text_align: None,
+            note_id: None,
         });
         *index += 1;
     }

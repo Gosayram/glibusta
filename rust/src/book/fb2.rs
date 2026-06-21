@@ -1,9 +1,9 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive;
 use crate::book::encoding::get_xml_attr;
-use anyhow::{bail, Context, Result};
-use quick_xml::events::Event;
+use anyhow::{Context, Result, bail};
 use quick_xml::Reader;
+use quick_xml::events::Event;
 
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let raw_bytes = if looks_like_zip(bytes) {
@@ -119,6 +119,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                                 italic: current_span_italic,
                                 superscript: false,
                                 href: Some(href),
+                                line_break: false,
                             });
                         }
                     }
@@ -276,6 +277,14 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: rich,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
@@ -291,10 +300,18 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text,
-                                block_type: BlockType::Heading,
+                                block_type: BlockType::Subtitle,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
@@ -307,10 +324,18 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text,
-                                block_type: BlockType::Quote,
+                                block_type: BlockType::Epigraph,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
@@ -323,10 +348,18 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text,
-                                block_type: BlockType::Paragraph,
+                                block_type: BlockType::TextAuthor,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
                             });
                             block_index += 1;
                         }
@@ -340,13 +373,19 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             image_url: None,
                             note_ref: None,
                             rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
                         });
                         block_index += 1;
                         in_empty_line = false;
                     }
                     "image" if in_body && !in_coverpage => {
-                        // FB2 images are referenced by id via l:href
-                        // We store a placeholder; actual image extraction happens at render time
                         body_blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
@@ -354,6 +393,14 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             image_url: Some(String::from("fb2-image")),
                             note_ref: None,
                             rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
                         });
                         block_index += 1;
                         in_image = false;
@@ -375,6 +422,14 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         image_url: None,
                         note_ref: None,
                         rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     block_index += 1;
                 } else if tag_name == "image" && in_body && !in_coverpage {
@@ -385,6 +440,14 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         image_url: Some(String::from("fb2-image")),
                         note_ref: None,
                         rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: None,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
                     });
                     block_index += 1;
                 }

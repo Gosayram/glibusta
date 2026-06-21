@@ -51,24 +51,33 @@ class EpubBookAdapter {
         text: spans.map((s) => s.text).join(),
         richSpans: _toRichSpans(spans),
       ),
-      epub.HeadingBlock(:final text) => ReaderBlock(
+      epub.HeadingBlock(:final text, :final level) => ReaderBlock(
         index: index,
         text: text,
         type: BlockType.heading,
+        headingLevel: level,
       ),
       epub.ImageBlock(:final localPath, :final alt) => ReaderBlock(
         index: index,
         text: alt ?? '',
         type: BlockType.image,
         imageUrl: localPath,
+        imageAlt: alt,
       ),
       epub.ListBlock(:final ordered, :final items) => ReaderBlock(
         index: index,
-        text: _formatList(ordered, items),
+        text: items.join('\n'),
+        type: BlockType.list,
+        ordered: ordered,
+        listItems: items
+            .map((item) => ReaderBlock(index: 0, text: item))
+            .toList(),
       ),
       epub.TableBlock(:final rows) => ReaderBlock(
         index: index,
-        text: _formatTable(rows),
+        text: rows.map((r) => r.join(' | ')).join('\n'),
+        type: BlockType.table,
+        tableRows: rows,
       ),
       epub.QuoteBlock(:final text) => ReaderBlock(
         index: index,
@@ -102,23 +111,5 @@ class EpubBookAdapter {
         .toList();
   }
 
-  String _formatList(bool ordered, List<String> items) {
-    final buf = StringBuffer();
-    for (var i = 0; i < items.length; i++) {
-      if (ordered) {
-        buf.writeln('${i + 1}. ${items[i]}');
-      } else {
-        buf.writeln('• ${items[i]}');
-      }
-    }
-    return buf.toString().trimRight();
-  }
 
-  String _formatTable(List<List<String>> rows) {
-    final buf = StringBuffer();
-    for (final row in rows) {
-      buf.writeln(row.join(' | '));
-    }
-    return buf.toString().trimRight();
-  }
 }

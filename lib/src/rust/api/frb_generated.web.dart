@@ -31,12 +31,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
-  Value dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     dynamic raw,
   );
 
   @protected
-  Value dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     dynamic raw,
   );
 
@@ -56,16 +58,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw);
+
+  @protected
+  double dco_decode_box_autoadd_f_64(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_i_32(dynamic raw);
+
+  @protected
   NormalizedBook dco_decode_box_autoadd_normalized_book(dynamic raw);
 
   @protected
   BigInt dco_decode_box_autoadd_usize(dynamic raw);
 
   @protected
+  double dco_decode_f_64(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<List<String>> dco_decode_list_list_String(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -95,7 +112,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
+  double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_usize(dynamic raw);
+
+  @protected
+  List<List<String>>? dco_decode_opt_list_list_String(dynamic raw);
+
+  @protected
+  List<ReaderBlock>? dco_decode_opt_list_reader_block(dynamic raw);
 
   @protected
   List<RichSpan>? dco_decode_opt_list_rich_span(dynamic raw);
@@ -122,12 +154,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
-  Value sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     SseDeserializer deserializer,
   );
 
   @protected
-  Value sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     SseDeserializer deserializer,
   );
 
@@ -147,6 +181,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
   NormalizedBook sse_decode_box_autoadd_normalized_book(
     SseDeserializer deserializer,
   );
@@ -155,10 +198,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer);
 
   @protected
+  double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<List<String>> sse_decode_list_list_String(SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -190,7 +239,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
+
+  @protected
+  int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
   BigInt? sse_decode_opt_box_autoadd_usize(SseDeserializer deserializer);
+
+  @protected
+  List<List<String>>? sse_decode_opt_list_list_String(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReaderBlock>? sse_decode_opt_list_reader_block(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<RichSpan>? sse_decode_opt_list_rich_span(SseDeserializer deserializer);
@@ -220,13 +288,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   );
@@ -248,6 +318,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_normalized_book(
     NormalizedBook self,
     SseSerializer serializer,
@@ -257,10 +336,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer);
 
   @protected
+  void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_list_String(
+    List<List<String>> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
@@ -303,7 +391,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_usize(BigInt? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_list_list_String(
+    List<List<String>>? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_list_reader_block(
+    List<ReaderBlock>? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_list_rich_span(
