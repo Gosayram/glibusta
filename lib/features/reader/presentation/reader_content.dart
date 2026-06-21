@@ -820,7 +820,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           2 => ps * 2,
           _ => ps * 1.5,
         };
-        return _estimateTextHeight(
+        return _measureTextHeight(
               block.text,
               settings.fontSize * scale,
               settings.lineHeight,
@@ -829,16 +829,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             spacing +
             ps;
       case BlockType.subtitle:
-        return _estimateTextHeight(
-              block.text,
-              settings.fontSize * 1.1,
-              settings.lineHeight,
-              width,
-            ) +
-            ps * 2 +
-            ps;
+        return _measureTextHeight(block.text, settings.fontSize * 1.1, settings.lineHeight, width) +
+            ps * 3;
       case BlockType.epigraph:
-        return _estimateTextHeight(
+        return _measureTextHeight(
               block.text,
               settings.fontSize * 0.95,
               settings.lineHeight,
@@ -847,16 +841,16 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ps * 2 +
             24;
       case BlockType.poem:
-        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 48) +
+        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 48) +
             ps * 4;
       case BlockType.cite:
-        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 40) +
+        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 40) +
             ps +
             16;
       case BlockType.textAuthor:
         return settings.fontSize * 0.9 * settings.lineHeight + ps;
       case BlockType.quote:
-        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 32) +
+        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 32) +
             ps +
             16;
       case BlockType.separator:
@@ -864,7 +858,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.image:
         return settings.fontSize * 8;
       case BlockType.footnote:
-        return _estimateTextHeight(
+        return _measureTextHeight(
               block.text,
               settings.fontSize * 0.85,
               settings.lineHeight,
@@ -873,20 +867,36 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ps;
       case BlockType.table:
         final rows = block.tableRows?.length ?? 0;
-        return (rows * settings.fontSize * settings.lineHeight) + ps * 2;
+        return (rows * settings.fontSize * settings.lineHeight * 1.3) + ps * 2 + 16;
       case BlockType.list:
-        final items = block.listItems?.length ?? 0;
-        return (items * settings.fontSize * settings.lineHeight) + ps + 8;
+        var totalHeight = ps + 8.0;
+        for (final item in block.listItems ?? <ReaderBlock>[]) {
+          totalHeight +=
+              _measureTextHeight(item.text, settings.fontSize, settings.lineHeight, width - 32) + 4;
+        }
+        return totalHeight;
       case BlockType.paragraph:
-        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width) + ps;
+        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width) + ps;
     }
   }
 
-  double _estimateTextHeight(String text, double fontSize, double lineHeight, double width) {
+  double _measureTextHeight(String text, double fontSize, double lineHeight, double maxWidth) {
     if (text.isEmpty) return fontSize * lineHeight;
-    final charsPerLine = (width / (fontSize * 0.55)).round().clamp(1, 200);
-    final lines = (text.length / charsPerLine).ceil();
-    return lines * fontSize * lineHeight;
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontSize: fontSize,
+          height: lineHeight,
+          letterSpacing: widget.settings.letterSpacing,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    painter.layout(maxWidth: maxWidth);
+    final height = painter.height;
+    painter.dispose();
+    return height;
   }
 
   Widget _buildPaginatedPage(int index, BuildContext context) {

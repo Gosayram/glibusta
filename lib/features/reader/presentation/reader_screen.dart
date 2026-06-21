@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +122,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _handleVerticalDragEnd(DragEndDetails details) {
     // Nothing needed
+  }
+
+  // Trackpad/mouse wheel scroll → page turn
+  double _scrollAccumulator = 0;
+  static const double _scrollThreshold = 50;
+
+  void _handlePointerSignal(PointerSignalEvent event) {
+    if (event is PointerScrollEvent) {
+      _scrollAccumulator += event.scrollDelta.dy;
+      if (_scrollAccumulator.abs() >= _scrollThreshold) {
+        if (_scrollAccumulator > 0) {
+          _goToNextPage();
+        } else {
+          _goToPreviousPage();
+        }
+        _scrollAccumulator = 0;
+      }
+    }
   }
 
   void _goToNextPage() {
@@ -419,43 +438,43 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
             ),
           ),
+          if (readerState.isSearchOpen && readerState.metadata != null)
+            Positioned.fill(
+              child: Builder(
+                builder: (context) {
+                  final searchService = _ctrl.createSearchService();
+                  if (searchService == null) return const SizedBox.shrink();
+                  return BookSearchOverlay(
+                    searchService: searchService,
+                    onJumpToResult: (position, query) {
+                      _ctrl.closeSearch();
+                      _ctrl.highlightSearchQuery(query);
+                      _ctrl.jumpToPosition(
+                        position.copyWith(bookId: widget.bookId),
+                      );
+                    },
+                    onDismiss: () {
+                      _ctrl.closeSearch();
+                      _gestureCoordinator.onSearchClosed();
+                    },
+                    theme: settings.theme,
+                  );
+                },
+              ),
+            ),
+          if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
+            Positioned(
+              bottom: MediaQuery.paddingOf(context).bottom + 80,
+              left: 24,
+              right: 24,
+              child: ReaderSelectionToolbar(
+                bookId: widget.bookId,
+                chapterIndex: readerState.currentPosition.chapterIndex,
+                paragraphIndex: readerState.currentPosition.paragraphIndex,
+                onDismiss: () => setState(() => _selectedText = null),
+              ),
+            ),
         ],
-        if (readerState.isSearchOpen && readerState.metadata != null)
-          Positioned.fill(
-            child: Builder(
-              builder: (context) {
-                final searchService = _ctrl.createSearchService();
-                if (searchService == null) return const SizedBox.shrink();
-                return BookSearchOverlay(
-                  searchService: searchService,
-                  onJumpToResult: (position, query) {
-                    _ctrl.closeSearch();
-                    _ctrl.highlightSearchQuery(query);
-                    _ctrl.jumpToPosition(
-                      position.copyWith(bookId: widget.bookId),
-                    );
-                  },
-                  onDismiss: () {
-                    _ctrl.closeSearch();
-                    _gestureCoordinator.onSearchClosed();
-                  },
-                  theme: settings.theme,
-                );
-              },
-            ),
-          ),
-        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
-          Positioned(
-            bottom: MediaQuery.paddingOf(context).bottom + 80,
-            left: 24,
-            right: 24,
-            child: ReaderSelectionToolbar(
-              bookId: widget.bookId,
-              chapterIndex: readerState.currentPosition.chapterIndex,
-              paragraphIndex: readerState.currentPosition.paragraphIndex,
-              onDismiss: () => setState(() => _selectedText = null),
-            ),
-          ),
       ],
     );
   }
@@ -475,48 +494,51 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           paragraphIndex: readerState.currentPosition.paragraphIndex,
         );
       },
-      child: GestureDetector(
-        onVerticalDragStart:
-            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
-            ? _handleVerticalDragStart
-            : null,
-        onVerticalDragUpdate:
-            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
-            ? _handleVerticalDragUpdate
-            : null,
-        onVerticalDragEnd:
-            _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
-            ? _handleVerticalDragEnd
-            : null,
-        onDoubleTap:
-            _gestureCoordinator.shouldHandleDoubleTap &&
-                settings.doubleTapAction != DoubleTapAction.disabled
-            ? _ctrl.handleDoubleTap
-            : null,
-        onLongPress:
-            _gestureCoordinator.shouldHandleLongPress &&
-                settings.longPressAction != LongPressAction.disabled
-            ? () {
-                _ctrl.handleLongPress();
-                if (settings.longPressAction == LongPressAction.selectText) {
-                  unawaited(_checkForSelectedText());
+      child: Listener(
+        onPointerSignal: _handlePointerSignal,
+        child: GestureDetector(
+          onVerticalDragStart:
+              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+              ? _handleVerticalDragStart
+              : null,
+          onVerticalDragUpdate:
+              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+              ? _handleVerticalDragUpdate
+              : null,
+          onVerticalDragEnd:
+              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+              ? _handleVerticalDragEnd
+              : null,
+          onDoubleTap:
+              _gestureCoordinator.shouldHandleDoubleTap &&
+                  settings.doubleTapAction != DoubleTapAction.disabled
+              ? _ctrl.handleDoubleTap
+              : null,
+          onLongPress:
+              _gestureCoordinator.shouldHandleLongPress &&
+                  settings.longPressAction != LongPressAction.disabled
+              ? () {
+                  _ctrl.handleLongPress();
+                  if (settings.longPressAction == LongPressAction.selectText) {
+                    unawaited(_checkForSelectedText());
+                  }
                 }
-              }
-            : null,
-        behavior: HitTestBehavior.translucent,
-        child: RepaintBoundary(
-          child: ReaderContentBody(
-            metadata: readerState.metadata!,
-            loadedChapters: readerState.loadedChapters,
-            settings: settings,
-            scrollController: _ctrl.scrollController,
-            onTap: _gestureCoordinator.shouldHandleTap
-                ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
-                : (_) {},
-            initialProgress: readerState.scrollProgress,
-            initialPage: readerState.currentPosition.chapterIndex,
-            highlightQuery: readerState.highlightedQuery,
-            chapterHighlights: _buildChapterHighlights(),
+              : null,
+          behavior: HitTestBehavior.translucent,
+          child: RepaintBoundary(
+            child: ReaderContentBody(
+              metadata: readerState.metadata!,
+              loadedChapters: readerState.loadedChapters,
+              settings: settings,
+              scrollController: _ctrl.scrollController,
+              onTap: _gestureCoordinator.shouldHandleTap
+                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
+                  : (_) {},
+              initialProgress: readerState.scrollProgress,
+              initialPage: readerState.currentPosition.chapterIndex,
+              highlightQuery: readerState.highlightedQuery,
+              chapterHighlights: _buildChapterHighlights(),
+            ),
           ),
         ),
       ),
