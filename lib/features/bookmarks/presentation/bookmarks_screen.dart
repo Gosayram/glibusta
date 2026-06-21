@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -10,12 +11,7 @@ import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/bookmark_repository.dart';
-
-final bookmarksStreamProvider = StreamProvider.family<List<Bookmark>, String>((ref, bookId) {
-  final database = ref.watch(databaseProvider);
-  final repository = BookmarkRepository(database);
-  return repository.watchBookmarks(bookId);
-});
+import '../data/bookmarks_providers.dart';
 
 class BookmarksScreen extends ConsumerWidget {
   final String bookId;
@@ -109,18 +105,7 @@ class BookmarksScreen extends ConsumerWidget {
     final repository = BookmarkRepository(database);
     await repository.deleteBookmark(bookmark.id);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Закладка удалена'),
-        action: SnackBarAction(
-          label: 'Отмена',
-          onPressed: () {
-            unawaited(repository.insertBookmark(bookmark));
-          },
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    unawaited(SmartDialog.showToast('Закладка удалена'));
   }
 }
 
@@ -138,49 +123,51 @@ class BookmarkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(bookmark.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        return showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Удалить закладку?'),
-            content: const Text('Это действие можно отменить'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Отмена'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Удалить'),
-              ),
-            ],
-          ),
-        );
-      },
-      background: Container(
-        color: Theme.of(context).colorScheme.error,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
-      ),
-      onDismissed: (_) => onDelete?.call(),
-      child: ListTile(
-        leading: const Icon(Icons.bookmark),
-        title: bookmark.selectedText != null
-            ? Text(
-                bookmark.selectedText!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              )
-            : Text('Стр. ${bookmark.chapterIndex + 1}'),
-        subtitle: Text(
-          'Абзац ${bookmark.paragraphIndex + 1}',
-          style: Theme.of(context).textTheme.bodySmall,
+    return RepaintBoundary(
+      child: Dismissible(
+        key: Key(bookmark.id),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) async {
+          return showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Удалить закладку?'),
+              content: const Text('Это действие можно отменить'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Удалить'),
+                ),
+              ],
+            ),
+          );
+        },
+        background: Container(
+          color: Theme.of(context).colorScheme.error,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 16),
+          child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
         ),
-        onTap: onTap,
+        onDismissed: (_) => onDelete?.call(),
+        child: ListTile(
+          leading: const Icon(Icons.bookmark),
+          title: bookmark.selectedText != null
+              ? Text(
+                  bookmark.selectedText!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Text('Стр. ${bookmark.chapterIndex + 1}'),
+          subtitle: Text(
+            'Абзац ${bookmark.paragraphIndex + 1}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          onTap: onTap,
+        ),
       ),
     );
   }

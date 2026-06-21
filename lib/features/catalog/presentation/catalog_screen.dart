@@ -8,10 +8,13 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/app_breakpoints.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../data/catalog_repository_impl.dart';
 
 part 'catalog_screen.g.dart';
@@ -38,15 +41,17 @@ class CatalogScreen extends ConsumerStatefulWidget {
 class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   Future<Map<String, bool>>? _downloadStatusFuture;
   List<Book> _lastBooks = const [];
+  String? _lastLoggedError;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final categoriesAsync = ref.watch(categoriesProvider);
     final popularAsync = ref.watch(popularBooksProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Каталог'),
+        title: Text(l10n.catalogTitle),
         automaticallyImplyLeading: false,
       ),
       body: RefreshIndicator(
@@ -54,7 +59,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           ref.invalidate(categoriesProvider);
           ref.invalidate(popularBooksProvider);
         },
-        child: _RestorableListView(
+        child: RestorableListView(
           restorationId: 'catalog-scroll',
           children: [
             AnimatedSwitcher(
@@ -71,7 +76,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   data: (List<String> categories) => _buildCategories(context, categories),
                   loading: () => SizedBox(
                     height: 100,
-                    child: Skeletonizer(
+                    child: Skeletonizer.zone(
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -89,7 +94,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   error: (Object e, _) => SizedBox(
                     height: 100,
                     child: ErrorStateWidget(
-                      message: 'Не удалось загрузить категории',
+                      message: l10n.categoriesLoadError,
                       details: e.toString(),
                       onRetry: () => ref.invalidate(categoriesProvider),
                     ),
@@ -105,7 +110,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.new_releases_outlined,
-                      label: 'Новые',
+                      label: l10n.newLabel,
                       onTap: () => context.push('/recent'),
                     ),
                   ),
@@ -113,7 +118,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.category_outlined,
-                      label: 'Жанры',
+                      label: l10n.genresTitle,
                       onTap: () => context.push('/genres'),
                     ),
                   ),
@@ -121,7 +126,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.trending_up,
-                      label: 'Популярные',
+                      label: l10n.popularLabel,
                       onTap: () => context.push('/catalog/popular'),
                     ),
                   ),
@@ -143,7 +148,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   data: (List<Book> books) => _buildPopularBooks(context, ref, books),
                   loading: () => SizedBox(
                     height: 200,
-                    child: Skeletonizer(
+                    child: Skeletonizer.zone(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -166,7 +171,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                   error: (Object e, _) => SizedBox(
                     height: 200,
                     child: ErrorStateWidget(
-                      message: 'Не удалось загрузить популярные книги',
+                      message: l10n.recentBooksLoadError,
                       details: e.toString(),
                       onRetry: () => ref.invalidate(popularBooksProvider),
                     ),
@@ -181,6 +186,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Widget _buildCategories(BuildContext context, List<String> categories) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -189,13 +195,13 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Жанры',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                l10n.genresTitle,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               TextButton(
                 onPressed: () => context.push('/genres'),
-                child: const Text('Все жанры'),
+                child: Text(l10n.allGenres),
               ),
             ],
           ),
@@ -209,6 +215,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             itemBuilder: (context, index) {
               final category = categories[index];
               return Padding(
+                key: ValueKey('$category-$index'),
                 padding: const EdgeInsets.only(right: 8),
                 child: ActionChip(
                   label: Text(category, style: const TextStyle(fontSize: 13)),
@@ -225,6 +232,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 
   Widget _buildPopularBooks(BuildContext context, WidgetRef ref, List<Book> books) {
+    final l10n = AppLocalizations.of(context);
     if (!identical(books, _lastBooks)) {
       _lastBooks = books;
       _downloadStatusFuture = _getDownloadStatusMap(ref, books);
@@ -232,11 +240,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            'Популярное',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            l10n.popularSection,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
         SizedBox(
@@ -245,11 +253,18 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             future: _downloadStatusFuture,
             builder: (context, snapshot) {
               if (snapshot.hasError) {
-                debugPrint('[Catalog] Failed to fetch download status: ${snapshot.error}');
+                final errorStr = '${snapshot.error}';
+                if (errorStr != _lastLoggedError) {
+                  _lastLoggedError = errorStr;
+                  AppLogger().warning(
+                    '[Catalog] Failed to fetch download status: $errorStr',
+                    name: 'Catalog',
+                  );
+                }
                 return const SizedBox.shrink();
               }
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return Skeletonizer(
+                return Skeletonizer.zone(
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -383,71 +398,6 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
   }
 }
 
-class _RestorableListView extends StatefulWidget {
-  final String restorationId;
-  final List<Widget> children;
-
-  const _RestorableListView({
-    required this.restorationId,
-    required this.children,
-  });
-
-  @override
-  State<_RestorableListView> createState() => _RestorableListViewState();
-}
-
-class _RestorableListViewState extends State<_RestorableListView> with RestorationMixin {
-  final RestorableDouble _offset = RestorableDouble(0);
-  ScrollController? _controller;
-
-  @override
-  String? get restorationId => widget.restorationId;
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
-    registerForRestoration(_offset, 'scroll_offset');
-  }
-
-  @override
-  void dispose() {
-    _controller?.removeListener(_saveOffset);
-    _controller?.dispose();
-    _offset.dispose();
-    super.dispose();
-  }
-
-  ScrollController _getController() {
-    if (_controller != null) return _controller!;
-    _controller = ScrollController(
-      initialScrollOffset: _offset.value,
-      keepScrollOffset: false,
-    )..addListener(_saveOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
-    return _controller!;
-  }
-
-  void _saveOffset() {
-    final controller = _controller;
-    if (controller == null || !controller.hasClients) return;
-    _offset.value = controller.position.pixels;
-  }
-
-  void _restoreOffset() {
-    final controller = _controller;
-    if (!mounted || controller == null || !controller.hasClients) return;
-    final maxOffset = controller.position.maxScrollExtent;
-    final offset = _offset.value.clamp(0.0, maxOffset);
-    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
-      controller.jumpTo(offset);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(controller: _getController(), children: widget.children);
-  }
-}
-
 class _QuickAccessTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -467,13 +417,18 @@ class _QuickAccessTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, size: 28, color: colorScheme.primary),
               const SizedBox(height: 4),
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

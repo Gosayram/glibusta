@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
+import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
 import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
@@ -120,6 +123,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     // Nothing needed
   }
 
+  void _goToNextPage() {
+    unawaited(HapticFeedback.lightImpact());
+    _ctrl.scrollToNext();
+  }
+
+  void _goToPreviousPage() {
+    unawaited(HapticFeedback.lightImpact());
+    _ctrl.scrollToPrevious();
+  }
+
   @override
   void dispose() {
     _lifecycleListener?.dispose();
@@ -131,18 +144,47 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
+      _ctrl.pauseSession();
       _ctrl.saveProgress();
+    } else if (state == AppLifecycleState.resumed) {
+      _ctrl.resumeSession();
     }
   }
 
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      _ctrl.scrollToPrevious();
+      _goToPreviousPage();
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      _ctrl.scrollToNext();
+      _goToNextPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _goToPreviousPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+        event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _goToNextPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.pageUp) {
+      _goToPreviousPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.pageDown) {
+      _goToNextPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space) {
+      _goToNextPage();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
       return true;
     }
     return false;
@@ -207,9 +249,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           final svc = ref.read(bookDeleteServiceProvider);
           await svc.removeFromLibrary(widget.bookId);
           if (!context.mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Удалено из библиотеки')),
-          );
+          unawaited(SmartDialog.showToast('Удалено из библиотеки'));
           if (context.mounted) Navigator.of(context).pop();
         },
       );
@@ -260,8 +300,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           if (didPop) _ctrl.saveProgress();
         },
         child: ReaderShortcuts(
-          onNextPage: () => _ctrl.scrollToNext(),
-          onPreviousPage: () => _ctrl.scrollToPrevious(),
+          onNextPage: () => _goToNextPage(),
+          onPreviousPage: () => _goToPreviousPage(),
           onIncreaseFontSize: () {
             final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
@@ -366,7 +406,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   totalChapters: readerState.chapterCount,
                   scrollProgress: readerState.scrollProgress,
                   estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                  chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
                   onJumpToProgress: _ctrl.jumpToProgress,
+                  onModeChanged: (mode) {
+                    ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                  },
                 ),
               ),
             ),
@@ -468,6 +512,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             initialProgress: readerState.scrollProgress,
             initialPage: readerState.currentPosition.chapterIndex,
             highlightQuery: readerState.highlightedQuery,
+            chapterHighlights: _buildChapterHighlights(),
           ),
         ),
       ),
@@ -599,6 +644,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       showAdaptivePanel<void>(
         context: context,
         child: ReaderQuickSettingsSheet(
+          bookId: widget.bookId,
           onDismiss: () {
             _ctrl.onBottomSheetClose();
             _gestureCoordinator.onBottomSheetClosed();
@@ -631,9 +677,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 Navigator.of(dialogContext).pop();
                 await _ctrl.deleteBookFile();
                 if (rootContext.mounted) {
-                  ScaffoldMessenger.of(rootContext).showSnackBar(
-                    const SnackBar(content: Text('Файл удалён')),
-                  );
+                  unawaited(SmartDialog.showToast('Файл удалён'));
                 }
                 if (rootContext.mounted && Navigator.of(rootContext).canPop()) {
                   Navigator.of(rootContext).pop();
@@ -657,7 +701,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   bool _isDistractionFree(ReaderSettings settings) {
-    return settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
+    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
+    return effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
   }
 
   Widget _buildWarmthOverlay(ReaderSettings settings) {
@@ -681,5 +726,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
       ),
     );
+  }
+
+  Map<int, List<TextHighlight>> _buildChapterHighlights() {
+    final highlights = ref.watch(bookHighlightsProvider(widget.bookId)).value;
+    final result = <int, List<TextHighlight>>{};
+    if (highlights != null) {
+      for (final h in highlights) {
+        result.putIfAbsent(h.chapterIndex, () => []).add(h);
+      }
+    }
+    return result;
   }
 }

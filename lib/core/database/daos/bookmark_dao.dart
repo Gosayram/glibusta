@@ -12,6 +12,12 @@ class BookmarkDao extends DatabaseAccessor<AppDatabase> with _$BookmarkDaoMixin 
   Future<List<Bookmark>> getBookmarksForBook(String bookId) async =>
       (select(bookmarks)..where((t) => t.bookId.equals(bookId))).get();
 
+  Stream<List<Bookmark>> watchBookmarksForBook(String bookId) =>
+      (select(bookmarks)..where((t) => t.bookId.equals(bookId))).watch();
+
   Future<List<Quote>> getQuotesForBook(String bookId) async =>
       (select(quotes)..where((t) => t.bookId.equals(bookId))).get();
+
+  Stream<List<Quote>> watchQuotesForBook(String bookId) =>
+      (select(quotes)..where((t) => t.bookId.equals(bookId))).watch();
 }

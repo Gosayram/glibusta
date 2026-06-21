@@ -57,7 +57,7 @@ class ReaderSettingsPersistence {
         hyphenation: map['hyphenation'] as bool? ?? true,
         tapZoneLayout: TapZoneLayout.values.firstWhere(
           (e) => e.name == map['tapZoneLayout'],
-          orElse: () => TapZoneLayout.third,
+          orElse: () => TapZoneLayout.quarter,
         ),
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],

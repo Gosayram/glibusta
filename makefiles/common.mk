@@ -48,7 +48,7 @@ RUFF_CHECK := $(RUFF) check
 RUFF_FORMAT := $(RUFF) format
 SHELLCHECK_RUN := $(SHELLCHECK)
 
-DART_FORMAT_PATHS ?= .
+DART_FORMAT_PATHS ?= lib test
 PRETTIER_GLOBS ?= **/*.{md,yml,yaml,json}
 PYTHON_PATHS ?= scripts
 SHELL_SCRIPT_PATHS ?= $(shell find scripts -type f -name '*.sh' 2>/dev/null)
@@ -92,5 +92,10 @@ require-shellcheck: ## Verify ShellCheck is available
 .PHONY: require-ruff
 require-ruff: ## Verify Ruff is available
 	@$(call REQUIRE_TOOL,$(RUFF))
+
+.PHONY: require-rust
+require-rust: ## Verify Rust toolchain is available
+	@$(call REQUIRE_TOOL,cargo)
+	@$(call REQUIRE_TOOL,rustc)
 
 endif

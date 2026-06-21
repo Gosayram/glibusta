@@ -26,6 +26,18 @@ class EpubParser implements BookParser {
   }) async {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      var totalDecompressed = 0;
+      const maxDecompressedSize = 500 * 1024 * 1024; // 500 MB
+      for (final file in archive) {
+        if (file.isFile) {
+          totalDecompressed += file.content.length;
+          if (totalDecompressed > maxDecompressedSize) {
+            throw const ParserFailure(
+              'EPUB: суммарный размер распакованных файлов превышает 500 МБ',
+            );
+          }
+        }
+      }
       return _parseArchive(archive, forcedEncoding: forcedEncoding);
     } on Object catch (e) {
       throw ParserFailure('Ошибка при разборе EPUB: $e');
@@ -71,26 +83,43 @@ class EpubParser implements BookParser {
       }
     }
 
+    String opfPath;
+    ArchiveFile? opfFile;
+
+    // Try META-INF/container.xml first
     final containerBytes = _findFileBytesFromIndex(fileIndex, 'META-INF/container.xml');
-    if (containerBytes == null) {
-      throw const ParserFailure('EPUB: container.xml не найден');
-    }
-    final containerResult = await _detector.detect(
-      Uint8List.fromList(containerBytes),
-      forcedEncoding: forcedEncoding,
-    );
-
-    final opfPath = _parseContainerPath(containerResult.text);
-    if (opfPath == null) {
-      throw const ParserFailure('EPUB: путь к OPF не найден');
+    if (containerBytes != null) {
+      final containerResult = await _detector.detect(
+        Uint8List.fromList(containerBytes),
+        forcedEncoding: forcedEncoding,
+      );
+      opfPath = _parseContainerPath(containerResult.text) ?? '';
+    } else {
+      opfPath = '';
     }
 
-    final opfBytes = _findFileBytesFromIndex(fileIndex, opfPath);
-    if (opfBytes == null) {
-      throw ParserFailure('EPUB: OPF файл не найден: $opfPath');
+    // If we have an OPF path from container.xml, try to find it
+    if (opfPath.isNotEmpty) {
+      opfFile = _findArchiveFile(fileIndex, opfPath);
     }
+
+    // Fallback: find any .opf file directly
+    if (opfFile == null) {
+      for (final entry in fileIndex.entries) {
+        if (entry.key.toLowerCase().endsWith('.opf')) {
+          opfFile = entry.value;
+          opfPath = entry.key;
+          break;
+        }
+      }
+    }
+
+    if (opfFile == null) {
+      throw const ParserFailure('EPUB: OPF файл не найден');
+    }
+
     final opfResult = await _detector.detect(
-      Uint8List.fromList(opfBytes),
+      Uint8List.fromList(opfFile.content as List<int>),
       forcedEncoding: forcedEncoding,
     );
 
@@ -325,9 +354,21 @@ class EpubParser implements BookParser {
     return el?.innerText.trim();
   }
 
-  List<int>? _findFileBytesFromIndex(Map<String, ArchiveFile> index, String path) {
+  ArchiveFile? _findArchiveFile(Map<String, ArchiveFile> index, String path) {
     final normalized = path.startsWith('/') ? path.substring(1) : path;
-    final file = index[normalized] ?? index[Uri.decodeComponent(normalized)];
-    return file?.content;
+    return index[normalized] ?? index[Uri.decodeComponent(normalized)];
+  }
+
+  List<int>? _findFileBytesFromIndex(Map<String, ArchiveFile> index, String path) {
+    final file = _findArchiveFile(index, path);
+    if (file != null) return file.content;
+    // Case-insensitive fallback
+    final lower = path.toLowerCase();
+    for (final entry in index.entries) {
+      if (entry.key.toLowerCase() == lower) {
+        return entry.value.content;
+      }
+    }
+    return null;
   }
 }

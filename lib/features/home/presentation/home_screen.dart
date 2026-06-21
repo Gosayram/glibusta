@@ -9,17 +9,12 @@ import '../../../shared/models/book.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../collections/presentation/collections_screen.dart';
-import '../../library/data/book_repository_impl.dart';
 import '../../library/presentation/pinned_books_provider.dart';
+import '../data/home_providers.dart';
 import 'continue_reading_card.dart';
 import 'continue_reading_provider.dart';
 import 'reading_heatmap.dart';
 import 'reading_stats_provider.dart';
-
-final recentBooksProvider = FutureProvider<List<Book>>((ref) async {
-  final repository = ref.watch(bookRepositoryProvider);
-  return repository.getAllBooks();
-});
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -86,7 +81,7 @@ class HomeScreen extends ConsumerWidget {
                     },
                     loading: () => SizedBox(
                       height: 160,
-                      child: Skeletonizer(
+                      child: Skeletonizer.zone(
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -183,7 +178,8 @@ class HomeScreen extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        for (final col in collections.take(3)) _CollectionTile(collection: col),
+                        for (final col in collections.take(3))
+                          _CollectionTile(key: ValueKey(col.id), collection: col),
                         const SizedBox(height: 24),
                       ],
                     );
@@ -227,7 +223,7 @@ class HomeScreen extends ConsumerWidget {
                     },
                     loading: () => SizedBox(
                       height: 180,
-                      child: Skeletonizer(
+                      child: Skeletonizer.zone(
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -420,7 +416,7 @@ class _ReadingStatsSection extends ConsumerWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Skeletonizer(
+          child: Skeletonizer.zone(
             child: Column(
               children: [
                 Skeleton.unite(
@@ -492,7 +488,7 @@ class _StatChip extends StatelessWidget {
 class _CollectionTile extends StatelessWidget {
   final Collection collection;
 
-  const _CollectionTile({required this.collection});
+  const _CollectionTile({super.key, required this.collection});
 
   @override
   Widget build(BuildContext context) {

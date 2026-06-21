@@ -3,28 +3,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/logging/app_logger.dart';
+
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/bookmarks/presentation/bookmarks_screen.dart';
 import '../features/catalog/presentation/author_detail_screen.dart';
-import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
 import '../features/catalog/presentation/genre_list_screen.dart';
+import '../features/catalog/presentation/opds_catalog_screen.dart';
 import '../features/catalog/presentation/recent_books_screen.dart';
-import '../features/collections/presentation/collections_screen.dart';
 import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
+import '../features/reader/presentation/chapter_split_rules_screen.dart';
 import '../features/reader/presentation/reader_entry_screen.dart';
-import '../features/reading_stats/presentation/reading_stats_screen.dart';
+import '../features/reader/presentation/reading_info_settings_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/series/presentation/series_detail_screen.dart';
 import '../features/series/presentation/series_screen.dart';
 import '../features/settings/presentation/diagnostics_screen.dart';
 import '../features/settings/presentation/font_download_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/settings/presentation/storage_management_screen.dart';
+import '../features/settings/presentation/tag_management_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
+import 'routes.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -34,7 +39,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/library',
     onException: (context, state, router) {
       if (kDebugMode) {
-        debugPrint('Router exception at ${state.uri.path}: ${state.error}');
+        AppLogger().warning(
+          'Router exception at ${state.uri.path}: ${state.error}',
+          name: 'Router',
+        );
       }
       if (state.uri.path != '/error') {
         final message = state.error?.toString() ?? 'Unknown router error';
@@ -102,59 +110,67 @@ final routerProvider = Provider<GoRouter>((ref) {
           return null;
         },
       ),
-      // Catalog (not a main tab, but within shell for nav)
-      ShellRoute(
-        builder: (BuildContext context, GoRouterState state, Widget child) {
-          return child;
-        },
-        routes: [
-          GoRoute(
-            path: '/catalog',
-            name: 'catalog',
-            builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
-          ),
-          GoRoute(
-            path: '/collections',
-            name: 'collections',
-            builder: (BuildContext context, GoRouterState state) => const CollectionsScreen(),
-          ),
-          GoRoute(
-            path: '/annotations',
-            name: 'annotations',
-            builder: (BuildContext context, GoRouterState state) => const AnnotationsScreen(),
-          ),
-          GoRoute(
-            path: '/stats',
-            name: 'stats',
-            builder: (BuildContext context, GoRouterState state) => const ReadingStatsScreen(),
-          ),
-          GoRoute(
-            path: '/series',
-            name: 'series',
-            builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
-          ),
-          GoRoute(
-            path: '/settings/diagnostics',
-            name: 'diagnostics',
-            builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
-          ),
-          GoRoute(
-            path: '/settings/fonts',
-            name: 'fonts',
-            builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
-          ),
-          GoRoute(
-            path: '/404',
-            redirect: (_, state) => '/error',
-          ),
-          GoRoute(
-            path: '/error',
-            name: 'error',
-            builder: (BuildContext context, GoRouterState state) => _ErrorRoute(
-              message: state.uri.queryParameters['message'],
-            ),
-          ),
-        ],
+      // Full-screen routes (outside shell) — typed routes
+      ...$appRoutes,
+      GoRoute(
+        path: '/series',
+        name: 'series',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const SeriesScreen(),
+      ),
+      GoRoute(
+        path: '/opds',
+        name: 'opds',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const OpdsCatalogScreen(),
+      ),
+      GoRoute(
+        path: '/settings/diagnostics',
+        name: 'diagnostics',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const DiagnosticsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/fonts',
+        name: 'fonts',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const FontDownloadScreen(),
+      ),
+      GoRoute(
+        path: '/settings/storage',
+        name: 'storage',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const StorageManagementScreen(),
+      ),
+      GoRoute(
+        path: '/settings/tags',
+        name: 'tags',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const TagManagementScreen(),
+      ),
+      GoRoute(
+        path: '/settings/reading-info',
+        name: 'reading-info',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ReadingInfoSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/chapter-split-rules',
+        name: 'chapter-split-rules',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => const ChapterSplitRulesScreen(),
+      ),
+      GoRoute(
+        path: '/404',
+        redirect: (_, state) => '/error',
+      ),
+      GoRoute(
+        path: '/error',
+        name: 'error',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) => _ErrorRoute(
+          message: state.uri.queryParameters['message'],
+        ),
       ),
       // Detail routes outside shell (full-screen)
       GoRoute(
@@ -162,19 +178,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookDetails',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: BookDetailsScreen(bookId: bookId),
             transitionsBuilder: (_, animation, second, child) {
-              final offset = Tween(
-                begin: const Offset(0.05, 0),
-                end: Offset.zero,
-              ).animate(animation);
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: offset, child: child),
-              );
+              return FadeTransition(opacity: animation, child: child);
             },
           );
         },
@@ -184,7 +193,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'reader',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: ReaderEntryScreen(bookId: bookId),
@@ -202,19 +211,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'seriesDetail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final seriesId = state.pathParameters['seriesId']!;
+          final seriesId = state.pathParameters['seriesId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: SeriesDetailScreen(seriesId: seriesId),
             transitionsBuilder: (_, animation, second, child) {
-              final offset = Tween(
-                begin: const Offset(0.05, 0),
-                end: Offset.zero,
-              ).animate(animation);
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: offset, child: child),
-              );
+              return FadeTransition(opacity: animation, child: child);
             },
           );
         },
@@ -224,7 +226,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'quotes',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return QuotesScreen(bookId: bookId);
         },
       ),
@@ -233,7 +235,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookAnnotations',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return AnnotationsScreen(bookId: bookId);
         },
       ),
@@ -242,7 +244,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'authorDetail',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final authorId = state.pathParameters['authorId']!;
+          final authorId = state.pathParameters['authorId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: AuthorDetailScreen(authorId: authorId),
@@ -271,7 +273,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'genreBooks',
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
-          final genreId = state.pathParameters['genreId']!;
+          final genreId = state.pathParameters['genreId'] ?? '';
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: GenreBooksScreen(genreId: genreId),
@@ -300,7 +302,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'bookmarks',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return BookmarksScreen(bookId: bookId);
         },
       ),
@@ -309,7 +311,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'notes',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) {
-          final bookId = state.pathParameters['bookId']!;
+          final bookId = state.pathParameters['bookId'] ?? '';
           return NotesScreen(bookId: bookId);
         },
       ),

@@ -216,7 +216,9 @@ class ReaderTelemetry {
 // --- Riverpod providers ---
 
 final readerTelemetryProvider = Provider<ReaderTelemetry>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'readerTelemetryProvider must be overridden at startup with a configured ReaderTelemetry instance.',
+  );
 });
 
 final bookStatsProvider = FutureProvider<Map<String, BookStats>>((ref) async {

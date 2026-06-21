@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/http/dio_provider.dart';
 import '../../../core/http/http_client.dart';
+import 'flibusta_models.dart';
 
 part 'flibusta_api_client.g.dart';
 
@@ -24,10 +25,22 @@ class FlibustaApiClient {
   Dio get dio => _dio;
   HttpClient get httpClient => _httpClient;
 
+  DateTime? _lastRequestTime;
+
+  Future<void> _enforceRateLimit() async {
+    if (_lastRequestTime != null) {
+      final elapsed = DateTime.now().difference(_lastRequestTime!);
+      const minInterval = Duration(milliseconds: 300);
+      if (elapsed < minInterval) {
+        await Future<void>.delayed(minInterval - elapsed);
+      }
+    }
+    _lastRequestTime = DateTime.now();
+  }
+
   Future<String> _getText(String relativePath, {CancelToken? cancelToken}) async {
-    final base = _dio.options.baseUrl;
-    final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
-    return _httpClient.get('$normalizedBase/$relativePath', cancelToken: cancelToken);
+    await _enforceRateLimit();
+    return _httpClient.getWithMirror(relativePath, cancelToken: cancelToken);
   }
 
   // ── Search: Books (HTML) ────────────────────────────────────────────────────
@@ -118,9 +131,10 @@ class FlibustaApiClient {
     String name, {
     int page = 0,
     int limit = 50,
+    CancelToken? cancelToken,
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&cha=on';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseSearchAuthorsResponse(response);
   }
 
@@ -154,9 +168,10 @@ class FlibustaApiClient {
     String name, {
     int page = 0,
     int limit = 50,
+    CancelToken? cancelToken,
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chs=on';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseSearchSeriesResponse(response);
   }
 
@@ -196,9 +211,10 @@ class FlibustaApiClient {
     String name, {
     int page = 0,
     int limit = 50,
+    CancelToken? cancelToken,
   }) async {
     final url = 'booksearch?ask=${Uri.encodeComponent(name)}&page=$page&chg=on';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseSearchGenresResponse(response);
   }
 
@@ -228,8 +244,8 @@ class FlibustaApiClient {
 
   // ── Book Details (HTML) ─────────────────────────────────────────────────────
 
-  Future<BookDetailsResponse> getBookDetails(String bookId) async {
-    final response = await _getText('b/$bookId');
+  Future<BookDetailsResponse> getBookDetails(String bookId, {CancelToken? cancelToken}) async {
+    final response = await _getText('b/$bookId', cancelToken: cancelToken);
     return _parseBookDetailsResponse(response, bookId);
   }
 
@@ -396,12 +412,13 @@ class FlibustaApiClient {
   Future<RecentBooksResponse> getRecentBooks({
     String? lang,
     String? type,
+    CancelToken? cancelToken,
   }) async {
     final params = <String>[];
     if (lang != null) params.add('lang=$lang');
     if (type != null) params.add('type=$type');
     final url = 'new${params.isNotEmpty ? '?${params.join('&')}' : ''}';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseRecentBooksResponse(response);
   }
 
@@ -425,8 +442,8 @@ class FlibustaApiClient {
 
   // ── Author Detail (HTML) ────────────────────────────────────────────────────
 
-  Future<AuthorDetailResponse> getAuthorDetail(String authorId) async {
-    final response = await _getText('a/$authorId');
+  Future<AuthorDetailResponse> getAuthorDetail(String authorId, {CancelToken? cancelToken}) async {
+    final response = await _getText('a/$authorId', cancelToken: cancelToken);
     return _parseAuthorDetailResponse(response, authorId);
   }
 
@@ -611,8 +628,9 @@ class FlibustaApiClient {
   Future<GenreBooksResponse> getGenreBooks(
     String genreId, {
     String order = 'a',
+    CancelToken? cancelToken,
   }) async {
-    final response = await _getText('g/$genreId?order=$order');
+    final response = await _getText('g/$genreId?order=$order', cancelToken: cancelToken);
     return _parseGenreBooksResponse(response, genreId);
   }
 
@@ -647,8 +665,8 @@ class FlibustaApiClient {
 
   // ── Genre List (HTML from /g) ───────────────────────────────────────────────
 
-  Future<GenreListResponse> getGenreList() async {
-    final response = await _getText('g');
+  Future<GenreListResponse> getGenreList({CancelToken? cancelToken}) async {
+    final response = await _getText('g', cancelToken: cancelToken);
     return _parseGenreListResponse(response);
   }
 
@@ -671,8 +689,8 @@ class FlibustaApiClient {
 
   // ── Series Detail (HTML) ────────────────────────────────────────────────────
 
-  Future<SeriesDetailResponse> getSeriesDetail(String seriesId) async {
-    final response = await _getText('sequence/$seriesId');
+  Future<SeriesDetailResponse> getSeriesDetail(String seriesId, {CancelToken? cancelToken}) async {
+    final response = await _getText('sequence/$seriesId', cancelToken: cancelToken);
     return _parseSeriesDetailResponse(response, seriesId);
   }
 
@@ -707,8 +725,8 @@ class FlibustaApiClient {
 
   // ── Popular books (HTML /stat/b) ──────────────────────────────────────────────
 
-  Future<OpdsBooksResponse> getPopularBooks() async {
-    final response = await _getText('stat/b');
+  Future<OpdsBooksResponse> getPopularBooks({CancelToken? cancelToken}) async {
+    final response = await _getText('stat/b', cancelToken: cancelToken);
     final doc = parse(response);
     final books = <SearchBookItem>[];
     final seen = <String>{};
@@ -728,13 +746,13 @@ class FlibustaApiClient {
 
   // ── OPDS: Popular/Recent books ──────────────────────────────────────────────
 
-  Future<OpdsBooksResponse> getPopularBooksOpds({int page = 0}) async {
-    final response = await _getText('opds/popular?pageNumber=$page');
+  Future<OpdsBooksResponse> getPopularBooksOpds({int page = 0, CancelToken? cancelToken}) async {
+    final response = await _getText('opds/popular?pageNumber=$page', cancelToken: cancelToken);
     return _parseOpdsBooksResponse(response);
   }
 
-  Future<OpdsBooksResponse> getRecentBooksOpds({int page = 0}) async {
-    final response = await _getText('opds/recent?pageNumber=$page');
+  Future<OpdsBooksResponse> getRecentBooksOpds({int page = 0, CancelToken? cancelToken}) async {
+    final response = await _getText('opds/recent?pageNumber=$page', cancelToken: cancelToken);
     return _parseOpdsBooksResponse(response);
   }
 
@@ -762,8 +780,8 @@ class FlibustaApiClient {
 
   // ── OPDS: Genres ────────────────────────────────────────────────────────────
 
-  Future<OpdsGenresResponse> getGenresOpds() async {
-    final response = await _getText('opds/genres');
+  Future<OpdsGenresResponse> getGenresOpds({CancelToken? cancelToken}) async {
+    final response = await _getText('opds/genres', cancelToken: cancelToken);
     return _parseOpdsGenresResponse(response);
   }
 
@@ -793,7 +811,9 @@ class FlibustaApiClient {
     String bookId, {
     String? review,
     int? score,
+    CancelToken? cancelToken,
   }) async {
+    await _enforceRateLimit();
     final data = <String, String>{
       'flag': 'on',
       'op': 'Сохранить',
@@ -804,28 +824,33 @@ class FlibustaApiClient {
       'polka/add/$bookId',
       data: data,
       options: Options(contentType: 'application/x-www-form-urlencoded'),
+      cancelToken: cancelToken,
     );
     return response.statusCode == 200;
   }
 
-  Future<bool> watchBook(String bookId) async {
+  Future<bool> watchBook(String bookId, {CancelToken? cancelToken}) async {
+    await _enforceRateLimit();
     try {
       final base = _dio.options.baseUrl;
       final normalizedBase = base.endsWith('/') ? base.substring(0, base.length - 1) : base;
       final response = await _dio.get<String>(
         '$normalizedBase/polka/watch/add/$bookId',
         options: Options(responseType: ResponseType.plain),
+        cancelToken: cancelToken,
       );
       return response.statusCode == 200 && !(response.data?.contains('user/login') ?? false);
-    } on Object {
+    } on DioException catch (_) {
+      return false;
+    } on Object catch (_) {
       return false;
     }
   }
 
   // ── Messages ────────────────────────────────────────────────────────────────
 
-  Future<MessagesResponse> getMessages() async {
-    final response = await _getText('messages');
+  Future<MessagesResponse> getMessages({CancelToken? cancelToken}) async {
+    final response = await _getText('messages', cancelToken: cancelToken);
     return _parseMessagesResponse(response);
   }
 
@@ -851,8 +876,10 @@ class FlibustaApiClient {
   Future<bool> sendMessage(
     String recipient,
     String subject,
-    String body,
-  ) async {
+    String body, {
+    CancelToken? cancelToken,
+  }) async {
+    await _enforceRateLimit();
     final response = await _dio.post<String>(
       'messages/new',
       data: <String, String>{
@@ -862,14 +889,15 @@ class FlibustaApiClient {
         'op': 'Отправить сообщение',
       },
       options: Options(contentType: 'application/x-www-form-urlencoded'),
+      cancelToken: cancelToken,
     );
     return response.statusCode == 200 || response.statusCode == 302;
   }
 
   // ── User Profile ────────────────────────────────────────────────────────────
 
-  Future<UserProfileResponse> getUserProfile(String userId) async {
-    final response = await _getText('user/$userId');
+  Future<UserProfileResponse> getUserProfile(String userId, {CancelToken? cancelToken}) async {
+    final response = await _getText('user/$userId', cancelToken: cancelToken);
     return _parseUserProfileResponse(response, userId);
   }
 
@@ -885,9 +913,12 @@ class FlibustaApiClient {
 
   // ── Recommendations ─────────────────────────────────────────────────────────
 
-  Future<RecommendationsResponse> getRecommendations({String? userId}) async {
+  Future<RecommendationsResponse> getRecommendations({
+    String? userId,
+    CancelToken? cancelToken,
+  }) async {
     final url = userId != null ? 'rec?view=recs&user=$userId' : 'rec';
-    final response = await _getText(url);
+    final response = await _getText(url, cancelToken: cancelToken);
     return _parseRecommendationsResponse(response);
   }
 
@@ -898,8 +929,8 @@ class FlibustaApiClient {
 
   // ── Black/White List ────────────────────────────────────────────────────────
 
-  Future<BwListResponse> getBwList(String userId) async {
-    final response = await _getText('bwlist/show/$userId');
+  Future<BwListResponse> getBwList(String userId, {CancelToken? cancelToken}) async {
+    final response = await _getText('bwlist/show/$userId', cancelToken: cancelToken);
     return _parseBwListResponse(response, userId);
   }
 
@@ -910,8 +941,8 @@ class FlibustaApiClient {
 
   // ── Tracker ─────────────────────────────────────────────────────────────────
 
-  Future<TrackerResponse> getTracker() async {
-    final response = await _getText('tracker');
+  Future<TrackerResponse> getTracker({CancelToken? cancelToken}) async {
+    final response = await _getText('tracker', cancelToken: cancelToken);
     return _parseTrackerResponse(response);
   }
 
@@ -968,242 +999,4 @@ class FlibustaApiClient {
 
     return books;
   }
-}
-
-// ── Response models ───────────────────────────────────────────────────────────
-
-class SearchByNameResponse {
-  final List<SearchBookItem> books;
-
-  const SearchByNameResponse({required this.books});
-}
-
-class SearchBookItem {
-  final String id;
-  final String name;
-  final List<SearchAuthorItem> authors;
-
-  const SearchBookItem({required this.id, required this.name, this.authors = const []});
-}
-
-class SearchAuthorsResponse {
-  final List<SearchAuthorItem> authors;
-
-  const SearchAuthorsResponse({required this.authors});
-}
-
-class SearchAuthorItem {
-  final String id;
-  final String name;
-
-  const SearchAuthorItem({required this.id, required this.name});
-}
-
-class SearchSeriesResponse {
-  final List<SearchSeriesItem> series;
-
-  const SearchSeriesResponse({required this.series});
-}
-
-class SearchSeriesItem {
-  final String id;
-  final String name;
-
-  const SearchSeriesItem({required this.id, required this.name});
-}
-
-class SearchGenresResponse {
-  final List<SearchGenreItem> genres;
-
-  const SearchGenresResponse({required this.genres});
-}
-
-class SearchGenreItem {
-  final String id;
-  final String name;
-
-  const SearchGenreItem({required this.id, required this.name});
-}
-
-class BookDetailsResponse {
-  final String id;
-  final String title;
-  final String description;
-  final String? coverUrl;
-  final List<String> authors;
-  final List<String> authorIds;
-  final List<String> formats;
-  final List<String> genres;
-  final List<SeriesInfoItem> series;
-
-  const BookDetailsResponse({
-    required this.id,
-    required this.title,
-    required this.description,
-    this.coverUrl,
-    required this.authors,
-    this.authorIds = const [],
-    required this.formats,
-    this.genres = const [],
-    this.series = const [],
-  });
-}
-
-class SeriesInfoItem {
-  final String id;
-  final String name;
-
-  const SeriesInfoItem({required this.id, required this.name});
-}
-
-class RecentBooksResponse {
-  final List<SearchBookItem> books;
-
-  const RecentBooksResponse({required this.books});
-}
-
-class AuthorDetailResponse {
-  final String id;
-  final String name;
-  final String? avatarUrl;
-  final String biography;
-  final List<AuthorSeriesGroup> seriesGroups;
-  final List<SearchBookItem> books;
-
-  const AuthorDetailResponse({
-    required this.id,
-    required this.name,
-    this.avatarUrl,
-    this.biography = '',
-    this.seriesGroups = const [],
-    required this.books,
-  });
-}
-
-class AuthorSeriesGroup {
-  final String id;
-  final String name;
-  final List<AuthorGenreItem> genres;
-  final List<AuthorBookItem> books;
-
-  AuthorSeriesGroup({
-    required this.id,
-    required this.name,
-    List<AuthorGenreItem>? genres,
-    List<AuthorBookItem>? books,
-  }) : genres = genres ?? [],
-       books = books ?? [];
-}
-
-class AuthorGenreItem {
-  final String id;
-  final String name;
-
-  const AuthorGenreItem({required this.id, required this.name});
-}
-
-class AuthorBookItem {
-  final String id;
-  final String name;
-  final int? index;
-  final String? size;
-  final int? pages;
-  final double? rating;
-  final List<String> formats;
-
-  const AuthorBookItem({
-    required this.id,
-    required this.name,
-    this.index,
-    this.size,
-    this.pages,
-    this.rating,
-    this.formats = const [],
-  });
-}
-
-class GenreBooksResponse {
-  final String id;
-  final String name;
-  final List<SearchBookItem> books;
-
-  const GenreBooksResponse({
-    required this.id,
-    required this.name,
-    required this.books,
-  });
-}
-
-class GenreListResponse {
-  final List<SearchGenreItem> genres;
-
-  const GenreListResponse({required this.genres});
-}
-
-class SeriesDetailResponse {
-  final String id;
-  final String name;
-  final List<SearchBookItem> books;
-
-  const SeriesDetailResponse({
-    required this.id,
-    required this.name,
-    required this.books,
-  });
-}
-
-class OpdsBooksResponse {
-  final List<SearchBookItem> books;
-
-  const OpdsBooksResponse({required this.books});
-}
-
-class OpdsGenresResponse {
-  final List<SearchGenreItem> genres;
-
-  const OpdsGenresResponse({required this.genres});
-}
-
-class MessagesResponse {
-  final List<MessageItem> messages;
-
-  const MessagesResponse({required this.messages});
-}
-
-class MessageItem {
-  final String sender;
-  final String subject;
-  final String date;
-
-  const MessageItem({
-    required this.sender,
-    required this.subject,
-    required this.date,
-  });
-}
-
-class UserProfileResponse {
-  final String userId;
-  final String username;
-
-  const UserProfileResponse({required this.userId, required this.username});
-}
-
-class RecommendationsResponse {
-  final List<SearchBookItem> books;
-
-  const RecommendationsResponse({required this.books});
-}
-
-class BwListResponse {
-  final String userId;
-  final List<SearchBookItem> books;
-
-  const BwListResponse({required this.userId, required this.books});
-}
-
-class TrackerResponse {
-  final List<SearchBookItem> books;
-
-  const TrackerResponse({required this.books});
 }

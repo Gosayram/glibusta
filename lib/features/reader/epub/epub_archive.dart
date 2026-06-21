@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:archive/archive.dart';
 
 const int _maxArchiveEntries = 1000;
@@ -10,10 +9,14 @@ final class EpubArchive {
   final Archive archive;
 
   static Future<EpubArchive> open(String filePath) async {
-    final bytes = await File(filePath).readAsBytes();
-    final archive = ZipDecoder().decodeBytes(bytes);
-    _validateArchive(archive);
-    return EpubArchive(archive);
+    final input = InputFileStream(filePath);
+    try {
+      final archive = ZipDecoder().decodeStream(input);
+      _validateArchive(archive);
+      return EpubArchive(archive);
+    } finally {
+      input.closeSync();
+    }
   }
 
   static void _validateArchive(Archive archive) {

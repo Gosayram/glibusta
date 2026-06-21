@@ -6,7 +6,7 @@ part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
+enum ReaderMode { auto, paginated, continuous, twoPage, focus, fullscreen }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -83,7 +83,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(BottomBarContent.percent) BottomBarContent bottomBarContent,
     @Default(0.0) double paragraphFirstLineIndent,
     @Default(true) bool hyphenation,
-    @Default(TapZoneLayout.third) TapZoneLayout tapZoneLayout,
+    @Default(TapZoneLayout.quarter) TapZoneLayout tapZoneLayout,
     @Default(PageTurnAnimation.slide) PageTurnAnimation pageTurnAnimation,
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
@@ -95,7 +95,20 @@ abstract class ReaderSettings with _$ReaderSettings {
   }) = _ReaderSettings;
 }
 
-class ReaderPosition {
+@freezed
+abstract class ReaderPosition with _$ReaderPosition {
+  const factory ReaderPosition({
+    required String bookId,
+    required int chapterIndex,
+    required int paragraphIndex,
+    @Default(0.0) double localOffset,
+    @Default(0.0) double progressPercent,
+    @Default('') String chapterId,
+    @Default(0) int textOffset,
+    required DateTime updatedAt,
+  }) = _ReaderPosition;
+  const ReaderPosition._();
+
   static final initial = ReaderPosition(
     bookId: '',
     chapterIndex: 0,
@@ -103,41 +116,7 @@ class ReaderPosition {
     updatedAt: DateTime(2000),
   );
 
-  final String bookId;
-  final int chapterIndex;
-  final int paragraphIndex;
-  final double localOffset;
-  final double progressPercent;
-  final DateTime updatedAt;
-
-  const ReaderPosition({
-    required this.bookId,
-    required this.chapterIndex,
-    required this.paragraphIndex,
-    this.localOffset = 0.0,
-    this.progressPercent = 0.0,
-    required this.updatedAt,
-  });
-
   int get currentPosition => chapterIndex;
-
-  ReaderPosition copyWith({
-    String? bookId,
-    int? chapterIndex,
-    int? paragraphIndex,
-    double? localOffset,
-    double? progressPercent,
-    DateTime? updatedAt,
-  }) {
-    return ReaderPosition(
-      bookId: bookId ?? this.bookId,
-      chapterIndex: chapterIndex ?? this.chapterIndex,
-      paragraphIndex: paragraphIndex ?? this.paragraphIndex,
-      localOffset: localOffset ?? this.localOffset,
-      progressPercent: progressPercent ?? this.progressPercent,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
-  }
 
   ReaderPosition clamp({required int chapterCount}) {
     if (chapterCount <= 0) {
@@ -155,6 +134,8 @@ class ReaderPosition {
       paragraphIndex: paragraphIndex < 0 ? 0 : paragraphIndex,
       localOffset: localOffset.clamp(0.0, 100.0),
       progressPercent: progressPercent.clamp(0.0, 1.0),
+      chapterId: chapterId,
+      textOffset: textOffset,
       updatedAt: updatedAt,
     );
   }

@@ -1,10 +1,7 @@
 import 'book_parser.dart';
-import 'epub_parser.dart' as legacy_epub;
-import 'fb2_parser.dart';
+import 'cbz_parser.dart';
 import 'format_detector.dart';
-import 'mobi_parser.dart';
-import 'rtf_parser.dart';
-import 'txt_parser.dart';
+import 'rust_book_parser.dart';
 
 final class BookParserRegistry {
   BookParserRegistry(this._parsers);
@@ -12,11 +9,8 @@ final class BookParserRegistry {
   final List<BookParser> _parsers;
 
   static final BookParserRegistry defaultInstance = BookParserRegistry([
-    legacy_epub.EpubParser(),
-    Fb2Parser(),
-    TxtBookParser(),
-    RtfBookParser(),
-    MobiBookParser(),
+    RustBookParser(),
+    CbzParser(),
   ]);
 
   BookParser parserFor(BookFormat format) {

@@ -101,6 +101,8 @@ class FlibustaApiSource extends BookSource {
         totalPages: totalPages,
         hasNextPage: query.page < totalPages - 1,
       );
+    } on DioException catch (e) {
+      throw Exception('Failed to parse search results: $e');
     } on Object catch (e) {
       throw Exception('Failed to parse search results: $e');
     }
@@ -178,6 +180,8 @@ class FlibustaApiSource extends BookSource {
         availableFormats: _parseFormats(result.formats),
         downloadUrls: result.formats.map((f) => '$normalizedBase/b/$bookId/$f').toList(),
       );
+    } on DioException catch (e) {
+      throw Exception('Failed to get book details: $e');
     } on Object catch (e) {
       throw Exception('Failed to get book details: $e');
     }

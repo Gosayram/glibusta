@@ -86,7 +86,9 @@ class ReaderBottomBar extends StatelessWidget {
     required this.totalChapters,
     required this.scrollProgress,
     required this.estimatedMinutesLeft,
+    required this.chapterTitle,
     this.onJumpToProgress,
+    this.onModeChanged,
   });
 
   final ReaderSettings settings;
@@ -94,7 +96,9 @@ class ReaderBottomBar extends StatelessWidget {
   final int totalChapters;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final String chapterTitle;
   final ValueChanged<double>? onJumpToProgress;
+  final ValueChanged<ReaderMode>? onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -103,8 +107,8 @@ class ReaderBottomBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final leftText = _buildLeftText(settings.bottomBarContent);
-    final rightText = _buildRightText(settings.bottomBarContent);
+    final percent = (scrollProgress * 100).round();
+    final page = (scrollProgress * totalChapters).ceil().clamp(1, totalChapters);
 
     return SafeArea(
       top: false,
@@ -123,13 +127,36 @@ class ReaderBottomBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Chapter title
+            if (chapterTitle.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  chapterTitle,
+                  style: TextStyle(
+                    color: colors.text.withValues(alpha: 0.8),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            // Page / percent info
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(leftText, style: TextStyle(color: colors.text, fontSize: 12)),
-                Text(rightText, style: TextStyle(color: colors.text, fontSize: 12)),
+                Text(
+                  '$page / $totalChapters',
+                  style: TextStyle(color: colors.text, fontSize: 12),
+                ),
+                Text(
+                  '$percent%',
+                  style: TextStyle(color: colors.text, fontSize: 12),
+                ),
               ],
             ),
+            // Slider
             if (onJumpToProgress != null) ...[
               const SizedBox(height: 4),
               SliderTheme(
@@ -147,47 +174,55 @@ class ReaderBottomBar extends StatelessWidget {
                 ),
               ),
             ],
+            // Mode switcher
+            if (onModeChanged != null) _buildModeSwitcher(colors),
           ],
         ),
       ),
     );
   }
 
-  String _buildLeftText(BottomBarContent content) {
-    switch (content) {
-      case BottomBarContent.percent:
-        return '${(scrollProgress * 100).round()}%';
-      case BottomBarContent.page:
-        final page = (scrollProgress * totalChapters).ceil();
-        return 'Стр. $page';
-      case BottomBarContent.chapter:
-        return 'Глава ${currentChapterIndex + 1} из $totalChapters';
-      case BottomBarContent.time:
-        final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
-        final hours = remainingMinutes ~/ 60;
-        final mins = remainingMinutes % 60;
-        return hours > 0 ? '~$hoursч $minsм' : '~$minsм';
-      case BottomBarContent.none:
-        return '';
-    }
-  }
+  Widget _buildModeSwitcher(ReaderColors colors) {
+    const modes = <ReaderMode, String>{
+      ReaderMode.auto: 'Авто',
+      ReaderMode.paginated: 'Страницы',
+      ReaderMode.continuous: 'Прокрутка',
+    };
 
-  String _buildRightText(BottomBarContent content) {
-    switch (content) {
-      case BottomBarContent.percent:
-        final remainingMinutes = (estimatedMinutesLeft * (1 - scrollProgress)).round();
-        final hours = remainingMinutes ~/ 60;
-        final mins = remainingMinutes % 60;
-        return hours > 0 ? '~$hoursч $minsм' : '~$minsм';
-      case BottomBarContent.page:
-        return 'Глава ${currentChapterIndex + 1} из $totalChapters';
-      case BottomBarContent.chapter:
-        return '${(scrollProgress * 100).round()}%';
-      case BottomBarContent.time:
-        return '${(scrollProgress * 100).round()}%';
-      case BottomBarContent.none:
-        return '';
-    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: modes.entries.map((entry) {
+        final isSelected = settings.mode == entry.key;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: GestureDetector(
+            onTap: () => onModeChanged?.call(entry.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colors.text.withValues(alpha: 0.15)
+                    : colors.text.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isSelected
+                      ? colors.text.withValues(alpha: 0.3)
+                      : colors.text.withValues(alpha: 0.1),
+                ),
+              ),
+              child: Text(
+                entry.value,
+                style: TextStyle(
+                  color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
   }
 }
 

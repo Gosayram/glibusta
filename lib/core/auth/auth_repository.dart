@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,11 +11,13 @@ import '../http/dio_provider.dart';
 import '../logging/app_logger.dart';
 
 part 'auth_repository.g.dart';
+part 'auth_repository.freezed.dart';
 
 const _kSessionNameKey = 'auth_session_name';
 const _kSessionMailKey = 'auth_session_mail';
 const _kSessionCookiesKey = 'auth_session_cookies';
 
+@JsonSerializable()
 class UserSession {
   final String name;
   final String? mail;
@@ -26,17 +29,9 @@ class UserSession {
     this.cookies = const {},
   });
 
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'mail': mail,
-    'cookies': cookies,
-  };
+  factory UserSession.fromJson(Map<String, dynamic> json) => _$UserSessionFromJson(json);
 
-  factory UserSession.fromJson(Map<String, dynamic> json) => UserSession(
-    name: json['name'] as String,
-    mail: json['mail'] as String?,
-    cookies: Map<String, String>.from(json['cookies'] as Map? ?? {}),
-  );
+  Map<String, dynamic> toJson() => _$UserSessionToJson(this);
 }
 
 class AuthRepository {
@@ -89,9 +84,10 @@ class AuthRepository {
     final setCookies = response.headers['set-cookie'];
     if (setCookies != null) {
       for (final cookie in setCookies) {
-        final parts = cookie.split(';').first.split('=');
-        if (parts.length >= 2) {
-          cookies[parts[0].trim()] = parts.sublist(1).join('=').trim();
+        final firstPart = cookie.split(';').first;
+        final eqIndex = firstPart.indexOf('=');
+        if (eqIndex > 0) {
+          cookies[firstPart.substring(0, eqIndex).trim()] = firstPart.substring(eqIndex + 1).trim();
         }
       }
     }
@@ -130,10 +126,89 @@ class AuthException implements Exception {
   String toString() => 'AuthException: $message';
 }
 
+/// Dio interceptor that detects 401 responses and attempts auto re-login.
+///
+/// On 401, it tries [AuthStateNotifier.tryAutoLogin] with stored credentials.
+/// If successful, retries the original request; otherwise passes the error.
+class SessionRefreshInterceptor extends Interceptor {
+  final Ref _ref;
+  Completer<bool>? _pendingRefresh;
+
+  SessionRefreshInterceptor(this._ref);
+
+  @override
+  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode != 401 ||
+        err.requestOptions.path.contains('/user/login') ||
+        err.requestOptions.extra['sessionRefreshed'] == true) {
+      handler.next(err);
+      return;
+    }
+
+    // If a refresh is already in progress, wait for it
+    if (_pendingRefresh != null) {
+      final success = await _pendingRefresh!.future;
+      if (!success) {
+        handler.next(err);
+        return;
+      }
+      await _retryRequest(err.requestOptions, handler);
+      return;
+    }
+
+    _pendingRefresh = Completer<bool>();
+    try {
+      final success = await _ref.read(authStateProvider.notifier).tryAutoLogin();
+      _pendingRefresh!.complete(success);
+
+      if (success) {
+        await _retryRequest(err.requestOptions, handler);
+      } else {
+        handler.next(err);
+      }
+    } on Object catch (e) {
+      _pendingRefresh!.complete(false);
+      AppLogger().warning('Session refresh failed: $e', name: 'Auth', error: e);
+      handler.next(err);
+    } finally {
+      _pendingRefresh = null;
+    }
+  }
+
+  Future<void> _retryRequest(
+    RequestOptions options,
+    ErrorInterceptorHandler handler,
+  ) async {
+    try {
+      final response = await _ref
+          .read(dioProvider)
+          .fetch<dynamic>(
+            options.copyWith(
+              headers: options.headers,
+              extra: {...options.extra, 'sessionRefreshed': true},
+            ),
+          );
+      handler.resolve(response);
+    } on DioException catch (e) {
+      handler.next(e);
+    } on Object catch (e) {
+      handler.next(DioException(requestOptions: options, error: e));
+    }
+  }
+}
+
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final dio = ref.watch(dioProvider);
   return AuthRepository(dio);
 });
+
+final flutterSecureStorageProvider = Provider<FlutterSecureStorage>(
+  (ref) => const FlutterSecureStorage(
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock_this_device,
+    ),
+  ),
+);
 
 @riverpod
 class AuthStateNotifier extends _$AuthStateNotifier {
@@ -145,10 +220,12 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       return const AuthStateData();
     }
     final mail = prefs.getString(_kSessionMailKey);
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
-        ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
+        ? Map<String, String>.from(
+            Uri.splitQueryString(cookiesRaw).map((k, v) => MapEntry(k, Uri.decodeComponent(v))),
+          )
         : <String, String>{};
     if (cookies.isEmpty) {
       return const AuthStateData();
@@ -190,22 +267,20 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionNameKey);
     await prefs.remove(_kSessionMailKey);
-    const secureStorage = FlutterSecureStorage();
-    await secureStorage.delete(key: _kSessionCookiesKey);
-    await secureStorage.delete(key: 'auth_username');
-    await secureStorage.delete(key: 'auth_password');
+    final secureStorage = ref.read(flutterSecureStorageProvider);
+    await secureStorage.deleteAll();
     state = const AsyncValue.data(AuthStateData());
   }
 
   void clearError() {
     final current = state.value;
     if (current != null) {
-      state = AsyncValue.data(current.copyWith(clearError: true));
+      state = AsyncValue.data(current.copyWith(error: null));
     }
   }
 
   Future<bool> tryAutoLogin() async {
-    const secureStorage = FlutterSecureStorage();
+    final secureStorage = ref.read(flutterSecureStorageProvider);
     final username = await secureStorage.read(key: 'auth_username');
     final password = await secureStorage.read(key: 'auth_password');
     if (username == null || password == null || username.isEmpty || password.isEmpty) {
@@ -239,41 +314,26 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     if (session.mail != null) {
       await prefs.setString(_kSessionMailKey, session.mail!);
     }
-    const secureStorage = FlutterSecureStorage();
-    if (session.cookies.isNotEmpty) {
-      final encoded = session.cookies.entries
-          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-          .join('&');
-      await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
+    final secureStorage = ref.read(flutterSecureStorageProvider);
+    if (session.cookies.isEmpty) {
+      await secureStorage.delete(key: _kSessionCookiesKey);
+      return;
     }
+    final encoded = session.cookies.entries
+        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
   }
 }
 
-class AuthStateData {
-  final bool isAuthenticated;
-  final UserSession? session;
-  final String? error;
-  final bool isLoading;
-
-  const AuthStateData({
-    this.isAuthenticated = false,
-    this.session,
-    this.error,
-    this.isLoading = false,
-  });
-
-  AuthStateData copyWith({
-    bool? isAuthenticated,
+@freezed
+abstract class AuthStateData with _$AuthStateData {
+  const factory AuthStateData({
+    @Default(false) bool isAuthenticated,
     UserSession? session,
     String? error,
-    bool isLoading = false,
-    bool clearError = false,
-  }) {
-    return AuthStateData(
-      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-      session: session ?? this.session,
-      error: clearError ? null : (error ?? this.error),
-      isLoading: isLoading,
-    );
-  }
+    @Default(false) bool isLoading,
+  }) = _AuthStateData;
+
+  const AuthStateData._();
 }

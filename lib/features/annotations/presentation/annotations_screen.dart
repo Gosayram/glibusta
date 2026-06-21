@@ -1,65 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
-import '../../bookmarks/data/bookmark_repository.dart';
-import '../../notes/data/note_repository.dart';
-import '../../quotes/data/quote_repository.dart';
-
-enum AnnotationType { bookmarks, notes, quotes }
-
-class AnnotationData {
-  final List<Bookmark> bookmarks;
-  final List<Note> notes;
-  final List<Quote> quotes;
-
-  const AnnotationData({
-    required this.bookmarks,
-    required this.notes,
-    required this.quotes,
-  });
-}
-
-final _bookmarkRepoProvider = Provider<BookmarkRepository>((ref) {
-  return BookmarkRepository(ref.watch(databaseProvider));
-});
-
-final _noteRepoProvider = Provider<NoteRepository>((ref) {
-  return NoteRepository(ref.watch(databaseProvider));
-});
-
-final _quoteRepoProvider = Provider<QuoteRepository>((ref) {
-  return QuoteRepository(ref.watch(databaseProvider));
-});
-
-final allAnnotationsProvider = FutureProvider.family<AnnotationData, String?>((ref, bookId) async {
-  final db = ref.watch(databaseProvider);
-  final bookmarkRepo = ref.watch(_bookmarkRepoProvider);
-  final noteRepo = ref.watch(_noteRepoProvider);
-  final quoteRepo = ref.watch(_quoteRepoProvider);
-
-  final List<Bookmark> bookmarks;
-  final List<Note> notes;
-  final List<Quote> quotes;
-
-  if (bookId != null) {
-    bookmarks = await bookmarkRepo.getAllBookmarks(bookId);
-    notes = await noteRepo.getAllNotes(bookId);
-    quotes = await quoteRepo.getAllQuotes(bookId);
-  } else {
-    bookmarks = await db.select(db.bookmarks).get();
-    notes = await db.select(db.notes).get();
-    quotes = await db.select(db.quotes).get();
-  }
-
-  return AnnotationData(
-    bookmarks: bookmarks,
-    notes: notes,
-    quotes: quotes,
-  );
-});
+import '../data/annotations_providers.dart';
 
 class AnnotationsScreen extends ConsumerStatefulWidget {
   final String? bookId;
@@ -155,25 +103,28 @@ class _BookmarkList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
-            final repo = ref.read(_bookmarkRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
-            await repo.deleteBookmark(bookmark.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Закладка удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertBookmark(bookmark);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
+            if (!context.mounted) return false;
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить закладку?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
               ),
             );
+            if (confirmed != true || !context.mounted) return false;
+            final repo = ref.read(bookmarkRepoProvider);
+            await repo.deleteBookmark(bookmark.id);
+            unawaited(SmartDialog.showToast('Закладка удалена'));
             return true;
           },
           child: ListTile(
@@ -229,25 +180,27 @@ class _NoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
-            final repo = ref.read(_noteRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
-            await repo.deleteNote(note.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Заметка удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertNote(note);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить заметку?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
               ),
             );
+            if (confirmed != true || !context.mounted) return false;
+            final repo = ref.read(noteRepoProvider);
+            await repo.deleteNote(note.id);
+            unawaited(SmartDialog.showToast('Заметка удалена'));
             return true;
           },
           child: ListTile(
@@ -304,25 +257,27 @@ class _QuoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
-            final repo = ref.read(_quoteRepoProvider);
-            final scaffold = ScaffoldMessenger.of(context);
-            final theme = Theme.of(context);
-            await repo.deleteQuote(quote.id);
-            scaffold.showSnackBar(
-              SnackBar(
-                content: const Text('Цитата удалена'),
-                action: SnackBarAction(
-                  label: 'Отмена',
-                  textColor: theme.colorScheme.inversePrimary,
-                  onPressed: () async {
-                    await repo.insertQuote(quote);
-                    if (context.mounted) {
-                      ref.invalidate(allAnnotationsProvider(bookId));
-                    }
-                  },
-                ),
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить цитату?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
               ),
             );
+            if (confirmed != true || !context.mounted) return false;
+            final repo = ref.read(quoteRepoProvider);
+            await repo.deleteQuote(quote.id);
+            unawaited(SmartDialog.showToast('Цитата удалена'));
             return true;
           },
           child: ListTile(
@@ -368,11 +323,9 @@ Color _parseColor(String? hexString) {
   if (hexString == null || hexString.isEmpty) return Colors.amber;
   final cleaned = hexString.startsWith('#') ? hexString.substring(1) : hexString;
   if (cleaned.length != 6 && cleaned.length != 8) return Colors.amber;
-  try {
-    return Color(int.parse('0xFF$cleaned'));
-  } on Object catch (_) {
-    return Colors.amber;
-  }
+  final parsed = int.tryParse('0xFF$cleaned');
+  if (parsed == null) return Colors.amber;
+  return Color(parsed);
 }
 
 class _EmptyState extends StatelessWidget {

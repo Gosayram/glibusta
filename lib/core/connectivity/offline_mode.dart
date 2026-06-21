@@ -1,14 +1,8 @@
 import 'dart:async';
-import 'dart:io' as io;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../logging/app_logger.dart';
 
 part 'offline_mode.g.dart';
 
@@ -121,141 +115,8 @@ Stream<NetworkState> networkState(Ref ref) {
   return Connectivity().onConnectivityChanged.map(mapConnectivity);
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 Future<NetworkState> currentNetwork(Ref ref) async {
   final results = await Connectivity().checkConnectivity();
   return mapConnectivity(results);
 }
-
-// --- Legacy OfflineModeService (kept for backward compatibility) ---
-
-class OfflineModeService {
-  OfflineModeService(this._logger) {
-    unawaited(_init());
-  }
-
-  final AppLogger _logger;
-  final _controller = StreamController<NetworkState>.broadcast();
-  NetworkState _state = const NetworkState(kind: NetworkKind.unknown, isMetered: false);
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
-
-  NetworkState get state => _state;
-  bool get isOnline => _state.kind != NetworkKind.offline;
-  bool get isOffline => _state.kind == NetworkKind.offline;
-  Stream<NetworkState> get stream => _controller.stream;
-
-  Future<void> _init() async {
-    try {
-      final results = await Connectivity().checkConnectivity();
-      _updateState(results);
-    } on Object catch (e) {
-      _logger.warning('Connectivity check failed: $e', name: 'OfflineMode');
-      const offline = NetworkState(kind: NetworkKind.offline, isMetered: false);
-      _state = offline;
-      _controller.add(offline);
-    }
-
-    _subscription = Connectivity().onConnectivityChanged.listen(_updateState);
-  }
-
-  void _updateState(List<ConnectivityResult> results) {
-    final newState = mapConnectivity(results);
-    if (newState.kind != _state.kind) {
-      _state = newState;
-      _logger.info('Connectivity changed: ${newState.kind.name}', name: 'OfflineMode');
-      _controller.add(newState);
-    }
-  }
-
-  Future<void> waitForConnection({Duration timeout = const Duration(seconds: 30)}) async {
-    if (isOnline) return;
-    final completer = Completer<void>();
-    Timer? timer;
-
-    final sub = stream.listen((state) {
-      if (state.kind != NetworkKind.offline && !completer.isCompleted) {
-        timer?.cancel();
-        completer.complete();
-      }
-    });
-
-    timer = Timer(timeout, () {
-      if (!completer.isCompleted) completer.complete();
-    });
-
-    await completer.future;
-    await sub.cancel();
-  }
-
-  void dispose() {
-    unawaited(_subscription?.cancel());
-    unawaited(_controller.close());
-  }
-
-  static Future<bool> probeServer(
-    String baseUrl, {
-    Duration timeout = const Duration(seconds: 5),
-  }) async {
-    String ua;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cached = prefs.getString('device_user_agent');
-      ua =
-          cached ??
-          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-              'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
-    } on Object {
-      ua =
-          'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36';
-    }
-    final dio = Dio(
-      BaseOptions(
-        connectTimeout: timeout,
-        receiveTimeout: timeout,
-        headers: {
-          'User-Agent': ua,
-          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        },
-      ),
-    );
-    (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      return io.HttpClient()
-        ..badCertificateCallback = (io.X509Certificate cert, String host, int port) => true;
-    };
-    try {
-      final normalizedBase = baseUrl.endsWith('/')
-          ? baseUrl.substring(0, baseUrl.length - 1)
-          : baseUrl;
-      final response = await dio.head<dynamic>('$normalizedBase/opds/');
-      return response.statusCode != null &&
-          response.statusCode! >= 200 &&
-          response.statusCode! < 500;
-    } on Object catch (_) {
-      return false;
-    } finally {
-      dio.close(force: true);
-    }
-  }
-}
-
-// --- Legacy providers (kept for backward compatibility) ---
-
-final offlineModeServiceProvider = Provider<OfflineModeService>((ref) {
-  final logger = ref.watch(appLoggerProvider);
-  final service = OfflineModeService(logger);
-  ref.onDispose(service.dispose);
-  return service;
-});
-
-final connectivityStateProvider = StreamProvider<NetworkState>((ref) {
-  final service = ref.watch(offlineModeServiceProvider);
-  return service.stream;
-});
-
-final isOnlineProvider = Provider<bool>((ref) {
-  final asyncState = ref.watch(connectivityStateProvider);
-  final state = asyncState.value;
-  return state != null && state.kind != NetworkKind.offline;
-});

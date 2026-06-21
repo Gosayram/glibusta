@@ -56,10 +56,17 @@ Future<List<ContinueReadingInfo>> continueReadingInfos(Ref ref) async {
   final books = await repository.getBooksWithProgress();
   if (books.isEmpty) return [];
 
+  // Batch load all reading progress in one query
+  final allProgress = await db.bookDao.getAllReadingProgress();
+  final progressMap = <String, ReadingProgressData>{};
+  for (final progress in allProgress) {
+    progressMap[progress.bookId] = progress;
+  }
+
   final infos = <ContinueReadingInfo>[];
 
   for (final book in books) {
-    final ReadingProgressData? progress = await db.bookDao.getReadingProgress(book.id);
+    final ReadingProgressData? progress = progressMap[book.id];
     if (progress == null) continue;
 
     final cachedBook = await bookOpenService.getCachedBook(book.id);

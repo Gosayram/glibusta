@@ -46,4 +46,4 @@ final class ContinueReadingInfosProvider
   }
 }
 
-String _$continueReadingInfosHash() => r'd1c7ca85eb900e84c002b70b6026a71ee0c53471';
+String _$continueReadingInfosHash() => r'ced143fc8ec78a110f1dc48a35148ab4de3e8ad6';

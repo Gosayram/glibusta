@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../../features/library/data/book_import_service.dart';
@@ -64,16 +65,13 @@ class ShareHandler {
             .importFile(file.path)
             .then((result) {
               if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    result.isSuccess
-                        ? 'Импортировано: ${result.title}'
-                        : result.isDuplicate
-                        ? 'Дубликат: ${result.title}'
-                        : 'Ошибка: ${result.error}',
-                  ),
-                  duration: const Duration(seconds: 2),
+              unawaited(
+                SmartDialog.showToast(
+                  result.isSuccess
+                      ? 'Импортировано: ${result.title}'
+                      : result.isDuplicate
+                      ? 'Дубликат: ${result.title}'
+                      : 'Ошибка: ${result.error}',
                 ),
               );
             })
@@ -84,6 +82,9 @@ class ShareHandler {
                 error: e,
                 st: st,
               );
+              if (!context.mounted) return;
+              final fileName = file.path.split(RegExp(r'[\\/]')).last;
+              unawaited(SmartDialog.showToast('Не удалось импортировать: $fileName'));
             }),
       );
     }

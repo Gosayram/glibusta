@@ -10,36 +10,94 @@ part 'series_provider.g.dart';
 Future<List<SeriesInfo>> allSeries(Ref ref) async {
   final db = ref.watch(databaseProvider);
   final seriesList = await db.seriesDao.getAllSeries();
-  final infos = <SeriesInfo>[];
 
+  // Batch: load all bookSeries rows for all series
+  final allBookSeriesRows = <String, List<BookSery>>{};
   for (final s in seriesList) {
-    final bookSeriesRows = await db.seriesDao.getBooksInSeries(s.id);
-    if (bookSeriesRows.isEmpty) continue;
-    final bookIds = bookSeriesRows.map((r) => r.bookId).toList();
-    final books = <Book>[];
-    for (final id in bookIds) {
-      final row = await db.bookDao.getBookById(id);
-      if (row != null) {
-        final authorIds = row.authorIds;
-        final nameMap = await db.authorDao.getAuthorNamesByIds(authorIds);
-        books.add(
-          Book(
-            id: row.id,
-            title: row.title,
-            authorIds: authorIds,
-            authorNames: authorIds.map((id) => nameMap[id]).whereType<String>().toList(),
-            genreIds: row.genreIds,
-            description: row.description,
-            coverUrl: row.coverUrl,
-            publishDate: row.publishDate,
-            availableFormats: const [],
-            source: BookSourceInfo(
-              sourceId: row.sourceId ?? '',
-              sourceUrl: row.sourceUrl ?? '',
-            ),
+    final rows = await db.seriesDao.getBooksInSeries(s.id);
+    if (rows.isNotEmpty) {
+      allBookSeriesRows[s.id] = rows;
+    }
+  }
+
+  // Collect all unique book IDs across all series
+  final allBookIds = <String>{};
+  for (final rows in allBookSeriesRows.values) {
+    for (final r in rows) {
+      allBookIds.add(r.bookId);
+    }
+  }
+
+  if (allBookIds.isEmpty) {
+    final infos = seriesList
+        .map(
+          (s) => SeriesInfo(
+            id: s.id,
+            name: s.name,
+            description: s.description,
+            books: const [],
+            bookSeriesRows: const [],
           ),
-        );
-      }
+        )
+        .toList();
+    infos.sort((a, b) => a.name.compareTo(b.name));
+    return infos;
+  }
+
+  // Batch: load all books in one query
+  final allBooks = await db.bookDao.getBooksByIds(allBookIds.toList());
+
+  // Batch: resolve all authors in one query
+  final allAuthorIds = <String>{};
+  for (final row in allBooks) {
+    allAuthorIds.addAll(row.authorIds);
+  }
+  final nameMap = await db.authorDao.getAuthorNamesByIds(allAuthorIds.toList());
+
+  // Build book lookup
+  final bookMap = <String, SavedBook>{};
+  for (final row in allBooks) {
+    bookMap[row.id] = row;
+  }
+
+  // Assemble results
+  final infos = <SeriesInfo>[];
+  for (final s in seriesList) {
+    final bookSeriesRows = allBookSeriesRows[s.id];
+    if (bookSeriesRows == null || bookSeriesRows.isEmpty) {
+      infos.add(
+        SeriesInfo(
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          books: const [],
+          bookSeriesRows: const [],
+        ),
+      );
+      continue;
+    }
+    final books = <Book>[];
+    for (final bsRow in bookSeriesRows) {
+      final row = bookMap[bsRow.bookId];
+      if (row == null) continue;
+      final authorIds = row.authorIds;
+      books.add(
+        Book(
+          id: row.id,
+          title: row.title,
+          authorIds: authorIds,
+          authorNames: authorIds.map((id) => nameMap[id]).whereType<String>().toList(),
+          genreIds: row.genreIds,
+          description: row.description,
+          coverUrl: row.coverUrl,
+          publishDate: row.publishDate,
+          availableFormats: const [],
+          source: BookSourceInfo(
+            sourceId: row.sourceId ?? '',
+            sourceUrl: row.sourceUrl ?? '',
+          ),
+        ),
+      );
     }
     infos.add(
       SeriesInfo(
@@ -73,11 +131,13 @@ Future<SeriesDetail?> seriesDetail(Ref ref, String seriesId) async {
   }
 
   final repository = ref.watch(bookRepositoryProvider);
-  final books = <Book>[];
-  for (final row in bookSeriesRows) {
-    final book = await repository.getBookById(row.bookId);
-    if (book != null) books.add(book);
-  }
+  final bookIds = bookSeriesRows.map((r) => r.bookId).toList();
+  final fetchedBooks = await repository.getBooksByIds(bookIds);
+  final byId = {for (final b in fetchedBooks) b.id: b};
+  final books = [
+    for (final id in bookIds)
+      if (byId[id] != null) byId[id]!,
+  ];
 
   return SeriesDetail(
     id: s.id,

@@ -45,7 +45,6 @@ void main() {
 
     test('unknown format for unsupported extension', () {
       expect(detectBookFormat('image.jpg'), BookFormat.unknown);
-      expect(detectBookFormat('file.docx'), BookFormat.unknown);
       expect(detectBookFormat('archive.rar'), BookFormat.unknown);
       expect(detectBookFormat('book.epub2'), BookFormat.unknown);
     });

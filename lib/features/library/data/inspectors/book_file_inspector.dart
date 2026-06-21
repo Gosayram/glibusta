@@ -49,8 +49,7 @@ final class BookFileInspector {
       );
     }
 
-    final bytes = await file.readAsBytes();
-    final hash = sha256.convert(bytes).toString();
+    final hash = await _computeStreamHash(file);
 
     final isDuplicate = await duplicateChecker.exists(hash);
     if (isDuplicate) {
@@ -65,13 +64,11 @@ final class BookFileInspector {
     }
 
     const maxMetadataBytes = 256 * 1024;
-    final metadataBytes = bytes.length <= maxMetadataBytes
-        ? bytes
-        : bytes.sublist(0, maxMetadataBytes);
+    final metadataBytes = await _readFileHead(file, maxMetadataBytes);
 
     final metadata = await metadataExtractor.extract(
       path: path,
-      bytes: Uint8List.fromList(metadataBytes),
+      bytes: metadataBytes,
       format: format,
       encodingDetector: encodingDetector,
     );
@@ -112,5 +109,21 @@ final class BookFileInspector {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;
+  }
+
+  Future<String> _computeStreamHash(File file) async {
+    final digest = await sha256.bind(file.openRead()).last;
+    return digest.toString();
+  }
+
+  Future<Uint8List> _readFileHead(File file, int maxBytes) async {
+    final raf = await file.open();
+    try {
+      final length = await raf.length();
+      final toRead = length < maxBytes ? length : maxBytes;
+      return await raf.read(toRead);
+    } finally {
+      await raf.close();
+    }
   }
 }

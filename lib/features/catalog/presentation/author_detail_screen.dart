@@ -1,11 +1,13 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
-import '../../search/data/flibusta_api_client.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/author_detail_provider.dart';
 
 class AuthorDetailScreen extends ConsumerWidget {
@@ -15,15 +17,16 @@ class AuthorDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final asyncDetail = ref.watch(authorDetailProvider(authorId));
     return Scaffold(
       body: asyncDetail.when(
-        data: (detail) {
+        data: (AuthorDetailResponse detail) {
           if (detail.books.isEmpty && detail.seriesGroups.isEmpty) {
             return CustomScrollView(
               slivers: [
                 SliverAppBar(
-                  title: Text(detail.name.isNotEmpty ? detail.name : 'Автор'),
+                  title: Text(detail.name.isNotEmpty ? detail.name : l10n.authorFallback),
                   pinned: true,
                 ),
                 const SliverFillRemaining(
@@ -33,8 +36,15 @@ class AuthorDetailScreen extends ConsumerWidget {
                       children: [
                         Icon(Icons.person_outline, size: 64),
                         SizedBox(height: 16),
-                        Text('Нет книг у этого автора'),
                       ],
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Text(l10n.noBooksByAuthor),
                     ),
                   ),
                 ),
@@ -52,7 +62,7 @@ class AuthorDetailScreen extends ConsumerWidget {
               children: [
                 const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 16),
-                Text('Не удалось загрузить автора', style: Theme.of(context).textTheme.titleMedium),
+                Text(l10n.authorLoadError, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(
                   '$e',
@@ -64,7 +74,7 @@ class AuthorDetailScreen extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () => ref.invalidate(authorDetailProvider(authorId)),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Повторить'),
+                  label: Text(l10n.retry),
                 ),
               ],
             ),
@@ -165,6 +175,7 @@ class _AuthorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final hasBio = biography.isNotEmpty;
     final baseUrl = 'https://www.flibusta.is';
@@ -182,10 +193,10 @@ class _AuthorHeader extends StatelessWidget {
                   child: SizedBox(
                     width: 80,
                     height: 80,
-                    child: Image.network(
-                      avatarUrl!.startsWith('http') ? avatarUrl! : '$baseUrl$avatarUrl',
+                    child: CachedNetworkImage(
+                      imageUrl: avatarUrl!.startsWith('http') ? avatarUrl! : '$baseUrl$avatarUrl',
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                      errorWidget: (context, error, stackTrace) => Container(
                         width: 80,
                         height: 80,
                         color: theme.colorScheme.surfaceContainerHighest,
@@ -211,7 +222,7 @@ class _AuthorHeader extends StatelessWidget {
                   children: [
                     const SizedBox(height: 8),
                     Text(
-                      _bookCountText(bookCount),
+                      l10n.bookCount(bookCount),
                       style: theme.textTheme.bodyLarge?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -219,7 +230,7 @@ class _AuthorHeader extends StatelessWidget {
                     if (seriesCount > 0) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '$seriesCount ${_seriesCountText(seriesCount)}',
+                        l10n.seriesCount(seriesCount),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                         ),
@@ -257,7 +268,7 @@ class _AuthorHeader extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  bioExpanded ? 'Свернуть' : 'Подробнее',
+                  bioExpanded ? l10n.collapse : l10n.readMore,
                   style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
@@ -266,24 +277,6 @@ class _AuthorHeader extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _bookCountText(int count) {
-    final mod100 = count % 100;
-    final mod10 = count % 10;
-    if (mod100 >= 11 && mod100 <= 14) return '$count книг';
-    if (mod10 == 1) return '$count книга';
-    if (mod10 >= 2 && mod10 <= 4) return '$count книги';
-    return '$count книг';
-  }
-
-  String _seriesCountText(int count) {
-    final mod100 = count % 100;
-    final mod10 = count % 10;
-    if (mod100 >= 11 && mod100 <= 14) return 'циклов';
-    if (mod10 == 1) return 'цикл';
-    if (mod10 >= 2 && mod10 <= 4) return 'цикла';
-    return 'циклов';
   }
 }
 
@@ -323,7 +316,7 @@ class _SeriesHeader extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 4,
-              children: series.genres.map<Widget>((g) {
+              children: series.genres.map<Widget>((AuthorGenreItem g) {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(

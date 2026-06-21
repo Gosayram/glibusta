@@ -3,6 +3,26 @@
 part of 'auth_repository.dart';
 
 // **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+UserSession _$UserSessionFromJson(Map<String, dynamic> json) => UserSession(
+  name: json['name'] as String,
+  mail: json['mail'] as String?,
+  cookies:
+      (json['cookies'] as Map<String, dynamic>?)?.map(
+        (k, e) => MapEntry(k, e as String),
+      ) ??
+      const {},
+);
+
+Map<String, dynamic> _$UserSessionToJson(UserSession instance) => <String, dynamic>{
+  'name': instance.name,
+  'mail': instance.mail,
+  'cookies': instance.cookies,
+};
+
+// **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
@@ -33,7 +53,7 @@ final class AuthStateNotifierProvider
   AuthStateNotifier create() => AuthStateNotifier();
 }
 
-String _$authStateNotifierHash() => r'2534f8f157fb798844c12955f76e3958e9b5a9d5';
+String _$authStateNotifierHash() => r'1af413cd22dee857b21f27b757847ab7f6d7f465';
 
 abstract class _$AuthStateNotifier extends $AsyncNotifier<AuthStateData> {
   FutureOr<AuthStateData> build();

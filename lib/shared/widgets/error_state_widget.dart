@@ -2,8 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '../../core/theme/app_duration.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 class ErrorStateWidget extends StatelessWidget {
   final String message;
@@ -28,7 +27,7 @@ class ErrorStateWidget extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: theme.disabledColor),
+            Icon(icon, size: 56, color: theme.colorScheme.onSurface.withValues(alpha: 0.38)),
             const SizedBox(height: 16),
             Text(
               message,
@@ -42,7 +41,9 @@ class ErrorStateWidget extends StatelessWidget {
                 child: Text(
                   details!,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.disabledColor),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                  ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -62,12 +63,7 @@ class ErrorStateWidget extends StatelessWidget {
                   OutlinedButton(
                     onPressed: () {
                       unawaited(Clipboard.setData(ClipboardData(text: details!)));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ошибка скопирована'),
-                          duration: AppDuration.snackbarShort,
-                        ),
-                      );
+                      unawaited(SmartDialog.showToast('Ошибка скопирована'));
                     },
                     child: const Text('Скопировать ошибку'),
                   ),

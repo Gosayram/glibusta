@@ -12,6 +12,9 @@ const Map<BookFormat, List<String>> extensionsByFormat = {
   BookFormat.prc: ['prc'],
   BookFormat.rtf: ['rtf'],
   BookFormat.djvu: ['djvu', 'djv'],
+  BookFormat.docx: ['docx'],
+  BookFormat.cbz: ['cbz'],
+  BookFormat.cbr: ['cbr'],
 };
 
 final Map<String, BookFormat> _extensionToFormat = {

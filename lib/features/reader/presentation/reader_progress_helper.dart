@@ -27,7 +27,7 @@ class ReaderProgressHelper {
         );
       }
       final progressPercent = row.progressPercent <= 0 && chapterCount > 0
-          ? row.chapterIndex / chapterCount
+          ? row.chapterIndex / (chapterCount > 1 ? chapterCount - 1 : 1)
           : row.progressPercent;
       return ReaderPosition(
         bookId: _bookId,
@@ -35,6 +35,8 @@ class ReaderProgressHelper {
         paragraphIndex: row.paragraphIndex,
         localOffset: row.localOffset,
         progressPercent: progressPercent.clamp(0.0, 1.0),
+        chapterId: row.chapterId,
+        textOffset: row.textOffset,
         updatedAt: row.updatedAt,
       ).clamp(chapterCount: chapterCount);
     } on Object catch (e) {
@@ -52,19 +54,32 @@ class ReaderProgressHelper {
     if (totalBlocks == 0) return;
     final pos = position.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     unawaited(
-      _database.bookDao.upsertReadingProgress(
-        ReadingProgressCompanion.insert(
-          bookId: _bookId,
-          currentPosition: Value(pos.chapterIndex),
-          chapterIndex: Value(pos.chapterIndex),
-          paragraphIndex: Value(pos.paragraphIndex),
-          localOffset: Value(pos.localOffset),
-          progressPercent: Value(pos.progressPercent),
-          totalPages: Value(totalBlocks),
-          lastRead: Value(pos.updatedAt),
-          updatedAt: Value(pos.updatedAt),
-        ),
-      ),
+      _database.bookDao
+          .upsertReadingProgress(
+            ReadingProgressCompanion.insert(
+              bookId: _bookId,
+              currentPosition: Value(pos.chapterIndex),
+              chapterIndex: Value(pos.chapterIndex),
+              paragraphIndex: Value(pos.paragraphIndex),
+              localOffset: Value(pos.localOffset),
+              progressPercent: Value(pos.progressPercent),
+              chapterId: Value(pos.chapterId),
+              textOffset: Value(pos.textOffset),
+              totalPages: Value(totalBlocks),
+              lastRead: Value(pos.updatedAt),
+              updatedAt: Value(pos.updatedAt),
+            ),
+          )
+          .then(
+            (_) {},
+            onError: (Object e) {
+              _logger.warning(
+                'Failed to save reading progress for $_bookId: $e',
+                name: 'Reader',
+                error: e,
+              );
+            },
+          ),
     );
   }
 

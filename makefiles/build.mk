@@ -9,45 +9,76 @@ DIST_DIR ?= dist/releases
 BUILD_DIR ?= build
 ANDROID_APK_SOURCE ?= $(BUILD_DIR)/app/outputs/flutter-apk/app-release.apk
 ANDROID_AAB_SOURCE ?= $(BUILD_DIR)/app/outputs/bundle/release/app-release.aab
+ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
 MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 
 ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).apk
-ANDROID_APK_SPLIT_DIR ?= $(BUILD_DIR)/app/outputs/flutter-apk
 ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).aab
 MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.zip
 
 MACOS_CODESIGN_IDENTITY ?= -
 
-FLUTTER_BUILD_APK := $(FLUTTER) build apk --release
-FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi
-FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release
-FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release
+DEBUG_INFO_ANDROID ?= $(BUILD_DIR)/symbols/android
+DEBUG_INFO_MACOS ?= $(BUILD_DIR)/symbols/macos
+
+FLUTTER_BUILD_APK := $(FLUTTER) build apk --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debug-info=$(DEBUG_INFO_MACOS)
+CARGO_BUILD_RELEASE := cd rust && cargo build --release
+CARGO_CHECK := cd rust && cargo check
 
 ##@ Build
+
+.PHONY: rust-build-release
+rust-build-release: require-rust ## Build Rust native library in release mode
+	@$(PRINT_STEP) "Building Rust library (release)"
+	$(CARGO_BUILD_RELEASE)
+	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || true
+	@$(PRINT_OK) "Rust release build complete"
+
+.PHONY: rust-build-check
+rust-build-check: require-rust ## Verify Rust code compiles
+	@$(PRINT_STEP) "Verifying Rust compilation"
+	$(CARGO_CHECK)
+	@$(PRINT_OK) "Rust compilation verified"
+
+.PHONY: rust-sync-version
+rust-sync-version: ## Sync Rust crate version with pubspec.yaml
+	@$(PRINT_STEP) "Syncing Rust version from pubspec.yaml"
+	@CARGO_VER=$$($(PYTHON) -c "import re; \
+		v=re.search(r'version:\s*(.+)', open('pubspec.yaml').read()).group(1).strip(); \
+		ver=v.split('+')[0]; print(ver)"); \
+	perl -pi -e "s/^version = .*/version = \"$$CARGO_VER\"/" rust/Cargo.toml; \
+	echo "  Rust version: $$CARGO_VER"
 
 .PHONY: bump
 bump: require-python ## Bump PATCH version (SemVer): 0.1.5+3 → 0.1.6+0
 	@$(PRINT_STEP) "Bumping patch version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-minor
 bump-minor: require-python ## Bump MINOR version (SemVer): 0.1.5+3 → 0.2.0+0
 	@$(PRINT_STEP) "Bumping minor version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --minor); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-major
 bump-major: require-python ## Bump MAJOR version (SemVer): 0.1.5+3 → 1.0.0+0
 	@$(PRINT_STEP) "Bumping major version"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --major); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: bump-build
 bump-build: require-python ## Bump build number only: 0.1.5+3 → 0.1.5+4
 	@$(PRINT_STEP) "Bumping build number"
 	@NEW_VER=$$($(PYTHON) $(SCRIPTS_DIR)/bump_version.py --build); \
 	echo "  $$NEW_VER"
+	@$(MAKE) rust-sync-version
 
 .PHONY: clean-artifacts
 clean-artifacts: ## Remove generated release artifacts
@@ -81,6 +112,7 @@ clean-build: ## Remove all build artifacts and caches for a fresh build
 	rm -rf linux/flutter/ephemeral
 	rm -rf windows/flutter/ephemeral
 	rm -rf web/favicon.png
+	rm -rf rust/target
 	$(FLUTTER) pub get
 
 .PHONY: clean-all
@@ -110,12 +142,13 @@ build-android-apk: clean-build bump-build require-flutter android-available sign
 .PHONY: build-android-apk-split
 build-android-apk-split: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
 	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
-	$(FLUTTER_BUILD_APK_SPLIT)
-	@for abi in arm64-v8a armeabi-v7a x86_64 universal; do \
+	$(FLUTTER_BUILD_APK_SPLIT) || true
+	@for abi in arm64-v8a armeabi-v7a; do \
 		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
 		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
-		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
+		if [ -f "$$src" ]; then cp "$$src" "$$dst"; else echo "Warning: Missing $$abi APK"; fi; \
 	done
+	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab

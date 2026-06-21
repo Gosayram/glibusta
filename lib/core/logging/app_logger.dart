@@ -339,8 +339,3 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
   });
   return logger;
 });
-
-final logEntriesProvider = Provider<List<LogEntry>>((ref) {
-  final logger = ref.watch(appLoggerProvider);
-  return logger.entries;
-});

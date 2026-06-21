@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/fonts/font_download_service.dart';
 import 'font_download_service_provider.dart';
@@ -68,17 +70,20 @@ class _FontDownloadScreenState extends ConsumerState<FontDownloadScreen> {
         font,
         onProgress: (received, total) {
           if (total > 0) {
+            if (!mounted) return;
             setState(() {
               _progress[font.id] = received / total;
             });
           }
         },
       );
+    } on DioException catch (e) {
+      if (mounted) {
+        unawaited(SmartDialog.showToast('Ошибка: $e'));
+      }
     } on Object catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка: $e'));
       }
     } finally {
       if (mounted) {

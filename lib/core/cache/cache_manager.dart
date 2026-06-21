@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'cache_manager.g.dart';
 
 enum CacheType { cover, searchResult, metadata, parsedBook, tempFile, thumbnail }
 
@@ -229,15 +232,19 @@ class CacheManager {
 // --- Riverpod providers ---
 
 final cacheManagerProvider = Provider<CacheManager>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'cacheManagerProvider must be overridden at startup with a configured CacheManager instance.',
+  );
 });
 
-final cacheSizeProvider = Provider<int>((ref) {
+@riverpod
+int cacheSize(Ref ref) {
   final manager = ref.watch(cacheManagerProvider);
   return manager.sizeBytes();
-});
+}
 
-final cacheSizeByTypeProvider = Provider<Map<CacheType, int>>((ref) {
+@riverpod
+Map<CacheType, int> cacheSizeByType(Ref ref) {
   final manager = ref.watch(cacheManagerProvider);
   return manager.sizeByType();
-});
+}

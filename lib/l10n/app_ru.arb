@@ -6,5 +6,52 @@
   "libraryTitle": "Библиотека",
   "downloadsTitle": "Загрузки",
   "readerTitle": "Читалка",
-  "settingsTitle": "Настройки"
+  "settingsTitle": "Настройки",
+  "collectionsTitle": "Коллекции",
+  "annotationsTitle": "Аннотации",
+  "statisticsTitle": "Статистика",
+
+  "catalogTitle": "Каталог",
+  "genresTitle": "Жанры",
+  "genreTitle": "Жанр",
+  "newLabel": "Новые",
+  "popularLabel": "Популярные",
+  "popularSection": "Популярное",
+  "allGenres": "Все жанры",
+  "recentlyAdded": "Недавно добавленные",
+  "onlineCatalogs": "Online Catalogs",
+
+  "filterHint": "Фильтр...",
+  "nothingFound": "Ничего не найдено",
+  "noGenres": "Нет жанров",
+  "noBooksInGenre": "Нет книг в этом жанре",
+  "noRecentBooks": "Нет недавно добавленных книг",
+  "noBooksByAuthor": "Нет книг у этого автора",
+  "authorFallback": "Автор",
+
+  "categoriesLoadError": "Не удалось загрузить категории",
+  "genresLoadError": "Ошибка загрузки жанров",
+  "genreLoadError": "Не удалось загрузить жанр",
+  "recentBooksLoadError": "Не удалось загрузить недавние книги",
+  "authorLoadError": "Не удалось загрузить автора",
+  "opdsLoadError": "Ошибка загрузки",
+  "opdsSearchError": "Ошибка поиска",
+
+  "retry": "Повторить",
+  "cancel": "Отмена",
+  "add": "Добавить",
+  "collapse": "Свернуть",
+  "readMore": "Подробнее",
+  "loading": "Загрузка",
+
+  "addCatalog": "Добавить каталог",
+  "nameLabel": "Название",
+  "opdsUrlLabel": "URL OPDS каталога",
+  "catalogSearchHint": "Поиск в каталоге...",
+  "opdsDownloading": "Загрузка",
+
+  "bookCount": "{count,plural, =0{нет книг} one{{count} книга} few{{count} книги} many{{count} книг} other{{count} книг}}",
+  "bookCountRu": "{count,plural, =0{нет книг} one{{count} книга} few{{count} книги} many{{count} книг} other{{count} книг}}",
+  "seriesCount": "{count,plural, =1{{count} цикл} few{{count} цикла} many{{count} циклов} other{{count} циклов}}",
+  "pagesLabel": "{count} с."
 }

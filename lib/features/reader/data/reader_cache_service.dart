@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import '../../../core/database/full_text_search.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import 'parsers/normalized_book.dart';
@@ -25,11 +26,14 @@ class ReaderCacheService {
   ReaderCacheService({
     required CacheFingerprintProvider fingerprintProvider,
     required AppFileStorage storage,
+    FullTextSearchService? ftsService,
   }) : _fingerprintProvider = fingerprintProvider,
-       _storage = storage;
+       _storage = storage,
+       _ftsService = ftsService;
 
   final CacheFingerprintProvider _fingerprintProvider;
   final AppFileStorage _storage;
+  final FullTextSearchService? _ftsService;
   final _logger = AppLogger();
 
   static const int _splitCacheVersion = 1;
@@ -145,7 +149,14 @@ class ReaderCacheService {
             ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
             : null;
 
-        await bookDir.delete(recursive: true);
+        try {
+          await bookDir.delete(recursive: true);
+        } on Object {
+          if (imagesBackup != null) {
+            await imagesBackup.rename('${bookDir.path}/epub_images');
+          }
+          rethrow;
+        }
 
         if (imagesBackup != null) {
           await imagesBackup.rename('${bookDir.path}/epub_images');
@@ -296,5 +307,37 @@ class ReaderCacheService {
         'chapters': book.chapters.map((chapter) => chapter.index).toList(),
       },
     );
+
+    // Index content for full-text search
+    await _indexFtsContent(bookId, book);
+  }
+
+  Future<void> _indexFtsContent(String bookId, NormalizedBook book) async {
+    if (_ftsService == null) return;
+    try {
+      final chapters = <BookChapterContent>[];
+      for (final chapter in book.chapters) {
+        final textParts = <String>[];
+        for (final block in chapter.blocks) {
+          if (block.text.isNotEmpty) {
+            textParts.add(block.text);
+          }
+        }
+        if (textParts.isNotEmpty) {
+          chapters.add(
+            BookChapterContent(
+              chapterIndex: chapter.index,
+              title: chapter.title,
+              content: textParts.join('\n'),
+            ),
+          );
+        }
+      }
+      if (chapters.isNotEmpty) {
+        await _ftsService.indexBook(bookId: bookId, chapters: chapters);
+      }
+    } on Object catch (e) {
+      _logger.warning('FTS indexing failed for $bookId: $e', name: 'Cache', error: e);
+    }
   }
 }

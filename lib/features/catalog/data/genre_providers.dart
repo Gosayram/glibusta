@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../features/search/data/flibusta_api_client.dart';
+import '../../../features/search/data/flibusta_models.dart';
 
 part 'genre_providers.g.dart';
 

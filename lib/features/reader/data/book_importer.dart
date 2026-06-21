@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/errors/failures.dart';
 import 'book_open_service.dart';
-import 'parsers/epub_parser.dart';
-import 'parsers/fb2_parser.dart';
+import 'parsers/cbr_parser.dart';
+import 'parsers/cbz_parser.dart';
 import 'parsers/format_detector.dart';
-import 'parsers/mobi_parser.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
-import 'parsers/rtf_parser.dart';
-import 'parsers/txt_parser.dart';
+import 'parsers/rust_book_parser.dart';
 
 final bookParserRegistryProvider = Provider<BookParserRegistry>((ref) {
   return BookParserRegistry.defaultInstance;
@@ -54,14 +52,17 @@ final class BookImporter {
 
     return Isolate.run<NormalizedBook>(() {
       return switch (format) {
-        BookFormat.epub => EpubParser().parseFile(filePath),
-        BookFormat.fb2 => Fb2Parser().parseFile(filePath),
-        BookFormat.txt => TxtBookParser().parseFile(filePath),
-        BookFormat.rtf => RtfBookParser().parseFile(filePath),
+        BookFormat.epub ||
+        BookFormat.fb2 ||
+        BookFormat.txt ||
+        BookFormat.rtf ||
+        BookFormat.mobi ||
+        BookFormat.azw3 ||
+        BookFormat.prc ||
+        BookFormat.docx => RustBookParser().parseFile(filePath),
+        BookFormat.cbz => CbzParser().parseFile(filePath),
+        BookFormat.cbr => CbrParser().parseFile(filePath),
         BookFormat.pdf => throw UnsupportedError('PDF uses separate viewer'),
-        BookFormat.mobi => MobiBookParser().parseFile(filePath),
-        BookFormat.azw3 => MobiBookParser().parseFile(filePath),
-        BookFormat.prc => MobiBookParser().parseFile(filePath),
         BookFormat.djvu => throw UnsupportedError('DJVU not supported'),
         BookFormat.unknown => throw UnsupportedError('Unknown format'),
       };

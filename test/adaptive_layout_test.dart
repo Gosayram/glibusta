@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/l10n/generated/app_localizations.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/widgets/adaptive_navigation.dart';
 import 'package:glibusta/shared/widgets/book_grid.dart';
@@ -58,7 +59,11 @@ void main() {
     );
     addTearDown(router.dispose);
     return ProviderScope(
-      child: MaterialApp.router(routerConfig: router),
+      child: MaterialApp.router(
+        routerConfig: router,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+      ),
     );
   }
 
@@ -100,7 +105,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 180);
+      expect(delegate.maxCrossAxisExtent, 140);
     });
   });
 
@@ -129,7 +134,7 @@ void main() {
       expect(find.byType(NavigationRail), findsNothing);
     });
 
-    testWidgets('BookGrid renders with maxCrossAxisExtent 180', (tester) async {
+    testWidgets('BookGrid renders with maxCrossAxisExtent 140', (tester) async {
       setScreenSize(tester, 412, 915);
       final books = makeBooks(8);
 
@@ -141,7 +146,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 180);
+      expect(delegate.maxCrossAxisExtent, 140);
     });
   });
 
@@ -221,7 +226,11 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            routerConfig: router,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -308,10 +317,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Библиотека'), findsOneWidget);
-      expect(find.text('Поиск'), findsOneWidget);
-      expect(find.text('Загрузки'), findsOneWidget);
-      expect(find.text('Настройки'), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('Downloads'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
     });
   });
 
@@ -391,7 +400,7 @@ void main() {
       expect(find.byType(GridView), findsOneWidget);
       final grid = tester.widget<GridView>(find.byType(GridView));
       final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 220);
+      expect(delegate.maxCrossAxisExtent, 260);
     });
   });
 

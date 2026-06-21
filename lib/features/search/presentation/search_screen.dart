@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -61,7 +62,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref
         .read(searchControllerProvider.notifier)
         .setFilters(
-          filters.copyWith(format: format, clearFormat: format == null),
+          filters.copyWith(format: format),
         );
   }
 
@@ -70,7 +71,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     ref
         .read(searchControllerProvider.notifier)
         .setFilters(
-          filters.copyWith(genre: value.trim(), clearGenre: value.trim().isEmpty),
+          filters.copyWith(genre: value.trim().isEmpty ? null : value.trim()),
         );
   }
 
@@ -80,8 +81,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         .read(searchControllerProvider.notifier)
         .setFilters(
           filters.copyWith(
-            language: value.trim(),
-            clearLanguage: value.trim().isEmpty,
+            language: value.trim().isEmpty ? null : value.trim(),
           ),
         );
   }
@@ -91,6 +91,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _genreController.clear();
     _languageController.clear();
     ref.read(searchControllerProvider.notifier).setFilters(const SearchFilters());
+  }
+
+  void _setDateRange(DateTime? from, DateTime? to) {
+    final filters = ref.read(searchControllerProvider).filters;
+    ref
+        .read(searchControllerProvider.notifier)
+        .setFilters(
+          filters.copyWith(
+            dateFrom: from,
+            dateTo: to,
+          ),
+        );
   }
 
   @override
@@ -362,6 +374,60 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               ),
           ],
         ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  filters.dateFrom != null
+                      ? 'С: ${filters.dateFrom!.day}.${filters.dateFrom!.month}.${filters.dateFrom!.year}'
+                      : 'Дата от',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: filters.dateFrom ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    _setDateRange(picked, filters.dateTo);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  filters.dateTo != null
+                      ? 'По: ${filters.dateTo!.day}.${filters.dateTo!.month}.${filters.dateTo!.year}'
+                      : 'Дата до',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: filters.dateTo ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    _setDateRange(filters.dateFrom, picked);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -369,28 +435,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildResults(BuildContext context, SearchState state) {
     if (state.books.isEmpty && state.authors.isEmpty && !state.isLoading) {
       return Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) => Opacity(
-            opacity: value,
-            child: child,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.search, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
-              const SizedBox(height: 16),
-              Text(
-                'Начните поиск',
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(
+              'Начните поиск',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ).animate().fadeIn(duration: 250.ms),
       );
     }
+
+    final resultChildren = _buildResultChildren(context, state);
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -407,95 +466,122 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           }
           return false;
         },
-        child: ListView(
+        child: ListView.builder(
           padding: EdgeInsets.fromLTRB(
             16,
             8,
             16,
             MediaQuery.viewPaddingOf(context).bottom + 24,
           ),
-          children: [
-            if (state.authors.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Text(
-                  'Авторы',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
-              ...state.authors.map(
-                (author) => Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(
-                        author.name.isNotEmpty ? author.name[0].toUpperCase() : '?',
-                      ),
-                    ),
-                    title: Text(author.name),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => unawaited(context.push('/author/${author.id}')),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            if (state.books.isNotEmpty) ...[
-              if (state.authors.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                  child: Text(
-                    'Книги',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-              if (context.isCompact)
-                ...state.books.map(
-                  (book) => BookListItem(
-                    book: book,
-                    onTap: () => unawaited(context.push('/reader/${book.id}')),
-                  ),
-                )
-              else
-                GridView.builder(
-                  padding: EdgeInsets.all(context.isExpanded ? 24 : 16),
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: context.isExpanded ? 220 : 180,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.62,
-                  ),
-                  itemCount: state.books.length,
-                  itemBuilder: (context, index) {
-                    final book = state.books[index];
-                    return BookCard(
-                      key: ValueKey(book.id),
-                      book: book,
-                      onTap: () => unawaited(context.push('/reader/${book.id}')),
-                    );
-                  },
-                ),
-              if (state.hasMore)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            ],
-            if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-          ],
+          itemCount: resultChildren.length,
+          itemBuilder: (context, index) => resultChildren[index],
         ),
       ),
     );
+  }
+
+  List<Widget> _buildResultChildren(BuildContext context, SearchState state) {
+    final children = <Widget>[];
+
+    if (state.authors.isNotEmpty) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Text(
+            'Авторы',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      );
+      for (final author in state.authors) {
+        children.add(
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: ListTile(
+              leading: CircleAvatar(
+                child: Text(
+                  author.name.isNotEmpty ? author.name[0].toUpperCase() : '?',
+                ),
+              ),
+              title: Text(author.name),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => unawaited(context.push('/author/${author.id}')),
+            ),
+          ),
+        );
+      }
+      children.add(const SizedBox(height: 8));
+    }
+
+    if (state.books.isNotEmpty) {
+      if (state.authors.isNotEmpty) {
+        children.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Text(
+              'Книги',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+        );
+      }
+      if (context.isCompact) {
+        for (final book in state.books) {
+          children.add(
+            BookListItem(
+              book: book,
+              onTap: () => unawaited(context.push('/reader/${book.id}')),
+            ),
+          );
+        }
+      } else {
+        children.add(
+          GridView.builder(
+            padding: EdgeInsets.all(context.isExpanded ? 24 : 16),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: context.isExpanded ? 220 : 180,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.62,
+            ),
+            itemCount: state.books.length,
+            itemBuilder: (context, index) {
+              final book = state.books[index];
+              return BookCard(
+                key: ValueKey(book.id),
+                book: book,
+                onTap: () => unawaited(context.push('/reader/${book.id}')),
+              );
+            },
+          ),
+        );
+      }
+      if (state.hasMore) {
+        children.add(
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+    }
+
+    if (state.isLoading && state.books.isEmpty && state.authors.isEmpty) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    return children;
   }
 }
 

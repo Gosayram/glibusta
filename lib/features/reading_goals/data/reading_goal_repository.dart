@@ -1,20 +1,15 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ReadingGoal {
-  final int dailyMinutes;
-  final bool isEnabled;
+part 'reading_goal_repository.freezed.dart';
 
-  const ReadingGoal({
-    this.dailyMinutes = 30,
-    this.isEnabled = false,
-  });
-
-  ReadingGoal copyWith({int? dailyMinutes, bool? isEnabled}) {
-    return ReadingGoal(
-      dailyMinutes: dailyMinutes ?? this.dailyMinutes,
-      isEnabled: isEnabled ?? this.isEnabled,
-    );
-  }
+@freezed
+abstract class ReadingGoal with _$ReadingGoal {
+  const factory ReadingGoal({
+    @Default(30) int dailyMinutes,
+    @Default(false) bool isEnabled,
+  }) = _ReadingGoal;
+  const ReadingGoal._();
 
   String get displayText {
     final h = dailyMinutes ~/ 60;

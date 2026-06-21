@@ -180,5 +180,7 @@ class SmartCleanupService {
 // --- Riverpod providers ---
 
 final smartCleanupServiceProvider = Provider<SmartCleanupService>((ref) {
-  throw UnimplementedError('Override in main');
+  throw StateError(
+    'smartCleanupServiceProvider must be overridden at startup with a configured SmartCleanupService instance.',
+  );
 });

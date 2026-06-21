@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
 import '../../features/library/data/book_import_service.dart';
 import '../../features/reader/data/parsers/format_detector.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../models/book.dart';
 import 'book_drop_zone.dart';
 import 'macos_right_panel.dart';
@@ -22,34 +24,36 @@ class AdaptiveNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
 
-  static const List<NavigationDestination> compactDestinations = [
-    NavigationDestination(icon: Icon(Icons.library_books), label: 'Библиотека'),
-    NavigationDestination(icon: Icon(Icons.search), label: 'Поиск'),
-    NavigationDestination(icon: Icon(Icons.download), label: 'Загрузки'),
-    NavigationDestination(icon: Icon(Icons.settings), label: 'Настройки'),
-  ];
-
-  static const List<NavigationRailDestination> expandedDestinations = [
-    NavigationRailDestination(
-      icon: Icon(Icons.library_books),
-      label: Text('Библиотека'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.search),
-      label: Text('Поиск'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.download),
-      label: Text('Загрузки'),
-    ),
-    NavigationRailDestination(
-      icon: Icon(Icons.settings),
-      label: Text('Настройки'),
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    final compactDestinations = [
+      NavigationDestination(icon: const Icon(Icons.library_books), label: l10n.libraryTitle),
+      NavigationDestination(icon: const Icon(Icons.search), label: l10n.searchTitle),
+      NavigationDestination(icon: const Icon(Icons.download), label: l10n.downloadsTitle),
+      NavigationDestination(icon: const Icon(Icons.settings), label: l10n.settingsTitle),
+    ];
+
+    final expandedDestinations = [
+      NavigationRailDestination(
+        icon: const Icon(Icons.library_books),
+        label: Text(l10n.libraryTitle),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.search),
+        label: Text(l10n.searchTitle),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.download),
+        label: Text(l10n.downloadsTitle),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.settings),
+        label: Text(l10n.settingsTitle),
+      ),
+    ];
+
     if (context.isCompact) {
       return NavigationBar(
         selectedIndex: selectedIndex,
@@ -85,16 +89,6 @@ class SidebarNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int>? onDestinationSelected;
 
-  static const List<_SidebarItem> _items = [
-    _SidebarItem(icon: Icons.library_books, label: 'Библиотека', route: '/library'),
-    _SidebarItem(icon: Icons.search, label: 'Поиск', route: '/search'),
-    _SidebarItem(icon: Icons.download, label: 'Загрузки', route: '/downloads'),
-    _SidebarItem(icon: Icons.collections_bookmark, label: 'Коллекции', route: '/collections'),
-    _SidebarItem(icon: Icons.sticky_note_2_outlined, label: 'Аннотации', route: '/annotations'),
-    _SidebarItem(icon: Icons.bar_chart, label: 'Статистика', route: '/stats'),
-    _SidebarItem(icon: Icons.settings, label: 'Настройки', route: '/settings'),
-  ];
-
   static const _branchIndexForItem = <int, int>{
     0: 0,
     1: 1,
@@ -105,6 +99,25 @@ class SidebarNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    final items = [
+      _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
+      _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
+      _SidebarItem(
+        icon: Icons.collections_bookmark,
+        label: l10n.collectionsTitle,
+        route: '/collections',
+      ),
+      _SidebarItem(
+        icon: Icons.sticky_note_2_outlined,
+        label: l10n.annotationsTitle,
+        route: '/annotations',
+      ),
+      _SidebarItem(icon: Icons.bar_chart, label: l10n.statisticsTitle, route: '/stats'),
+      _SidebarItem(icon: Icons.settings, label: l10n.settingsTitle, route: '/settings'),
+    ];
 
     return Material(
       color: colorScheme.surfaceContainerHighest,
@@ -134,9 +147,9 @@ class SidebarNavigation extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                itemCount: _items.length,
+                itemCount: items.length,
                 itemBuilder: (context, index) {
-                  final item = _items[index];
+                  final item = items[index];
                   final branchIdx = _branchIndexForItem[index];
                   final isBranchItem = branchIdx != null;
                   final isSelected = isBranchItem && branchIdx == selectedIndex;
@@ -302,10 +315,8 @@ class MacOSShell extends ConsumerWidget {
         .where((p) => importableExtensions.any((ext) => p.toLowerCase().endsWith('.$ext')))
         .toList();
     if (bookPaths.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
-        ),
+      unawaited(
+        SmartDialog.showToast('Поддерживаются EPUB, FB2, ZIP, TXT, RTF, MOBI/AZW/PRC и DJVU'),
       );
       return;
     }
@@ -319,7 +330,7 @@ class MacOSShell extends ConsumerWidget {
               : result.isDuplicate
               ? 'Дубликат: ${result.title}'
               : 'Ошибка: ${result.error}';
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+          unawaited(SmartDialog.showToast(msg));
         }),
       );
     }

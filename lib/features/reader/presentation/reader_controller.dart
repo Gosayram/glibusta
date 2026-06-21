@@ -16,6 +16,7 @@ import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/book_search_service.dart';
 import '../data/parsers/normalized_book.dart';
+import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
 import 'reader_content_helper.dart';
 import 'reader_progress_helper.dart';
@@ -141,6 +142,9 @@ class ReaderController {
   final _autoThemeService = AutoThemeService();
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
+  final _sessionStopwatch = Stopwatch();
+  int _accumulatedSeconds = 0;
+  bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   ScrollController? _scrollController;
@@ -150,6 +154,7 @@ class ReaderController {
   bool _loaded = false;
   bool _fullscreenEnabled = false;
   int _loadGeneration = 0;
+  int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
 
   late final ReaderContentHelper _content;
@@ -159,7 +164,6 @@ class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
-    _disposed = true;
     _loadGeneration++;
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
@@ -168,9 +172,53 @@ class ReaderController {
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     disableFullscreen();
+    _flushSessionTime();
     saveProgress();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
+    _disposed = true;
+  }
+
+  void _flushSessionTime() {
+    if (_sessionStopwatch.isRunning) {
+      _sessionStopwatch.stop();
+    }
+    final totalSeconds = _accumulatedSeconds + (_sessionStopwatch.elapsed.inSeconds);
+    _accumulatedSeconds = 0;
+    _sessionStopwatch.reset();
+    if (totalSeconds > 0 && !_disposed) {
+      final db = _ref.read(databaseProvider);
+      unawaited(
+        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), totalSeconds),
+      );
+    }
+  }
+
+  void pauseSession() {
+    if (_paused || !_loaded) return;
+    _paused = true;
+    if (_sessionStopwatch.isRunning) {
+      _sessionStopwatch.stop();
+    }
+    _accumulatedSeconds += _sessionStopwatch.elapsed.inSeconds;
+    _sessionStopwatch.reset();
+    _flushAccumulatedTime();
+  }
+
+  void resumeSession() {
+    if (!_paused || !_loaded) return;
+    _paused = false;
+    _sessionStopwatch.start();
+  }
+
+  void _flushAccumulatedTime() {
+    if (_accumulatedSeconds > 0 && !_disposed) {
+      final db = _ref.read(databaseProvider);
+      unawaited(
+        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), _accumulatedSeconds),
+      );
+      _accumulatedSeconds = 0;
+    }
   }
 
   void _updateState(ReaderState newState) {
@@ -201,6 +249,9 @@ class ReaderController {
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
       final meta = await _content.loadMetadata(onCacheMode: (mode) => _cacheMode = mode);
       if (!_isActiveLoad(loadGeneration)) return;
+
+      // Apply per-book settings if available
+      await _applyPerBookSettings();
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
@@ -220,6 +271,7 @@ class ReaderController {
       await _ensureChaptersLoaded(savedPosition.chapterIndex);
       if (!_isActiveLoad(loadGeneration)) return;
       _loaded = true;
+      _sessionStopwatch.start();
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
       const wordsPerMinute = 200;
@@ -268,6 +320,17 @@ class ReaderController {
   bool _isActiveLoad(int loadGeneration) {
     return !_disposed && loadGeneration == _loadGeneration;
   }
+
+  /// Resolves ReaderMode.auto to an actual mode based on device type.
+  /// Auto defaults to paginated on phones, continuous for very long TXT.
+  ReaderMode _resolveAutoMode(ReaderMode mode) {
+    if (mode != ReaderMode.auto) return mode;
+    return ReaderMode.paginated;
+  }
+
+  ReaderMode get effectiveMode => _resolveAutoMode(
+    _ref.read(readerSettingsProvider).mode,
+  );
 
   static ReaderErrorKind _classifyError(Object error) => switch (error) {
     BookMissingFailure() => ReaderErrorKind.bookMissing,
@@ -324,6 +387,7 @@ class ReaderController {
   // ── Chapter windowing ─────────────────────────────────
 
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
+    final generation = ++_chapterLoadGeneration;
     if (_loaded && !_state.isLoading) {
       _updateState(_state.copyWith(isDynamicallyLoading: true));
     }
@@ -332,9 +396,9 @@ class ReaderController {
       _state.loadedChapters,
       chapterCount: _state.chapterCount,
     );
-    if (!_disposed) {
-      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
-    }
+    // Discard stale results if a newer chapter load superseded this one.
+    if (_disposed || generation != _chapterLoadGeneration) return;
+    _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
   }
 
   void _evictDistantChapters(int centerIndex) {
@@ -347,6 +411,11 @@ class ReaderController {
   // ── Scroll / progress ─────────────────────────────────
 
   ScrollController get scrollController {
+    if (_disposed) {
+      // Avoid creating (and leaking) a fresh controller after disposal;
+      // return the existing (disposed) instance when present.
+      if (_scrollController != null) return _scrollController!;
+    }
     _scrollController ??= ScrollController()..addListener(_onScroll);
     return _scrollController!;
   }
@@ -452,26 +521,30 @@ class ReaderController {
   }
 
   void _restoreSavedPosition(ReaderPosition position) {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
       _updateState(_state.copyWith(currentPosition: position));
       return;
     }
     if (_scrollController == null) return;
-    unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
-      final maxScroll = _scrollController!.position.maxScrollExtent;
-      if (maxScroll <= 0) return;
-      unawaited(
-        _scrollController!.animateTo(
-          (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        ),
-      );
-    });
+    unawaited(
+      _ensureChaptersLoaded(position.chapterIndex).then((_) {
+        if (_disposed || _scrollController == null) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+          final maxScroll = _scrollController!.position.maxScrollExtent;
+          if (maxScroll <= 0) return;
+          unawaited(
+            _scrollController!.animateTo(
+              (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+            ),
+          );
+        });
+      }),
+    );
   }
 
   void saveProgress() {
@@ -503,9 +576,9 @@ class ReaderController {
   // ── Navigation ────────────────────────────────────────
 
   void scrollToNext() {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
-      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+      final step = mode == ReaderMode.twoPage ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
         _state.chapterCount - 1,
@@ -534,9 +607,9 @@ class ReaderController {
   }
 
   void scrollToPrevious() {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
-      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+      final step = mode == ReaderMode.twoPage ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
         _state.chapterCount - 1,
@@ -567,8 +640,8 @@ class ReaderController {
     final total = _state.chapterCount;
     if (total == 0) return;
     final clamped = position.clamp(chapterCount: total);
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
       _updateState(_state.copyWith(currentPosition: clamped));
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
@@ -596,8 +669,8 @@ class ReaderController {
     );
     unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) return;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
@@ -607,6 +680,23 @@ class ReaderController {
         curve: Curves.easeInOut,
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+      final actualMax = _scrollController!.position.maxScrollExtent;
+      if ((actualMax - maxScroll).abs() > 1) {
+        final clampedTarget = (bounded * actualMax).clamp(0.0, actualMax);
+        final currentOffset = _scrollController!.offset;
+        if ((currentOffset - clampedTarget).abs() > 1) {
+          unawaited(
+            _scrollController!.animateTo(
+              clampedTarget,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+            ),
+          );
+        }
+      }
+    });
   }
 
   // ── Gestures ──────────────────────────────────────────
@@ -640,7 +730,7 @@ class ReaderController {
         break;
       case DoubleTapAction.toggleFullscreen:
         final notifier = _ref.read(readerSettingsProvider.notifier);
-        final currentMode = _ref.read(readerSettingsProvider).mode;
+        final currentMode = effectiveMode;
         notifier.updateMode(
           currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
         );
@@ -718,6 +808,18 @@ class ReaderController {
   }
 
   // ── Theme / system ────────────────────────────────────
+
+  Future<void> _applyPerBookSettings() async {
+    try {
+      final service = _ref.read(perBookSettingsServiceProvider);
+      if (await service.hasPerBookSettings(_bookId)) {
+        final effective = await service.getEffectiveSettings(_bookId);
+        _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Failed to apply per-book settings: $e');
+    }
+  }
 
   void _applyWakeLock() {
     final keepAwake = _ref.read(readerSettingsProvider).keepScreenAwake;

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
@@ -20,6 +21,9 @@ class PdfReaderScreen extends StatefulWidget {
 
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
   late final PdfViewerController _controller;
+  late final PdfTextSearcher _searcher;
+  final _searchController = TextEditingController();
+  bool _showSearch = false;
   int? _currentPage;
   int? _totalPages;
 
@@ -27,6 +31,14 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void initState() {
     super.initState();
     _controller = PdfViewerController();
+    _searcher = PdfTextSearcher(_controller);
+  }
+
+  @override
+  void dispose() {
+    _searcher.dispose();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -46,6 +58,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       appBar: AppBar(
         title: Text(_appBarTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => setState(() => _showSearch = !_showSearch),
+          ),
           PopupMenuButton<String>(
             onSelected: _handleMenuAction,
             itemBuilder: (context) => [
@@ -62,143 +78,188 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           ),
         ],
       ),
-      body: PdfViewer.file(
-        widget.filePath,
-        controller: _controller,
-        initialPageNumber: widget.initialPage,
-        params: PdfViewerParams(
-          backgroundColor: colorScheme.surface,
-          margin: 4,
-          textSelectionParams: const PdfTextSelectionParams(),
-          sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
-            maxScale: 8.0,
-            minScale: 0.1,
-            useAlternativeFitScaleAsMinScale: true,
-            onePassRenderingScaleThreshold: 200 / 72,
-          ),
-          scrollPhysics: const FixedOverscrollPhysics(maxOverscroll: 120),
-          onPageChanged: (pageNumber) {
-            if (mounted) setState(() => _currentPage = pageNumber);
-          },
-          onDocumentChanged: (document) {
-            if (document != null && mounted) {
-              setState(() => _totalPages = document.pages.length);
-            }
-          },
-          onDocumentLoadFinished: (documentRef, loadSucceeded) {
-            if (!loadSucceeded || !mounted) return;
-            final doc = documentRef.resolveListenable().document;
-            if (doc != null && mounted) {
-              setState(() => _totalPages = doc.pages.length);
-            }
-          },
-          viewerOverlayBuilder: (context, size, handleLinkTap) {
-            return [
-              Positioned(
-                right: 8,
-                top: size.height * 0.1,
-                bottom: size.height * 0.1,
-                child: PdfViewerScrollThumb(controller: _controller),
+      body: Stack(
+        children: [
+          PdfViewer.file(
+            widget.filePath,
+            controller: _controller,
+            initialPageNumber: widget.initialPage,
+            params: PdfViewerParams(
+              backgroundColor: colorScheme.surface,
+              margin: 4,
+              textSelectionParams: const PdfTextSelectionParams(),
+              sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
+                maxScale: 8.0,
+                minScale: 0.1,
+                useAlternativeFitScaleAsMinScale: true,
+                onePassRenderingScaleThreshold: 200 / 72,
               ),
-              Positioned(
-                bottom: 8,
-                left: size.width * 0.1,
-                right: size.width * 0.1,
-                child: PdfViewerScrollThumb(
-                  controller: _controller,
-                  orientation: ScrollbarOrientation.bottom,
-                ),
-              ),
-            ];
-          },
-          pageOverlaysBuilder: (context, pageRect, page) {
-            return [
-              Positioned(
-                bottom: 4,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    '${page.pageNumber}',
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ),
-              ),
-            ];
-          },
-          loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(
-                    value: totalBytes != null ? bytesDownloaded / totalBytes : null,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    totalBytes != null
-                        ? '${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
-                        : 'Загрузка...',
-                  ),
-                ],
-              ),
-            );
-          },
-          errorBannerBuilder: (context, error, stackTrace, documentRef) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 12),
-                  Text('Ошибка загрузки PDF', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$error',
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
-          },
-          linkHandlerParams: PdfLinkHandlerParams(
-            onLinkTap: (link) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Ссылка: ${link.url}')),
-              );
-            },
-          ),
-          getPageRenderingScale: (context, page, controller, estimatedScale) {
-            final w = page.width * estimatedScale;
-            final h = page.height * estimatedScale;
-            if (w > 4096 || h > 4096) {
-              return (200 / 72.0).clamp(estimatedScale * 0.5, estimatedScale);
-            }
-            return estimatedScale;
-          },
-          buildContextMenu: (context, params) {
-            if (!params.isTextSelectionEnabled) return null;
-            return PopupMenuButton<String>(
-              onSelected: (value) {
-                params.dismissContextMenu();
-                if (value == 'copy') {
-                  unawaited(params.textSelectionDelegate.copyTextSelection());
-                } else if (value == 'clear') {
-                  unawaited(params.textSelectionDelegate.clearTextSelection());
+              scrollPhysics: const FixedOverscrollPhysics(maxOverscroll: 120),
+              onPageChanged: (pageNumber) {
+                if (mounted) setState(() => _currentPage = pageNumber);
+              },
+              onDocumentChanged: (document) {
+                if (document != null && mounted) {
+                  setState(() => _totalPages = document.pages.length);
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'copy', child: Text('Копировать')),
-                const PopupMenuItem(value: 'clear', child: Text('Снять выделение')),
+              onDocumentLoadFinished: (documentRef, loadSucceeded) {
+                if (!loadSucceeded || !mounted) return;
+                final doc = documentRef.resolveListenable().document;
+                if (doc != null && mounted) {
+                  setState(() => _totalPages = doc.pages.length);
+                }
+              },
+              pagePaintCallbacks: [
+                _searcher.pageTextMatchPaintCallback,
               ],
-            );
-          },
-        ),
+              viewerOverlayBuilder: (context, size, handleLinkTap) {
+                return [
+                  Positioned(
+                    right: 8,
+                    top: size.height * 0.1,
+                    bottom: size.height * 0.1,
+                    child: PdfViewerScrollThumb(controller: _controller),
+                  ),
+                  Positioned(
+                    bottom: 8,
+                    left: size.width * 0.1,
+                    right: size.width * 0.1,
+                    child: PdfViewerScrollThumb(
+                      controller: _controller,
+                      orientation: ScrollbarOrientation.bottom,
+                    ),
+                  ),
+                ];
+              },
+              pageOverlaysBuilder: (context, pageRect, page) {
+                return [
+                  Positioned(
+                    bottom: 4,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '${page.pageNumber}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                ];
+              },
+              loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        value: totalBytes != null ? bytesDownloaded / totalBytes : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        totalBytes != null
+                            ? '${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
+                            : 'Загрузка...',
+                      ),
+                    ],
+                  ),
+                );
+              },
+              errorBannerBuilder: (context, error, stackTrace, documentRef) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Ошибка загрузки PDF',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$error',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              },
+              linkHandlerParams: PdfLinkHandlerParams(
+                onLinkTap: (link) {
+                  final url = link.url;
+                  if (url != null) {
+                    unawaited(launchUrl(url));
+                  }
+                },
+              ),
+              getPageRenderingScale: (context, page, controller, estimatedScale) {
+                final w = page.width * estimatedScale;
+                final h = page.height * estimatedScale;
+                if (w > 4096 || h > 4096) {
+                  return (200 / 72.0).clamp(
+                    estimatedScale * 0.5,
+                    estimatedScale,
+                  );
+                }
+                return estimatedScale;
+              },
+              buildContextMenu: (context, params) {
+                if (!params.isTextSelectionEnabled) return null;
+                return PopupMenuButton<String>(
+                  onSelected: (value) {
+                    params.dismissContextMenu();
+                    if (value == 'copy') {
+                      unawaited(
+                        params.textSelectionDelegate.copyTextSelection(),
+                      );
+                    } else if (value == 'clear') {
+                      unawaited(
+                        params.textSelectionDelegate.clearTextSelection(),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'copy',
+                      child: Text('Копировать'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'clear',
+                      child: Text('Снять выделение'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          if (_showSearch)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: _SearchOverlay(
+                searcher: _searcher,
+                searchController: _searchController,
+                onClose: () => setState(() => _showSearch = false),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -221,7 +282,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         final altScale = _controller.alternativeFitScale;
         if (altScale != null) {
           await _controller.goTo(
-            _controller.calcMatrixFor(_controller.visibleRect.center, zoom: altScale),
+            _controller.calcMatrixFor(
+              _controller.visibleRect.center,
+              zoom: altScale,
+            ),
           );
         }
         break;
@@ -241,7 +305,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   }
 
   Future<int?> _showGoToPageDialog() async {
-    final ctrl = TextEditingController(text: _currentPage?.toString() ?? '');
+    final ctrl = TextEditingController(
+      text: _currentPage?.toString() ?? '',
+    );
     final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
@@ -250,10 +316,15 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
           controller: ctrl,
           keyboardType: TextInputType.number,
           autofocus: true,
-          decoration: InputDecoration(hintText: '1 – ${_totalPages ?? "?"}'),
+          decoration: InputDecoration(
+            hintText: '1 – ${_totalPages ?? "?"}',
+          ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Отмена')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
           FilledButton(
             onPressed: () {
               final p = int.tryParse(ctrl.text);
@@ -265,5 +336,126 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
     );
     return result;
+  }
+}
+
+class _SearchOverlay extends StatefulWidget {
+  final PdfTextSearcher searcher;
+  final TextEditingController searchController;
+  final VoidCallback onClose;
+
+  const _SearchOverlay({
+    required this.searcher,
+    required this.searchController,
+    required this.onClose,
+  });
+
+  @override
+  State<_SearchOverlay> createState() => _SearchOverlayState();
+}
+
+class _SearchOverlayState extends State<_SearchOverlay> {
+  void _listener() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.searcher.addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    widget.searcher.removeListener(_listener);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final matches = widget.searcher.matches;
+    final currentIndex = widget.searcher.currentIndex;
+    final count = matches.length;
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest,
+      elevation: 4,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Поиск в тексте...',
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: widget.searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              widget.searchController.clear();
+                              widget.searcher.resetTextSearch();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  onChanged: (value) {
+                    widget.searcher.startTextSearch(
+                      value,
+                      searchImmediately: true,
+                    );
+                  },
+                  onSubmitted: (value) {
+                    widget.searcher.startTextSearch(
+                      value,
+                      searchImmediately: true,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (count > 0)
+                Text(
+                  '${currentIndex != null ? currentIndex + 1 : 0}/$count',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_up, size: 22),
+                onPressed: count > 0 ? () => widget.searcher.goToPrevMatch() : null,
+                tooltip: 'Предыдущее',
+              ),
+              IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down, size: 22),
+                onPressed: count > 0 ? () => widget.searcher.goToNextMatch() : null,
+                tooltip: 'Следующее',
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 22),
+                onPressed: () {
+                  widget.searcher.resetTextSearch();
+                  widget.onClose();
+                },
+                tooltip: 'Закрыть',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
-import 'package:pdfrx/pdfrx.dart';
 
 import '../logging/app_logger.dart';
 
@@ -13,7 +12,12 @@ class AppBootstrap {
 
   static Future<void> init() async {
     await dotenv.load();
-    unawaited(pdfrxFlutterInitialize());
+    if (!dotenv.isEveryDefined(['BASE_URL'])) {
+      throw StateError(
+        'Required environment variable BASE_URL is not defined. '
+        'Check your .env file.',
+      );
+    }
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();

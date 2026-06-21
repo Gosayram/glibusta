@@ -13,6 +13,32 @@ import 'normalized_book.dart';
 class Fb2Parser implements BookParser {
   final _detector = BookEncodingDetector();
 
+  /// Pattern matching `<binary ...>...</binary>` elements, including
+  /// those with a missing closing `</binary>` tag.
+  ///
+  /// Matches from `<binary` to either `</binary>` or the next XML tag,
+  /// since base64 content never contains `<` characters.
+  static final _binaryTagPattern = RegExp(
+    r'<binary[^>]*>(?:[^<]|<(?!/?binary))*(?:</binary>)?',
+    multiLine: true,
+    dotAll: true,
+  );
+
+  /// Pattern for DOCTYPE declarations containing ENTITY definitions.
+  /// Prevents billion laughs XML entity expansion attacks.
+  static final _doctypeEntityPattern = RegExp(
+    r'<!DOCTYPE[^>]*\[[\s\S]*?\]>',
+    multiLine: true,
+    caseSensitive: false,
+  );
+
+  /// Pattern for standalone ENTITY declarations outside DOCTYPE.
+  static final _entityDeclPattern = RegExp(
+    r'<!ENTITY\s+\S+\s+[^>]*>',
+    multiLine: true,
+    caseSensitive: false,
+  );
+
   @override
   bool supports(BookFormat format) => format == BookFormat.fb2;
 
@@ -31,7 +57,12 @@ class Fb2Parser implements BookParser {
         fileName: fileName,
         forcedEncoding: forcedEncoding,
       );
-      final document = XmlDocument.parse(result.text);
+      final sanitized = _sanitizeXml(result.text);
+      if (sanitized.length > 50 * 1024 * 1024) {
+        throw const ParserFailure('FB2: размер XML превышает 50 МБ');
+      }
+      final safeXml = _stripDtdEntities(sanitized);
+      final document = XmlDocument.parse(safeXml);
       return _parseDocument(document);
     } on XmlException catch (e) {
       throw ParserFailure('Ошибка разбора FB2: ${e.message}');
@@ -42,6 +73,21 @@ class Fb2Parser implements BookParser {
     }
   }
 
+  /// Remove `<binary>` elements before strict XML parsing.
+  ///
+  /// Some FB2 generators produce malformed `<binary>` blocks (missing closing
+  /// tags, invalid base64, etc.). The binary data is only used for cover
+  /// extraction in a separate code path that handles its own errors. Removing
+  /// them here lets the rest of the document parse successfully.
+  static String _sanitizeXml(String text) {
+    return text.replaceAll(_binaryTagPattern, '');
+  }
+
+  /// Strip DOCTYPE with ENTITY declarations to prevent billion laughs attack.
+  static String _stripDtdEntities(String text) {
+    return text.replaceAll(_doctypeEntityPattern, '').replaceAll(_entityDeclPattern, '');
+  }
+
   /// If bytes are a ZIP archive (FB2.ZIP), extract the first .fb2 file.
   Uint8List _extractFromZipIfNeeded(Uint8List bytes) {
     if (bytes.length < 4) return bytes;
@@ -49,6 +95,18 @@ class Fb2Parser implements BookParser {
     if (bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
       try {
         final archive = ZipDecoder().decodeBytes(bytes);
+        var totalDecompressed = 0;
+        const maxDecompressedSize = 500 * 1024 * 1024; // 500 MB
+        for (final file in archive) {
+          if (file.isFile) {
+            totalDecompressed += file.content.length;
+            if (totalDecompressed > maxDecompressedSize) {
+              throw const FormatException(
+                'FB2.ZIP: суммарный размер распакованных файлов превышает 500 МБ',
+              );
+            }
+          }
+        }
         final fb2File = archive.files.cast<ArchiveFile?>().firstWhere(
           (f) => f!.name.toLowerCase().endsWith('.fb2') && !_hasZipSlip(f.name),
           orElse: () => null,
@@ -108,7 +166,7 @@ class Fb2Parser implements BookParser {
     );
   }
 
-  Map<String, dynamic> _parseDescription(XmlDocument document) {
+  static Map<String, dynamic> _parseDescription(XmlDocument document) {
     final result = <String, dynamic>{};
 
     final titleInfo = document.findAllElements('title-info');
@@ -151,7 +209,7 @@ class Fb2Parser implements BookParser {
     return result;
   }
 
-  List<ReaderChapter> _parseBody(XmlDocument document) {
+  static List<ReaderChapter> _parseBody(XmlDocument document) {
     final chapters = <ReaderChapter>[];
     int chapterIndex = 0;
 
@@ -172,7 +230,7 @@ class Fb2Parser implements BookParser {
     return chapters;
   }
 
-  List<ReaderBlock> _parseSection(XmlElement element, int chapterIndex) {
+  static List<ReaderBlock> _parseSection(XmlElement element, int chapterIndex) {
     final blocks = <ReaderBlock>[];
     int blockIndex = 0;
 
@@ -196,7 +254,7 @@ class Fb2Parser implements BookParser {
               ReaderBlock(
                 index: blockIndex++,
                 text: text,
-                type: BlockType.heading,
+                type: BlockType.subtitle,
               ),
             );
           }
@@ -224,7 +282,31 @@ class Fb2Parser implements BookParser {
               ReaderBlock(
                 index: blockIndex++,
                 text: text,
-                type: BlockType.quote,
+                type: BlockType.cite,
+              ),
+            );
+          }
+          break;
+        case 'epigraph':
+          final text = child.innerText.trim();
+          if (text.isNotEmpty) {
+            blocks.add(
+              ReaderBlock(
+                index: blockIndex++,
+                text: text,
+                type: BlockType.epigraph,
+              ),
+            );
+          }
+          break;
+        case 'text-author':
+          final text = child.innerText.trim();
+          if (text.isNotEmpty) {
+            blocks.add(
+              ReaderBlock(
+                index: blockIndex++,
+                text: text,
+                type: BlockType.textAuthor,
               ),
             );
           }
@@ -240,61 +322,12 @@ class Fb2Parser implements BookParser {
 }
 
 NormalizedBook parseFb2FromText(String text, {String? fileName}) {
-  final document = XmlDocument.parse(text);
+  final sanitized = Fb2Parser._sanitizeXml(text);
+  final safeXml = Fb2Parser._stripDtdEntities(sanitized);
+  final document = XmlDocument.parse(safeXml);
 
-  final description = <String, dynamic>{};
-  final titleInfo = document.findAllElements('title-info');
-  if (titleInfo.isNotEmpty) {
-    final title = titleInfo.first.findAllElements('book-title');
-    if (title.isNotEmpty) {
-      description['title'] = title.first.innerText;
-    }
-
-    final authors = <String>[];
-    for (final author in titleInfo.first.findAllElements('author')) {
-      final firstName = author.findAllElements('first-name');
-      final lastName = author.findAllElements('last-name');
-      if (firstName.isNotEmpty && lastName.isNotEmpty) {
-        authors.add('${firstName.first.innerText} ${lastName.first.innerText}');
-      }
-    }
-    description['authors'] = authors;
-
-    final annotation = titleInfo.first.findAllElements('annotation');
-    if (annotation.isNotEmpty) {
-      description['annotation'] = annotation.first.innerText;
-    }
-
-    final genres = <String>[];
-    for (final genre in titleInfo.first.findAllElements('genre')) {
-      genres.add(genre.innerText);
-    }
-    description['genres'] = genres;
-  }
-
-  final documentInfo = document.findAllElements('document-info');
-  if (documentInfo.isNotEmpty) {
-    final id = documentInfo.first.findAllElements('id');
-    if (id.isNotEmpty) {
-      description['id'] = id.first.innerText;
-    }
-  }
-
-  final chapters = <ReaderChapter>[];
-  int chapterIndex = 0;
-  final bodies = document.findAllElements('body');
-  for (final body in bodies) {
-    final blocks = _parseFb2Section(body, chapterIndex);
-    if (blocks.isNotEmpty) {
-      chapters.add(
-        ReaderChapter(
-          index: chapterIndex++,
-          title: 'Chapter $chapterIndex',
-          blocks: blocks,
-        ),
-      );
-    }
-  }
+  final description = Fb2Parser._parseDescription(document);
+  final chapters = Fb2Parser._parseBody(document);
 
   return NormalizedBook(
     id: description['id'] as String? ?? fileName ?? 'unknown',
@@ -310,48 +343,4 @@ NormalizedBook parseFb2FromText(String text, {String? fileName}) {
       'genres': description['genres'],
     },
   );
-}
-
-List<ReaderBlock> _parseFb2Section(XmlElement element, int chapterIndex) {
-  final blocks = <ReaderBlock>[];
-  int blockIndex = 0;
-
-  for (final child in element.childElements) {
-    switch (child.name.local) {
-      case 'p':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text));
-        }
-        break;
-      case 'subtitle':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text, type: BlockType.heading));
-        }
-        break;
-      case 'image':
-        final href =
-            child.getAttribute('l:href') ??
-            child.getAttribute('href') ??
-            child.getAttribute('xlink:href');
-        if (href != null) {
-          blocks.add(
-            ReaderBlock(index: blockIndex++, text: '', type: BlockType.image, imageUrl: href),
-          );
-        }
-        break;
-      case 'cite':
-        final text = child.innerText.trim();
-        if (text.isNotEmpty) {
-          blocks.add(ReaderBlock(index: blockIndex++, text: text, type: BlockType.quote));
-        }
-        break;
-      case 'section':
-        blocks.addAll(_parseFb2Section(child, chapterIndex));
-        break;
-    }
-  }
-
-  return blocks;
 }

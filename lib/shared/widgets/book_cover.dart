@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../models/book.dart';
@@ -43,10 +44,10 @@ class BookCover extends StatelessWidget {
         aspectRatio: 2 / 3,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            coverUrl,
+          child: CachedNetworkImage(
+            imageUrl: coverUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => GeneratedBookCover(
+            errorWidget: (_, _, _) => GeneratedBookCover(
               title: book.title,
               author: book.displayAuthor,
               seed: book.id,

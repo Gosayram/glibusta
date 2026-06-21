@@ -1,9 +1,19 @@
-import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
-final lifecycleServiceProvider = Provider<LifecycleService>((ref) {
-  return LifecycleService(ref);
-});
+import 'package:flutter/widgets.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../logging/app_logger.dart';
+import '../services/sync_service.dart';
+
+part 'lifecycle_service.g.dart';
+
+@riverpod
+LifecycleService lifecycleService(Ref ref) {
+  final service = LifecycleService(ref);
+  service._setupAutoSync(ref);
+  return service;
+}
 
 class LifecycleService {
   final Ref ref;
@@ -11,12 +21,32 @@ class LifecycleService {
 
   LifecycleService(this.ref);
 
+  void _setupAutoSync(Ref ref) {
+    setCallback(LifecycleEvent.pause, () {
+      _triggerAutoSync(ref);
+    });
+    setCallback(LifecycleEvent.hide, () {
+      _triggerAutoSync(ref);
+    });
+  }
+
+  void _triggerAutoSync(Ref ref) {
+    try {
+      final syncService = ref.read(syncServiceProvider);
+      if (syncService.config?.autoSync == true && syncService.status != SyncStatus.syncing) {
+        unawaited(syncService.sync());
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Failed to trigger auto-sync', error: e);
+    }
+  }
+
   void setCallback(LifecycleEvent event, VoidCallback callback) {
     _callbacks.putIfAbsent(event, () => []).add(callback);
   }
 
   void handleEvent(LifecycleEvent event) {
-    for (final callback in _callbacks[event] ?? []) {
+    for (final callback in _callbacks[event] ?? <VoidCallback>[]) {
       callback();
     }
   }

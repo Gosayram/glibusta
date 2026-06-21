@@ -11,8 +11,8 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
-import '../core/theme/app_colors.dart';
 import '../features/library/data/book_import_service.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
 import 'theme.dart';
@@ -119,40 +119,37 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     final themeMode = ref.watch(themeModeProvider);
     return DynamicColorBuilder(
       builder: (ColorScheme? dynamicLight, ColorScheme? dynamicDark) {
-        final lightColorScheme = dynamicLight != null
-            ? dynamicLight.harmonized()
-            : ColorScheme.fromSeed(
-                seedColor: AppColors.primary,
-              );
-        final darkColorScheme = dynamicDark != null
-            ? dynamicDark.harmonized()
-            : ColorScheme.fromSeed(
-                seedColor: AppColors.primary,
-                brightness: Brightness.dark,
-              );
+        final useDynamicLight = dynamicLight != null;
+        final useDynamicDark = dynamicDark != null;
         final transitions = PageTransitionsTheme(
           builders: {
             for (final p in TargetPlatform.values) p: _platformTransitionBuilder(p),
           },
         );
-        final lightTheme = AppTheme.lightTheme.copyWith(
-          colorScheme: lightColorScheme,
-          pageTransitionsTheme: transitions,
-          extensions: [
-            const SkeletonizerConfigData(
-              enableSwitchAnimation: true,
-            ),
-          ],
-        );
-        final darkTheme = AppTheme.darkTheme.copyWith(
-          colorScheme: darkColorScheme,
-          pageTransitionsTheme: transitions,
-          extensions: [
-            const SkeletonizerConfigData(
-              enableSwitchAnimation: true,
-            ),
-          ],
-        );
+        final lightTheme =
+            AppTheme.buildLightTheme(
+              useDynamicScheme: useDynamicLight,
+              dynamicScheme: dynamicLight,
+            ).copyWith(
+              pageTransitionsTheme: transitions,
+              extensions: [
+                const SkeletonizerConfigData(
+                  enableSwitchAnimation: true,
+                ),
+              ],
+            );
+        final darkTheme =
+            AppTheme.buildDarkTheme(
+              useDynamicScheme: useDynamicDark,
+              dynamicScheme: dynamicDark,
+            ).copyWith(
+              pageTransitionsTheme: transitions,
+              extensions: [
+                const SkeletonizerConfigData(
+                  enableSwitchAnimation: true,
+                ),
+              ],
+            );
         return MaterialApp.router(
           title: 'Glibusta',
           theme: lightTheme,
@@ -160,6 +157,8 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
           themeMode: themeMode,
           routerConfig: router,
           restorationScopeId: 'app',
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           builder: (context, child) {
             final wrappedChild = _GlobalKeyboardShortcuts(
               key: const Key('global-keyboard-shortcuts'),

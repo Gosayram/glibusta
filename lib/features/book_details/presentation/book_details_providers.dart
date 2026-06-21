@@ -2,9 +2,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../shared/models/download_task.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../data/book_comments_service.dart';
+import '../data/book_details_repository_impl.dart';
+
+final bookDetailsProvider = FutureProvider.autoDispose.family<BookDetails, String>((
+  ref,
+  bookId,
+) async {
+  final repository = ref.watch(bookDetailsRepositoryProvider);
+  return repository.getBookDetails(bookId);
+});
+
+final bookReadingProgressProvider = FutureProvider.autoDispose.family<ReadingProgressData?, String>(
+  (
+    ref,
+    bookId,
+  ) async {
+    final db = ref.watch(databaseProvider);
+    return db.bookDao.getReadingProgress(bookId);
+  },
+);
 
 final seriesForBookProvider = FutureProvider.autoDispose.family<List<Sery>, String>((
   ref,
@@ -26,20 +46,20 @@ final chaptersForBookProvider = FutureProvider.autoDispose.family<NormalizedBook
   }
 });
 
-final bookmarksForBookProvider = FutureProvider.autoDispose.family<List<Bookmark>, String>((
+final bookmarksForBookProvider = StreamProvider.autoDispose.family<List<Bookmark>, String>((
   ref,
   bookId,
-) async {
+) {
   final db = ref.watch(databaseProvider);
-  return db.bookmarkDao.getBookmarksForBook(bookId);
+  return db.bookmarkDao.watchBookmarksForBook(bookId);
 });
 
-final quotesForBookProvider = FutureProvider.autoDispose.family<List<Quote>, String>((
+final quotesForBookProvider = StreamProvider.autoDispose.family<List<Quote>, String>((
   ref,
   bookId,
-) async {
+) {
   final db = ref.watch(databaseProvider);
-  return db.bookmarkDao.getQuotesForBook(bookId);
+  return db.bookmarkDao.watchQuotesForBook(bookId);
 });
 
 final commentsForBookProvider = FutureProvider.autoDispose.family<List<BookComment>, String>((

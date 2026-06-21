@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -10,6 +13,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/background_task_provider.dart';
+import '../../../core/services/tag_service.dart';
 import '../../../core/services/task_queue_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
@@ -18,6 +22,8 @@ import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/library_master_detail.dart';
+import '../../../shared/widgets/restorable_scroll_view.dart';
+import '../../reader/data/per_book_settings_service.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
@@ -155,7 +161,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               }).toList();
                         return _buildBooksGrid(context, ref, filtered);
                       },
-                      loading: () => Skeletonizer(
+                      loading: () => Skeletonizer.zone(
                         child: GridView.builder(
                           padding: const EdgeInsets.all(16),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -244,27 +250,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
       if (inspection.decision == ImportDecision.duplicate) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Дубликат: ${inspection.title ?? inspection.reason}')),
-          );
+          unawaited(SmartDialog.showToast('Дубликат: ${inspection.title ?? inspection.reason}'));
         }
         return;
       }
 
       if (inspection.decision == ImportDecision.corrupted) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка: ${inspection.reason}')),
-          );
+          unawaited(SmartDialog.showToast('Ошибка: ${inspection.reason}'));
         }
         return;
       }
 
       if (inspection.decision == ImportDecision.unsupported) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Формат не поддерживается')),
-          );
+          unawaited(SmartDialog.showToast('Формат не поддерживается'));
         }
         return;
       }
@@ -278,16 +278,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importFromInspection(inspection),
           );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              importResult.isSuccess
-                  ? 'Импортировано: ${importResult.title}'
-                  : importResult.needsEncodingSelection
-                  ? 'Нужен выбор кодировки'
-                  : 'Ошибка: ${importResult.error}',
-            ),
-            duration: const Duration(seconds: 2),
+        unawaited(
+          SmartDialog.showToast(
+            importResult.isSuccess
+                ? 'Импортировано: ${importResult.title}'
+                : importResult.needsEncodingSelection
+                ? 'Нужен выбор кодировки'
+                : 'Ошибка: ${importResult.error}',
           ),
         );
       }
@@ -312,18 +309,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importDirectory(dirPath),
           );
       if (context.mounted) {
-        final firstFailure = batchResult.failures.firstOrNull;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Импортировано: ${batchResult.successCount}, '
-              'дубликатов: ${batchResult.duplicateCount}, '
-              'ошибок: ${batchResult.failureCount}'
-              '${firstFailure != null ? '. Первая ошибка: ${_fileName(firstFailure.path)}' : ''}',
-            ),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showImportSummaryDialog(context, batchResult);
       }
       ref.invalidate(libraryBooksProvider);
     } on Object catch (e) {
@@ -331,11 +317,126 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
-  String _fileName(String path) {
-    if (path.isEmpty) return 'unknown';
-    final normalized = path.replaceAll(r'\', '/');
-    final lastSlash = normalized.lastIndexOf('/');
-    return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+  void _showImportSummaryDialog(BuildContext context, ImportBatchResult batch) {
+    final failures = batch.failures;
+    final hasErrors = failures.isNotEmpty;
+    final hasCircuitBroken = batch.circuitBroken;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            hasCircuitBroken
+                ? Icons.warning_amber_rounded
+                : hasErrors
+                ? Icons.info_outline
+                : Icons.check_circle_outline,
+            color: hasCircuitBroken
+                ? Theme.of(ctx).colorScheme.error
+                : hasErrors
+                ? Theme.of(ctx).colorScheme.secondary
+                : Theme.of(ctx).colorScheme.primary,
+            size: 32,
+          ),
+          title: Text(
+            hasCircuitBroken
+                ? 'Импорт приостановлен'
+                : hasErrors
+                ? 'Импорт завершён с ошибками'
+                : 'Импорт завершён',
+          ),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _summaryRow(
+                  Icons.check,
+                  'Импортировано',
+                  '${batch.successCount}',
+                  Theme.of(ctx).colorScheme.primary,
+                ),
+                _summaryRow(
+                  Icons.copy,
+                  'Дубликатов',
+                  '${batch.duplicateCount}',
+                  Theme.of(ctx).colorScheme.secondary,
+                ),
+                if (hasErrors)
+                  _summaryRow(
+                    Icons.error_outline,
+                    'Ошибок',
+                    '${batch.failureCount}',
+                    Theme.of(ctx).colorScheme.error,
+                  ),
+                if (hasCircuitBroken) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Импорт остановлен после 3 ошибок подряд. '
+                    'Возможно, повреждённые файлы или неподдерживаемый формат.',
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.error,
+                    ),
+                  ),
+                ],
+                if (hasErrors) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ошибки:',
+                    style: Theme.of(ctx).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  ...failures
+                      .take(5)
+                      .map(
+                        (f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '  ${f.path.split('/').last}: ${f.result.error ?? "неизвестная ошибка"}',
+                            style: Theme.of(ctx).textTheme.bodySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                  if (failures.length > 5)
+                    Text(
+                      '  ... и ещё ${failures.length - 5}',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(label),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.w600, color: color),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showImportSheet(BuildContext context, WidgetRef ref) {
@@ -382,52 +483,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
     if (books.isEmpty) {
       return Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0.0, end: 1.0),
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, child) => Opacity(
-            opacity: value,
-            child: child,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.library_books_outlined,
-                size: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.library_books_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Библиотека пуста',
+              style: TextStyle(
+                fontSize: 18,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Библиотека пуста',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Найдите и скачайте книги, или импортируйте файлы',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Найдите и скачайте книги, или импортируйте файлы',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              FilledButton.tonal(
-                onPressed: () => context.push('/catalog'),
-                child: const Text('Перейти в каталог'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => _importBook(context, ref),
-                child: const Text('Импортировать файл'),
-              ),
-            ],
-          ),
-        ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.tonal(
+              onPressed: () => context.push('/catalog'),
+              child: const Text('Перейти в каталог'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: () => _importBook(context, ref),
+              child: const Text('Импортировать файл'),
+            ),
+          ],
+        ).animate().fadeIn(duration: 250.ms),
       );
     }
 
@@ -444,7 +536,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
-    return _RestorableCustomScrollView(
+    return RestorableCustomScrollView(
       restorationId: 'library-books-scroll',
       slivers: [
         // Pinned section
@@ -585,6 +677,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(HapticFeedback.mediumImpact());
     final pinnedState = ref.read(pinnedBooksProvider.notifier);
     final isPinned = pinnedState.isPinned(book.id);
 
@@ -604,6 +697,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('Подробности'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(context.push('/book/${book.id}'));
+                },
+              ),
+              ListTile(
                 leading: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
                 title: Text(isPinned ? 'Открепить' : 'Закрепить'),
                 subtitle: isPinned ? null : const Text('Максимум 5 книг'),
@@ -613,9 +714,40 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.bookmark_add),
-                title: const Text('Добавить закладку'),
-                onTap: () => Navigator.pop(ctx),
+                leading: const Icon(Icons.label_outline),
+                title: const Text('Теги'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showTagPicker(context, ref, book);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_open),
+                title: const Text('Переместить в папку'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showFolderPicker(context, ref, book);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Поделиться'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _shareBook(context, book);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.tune),
+                title: const Text('Сбросить настройки чтения'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final svc = ref.read(perBookSettingsServiceProvider);
+                  await svc.resetToGlobal(book.id);
+                  if (context.mounted) {
+                    unawaited(SmartDialog.showToast('Настройки сброшены'));
+                  }
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.delete),
@@ -632,9 +764,31 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
+  void _showTagPicker(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => _TagPickerSheet(book: book),
+      ),
+    );
+  }
+
+  void _showFolderPicker(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(SmartDialog.showToast('Выбор папки将在 реализован'));
+  }
+
+  void _shareBook(BuildContext context, Book book) {
+    if (book.source.sourceUrl.isNotEmpty) {
+      unawaited(SmartDialog.showToast('Поделиться «${book.title}»'));
+    }
+  }
+
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Book book) async {
     final result = await DeleteBookDialog.show(context, bookTitle: book.title);
     if (result == null || !context.mounted) return;
+
+    unawaited(HapticFeedback.heavyImpact());
 
     final service = ref.read(bookDeleteServiceProvider);
     if (result.deleteFile) {
@@ -644,81 +798,159 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     ref.invalidate(libraryBooksProvider);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.deleteFile
-                ? '«${book.title}» удалена с диска'
-                : '«${book.title}» удалена из списка',
-          ),
+      unawaited(
+        SmartDialog.showToast(
+          result.deleteFile
+              ? '«${book.title}» удалена с диска'
+              : '«${book.title}» удалена из списка',
         ),
       );
     }
   }
 }
 
-class _RestorableCustomScrollView extends StatefulWidget {
-  final String restorationId;
-  final List<Widget> slivers;
+class _TagPickerSheet extends ConsumerStatefulWidget {
+  const _TagPickerSheet({required this.book});
 
-  const _RestorableCustomScrollView({
-    required this.restorationId,
-    required this.slivers,
-  });
+  final Book book;
 
   @override
-  State<_RestorableCustomScrollView> createState() => _RestorableCustomScrollViewState();
+  ConsumerState<_TagPickerSheet> createState() => _TagPickerSheetState();
 }
 
-class _RestorableCustomScrollViewState extends State<_RestorableCustomScrollView>
-    with RestorationMixin {
-  final RestorableDouble _offset = RestorableDouble(0);
-  ScrollController? _controller;
+class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
+  late Set<String> _selectedTagIds;
+  bool _isLoading = true;
 
   @override
-  String? get restorationId => widget.restorationId;
-
-  @override
-  void restoreState(RestorationBucket? oldBucket, bool restoredFromOldBucket) {
-    registerForRestoration(_offset, 'scroll_offset');
+  void initState() {
+    super.initState();
+    _selectedTagIds = {};
+    unawaited(_loadTags());
   }
 
-  @override
-  void dispose() {
-    _controller?.removeListener(_saveOffset);
-    _controller?.dispose();
-    _offset.dispose();
-    super.dispose();
-  }
-
-  ScrollController _getController() {
-    if (_controller != null) return _controller!;
-    _controller = ScrollController(
-      initialScrollOffset: _offset.value,
-      keepScrollOffset: false,
-    )..addListener(_saveOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restoreOffset());
-    return _controller!;
-  }
-
-  void _saveOffset() {
-    final controller = _controller;
-    if (controller == null || !controller.hasClients) return;
-    _offset.value = controller.position.pixels;
-  }
-
-  void _restoreOffset() {
-    final controller = _controller;
-    if (!mounted || controller == null || !controller.hasClients) return;
-    final maxOffset = controller.position.maxScrollExtent;
-    final offset = _offset.value.clamp(0.0, maxOffset);
-    if (offset > 0 && (controller.position.pixels - offset).abs() > 1) {
-      controller.jumpTo(offset);
+  Future<void> _loadTags() async {
+    final tagService = ref.read<TagService>(tagServiceProvider);
+    final bookTags = await tagService.getTagsForBook(widget.book.id);
+    if (mounted) {
+      setState(() {
+        _selectedTagIds = bookTags.map((t) => t.id).toSet();
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(controller: _getController(), slivers: widget.slivers);
+    final tagsAsync = ref.watch(allTagsProvider);
+
+    return DraggableScrollableSheet(
+      minChildSize: 0.3,
+      maxChildSize: 0.8,
+      expand: false,
+      builder: (ctx, scrollController) => SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Теги',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: tagsAsync.when(
+                data: (tags) {
+                  if (tags.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.label_off, size: 48, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text('Нет тегов'),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              unawaited(context.push('/settings/tags'));
+                            },
+                            child: const Text('Создать тег'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: tags.length,
+                    itemBuilder: (_, index) {
+                      final tag = tags[index];
+                      final isSelected = _selectedTagIds.contains(tag.id);
+                      return CheckboxListTile(
+                        secondary: CircleAvatar(
+                          backgroundColor: _parseColor(tag.color),
+                          radius: 12,
+                        ),
+                        title: Text(tag.name),
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedTagIds.add(tag.id);
+                            } else {
+                              _selectedTagIds.remove(tag.id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Ошибка: $e')),
+              ),
+            ),
+            if (!_isLoading)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => _saveTags(ctx),
+                    child: const Text('Сохранить'),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveTags(BuildContext ctx) async {
+    final tagService = ref.read(tagServiceProvider);
+    await tagService.setBookTags(widget.book.id, _selectedTagIds.toList());
+    if (ctx.mounted) {
+      Navigator.pop(ctx);
+      unawaited(SmartDialog.showToast('Теги сохранены'));
+    }
+  }
+
+  Color _parseColor(String hex) {
+    final clean = hex.replaceFirst('#', '');
+    final parsed = int.tryParse(clean, radix: 16);
+    if (parsed == null) return const Color(0xFFFFEB3B);
+    return Color(0xFF000000 | parsed);
   }
 }

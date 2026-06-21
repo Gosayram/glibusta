@@ -9,6 +9,8 @@ part 'author_dao.g.dart';
 class AuthorDao extends DatabaseAccessor<AppDatabase> with _$AuthorDaoMixin {
   AuthorDao(super.attachedDatabase);
 
+  Stream<List<Author>> watchAll() => select(authors).watch();
+
   Future<List<Author>> getAllAuthors() async => select(authors).get();
 
   Future<int> insertAuthor(AuthorsCompanion entry) => into(authors).insertOnConflictUpdate(entry);

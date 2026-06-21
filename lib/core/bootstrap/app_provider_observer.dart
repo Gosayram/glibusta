@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../logging/app_logger.dart';
 
 final class AppProviderObserver extends ProviderObserver {
   @override
@@ -8,6 +9,6 @@ final class AppProviderObserver extends ProviderObserver {
     Object error,
     StackTrace stackTrace,
   ) {
-    debugPrint('[Provider FAIL] ${context.provider.name}: $error');
+    AppLogger().warning('[Provider FAIL] ${context.provider.name}: $error', name: 'Provider');
   }
 }

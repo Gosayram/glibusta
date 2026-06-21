@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/utils/app_breakpoints.dart';
 import 'package:glibusta/core/utils/platform_detector.dart';
+import 'package:glibusta/l10n/generated/app_localizations.dart';
 import 'package:glibusta/shared/widgets/adaptive_navigation.dart';
 
 void main() {
@@ -20,6 +21,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AdaptiveNavigation(
               selectedIndex: 0,
@@ -39,6 +42,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AdaptiveNavigation(
               selectedIndex: 0,
@@ -58,6 +63,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AdaptiveNavigation(
               selectedIndex: 0,
@@ -68,10 +75,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Библиотека'), findsOneWidget);
-      expect(find.text('Поиск'), findsOneWidget);
-      expect(find.text('Загрузки'), findsOneWidget);
-      expect(find.text('Настройки'), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('Downloads'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
     });
 
     testWidgets('calls onDestinationSelected on tap', (tester) async {
@@ -80,6 +87,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AdaptiveNavigation(
               selectedIndex: 0,
@@ -103,6 +112,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SidebarNavigation(
               onDestinationSelected: (_) {},
@@ -112,11 +123,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Библиотека'), findsOneWidget);
-      expect(find.text('Поиск'), findsOneWidget);
-      expect(find.text('Загрузки'), findsOneWidget);
-      expect(find.text('Коллекции'), findsOneWidget);
-      expect(find.text('Настройки'), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('Downloads'), findsOneWidget);
+      expect(find.text('Collections'), findsOneWidget);
+      expect(find.text('Settings'), findsOneWidget);
     });
 
     testWidgets('shows Glibusta title', (tester) async {
@@ -124,6 +135,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SidebarNavigation(
               onDestinationSelected: (_) {},
@@ -141,6 +154,8 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SidebarNavigation(
               selectedIndex: 1,
@@ -152,12 +167,12 @@ void main() {
       await tester.pumpAndSettle();
 
       final homeTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'Библиотека'),
+        find.widgetWithText(ListTile, 'Library'),
       );
       expect(homeTile.selected, isFalse);
 
       final searchTile = tester.widget<ListTile>(
-        find.widgetWithText(ListTile, 'Поиск'),
+        find.widgetWithText(ListTile, 'Search'),
       );
       expect(searchTile.selected, isTrue);
     });

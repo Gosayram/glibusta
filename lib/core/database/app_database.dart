@@ -14,7 +14,11 @@ import 'daos/bookmark_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/download_dao.dart';
 import 'daos/genre_dao.dart';
+import 'daos/highlight_dao.dart';
+import 'daos/per_book_settings_dao.dart';
+import 'daos/reading_time_dao.dart';
 import 'daos/series_dao.dart';
+import 'daos/tag_dao.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -35,15 +39,24 @@ part 'app_database.g.dart';
     Collections,
     BookCollections,
     ReadingSessions,
+    PerBookSettings,
+    Tags,
+    BookTags,
+    ReadingTime,
+    TextHighlights,
   ],
   daos: [
     BookDao,
-    AuthorDao,
-    SeriesDao,
-    CollectionDao,
     DownloadDao,
+    CollectionDao,
     BookmarkDao,
     GenreDao,
+    PerBookSettingsDao,
+    TagDao,
+    ReadingTimeDao,
+    AuthorDao,
+    SeriesDao,
+    HighlightDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -52,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +76,10 @@ class AppDatabase extends _$AppDatabase {
       await _backupDatabase(from);
       await customStatement('PRAGMA foreign_keys = OFF');
       try {
+        if (from > to) {
+          await _handleDowngrade(m, from, to);
+          return;
+        }
         await transaction(() async {
           if (from < 2) {
             await m.addColumn(savedBooks, savedBooks.contentHash);
@@ -98,6 +115,23 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(savedBooks, savedBooks.coverPath);
             await m.addColumn(savedBooks, savedBooks.coverStatus);
           }
+          if (from < 10) {
+            await m.createTable(perBookSettings);
+          }
+          if (from < 11) {
+            await m.createTable(tags);
+            await m.createTable(bookTags);
+          }
+          if (from < 12) {
+            await m.createTable(readingTime);
+          }
+          if (from < 13) {
+            await m.createTable(textHighlights);
+          }
+          if (from < 14) {
+            await m.addColumn(readingProgress, readingProgress.chapterId);
+            await m.addColumn(readingProgress, readingProgress.textOffset);
+          }
         });
       } finally {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -126,6 +160,20 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
+  Future<void> _handleDowngrade(Migrator m, int from, int to) async {
+    AppLogger().warning(
+      'Database downgraded from $from to $to — recreating all tables',
+      name: 'Database',
+    );
+    final reversedEntities = m.database.allSchemaEntities.toList().reversed;
+    await transaction(() async {
+      for (final entity in reversedEntities) {
+        await m.drop(entity);
+      }
+      await m.createAll();
+    });
+  }
+
   static const int _maxBackups = 3;
 
   Future<void> _cleanupOldBackups() async {
@@ -148,6 +196,109 @@ class AppDatabase extends _$AppDatabase {
   static Future<String> get _databasePath async {
     final dbFolder = await getApplicationDocumentsDirectory();
     return p.join(dbFolder.path, 'glibusta', 'glibusta.sqlite');
+  }
+
+  Future<File> prepareUploadSnapshot() async {
+    final dbPath = await _databasePath;
+    final snapshotFile = File('$dbPath.upload');
+    try {
+      await customStatement('VACUUM INTO ?', [snapshotFile.path]);
+    } on Object catch (e) {
+      AppLogger().warning(
+        'VACUUM INTO failed, falling back to copy: $e',
+        name: 'Database',
+        error: e,
+      );
+      await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+      final dbFile = File(dbPath);
+      await dbFile.copy(snapshotFile.path);
+      final walFile = File('$dbPath-wal');
+      if (await walFile.exists()) {
+        await walFile.copy('${snapshotFile.path}-wal');
+      }
+      final shmFile = File('$dbPath-shm');
+      if (await shmFile.exists()) {
+        await shmFile.copy('${snapshotFile.path}-shm');
+      }
+    }
+    return snapshotFile;
+  }
+
+  Future<void> deleteUploadSnapshot() async {
+    final dbPath = await _databasePath;
+    final snapshotPath = '$dbPath.upload';
+    for (final path in [snapshotPath, '$snapshotPath-wal', '$snapshotPath-shm']) {
+      final f = File(path);
+      if (await f.exists()) {
+        await f.delete();
+      }
+    }
+  }
+
+  Future<void> fixDatabaseHeader() async {
+    final dbPath = await _databasePath;
+    final dbFile = File(dbPath);
+    if (!await dbFile.exists()) return;
+
+    try {
+      final bytes = await dbFile.readAsBytes();
+      if (bytes.length < 20) return;
+
+      const walMagicOffset = 18;
+      final byte0 = bytes[0];
+      final byte1 = bytes[1];
+
+      if (byte0 == 0x37 && byte1 == 0x0f && bytes.length > walMagicOffset + 2) {
+        final walByte0 = bytes[walMagicOffset];
+        final walByte1 = bytes[walMagicOffset + 1];
+
+        if (walByte0 == 0x37 && walByte1 == 0x0f) {
+          AppLogger().info(
+            'Patching WAL header for legacy compatibility',
+            name: 'Database',
+          );
+          final patched = Uint8List.fromList(bytes);
+          patched[walMagicOffset] = 0x37;
+          patched[walMagicOffset + 1] = 0x0f;
+          patched[walMagicOffset + 2] = 0x10;
+          patched[walMagicOffset + 3] = 0x20;
+          await dbFile.writeAsBytes(patched);
+        }
+      }
+    } on Object catch (e) {
+      AppLogger().warning(
+        'Failed to fix database header: $e',
+        name: 'Database',
+        error: e,
+      );
+    }
+  }
+
+  Future<void> checkpointWal() async {
+    try {
+      await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+    } on Object catch (e) {
+      AppLogger().warning(
+        'WAL checkpoint failed: $e',
+        name: 'Database',
+        error: e,
+      );
+    }
+  }
+
+  Future<DateTime?> getLatestModTime() async {
+    final dbPath = await _databasePath;
+    DateTime? latest;
+    for (final ext in ['', '-wal']) {
+      final f = File('$dbPath$ext');
+      if (await f.exists()) {
+        final stat = await f.stat();
+        if (latest == null || stat.modified.isAfter(latest)) {
+          latest = stat.modified;
+        }
+      }
+    }
+    return latest;
   }
 }
 

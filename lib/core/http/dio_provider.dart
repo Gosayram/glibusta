@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:native_dio_adapter/native_dio_adapter.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../auth/auth_repository.dart';
 import '../config/app_settings.dart';
 import '../logging/app_logger.dart';
 import '../theme/app_duration.dart';
@@ -18,12 +21,12 @@ Dio dio(Ref ref) {
       baseUrl: settings.baseUrl,
       connectTimeout: AppDuration.httpConnect,
       receiveTimeout: AppDuration.httpReceive,
+      sendTimeout: const Duration(seconds: 30),
       responseType: ResponseType.plain,
       followRedirects: true,
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate',
         'Connection': 'close',
       },
     ),
@@ -33,12 +36,8 @@ Dio dio(Ref ref) {
 
   dio.interceptors.addAll([
     const _UserAgentInterceptor(),
-    LogInterceptor(
-      requestHeader: false,
-      responseHeader: false,
-      logPrint: (obj) => AppLogger().finest('$obj', name: 'Http'),
-    ),
     AuthInterceptor(ref),
+    SessionRefreshInterceptor(ref),
     LoggingInterceptor(),
     ErrorMappingInterceptor(),
     _RetryInterceptor(dio: dio, maxRetries: 3),
@@ -103,7 +102,9 @@ class _RetryInterceptor extends Interceptor {
       name: 'Http',
     );
 
-    final delay = Duration(seconds: 1 << retryCount);
+    final delay = Duration(
+      milliseconds: (1 << retryCount) * 1000 + Random().nextInt(1000),
+    );
     await Future<void>.delayed(delay);
 
     final options = Options(
@@ -137,8 +138,14 @@ class _RetryInterceptor extends Interceptor {
 
   bool _shouldNotRetry(DioException err) {
     if (err.type == DioExceptionType.cancel) return true;
+    final method = err.requestOptions.method.toUpperCase();
+    final isSafeRetryMethod = method == 'GET' || method == 'HEAD' || method == 'OPTIONS';
+    final retryOptIn = err.requestOptions.extra['retryable'] == true;
+    if (!isSafeRetryMethod && !retryOptIn) return true;
     final status = err.response?.statusCode;
-    if (status == 401 || status == 403 || status == 404) return true;
+    if (status == 400 || status == 401 || status == 403 || status == 404 || status == 422) {
+      return true;
+    }
     return false;
   }
 }

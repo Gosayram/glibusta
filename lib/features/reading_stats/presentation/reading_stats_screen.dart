@@ -1,17 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/services/stats_export_service.dart';
 import '../../../core/telemetry/reader_telemetry.dart' as telemetry;
 import '../../home/presentation/reading_heatmap.dart';
 import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
-
-final bookStatsListProvider = FutureProvider<Map<String, telemetry.BookStats>>((ref) async {
-  final telemetryRepo = ref.watch(telemetry.readerTelemetryProvider);
-  return telemetryRepo.getAllStats();
-});
+import '../data/reading_stats_providers.dart';
 
 class ReadingStatsScreen extends ConsumerWidget {
   const ReadingStatsScreen({super.key});
@@ -24,9 +24,18 @@ class ReadingStatsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Статистика чтения'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (String value) => _handleExport(context, ref, value),
+            itemBuilder: (BuildContext context) => [
+              const PopupMenuItem(value: 'json', child: Text('Экспорт JSON')),
+              const PopupMenuItem(value: 'csv', child: Text('Экспорт CSV')),
+            ],
+          ),
+        ],
       ),
       body: statsAsync.when(
-        data: (stats) {
+        data: (ReadingStats stats) {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -56,7 +65,7 @@ class ReadingStatsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               bookStatsAsync.when(
-                data: (bookStats) {
+                data: (Map<String, telemetry.BookStats> bookStats) {
                   if (bookStats.isEmpty) {
                     return Card(
                       child: Padding(
@@ -85,7 +94,7 @@ class ReadingStatsScreen extends ConsumerWidget {
 
                   return Card(
                     child: Column(
-                      children: sorted.take(10).map((entry) {
+                      children: sorted.take(10).map((MapEntry<String, telemetry.BookStats> entry) {
                         final bookId = entry.key;
                         final bs = entry.value;
                         final minutes = bs.totalTime.inMinutes;
@@ -100,7 +109,7 @@ class ReadingStatsScreen extends ConsumerWidget {
                             child: Text('${bs.sessionsCount}'),
                           ),
                           title: Text(
-                            'Книга ${bookId.substring(0, 8)}...',
+                            'Книга ${bookId.substring(0, bookId.length > 8 ? 8 : bookId.length)}...',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -155,12 +164,26 @@ class ReadingStatsScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _handleExport(BuildContext context, WidgetRef ref, String format) async {
+    try {
+      final exportService = ref.read(statsExportServiceProvider);
+      if (format == 'json') {
+        await exportService.shareJson();
+      } else {
+        await exportService.shareCsv();
+      }
+    } on Object catch (e) {
+      if (!context.mounted) return;
+      unawaited(SmartDialog.showToast('Ошибка экспорта: $e'));
+    }
+  }
 }
 
 class _SummaryCards extends StatelessWidget {
-  final ReadingStats stats;
-
   const _SummaryCards({required this.stats});
+
+  final ReadingStats stats;
 
   @override
   Widget build(BuildContext context) {
@@ -213,12 +236,6 @@ class _SummaryCards extends StatelessWidget {
 }
 
 class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String subtitle;
-  final Color color;
-
   const _StatCard({
     required this.icon,
     required this.label,
@@ -226,6 +243,12 @@ class _StatCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
   });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final String subtitle;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -272,9 +295,9 @@ class _StatCard extends StatelessWidget {
 }
 
 class _GoalCard extends ConsumerWidget {
-  final int todayMinutes;
-
   const _GoalCard({required this.todayMinutes});
+
+  final int todayMinutes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

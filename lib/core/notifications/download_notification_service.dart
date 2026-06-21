@@ -16,13 +16,29 @@ DownloadNotificationService downloadNotificationService(Ref ref) {
 class DownloadNotificationService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   final AppLogger _logger = AppLogger();
+  Future<void>? _initialized;
+  static int _nextId = 1000;
 
   static const _downloadChannelId = 'glibusta_downloads';
   static const _downloadChannelName = 'Загрузки книг';
   static const _downloadChannelDescription = 'Прогресс загрузки книг и статус';
 
+  final Map<String, int> _taskNotificationIds = {};
+
   int _notificationId(String taskId) {
-    return 1000 + (taskId.hashCode & 0x7FFFFFFF) % 9000;
+    return _taskNotificationIds.putIfAbsent(taskId, () => _nextId++);
+  }
+
+  Future<void> _ensureInitialized() {
+    return _initialized ??= _plugin
+        .initialize(
+          settings: const InitializationSettings(
+            android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+            iOS: DarwinInitializationSettings(),
+            macOS: DarwinInitializationSettings(),
+          ),
+        )
+        .then((_) {});
   }
 
   Future<void> showProgress({
@@ -40,11 +56,12 @@ class DownloadNotificationService {
       final receivedMb = (received / (1024 * 1024)).toStringAsFixed(1);
       final totalMb = (total / (1024 * 1024)).toStringAsFixed(1);
       final speed = _formatSpeed(speedBytesPerSec);
-      body = '$format — $progress% ($receivedMb / $totalMb МБ) • $speed';
+      body =
+          '$format — $progress% ($receivedMb / $totalMb МБ)${speed.isNotEmpty ? ' • $speed' : ''}';
     } else {
       final receivedMb = (received / (1024 * 1024)).toStringAsFixed(1);
       final speed = _formatSpeed(speedBytesPerSec);
-      body = '$format — $receivedMb МБ • $speed';
+      body = '$format — $receivedMb МБ${speed.isNotEmpty ? ' • $speed' : ''}';
     }
 
     final maxProgress = total != null && total > 0 ? 100 : 0;
@@ -62,9 +79,14 @@ class DownloadNotificationService {
       onlyAlertOnce: true,
     );
 
-    final details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(),
+      macOS: const DarwinNotificationDetails(),
+    );
 
     try {
+      await _ensureInitialized();
       await _plugin.show(
         id: _notificationId(task.id),
         title: title,
@@ -91,9 +113,14 @@ class DownloadNotificationService {
       channelDescription: _downloadChannelDescription,
     );
 
-    final details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(),
+      macOS: const DarwinNotificationDetails(),
+    );
 
     try {
+      await _ensureInitialized();
       await _plugin.show(
         id: _notificationId(task.id),
         title: title,
@@ -120,9 +147,14 @@ class DownloadNotificationService {
       channelDescription: _downloadChannelDescription,
     );
 
-    final details = NotificationDetails(android: androidDetails);
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: const DarwinNotificationDetails(),
+      macOS: const DarwinNotificationDetails(),
+    );
 
     try {
+      await _ensureInitialized();
       await _plugin.show(
         id: _notificationId(task.id),
         title: title,

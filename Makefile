@@ -8,6 +8,7 @@ include makefiles/build.mk
 include makefiles/quality.mk
 include makefiles/upgrade.mk
 include makefiles/signing.mk
+include makefiles/device.mk
 
 .DEFAULT_GOAL := help
 

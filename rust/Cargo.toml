@@ -1,0 +1,68 @@
+[package]
+name = "glibusta_core"
+version = "0.1.3"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+name = "glibusta_core"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+encoding_rs = "0.8"
+flutter_rust_bridge = "=2.11.0"
+memchr = "2"
+
+quick-xml = { version = "0.40", features = ["serialize"] }
+regex = { version = "1", default-features = false, features = ["std", "perf", "unicode-perl"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+sha2 = "0.11"
+
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[build-dependencies]
+flutter_rust_bridge_codegen = "=2.11.0"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Suppress pedantic/noise lints
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
+items_after_statements = "allow"
+return_self_not_must_use = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+too_many_arguments = "allow"
+struct_excessive_bools = "allow"
+suboptimal_flops = "allow"
+trivially_copy_pass_by_ref = "allow"
+doc_markdown = "allow"
+needless_pass_by_value = "allow"
+if_not_else = "allow"
+match_same_arms = "allow"
+redundant_else = "allow"
+option_if_let_else = "allow"
+must_use_unit = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+
+# FRB generated code compatibility
+module_inception = "allow"
+should_implement_trait = "allow"
+
+# ─── Release profile: minimize .so size ────────────────────────────────
+[profile.release]
+opt-level = "z"       # aggressive size optimization
+lto = true            # Link Time Optimization — dead code elimination across crates
+codegen-units = 1     # single codegen unit = better optimization (slower build)
+panic = "abort"       # remove stack unwinding code on panic
+strip = "symbols"     # strip debug symbols from .so

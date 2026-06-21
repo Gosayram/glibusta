@@ -35,6 +35,8 @@ class BookCommentsService {
     try {
       final html = await _client.getWithMirror('/b/$bookId');
       return _parseComments(html);
+    } on DioException catch (_) {
+      return const [];
     } on Object catch (_) {
       return const [];
     }
@@ -76,6 +78,8 @@ class BookCommentsService {
         ),
       );
       return true;
+    } on DioException catch (_) {
+      return false;
     } on Object catch (_) {
       return false;
     }

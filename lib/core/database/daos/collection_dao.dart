@@ -11,6 +11,8 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
 
   Future<List<Collection>> getAllCollections() async => select(collections).get();
 
+  Stream<List<Collection>> watchAllCollections() => select(collections).watch();
+
   Future<Collection?> getCollectionById(String id) async =>
       (select(collections)..where((t) => t.id.equals(id))).getSingleOrNull();
 

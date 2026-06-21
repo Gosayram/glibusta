@@ -3,8 +3,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/recent_books_provider.dart';
 
 class RecentBooksScreen extends ConsumerWidget {
@@ -12,11 +14,12 @@ class RecentBooksScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final asyncBooks = ref.watch(recentBooksProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Недавно добавленные')),
+      appBar: AppBar(title: Text(l10n.recentlyAdded)),
       body: asyncBooks.when(
-        data: (response) {
+        data: (RecentBooksResponse response) {
           if (response.books.isEmpty) {
             return Center(
               child: Column(
@@ -29,7 +32,7 @@ class RecentBooksScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Нет недавно добавленных книг',
+                    l10n.noRecentBooks,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -44,7 +47,7 @@ class RecentBooksScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: Text(
-                  '${response.books.length} ${_bookCountText(response.books.length)}',
+                  l10n.bookCount(response.books.length),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -88,7 +91,7 @@ class RecentBooksScreen extends ConsumerWidget {
                 const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Не удалось загрузить недавние книги',
+                  l10n.recentBooksLoadError,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -102,7 +105,7 @@ class RecentBooksScreen extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: () => ref.invalidate(recentBooksProvider),
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Повторить'),
+                  label: Text(l10n.retry),
                 ),
               ],
             ),
@@ -110,14 +113,5 @@ class RecentBooksScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  String _bookCountText(int count) {
-    final mod100 = count % 100;
-    final mod10 = count % 10;
-    if (mod100 >= 11 && mod100 <= 14) return 'книг';
-    if (mod10 == 1) return 'книга';
-    if (mod10 >= 2 && mod10 <= 4) return 'книги';
-    return 'книг';
   }
 }

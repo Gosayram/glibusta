@@ -1,18 +1,21 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
+import '../../../core/logging/app_logger.dart';
+import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/content_safety_service.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
@@ -121,6 +124,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Управление папками',
             subtitle: 'Сохранённые папки и доступ',
             onTap: () => _showPersistedUrisDialog(context),
+          ),
+          _SettingsTile(
+            icon: Icons.storage,
+            title: 'Управление хранилищем',
+            subtitle: 'Размер данных, очистка кеша',
+            onTap: () => context.push('/settings/storage'),
+          ),
+          _SettingsTile(
+            icon: Icons.label,
+            title: 'Теги',
+            subtitle: 'Управление тегами книг',
+            onTap: () => context.push('/settings/tags'),
+          ),
+          _SettingsTile(
+            icon: Icons.info_outline,
+            title: 'Reading Info Bar',
+            subtitle: 'Настройка header/footer в reader',
+            onTap: () => context.push('/settings/reading-info'),
+          ),
+          _SettingsTile(
+            icon: Icons.view_list,
+            title: 'Chapter Split Rules',
+            subtitle: 'Правила разделения TXT на главы',
+            onTap: () => context.push('/settings/chapter-split-rules'),
           ),
 
           const Divider(),
@@ -267,21 +294,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         appVersion: '${info.version}+${info.buildNumber}',
       );
       final json = await backupService.exportData();
-      // TODO: Use file picker or share to save the JSON
       if (kDebugMode) {
-        debugPrint('Exported data: ${json.length} bytes');
+        AppLogger().fine('Exported data: ${json.length} bytes', name: 'Settings');
       }
 
+      // Write to a temporary file and share it via the system share sheet.
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+      final tempFile = File('${Directory.systemTemp.path}/glibusta_backup_$timestamp.json');
+      await tempFile.writeAsString(json);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(tempFile.path)],
+          text: 'Glibusta settings',
+        ),
+      );
+
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Данные экспортированы')),
-      );
+      unawaited(SmartDialog.showToast('Данные экспортированы'));
     } on Exception catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка экспорта: $e')),
-      );
+      unawaited(SmartDialog.showToast('Ошибка экспорта: $e'));
     }
   }
 
@@ -313,12 +346,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !context.mounted) return;
 
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
-      final filePath = result.files.single.path;
+      final picker = BookFilePicker();
+      final filePath = await picker.pickFile(['json']);
       if (filePath == null) return;
 
       final db = ref.read(databaseProvider);
@@ -333,26 +362,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!context.mounted) return;
 
       if (importResult.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Импортировано: ${importResult.progressImported} прогрессов, '
-              '${importResult.bookmarksImported} закладок, '
-              '${importResult.notesImported} заметок, '
-              '${importResult.quotesImported} цитат',
-            ),
+        unawaited(
+          SmartDialog.showToast(
+            'Импортировано: ${importResult.progressImported} прогрессов, '
+            '${importResult.bookmarksImported} закладок, '
+            '${importResult.notesImported} заметок, '
+            '${importResult.quotesImported} цитат',
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: ${importResult.error}')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка: ${importResult.error}'));
       }
     } on Object catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка импорта: $e')),
-      );
+      unawaited(SmartDialog.showToast('Ошибка импорта: $e'));
     }
   }
 
@@ -602,15 +625,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _pickFolder(BuildContext context, WidgetRef ref, StorageMode mode) async {
     final folder = ref.read(externalFolderProvider);
     if (folder.uri != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Текущая папка: ${folder.name ?? folder.uri}'),
-          action: SnackBarAction(
-            label: 'Выбрать другую',
-            onPressed: () => _doPickFolder(context, ref, mode),
-          ),
-        ),
-      );
+      unawaited(SmartDialog.showToast('Текущая папка: ${folder.name ?? folder.uri}'));
     } else {
       await _doPickFolder(context, ref, mode);
     }
@@ -622,9 +637,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final uri = await bridge.pickFolder();
       if (uri == null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Выбор папки отменён')),
-          );
+          unawaited(SmartDialog.showToast('Выбор папки отменён'));
         }
         return;
       }
@@ -635,15 +648,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await ref.read(externalFolderProvider.notifier).updateFolder(uri: uri, name: name);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Найдено книг: ${scanned.length}')),
-        );
+        unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
       }
     } on Object catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
-        );
+        unawaited(SmartDialog.showToast('Ошибка: $e'));
       }
     }
   }
@@ -734,9 +743,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           if (!uris.contains(uri)) uris.add(uri);
                         });
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Найдено книг: ${scanned.length}')),
-                          );
+                          unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
                         }
                       }
                     },

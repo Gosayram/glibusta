@@ -1,4 +1,8 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'book.dart';
+
+part 'search_query.freezed.dart';
 
 class SearchQuery {
   final String query;
@@ -23,33 +27,19 @@ class SearchQuery {
       filters.hasFilters || genre != null || author != null || title != null || series != null;
 }
 
-class SearchFilters {
-  final BookFormat? format;
-  final String? language;
-  final String? genre;
-
-  const SearchFilters({
-    this.format,
-    this.language,
-    this.genre,
-  });
-
-  bool get hasFilters => format != null || _hasText(language) || _hasText(genre);
-
-  SearchFilters copyWith({
+@freezed
+abstract class SearchFilters with _$SearchFilters {
+  const factory SearchFilters({
     BookFormat? format,
     String? language,
     String? genre,
-    bool clearFormat = false,
-    bool clearLanguage = false,
-    bool clearGenre = false,
-  }) {
-    return SearchFilters(
-      format: clearFormat ? null : (format ?? this.format),
-      language: clearLanguage ? null : (language ?? this.language),
-      genre: clearGenre ? null : (genre ?? this.genre),
-    );
-  }
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) = _SearchFilters;
+  const SearchFilters._();
+
+  bool get hasFilters =>
+      format != null || _hasText(language) || _hasText(genre) || dateFrom != null || dateTo != null;
 }
 
 bool _hasText(String? value) => value != null && value.trim().isNotEmpty;

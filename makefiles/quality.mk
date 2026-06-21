@@ -101,12 +101,107 @@ test: require-flutter ## Run Flutter tests
 	@$(PRINT_STEP) "Running Flutter tests"
 	$(FLUTTER_TEST)
 
+.PHONY: rustfmt
+rustfmt: ## Format Rust sources
+	@$(PRINT_STEP) "Formatting Rust sources"
+	cd rust && cargo fmt
+
+.PHONY: rustfmt-check
+rustfmt-check: ## Check Rust formatting
+	@$(PRINT_STEP) "Checking Rust formatting"
+	cd rust && cargo fmt -- --check
+
+.PHONY: rust-clippy
+rust-clippy: ## Run Clippy on Rust code
+	@$(PRINT_STEP) "Running Clippy on Rust code"
+	cd rust && cargo clippy --all-targets
+
+.PHONY: rust-clippy-fix
+rust-clippy-fix: ## Run Clippy and auto-fix
+	@$(PRINT_STEP) "Running Clippy auto-fix on Rust code"
+	cd rust && cargo clippy --fix --allow-dirty --allow-staged 2>&1
+	cd rust && cargo fmt
+
+.PHONY: rust-check
+rust-check: ## Full Rust build check
+	@$(PRINT_STEP) "Running cargo check"
+	cd rust && cargo check
+
+.PHONY: rust-lints
+rust-lints: ## Run ltrs spell-check on Rust comments/strings
+	@$(PRINT_STEP) "Checking Rust strings with LanguageTool"
+	@find rust/src -name "*.rs" ! -name "frb_generated*" -exec grep -l '"[^"]*[а-яА-ЯёЁ]' {} + 2>/dev/null | \
+		xargs -I{} ltrs check --language ru-RU "{}" 2>/dev/null || true
+
+.PHONY: rust-bloat
+rust-bloat: ## Analyze Rust binary size breakdown
+	@$(PRINT_STEP) "Analyzing Rust binary size"
+	cd rust && cargo bloat --release -n 30
+
+.PHONY: rust-size
+rust-size: ## Show Rust binary sizes
+	@$(PRINT_STEP) "Rust binary sizes:"
+	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || echo "Run 'cargo build --release' first"
+
+.PHONY: flutter-size
+flutter-size: ## Analyze APK/AAB size
+	@$(PRINT_STEP) "Analyzing Flutter build size"
+	@TMP_LOG=$$(mktemp); \
+	if flutter build apk --analyze-size --target-platform android-arm64 > "$$TMP_LOG" 2>&1; then \
+		tail -5 "$$TMP_LOG"; \
+		rm -f "$$TMP_LOG"; \
+	else \
+		tail -20 "$$TMP_LOG"; \
+		rm -f "$$TMP_LOG"; \
+		exit 1; \
+	fi
+
+.PHONY: rust-audit
+rust-audit: ## Scan Rust dependencies for CVE vulnerabilities
+	@$(PRINT_STEP) "Scanning Rust dependencies for vulnerabilities"
+	cd rust && cargo audit
+
+.PHONY: rust-deny
+rust-deny: ## Check licenses, bans, advisories, sources via cargo-deny
+	@$(PRINT_STEP) "Checking Rust dependency policy"
+	cd rust && cargo deny check
+
+.PHONY: rust-outdated
+rust-outdated: ## Show outdated direct Rust dependencies
+	@$(PRINT_STEP) "Checking outdated Rust dependencies"
+	cd rust && cargo outdated --depth 1
+
+.PHONY: rust-upgrade-check
+rust-upgrade-check: ## Check available Rust dependency upgrades (dry run)
+	@$(PRINT_STEP) "Checking Rust upgrade candidates"
+	cd rust && cargo upgrade --dry-run
+
+.PHONY: rust-sort
+rust-sort: ## Sort Rust dependencies alphabetically
+	@$(PRINT_STEP) "Sorting Rust dependencies"
+	cd rust && cargo sort
+
+.PHONY: rust-sort-check
+rust-sort-check: ## Check Rust dependency sorting
+	@$(PRINT_STEP) "Checking Rust dependency sorting"
+	cd rust && cargo sort --check
+
+.PHONY: rust-nextest
+rust-nextest: ## Run Rust tests with cargo-nextest (faster)
+	@$(PRINT_STEP) "Running Rust tests with nextest"
+	cd rust && cargo nextest run
+
+.PHONY: rust-nextest-ci
+rust-nextest-ci: ## Run Rust tests with nextest (CI mode, no re-runs)
+	@$(PRINT_STEP) "Running Rust tests (CI mode)"
+	cd rust && cargo nextest run --failure-quick
+
 .PHONY: fix-all
-fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix ## Apply all automatic fixes and formatting
+fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict ## Run all local linting and formatting checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

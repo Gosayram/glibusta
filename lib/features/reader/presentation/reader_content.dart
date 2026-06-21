@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
+import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
+import 'highlighted_text.dart';
 
 class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
@@ -19,6 +21,8 @@ class ReaderContentBody extends StatefulWidget {
     this.initialProgress = 0.0,
     this.initialPage = 0,
     this.highlightQuery,
+    this.ttsHighlightIndex,
+    this.chapterHighlights = const <int, List<TextHighlight>>{},
   });
 
   final NormalizedBookMetadata metadata;
@@ -29,6 +33,8 @@ class ReaderContentBody extends StatefulWidget {
   final double initialProgress;
   final int initialPage;
   final String? highlightQuery;
+  final int? ttsHighlightIndex;
+  final Map<int, List<TextHighlight>> chapterHighlights;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -36,6 +42,14 @@ class ReaderContentBody extends StatefulWidget {
 
 class _ReaderContentBodyState extends State<ReaderContentBody> {
   bool _didScrollToProgress = false;
+
+  @override
+  void didUpdateWidget(covariant ReaderContentBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialProgress != oldWidget.initialProgress) {
+      _didScrollToProgress = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +62,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     final initialPage = widget.initialPage;
     final highlightQuery = widget.highlightQuery;
 
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
+    if (effectiveMode == ReaderMode.paginated || effectiveMode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
         metadata: metadata,
         loadedChapters: loadedChapters,
@@ -56,10 +71,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         onTap: onTap,
         initialPage: initialPage,
         highlightQuery: highlightQuery,
+        ttsHighlightIndex: widget.ttsHighlightIndex,
+        chapterHighlights: widget.chapterHighlights,
       );
     }
 
-    final isFocus = settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
+    final isFocus = effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
     final effectiveMargin = isFocus
         ? EdgeInsets.symmetric(
             horizontal: settings.margin * 1.5,
@@ -190,6 +207,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       ReaderTextAlign.right => TextAlign.right,
     };
 
+    final chapterHighlights = widget.chapterHighlights[chapterIndex];
+
     final header = chapter.title.isNotEmpty
         ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
@@ -208,7 +227,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+        ...chapter.blocks.asMap().entries.map(
+          (entry) => _buildBlock(
+            entry.value,
+            settings,
+            textAlign,
+            blockHighlights: chapterHighlights
+                ?.where((TextHighlight h) => h.blockIndex == entry.key)
+                .toList(),
+          ),
+        ),
       ],
     );
   }
@@ -216,10 +244,35 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   Widget _buildBlock(
     ReaderBlock block,
     ReaderSettings settings,
-    TextAlign textAlign,
-  ) {
+    TextAlign textAlign, {
+    List<TextHighlight>? blockHighlights,
+  }) {
     switch (block.type) {
       case BlockType.heading:
+        final level = block.headingLevel ?? 2;
+        final scale = switch (level) {
+          1 => 1.6,
+          2 => 1.4,
+          3 => 1.2,
+          _ => 1.1,
+        };
+        final spacing = switch (level) {
+          1 => settings.paragraphSpacing * 3,
+          2 => settings.paragraphSpacing * 2,
+          _ => settings.paragraphSpacing * 1.5,
+        };
+        return Padding(
+          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * scale,
+              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+            ),
+            block.textAlign ?? textAlign,
+          ),
+        );
+      case BlockType.subtitle:
         return Padding(
           padding: EdgeInsets.only(
             top: settings.paragraphSpacing * 2,
@@ -228,10 +281,77 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           child: _buildHighlightedText(
             block.text,
             _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 1.2,
-              fontWeight: FontWeight.bold,
+              fontSize: settings.fontSize * 1.1,
+              fontStyle: FontStyle.italic,
             ),
-            textAlign,
+            block.textAlign ?? TextAlign.center,
+          ),
+        );
+      case BlockType.epigraph:
+        return Container(
+          margin: EdgeInsets.symmetric(
+            vertical: settings.paragraphSpacing * 2,
+            horizontal: settings.margin * 0.5,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildHighlightedText(
+                block.text,
+                _getReaderStyle(settings).copyWith(
+                  fontStyle: FontStyle.italic,
+                  fontSize: settings.fontSize * 0.95,
+                ),
+                TextAlign.right,
+              ),
+            ],
+          ),
+        );
+      case BlockType.poem:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(
+              fontStyle: FontStyle.italic,
+            ),
+            TextAlign.center,
+          ),
+        );
+      case BlockType.cite:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: _buildHighlightedText(
+            block.text,
+            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
+            TextAlign.left,
+          ),
+        );
+      case BlockType.textAuthor:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing,
+            left: settings.margin,
+          ),
+          child: Text(
+            '— ${block.text}',
+            style: _getReaderStyle(settings).copyWith(
+              fontSize: settings.fontSize * 0.9,
+              fontStyle: FontStyle.italic,
+              color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.right,
           ),
         );
       case BlockType.quote:
@@ -248,9 +368,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           ),
           child: _buildHighlightedText(
             block.text,
-            _getReaderStyle(settings).copyWith(
-              fontStyle: FontStyle.italic,
-            ),
+            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
             textAlign,
           ),
         );
@@ -261,28 +379,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          final uri = Uri.tryParse(block.imageUrl!);
-          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
-          if (!isLocal) {
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-              child: Center(
-                child: Icon(Icons.broken_image, size: 64, color: _getReaderStyle(settings).color),
-              ),
-            );
-          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(block.imageUrl!),
-                  fit: BoxFit.contain,
-                  errorBuilder: (ctx, e, s) => Icon(
-                    Icons.broken_image,
-                    size: 64,
-                    color: _getReaderStyle(settings).color,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                  child: _buildImageWidget(
+                    block.imageUrl!,
+                    _getReaderStyle(settings).color,
                   ),
                 ),
               ),
@@ -301,20 +407,33 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             textAlign,
           ),
         );
+      case BlockType.table:
+        return _buildTable(block, settings);
+      case BlockType.list:
+        return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = settings.paragraphFirstLineIndent > 0
-            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-            : EdgeInsets.zero;
+        final indent = (block.textIndent != null && block.textIndent! > 0)
+            ? EdgeInsets.only(left: block.textIndent!)
+            : (settings.paragraphFirstLineIndent > 0
+                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                  : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(
-              block.text,
-              _getReaderStyle(settings),
-              textAlign,
-              richSpans: block.richSpans,
-            ),
+            child: blockHighlights != null && blockHighlights.isNotEmpty
+                ? HighlightedText(
+                    text: block.text,
+                    style: _getReaderStyle(settings),
+                    textAlign: block.textAlign ?? textAlign,
+                    highlights: blockHighlights,
+                  )
+                : _buildHighlightedText(
+                    block.text,
+                    _getReaderStyle(settings),
+                    block.textAlign ?? textAlign,
+                    richSpans: block.richSpans,
+                  ),
           ),
         );
     }
@@ -345,7 +464,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
     final linkColor = Theme.of(context).colorScheme.primary;
-    return richSpans.map((span) {
+    final spans = <InlineSpan>[];
+    for (final span in richSpans) {
+      if (span.lineBreak) {
+        spans.add(const TextSpan(text: '\n'));
+        continue;
+      }
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
@@ -360,8 +484,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           decoration: TextDecoration.underline,
         );
       }
-      return TextSpan(text: span.text, style: spanStyle);
-    }).toList();
+      spans.add(TextSpan(text: span.text, style: spanStyle));
+    }
+    return spans;
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
@@ -427,6 +552,121 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       letterSpacing: settings.letterSpacing,
     );
   }
+
+  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        final bytes = base64Decode(data.last);
+        return InteractiveViewer(
+          maxScale: 4.0,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, e, s) => Icon(
+              Icons.broken_image,
+              size: 64,
+              color: errorColor,
+            ),
+          ),
+        );
+      }
+    }
+
+    if (isFileUri || isPlainPath) {
+      final filePath = isFileUri ? uri.path : imageUrl;
+      return InteractiveViewer(
+        maxScale: 4.0,
+        child: Image.file(
+          File(filePath),
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => Icon(
+            Icons.broken_image,
+            size: 64,
+            color: errorColor,
+          ),
+        ),
+      );
+    }
+
+    return Icon(Icons.broken_image, size: 64, color: errorColor);
+  }
+
+  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
+    final rows = block.tableRows;
+    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+    final baseStyle = _getReaderStyle(settings);
+    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
+    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const IntrinsicColumnWidth(),
+          border: TableBorder.all(
+            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
+          ),
+          children: rows.asMap().entries.map((entry) {
+            final isHeader = entry.key == 0;
+            return TableRow(
+              children: entry.value.map((cell) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
+    final items = block.listItems;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final isOrdered = block.ordered ?? false;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
+          return Padding(
+            padding: const EdgeInsets.only(left: 24, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$bullet ',
+                  style: _getReaderStyle(settings),
+                ),
+                Expanded(
+                  child: _buildHighlightedText(
+                    item.text,
+                    _getReaderStyle(settings),
+                    textAlign,
+                    richSpans: item.richSpans,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _PaginatedContentBody extends StatefulWidget {
@@ -437,6 +677,8 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.onTap,
     required this.initialPage,
     this.highlightQuery,
+    this.ttsHighlightIndex,
+    this.chapterHighlights = const <int, List<TextHighlight>>{},
   });
 
   final NormalizedBookMetadata metadata;
@@ -445,6 +687,8 @@ class _PaginatedContentBody extends StatefulWidget {
   final GestureTapUpCallback onTap;
   final int initialPage;
   final String? highlightQuery;
+  final int? ttsHighlightIndex;
+  final Map<int, List<TextHighlight>> chapterHighlights;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -504,6 +748,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       ReaderTextAlign.center => TextAlign.center,
       ReaderTextAlign.right => TextAlign.right,
     };
+    final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
     if (chapter == null) {
       return _buildLoadingPlaceholder(settings, chapterIndex);
@@ -529,7 +774,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           header,
-          ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+          ...chapter.blocks.asMap().entries.map(
+            (entry) => _buildBlock(
+              entry.value,
+              textAlign,
+              blockHighlights: chapterHighlights
+                  ?.where((TextHighlight h) => h.blockIndex == entry.key)
+                  .toList(),
+            ),
+          ),
         ],
       );
     }
@@ -541,7 +794,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         ListBody(
           children: [
             for (int i = 0; i < chapter.blocks.length; i++)
-              _buildBlock(chapter.blocks[i], textAlign),
+              _buildBlock(
+                chapter.blocks[i],
+                textAlign,
+                blockHighlights: chapterHighlights
+                    ?.where((TextHighlight h) => h.blockIndex == i)
+                    .toList(),
+              ),
           ],
         ),
       ],
@@ -594,12 +853,40 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     );
   }
 
-  Widget _buildBlock(ReaderBlock block, TextAlign textAlign) {
+  Widget _buildBlock(
+    ReaderBlock block,
+    TextAlign textAlign, {
+    List<TextHighlight>? blockHighlights,
+  }) {
     final settings = widget.settings;
     final style = _getReaderStyle(settings);
 
     switch (block.type) {
       case BlockType.heading:
+        final level = block.headingLevel ?? 2;
+        final scale = switch (level) {
+          1 => 1.6,
+          2 => 1.4,
+          3 => 1.2,
+          _ => 1.1,
+        };
+        final spacing = switch (level) {
+          1 => settings.paragraphSpacing * 3,
+          2 => settings.paragraphSpacing * 2,
+          _ => settings.paragraphSpacing * 1.5,
+        };
+        return Padding(
+          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(
+              fontSize: settings.fontSize * scale,
+              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+            ),
+            block.textAlign ?? textAlign,
+          ),
+        );
+      case BlockType.subtitle:
         return Padding(
           padding: EdgeInsets.only(
             top: settings.paragraphSpacing * 2,
@@ -608,10 +895,75 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: _buildHighlightedText(
             block.text,
             style.copyWith(
-              fontSize: settings.fontSize * 1.2,
-              fontWeight: FontWeight.bold,
+              fontSize: settings.fontSize * 1.1,
+              fontStyle: FontStyle.italic,
             ),
-            textAlign,
+            block.textAlign ?? TextAlign.center,
+          ),
+        );
+      case BlockType.epigraph:
+        return Container(
+          margin: EdgeInsets.symmetric(
+            vertical: settings.paragraphSpacing * 2,
+            horizontal: settings.margin * 0.5,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildHighlightedText(
+                block.text,
+                style.copyWith(
+                  fontStyle: FontStyle.italic,
+                  fontSize: settings.fontSize * 0.95,
+                ),
+                TextAlign.right,
+              ),
+            ],
+          ),
+        );
+      case BlockType.poem:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(fontStyle: FontStyle.italic),
+            TextAlign.center,
+          ),
+        );
+      case BlockType.cite:
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: (style.color ?? Colors.black).withValues(alpha: 0.3),
+                width: 3,
+              ),
+            ),
+          ),
+          child: _buildHighlightedText(
+            block.text,
+            style.copyWith(fontStyle: FontStyle.italic),
+            TextAlign.left,
+          ),
+        );
+      case BlockType.textAuthor:
+        return Padding(
+          padding: EdgeInsets.only(
+            top: settings.paragraphSpacing,
+            left: settings.margin,
+          ),
+          child: Text(
+            '— ${block.text}',
+            style: style.copyWith(
+              fontSize: settings.fontSize * 0.9,
+              fontStyle: FontStyle.italic,
+              color: (style.color ?? Colors.black).withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.right,
           ),
         );
       case BlockType.quote:
@@ -639,27 +991,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         );
       case BlockType.image:
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          final uri = Uri.tryParse(block.imageUrl!);
-          final isLocal = uri == null || !uri.isAbsolute || uri.scheme == 'file';
-          if (!isLocal) {
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-              child: Center(child: Icon(Icons.broken_image, size: 64, color: style.color)),
-            );
-          }
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
             child: Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(block.imageUrl!),
-                  fit: BoxFit.contain,
-                  errorBuilder: (ctx, e, s) => Icon(
-                    Icons.broken_image,
-                    size: 64,
-                    color: style.color,
-                  ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                  child: _buildImageWidget(block.imageUrl!, style.color),
                 ),
               ),
             ),
@@ -671,21 +1010,37 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
           child: _buildHighlightedText(
             block.text,
-            style.copyWith(
-              fontSize: settings.fontSize * 0.85,
-            ),
+            style.copyWith(fontSize: settings.fontSize * 0.85),
             textAlign,
           ),
         );
+      case BlockType.table:
+        return _buildTable(block, settings);
+      case BlockType.list:
+        return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = settings.paragraphFirstLineIndent > 0
-            ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-            : EdgeInsets.zero;
+        final indent = (block.textIndent != null && block.textIndent! > 0)
+            ? EdgeInsets.only(left: block.textIndent!)
+            : (settings.paragraphFirstLineIndent > 0
+                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                  : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, style, textAlign, richSpans: block.richSpans),
+            child: blockHighlights != null && blockHighlights.isNotEmpty
+                ? HighlightedText(
+                    text: block.text,
+                    style: style,
+                    textAlign: block.textAlign ?? textAlign,
+                    highlights: blockHighlights,
+                  )
+                : _buildHighlightedText(
+                    block.text,
+                    style,
+                    block.textAlign ?? textAlign,
+                    richSpans: block.richSpans,
+                  ),
           ),
         );
     }
@@ -716,7 +1071,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
     final linkColor = Theme.of(context).colorScheme.primary;
-    return richSpans.map((span) {
+    final spans = <InlineSpan>[];
+    for (final span in richSpans) {
+      if (span.lineBreak) {
+        spans.add(const TextSpan(text: '\n'));
+        continue;
+      }
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
@@ -731,8 +1091,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           decoration: TextDecoration.underline,
         );
       }
-      return TextSpan(text: span.text, style: spanStyle);
-    }).toList();
+      spans.add(TextSpan(text: span.text, style: spanStyle));
+    }
+    return spans;
   }
 
   List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
@@ -943,5 +1304,117 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ),
         );
     }
+  }
+
+  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        final bytes = base64Decode(data.last);
+        return InteractiveViewer(
+          maxScale: 4.0,
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, e, s) => Icon(
+              Icons.broken_image,
+              size: 64,
+              color: errorColor,
+            ),
+          ),
+        );
+      }
+    }
+
+    if (isFileUri || isPlainPath) {
+      final filePath = isFileUri ? uri.path : imageUrl;
+      return InteractiveViewer(
+        maxScale: 4.0,
+        child: Image.file(
+          File(filePath),
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => Icon(
+            Icons.broken_image,
+            size: 64,
+            color: errorColor,
+          ),
+        ),
+      );
+    }
+
+    return Icon(Icons.broken_image, size: 64, color: errorColor);
+  }
+
+  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
+    final rows = block.tableRows;
+    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+    final baseStyle = _getReaderStyle(settings);
+    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
+    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          defaultColumnWidth: const IntrinsicColumnWidth(),
+          border: TableBorder.all(
+            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
+          ),
+          children: rows.asMap().entries.map((entry) {
+            final isHeader = entry.key == 0;
+            return TableRow(
+              children: entry.value.map((cell) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
+    final items = block.listItems;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final isOrdered = block.ordered ?? false;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
+          return Padding(
+            padding: const EdgeInsets.only(left: 24, bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$bullet ', style: _getReaderStyle(settings)),
+                Expanded(
+                  child: _buildHighlightedText(
+                    item.text,
+                    _getReaderStyle(settings),
+                    textAlign,
+                    richSpans: item.richSpans,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 }

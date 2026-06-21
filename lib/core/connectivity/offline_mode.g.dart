@@ -186,7 +186,7 @@ final class CurrentNetworkProvider
         argument: null,
         retry: null,
         name: r'currentNetworkProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -206,4 +206,4 @@ final class CurrentNetworkProvider
   }
 }
 
-String _$currentNetworkHash() => r'9df9deeedbd4348e93e7db12259878f93ec70143';
+String _$currentNetworkHash() => r'a26be1fa1f11acf53deb2404ace2b8bfd2c0b322';
