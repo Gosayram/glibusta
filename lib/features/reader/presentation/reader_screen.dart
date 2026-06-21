@@ -5,11 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
+import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
 import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
@@ -404,7 +406,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   totalChapters: readerState.chapterCount,
                   scrollProgress: readerState.scrollProgress,
                   estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                  chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
                   onJumpToProgress: _ctrl.jumpToProgress,
+                  onModeChanged: (mode) {
+                    ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                  },
                 ),
               ),
             ),
@@ -506,6 +512,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             initialProgress: readerState.scrollProgress,
             initialPage: readerState.currentPosition.chapterIndex,
             highlightQuery: readerState.highlightedQuery,
+            chapterHighlights: _buildChapterHighlights(),
           ),
         ),
       ),
@@ -694,7 +701,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   bool _isDistractionFree(ReaderSettings settings) {
-    return settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
+    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
+    return effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
   }
 
   Widget _buildWarmthOverlay(ReaderSettings settings) {
@@ -718,5 +726,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ),
       ),
     );
+  }
+
+  Map<int, List<TextHighlight>> _buildChapterHighlights() {
+    final highlights = ref.watch(bookHighlightsProvider(widget.bookId)).value;
+    final result = <int, List<TextHighlight>>{};
+    if (highlights != null) {
+      for (final h in highlights) {
+        result.putIfAbsent(h.chapterIndex, () => []).add(h);
+      }
+    }
+    return result;
   }
 }

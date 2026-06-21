@@ -69,9 +69,7 @@ class EpubBookAdapter {
         text: items.join('\n'),
         type: BlockType.list,
         ordered: ordered,
-        listItems: items
-            .map((item) => ReaderBlock(index: 0, text: item))
-            .toList(),
+        listItems: items.map((item) => ReaderBlock(index: 0, text: item)).toList(),
       ),
       epub.TableBlock(:final rows) => ReaderBlock(
         index: index,
@@ -110,6 +108,4 @@ class EpubBookAdapter {
         )
         .toList();
   }
-
-
 }

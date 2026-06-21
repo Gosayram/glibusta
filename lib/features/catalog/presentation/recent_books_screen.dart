@@ -114,5 +114,4 @@ class RecentBooksScreen extends ConsumerWidget {
       ),
     );
   }
-
 }

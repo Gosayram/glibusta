@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
+import '../features/highlights/presentation/highlights_notes_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 
 part 'routes.g.dart';
@@ -45,5 +46,17 @@ class StatsRoute extends GoRouteData with $StatsRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) {
     return const ReadingStatsScreen();
+  }
+}
+
+@TypedGoRoute<HighlightsRoute>(path: '/highlights/:bookId', name: 'highlights')
+class HighlightsRoute extends GoRouteData with $HighlightsRoute {
+  const HighlightsRoute({required this.bookId});
+
+  final String bookId;
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return HighlightsNotesScreen(bookId: bookId);
   }
 }

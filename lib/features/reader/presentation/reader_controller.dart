@@ -321,6 +321,17 @@ class ReaderController {
     return !_disposed && loadGeneration == _loadGeneration;
   }
 
+  /// Resolves ReaderMode.auto to an actual mode based on device type.
+  /// Auto defaults to paginated on phones, continuous for very long TXT.
+  ReaderMode _resolveAutoMode(ReaderMode mode) {
+    if (mode != ReaderMode.auto) return mode;
+    return ReaderMode.paginated;
+  }
+
+  ReaderMode get effectiveMode => _resolveAutoMode(
+    _ref.read(readerSettingsProvider).mode,
+  );
+
   static ReaderErrorKind _classifyError(Object error) => switch (error) {
     BookMissingFailure() => ReaderErrorKind.bookMissing,
     UnsupportedFormatFailure() => ReaderErrorKind.unsupportedFormat,
@@ -510,8 +521,8 @@ class ReaderController {
   }
 
   void _restoreSavedPosition(ReaderPosition position) {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
       _updateState(_state.copyWith(currentPosition: position));
       return;
     }
@@ -565,9 +576,9 @@ class ReaderController {
   // ── Navigation ────────────────────────────────────────
 
   void scrollToNext() {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
-      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+      final step = mode == ReaderMode.twoPage ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
         _state.chapterCount - 1,
@@ -596,9 +607,9 @@ class ReaderController {
   }
 
   void scrollToPrevious() {
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
-      final step = settings.mode == ReaderMode.twoPage ? 2 : 1;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+      final step = mode == ReaderMode.twoPage ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
         _state.chapterCount - 1,
@@ -629,8 +640,8 @@ class ReaderController {
     final total = _state.chapterCount;
     if (total == 0) return;
     final clamped = position.clamp(chapterCount: total);
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
       _updateState(_state.copyWith(currentPosition: clamped));
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
@@ -658,8 +669,8 @@ class ReaderController {
     );
     unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
-    final settings = _ref.read(readerSettingsProvider);
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) return;
+    final mode = effectiveMode;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
@@ -719,7 +730,7 @@ class ReaderController {
         break;
       case DoubleTapAction.toggleFullscreen:
         final notifier = _ref.read(readerSettingsProvider.notifier);
-        final currentMode = _ref.read(readerSettingsProvider).mode;
+        final currentMode = effectiveMode;
         notifier.updateMode(
           currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
         );

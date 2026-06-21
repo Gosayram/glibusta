@@ -367,6 +367,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     ReaderSettingsNotifier notifier,
   ) {
     const modeLabels = {
+      ReaderMode.auto: 'Авто',
       ReaderMode.continuous: 'Прокрутка',
       ReaderMode.paginated: 'Страницы',
       ReaderMode.twoPage: '2 колонки',

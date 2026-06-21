@@ -112,5 +112,4 @@ class GenreBooksScreen extends ConsumerWidget {
       ),
     );
   }
-
 }

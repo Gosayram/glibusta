@@ -278,7 +278,6 @@ class _AuthorHeader extends StatelessWidget {
       ),
     );
   }
-
 }
 
 // ── Series Header ────────────────────────────────────────────────────────────

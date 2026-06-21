@@ -6,7 +6,7 @@ part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { paginated, continuous, twoPage, focus, fullscreen }
+enum ReaderMode { auto, paginated, continuous, twoPage, focus, fullscreen }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -83,7 +83,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(BottomBarContent.percent) BottomBarContent bottomBarContent,
     @Default(0.0) double paragraphFirstLineIndent,
     @Default(true) bool hyphenation,
-    @Default(TapZoneLayout.third) TapZoneLayout tapZoneLayout,
+    @Default(TapZoneLayout.quarter) TapZoneLayout tapZoneLayout,
     @Default(PageTurnAnimation.slide) PageTurnAnimation pageTurnAnimation,
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
@@ -103,6 +103,8 @@ abstract class ReaderPosition with _$ReaderPosition {
     required int paragraphIndex,
     @Default(0.0) double localOffset,
     @Default(0.0) double progressPercent,
+    @Default('') String chapterId,
+    @Default(0) int textOffset,
     required DateTime updatedAt,
   }) = _ReaderPosition;
   const ReaderPosition._();
@@ -132,6 +134,8 @@ abstract class ReaderPosition with _$ReaderPosition {
       paragraphIndex: paragraphIndex < 0 ? 0 : paragraphIndex,
       localOffset: localOffset.clamp(0.0, 100.0),
       progressPercent: progressPercent.clamp(0.0, 1.0),
+      chapterId: chapterId,
+      textOffset: textOffset,
       updatedAt: updatedAt,
     );
   }

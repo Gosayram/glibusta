@@ -83,6 +83,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               label: 'Цитата',
               onTap: () => unawaited(_addQuote(context)),
             ),
+            _ToolbarButton(
+              icon: Icons.highlight,
+              label: 'Выделить',
+              onTap: () => unawaited(_addHighlight(context)),
+            ),
           ],
         ),
       ),
@@ -252,6 +257,73 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       if (context.mounted) {
         unawaited(SmartDialog.showToast('Цитата сохранена'));
       }
+    }
+    widget.onDismiss();
+  }
+
+  Future<void> _addHighlight(BuildContext context) async {
+    if (_selectedText == null || _selectedText!.isEmpty) return;
+
+    final colors = <String, Color>{
+      'yellow': const Color(0xFFFFEB3B),
+      'green': const Color(0xFF4CAF50),
+      'blue': const Color(0xFF2196F3),
+      'red': const Color(0xFFF44336),
+      'purple': const Color(0xFF9C27B0),
+      'orange': const Color(0xFFFF9800),
+    };
+
+    final selectedColor = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Цвет подсветки'),
+        children: colors.entries
+            .map(
+              (e) => SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(e.key),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: e.value,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(e.key[0].toUpperCase() + e.key.substring(1)),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+
+    if (selectedColor == null || !context.mounted) return;
+
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.textHighlights)
+        .insert(
+          TextHighlightsCompanion.insert(
+            id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+            bookId: widget.bookId,
+            chapterId: widget.chapterIndex.toString(),
+            chapterIndex: widget.chapterIndex,
+            blockIndex: widget.paragraphIndex,
+            startOffset: 0,
+            endOffset: _selectedText!.length,
+            selectedText: _selectedText!,
+            color: Value(selectedColor),
+          ),
+        );
+    if (context.mounted) {
+      unawaited(SmartDialog.showToast('Текст выделен'));
     }
     widget.onDismiss();
   }

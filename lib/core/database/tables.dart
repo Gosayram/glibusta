@@ -100,6 +100,8 @@ class ReadingProgress extends Table {
   IntColumn get paragraphIndex => integer().withDefault(const Constant(0))();
   RealColumn get localOffset => real().withDefault(const Constant(0.0))();
   RealColumn get progressPercent => real().withDefault(const Constant(0.0))();
+  TextColumn get chapterId => text().withDefault(const Constant(''))();
+  IntColumn get textOffset => integer().withDefault(const Constant(0))();
   IntColumn get totalPages => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastRead => dateTime().clientDefault(DateTime.now)();
   DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
@@ -230,4 +232,25 @@ class ReadingTime extends Table {
 
   @override
   Set<Column<Object>> get primaryKey => {bookId, date};
+}
+
+@TableIndex(name: 'idx_text_highlights_bookId', columns: {#bookId})
+@TableIndex(name: 'idx_text_highlights_chapterId', columns: {#chapterId})
+class TextHighlights extends Table {
+  TextColumn get id => text()();
+  TextColumn get bookId => text()();
+  TextColumn get chapterId => text()();
+  IntColumn get chapterIndex => integer()();
+  IntColumn get blockIndex => integer()();
+  IntColumn get startOffset => integer()();
+  IntColumn get endOffset => integer()();
+  TextColumn get selectedText => text()();
+  TextColumn get color => text().withDefault(const Constant('yellow'))();
+  TextColumn get noteText => text().nullable()();
+  BoolColumn get isOrphaned => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }

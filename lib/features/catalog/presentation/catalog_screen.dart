@@ -194,15 +194,15 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  l10n.genresTitle,
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                TextButton(
-                  onPressed: () => context.push('/genres'),
-                  child: Text(l10n.allGenres),
-                ),
+            children: [
+              Text(
+                l10n.genresTitle,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              TextButton(
+                onPressed: () => context.push('/genres'),
+                child: Text(l10n.allGenres),
+              ),
             ],
           ),
         ),

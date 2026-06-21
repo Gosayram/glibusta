@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
+import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
+import 'highlighted_text.dart';
 
 class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
@@ -21,6 +22,7 @@ class ReaderContentBody extends StatefulWidget {
     this.initialPage = 0,
     this.highlightQuery,
     this.ttsHighlightIndex,
+    this.chapterHighlights = const <int, List<TextHighlight>>{},
   });
 
   final NormalizedBookMetadata metadata;
@@ -32,6 +34,7 @@ class ReaderContentBody extends StatefulWidget {
   final int initialPage;
   final String? highlightQuery;
   final int? ttsHighlightIndex;
+  final Map<int, List<TextHighlight>> chapterHighlights;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -59,7 +62,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     final initialPage = widget.initialPage;
     final highlightQuery = widget.highlightQuery;
 
-    if (settings.mode == ReaderMode.paginated || settings.mode == ReaderMode.twoPage) {
+    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
+    if (effectiveMode == ReaderMode.paginated || effectiveMode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
         metadata: metadata,
         loadedChapters: loadedChapters,
@@ -68,10 +72,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         initialPage: initialPage,
         highlightQuery: highlightQuery,
         ttsHighlightIndex: widget.ttsHighlightIndex,
+        chapterHighlights: widget.chapterHighlights,
       );
     }
 
-    final isFocus = settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
+    final isFocus = effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
     final effectiveMargin = isFocus
         ? EdgeInsets.symmetric(
             horizontal: settings.margin * 1.5,
@@ -202,6 +207,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       ReaderTextAlign.right => TextAlign.right,
     };
 
+    final chapterHighlights = widget.chapterHighlights[chapterIndex];
+
     final header = chapter.title.isNotEmpty
         ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
@@ -220,7 +227,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        ...chapter.blocks.map((block) => _buildBlock(block, settings, textAlign)),
+        ...chapter.blocks.asMap().entries.map(
+          (entry) => _buildBlock(
+            entry.value,
+            settings,
+            textAlign,
+            blockHighlights: chapterHighlights
+                ?.where((TextHighlight h) => h.blockIndex == entry.key)
+                .toList(),
+          ),
+        ),
       ],
     );
   }
@@ -228,8 +244,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   Widget _buildBlock(
     ReaderBlock block,
     ReaderSettings settings,
-    TextAlign textAlign,
-  ) {
+    TextAlign textAlign, {
+    List<TextHighlight>? blockHighlights,
+  }) {
     switch (block.type) {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
@@ -398,18 +415,25 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         final indent = (block.textIndent != null && block.textIndent! > 0)
             ? EdgeInsets.only(left: block.textIndent!)
             : (settings.paragraphFirstLineIndent > 0
-                ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-                : EdgeInsets.zero);
+                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                  : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(
-              block.text,
-              _getReaderStyle(settings),
-              block.textAlign ?? textAlign,
-              richSpans: block.richSpans,
-            ),
+            child: blockHighlights != null && blockHighlights.isNotEmpty
+                ? HighlightedText(
+                    text: block.text,
+                    style: _getReaderStyle(settings),
+                    textAlign: block.textAlign ?? textAlign,
+                    highlights: blockHighlights,
+                  )
+                : _buildHighlightedText(
+                    block.text,
+                    _getReaderStyle(settings),
+                    block.textAlign ?? textAlign,
+                    richSpans: block.richSpans,
+                  ),
           ),
         );
     }
@@ -588,7 +612,6 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           defaultColumnWidth: const IntrinsicColumnWidth(),
           border: TableBorder.all(
             color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
-            width: 1,
           ),
           children: rows.asMap().entries.map((entry) {
             final isHeader = entry.key == 0;
@@ -655,6 +678,7 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.initialPage,
     this.highlightQuery,
     this.ttsHighlightIndex,
+    this.chapterHighlights = const <int, List<TextHighlight>>{},
   });
 
   final NormalizedBookMetadata metadata;
@@ -664,6 +688,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final int initialPage;
   final String? highlightQuery;
   final int? ttsHighlightIndex;
+  final Map<int, List<TextHighlight>> chapterHighlights;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -723,6 +748,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       ReaderTextAlign.center => TextAlign.center,
       ReaderTextAlign.right => TextAlign.right,
     };
+    final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
     if (chapter == null) {
       return _buildLoadingPlaceholder(settings, chapterIndex);
@@ -748,7 +774,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           header,
-          ...chapter.blocks.map((block) => _buildBlock(block, textAlign)),
+          ...chapter.blocks.asMap().entries.map(
+            (entry) => _buildBlock(
+              entry.value,
+              textAlign,
+              blockHighlights: chapterHighlights
+                  ?.where((TextHighlight h) => h.blockIndex == entry.key)
+                  .toList(),
+            ),
+          ),
         ],
       );
     }
@@ -760,7 +794,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         ListBody(
           children: [
             for (int i = 0; i < chapter.blocks.length; i++)
-              _buildBlock(chapter.blocks[i], textAlign),
+              _buildBlock(
+                chapter.blocks[i],
+                textAlign,
+                blockHighlights: chapterHighlights
+                    ?.where((TextHighlight h) => h.blockIndex == i)
+                    .toList(),
+              ),
           ],
         ),
       ],
@@ -813,7 +853,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     );
   }
 
-  Widget _buildBlock(ReaderBlock block, TextAlign textAlign) {
+  Widget _buildBlock(
+    ReaderBlock block,
+    TextAlign textAlign, {
+    List<TextHighlight>? blockHighlights,
+  }) {
     final settings = widget.settings;
     final style = _getReaderStyle(settings);
 
@@ -978,13 +1022,25 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final indent = (block.textIndent != null && block.textIndent! > 0)
             ? EdgeInsets.only(left: block.textIndent!)
             : (settings.paragraphFirstLineIndent > 0
-                ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-                : EdgeInsets.zero);
+                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
+                  : EdgeInsets.zero);
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
           child: Padding(
             padding: indent,
-            child: _buildHighlightedText(block.text, style, block.textAlign ?? textAlign, richSpans: block.richSpans),
+            child: blockHighlights != null && blockHighlights.isNotEmpty
+                ? HighlightedText(
+                    text: block.text,
+                    style: style,
+                    textAlign: block.textAlign ?? textAlign,
+                    highlights: blockHighlights,
+                  )
+                : _buildHighlightedText(
+                    block.text,
+                    style,
+                    block.textAlign ?? textAlign,
+                    richSpans: block.richSpans,
+                  ),
           ),
         );
     }
@@ -1309,7 +1365,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           defaultColumnWidth: const IntrinsicColumnWidth(),
           border: TableBorder.all(
             color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
-            width: 1,
           ),
           children: rows.asMap().entries.map((entry) {
             final isHeader = entry.key == 0;

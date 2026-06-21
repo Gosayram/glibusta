@@ -35,6 +35,8 @@ class ReaderProgressHelper {
         paragraphIndex: row.paragraphIndex,
         localOffset: row.localOffset,
         progressPercent: progressPercent.clamp(0.0, 1.0),
+        chapterId: row.chapterId,
+        textOffset: row.textOffset,
         updatedAt: row.updatedAt,
       ).clamp(chapterCount: chapterCount);
     } on Object catch (e) {
@@ -61,6 +63,8 @@ class ReaderProgressHelper {
               paragraphIndex: Value(pos.paragraphIndex),
               localOffset: Value(pos.localOffset),
               progressPercent: Value(pos.progressPercent),
+              chapterId: Value(pos.chapterId),
+              textOffset: Value(pos.textOffset),
               totalPages: Value(totalBlocks),
               lastRead: Value(pos.updatedAt),
               updatedAt: Value(pos.updatedAt),

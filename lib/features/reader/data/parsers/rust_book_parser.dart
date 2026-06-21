@@ -135,9 +135,7 @@ class RustBookParser implements BookParser {
                             ),
                           )
                           .toList(),
-                      tableRows: rb.tableRows
-                          ?.map((row) => row.cast<String>())
-                          .toList(),
+                      tableRows: rb.tableRows?.map((row) => row.cast<String>()).toList(),
                       imageAlt: rb.imageAlt,
                       textIndent: rb.textIndent,
                       textAlign: rb.textAlign != null

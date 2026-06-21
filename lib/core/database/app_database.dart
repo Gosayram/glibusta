@@ -14,6 +14,7 @@ import 'daos/bookmark_dao.dart';
 import 'daos/collection_dao.dart';
 import 'daos/download_dao.dart';
 import 'daos/genre_dao.dart';
+import 'daos/highlight_dao.dart';
 import 'daos/per_book_settings_dao.dart';
 import 'daos/reading_time_dao.dart';
 import 'daos/series_dao.dart';
@@ -42,6 +43,7 @@ part 'app_database.g.dart';
     Tags,
     BookTags,
     ReadingTime,
+    TextHighlights,
   ],
   daos: [
     BookDao,
@@ -54,6 +56,7 @@ part 'app_database.g.dart';
     ReadingTimeDao,
     AuthorDao,
     SeriesDao,
+    HighlightDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -62,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -121,6 +124,13 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 12) {
             await m.createTable(readingTime);
+          }
+          if (from < 13) {
+            await m.createTable(textHighlights);
+          }
+          if (from < 14) {
+            await m.addColumn(readingProgress, readingProgress.chapterId);
+            await m.addColumn(readingProgress, readingProgress.textOffset);
           }
         });
       } finally {

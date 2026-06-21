@@ -172,8 +172,7 @@ class ReaderBlock {
     if (ordered != null) 'ordered': ordered,
     if (listItems != null && listItems!.isNotEmpty)
       'listItems': listItems!.map((b) => b.toJson()).toList(),
-    if (tableRows != null && tableRows!.isNotEmpty)
-      'tableRows': tableRows,
+    if (tableRows != null && tableRows!.isNotEmpty) 'tableRows': tableRows,
     if (imageAlt != null) 'imageAlt': imageAlt,
     if (textIndent != null) 'textIndent': textIndent,
     if (textAlign != null) 'textAlign': textAlign!.name,

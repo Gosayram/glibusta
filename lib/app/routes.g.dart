@@ -11,6 +11,7 @@ List<RouteBase> get $appRoutes => [
   $collectionsRoute,
   $annotationsRoute,
   $statsRoute,
+  $highlightsRoute,
 ];
 
 RouteBase get $catalogRoute => GoRouteData.$route(
@@ -99,6 +100,34 @@ mixin $StatsRoute on GoRouteData {
 
   @override
   String get location => GoRouteData.$location('/stats');
+
+  @override
+  void go(BuildContext context) => context.go(location);
+
+  @override
+  Future<T?> push<T>(BuildContext context) => context.push<T>(location);
+
+  @override
+  void pushReplacement(BuildContext context) => context.pushReplacement(location);
+
+  @override
+  void replace(BuildContext context) => context.replace(location);
+}
+
+RouteBase get $highlightsRoute => GoRouteData.$route(
+  path: '/highlights/:bookId',
+  name: 'highlights',
+  factory: $HighlightsRoute._fromState,
+);
+
+mixin $HighlightsRoute on GoRouteData {
+  static HighlightsRoute _fromState(GoRouterState state) =>
+      HighlightsRoute(bookId: state.pathParameters['bookId']!);
+
+  HighlightsRoute get _self => this as HighlightsRoute;
+
+  @override
+  String get location => GoRouteData.$location('/highlights/${Uri.encodeComponent(_self.bookId)}');
 
   @override
   void go(BuildContext context) => context.go(location);

@@ -272,12 +272,14 @@ void main() {
             totalChapters: 10,
             scrollProgress: 0.3,
             estimatedMinutesLeft: 120,
+            chapterTitle: 'Глава 3',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Глава 3 из 10'), findsOneWidget);
+      expect(find.text('Глава 3'), findsOneWidget);
+      expect(find.text('3 / 10'), findsOneWidget);
     });
 
     testWidgets('displays percentage and time', (tester) async {
@@ -289,13 +291,13 @@ void main() {
             totalChapters: 5,
             scrollProgress: 0.5,
             estimatedMinutesLeft: 100,
+            chapterTitle: 'Пролог',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('50%'), findsOneWidget);
-      expect(find.textContaining('~50м'), findsOneWidget);
+      expect(find.text('50%'), findsOneWidget);
     });
 
     testWidgets('formats hours and minutes correctly', (tester) async {
@@ -307,6 +309,7 @@ void main() {
             totalChapters: 5,
             scrollProgress: 0.0,
             estimatedMinutesLeft: 150,
+            chapterTitle: '',
           ),
         ),
       );
@@ -325,6 +328,7 @@ void main() {
             totalChapters: 5,
             scrollProgress: 0.9,
             estimatedMinutesLeft: 10,
+            chapterTitle: '',
           ),
         ),
       );

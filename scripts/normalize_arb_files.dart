@@ -1,5 +1,4 @@
 #!/usr/bin/env dart
-
 // ignore_for_file: avoid_print
 
 import 'dart:io';
@@ -11,12 +10,9 @@ void main(List<String> args) {
     exit(1);
   }
 
-  final arbFiles = l10nDir
-      .listSync()
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.arb'))
-      .toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  final arbFiles =
+      l10nDir.listSync().whereType<File>().where((f) => f.path.endsWith('.arb')).toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
 
   if (arbFiles.isEmpty) {
     print('No ARB files found');
