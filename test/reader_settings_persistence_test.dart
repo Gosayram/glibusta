@@ -35,7 +35,6 @@ void main() {
           fontSize: 22.0,
           lineHeight: 1.7,
           margin: 24.0,
-          paragraphSpacing: 12.0,
           letterSpacing: 0.5,
           autoThemeMode: AutoThemeMode.sunset,
           customDayHour: 8,

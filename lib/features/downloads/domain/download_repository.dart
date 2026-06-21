@@ -17,4 +17,11 @@ abstract class DownloadRepository {
   Future<void> updateStatus(String taskId, DownloadStatus status);
   Future<void> cancelDownload(String taskId);
   Future<void> removeDownload(String taskId);
+
+  Future<void> registerInLibrary({
+    required String bookId,
+    required String bookTitle,
+    required String format,
+    required String filePath,
+  });
 }

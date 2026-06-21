@@ -11,6 +11,29 @@ ignore = [
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
+# Transitive duplicates from flutter_rust_bridge_codegen (build-time only, never in release binary)
+skip = [
+    "bitflags",
+    "block-buffer",
+    "console",
+    "cpufeatures",
+    "crypto-common",
+    "digest",
+    "hashbrown",
+    "heck",
+    "indicatif",
+    "syn",
+    "toml",
+    "windows-sys",
+    "windows-targets",
+    "windows_aarch64_gnullvm",
+    "windows_aarch64_msvc",
+    "windows_i686_gnu",
+    "windows_i686_msvc",
+    "windows_x86_64_gnu",
+    "windows_x86_64_gnullvm",
+    "windows_x86_64_msvc",
+]
 
 [licenses]
 allow = [

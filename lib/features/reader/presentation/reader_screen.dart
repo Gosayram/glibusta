@@ -141,7 +141,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _handleAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       _ctrl.pauseSession();
@@ -296,8 +297,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       duration: AppDuration.readerThemeTransition,
       curve: Curves.easeOutCubic,
       child: PopScope(
+        canPop: false,
         onPopInvokedWithResult: (didPop, result) {
-          if (didPop) _ctrl.saveProgress();
+          if (didPop) return;
+          _ctrl.saveProgress();
+          Navigator.of(context).pop();
         },
         child: ReaderShortcuts(
           onNextPage: () => _goToNextPage(),

@@ -108,69 +108,80 @@ class DownloadTile extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(_statusIcon(task.status), size: 20, color: _statusColor(context, task.status)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    task.bookTitle ?? task.sourceUrl.split('/').last,
-                    style: theme.textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: task.status == DownloadStatus.completed && task.bookId.isNotEmpty
+            ? () => context.push('/reader/${task.bookId}')
+            : null,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _statusIcon(task.status),
+                    size: 20,
+                    color: _statusColor(context, task.status),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      task.bookTitle ?? task.sourceUrl.split('/').last,
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    task.format.name.toUpperCase(),
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ],
+              ),
+              if (task.status == DownloadStatus.running ||
+                  task.status == DownloadStatus.paused) ...[
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: task.totalBytes != null && task.totalBytes! > 0
+                      ? (task.downloadedBytes ?? 0) / task.totalBytes!
+                      : null,
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  task.format.name.toUpperCase(),
-                  style: theme.textTheme.labelSmall,
+                  '${_formatBytes(task.downloadedBytes ?? 0)} / ${_formatBytes(task.totalBytes ?? 0)}',
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
-            ),
-            if (task.status == DownloadStatus.running || task.status == DownloadStatus.paused) ...[
               const SizedBox(height: 8),
-              LinearProgressIndicator(
-                value: task.totalBytes != null && task.totalBytes! > 0
-                    ? (task.downloadedBytes ?? 0) / task.totalBytes!
-                    : null,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_formatBytes(task.downloadedBytes ?? 0)} / ${_formatBytes(task.totalBytes ?? 0)}',
-                style: theme.textTheme.bodySmall,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (task.status == DownloadStatus.running)
+                    IconButton(
+                      icon: const Icon(Icons.pause, size: 20),
+                      onPressed: () => queue.pause(task.id),
+                    ),
+                  if (task.status == DownloadStatus.paused)
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow, size: 20),
+                      onPressed: () => queue.resume(task.id),
+                    ),
+                  if (task.status != DownloadStatus.canceled &&
+                      task.status != DownloadStatus.completed)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => queue.cancel(task.id),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20),
+                    onPressed: () => queue.remove(task.id),
+                  ),
+                ],
               ),
             ],
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (task.status == DownloadStatus.running)
-                  IconButton(
-                    icon: const Icon(Icons.pause, size: 20),
-                    onPressed: () => queue.pause(task.id),
-                  ),
-                if (task.status == DownloadStatus.paused)
-                  IconButton(
-                    icon: const Icon(Icons.play_arrow, size: 20),
-                    onPressed: () => queue.resume(task.id),
-                  ),
-                if (task.status != DownloadStatus.canceled &&
-                    task.status != DownloadStatus.completed)
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => queue.cancel(task.id),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.delete, size: 20),
-                  onPressed: () => queue.remove(task.id),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

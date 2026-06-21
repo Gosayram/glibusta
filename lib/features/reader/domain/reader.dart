@@ -64,12 +64,12 @@ enum LongPressAction { selectText, addBookmark, openMenu, disabled }
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
     @Default(ReaderTheme.system) ReaderTheme theme,
-    @Default(ReaderMode.continuous) ReaderMode mode,
+    @Default(ReaderMode.auto) ReaderMode mode,
     @Default(18.0) double fontSize,
     @Default(1.55) double lineHeight,
     @Default(20.0) double margin,
     @Default(ReaderFont.literata) ReaderFont font,
-    @Default(8.0) double paragraphSpacing,
+    @Default(12.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
     @Default(ReaderTextAlign.left) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,
@@ -178,7 +178,6 @@ class ReadingProfile {
         fontSize: 20.0,
         lineHeight: 1.7,
         margin: 24.0,
-        paragraphSpacing: 12.0,
         theme: ReaderTheme.sepia,
       ),
     ),

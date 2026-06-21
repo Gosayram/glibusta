@@ -106,6 +106,28 @@ class DownloadRepositoryImpl implements DownloadRepository {
     await _db.downloadDao.deleteDownload(taskId);
   }
 
+  @override
+  Future<void> registerInLibrary({
+    required String bookId,
+    required String bookTitle,
+    required String format,
+    required String filePath,
+  }) async {
+    final existing = await (_db.select(
+      _db.savedBooks,
+    )..where((t) => t.id.equals(bookId))).getSingleOrNull();
+    if (existing != null) return;
+    await _db
+        .into(_db.savedBooks)
+        .insert(
+          SavedBooksCompanion.insert(
+            id: bookId,
+            title: bookTitle,
+            filePath: Value(filePath),
+          ),
+        );
+  }
+
   DownloadTask _rowToTask(Download row) {
     return DownloadTask(
       id: row.id,

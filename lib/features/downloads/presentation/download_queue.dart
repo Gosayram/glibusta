@@ -224,7 +224,8 @@ class DownloadQueue {
           final updated = DownloadTask(
             id: task.id,
             bookId: task.bookId,
-            bookTitle: task.bookTitle,
+            bookTitle: task.bookTitle ?? '',
+
             format: task.format,
             sourceUrl: task.sourceUrl,
             targetPath: task.targetPath,
@@ -263,6 +264,12 @@ class DownloadQueue {
       _speedTrackers.remove(task.id);
       _retryAttempts.remove(task.id);
       await _repository.updateStatus(task.id, DownloadStatus.completed);
+      await _repository.registerInLibrary(
+        bookId: task.bookId,
+        bookTitle: task.bookTitle ?? '',
+        format: task.format.name,
+        filePath: task.targetPath ?? '',
+      );
       await _notificationService.showCompleted(completed);
     } on Object {
       final isCancelled = _cancelledIds.contains(task.id);
@@ -278,7 +285,7 @@ class DownloadQueue {
             final retried = DownloadTask(
               id: task.id,
               bookId: task.bookId,
-              bookTitle: task.bookTitle,
+              bookTitle: task.bookTitle ?? '',
               format: task.format,
               sourceUrl: task.sourceUrl,
               targetPath: task.targetPath,

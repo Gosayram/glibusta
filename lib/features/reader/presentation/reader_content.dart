@@ -1243,6 +1243,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: PageView.builder(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
+            padEnds: false,
             itemCount: pageCount,
             itemBuilder: (context, index) {
               return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);
@@ -1257,6 +1258,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: PageView.builder(
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
+            padEnds: false,
             itemCount: pageCount,
             itemBuilder: (context, index) {
               return AnimatedSwitcher(
@@ -1276,6 +1278,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: PageView.builder(
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
+            padEnds: false,
             itemCount: pageCount,
             itemBuilder: (context, index) {
               return AnimatedSwitcher(
@@ -1297,6 +1300,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: PageView.builder(
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
+            padEnds: false,
             itemCount: pageCount,
             itemBuilder: (context, index) {
               return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);

@@ -20,7 +20,7 @@ class ReaderSettingsPersistence {
         ),
         mode: ReaderMode.values.firstWhere(
           (e) => e.name == map['mode'],
-          orElse: () => ReaderMode.continuous,
+          orElse: () => ReaderMode.auto,
         ),
         fontSize: (map['fontSize'] as num?)?.toDouble() ?? 18.0,
         lineHeight: (map['lineHeight'] as num?)?.toDouble() ?? 1.55,
