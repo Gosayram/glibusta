@@ -15,12 +15,12 @@ void main() {
       test('returns default settings when no saved data exists', () async {
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.theme, ReaderTheme.system);
-        expect(settings.mode, ReaderMode.continuous);
+        expect(settings.mode, ReaderMode.auto);
         expect(settings.fontSize, 18.0);
         expect(settings.lineHeight, 1.55);
         expect(settings.margin, 20.0);
         expect(settings.font, ReaderFont.literata);
-        expect(settings.paragraphSpacing, 8.0);
+        expect(settings.paragraphSpacing, 12.0);
         expect(settings.letterSpacing, 0.0);
         expect(settings.textAlign, ReaderTextAlign.left);
         expect(settings.autoThemeMode, AutoThemeMode.off);

@@ -694,10 +694,25 @@ class _PaginatedContentBody extends StatefulWidget {
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
 }
 
+class _PageContent {
+  final int chapterIndex;
+  final int blockStart;
+  final int blockEnd;
+  final bool showChapterTitle;
+
+  const _PageContent({
+    required this.chapterIndex,
+    required this.blockStart,
+    required this.blockEnd,
+    this.showChapterTitle = false,
+  });
+}
+
 class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
   bool _didRestoreInitialPage = false;
   bool _disposed = false;
+  List<_PageContent> _pages = const [];
 
   @override
   void initState() {
@@ -711,16 +726,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (widget.initialPage != oldWidget.initialPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_disposed || !_pageController.hasClients) return;
-        final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
-        final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
-        final pageCount = useTwoPageLayout
-            ? ((widget.metadata.chapterCount + 1) ~/ 2)
-            : widget.metadata.chapterCount;
+        final pageCount = _pages.length;
         if (pageCount == 0) return;
-        final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
-          0,
-          pageCount - 1,
-        );
+        final targetPage = widget.initialPage.clamp(0, pageCount - 1);
         unawaited(
           _pageController.animateToPage(
             targetPage,
@@ -739,71 +747,204 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     super.dispose();
   }
 
-  Widget _buildChapterContent(int chapterIndex) {
+  List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
     final settings = widget.settings;
-    final chapter = widget.loadedChapters[chapterIndex];
+    final style = _getReaderStyle(settings);
+    final pages = <_PageContent>[];
+
+    for (int chIdx = 0; chIdx < widget.metadata.chapterCount; chIdx++) {
+      final chapter = widget.loadedChapters[chIdx];
+      if (chapter == null || chapter.blocks.isEmpty) {
+        pages.add(
+          _PageContent(chapterIndex: chIdx, blockStart: 0, blockEnd: 0, showChapterTitle: true),
+        );
+        continue;
+      }
+
+      final titleHeight = chapter.title.isNotEmpty
+          ? settings.fontSize * 1.4 * settings.lineHeight + settings.paragraphSpacing * 2
+          : 0.0;
+      var currentHeight = titleHeight;
+      var pageStart = 0;
+
+      for (int i = 0; i < chapter.blocks.length; i++) {
+        final block = chapter.blocks[i];
+        final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
+
+        if (currentHeight + blockHeight > availableHeight && i > pageStart) {
+          pages.add(
+            _PageContent(
+              chapterIndex: chIdx,
+              blockStart: pageStart,
+              blockEnd: i,
+              showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
+            ),
+          );
+          pageStart = i;
+          currentHeight = blockHeight;
+        } else {
+          currentHeight += blockHeight;
+        }
+      }
+
+      pages.add(
+        _PageContent(
+          chapterIndex: chIdx,
+          blockStart: pageStart,
+          blockEnd: chapter.blocks.length,
+          showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
+        ),
+      );
+    }
+    return pages;
+  }
+
+  double _estimateBlockHeight(
+    ReaderBlock block,
+    ReaderSettings settings,
+    TextStyle style,
+    double width,
+  ) {
+    final ps = settings.paragraphSpacing;
+    switch (block.type) {
+      case BlockType.heading:
+        final level = block.headingLevel ?? 2;
+        final scale = switch (level) {
+          1 => 1.6,
+          2 => 1.4,
+          3 => 1.2,
+          _ => 1.1,
+        };
+        final spacing = switch (level) {
+          1 => ps * 3,
+          2 => ps * 2,
+          _ => ps * 1.5,
+        };
+        return _estimateTextHeight(
+              block.text,
+              settings.fontSize * scale,
+              settings.lineHeight,
+              width,
+            ) +
+            spacing +
+            ps;
+      case BlockType.subtitle:
+        return _estimateTextHeight(
+              block.text,
+              settings.fontSize * 1.1,
+              settings.lineHeight,
+              width,
+            ) +
+            ps * 2 +
+            ps;
+      case BlockType.epigraph:
+        return _estimateTextHeight(
+              block.text,
+              settings.fontSize * 0.95,
+              settings.lineHeight,
+              width - settings.margin,
+            ) +
+            ps * 2 +
+            24;
+      case BlockType.poem:
+        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 48) +
+            ps * 4;
+      case BlockType.cite:
+        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 40) +
+            ps +
+            16;
+      case BlockType.textAuthor:
+        return settings.fontSize * 0.9 * settings.lineHeight + ps;
+      case BlockType.quote:
+        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 32) +
+            ps +
+            16;
+      case BlockType.separator:
+        return ps * 4;
+      case BlockType.image:
+        return settings.fontSize * 8;
+      case BlockType.footnote:
+        return _estimateTextHeight(
+              block.text,
+              settings.fontSize * 0.85,
+              settings.lineHeight,
+              width,
+            ) +
+            ps;
+      case BlockType.table:
+        final rows = block.tableRows?.length ?? 0;
+        return (rows * settings.fontSize * settings.lineHeight) + ps * 2;
+      case BlockType.list:
+        final items = block.listItems?.length ?? 0;
+        return (items * settings.fontSize * settings.lineHeight) + ps + 8;
+      case BlockType.paragraph:
+        return _estimateTextHeight(block.text, settings.fontSize, settings.lineHeight, width) + ps;
+    }
+  }
+
+  double _estimateTextHeight(String text, double fontSize, double lineHeight, double width) {
+    if (text.isEmpty) return fontSize * lineHeight;
+    final charsPerLine = (width / (fontSize * 0.55)).round().clamp(1, 200);
+    final lines = (text.length / charsPerLine).ceil();
+    return lines * fontSize * lineHeight;
+  }
+
+  Widget _buildPaginatedPage(int index, BuildContext context) {
+    final page = _pages[index];
+    final settings = widget.settings;
+    final chapter = widget.loadedChapters[page.chapterIndex];
     final textAlign = switch (settings.textAlign) {
       ReaderTextAlign.left => TextAlign.left,
       ReaderTextAlign.justify => TextAlign.justify,
       ReaderTextAlign.center => TextAlign.center,
       ReaderTextAlign.right => TextAlign.right,
     };
-    final chapterHighlights = widget.chapterHighlights[chapterIndex];
+    final chapterHighlights = widget.chapterHighlights[page.chapterIndex];
 
     if (chapter == null) {
-      return _buildLoadingPlaceholder(settings, chapterIndex);
+      return _buildLoadingPlaceholder(settings, page.chapterIndex);
     }
 
     final style = _getReaderStyle(settings);
-    final header = chapter.title.isNotEmpty
-        ? Padding(
-            padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: _buildHighlightedText(
-              chapter.title,
-              style.copyWith(
-                fontSize: settings.fontSize * 1.4,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign,
-            ),
-          )
-        : const SizedBox.shrink();
+    final content = <Widget>[];
 
-    if (chapter.blocks.length <= 50) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          header,
-          ...chapter.blocks.asMap().entries.map(
-            (entry) => _buildBlock(
-              entry.value,
-              textAlign,
-              blockHighlights: chapterHighlights
-                  ?.where((TextHighlight h) => h.blockIndex == entry.key)
-                  .toList(),
-            ),
+    if (page.showChapterTitle && chapter.title.isNotEmpty) {
+      content.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
+          child: _buildHighlightedText(
+            chapter.title,
+            style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
+            textAlign,
           ),
-        ],
+        ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        header,
-        ListBody(
-          children: [
-            for (int i = 0; i < chapter.blocks.length; i++)
-              _buildBlock(
-                chapter.blocks[i],
-                textAlign,
-                blockHighlights: chapterHighlights
-                    ?.where((TextHighlight h) => h.blockIndex == i)
-                    .toList(),
-              ),
-          ],
+    for (int i = page.blockStart; i < page.blockEnd && i < chapter.blocks.length; i++) {
+      content.add(
+        _buildBlock(
+          chapter.blocks[i],
+          textAlign,
+          blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
         ),
-      ],
+      );
+    }
+
+    return SafeArea(
+      key: ValueKey('page-$index'),
+      top: false,
+      bottom: false,
+      child: Directionality(
+        textDirection: _effectiveTextDirection(context),
+        child: Padding(
+          padding: EdgeInsets.all(settings.margin),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: content,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1158,18 +1299,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   Widget _buildPage(int index, BuildContext context) {
-    return SafeArea(
-      key: ValueKey(index),
-      top: false,
-      bottom: false,
-      child: Directionality(
-        textDirection: _effectiveTextDirection(context),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(widget.settings.margin),
-          child: _buildChapterContent(index),
-        ),
-      ),
-    );
+    if (index < _pages.length) {
+      return _buildPaginatedPage(index, context);
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildTwoPage(int index, BuildContext context) {
@@ -1180,29 +1313,17 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       child: Row(
         children: [
           Expanded(
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(widget.settings.margin),
-                child: _buildChapterContent(leftIndex),
-              ),
-            ),
+            child: leftIndex < _pages.length
+                ? _buildPaginatedPage(leftIndex, context)
+                : const SizedBox.shrink(),
           ),
           Container(
             width: 1,
             color: ReaderColors.forTheme(widget.settings.theme).text.withValues(alpha: 0.1),
           ),
           Expanded(
-            child: rightIndex < widget.metadata.chapterCount
-                ? SafeArea(
-                    top: false,
-                    bottom: false,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.all(widget.settings.margin),
-                      child: _buildChapterContent(rightIndex),
-                    ),
-                  )
+            child: rightIndex < _pages.length
+                ? _buildPaginatedPage(rightIndex, context)
                 : const SizedBox.shrink(),
           ),
         ],
@@ -1212,102 +1333,113 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   @override
   Widget build(BuildContext context) {
-    final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
-    final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
-    final pageCount = useTwoPageLayout
-        ? ((widget.metadata.chapterCount + 1) ~/ 2)
-        : widget.metadata.chapterCount;
-    if (!_didRestoreInitialPage && widget.initialPage > 0 && pageCount > 0) {
-      final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage).clamp(
-        0,
-        pageCount - 1,
-      );
-      _didRestoreInitialPage = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_disposed || !_pageController.hasClients) return;
-        unawaited(
-          _pageController.animateToPage(
-            targetPage,
-            duration: Duration.zero,
-            curve: Curves.easeInOut,
-          ),
-        );
-      });
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = constraints.maxHeight;
+        final contentWidth = constraints.maxWidth - widget.settings.margin * 2;
+        _pages = _paginateContent(availableHeight, contentWidth);
+        final pageCount = _pages.length;
+        if (pageCount == 0) {
+          return const SizedBox.shrink();
+        }
 
-    switch (widget.settings.pageTurnAnimation) {
-      case PageTurnAnimation.none:
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapUp: widget.onTap,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(),
-            padEnds: false,
-            itemCount: pageCount,
-            itemBuilder: (context, index) {
-              return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);
-            },
-          ),
-        );
+        final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
+        final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
+        final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
-      case PageTurnAnimation.fade:
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapUp: widget.onTap,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            padEnds: false,
-            itemCount: pageCount,
-            itemBuilder: (context, index) {
-              return AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: useTwoPageLayout
-                    ? _buildTwoPage(index, context)
-                    : _buildPage(index, context),
+        if (!_didRestoreInitialPage && widget.initialPage > 0) {
+          final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage)
+              .clamp(
+                0,
+                effectivePageCount - 1,
               );
-            },
-          ),
-        );
+          _didRestoreInitialPage = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_disposed || !_pageController.hasClients) return;
+            unawaited(
+              _pageController.animateToPage(
+                targetPage,
+                duration: Duration.zero,
+                curve: Curves.easeInOut,
+              ),
+            );
+          });
+        }
 
-      case PageTurnAnimation.curl:
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapUp: widget.onTap,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            padEnds: false,
-            itemCount: pageCount,
-            itemBuilder: (context, index) {
-              return AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                switchInCurve: Curves.easeInOut,
-                switchOutCurve: Curves.easeInOut,
-                child: useTwoPageLayout
-                    ? _buildTwoPage(index, context)
-                    : _buildPage(index, context),
-              );
-            },
-          ),
-        );
+        Widget itemBuilder(BuildContext context, int index) {
+          if (useTwoPageLayout) {
+            return _buildTwoPage(index, context);
+          }
+          return _buildPage(index, context);
+        }
 
-      case PageTurnAnimation.slide:
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapUp: widget.onTap,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: const BouncingScrollPhysics(),
-            padEnds: false,
-            itemCount: pageCount,
-            itemBuilder: (context, index) {
-              return useTwoPageLayout ? _buildTwoPage(index, context) : _buildPage(index, context);
-            },
-          ),
-        );
-    }
+        switch (widget.settings.pageTurnAnimation) {
+          case PageTurnAnimation.none:
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: widget.onTap,
+              child: PageView.builder(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                padEnds: false,
+                itemCount: effectivePageCount,
+                itemBuilder: itemBuilder,
+              ),
+            );
+
+          case PageTurnAnimation.fade:
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: widget.onTap,
+              child: PageView.builder(
+                controller: _pageController,
+                physics: const BouncingScrollPhysics(),
+                padEnds: false,
+                itemCount: effectivePageCount,
+                itemBuilder: (context, index) {
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: itemBuilder(context, index),
+                  );
+                },
+              ),
+            );
+
+          case PageTurnAnimation.curl:
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: widget.onTap,
+              child: PageView.builder(
+                controller: _pageController,
+                physics: const BouncingScrollPhysics(),
+                padEnds: false,
+                itemCount: effectivePageCount,
+                itemBuilder: (context, index) {
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    switchInCurve: Curves.easeInOut,
+                    switchOutCurve: Curves.easeInOut,
+                    child: itemBuilder(context, index),
+                  );
+                },
+              ),
+            );
+
+          case PageTurnAnimation.slide:
+            return GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: widget.onTap,
+              child: PageView.builder(
+                controller: _pageController,
+                physics: const BouncingScrollPhysics(),
+                padEnds: false,
+                itemCount: effectivePageCount,
+                itemBuilder: itemBuilder,
+              ),
+            );
+        }
+      },
+    );
   }
 
   Widget _buildImageWidget(String imageUrl, Color? errorColor) {

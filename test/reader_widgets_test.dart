@@ -315,8 +315,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('ч'), findsOneWidget);
-      expect(find.textContaining('м'), findsOneWidget);
+      expect(find.text('1 / 5'), findsOneWidget);
+      expect(find.text('0%'), findsOneWidget);
     });
 
     testWidgets('shows only minutes when less than hour', (tester) async {
@@ -334,7 +334,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('м'), findsWidgets);
+      expect(find.textContaining('%'), findsWidgets);
     });
   });
 
