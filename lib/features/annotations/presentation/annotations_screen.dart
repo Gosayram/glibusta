@@ -103,6 +103,25 @@ class _BookmarkList extends ConsumerWidget {
             child: Icon(Icons.delete, color: Theme.of(context).colorScheme.onError),
           ),
           confirmDismiss: (_) async {
+            if (!context.mounted) return false;
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить закладку?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true || !context.mounted) return false;
             final repo = ref.read(bookmarkRepoProvider);
             await repo.deleteBookmark(bookmark.id);
             unawaited(SmartDialog.showToast('Закладка удалена'));
@@ -161,6 +180,24 @@ class _NoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить заметку?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true || !context.mounted) return false;
             final repo = ref.read(noteRepoProvider);
             await repo.deleteNote(note.id);
             unawaited(SmartDialog.showToast('Заметка удалена'));
@@ -220,6 +257,24 @@ class _QuoteList extends ConsumerWidget {
           ),
           confirmDismiss: (_) async {
             if (!context.mounted) return false;
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Удалить цитату?'),
+                content: const Text('Это действие нельзя отменить.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Удалить'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true || !context.mounted) return false;
             final repo = ref.read(quoteRepoProvider);
             await repo.deleteQuote(quote.id);
             unawaited(SmartDialog.showToast('Цитата удалена'));

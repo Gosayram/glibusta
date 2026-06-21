@@ -117,7 +117,7 @@ class BottomActionBar extends ConsumerWidget {
     } on Object catch (e) {
       AppLogger().severe('Download failed: $e', name: 'BookDetails', error: e);
       if (context.mounted) {
-        unawaited(SmartDialog.showToast('Ошибка загрузки: $e'));
+        unawaited(SmartDialog.showToast('Ошибка загрузки'));
       }
     }
   }

@@ -10,9 +10,13 @@ final class EpubArchive {
 
   static Future<EpubArchive> open(String filePath) async {
     final input = InputFileStream(filePath);
-    final archive = ZipDecoder().decodeStream(input);
-    _validateArchive(archive);
-    return EpubArchive(archive);
+    try {
+      final archive = ZipDecoder().decodeStream(input);
+      _validateArchive(archive);
+      return EpubArchive(archive);
+    } finally {
+      input.closeSync();
+    }
   }
 
   static void _validateArchive(Archive archive) {

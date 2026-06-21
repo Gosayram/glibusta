@@ -46,42 +46,52 @@ class FormatSelectionSheet extends StatelessWidget {
               ),
             ),
           const Divider(height: 1),
-          ...formats.map((format) {
-            final info = _formatInfo(format);
-            final capService = const FormatCapabilityService();
-            final cap = capService.capabilityOf(format);
-            final warning = capService.warningLabel(format);
-            return ListTile(
-              leading: Icon(info.icon, color: info.color),
-              title: Row(
-                children: [
-                  Text(info.label),
-                  if (warning != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: cap == FormatCapability.partial
-                            ? const Color(0xFFFFA726).withValues(alpha: 0.2)
-                            : const Color(0xFF9E9E9E).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        cap.label,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cap == FormatCapability.partial
-                              ? const Color(0xFFFFA726)
-                              : const Color(0xFF9E9E9E),
-                        ),
-                      ),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.5,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: formats.map((format) {
+                  final info = _formatInfo(format);
+                  final capService = const FormatCapabilityService();
+                  final cap = capService.capabilityOf(format);
+                  final warning = capService.warningLabel(format);
+                  return ListTile(
+                    leading: Icon(info.icon, color: info.color),
+                    title: Row(
+                      children: [
+                        Text(info.label),
+                        if (warning != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cap == FormatCapability.partial
+                                  ? const Color(0xFFFFA726).withValues(alpha: 0.2)
+                                  : const Color(0xFF9E9E9E).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              cap.label,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cap == FormatCapability.partial
+                                    ? const Color(0xFFFFA726)
+                                    : const Color(0xFF9E9E9E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ],
+                    subtitle: Text(info.description, style: theme.textTheme.bodySmall),
+                    onTap: () => Navigator.of(context).pop(format),
+                  );
+                }).toList(),
               ),
-              subtitle: Text(info.description, style: theme.textTheme.bodySmall),
-              onTap: () => Navigator.of(context).pop(format),
-            );
-          }),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),
