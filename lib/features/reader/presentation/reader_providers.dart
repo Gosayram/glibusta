@@ -188,8 +188,44 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(horizontalLimiter: value);
   }
 
+  void updateHorizontalLimiterHeight(double value) {
+    state = state.copyWith(horizontalLimiterHeight: value);
+  }
+
+  void updateHorizontalLimiterOffset(double value) {
+    state = state.copyWith(horizontalLimiterOffset: value);
+  }
+
+  void updateHorizontalLimiterDimming(double value) {
+    state = state.copyWith(horizontalLimiterDimming: value);
+  }
+
+  void updateHorizontalLimiterLines(bool value) {
+    state = state.copyWith(horizontalLimiterLines: value);
+  }
+
   void updateScrollbarIndicator(bool value) {
     state = state.copyWith(scrollbarIndicator: value);
+  }
+
+  void updateShowImages(bool value) {
+    state = state.copyWith(showImages: value);
+  }
+
+  void updateImageCornerRadius(double value) {
+    state = state.copyWith(imageCornerRadius: value);
+  }
+
+  void updateImageAlignment(ImageAlignment value) {
+    state = state.copyWith(imageAlignment: value);
+  }
+
+  void updateImageWidth(double value) {
+    state = state.copyWith(imageWidth: value);
+  }
+
+  void updateImageColorEffect(ImageColorEffect value) {
+    state = state.copyWith(imageColorEffect: value);
   }
 
   void applyProfile(ReaderSettings profile) {

@@ -89,6 +89,9 @@ class ReaderBottomBar extends StatelessWidget {
     required this.chapterTitle,
     this.onJumpToProgress,
     this.onModeChanged,
+    this.checkpoints = const [],
+    this.onCheckpointForward,
+    this.onCheckpointBack,
   });
 
   final ReaderSettings settings;
@@ -99,6 +102,9 @@ class ReaderBottomBar extends StatelessWidget {
   final String chapterTitle;
   final ValueChanged<double>? onJumpToProgress;
   final ValueChanged<ReaderMode>? onModeChanged;
+  final List<double> checkpoints;
+  final VoidCallback? onCheckpointForward;
+  final VoidCallback? onCheckpointBack;
 
   @override
   Widget build(BuildContext context) {
@@ -159,20 +165,61 @@ class ReaderBottomBar extends StatelessWidget {
             // Slider
             if (onJumpToProgress != null) ...[
               const SizedBox(height: 4),
-              SliderTheme(
-                data: SliderThemeData(
-                  activeTrackColor: colors.text.withValues(alpha: 0.4),
-                  inactiveTrackColor: colors.text.withValues(alpha: 0.15),
-                  thumbColor: colors.text.withValues(alpha: 0.7),
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                  trackHeight: 2,
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                ),
-                child: Slider(
-                  value: scrollProgress.clamp(0.0, 1.0),
-                  onChanged: onJumpToProgress,
-                ),
+              Row(
+                children: [
+                  if (onCheckpointBack != null)
+                    GestureDetector(
+                      onTap: onCheckpointBack,
+                      child: Icon(
+                        Icons.bookmark,
+                        size: 16,
+                        color: checkpoints.any((c) => c < scrollProgress - 0.02)
+                            ? colors.text.withValues(alpha: 0.6)
+                            : colors.text.withValues(alpha: 0.15),
+                      ),
+                    ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderThemeData(
+                        activeTrackColor: colors.text.withValues(alpha: 0.4),
+                        inactiveTrackColor: colors.text.withValues(alpha: 0.15),
+                        thumbColor: colors.text.withValues(alpha: 0.7),
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        trackHeight: 2,
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      ),
+                      child: Slider(
+                        value: scrollProgress.clamp(0.0, 1.0),
+                        onChanged: onJumpToProgress,
+                      ),
+                    ),
+                  ),
+                  if (onCheckpointForward != null)
+                    GestureDetector(
+                      onTap: onCheckpointForward,
+                      child: Icon(
+                        Icons.bookmark,
+                        size: 16,
+                        color: checkpoints.any((c) => c > scrollProgress + 0.02)
+                            ? colors.text.withValues(alpha: 0.6)
+                            : colors.text.withValues(alpha: 0.15),
+                      ),
+                    ),
+                ],
               ),
+              // Checkpoint markers
+              if (checkpoints.isNotEmpty)
+                SizedBox(
+                  height: 6,
+                  child: CustomPaint(
+                    size: Size.infinite,
+                    painter: _CheckpointMarkerPainter(
+                      checkpoints: checkpoints,
+                      progress: scrollProgress,
+                      color: colors.text,
+                    ),
+                  ),
+                ),
             ],
             // Mode switcher
             if (onModeChanged != null) _buildModeSwitcher(colors),
@@ -253,4 +300,33 @@ class ReaderProgressBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CheckpointMarkerPainter extends CustomPainter {
+  _CheckpointMarkerPainter({
+    required this.checkpoints,
+    required this.progress,
+    required this.color,
+  });
+
+  final List<double> checkpoints;
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    for (final cp in checkpoints) {
+      final x = cp.clamp(0.0, 1.0) * size.width;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CheckpointMarkerPainter oldDelegate) =>
+      checkpoints != oldDelegate.checkpoints || progress != oldDelegate.progress;
 }

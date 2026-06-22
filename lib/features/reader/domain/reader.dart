@@ -66,6 +66,10 @@ enum HorizontalGestureScroll { half, twoThirds, threeQuarters }
 
 enum OrientationLock { none, portrait, landscape }
 
+enum ImageAlignment { start, center, end }
+
+enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
+
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
@@ -106,7 +110,16 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(OrientationLock.none) OrientationLock orientationLock,
     @Default(false) bool bionicReading,
     @Default(false) bool horizontalLimiter,
+    @Default(0.5) double horizontalLimiterHeight,
+    @Default(0.5) double horizontalLimiterOffset,
+    @Default(0.15) double horizontalLimiterDimming,
+    @Default(true) bool horizontalLimiterLines,
     @Default(false) bool scrollbarIndicator,
+    @Default(true) bool showImages,
+    @Default(0.0) double imageCornerRadius,
+    @Default(ImageAlignment.center) ImageAlignment imageAlignment,
+    @Default(1.0) double imageWidth,
+    @Default(ImageColorEffect.off) ImageColorEffect imageColorEffect,
   }) = _ReaderSettings;
 }
 

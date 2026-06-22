@@ -54,6 +54,7 @@ class ReaderState {
   final bool isSearchOpen;
   final String? highlightedQuery;
   final bool isDynamicallyLoading;
+  final List<double> checkpoints;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -73,6 +74,7 @@ class ReaderState {
     this.isSearchOpen = false,
     this.highlightedQuery,
     this.isDynamicallyLoading = false,
+    this.checkpoints = const [],
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;
@@ -112,6 +114,7 @@ class ReaderState {
     bool clearHighlight = false,
     bool clearLoadingMessage = false,
     bool? isDynamicallyLoading,
+    List<double>? checkpoints,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
@@ -130,6 +133,7 @@ class ReaderState {
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
       isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
+      checkpoints: checkpoints ?? this.checkpoints,
     );
   }
 }
@@ -570,6 +574,53 @@ class ReaderController {
       totalBlocks += chapter.blocks.length;
     }
     _progress.saveProgress(_state.currentPosition, totalBlocks);
+  }
+
+  void saveCheckpoint() {
+    final p = _state.scrollProgress;
+    final existing = _state.checkpoints;
+    // Deduplicate: remove checkpoint within 2% of current position
+    final filtered = existing.where((c) => (c - p).abs() > 0.02).toList()
+      ..add(p)
+      ..sort();
+    _updateState(_state.copyWith(checkpoints: filtered));
+  }
+
+  void navigateToCheckpoint(double progress) {
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    final maxScroll = _scrollController!.position.maxScrollExtent;
+    unawaited(
+      _scrollController!.animateTo(
+        progress.clamp(0.0, 1.0) * maxScroll,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      ),
+    );
+    // Remove the checkpoint after navigating to it (single-use)
+    final filtered = _state.checkpoints.where((c) => (c - progress).abs() > 0.02).toList();
+    _updateState(_state.copyWith(checkpoints: filtered));
+  }
+
+  bool get hasCheckpointAhead {
+    final p = _state.scrollProgress;
+    return _state.checkpoints.any((c) => c > p + 0.02);
+  }
+
+  bool get hasCheckpointBehind {
+    final p = _state.scrollProgress;
+    return _state.checkpoints.any((c) => c < p - 0.02);
+  }
+
+  void navigateToNearestCheckpoint({required bool forward}) {
+    final p = _state.scrollProgress;
+    final sorted = List<double>.from(_state.checkpoints)..sort();
+    if (forward) {
+      final next = sorted.where((c) => c > p + 0.01).firstOrNull;
+      if (next != null) navigateToCheckpoint(next);
+    } else {
+      final prev = sorted.where((c) => c < p - 0.01).lastOrNull;
+      if (prev != null) navigateToCheckpoint(prev);
+    }
   }
 
   void reanchorAfterLayoutChange() {

@@ -483,14 +483,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     }
                   },
                   onMore: readerState.metadata != null
-                      ? () => TableOfContentsSheet.show(
-                          context,
-                          metadata: readerState.metadata!,
-                          currentChapterIndex: readerState.currentPosition.chapterIndex,
-                          onJumpToPosition: _ctrl.jumpToPosition,
-                          loadedChapters: readerState.loadedChapters,
-                          isDynamicallyLoading: readerState.isDynamicallyLoading,
-                        )
+                      ? () {
+                          _ctrl.saveCheckpoint();
+                          TableOfContentsSheet.show(
+                            context,
+                            metadata: readerState.metadata!,
+                            currentChapterIndex: readerState.currentPosition.chapterIndex,
+                            onJumpToPosition: _ctrl.jumpToPosition,
+                            loadedChapters: readerState.loadedChapters,
+                            isDynamicallyLoading: readerState.isDynamicallyLoading,
+                          );
+                        }
                       : () {},
                 ),
               ),
@@ -518,6 +521,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   onModeChanged: (mode) {
                     ref.read(readerSettingsProvider.notifier).updateMode(mode);
                   },
+                  checkpoints: readerState.checkpoints,
+                  onCheckpointForward: _ctrl.hasCheckpointAhead
+                      ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
+                      : null,
+                  onCheckpointBack: _ctrl.hasCheckpointBehind
+                      ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                      : null,
                 ),
               ),
             ),
@@ -763,6 +773,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _showQuickSettings(BuildContext context) {
+    _ctrl.saveCheckpoint();
     _ctrl.onBottomSheetOpen();
     _gestureCoordinator.onBottomSheetOpened();
     unawaited(

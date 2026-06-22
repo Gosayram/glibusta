@@ -95,7 +95,22 @@ class ReaderSettingsPersistence {
         ),
         bionicReading: map['bionicReading'] as bool? ?? false,
         horizontalLimiter: map['horizontalLimiter'] as bool? ?? false,
+        horizontalLimiterHeight: (map['horizontalLimiterHeight'] as num?)?.toDouble() ?? 0.5,
+        horizontalLimiterOffset: (map['horizontalLimiterOffset'] as num?)?.toDouble() ?? 0.5,
+        horizontalLimiterDimming: (map['horizontalLimiterDimming'] as num?)?.toDouble() ?? 0.15,
+        horizontalLimiterLines: map['horizontalLimiterLines'] as bool? ?? true,
         scrollbarIndicator: map['scrollbarIndicator'] as bool? ?? false,
+        showImages: map['showImages'] as bool? ?? true,
+        imageCornerRadius: (map['imageCornerRadius'] as num?)?.toDouble() ?? 0.0,
+        imageAlignment: ImageAlignment.values.firstWhere(
+          (e) => e.name == map['imageAlignment'],
+          orElse: () => ImageAlignment.center,
+        ),
+        imageWidth: (map['imageWidth'] as num?)?.toDouble() ?? 1.0,
+        imageColorEffect: ImageColorEffect.values.firstWhere(
+          (e) => e.name == map['imageColorEffect'],
+          orElse: () => ImageColorEffect.off,
+        ),
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -143,7 +158,16 @@ class ReaderSettingsPersistence {
         'orientationLock': settings.orientationLock.name,
         'bionicReading': settings.bionicReading,
         'horizontalLimiter': settings.horizontalLimiter,
+        'horizontalLimiterHeight': settings.horizontalLimiterHeight,
+        'horizontalLimiterOffset': settings.horizontalLimiterOffset,
+        'horizontalLimiterDimming': settings.horizontalLimiterDimming,
+        'horizontalLimiterLines': settings.horizontalLimiterLines,
         'scrollbarIndicator': settings.scrollbarIndicator,
+        'showImages': settings.showImages,
+        'imageCornerRadius': settings.imageCornerRadius,
+        'imageAlignment': settings.imageAlignment.name,
+        'imageWidth': settings.imageWidth,
+        'imageColorEffect': settings.imageColorEffect.name,
       }),
     );
   }

@@ -162,6 +162,35 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 12),
         const _SectionTitle('Ширина читателя'),
         _buildReaderWidthRow(settings, notifier),
+        const SizedBox(height: 16),
+        _buildToggleRow(
+          'Показывать изображения',
+          Icons.image,
+          settings.showImages,
+          (v) => notifier.updateShowImages(v),
+        ),
+        if (settings.showImages) ...[
+          const SizedBox(height: 8),
+          _buildSliderRow(
+            'Скругление',
+            settings.imageCornerRadius / 32,
+            0.0,
+            1.0,
+            (v) => notifier.updateImageCornerRadius(v * 32),
+          ),
+          _buildSliderRow(
+            'Ширина',
+            settings.imageWidth,
+            0.3,
+            1.0,
+            (v) => notifier.updateImageWidth(v),
+          ),
+          const _SectionTitle('Выравнивание'),
+          _buildImageAlignmentRow(settings, notifier),
+          const SizedBox(height: 8),
+          const _SectionTitle('Цветовой эффект'),
+          _buildImageColorEffectRow(settings, notifier),
+        ],
       ],
     );
   }
@@ -252,6 +281,36 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           settings.horizontalLimiter,
           (v) => notifier.updateHorizontalLimiter(v),
         ),
+        if (settings.horizontalLimiter) ...[
+          const SizedBox(height: 8),
+          _buildSliderRow(
+            'Высота зоны',
+            settings.horizontalLimiterHeight,
+            0.2,
+            0.9,
+            (v) => notifier.updateHorizontalLimiterHeight(v),
+          ),
+          _buildSliderRow(
+            'Смещение',
+            settings.horizontalLimiterOffset,
+            0.1,
+            0.9,
+            (v) => notifier.updateHorizontalLimiterOffset(v),
+          ),
+          _buildSliderRow(
+            'Затемнение',
+            settings.horizontalLimiterDimming,
+            0.0,
+            0.5,
+            (v) => notifier.updateHorizontalLimiterDimming(v),
+          ),
+          _buildToggleRow(
+            'Линии-разделители',
+            Icons.horizontal_rule,
+            settings.horizontalLimiterLines,
+            (v) => notifier.updateHorizontalLimiterLines(v),
+          ),
+        ],
         const SizedBox(height: 12),
 
         _buildToggleRow(
@@ -579,6 +638,87 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         ),
         const Icon(Icons.wb_sunny, size: 20, color: Colors.orange),
       ],
+    );
+  }
+
+  static Widget _buildSliderRow(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(label, style: const TextStyle(fontSize: 12)),
+          ),
+          Expanded(
+            flex: 5,
+            child: Slider(
+              value: value.clamp(min, max),
+              min: min,
+              max: max,
+              onChanged: onChanged,
+            ),
+          ),
+          SizedBox(
+            width: 36,
+            child: Text(
+              '${(value * 100).round()}%',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildImageAlignmentRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      ImageAlignment.start: 'По левому краю',
+      ImageAlignment.center: 'По центру',
+      ImageAlignment.end: 'По правому краю',
+    };
+    return Wrap(
+      spacing: 8,
+      children: ImageAlignment.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.imageAlignment == v,
+          onSelected: (_) => notifier.updateImageAlignment(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildImageColorEffectRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      ImageColorEffect.off: 'Нет',
+      ImageColorEffect.grayscale: 'Ч/Б',
+      ImageColorEffect.fontColor: 'Цвет шрифта',
+      ImageColorEffect.backgroundColor: 'Цвет фона',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: ImageColorEffect.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.imageColorEffect == v,
+          onSelected: (_) => notifier.updateImageColorEffect(v),
+        );
+      }).toList(),
     );
   }
 

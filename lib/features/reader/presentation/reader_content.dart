@@ -44,6 +44,56 @@ void _appendBionicWord(List<InlineSpan> spans, String word, TextStyle style) {
   }
 }
 
+/// Limiter vertical helpers
+double _limiterTopOffset(ReaderSettings s) {
+  final dimFraction = (1.0 - s.horizontalLimiterHeight).clamp(0.0, 1.0);
+  final topFraction = (1.0 - s.horizontalLimiterOffset).clamp(0.0, 1.0);
+  return dimFraction * topFraction;
+}
+
+double _limiterBottomOffset(ReaderSettings s) {
+  final dimFraction = (1.0 - s.horizontalLimiterHeight).clamp(0.0, 1.0);
+  final bottomFraction = s.horizontalLimiterOffset.clamp(0.0, 1.0);
+  return dimFraction * bottomFraction;
+}
+
+ColorFilter? _imageColorFilter(ReaderSettings? s) {
+  if (s == null) return null;
+  return switch (s.imageColorEffect) {
+    ImageColorEffect.off => null,
+    ImageColorEffect.grayscale => const ColorFilter.matrix([
+      0.2126,
+      0.7152,
+      0.0722,
+      0,
+      0,
+      0.2126,
+      0.7152,
+      0.0722,
+      0,
+      0,
+      0.2126,
+      0.7152,
+      0.0722,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ]),
+    ImageColorEffect.fontColor => ColorFilter.mode(
+      ReaderColors.forTheme(s.theme).text,
+      BlendMode.color,
+    ),
+    ImageColorEffect.backgroundColor => ColorFilter.mode(
+      ReaderColors.forTheme(s.theme).scaffold,
+      BlendMode.color,
+    ),
+  };
+}
+
 class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
     super.key,
@@ -211,28 +261,59 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                 ),
               ],
               if (settings.horizontalLimiter) ...[
+                // Top dimming zone
                 Positioned(
                   left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: settings.margin,
-                  child: ColoredBox(
-                    color:
-                        _getReaderStyle(settings).color?.withValues(alpha: 0.06) ??
-                        Colors.black.withValues(alpha: 0.06),
-                  ),
-                ),
-                Positioned(
                   right: 0,
                   top: 0,
-                  bottom: 0,
-                  width: settings.margin,
+                  height: _limiterTopOffset(settings),
                   child: ColoredBox(
                     color:
-                        _getReaderStyle(settings).color?.withValues(alpha: 0.06) ??
-                        Colors.black.withValues(alpha: 0.06),
+                        _getReaderStyle(
+                          settings,
+                        ).color?.withValues(alpha: settings.horizontalLimiterDimming) ??
+                        Colors.black.withValues(alpha: settings.horizontalLimiterDimming),
                   ),
                 ),
+                // Bottom dimming zone
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  height: _limiterBottomOffset(settings),
+                  child: ColoredBox(
+                    color:
+                        _getReaderStyle(
+                          settings,
+                        ).color?.withValues(alpha: settings.horizontalLimiterDimming) ??
+                        Colors.black.withValues(alpha: settings.horizontalLimiterDimming),
+                  ),
+                ),
+                // Top ruler line
+                if (settings.horizontalLimiterLines) ...[
+                  Positioned(
+                    left: settings.margin,
+                    right: settings.margin,
+                    top: _limiterTopOffset(settings),
+                    child: Container(
+                      height: 1,
+                      color:
+                          _getReaderStyle(settings).color?.withValues(alpha: 0.2) ??
+                          Colors.black.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  Positioned(
+                    left: settings.margin,
+                    right: settings.margin,
+                    bottom: _limiterBottomOffset(settings),
+                    child: Container(
+                      height: 1,
+                      color:
+                          _getReaderStyle(settings).color?.withValues(alpha: 0.2) ??
+                          Colors.black.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ],
               ],
             ],
           ),
@@ -474,17 +555,24 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           child: Center(child: Text('* * *', style: _getReaderStyle(settings))),
         );
       case BlockType.image:
+        if (!settings.showImages) return const SizedBox.shrink();
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-            child: Center(
+            child: Align(
+              alignment: switch (settings.imageAlignment) {
+                ImageAlignment.start => Alignment.centerLeft,
+                ImageAlignment.center => Alignment.center,
+                ImageAlignment.end => Alignment.centerRight,
+              },
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+                constraints: BoxConstraints(maxWidth: 600 * settings.imageWidth),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(settings.imageCornerRadius),
                   child: _buildImageWidget(
                     block.imageUrl!,
                     _getReaderStyle(settings).color,
+                    settings,
                   ),
                 ),
               ),
@@ -666,7 +754,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     );
   }
 
-  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+  Widget _buildImageWidget(String imageUrl, Color? errorColor, [ReaderSettings? settings]) {
+    final colorFilter = _imageColorFilter(settings);
     final uri = Uri.tryParse(imageUrl);
     final isDataUri = uri != null && uri.scheme == 'data';
     final isFileUri = uri != null && uri.scheme == 'file';
@@ -676,7 +765,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       final data = imageUrl.split(',');
       if (data.length == 2) {
         final bytes = base64Decode(data.last);
-        return InteractiveViewer(
+        final img = InteractiveViewer(
           maxScale: 4.0,
           child: Image.memory(
             bytes,
@@ -688,12 +777,13 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             ),
           ),
         );
+        return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
       }
     }
 
     if (isFileUri || isPlainPath) {
       final filePath = isFileUri ? uri.path : imageUrl;
-      return InteractiveViewer(
+      final img = InteractiveViewer(
         maxScale: 4.0,
         child: Image.file(
           File(filePath),
@@ -705,6 +795,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           ),
         ),
       );
+      return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
     }
 
     return Icon(Icons.broken_image, size: 64, color: errorColor);
@@ -1264,15 +1355,21 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           child: Center(child: Text('* * *', style: style)),
         );
       case BlockType.image:
+        if (!widget.settings.showImages) return const SizedBox.shrink();
         if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
           return Padding(
             padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-            child: Center(
+            child: Align(
+              alignment: switch (widget.settings.imageAlignment) {
+                ImageAlignment.start => Alignment.centerLeft,
+                ImageAlignment.center => Alignment.center,
+                ImageAlignment.end => Alignment.centerRight,
+              },
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-                  child: _buildImageWidget(block.imageUrl!, style.color),
+                constraints: BoxConstraints(maxWidth: 600 * widget.settings.imageWidth),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.settings.imageCornerRadius),
+                  child: _buildImageWidget(block.imageUrl!, style.color, widget.settings),
                 ),
               ),
             ),
@@ -1618,22 +1715,42 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               if (widget.settings.horizontalLimiter) ...[
                 Positioned(
                   left: 0,
+                  right: 0,
                   top: 0,
-                  bottom: 0,
-                  width: widget.settings.margin,
+                  height: _limiterTopOffset(widget.settings),
                   child: ColoredBox(
-                    color: colors.text.withValues(alpha: 0.06),
+                    color: colors.text.withValues(alpha: widget.settings.horizontalLimiterDimming),
                   ),
                 ),
                 Positioned(
+                  left: 0,
                   right: 0,
-                  top: 0,
                   bottom: 0,
-                  width: widget.settings.margin,
+                  height: _limiterBottomOffset(widget.settings),
                   child: ColoredBox(
-                    color: colors.text.withValues(alpha: 0.06),
+                    color: colors.text.withValues(alpha: widget.settings.horizontalLimiterDimming),
                   ),
                 ),
+                if (widget.settings.horizontalLimiterLines) ...[
+                  Positioned(
+                    left: widget.settings.margin,
+                    right: widget.settings.margin,
+                    top: _limiterTopOffset(widget.settings),
+                    child: Container(
+                      height: 1,
+                      color: colors.text.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  Positioned(
+                    left: widget.settings.margin,
+                    right: widget.settings.margin,
+                    bottom: _limiterBottomOffset(widget.settings),
+                    child: Container(
+                      height: 1,
+                      color: colors.text.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ],
               ],
             ],
           );
@@ -1643,7 +1760,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     );
   }
 
-  Widget _buildImageWidget(String imageUrl, Color? errorColor) {
+  Widget _buildImageWidget(String imageUrl, Color? errorColor, [ReaderSettings? settings]) {
+    final colorFilter = _imageColorFilter(settings);
     final uri = Uri.tryParse(imageUrl);
     final isDataUri = uri != null && uri.scheme == 'data';
     final isFileUri = uri != null && uri.scheme == 'file';
@@ -1653,7 +1771,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       final data = imageUrl.split(',');
       if (data.length == 2) {
         final bytes = base64Decode(data.last);
-        return InteractiveViewer(
+        final img = InteractiveViewer(
           maxScale: 4.0,
           child: Image.memory(
             bytes,
@@ -1665,12 +1783,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ),
           ),
         );
+        return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
       }
     }
 
     if (isFileUri || isPlainPath) {
       final filePath = isFileUri ? uri.path : imageUrl;
-      return InteractiveViewer(
+      final img = InteractiveViewer(
         maxScale: 4.0,
         child: Image.file(
           File(filePath),
@@ -1682,6 +1801,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ),
         ),
       );
+      return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
     }
 
     return Icon(Icons.broken_image, size: 64, color: errorColor);
