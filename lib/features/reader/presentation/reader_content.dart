@@ -458,9 +458,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
         final scale = switch (level) {
-          1 => 1.6,
-          2 => 1.4,
-          3 => 1.2,
+          1 => 1.8,
+          2 => 1.5,
+          3 => 1.25,
           _ => 1.1,
         };
         final spacing = switch (level) {
@@ -474,9 +474,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             block.text,
             _getReaderStyle(settings).copyWith(
               fontSize: settings.fontSize * scale,
-              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+              fontWeight: FontWeight.bold,
             ),
-            block.textAlign ?? textAlign,
+            block.textAlign ?? TextAlign.left,
           ),
         );
       case BlockType.subtitle:
@@ -551,14 +551,15 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             top: settings.paragraphSpacing,
             left: settings.margin,
           ),
-          child: Text(
+          child: _buildHighlightedText(
             '— ${block.text}',
-            style: _getReaderStyle(settings).copyWith(
+            _getReaderStyle(settings).copyWith(
               fontSize: settings.fontSize * 0.9,
               fontStyle: FontStyle.italic,
               color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.6),
             ),
-            textAlign: TextAlign.right,
+            TextAlign.right,
+            richSpans: block.richSpans,
           ),
         );
       case BlockType.quote:
@@ -626,29 +627,28 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       case BlockType.list:
         return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = (block.textIndent != null && block.textIndent! > 0)
-            ? EdgeInsets.only(left: block.textIndent!)
-            : (settings.paragraphFirstLineIndent > 0
-                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-                  : EdgeInsets.zero);
+        final indentValue = (block.textIndent != null && block.textIndent! > 0)
+            ? block.textIndent!
+            : settings.paragraphFirstLineIndent;
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: Padding(
-            padding: indent,
-            child: blockHighlights != null && blockHighlights.isNotEmpty
-                ? HighlightedText(
+          child: blockHighlights != null && blockHighlights.isNotEmpty
+              ? Padding(
+                  padding: EdgeInsets.only(left: indentValue),
+                  child: HighlightedText(
                     text: block.text,
                     style: _getReaderStyle(settings),
                     textAlign: block.textAlign ?? textAlign,
                     highlights: blockHighlights,
-                  )
-                : _buildHighlightedText(
-                    block.text,
-                    _getReaderStyle(settings),
-                    block.textAlign ?? textAlign,
-                    richSpans: block.richSpans,
                   ),
-          ),
+                )
+              : _buildHighlightedText(
+                  block.text,
+                  _getReaderStyle(settings),
+                  block.textAlign ?? textAlign,
+                  richSpans: block.richSpans,
+                  firstLineIndent: indentValue,
+                ),
         );
     }
   }
@@ -658,18 +658,33 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     TextStyle style,
     TextAlign textAlign, {
     List<RichSpan>? richSpans,
+    double firstLineIndent = 0,
   }) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
       if (richSpans != null && richSpans.isNotEmpty) {
-        return Text.rich(
-          TextSpan(children: _buildRichTextSpans(richSpans, style)),
-          textAlign: textAlign,
-        );
+        final spans = _buildRichTextSpans(richSpans, style);
+        if (firstLineIndent > 0) {
+          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+        }
+        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
       }
       if (widget.settings.bionicReading) {
+        final spans = _bionicReadingSpans(text, style);
+        if (firstLineIndent > 0) {
+          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+        }
+        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+      }
+      if (firstLineIndent > 0) {
         return Text.rich(
-          TextSpan(children: _bionicReadingSpans(text, style)),
+          TextSpan(
+            children: [
+              WidgetSpan(child: SizedBox(width: firstLineIndent)),
+              TextSpan(text: text),
+            ],
+          ),
+          style: style,
           textAlign: textAlign,
         );
       }
@@ -693,16 +708,28 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
-      if (span.superscript) {
-        spanStyle = spanStyle.copyWith(
-          fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
-        );
-      }
       if (span.href != null) {
         spanStyle = spanStyle.copyWith(
           color: linkColor,
           decoration: TextDecoration.underline,
         );
+      }
+      if (span.superscript) {
+        final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Transform.translate(
+              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              child: Text(
+                span.text,
+                style: spanStyle.copyWith(fontSize: supFontSize),
+              ),
+            ),
+          ),
+        );
+        continue;
       }
       spans.add(TextSpan(text: span.text, style: spanStyle));
     }
@@ -726,8 +753,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         TextSpan(
           text: match.group(0),
           style: style.copyWith(
-            color: Colors.amber,
-            backgroundColor: Colors.black38,
+            backgroundColor: const Color(0x66FFEB3B),
           ),
         ),
       );
@@ -754,7 +780,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors = widget.customColors ?? ReaderColors.forTheme(settings.theme);
+    final colors =
+        widget.customColors ??
+        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     final String fontFamily;
     switch (settings.font) {
       case ReaderFont.inter:
@@ -1048,9 +1076,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
         final scale = switch (level) {
-          1 => 1.6,
-          2 => 1.4,
-          3 => 1.2,
+          1 => 1.8,
+          2 => 1.5,
+          3 => 1.25,
           _ => 1.1,
         };
         final spacing = switch (level) {
@@ -1094,7 +1122,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.separator:
         return ps * 4;
       case BlockType.image:
-        return settings.fontSize * 8;
+        final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
+        return (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
       case BlockType.footnote:
         return _measureTextHeight(
               block.text,
@@ -1114,19 +1143,33 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
         return totalHeight;
       case BlockType.paragraph:
-        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width) + ps;
+        final indent = (block.textIndent ?? settings.paragraphFirstLineIndent);
+        return _measureTextHeight(
+              block.text,
+              settings.fontSize,
+              settings.lineHeight,
+              width - indent,
+            ) +
+            ps;
     }
   }
 
   double _measureTextHeight(String text, double fontSize, double lineHeight, double maxWidth) {
     if (text.isEmpty) return fontSize * lineHeight;
+    final settings = widget.settings;
+    final colors =
+        widget.customColors ??
+        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
+    final fontFamily = settings.font == ReaderFont.inter ? 'Inter' : 'Literata';
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: TextStyle(
+          fontFamily: fontFamily,
           fontSize: fontSize,
           height: lineHeight,
-          letterSpacing: widget.settings.letterSpacing,
+          letterSpacing: settings.letterSpacing,
+          color: colors.text,
         ),
       ),
       textDirection: TextDirection.ltr,
@@ -1187,6 +1230,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       );
     }
 
+    final isFocus = settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
+    final effectiveMargin = isFocus
+        ? EdgeInsets.symmetric(
+            horizontal: settings.margin * 1.5,
+            vertical: settings.margin,
+          )
+        : EdgeInsets.all(settings.margin);
+
     return SafeArea(
       key: ValueKey('page-$index'),
       top: false,
@@ -1194,7 +1245,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       child: Directionality(
         textDirection: _effectiveTextDirection(context),
         child: Padding(
-          padding: EdgeInsets.all(settings.margin),
+          padding: effectiveMargin,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: content,
@@ -1262,9 +1313,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
         final scale = switch (level) {
-          1 => 1.6,
-          2 => 1.4,
-          3 => 1.2,
+          1 => 1.8,
+          2 => 1.5,
+          3 => 1.25,
           _ => 1.1,
         };
         final spacing = switch (level) {
@@ -1278,9 +1329,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             block.text,
             style.copyWith(
               fontSize: settings.fontSize * scale,
-              fontWeight: level <= 2 ? FontWeight.bold : FontWeight.w600,
+              fontWeight: FontWeight.bold,
             ),
-            block.textAlign ?? textAlign,
+            block.textAlign ?? TextAlign.left,
           ),
         );
       case BlockType.subtitle:
@@ -1353,14 +1404,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             top: settings.paragraphSpacing,
             left: settings.margin,
           ),
-          child: Text(
+          child: _buildHighlightedText(
             '— ${block.text}',
-            style: style.copyWith(
+            style.copyWith(
               fontSize: settings.fontSize * 0.9,
               fontStyle: FontStyle.italic,
               color: (style.color ?? Colors.black).withValues(alpha: 0.6),
             ),
-            textAlign: TextAlign.right,
+            TextAlign.right,
+            richSpans: block.richSpans,
           ),
         );
       case BlockType.quote:
@@ -1422,29 +1474,28 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.list:
         return _buildList(block, settings, textAlign);
       case BlockType.paragraph:
-        final indent = (block.textIndent != null && block.textIndent! > 0)
-            ? EdgeInsets.only(left: block.textIndent!)
-            : (settings.paragraphFirstLineIndent > 0
-                  ? EdgeInsets.only(left: settings.paragraphFirstLineIndent)
-                  : EdgeInsets.zero);
+        final indentValue = (block.textIndent != null && block.textIndent! > 0)
+            ? block.textIndent!
+            : settings.paragraphFirstLineIndent;
         return Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: Padding(
-            padding: indent,
-            child: blockHighlights != null && blockHighlights.isNotEmpty
-                ? HighlightedText(
+          child: blockHighlights != null && blockHighlights.isNotEmpty
+              ? Padding(
+                  padding: EdgeInsets.only(left: indentValue),
+                  child: HighlightedText(
                     text: block.text,
                     style: style,
                     textAlign: block.textAlign ?? textAlign,
                     highlights: blockHighlights,
-                  )
-                : _buildHighlightedText(
-                    block.text,
-                    style,
-                    block.textAlign ?? textAlign,
-                    richSpans: block.richSpans,
                   ),
-          ),
+                )
+              : _buildHighlightedText(
+                  block.text,
+                  style,
+                  block.textAlign ?? textAlign,
+                  richSpans: block.richSpans,
+                  firstLineIndent: indentValue,
+                ),
         );
     }
   }
@@ -1454,18 +1505,33 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     TextStyle style,
     TextAlign textAlign, {
     List<RichSpan>? richSpans,
+    double firstLineIndent = 0,
   }) {
     final query = widget.highlightQuery?.trim();
     if (query == null || query.isEmpty) {
       if (richSpans != null && richSpans.isNotEmpty) {
-        return Text.rich(
-          TextSpan(children: _buildRichTextSpans(richSpans, style)),
-          textAlign: textAlign,
-        );
+        final spans = _buildRichTextSpans(richSpans, style);
+        if (firstLineIndent > 0) {
+          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+        }
+        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
       }
       if (widget.settings.bionicReading) {
+        final spans = _bionicReadingSpans(text, style);
+        if (firstLineIndent > 0) {
+          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+        }
+        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+      }
+      if (firstLineIndent > 0) {
         return Text.rich(
-          TextSpan(children: _bionicReadingSpans(text, style)),
+          TextSpan(
+            children: [
+              WidgetSpan(child: SizedBox(width: firstLineIndent)),
+              TextSpan(text: text),
+            ],
+          ),
+          style: style,
           textAlign: textAlign,
         );
       }
@@ -1489,16 +1555,28 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       var spanStyle = baseStyle;
       if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
       if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
-      if (span.superscript) {
-        spanStyle = spanStyle.copyWith(
-          fontSize: baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0,
-        );
-      }
       if (span.href != null) {
         spanStyle = spanStyle.copyWith(
           color: linkColor,
           decoration: TextDecoration.underline,
         );
+      }
+      if (span.superscript) {
+        final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Transform.translate(
+              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              child: Text(
+                span.text,
+                style: spanStyle.copyWith(fontSize: supFontSize),
+              ),
+            ),
+          ),
+        );
+        continue;
       }
       spans.add(TextSpan(text: span.text, style: spanStyle));
     }
@@ -1522,8 +1600,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         TextSpan(
           text: match.group(0),
           style: style.copyWith(
-            color: Colors.amber,
-            backgroundColor: Colors.black38,
+            backgroundColor: const Color(0x66FFEB3B),
           ),
         ),
       );
@@ -1547,7 +1624,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors = widget.customColors ?? ReaderColors.forTheme(settings.theme);
+    final colors =
+        widget.customColors ??
+        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     final String fontFamily;
     switch (settings.font) {
       case ReaderFont.inter:
@@ -1913,6 +1992,14 @@ class _SmoothScrollBehavior extends ScrollBehavior {
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const BouncingScrollPhysics();
+    final platform = Theme.of(context).platform;
+    return switch (platform) {
+      TargetPlatform.android ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows ||
+      TargetPlatform.fuchsia ||
+      TargetPlatform.linux => const ClampingScrollPhysics(),
+      TargetPlatform.iOS => const BouncingScrollPhysics(),
+    };
   }
 }

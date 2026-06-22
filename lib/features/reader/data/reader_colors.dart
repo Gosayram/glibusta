@@ -31,6 +31,13 @@ class ReaderColors {
     };
   }
 
+  static ReaderColors forThemeWithContext(ReaderTheme theme, Brightness brightness) {
+    if (theme == ReaderTheme.system) {
+      return brightness == Brightness.dark ? _dark : _light;
+    }
+    return forTheme(theme);
+  }
+
   static Color progressColor(ReaderTheme theme) {
     return switch (theme) {
       ReaderTheme.system || ReaderTheme.light => Colors.blue.shade700,
