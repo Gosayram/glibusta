@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 
@@ -64,6 +65,56 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   if (context.mounted) {
                     unawaited(SmartDialog.showToast('Текст скопирован'));
                   }
+                }
+                widget.onDismiss();
+              },
+            ),
+            _ToolbarButton(
+              icon: Icons.share,
+              label: 'Поделиться',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final uri = Uri(
+                    scheme: 'mailto',
+                    queryParameters: {'body': _selectedText},
+                  );
+                  await launchUrl(uri);
+                }
+                widget.onDismiss();
+              },
+            ),
+            _ToolbarButton(
+              icon: Icons.search,
+              label: 'В поиске',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://www.google.com/search?q=$query');
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                widget.onDismiss();
+              },
+            ),
+            _ToolbarButton(
+              icon: Icons.translate,
+              label: 'Перевод',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$query');
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+                widget.onDismiss();
+              },
+            ),
+            _ToolbarButton(
+              icon: Icons.menu_book,
+              label: 'Словарь',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://api.dictionaryapi.dev/api/v2/entries/en/$query');
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
                 widget.onDismiss();
               },

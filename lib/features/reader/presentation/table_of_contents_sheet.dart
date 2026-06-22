@@ -58,7 +58,23 @@ class TableOfContentsSheet extends StatelessWidget {
   }
 }
 
-class _TableOfContentsContent extends StatelessWidget {
+class _TocEntry {
+  final int index;
+  final String title;
+  final int depth;
+  final bool isGroup;
+  final int groupId;
+
+  const _TocEntry({
+    required this.index,
+    required this.title,
+    required this.depth,
+    required this.isGroup,
+    required this.groupId,
+  });
+}
+
+class _TableOfContentsContent extends StatefulWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final ValueChanged<ReaderPosition> onJumpToPosition;
@@ -76,7 +92,72 @@ class _TableOfContentsContent extends StatelessWidget {
   });
 
   @override
+  State<_TableOfContentsContent> createState() => _TableOfContentsContentState();
+}
+
+class _TableOfContentsContentState extends State<_TableOfContentsContent> {
+  final Set<int> _collapsedGroups = {};
+
+  List<_TocEntry> _buildHierarchy() {
+    final titles = widget.metadata.chapterTitles;
+    final entries = <_TocEntry>[];
+    final depthStack = <({int depth, int groupId, String title})>[];
+
+    for (var i = 0; i < titles.length; i++) {
+      final title = i < titles.length ? titles[i] : '';
+      final depth = _detectDepth(title);
+
+      while (depthStack.isNotEmpty && depthStack.last.depth >= depth) {
+        depthStack.removeLast();
+      }
+
+      final groupId = depthStack.isNotEmpty ? depthStack.last.groupId : i;
+      entries.add(
+        _TocEntry(
+          index: i,
+          title: title,
+          depth: depth,
+          isGroup: false,
+          groupId: groupId,
+        ),
+      );
+      depthStack.add((depth: depth, groupId: i, title: title));
+    }
+
+    final childGroupIds = <int>{};
+    for (final entry in entries) {
+      if (entries.any((e) => e.groupId == entry.index && e.index != entry.index)) {
+        childGroupIds.add(entry.index);
+      }
+    }
+
+    return entries.map((e) {
+      if (childGroupIds.contains(e.index)) {
+        return _TocEntry(
+          index: e.index,
+          title: e.title,
+          depth: e.depth,
+          isGroup: true,
+          groupId: e.groupId,
+        );
+      }
+      return e;
+    }).toList();
+  }
+
+  int _detectDepth(String title) {
+    final trimmed = title.trim();
+    final match = RegExp(r'^(\d+(?:[.\-]\d+)*)\s').firstMatch(trimmed);
+    if (match != null) {
+      return match.group(1)!.split(RegExp(r'[.\-]')).length - 1;
+    }
+    if (trimmed.startsWith(RegExp(r'[IVX]+\s'))) return 1;
+    return 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final entries = _buildHierarchy();
     return Column(
       children: [
         Padding(
@@ -107,7 +188,7 @@ class _TableOfContentsContent extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${metadata.chapterCount} глав',
+                '${widget.metadata.chapterCount} глав',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -119,41 +200,68 @@ class _TableOfContentsContent extends StatelessWidget {
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
-            controller: scrollController,
-            itemCount: metadata.chapterCount,
+            controller: widget.scrollController,
+            itemCount: entries.length,
             itemBuilder: (context, index) {
-              final title = index < metadata.chapterTitles.length
-                  ? metadata.chapterTitles[index]
-                  : '';
-              final isActive = index == currentChapterIndex;
-              final isLoaded = loadedChapters.containsKey(index);
-              final isUnloaded = !isLoaded && isDynamicallyLoading;
+              final entry = entries[index];
+              final title = entry.title.isNotEmpty ? entry.title : 'Глава ${entry.index + 1}';
+              final isActive = entry.index == widget.currentChapterIndex;
+              final isGroup = entry.isGroup;
+              final isCollapsed = _collapsedGroups.contains(entry.groupId);
+              final isLoaded = widget.loadedChapters.containsKey(entry.index);
+              final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
+
               return ListTile(
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: isUnloaded
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isActive
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                contentPadding: EdgeInsets.only(
+                  left: 16.0 + entry.depth * 16.0,
                 ),
+                leading: isGroup
+                    ? GestureDetector(
+                        onTap: () => setState(() {
+                          if (isCollapsed) {
+                            _collapsedGroups.remove(entry.groupId);
+                          } else {
+                            _collapsedGroups.add(entry.groupId);
+                          }
+                        }),
+                        child: Icon(
+                          isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      )
+                    : CircleAvatar(
+                        radius: 16,
+                        backgroundColor: isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: isUnloaded
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                '${entry.index + 1}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isActive
+                                      ? Theme.of(context).colorScheme.onPrimary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                      ),
                 title: Text(
-                  title.isNotEmpty ? title : 'Глава ${index + 1}',
+                  title,
                   style: TextStyle(
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isActive
+                        ? FontWeight.bold
+                        : isGroup
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    fontSize: isGroup ? 14 : 13,
                     color: isUnloaded
                         ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
                         : isActive
@@ -161,7 +269,19 @@ class _TableOfContentsContent extends StatelessWidget {
                         : null,
                   ),
                 ),
-                subtitle: isUnloaded
+                subtitle: isActive
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: LinearProgressIndicator(
+                          value: widget.metadata.chapterCount <= 1
+                              ? 0.0
+                              : (widget.currentChapterIndex / (widget.metadata.chapterCount - 1))
+                                    .clamp(0.0, 1.0),
+                          minHeight: 2,
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        ),
+                      )
+                    : isUnloaded
                     ? Text(
                         'загрузка...',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -172,13 +292,13 @@ class _TableOfContentsContent extends StatelessWidget {
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();
-                  final progress = metadata.chapterCount <= 1
+                  final progress = widget.metadata.chapterCount <= 1
                       ? 0.0
-                      : index / (metadata.chapterCount - 1);
-                  onJumpToPosition(
+                      : entry.index / (widget.metadata.chapterCount - 1);
+                  widget.onJumpToPosition(
                     ReaderPosition(
-                      bookId: metadata.id,
-                      chapterIndex: index,
+                      bookId: widget.metadata.id,
+                      chapterIndex: entry.index,
                       paragraphIndex: 0,
                       progressPercent: progress,
                       updatedAt: DateTime.now(),

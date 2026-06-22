@@ -72,6 +72,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       ref.listenManual(readerSettingsProvider, (prev, next) {
         _syncFullscreen(next.mode);
         if (prev != null) _handleLayoutChange(prev, next);
+        if (prev == null || prev.orientationLock != next.orientationLock) {
+          _syncOrientation(next.orientationLock);
+        }
       });
     });
   }
@@ -85,6 +88,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     } else {
       _ctrl.disableFullscreen();
     }
+  }
+
+  void _syncOrientation(OrientationLock lock) {
+    final orientations = switch (lock) {
+      OrientationLock.none => null,
+      OrientationLock.portrait => [DeviceOrientation.portraitUp],
+      OrientationLock.landscape => [
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ],
+    };
+    unawaited(
+      SystemChrome.setPreferredOrientations(orientations ?? []),
+    );
   }
 
   void _handleLayoutChange(ReaderSettings prev, ReaderSettings next) {
@@ -142,6 +159,46 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
   }
 
+  // Horizontal swipe for page turns
+  double _dragStartX = 0;
+  bool _isHorizontalDrag = false;
+
+  void _handleHorizontalDragStart(DragStartDetails details) {
+    _dragStartX = details.globalPosition.dx;
+    _isHorizontalDrag = false;
+  }
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
+    final deltaX = details.globalPosition.dx - _dragStartX;
+    if (deltaX.abs() > 20) {
+      _isHorizontalDrag = true;
+    }
+  }
+
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    if (!_isHorizontalDrag) return;
+    final settings = ref.read(readerSettingsProvider);
+    final sensitivity = switch (settings.horizontalGestureScroll) {
+      HorizontalGestureScroll.half => 0.5,
+      HorizontalGestureScroll.twoThirds => 0.67,
+      HorizontalGestureScroll.threeQuarters => 0.75,
+    };
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final threshold = screenWidth * sensitivity;
+    final deltaX = details.globalPosition.dx - _dragStartX;
+    final velocity = details.primaryVelocity ?? 0;
+
+    if (deltaX.abs() > threshold || velocity.abs() > 500) {
+      final isForward = deltaX < 0 || velocity < 0;
+      final isInverted = settings.horizontalGesture == HorizontalGesture.inverse;
+      if (isForward != isInverted) {
+        _goToNextPage();
+      } else {
+        _goToPreviousPage();
+      }
+    }
+  }
+
   void _goToNextPage() {
     unawaited(HapticFeedback.lightImpact());
     _ctrl.scrollToNext();
@@ -156,6 +213,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void dispose() {
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    unawaited(SystemChrome.setPreferredOrientations([]));
     super.dispose();
   }
 
@@ -373,6 +431,32 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               theme: settings.theme,
             ),
           ),
+        if (settings.scrollbarIndicator)
+          Positioned(
+            right: 2,
+            top: 48,
+            bottom: 60,
+            child: _ScrollbarIndicator(progress: readerState.scrollProgress),
+          ),
+        Positioned(
+          right: 0,
+          top: 48,
+          bottom: 60,
+          width: 20,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: (details) {
+              final v = details.primaryVelocity ?? 0;
+              if (v.abs() < 100) return;
+              final themes = ReaderTheme.values;
+              final current = themes.indexOf(settings.theme);
+              final next = v > 0
+                  ? (current + 1) % themes.length
+                  : (current - 1 + themes.length) % themes.length;
+              ref.read(readerSettingsProvider.notifier).updateTheme(themes[next]);
+            },
+          ),
+        ),
         if (!_isDistractionFree(settings)) ...[
           Positioned(
             top: 0,
@@ -513,6 +597,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               _gestureCoordinator.shouldHandleDoubleTap &&
                   settings.doubleTapAction != DoubleTapAction.disabled
               ? _ctrl.handleDoubleTap
+              : null,
+          onHorizontalDragStart:
+              _gestureCoordinator.shouldHandleVerticalDrag &&
+                  settings.horizontalGesture != HorizontalGesture.off
+              ? _handleHorizontalDragStart
+              : null,
+          onHorizontalDragUpdate:
+              _gestureCoordinator.shouldHandleVerticalDrag &&
+                  settings.horizontalGesture != HorizontalGesture.off
+              ? _handleHorizontalDragUpdate
+              : null,
+          onHorizontalDragEnd:
+              _gestureCoordinator.shouldHandleVerticalDrag &&
+                  settings.horizontalGesture != HorizontalGesture.off
+              ? _handleHorizontalDragEnd
               : null,
           onLongPress:
               _gestureCoordinator.shouldHandleLongPress &&
@@ -763,5 +862,37 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       }
     }
     return result;
+  }
+}
+
+class _ScrollbarIndicator extends StatelessWidget {
+  const _ScrollbarIndicator({required this.progress});
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackH = constraints.maxHeight;
+        final thumbH = (trackH * 0.15).clamp(20.0, trackH);
+        final thumbTop = (trackH - thumbH) * progress.clamp(0.0, 1.0);
+        return Stack(
+          children: [
+            Positioned(
+              top: thumbTop,
+              right: 0,
+              child: Container(
+                width: 3,
+                height: thumbH,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

@@ -211,6 +211,11 @@ class ReaderBlock {
   );
 }
 
+/// Signature for a block transformer hook.
+/// Plugins can register transformers to modify blocks before rendering.
+/// Return null to skip the block entirely, or a modified/new block.
+typedef BlockTransformer = ReaderBlock? Function(ReaderBlock block);
+
 class RichSpan {
   final String text;
   final bool bold;

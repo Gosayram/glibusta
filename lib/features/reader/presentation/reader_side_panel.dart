@@ -32,6 +32,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   late final BookmarkRepository _bookmarks;
   late final NoteRepository _notes;
   late final QuoteRepository _quotes;
+  final Set<int> _collapsedGroups = {};
 
   @override
   void initState() {
@@ -77,26 +78,122 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   }
 
   Widget _buildTableOfContents(BuildContext context) {
+    final chapters = _buildHierarchy();
     return ListView.builder(
-      itemCount: widget.metadata.chapterCount,
+      itemCount: chapters.length,
       itemBuilder: (context, index) {
-        final title = index < widget.metadata.chapterTitles.length
-            ? widget.metadata.chapterTitles[index]
-            : '';
-        final isActive = index == widget.currentChapterIndex;
+        final item = chapters[index];
+        final title = item.title.isNotEmpty ? item.title : 'Глава ${item.index + 1}';
+        final isActive = item.index == widget.currentChapterIndex;
+        final isGroup = item.isGroup;
+        final isCollapsed = _collapsedGroups.contains(item.groupId);
+
         return ListTile(
+          contentPadding: EdgeInsets.only(left: 12.0 + item.depth * 16.0),
+          leading: isGroup
+              ? GestureDetector(
+                  onTap: () => setState(() {
+                    if (isCollapsed) {
+                      _collapsedGroups.remove(item.groupId);
+                    } else {
+                      _collapsedGroups.add(item.groupId);
+                    }
+                  }),
+                  child: Icon(
+                    isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                )
+              : null,
           title: Text(
-            title.isNotEmpty ? title : 'Глава ${index + 1}',
+            title,
             style: TextStyle(
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isActive
+                  ? FontWeight.bold
+                  : isGroup
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+              fontSize: isGroup ? 14 : 13,
               color: isActive ? Theme.of(context).colorScheme.primary : null,
             ),
           ),
+          subtitle: isActive
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinearProgressIndicator(
+                    value: widget.metadata.chapterCount <= 1
+                        ? 0.0
+                        : (widget.currentChapterIndex / (widget.metadata.chapterCount - 1)).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                    minHeight: 2,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                )
+              : null,
           dense: true,
-          onTap: () => _jumpToChapter(index),
+          onTap: () => _jumpToChapter(item.index),
         );
       },
     );
+  }
+
+  List<_TocItem> _buildHierarchy() {
+    final titles = widget.metadata.chapterTitles;
+    final items = <_TocItem>[];
+    final depthStack = <_DepthInfo>[];
+
+    for (var i = 0; i < titles.length; i++) {
+      final title = i < titles.length ? titles[i] : '';
+      final depth = _detectDepth(title);
+
+      while (depthStack.isNotEmpty && depthStack.last.depth >= depth) {
+        depthStack.removeLast();
+      }
+
+      final groupId = depthStack.isNotEmpty ? depthStack.last.groupId : i;
+
+      items.add(
+        _TocItem(
+          index: i,
+          title: title,
+          depth: depth,
+          isGroup: false,
+          groupId: groupId,
+        ),
+      );
+
+      depthStack.add(_DepthInfo(depth: depth, groupId: i, title: title));
+    }
+
+    // Mark parents: any index that appears in depthStack as a groupId for later items
+    final parentIndices = <int>{};
+    for (final item in items) {
+      if (items.any((other) => other.groupId == item.index && other.index != item.index)) {
+        parentIndices.add(item.index);
+      }
+    }
+
+    return items.map((item) {
+      if (parentIndices.contains(item.index)) {
+        final titleIdx = depthStack.indexWhere((d) => d.groupId == item.index);
+        final title = titleIdx >= 0 ? depthStack[titleIdx].title : item.title;
+        return item.copyWith(isGroup: true, title: title);
+      }
+      return item;
+    }).toList();
+  }
+
+  int _detectDepth(String title) {
+    final trimmed = title.trim();
+    final match = RegExp(r'^(\d+(?:[.\-]\d+)*)\s').firstMatch(trimmed);
+    if (match != null) {
+      return match.group(1)!.split(RegExp(r'[.\-]')).length - 1;
+    }
+    if (trimmed.startsWith(RegExp(r'[IVX]+\s'))) return 1;
+    return 0;
   }
 
   Widget _buildBookmarks() {
@@ -234,4 +331,44 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   String _positionText(int chapterIndex) {
     return 'Глава ${chapterIndex + 1}';
   }
+}
+
+class _TocItem {
+  final int index;
+  final String title;
+  final int depth;
+  final bool isGroup;
+  final int groupId;
+
+  const _TocItem({
+    required this.index,
+    required this.title,
+    required this.depth,
+    required this.isGroup,
+    required this.groupId,
+  });
+
+  _TocItem copyWith({
+    int? index,
+    String? title,
+    int? depth,
+    bool? isGroup,
+    int? groupId,
+  }) {
+    return _TocItem(
+      index: index ?? this.index,
+      title: title ?? this.title,
+      depth: depth ?? this.depth,
+      isGroup: isGroup ?? this.isGroup,
+      groupId: groupId ?? this.groupId,
+    );
+  }
+}
+
+class _DepthInfo {
+  final int depth;
+  final int groupId;
+  final String title;
+
+  const _DepthInfo({required this.depth, required this.groupId, required this.title});
 }

@@ -31,6 +31,7 @@ class ReaderSettingsPersistence {
         ),
         paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 8.0,
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
+        fontWeightDelta: (map['fontWeightDelta'] as num?)?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(
           (e) => e.name == map['textAlign'],
           orElse: () => ReaderTextAlign.left,
@@ -78,6 +79,23 @@ class ReaderSettingsPersistence {
           orElse: () => LongPressAction.selectText,
         ),
         restoreLastPosition: map['restoreLastPosition'] as bool? ?? true,
+        horizontalGesture: HorizontalGesture.values.firstWhere(
+          (e) => e.name == map['horizontalGesture'],
+          orElse: () => HorizontalGesture.on,
+        ),
+        horizontalGestureScroll: HorizontalGestureScroll.values.firstWhere(
+          (e) => e.name == map['horizontalGestureScroll'],
+          orElse: () => HorizontalGestureScroll.half,
+        ),
+        perceptionExpander: map['perceptionExpander'] as bool? ?? false,
+        hideBarsOnFastScroll: map['hideBarsOnFastScroll'] as bool? ?? false,
+        orientationLock: OrientationLock.values.firstWhere(
+          (e) => e.name == map['orientationLock'],
+          orElse: () => OrientationLock.none,
+        ),
+        bionicReading: map['bionicReading'] as bool? ?? false,
+        horizontalLimiter: map['horizontalLimiter'] as bool? ?? false,
+        scrollbarIndicator: map['scrollbarIndicator'] as bool? ?? false,
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -97,6 +115,7 @@ class ReaderSettingsPersistence {
         'font': settings.font.name,
         'paragraphSpacing': settings.paragraphSpacing,
         'letterSpacing': settings.letterSpacing,
+        'fontWeightDelta': settings.fontWeightDelta,
         'textAlign': settings.textAlign.name,
         'autoThemeMode': settings.autoThemeMode.name,
         'customDayHour': settings.customDayHour,
@@ -117,6 +136,14 @@ class ReaderSettingsPersistence {
         'doubleTapAction': settings.doubleTapAction.name,
         'longPressAction': settings.longPressAction.name,
         'restoreLastPosition': settings.restoreLastPosition,
+        'horizontalGesture': settings.horizontalGesture.name,
+        'horizontalGestureScroll': settings.horizontalGestureScroll.name,
+        'perceptionExpander': settings.perceptionExpander,
+        'hideBarsOnFastScroll': settings.hideBarsOnFastScroll,
+        'orientationLock': settings.orientationLock.name,
+        'bionicReading': settings.bionicReading,
+        'horizontalLimiter': settings.horizontalLimiter,
+        'scrollbarIndicator': settings.scrollbarIndicator,
       }),
     );
   }

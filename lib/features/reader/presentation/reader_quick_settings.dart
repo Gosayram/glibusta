@@ -6,14 +6,36 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'reader_providers.dart';
 
-class ReaderQuickSettingsSheet extends ConsumerWidget {
+class ReaderQuickSettingsSheet extends ConsumerStatefulWidget {
   const ReaderQuickSettingsSheet({super.key, this.onDismiss, this.bookId});
 
   final VoidCallback? onDismiss;
   final String? bookId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReaderQuickSettingsSheet> createState() => _ReaderQuickSettingsSheetState();
+}
+
+class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSheet> {
+  late final PageController _pageController;
+  int _currentPage = 0;
+
+  static const _pageLabels = ['Внешний вид', 'Режим', 'Жесты'];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
 
@@ -22,160 +44,262 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.only(top: 12),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 16),
-
-              if (bookId != null) _buildPerBookSection(context, ref, bookId!),
-
-              const Text('Тема', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildThemeRow(context, settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Шрифт', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildFontRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Размер шрифта', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildFontSizeRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Межстрочный', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildLineHeightRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Отступы', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildMarginRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Авто-тема', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildAutoThemeRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Режим', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildModeRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Яркость', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildBrightnessRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Тёплый фильтр', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildWarmthRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              _buildToggleRow(
-                'Не выключать экран',
-                Icons.screen_lock_portrait,
-                settings.keepScreenAwake,
-                (v) => notifier.updateKeepScreenAwake(v),
+            ),
+            const SizedBox(height: 12),
+            _buildPageIndicator(context),
+            const SizedBox(height: 8),
+            if (widget.bookId != null) _buildPerBookSection(context, ref, widget.bookId!),
+            SizedBox(
+              height: _estimatedPageHeight(context),
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (i) => setState(() => _currentPage = i),
+                children: [
+                  _buildPage1(context, settings, notifier),
+                  _buildPage2(context, settings, notifier),
+                  _buildPage3(context, settings, notifier),
+                ],
               ),
-              const SizedBox(height: 12),
-
-              _buildToggleRow(
-                'Переносы',
-                Icons.format_textdirection_l_to_r,
-                settings.hyphenation,
-                (v) => notifier.updateHyphenation(v),
-              ),
-              const SizedBox(height: 20),
-
-              const Text('Скрытие UI (сек)', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildAutoHideRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Позиция прогресса', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildProgressBarPositionRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Содержимое нижней панели', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildBottomBarContentRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Зоны касания', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildTapZoneRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Анимация страниц', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildPageTurnAnimationRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Направление текста', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildTextDirectionRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Ширина читателя', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildReaderWidthRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              _buildToggleRow(
-                'Вертикальный свайп для яркости',
-                Icons.swipe_up,
-                settings.verticalSwipeBrightness,
-                (v) => notifier.updateVerticalSwipeBrightness(v),
-              ),
-              const SizedBox(height: 20),
-
-              const Text('Двойной тап', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildDoubleTapActionRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              const Text('Долгое нажатие', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildLongPressActionRow(settings, notifier),
-              const SizedBox(height: 20),
-
-              _buildToggleRow(
-                'Восстанавливать позицию',
-                Icons.restore,
-                settings.restoreLastPosition,
-                (v) => notifier.updateRestoreLastPosition(v),
-              ),
-              const SizedBox(height: 20),
-
-              const Text('Кодировка', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildEncodingRow(settings, notifier),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+          ],
         ),
       ),
     );
   }
+
+  double _estimatedPageHeight(BuildContext context) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    return screenH * 0.5;
+  }
+
+  Widget _buildPageIndicator(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(_pageLabels.length, (i) {
+        final isActive = i == _currentPage;
+        return GestureDetector(
+          onTap: () => _pageController.animateToPage(
+            i,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              _pageLabels[i],
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                color: isActive
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  // ── Page 1: Внешний вид (Display) ──
+
+  Widget _buildPage1(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        const _SectionTitle('Тема'),
+        _buildThemeRow(context, settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Шрифт'),
+        _buildFontRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Размер шрифта'),
+        _buildFontSizeRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Толщина шрифта'),
+        _buildFontWeightRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Межстрочный'),
+        _buildLineHeightRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Отступы'),
+        _buildMarginRow(settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Яркость'),
+        _buildBrightnessRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Тёплый фильтр'),
+        _buildWarmthRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Ширина читателя'),
+        _buildReaderWidthRow(settings, notifier),
+      ],
+    );
+  }
+
+  // ── Page 2: Режим (Mode) ──
+
+  Widget _buildPage2(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        const _SectionTitle('Режим чтения'),
+        _buildModeRow(settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Текст и переносы'),
+        _buildTextDirectionRow(settings, notifier),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Переносы слов',
+          Icons.format_textdirection_l_to_r,
+          settings.hyphenation,
+          (v) => notifier.updateHyphenation(v),
+        ),
+        const SizedBox(height: 16),
+        const _SectionTitle('Анимация страниц'),
+        _buildPageTurnAnimationRow(settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Авто-тема'),
+        _buildAutoThemeRow(settings, notifier),
+        const SizedBox(height: 16),
+        _buildToggleRow(
+          'Не выключать экран',
+          Icons.screen_lock_portrait,
+          settings.keepScreenAwake,
+          (v) => notifier.updateKeepScreenAwake(v),
+        ),
+        const SizedBox(height: 12),
+        const _SectionTitle('Кодировка'),
+        _buildEncodingRow(settings, notifier),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Восстанавливать позицию',
+          Icons.restore,
+          settings.restoreLastPosition,
+          (v) => notifier.updateRestoreLastPosition(v),
+        ),
+      ],
+    );
+  }
+
+  // ── Page 3: Жесты (Gestures & behavior) ──
+
+  Widget _buildPage3(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        const _SectionTitle('Горизонтальный жест'),
+        _buildHorizontalGestureRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Чувствительность свайпа'),
+        _buildHorizontalGestureScrollRow(settings, notifier),
+        const SizedBox(height: 16),
+        _buildToggleRow(
+          'Вертикальный свайп для яркости',
+          Icons.swipe_up,
+          settings.verticalSwipeBrightness,
+          (v) => notifier.updateVerticalSwipeBrightness(v),
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Расширитель восприятия',
+          Icons.view_sidebar_outlined,
+          settings.perceptionExpander,
+          (v) => notifier.updatePerceptionExpander(v),
+        ),
+        const SizedBox(height: 12),
+
+        _buildToggleRow(
+          'Горизонтальный лимитер',
+          Icons.center_focus_strong,
+          settings.horizontalLimiter,
+          (v) => notifier.updateHorizontalLimiter(v),
+        ),
+        const SizedBox(height: 12),
+
+        _buildToggleRow(
+          'Bionic Reading',
+          Icons.speed,
+          settings.bionicReading,
+          (v) => notifier.updateBionicReading(v),
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Полоса прокрутки',
+          Icons.view_sidebar_outlined,
+          settings.scrollbarIndicator,
+          (v) => notifier.updateScrollbarIndicator(v),
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Скрытие панелей при прокрутке',
+          Icons.speed,
+          settings.hideBarsOnFastScroll,
+          (v) => notifier.updateHideBarsOnFastScroll(v),
+        ),
+        const SizedBox(height: 16),
+        const _SectionTitle('Ориентация экрана'),
+        _buildOrientationLockRow(settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Зоны касания'),
+        _buildTapZoneRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Двойной тап'),
+        _buildDoubleTapActionRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Долгое нажатие'),
+        _buildLongPressActionRow(settings, notifier),
+        const SizedBox(height: 16),
+        const _SectionTitle('Скрытие UI (сек)'),
+        _buildAutoHideRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Позиция прогресса'),
+        _buildProgressBarPositionRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Нижняя панель'),
+        _buildBottomBarContentRow(settings, notifier),
+      ],
+    );
+  }
+
+  // ── Shared builders ──
 
   static Widget _buildThemeRow(
     BuildContext context,
@@ -277,6 +401,30 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     );
   }
 
+  static Widget _buildFontWeightRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Row(
+      children: [
+        const Icon(Icons.straighten, size: 20),
+        Expanded(
+          child: Slider(
+            value: settings.fontWeightDelta,
+            min: -1,
+            divisions: 4,
+            label: settings.fontWeightDelta == 0
+                ? 'Норма'
+                : settings.fontWeightDelta > 0
+                ? 'Жирнее'
+                : 'Тоньше',
+            onChanged: (v) => notifier.updateFontWeightDelta(v),
+          ),
+        ),
+      ],
+    );
+  }
+
   static Widget _buildLineHeightRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
@@ -340,7 +488,10 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
               DropdownButton<int>(
                 value: settings.customDayHour,
                 isDense: true,
-                items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text('$i:00'))),
+                items: List.generate(
+                  24,
+                  (i) => DropdownMenuItem(value: i, child: Text('$i:00')),
+                ),
                 onChanged: (v) {
                   if (v != null) notifier.updateCustomDayHour(v);
                 },
@@ -350,7 +501,10 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
               DropdownButton<int>(
                 value: settings.customNightHour,
                 isDense: true,
-                items: List.generate(24, (i) => DropdownMenuItem(value: i, child: Text('$i:00'))),
+                items: List.generate(
+                  24,
+                  (i) => DropdownMenuItem(value: i, child: Text('$i:00')),
+                ),
                 onChanged: (v) {
                   if (v != null) notifier.updateCustomNightHour(v);
                 },
@@ -607,8 +761,9 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
   ) {
     const labels = {
       DoubleTapAction.toggleUI: 'Скрыть/показать UI',
-      DoubleTapAction.addBookmark: 'Добавить закладку',
-      DoubleTapAction.toggleFullscreen: 'Полноэкранный режим',
+      DoubleTapAction.addBookmark: 'Закладка',
+      DoubleTapAction.toggleFullscreen: 'Полноэкранный',
+      DoubleTapAction.translate: 'Перевести абзац',
       DoubleTapAction.disabled: 'Выкл',
     };
     return Wrap(
@@ -630,8 +785,8 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
   ) {
     const labels = {
       LongPressAction.selectText: 'Выделить текст',
-      LongPressAction.addBookmark: 'Добавить закладку',
-      LongPressAction.openMenu: 'Открыть меню',
+      LongPressAction.addBookmark: 'Закладка',
+      LongPressAction.openMenu: 'Меню',
       LongPressAction.disabled: 'Выкл',
     };
     return Wrap(
@@ -647,8 +802,71 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
     );
   }
 
+  static Widget _buildHorizontalGestureRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      HorizontalGesture.off: 'Выкл',
+      HorizontalGesture.on: 'Вкл',
+      HorizontalGesture.inverse: 'Инверсия',
+    };
+    return Wrap(
+      spacing: 8,
+      children: HorizontalGesture.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.horizontalGesture == v,
+          onSelected: (_) => notifier.updateHorizontalGesture(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildHorizontalGestureScrollRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      HorizontalGestureScroll.half: '1/2 экрана',
+      HorizontalGestureScroll.twoThirds: '2/3 экрана',
+      HorizontalGestureScroll.threeQuarters: '3/4 экрана',
+    };
+    return Wrap(
+      spacing: 8,
+      children: HorizontalGestureScroll.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.horizontalGestureScroll == v,
+          onSelected: (_) => notifier.updateHorizontalGestureScroll(v),
+        );
+      }).toList(),
+    );
+  }
+
+  static Widget _buildOrientationLockRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = {
+      OrientationLock.none: 'Система',
+      OrientationLock.portrait: 'Книжная',
+      OrientationLock.landscape: 'Альбомная',
+    };
+    return Wrap(
+      spacing: 8,
+      children: OrientationLock.values.map((v) {
+        return ChoiceChip(
+          label: Text(labels[v]!),
+          selected: settings.orientationLock == v,
+          onSelected: (_) => notifier.updateOrientationLock(v),
+        );
+      }).toList(),
+    );
+  }
+
   static const _encodingOptions = <String?>[
-    null, // auto
+    null,
     'utf-8',
     'windows-1251',
     'koi8-r',
@@ -699,7 +917,7 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
         if (!hasPerBook) return const SizedBox.shrink();
         final theme = Theme.of(context);
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.only(bottom: 8, left: 20, right: 20),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
@@ -734,6 +952,22 @@ class ReaderQuickSettingsSheet extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

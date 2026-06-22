@@ -10,6 +10,40 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'highlighted_text.dart';
 
+List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
+  final spans = <InlineSpan>[];
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    final ch = text[i];
+    if (ch == ' ' || ch == '\n' || ch == '\t') {
+      if (buffer.isNotEmpty) {
+        _appendBionicWord(spans, buffer.toString(), style);
+        buffer.clear();
+      }
+      spans.add(TextSpan(text: ch, style: style));
+    } else {
+      buffer.write(ch);
+    }
+  }
+  if (buffer.isNotEmpty) {
+    _appendBionicWord(spans, buffer.toString(), style);
+  }
+  return spans;
+}
+
+void _appendBionicWord(List<InlineSpan> spans, String word, TextStyle style) {
+  final boldLen = (word.length * 0.4).ceil().clamp(1, word.length);
+  spans.add(
+    TextSpan(
+      text: word.substring(0, boldLen),
+      style: style.copyWith(fontWeight: FontWeight.w700),
+    ),
+  );
+  if (boldLen < word.length) {
+    spans.add(TextSpan(text: word.substring(boldLen), style: style));
+  }
+}
+
 class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
     super.key,
@@ -23,6 +57,7 @@ class ReaderContentBody extends StatefulWidget {
     this.highlightQuery,
     this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
+    this.blockTransformers,
   });
 
   final NormalizedBookMetadata metadata;
@@ -35,6 +70,7 @@ class ReaderContentBody extends StatefulWidget {
   final String? highlightQuery;
   final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
+  final List<BlockTransformer>? blockTransformers;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -73,6 +109,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         highlightQuery: highlightQuery,
         ttsHighlightIndex: widget.ttsHighlightIndex,
         chapterHighlights: widget.chapterHighlights,
+        blockTransformers: widget.blockTransformers,
       );
     }
 
@@ -110,43 +147,94 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         onTapUp: onTap,
         child: Directionality(
           textDirection: textDirection,
-          child: ListView.builder(
-            controller: scrollController,
-            padding: effectiveMargin,
-            itemCount: metadata.chapterCount,
-            addAutomaticKeepAlives: false,
-            itemBuilder: (context, index) {
-              final chapter = loadedChapters[index];
-              final isLast = index == metadata.chapterCount - 1;
-              final nextTitle = index + 1 < metadata.chapterTitles.length
-                  ? metadata.chapterTitles[index + 1]
-                  : '';
-              return Column(
-                key: ValueKey('chapter-$index'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (chapter != null)
-                    _buildChapterContent(chapter, settings, index)
-                  else
-                    _buildLoadingPlaceholder(settings, index),
-                  if (!isLast && chapter != null && loadedChapters[index + 1] != null)
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: settings.paragraphSpacing * 3,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
-                          style: _getReaderStyle(settings).copyWith(
-                            color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+          child: Stack(
+            children: [
+              ScrollConfiguration(
+                behavior: const _SmoothScrollBehavior(),
+                child: ListView.builder(
+                  controller: scrollController,
+                  padding: effectiveMargin,
+                  itemCount: metadata.chapterCount,
+                  addAutomaticKeepAlives: false,
+                  itemBuilder: (context, index) {
+                    final chapter = loadedChapters[index];
+                    final isLast = index == metadata.chapterCount - 1;
+                    final nextTitle = index + 1 < metadata.chapterTitles.length
+                        ? metadata.chapterTitles[index + 1]
+                        : '';
+                    return Column(
+                      key: ValueKey('chapter-$index'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (chapter != null)
+                          _buildChapterContent(chapter, settings, index)
+                        else
+                          _buildLoadingPlaceholder(settings, index),
+                        if (!isLast && chapter != null && loadedChapters[index + 1] != null)
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: settings.paragraphSpacing * 3,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
+                                style: _getReaderStyle(settings).copyWith(
+                                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+                      ],
+                    );
+                  },
+                ),
+              ),
+              if (settings.perceptionExpander) ...[
+                Positioned(
+                  left: settings.margin - 1,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 1,
+                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.15),
+                  ),
+                ),
+                Positioned(
+                  right: settings.margin - 1,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 1,
+                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.15),
+                  ),
+                ),
+              ],
+              if (settings.horizontalLimiter) ...[
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: settings.margin,
+                  child: ColoredBox(
+                    color:
+                        _getReaderStyle(settings).color?.withValues(alpha: 0.06) ??
+                        Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: settings.margin,
+                  child: ColoredBox(
+                    color:
+                        _getReaderStyle(settings).color?.withValues(alpha: 0.06) ??
+                        Colors.black.withValues(alpha: 0.06),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -227,16 +315,24 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         header,
-        ...chapter.blocks.asMap().entries.map(
-          (entry) => _buildBlock(
-            entry.value,
+        ...chapter.blocks.asMap().entries.map((entry) {
+          var block = entry.value;
+          if (widget.blockTransformers != null) {
+            for (final t in widget.blockTransformers!) {
+              final transformed = t(block);
+              if (transformed == null) return const SizedBox.shrink();
+              block = transformed;
+            }
+          }
+          return _buildBlock(
+            block,
             settings,
             textAlign,
             blockHighlights: chapterHighlights
                 ?.where((TextHighlight h) => h.blockIndex == entry.key)
                 .toList(),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
@@ -453,6 +549,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           textAlign: textAlign,
         );
       }
+      if (widget.settings.bionicReading) {
+        return Text.rich(
+          TextSpan(children: _bionicReadingSpans(text, style)),
+          textAlign: textAlign,
+        );
+      }
       return Text(text, style: style, textAlign: textAlign);
     }
 
@@ -544,12 +646,23 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         fontFamily = 'Literata';
         break;
     }
+    FontWeight fontWeight = FontWeight.normal;
+    if (settings.fontWeightDelta > 0.33) {
+      fontWeight = FontWeight.w600;
+    } else if (settings.fontWeightDelta > 0) {
+      fontWeight = FontWeight.w500;
+    } else if (settings.fontWeightDelta < -0.33) {
+      fontWeight = FontWeight.w300;
+    } else if (settings.fontWeightDelta < 0) {
+      fontWeight = FontWeight.w400;
+    }
     return TextStyle(
       fontFamily: fontFamily,
       fontSize: settings.fontSize,
       height: settings.lineHeight,
       color: colors.text,
       letterSpacing: settings.letterSpacing,
+      fontWeight: fontWeight,
     );
   }
 
@@ -679,6 +792,7 @@ class _PaginatedContentBody extends StatefulWidget {
     this.highlightQuery,
     this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
+    this.blockTransformers,
   });
 
   final NormalizedBookMetadata metadata;
@@ -689,6 +803,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final String? highlightQuery;
   final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
+  final List<BlockTransformer>? blockTransformers;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -932,9 +1047,17 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
 
     for (int i = page.blockStart; i < page.blockEnd && i < chapter.blocks.length; i++) {
+      var block = chapter.blocks[i];
+      if (widget.blockTransformers != null) {
+        for (final t in widget.blockTransformers!) {
+          final transformed = t(block);
+          if (transformed == null) break;
+          block = transformed;
+        }
+      }
       content.add(
         _buildBlock(
-          chapter.blocks[i],
+          block,
           textAlign,
           blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
         ),
@@ -1211,6 +1334,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           textAlign: textAlign,
         );
       }
+      if (widget.settings.bionicReading) {
+        return Text.rich(
+          TextSpan(children: _bionicReadingSpans(text, style)),
+          textAlign: textAlign,
+        );
+      }
       return Text(text, style: style, textAlign: textAlign);
     }
 
@@ -1299,12 +1428,23 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         fontFamily = 'Literata';
         break;
     }
+    FontWeight fontWeight = FontWeight.normal;
+    if (settings.fontWeightDelta > 0.33) {
+      fontWeight = FontWeight.w600;
+    } else if (settings.fontWeightDelta > 0) {
+      fontWeight = FontWeight.w500;
+    } else if (settings.fontWeightDelta < -0.33) {
+      fontWeight = FontWeight.w300;
+    } else if (settings.fontWeightDelta < 0) {
+      fontWeight = FontWeight.w400;
+    }
     return TextStyle(
       fontFamily: fontFamily,
       fontSize: settings.fontSize,
       height: settings.lineHeight,
       color: colors.text,
       letterSpacing: settings.letterSpacing,
+      fontWeight: fontWeight,
     );
   }
 
@@ -1383,9 +1523,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return _buildPage(index, context);
         }
 
+        Widget pageContent;
         switch (widget.settings.pageTurnAnimation) {
           case PageTurnAnimation.none:
-            return GestureDetector(
+            pageContent = GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTapUp: widget.onTap,
               child: PageView.builder(
@@ -1398,7 +1539,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             );
 
           case PageTurnAnimation.fade:
-            return GestureDetector(
+            pageContent = GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTapUp: widget.onTap,
               child: PageView.builder(
@@ -1416,7 +1557,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             );
 
           case PageTurnAnimation.curl:
-            return GestureDetector(
+            pageContent = GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTapUp: widget.onTap,
               child: PageView.builder(
@@ -1436,7 +1577,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             );
 
           case PageTurnAnimation.slide:
-            return GestureDetector(
+            pageContent = GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTapUp: widget.onTap,
               child: PageView.builder(
@@ -1448,6 +1589,56 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               ),
             );
         }
+
+        if (widget.settings.perceptionExpander || widget.settings.horizontalLimiter) {
+          final colors = ReaderColors.forTheme(widget.settings.theme);
+          return Stack(
+            children: [
+              pageContent,
+              if (widget.settings.perceptionExpander) ...[
+                Positioned(
+                  left: widget.settings.margin - 1,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 1,
+                    color: colors.text.withValues(alpha: 0.15),
+                  ),
+                ),
+                Positioned(
+                  right: widget.settings.margin - 1,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 1,
+                    color: colors.text.withValues(alpha: 0.15),
+                  ),
+                ),
+              ],
+              if (widget.settings.horizontalLimiter) ...[
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: widget.settings.margin,
+                  child: ColoredBox(
+                    color: colors.text.withValues(alpha: 0.06),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: widget.settings.margin,
+                  child: ColoredBox(
+                    color: colors.text.withValues(alpha: 0.06),
+                  ),
+                ),
+              ],
+            ],
+          );
+        }
+        return pageContent;
       },
     );
   }
@@ -1562,5 +1753,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         },
       ),
     );
+  }
+}
+
+class _SmoothScrollBehavior extends ScrollBehavior {
+  const _SmoothScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const BouncingScrollPhysics();
   }
 }

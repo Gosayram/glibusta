@@ -1,4 +1,5 @@
 [advisories]
+version = 2
 ignore = [
     # derivative is unmaintained — pinned by flutter_rust_bridge_codegen, no fix available
     "RUSTSEC-2024-0388",
@@ -36,6 +37,7 @@ skip = [
 ]
 
 [licenses]
+version = 2
 allow = [
     "MIT",
     "Apache-2.0",

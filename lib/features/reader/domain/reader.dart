@@ -56,9 +56,15 @@ enum PageTurnAnimation { none, slide, fade, curl }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 
-enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, disabled }
+enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, translate, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
+
+enum HorizontalGesture { off, on, inverse }
+
+enum HorizontalGestureScroll { half, twoThirds, threeQuarters }
+
+enum OrientationLock { none, portrait, landscape }
 
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
@@ -71,6 +77,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderFont.literata) ReaderFont font,
     @Default(12.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
+    @Default(0.0) double fontWeightDelta,
     @Default(ReaderTextAlign.left) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,
     @Default(7) int customDayHour,
@@ -92,6 +99,14 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
     @Default(true) bool restoreLastPosition,
     String? forcedEncoding,
+    @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,
+    @Default(HorizontalGestureScroll.half) HorizontalGestureScroll horizontalGestureScroll,
+    @Default(false) bool perceptionExpander,
+    @Default(false) bool hideBarsOnFastScroll,
+    @Default(OrientationLock.none) OrientationLock orientationLock,
+    @Default(false) bool bionicReading,
+    @Default(false) bool horizontalLimiter,
+    @Default(false) bool scrollbarIndicator,
   }) = _ReaderSettings;
 }
 

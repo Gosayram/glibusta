@@ -15,6 +15,7 @@ class ReaderColors {
   static const _oled = ReaderColors(scaffold: Colors.black, text: Color(0xFFDADADA));
   static const _bedtime = ReaderColors(scaffold: Color(0xFF1A1612), text: Color(0xFFD7CDBF));
 
+  // ignore: prefer_constructors_over_static_methods — factory-style accessor
   static ReaderColors forTheme(ReaderTheme theme) {
     return switch (theme) {
       ReaderTheme.system || ReaderTheme.light => _light,
@@ -35,5 +36,34 @@ class ReaderColors {
       ReaderTheme.oled => Colors.blue.shade300,
       ReaderTheme.bedtime => const Color(0xFFD7CDBF),
     };
+  }
+}
+
+/// Chrome-specific colors derived from reader theme.
+/// Separates UI chrome styling from content styling.
+class ReaderChromeColors {
+  final Color background;
+  final Color onBackground;
+  final Color surface;
+  final double backgroundOpacity;
+
+  const ReaderChromeColors({
+    required this.background,
+    required this.onBackground,
+    required this.surface,
+    this.backgroundOpacity = 0.95,
+  });
+
+  factory ReaderChromeColors.forTheme(ReaderTheme theme) {
+    final isDark = switch (theme) {
+      ReaderTheme.dark || ReaderTheme.oled || ReaderTheme.bedtime => true,
+      _ => false,
+    };
+    return ReaderChromeColors(
+      background: isDark ? const Color(0xFF1C1B1F) : Colors.white,
+      onBackground: isDark ? Colors.white70 : Colors.black87,
+      surface: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5),
+      backgroundOpacity: isDark ? 0.92 : 0.95,
+    );
   }
 }

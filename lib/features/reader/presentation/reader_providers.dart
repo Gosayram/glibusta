@@ -72,6 +72,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(letterSpacing: spacing);
   }
 
+  void updateFontWeightDelta(double delta) {
+    state = state.copyWith(fontWeightDelta: delta);
+  }
+
   void updateTextAlign(ReaderTextAlign align) {
     state = state.copyWith(textAlign: align);
   }
@@ -154,6 +158,38 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
 
   void updateForcedEncoding(String? encoding) {
     state = state.copyWith(forcedEncoding: encoding);
+  }
+
+  void updateHorizontalGesture(HorizontalGesture gesture) {
+    state = state.copyWith(horizontalGesture: gesture);
+  }
+
+  void updateHorizontalGestureScroll(HorizontalGestureScroll scroll) {
+    state = state.copyWith(horizontalGestureScroll: scroll);
+  }
+
+  void updatePerceptionExpander(bool enabled) {
+    state = state.copyWith(perceptionExpander: enabled);
+  }
+
+  void updateHideBarsOnFastScroll(bool enabled) {
+    state = state.copyWith(hideBarsOnFastScroll: enabled);
+  }
+
+  void updateOrientationLock(OrientationLock lock) {
+    state = state.copyWith(orientationLock: lock);
+  }
+
+  void updateBionicReading(bool value) {
+    state = state.copyWith(bionicReading: value);
+  }
+
+  void updateHorizontalLimiter(bool value) {
+    state = state.copyWith(horizontalLimiter: value);
+  }
+
+  void updateScrollbarIndicator(bool value) {
+    state = state.copyWith(scrollbarIndicator: value);
   }
 
   void applyProfile(ReaderSettings profile) {

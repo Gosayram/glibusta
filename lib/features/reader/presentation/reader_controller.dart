@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
@@ -156,6 +157,7 @@ class ReaderController {
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
+  double _lastScrollOffset = 0;
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -430,6 +432,17 @@ class ReaderController {
       _updatePositionFromScroll(boundedProgress);
       _progressDebouncer.call(saveProgress);
 
+      // Hide bars on fast scroll
+      final settings = _ref.read(readerSettingsProvider);
+      if (settings.hideBarsOnFastScroll && _state.uiVisible) {
+        final currentOffset = _scrollController!.offset;
+        final delta = (currentOffset - _lastScrollOffset).abs();
+        _lastScrollOffset = currentOffset;
+        if (delta > 30) {
+          _updateState(_state.copyWith(uiVisible: false));
+        }
+      }
+
       if (!_state.isLoading && _state.chapterCount > 0) {
         final total = _state.chapterCount;
         final chapterIndex = (boundedProgress * (total - 1)).round();
@@ -451,12 +464,15 @@ class ReaderController {
         (position.localOffset - _state.currentPosition.localOffset).abs() < 0.5) {
       return;
     }
+    final chapterChanged = position.chapterIndex != _state.currentPosition.chapterIndex;
     _updateState(_state.copyWith(currentPosition: position));
     _ref
         .read(readingProgressProvider.notifier)
         .updateProgress(
           ReadingProgress.fromPosition(position, totalPages: total),
         );
+    // Checkpoint: save immediately on chapter boundary crossing
+    if (chapterChanged) saveProgress();
   }
 
   ReaderPosition _positionFromProgress(double progress) {
@@ -735,9 +751,24 @@ class ReaderController {
           currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
         );
         break;
+      case DoubleTapAction.translate:
+        _translateCurrentParagraph();
+        break;
       case DoubleTapAction.disabled:
         break;
     }
+  }
+
+  void _translateCurrentParagraph() {
+    final chapter = _state.loadedChapters[_state.currentPosition.chapterIndex];
+    if (chapter == null) return;
+    final paragraphIndex = _state.currentPosition.paragraphIndex;
+    if (paragraphIndex < 0 || paragraphIndex >= chapter.blocks.length) return;
+    final text = chapter.blocks[paragraphIndex].text;
+    if (text.isEmpty) return;
+    final encoded = Uri.encodeComponent(text);
+    final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$encoded');
+    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
   }
 
   void handleLongPress() {
