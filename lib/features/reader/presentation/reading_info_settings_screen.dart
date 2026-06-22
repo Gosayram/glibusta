@@ -30,42 +30,46 @@ class ReadingInfoSettingsScreen extends ConsumerWidget {
           _SlotPicker(
             label: 'Left',
             value: config.headerLeft,
-            onChanged: (InfoSlotMode mode) =>
-                ref.read<ReadingInfoNotifier>(readingInfoProvider.notifier).updateHeaderLeft(mode),
+            onChanged: (InfoSlotMode mode) => ref
+                .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
+                .update((s) => s.copyWith(headerLeft: mode)),
           ),
           _SlotPicker(
             label: 'Center',
             value: config.headerCenter,
             onChanged: (InfoSlotMode mode) => ref
                 .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
-                .updateHeaderCenter(mode),
+                .update((s) => s.copyWith(headerCenter: mode)),
           ),
           _SlotPicker(
             label: 'Right',
             value: config.headerRight,
-            onChanged: (InfoSlotMode mode) =>
-                ref.read<ReadingInfoNotifier>(readingInfoProvider.notifier).updateHeaderRight(mode),
+            onChanged: (InfoSlotMode mode) => ref
+                .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
+                .update((s) => s.copyWith(headerRight: mode)),
           ),
           const SizedBox(height: 24),
           const _SectionHeader(title: 'Footer'),
           _SlotPicker(
             label: 'Left',
             value: config.footerLeft,
-            onChanged: (InfoSlotMode mode) =>
-                ref.read<ReadingInfoNotifier>(readingInfoProvider.notifier).updateFooterLeft(mode),
+            onChanged: (InfoSlotMode mode) => ref
+                .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
+                .update((s) => s.copyWith(footerLeft: mode)),
           ),
           _SlotPicker(
             label: 'Center',
             value: config.footerCenter,
             onChanged: (InfoSlotMode mode) => ref
                 .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
-                .updateFooterCenter(mode),
+                .update((s) => s.copyWith(footerCenter: mode)),
           ),
           _SlotPicker(
             label: 'Right',
             value: config.footerRight,
-            onChanged: (InfoSlotMode mode) =>
-                ref.read<ReadingInfoNotifier>(readingInfoProvider.notifier).updateFooterRight(mode),
+            onChanged: (InfoSlotMode mode) => ref
+                .read<ReadingInfoNotifier>(readingInfoProvider.notifier)
+                .update((s) => s.copyWith(footerRight: mode)),
           ),
           const SizedBox(height: 24),
           const _SectionHeader(title: 'Appearance'),

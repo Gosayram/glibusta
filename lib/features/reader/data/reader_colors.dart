@@ -42,32 +42,3 @@ class ReaderColors {
     };
   }
 }
-
-/// Chrome-specific colors derived from reader theme.
-/// Separates UI chrome styling from content styling.
-class ReaderChromeColors {
-  final Color background;
-  final Color onBackground;
-  final Color surface;
-  final double backgroundOpacity;
-
-  const ReaderChromeColors({
-    required this.background,
-    required this.onBackground,
-    required this.surface,
-    this.backgroundOpacity = 0.95,
-  });
-
-  factory ReaderChromeColors.forTheme(ReaderTheme theme) {
-    final isDark = switch (theme) {
-      ReaderTheme.dark || ReaderTheme.oled || ReaderTheme.bedtime => true,
-      _ => false,
-    };
-    return ReaderChromeColors(
-      background: isDark ? const Color(0xFF1C1B1F) : Colors.white,
-      onBackground: isDark ? Colors.white70 : Colors.black87,
-      surface: isDark ? const Color(0xFF2C2C2C) : const Color(0xFFF5F5F5),
-      backgroundOpacity: isDark ? 0.92 : 0.95,
-    );
-  }
-}

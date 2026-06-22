@@ -230,7 +230,18 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
         const _SectionTitle('Режим чтения'),
-        _buildModeRow(settings, notifier),
+        _enumChoiceChips(
+          current: settings.mode,
+          labels: const {
+            ReaderMode.auto: 'Авто',
+            ReaderMode.continuous: 'Прокрутка',
+            ReaderMode.paginated: 'Страницы',
+            ReaderMode.twoPage: '2 колонки',
+            ReaderMode.focus: 'Фокус',
+            ReaderMode.fullscreen: 'Полный',
+          },
+          onChanged: (v) => notifier.updateMode(v),
+        ),
         const SizedBox(height: 16),
         const _SectionTitle('Текст и переносы'),
         _buildTextDirectionRow(settings, notifier),
@@ -831,28 +842,24 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
-  static Widget _buildModeRow(
-    ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
-    const modeLabels = {
-      ReaderMode.auto: 'Авто',
-      ReaderMode.continuous: 'Прокрутка',
-      ReaderMode.paginated: 'Страницы',
-      ReaderMode.twoPage: '2 колонки',
-      ReaderMode.focus: 'Фокус',
-      ReaderMode.fullscreen: 'Полный',
-    };
+  // ponytail: one generic builder replaces 14 copy-paste enum rows
+  static Widget _enumChoiceChips<T extends Enum>({
+    required T current,
+    required Map<T, String> labels,
+    required ValueChanged<T> onChanged,
+  }) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: ReaderMode.values.map((mode) {
-        return ChoiceChip(
-          label: Text(modeLabels[mode]!),
-          selected: settings.mode == mode,
-          onSelected: (_) => notifier.updateMode(mode),
-        );
-      }).toList(),
+      children: labels.entries
+          .map(
+            (e) => ChoiceChip(
+              label: Text(e.value),
+              selected: current == e.key,
+              onSelected: (_) => onChanged(e.key),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -934,49 +941,33 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
+  // ponytail: enum rows → inline _enumChoiceChips
   static Widget _buildImageAlignmentRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.imageAlignment,
+    labels: const {
       ImageAlignment.start: 'По левому краю',
       ImageAlignment.center: 'По центру',
       ImageAlignment.end: 'По правому краю',
-    };
-    return Wrap(
-      spacing: 8,
-      children: ImageAlignment.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.imageAlignment == v,
-          onSelected: (_) => notifier.updateImageAlignment(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateImageAlignment(v),
+  );
 
   static Widget _buildImageColorEffectRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.imageColorEffect,
+    labels: const {
       ImageColorEffect.off: 'Нет',
       ImageColorEffect.grayscale: 'Ч/Б',
       ImageColorEffect.fontColor: 'Цвет шрифта',
       ImageColorEffect.backgroundColor: 'Цвет фона',
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: ImageColorEffect.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.imageColorEffect == v,
-          onSelected: (_) => notifier.updateImageColorEffect(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateImageColorEffect(v),
+  );
 
   static Widget _buildToggleRow(
     String label,
@@ -1015,112 +1006,70 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildProgressBarPositionRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.progressBarPosition,
+    labels: const {
       ProgressBarPosition.top: 'Сверху',
       ProgressBarPosition.bottom: 'Снизу',
       ProgressBarPosition.hidden: 'Скрыта',
-    };
-    return Wrap(
-      spacing: 8,
-      children: ProgressBarPosition.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.progressBarPosition == v,
-          onSelected: (_) => notifier.updateProgressBarPosition(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateProgressBarPosition(v),
+  );
 
   static Widget _buildBottomBarContentRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.bottomBarContent,
+    labels: const {
       BottomBarContent.percent: 'Процент',
       BottomBarContent.page: 'Страница',
       BottomBarContent.chapter: 'Глава',
       BottomBarContent.time: 'Время',
       BottomBarContent.none: 'Скрыта',
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: BottomBarContent.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.bottomBarContent == v,
-          onSelected: (_) => notifier.updateBottomBarContent(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateBottomBarContent(v),
+  );
 
   static Widget _buildTapZoneRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.tapZoneLayout,
+    labels: const {
       TapZoneLayout.third: '1/3',
       TapZoneLayout.quarter: '1/4',
       TapZoneLayout.edge: 'Край',
-    };
-    return Wrap(
-      spacing: 8,
-      children: TapZoneLayout.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.tapZoneLayout == v,
-          onSelected: (_) => notifier.updateTapZoneLayout(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateTapZoneLayout(v),
+  );
 
   static Widget _buildPageTurnAnimationRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.pageTurnAnimation,
+    labels: const {
       PageTurnAnimation.none: 'Нет',
       PageTurnAnimation.slide: 'Слайд',
       PageTurnAnimation.fade: 'Затухание',
       PageTurnAnimation.curl: 'Свертывание',
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: PageTurnAnimation.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.pageTurnAnimation == v,
-          onSelected: (_) => notifier.updatePageTurnAnimation(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updatePageTurnAnimation(v),
+  );
 
   static Widget _buildTextDirectionRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.textDirection,
+    labels: const {
       ReaderTextDirection.ltr: 'LTR',
       ReaderTextDirection.rtl: 'RTL',
       ReaderTextDirection.auto: 'Авто',
-    };
-    return Wrap(
-      spacing: 8,
-      children: ReaderTextDirection.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.textDirection == v,
-          onSelected: (_) => notifier.updateTextDirection(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateTextDirection(v),
+  );
 
   static Widget _buildReaderWidthRow(
     ReaderSettings settings,
@@ -1154,112 +1103,70 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildDoubleTapActionRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.doubleTapAction,
+    labels: const {
       DoubleTapAction.toggleUI: 'Скрыть/показать UI',
       DoubleTapAction.addBookmark: 'Закладка',
       DoubleTapAction.toggleFullscreen: 'Полноэкранный',
       DoubleTapAction.translate: 'Перевести абзац',
       DoubleTapAction.disabled: 'Выкл',
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: DoubleTapAction.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.doubleTapAction == v,
-          onSelected: (_) => notifier.updateDoubleTapAction(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateDoubleTapAction(v),
+  );
 
   static Widget _buildLongPressActionRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.longPressAction,
+    labels: const {
       LongPressAction.selectText: 'Выделить текст',
       LongPressAction.addBookmark: 'Закладка',
       LongPressAction.openMenu: 'Меню',
       LongPressAction.disabled: 'Выкл',
-    };
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: LongPressAction.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.longPressAction == v,
-          onSelected: (_) => notifier.updateLongPressAction(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateLongPressAction(v),
+  );
 
   static Widget _buildHorizontalGestureRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.horizontalGesture,
+    labels: const {
       HorizontalGesture.off: 'Выкл',
       HorizontalGesture.on: 'Вкл',
       HorizontalGesture.inverse: 'Инверсия',
-    };
-    return Wrap(
-      spacing: 8,
-      children: HorizontalGesture.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.horizontalGesture == v,
-          onSelected: (_) => notifier.updateHorizontalGesture(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateHorizontalGesture(v),
+  );
 
   static Widget _buildHorizontalGestureScrollRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.horizontalGestureScroll,
+    labels: const {
       HorizontalGestureScroll.half: '1/2 экрана',
       HorizontalGestureScroll.twoThirds: '2/3 экрана',
       HorizontalGestureScroll.threeQuarters: '3/4 экрана',
-    };
-    return Wrap(
-      spacing: 8,
-      children: HorizontalGestureScroll.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.horizontalGestureScroll == v,
-          onSelected: (_) => notifier.updateHorizontalGestureScroll(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateHorizontalGestureScroll(v),
+  );
 
   static Widget _buildOrientationLockRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
-  ) {
-    const labels = {
+  ) => _enumChoiceChips(
+    current: settings.orientationLock,
+    labels: const {
       OrientationLock.none: 'Система',
       OrientationLock.portrait: 'Книжная',
       OrientationLock.landscape: 'Альбомная',
-    };
-    return Wrap(
-      spacing: 8,
-      children: OrientationLock.values.map((v) {
-        return ChoiceChip(
-          label: Text(labels[v]!),
-          selected: settings.orientationLock == v,
-          onSelected: (_) => notifier.updateOrientationLock(v),
-        );
-      }).toList(),
-    );
-  }
+    },
+    onChanged: (v) => notifier.updateOrientationLock(v),
+  );
 
   static const _encodingOptions = <String?>[
     null,
