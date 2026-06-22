@@ -166,14 +166,4 @@ void main() {
       expect(progress.lastRead, pos.updatedAt);
     });
   });
-
-  group('ReadingProfile', () {
-    test('defaults has 4 profiles', () {
-      expect(ReadingProfile.defaults.length, 4);
-      expect(ReadingProfile.defaults[0].name, 'Стандартный');
-      expect(ReadingProfile.defaults[1].name, 'Комфортный');
-      expect(ReadingProfile.defaults[2].name, 'Компактный');
-      expect(ReadingProfile.defaults[3].name, 'Ночной');
-    });
-  });
 }

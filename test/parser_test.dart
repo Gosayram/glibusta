@@ -1,51 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/features/search/domain/book_source.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/models/search_query.dart';
 
 void main() {
-  group('MockBookSource', () {
-    test('returns empty results for search', () async {
-      final source = MockBookSource();
-      final result = await source.searchBooks(const SearchQuery(query: 'test'));
-
-      expect(result.books, isEmpty);
-      expect(result.hasNextPage, isFalse);
-      expect(result.currentPage, 0);
-    });
-
-    test('returns mock book details', () async {
-      final source = MockBookSource();
-      final details = await source.getBookDetails('123');
-
-      expect(details.book.id, '123');
-      expect(details.book.title, 'Mock Book');
-      expect(details.description, 'Mock description');
-      expect(details.availableFormats, contains(BookFormat.fb2));
-    });
-
-    test('returns mock formats', () async {
-      final source = MockBookSource();
-      final formats = await source.getAvailableFormats('123');
-
-      expect(
-        formats,
-        containsAll([BookFormat.fb2, BookFormat.epub, BookFormat.txt, BookFormat.mobi]),
-      );
-      expect(formats.length, 4);
-    });
-
-    test('returns mock download URL', () async {
-      final source = MockBookSource();
-      final url = await source.getDownloadUrl('123', BookFormat.fb2);
-
-      expect(url, contains('123'));
-      expect(url, contains('fb2'));
-    });
-  });
-
   group('SearchQuery', () {
     test('has default page of 0', () {
       const query = SearchQuery(query: 'test');

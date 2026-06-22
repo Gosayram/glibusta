@@ -47,40 +47,4 @@ class ContentSafetyService {
       AppLogger().warning('Failed to save safety level: $e', name: 'ContentSafety', error: e);
     }
   }
-
-  static bool shouldFilter(ContentSafetyLevel level, List<String> tags) {
-    if (level == ContentSafetyLevel.standard) return false;
-    if (level == ContentSafetyLevel.strict) {
-      return _unsafeTags.any((u) => tags.any((t) => t.toLowerCase().contains(u)));
-    }
-    return _explicitTags.any((e) => tags.any((t) => t.toLowerCase().contains(e)));
-  }
-
-  static bool shouldFilterTitle(ContentSafetyLevel level, String title) {
-    if (level == ContentSafetyLevel.standard) return false;
-    final lower = title.toLowerCase();
-    if (level == ContentSafetyLevel.strict) {
-      return _unsafeTags.any((u) => lower.contains(u));
-    }
-    return _explicitTags.any((e) => lower.contains(e));
-  }
-
-  static const _explicitTags = <String>[
-    '18+',
-    'adult',
-    'nsfw',
-    'erotic',
-    'erotica',
-  ];
-
-  static const _unsafeTags = <String>[
-    '18+',
-    'adult',
-    'nsfw',
-    'erotic',
-    'erotica',
-    'violence',
-    'gore',
-    'horror',
-  ];
 }

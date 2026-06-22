@@ -344,7 +344,6 @@ class ReaderController {
     CacheCorruptedFailure() => ReaderErrorKind.cacheCorrupted,
     InvalidEncodingFailure() => ReaderErrorKind.invalidEncoding,
     TimeoutException() => ReaderErrorKind.parserTimeout,
-    BookOpenFailure() => ReaderErrorKind.unknown,
     _ => ReaderErrorKind.unknown,
   };
 

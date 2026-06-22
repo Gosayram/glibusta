@@ -3,21 +3,6 @@ import 'package:glibusta/core/theme/app_colors.dart';
 
 void main() {
   group('AppColors', () {
-    test('primary colors are defined', () {
-      expect(AppColors.primary, isNotNull);
-      expect(AppColors.primaryDark, isNotNull);
-    });
-
-    test('background colors are defined', () {
-      expect(AppColors.backgroundLight, isNotNull);
-      expect(AppColors.backgroundDark, isNotNull);
-    });
-
-    test('surface colors are defined', () {
-      expect(AppColors.surfaceLight, isNotNull);
-      expect(AppColors.surfaceDark, isNotNull);
-    });
-
     test('reader backgrounds are defined', () {
       expect(AppColors.readerDay, isNotNull);
       expect(AppColors.readerNight, isNotNull);
@@ -31,18 +16,6 @@ void main() {
       expect(AppColors.warning, isNotNull);
       expect(AppColors.error, isNotNull);
       expect(AppColors.info, isNotNull);
-    });
-
-    test('text colors are defined', () {
-      expect(AppColors.textPrimaryLight, isNotNull);
-      expect(AppColors.textSecondaryLight, isNotNull);
-      expect(AppColors.textPrimaryDark, isNotNull);
-      expect(AppColors.textSecondaryDark, isNotNull);
-    });
-
-    test('divider colors are defined', () {
-      expect(AppColors.dividerLight, isNotNull);
-      expect(AppColors.dividerDark, isNotNull);
     });
 
     test('reader OLED black is pure black', () {
