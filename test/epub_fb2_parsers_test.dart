@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/features/reader/data/parsers/fb2_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
+import 'package:glibusta/features/reader/data/parsers/rust_book_parser.dart';
 import 'package:glibusta/features/reader/epub/epub_archive.dart';
 import 'package:glibusta/features/reader/epub/epub_image_store.dart';
 import 'package:glibusta/features/reader/epub/epub_parser.dart' as new_epub;
@@ -138,7 +138,7 @@ void main() {
       final file = File(p.join(testDir, '25. Джек Ричер, или Синяя луна.fb2'));
       expect(await file.exists(), isTrue, reason: 'Missing fixture: plain FB2 file');
 
-      final parser = Fb2Parser();
+      final parser = RustBookParser();
       final book = await parser.parseFile(file.path);
 
       expect(book.title, isNotEmpty);
@@ -154,7 +154,7 @@ void main() {
           continue;
         }
 
-        final parser = Fb2Parser();
+        final parser = RustBookParser();
         final book = await parser.parseFile(file.path);
 
         expect(book.title, isNotEmpty, reason: '$name should have a title');

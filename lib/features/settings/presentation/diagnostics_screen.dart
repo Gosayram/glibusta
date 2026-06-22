@@ -18,6 +18,7 @@ import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart' show currentNetworkProvider;
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
@@ -197,7 +198,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                 if (info.persistentLogSize > 0)
                   ListTile(
                     title: const Text('Файл логов'),
-                    trailing: Text(_formatBytes(info.persistentLogSize)),
+                    trailing: Text(formatBytes(info.persistentLogSize)),
                   ),
                 if (info.recentErrors.isNotEmpty)
                   ...info.recentErrors.map(
@@ -359,7 +360,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     try {
       final dir = await getApplicationSupportDirectory();
       final stat = await dir.stat();
-      appSize = _formatBytes(stat.size);
+      appSize = formatBytes(stat.size);
       // Try to get free space
       final result = await Process.run('df', ['-h', dir.path]);
       if (result.exitCode == 0) {
@@ -467,7 +468,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       totalBooks: totalBooks,
       fb2Count: fb2Count,
       epubCount: epubCount,
-      dbSize: '~${_formatBytes(totalBooks * 500 * 1024)}',
+      dbSize: '~${formatBytes(totalBooks * 500 * 1024)}',
       lastError: lastError,
       recentErrors: recentErrors,
       recentWarnings: recentWarnings,
@@ -492,13 +493,6 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       paddingBottom: padding.bottom,
       viewInsetsBottom: viewInsets.bottom,
     );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   Future<void> _exportReport(BuildContext context, DiagnosticsInfo info) async {

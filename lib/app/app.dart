@@ -69,7 +69,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   void _initPlatform() {
-    if (ref.read(platformCapabilitiesProvider).supportsPredictiveBack) {
+    if (supportsPredictiveBack) {
       _initAndroidEdgeToEdge();
     }
   }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/format_utils.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import 'download_queue.dart';
@@ -150,7 +151,7 @@ class DownloadTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${_formatBytes(task.downloadedBytes ?? 0)} / ${_formatBytes(task.totalBytes ?? 0)}',
+                  '${formatBytes(task.downloadedBytes ?? 0)} / ${formatBytes(task.totalBytes ?? 0)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
@@ -207,13 +208,5 @@ class DownloadTile extends ConsumerWidget {
       DownloadStatus.failed => AppColors.error,
       DownloadStatus.canceled => Theme.of(context).colorScheme.outline,
     };
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    }
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 }

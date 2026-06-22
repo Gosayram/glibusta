@@ -802,29 +802,10 @@ class ReaderController {
         );
         break;
       case DoubleTapAction.translate:
-        _translateCurrentParagraph();
         break;
       case DoubleTapAction.disabled:
         break;
     }
-  }
-
-  void _translateCurrentParagraph() {
-    final chapter = _state.loadedChapters[_state.currentPosition.chapterIndex];
-    if (chapter == null) return;
-    final paragraphIndex = _state.currentPosition.paragraphIndex;
-    if (paragraphIndex < 0 || paragraphIndex >= chapter.blocks.length) return;
-    final text = chapter.blocks[paragraphIndex].text;
-    if (text.isEmpty) return;
-    _pendingTranslation = text;
-  }
-
-  String? _pendingTranslation;
-
-  String? consumePendingTranslation() {
-    final t = _pendingTranslation;
-    _pendingTranslation = null;
-    return t;
   }
 
   void handleLongPress() {

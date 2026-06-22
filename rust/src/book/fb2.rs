@@ -1,6 +1,7 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive;
 use crate::book::encoding::get_xml_attr;
+use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -63,7 +64,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
     let mut current_span_italic = false;
+    let mut current_span_superscript = false;
+    let mut current_span_href: Option<String> = None;
     let mut section_depth = 0i32;
+    let mut current_binary_id: Option<String> = None;
+
+    // Collect all binary data for inline images
+    let mut binaries: std::collections::HashMap<String, String> = std::collections::HashMap::new();
 
     loop {
         match reader.read_event() {
@@ -84,19 +91,16 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "genre" if in_title_info => in_genre = true,
                     "coverpage" => in_coverpage = true,
                     "binary" => {
-                        let is_cover = e.attributes().any(|a| {
-                            a.map(|attr| {
-                                attr.key.as_ref() == b"id"
-                                    && std::str::from_utf8(attr.value.as_ref())
-                                        .unwrap_or("")
-                                        .starts_with("cover")
-                            })
-                            .unwrap_or(false)
-                        });
-                        if is_cover && cover_data.is_none() {
+                        let binary_id = get_xml_attr(e, b"id").unwrap_or_default();
+                        if binary_id.starts_with("cover") && cover_data.is_none() {
                             in_binary = true;
-                            current_text.clear();
+                            current_binary_id = Some(binary_id);
+                        } else {
+                            // Still track for inline image lookups
+                            in_binary = true;
+                            current_binary_id = Some(binary_id);
                         }
+                        current_text.clear();
                     }
                     "body" => in_body = true,
                     "section" if in_body => {
@@ -109,21 +113,50 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "empty-line" if in_body => in_empty_line = true,
                     "image" if in_body && !in_coverpage => in_image = true,
                     "text-author" if in_body => in_text_author = true,
-                    "strong" if in_p || in_subtitle => current_span_bold = true,
-                    "emphasis" if in_p || in_subtitle => current_span_italic = true,
-                    "a" if in_p => {
-                        if let Some(href) = get_xml_attr(e, b"href") {
-                            current_rich_spans.push(RichSpan {
-                                text: String::new(),
-                                bold: current_span_bold,
-                                italic: current_span_italic,
-                                superscript: false,
-                                href: Some(href),
-                                line_break: false,
-                            });
-                        }
+                    "strong" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_bold = true;
                     }
-                    "sup" if in_p => current_span_bold = false,
+                    "emphasis" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_italic = true;
+                    }
+                    "a" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_href = get_xml_attr(e, b"href");
+                    }
+                    "sup" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_superscript = true;
+                    }
                     _ => {}
                 }
             }
@@ -237,10 +270,16 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "genre" => in_genre = false,
                     "coverpage" => in_coverpage = false,
                     "binary" => {
-                        if in_binary && cover_data.is_none() && !current_text.is_empty() {
-                            cover_data = Some(current_text.trim().to_string());
+                        if in_binary && !current_text.is_empty() {
+                            if let Some(ref id) = current_binary_id {
+                                if id.starts_with("cover") && cover_data.is_none() {
+                                    cover_data = Some(current_text.trim().to_string());
+                                }
+                                binaries.insert(id.clone(), current_text.trim().to_string());
+                            }
                         }
                         in_binary = false;
+                        current_binary_id = None;
                         current_text.clear();
                     }
                     "body" => in_body = false,
@@ -253,22 +292,42 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         }
                     }
                     "p" if in_body => {
-                        let text = current_span_text.trim().to_string();
-                        current_span_text.clear();
+                        // Flush any remaining inline text into a span if formatting active
+                        if !current_span_text.trim().is_empty()
+                            && (current_span_bold
+                                || current_span_italic
+                                || current_span_superscript
+                                || current_span_href.is_some())
+                        {
+                            flush_rich_span(
+                                &mut current_rich_spans,
+                                &mut current_span_text,
+                                current_span_bold,
+                                current_span_italic,
+                                current_span_superscript,
+                                &current_span_href,
+                            );
+                        }
+                        // Get the full text: either from spans or from raw text buffer
+                        let text = if current_rich_spans.is_empty() {
+                            let t = current_span_text.trim().to_string();
+                            current_span_text.clear();
+                            t
+                        } else {
+                            current_rich_spans
+                                .iter()
+                                .map(|s| s.text.as_str())
+                                .collect::<Vec<_>>()
+                                .join("")
+                                .trim()
+                                .to_string()
+                        };
 
                         if !text.is_empty() || !current_rich_spans.is_empty() {
                             let rich = if current_rich_spans.is_empty() {
                                 None
                             } else {
-                                let mut spans = current_rich_spans.clone();
-                                if !text.is_empty() {
-                                    if let Some(last) = spans.last_mut() {
-                                        if last.text.is_empty() {
-                                            last.text = text.clone();
-                                        }
-                                    }
-                                }
-                                Some(spans)
+                                Some(current_rich_spans.clone())
                             };
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
@@ -289,8 +348,11 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             block_index += 1;
                         }
                         current_rich_spans.clear();
+                        current_span_text.clear();
                         current_span_bold = false;
                         current_span_italic = false;
+                        current_span_superscript = false;
+                        current_span_href = None;
                         in_p = false;
                     }
                     "subtitle" if in_body => {
@@ -386,11 +448,18 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         in_empty_line = false;
                     }
                     "image" if in_body && !in_coverpage => {
+                        // Try to extract binary reference from the image tag
+                        let image_ref = current_text.trim().to_string();
+                        current_text.clear();
+                        let key = image_ref.trim_start_matches('#').to_string();
+                        let image_url = binaries
+                            .get(&key)
+                            .map(|d| format!("data:image/jpeg;base64,{}", d));
                         body_blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
                             block_type: BlockType::Image,
-                            image_url: Some(String::from("fb2-image")),
+                            image_url,
                             note_ref: None,
                             rich_spans: None,
                             heading_level: None,
@@ -405,10 +474,50 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         block_index += 1;
                         in_image = false;
                     }
-                    "strong" if in_p => current_span_bold = false,
-                    "emphasis" if in_p => current_span_italic = false,
-                    "a" if in_p => {}
-                    "sup" if in_p => {}
+                    "strong" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_bold = false;
+                    }
+                    "emphasis" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_italic = false;
+                    }
+                    "a" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_href = None;
+                    }
+                    "sup" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            &current_span_href,
+                        );
+                        current_span_superscript = false;
+                    }
                     _ => {}
                 }
             }
@@ -433,11 +542,19 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     });
                     block_index += 1;
                 } else if tag_name == "image" && in_body && !in_coverpage {
+                    // Empty <image l:href="#id"/> — lookup binary
+                    let href = get_xml_attr(e, b"l:href")
+                        .or_else(|| get_xml_attr(e, b"href"))
+                        .unwrap_or_default();
+                    let key = href.trim_start_matches('#').to_string();
+                    let image_url = binaries
+                        .get(&key)
+                        .map(|d| format!("data:image/jpeg;base64,{}", d));
                     body_blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
                         block_type: BlockType::Image,
-                        image_url: Some(String::from("fb2-image")),
+                        image_url,
                         note_ref: None,
                         rich_spans: None,
                         heading_level: None,

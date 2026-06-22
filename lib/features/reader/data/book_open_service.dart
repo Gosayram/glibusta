@@ -7,10 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/full_text_search.dart';
-import '../../../core/encoding/encoding_detection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
-import '../../../core/formats/rtf_format_handler.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../library/domain/book_file_repository.dart';
@@ -18,11 +16,9 @@ import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
 import 'parsers/epub_parser.dart' as legacy_epub;
-import 'parsers/fb2_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
-import 'parsers/txt_parser.dart';
 import 'reader_cache_service.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
@@ -68,27 +64,6 @@ class BookOpenService {
     final parser = new_epub.CustomEpubParser(imageStore: imageStore);
     final epubBook = await parser.parse(args.filePath);
     return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
-  }
-
-  static Future<NormalizedBook> _parseRtfInWorker(({String filePath, String bookId}) args) async {
-    final document = await RtfFormatHandler().prepare(args.filePath);
-    return document.toNormalizedBook(args.bookId);
-  }
-
-  static Future<NormalizedBook> _parseTextBasedInWorker(
-    ({BookFormat format, List<int> bytes, String fileName}) args,
-  ) async {
-    final typedBytes = args.bytes is Uint8List
-        ? args.bytes as Uint8List
-        : Uint8List.fromList(args.bytes);
-    final detector = BookEncodingDetector();
-    final detectionResult = await detector.detect(typedBytes, fileName: args.fileName);
-    final detectedText = detectionResult.text;
-    return switch (args.format) {
-      BookFormat.fb2 => parseFb2FromText(detectedText, fileName: args.fileName),
-      BookFormat.txt => parseTxtFromText(detectedText, fileName: args.fileName),
-      _ => throw const UnsupportedFormatFailure(),
-    };
   }
 
   Future<NormalizedBook> openBook(String bookId) async {
@@ -192,83 +167,18 @@ class BookOpenService {
       }
     }
 
-    if (bookFormat == BookFormat.rtf) {
-      final effectiveBookId = bookId ?? _extractBookId(filePath);
-      return Isolate.run(
-        () => _parseRtfInWorker((filePath: filePath, bookId: effectiveBookId)),
-      ).timeout(
-        _parsingTimeout,
-        onTimeout: () => throw TimeoutException(
-          'Разбор RTF занял слишком много времени.',
-        ),
-      );
+    final parser = _registry.parserForFormat(bookFormat);
+    if (parser == null) {
+      throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
     }
-
-    if (bookFormat == BookFormat.mobi ||
-        bookFormat == BookFormat.azw3 ||
-        bookFormat == BookFormat.prc) {
-      final parser = _registry.parserForFormat(bookFormat);
-      if (parser == null) {
-        throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
-      }
-      return parser
-          .parseFile(filePath)
-          .timeout(
-            _parsingTimeout,
-            onTimeout: () => throw TimeoutException(
-              'Разбор ${bookFormat.name.toUpperCase()} занял слишком много времени.',
-            ),
-          );
-    }
-
-    try {
-      final file = File(filePath);
-      final fileSize = await file.length();
-      if (isBookFileTooLarge(bookFormat, fileSize)) {
-        throw UnsupportedFormatFailure(bookFileTooLargeMessage(bookFormat, fileSize));
-      }
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        throw const CacheCorruptedFailure('Файл пуст');
-      }
-      final fileName = filePath.split('/').last;
-
-      if (bookFormat == BookFormat.epub) {
-        final parser = _registry.parserForFormat(bookFormat);
-        if (parser == null) {
-          throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
-        }
-        return await parser
-            .parse(bytes, fileName: fileName)
-            .timeout(
-              _parsingTimeout,
-              onTimeout: () => throw TimeoutException(
-                'Разбор ${bookFormat.name} занял слишком много времени.',
-              ),
-            );
-      }
-
-      return await Isolate.run(
-        () => _parseTextBasedInWorker(
-          (format: bookFormat, bytes: bytes, fileName: fileName),
-        ),
-      ).timeout(
-        _parsingTimeout,
-        onTimeout: () => throw TimeoutException(
-          'Разбор ${bookFormat.name} занял слишком много времени.',
-        ),
-      );
-    } on TimeoutException {
-      rethrow;
-    } on Object catch (e, st) {
-      _logger.severe(
-        'Parsing failed for $bookFormat: $e',
-        name: 'Reader',
-        error: e,
-        st: st,
-      );
-      rethrow;
-    }
+    return parser
+        .parseFile(filePath)
+        .timeout(
+          _parsingTimeout,
+          onTimeout: () => throw TimeoutException(
+            'Разбор ${bookFormat.name} занял слишком много времени.',
+          ),
+        );
   }
 
   String _extractBookId(String filePath) {

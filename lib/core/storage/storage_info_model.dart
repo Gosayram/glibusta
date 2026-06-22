@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 
 import '../database/app_database.dart';
 import '../platform/app_file_storage.dart';
+import '../utils/format_utils.dart';
+export '../utils/format_utils.dart' show formatBytes;
 
 class StorageCategory {
   const StorageCategory({
@@ -18,15 +20,6 @@ class StorageCategory {
   final int sizeBytes;
 
   String get sizeHuman => formatBytes(sizeBytes);
-}
-
-String formatBytes(int bytes) {
-  if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  if (bytes < 1024 * 1024 * 1024) {
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 }
 
 class StorageInfoModel {

@@ -1,6 +1,7 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
+use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{decode_bytes, get_xml_attr};
+use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -328,10 +329,24 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut current_text = String::new();
     let mut in_body = false;
-    let mut tag_stack: Vec<String> = Vec::new();
+    let mut in_block = false; // inside p, h1-h6, blockquote
+    let mut block_type = BlockType::Paragraph;
+    let mut heading_level: Option<i32> = None;
+
+    // Rich span tracking
+    let mut rich_spans: Vec<RichSpan> = Vec::new();
+    let mut span_text = String::new();
+    let mut bold = false;
+    let mut italic = false;
+    let mut superscript = false;
+    let mut href: Option<String> = None;
+
+    // Table state
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_row: Vec<String> = Vec::new();
     let mut in_table = false;
+
+    // List state
     let mut in_list = false;
     let mut list_items: Vec<String> = Vec::new();
 
@@ -343,126 +358,214 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                 match tag.as_str() {
                     "body" => in_body = true,
                     "p" if in_body => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
+                            &mut rich_spans,
                             &mut block_index,
-                            BlockType::Paragraph,
+                            block_type.clone(),
+                            heading_level,
+                            None,
                         );
                         current_text.clear();
-                        tag_stack.push("p".to_string());
+                        rich_spans.clear();
+                        span_text.clear();
+                        in_block = true;
+                        block_type = BlockType::Paragraph;
+                        heading_level = None;
                     }
                     t if t.starts_with('h') && t.len() == 2 && in_body => {
-                        if t.as_bytes()[1].is_ascii_digit() {
-                            flush_block(
-                                &mut blocks,
-                                &mut current_text,
-                                &mut block_index,
-                                BlockType::Paragraph,
-                            );
-                            current_text.clear();
-                            tag_stack.push(t.to_string());
+                        if let Some(d) = t.as_bytes().get(1) {
+                            if d.is_ascii_digit() {
+                                flush_rich_span(
+                                    &mut rich_spans,
+                                    &mut span_text,
+                                    bold,
+                                    italic,
+                                    superscript,
+                                    &href,
+                                );
+                                flush_block(
+                                    &mut blocks,
+                                    &mut current_text,
+                                    &mut rich_spans,
+                                    &mut block_index,
+                                    block_type.clone(),
+                                    heading_level,
+                                    None,
+                                );
+                                current_text.clear();
+                                rich_spans.clear();
+                                span_text.clear();
+                                in_block = true;
+                                block_type = BlockType::Heading;
+                                heading_level = Some(*d as i32 - '0' as i32);
+                            }
                         }
                     }
                     "blockquote" if in_body => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
+                            &mut rich_spans,
                             &mut block_index,
-                            BlockType::Paragraph,
+                            block_type.clone(),
+                            heading_level,
+                            None,
                         );
                         current_text.clear();
-                        tag_stack.push("blockquote".to_string());
+                        rich_spans.clear();
+                        span_text.clear();
+                        in_block = true;
+                        block_type = BlockType::Quote;
+                        heading_level = None;
                     }
                     "table" if in_body => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
+                            &mut rich_spans,
                             &mut block_index,
-                            BlockType::Paragraph,
+                            block_type.clone(),
+                            heading_level,
+                            None,
                         );
                         current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
                         in_table = true;
                         table_rows.clear();
-                        tag_stack.push("table".to_string());
                     }
                     "tr" if in_table => {
                         current_row.clear();
-                        tag_stack.push("tr".to_string());
                     }
-                    "td" | "th"
-                        if in_table && tag_stack.last().map(|s| s.as_str()) == Some("tr") =>
-                    {
-                        current_text.clear();
-                        tag_stack.push(tag.clone());
+                    "td" | "th" if in_table => {
+                        span_text.clear();
+                        rich_spans.clear();
                     }
                     "ul" if in_body => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
+                            &mut rich_spans,
                             &mut block_index,
-                            BlockType::Paragraph,
+                            block_type.clone(),
+                            heading_level,
+                            None,
                         );
                         current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
                         in_list = true;
                         list_items.clear();
-                        tag_stack.push("ul".to_string());
                     }
                     "ol" if in_body => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
+                            &mut rich_spans,
                             &mut block_index,
-                            BlockType::Paragraph,
+                            block_type.clone(),
+                            heading_level,
+                            None,
                         );
                         current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
                         in_list = true;
                         list_items.clear();
-                        tag_stack.push("ol".to_string());
                     }
                     "li" if in_list => {
-                        current_text.clear();
-                        tag_stack.push("li".to_string());
+                        span_text.clear();
+                        rich_spans.clear();
                     }
-                    "hr" if in_body => {
-                        blocks.push(ReaderBlock {
-                            index: block_index,
-                            text: String::new(),
-                            block_type: BlockType::Separator,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    // Inline formatting tags
+                    "strong" | "b" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        bold = true;
                     }
-                    "img" if in_body => {
-                        let src = get_xml_attr(e, b"src");
-                        let alt = get_xml_attr(e, b"alt");
-                        blocks.push(ReaderBlock {
-                            index: block_index,
-                            text: String::new(),
-                            block_type: BlockType::Image,
-                            image_url: src,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: alt,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    "em" | "i" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        italic = true;
+                    }
+                    "sup" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        superscript = true;
+                    }
+                    "a" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        href = get_xml_attr(e, b"href");
+                    }
+                    "br" if in_block => {
+                        span_text.push('\n');
                     }
                     _ => {}
                 }
@@ -470,36 +573,68 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
             Ok(Event::Text(ref e)) => {
                 if in_body {
                     let text = e.xml10_content().unwrap_or_default();
-                    current_text.push_str(&text);
+                    if in_block {
+                        span_text.push_str(&text);
+                    } else if in_table {
+                        // Inside td/th - accumulate for cell
+                        span_text.push_str(&text);
+                    } else {
+                        current_text.push_str(&text);
+                    }
                 }
             }
             Ok(Event::CData(ref e)) => {
                 if in_body {
                     let text = e.xml10_content().unwrap_or_default();
-                    current_text.push_str(&text);
+                    if in_block || in_table {
+                        span_text.push_str(&text);
+                    } else {
+                        current_text.push_str(&text);
+                    }
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
                 if in_body {
                     let text = e.xml10_content().unwrap_or_default();
-                    current_text.push_str(&text);
+                    if in_block || in_table {
+                        span_text.push_str(&text);
+                    } else {
+                        current_text.push_str(&text);
+                    }
                 }
             }
             Ok(Event::End(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = false,
-                    "p" if in_body && tag_stack.last().map(|s| s.as_str()) == Some("p") => {
-                        tag_stack.pop();
+                    "p" if in_block && block_type == BlockType::Paragraph => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         let t = current_text.trim().to_string();
-                        if !t.is_empty() {
+                        let rich = if rich_spans.is_empty() {
+                            None
+                        } else {
+                            // If we only have one span that covers all text, flatten
+                            if rich_spans.len() == 1 && rich_spans[0].text == t {
+                                None
+                            } else {
+                                Some(rich_spans.clone())
+                            }
+                        };
+                        if !t.is_empty() || rich.is_some() {
                             blocks.push(ReaderBlock {
                                 index: block_index,
                                 text: t,
                                 block_type: BlockType::Paragraph,
                                 image_url: None,
                                 note_ref: None,
-                                rich_spans: None,
+                                rich_spans: rich,
                                 heading_level: None,
                                 ordered: None,
                                 list_items: None,
@@ -512,39 +647,76 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             block_index += 1;
                         }
                         current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
+                        in_block = false;
+                        bold = false;
+                        italic = false;
+                        superscript = false;
+                        href = None;
                     }
-                    t if t.starts_with('h') && t.len() == 2 && in_body => {
-                        if tag_stack.last().map(|s| s.as_str()) == Some(t) {
-                            tag_stack.pop();
-                            let t_text = current_text.trim().to_string();
-                            if !t_text.is_empty() {
-                                let level = t.as_bytes()[1] as i32 - '0' as i32;
-                                blocks.push(ReaderBlock {
-                                    index: block_index,
-                                    text: t_text,
-                                    block_type: BlockType::Heading,
-                                    image_url: None,
-                                    note_ref: None,
-                                    rich_spans: None,
-                                    heading_level: Some(level),
-                                    ordered: None,
-                                    list_items: None,
-                                    table_rows: None,
-                                    image_alt: None,
-                                    text_indent: None,
-                                    text_align: None,
-                                    note_id: None,
-                                });
-                                block_index += 1;
+                    t if t.starts_with('h')
+                        && t.len() == 2
+                        && in_block
+                        && block_type == BlockType::Heading =>
+                    {
+                        if let Some(d) = t.as_bytes().get(1) {
+                            if d.is_ascii_digit() {
+                                let expected_level = *d as i32 - '0' as i32;
+                                if heading_level == Some(expected_level) {
+                                    flush_rich_span(
+                                        &mut rich_spans,
+                                        &mut span_text,
+                                        bold,
+                                        italic,
+                                        superscript,
+                                        &href,
+                                    );
+                                    let t_text = current_text.trim().to_string();
+                                    if !t_text.is_empty() {
+                                        blocks.push(ReaderBlock {
+                                            index: block_index,
+                                            text: t_text,
+                                            block_type: BlockType::Heading,
+                                            image_url: None,
+                                            note_ref: None,
+                                            rich_spans: if rich_spans.is_empty() {
+                                                None
+                                            } else {
+                                                Some(rich_spans.clone())
+                                            },
+                                            heading_level,
+                                            ordered: None,
+                                            list_items: None,
+                                            table_rows: None,
+                                            image_alt: None,
+                                            text_indent: None,
+                                            text_align: None,
+                                            note_id: None,
+                                        });
+                                        block_index += 1;
+                                    }
+                                    current_text.clear();
+                                    rich_spans.clear();
+                                    span_text.clear();
+                                    in_block = false;
+                                    bold = false;
+                                    italic = false;
+                                    superscript = false;
+                                    href = None;
+                                }
                             }
-                            current_text.clear();
                         }
                     }
-                    "blockquote"
-                        if in_body
-                            && tag_stack.last().map(|s| s.as_str()) == Some("blockquote") =>
-                    {
-                        tag_stack.pop();
+                    "blockquote" if in_block && block_type == BlockType::Quote => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         let t = current_text.trim().to_string();
                         if !t.is_empty() {
                             blocks.push(ReaderBlock {
@@ -553,7 +725,11 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                 block_type: BlockType::Quote,
                                 image_url: None,
                                 note_ref: None,
-                                rich_spans: None,
+                                rich_spans: if rich_spans.is_empty() {
+                                    None
+                                } else {
+                                    Some(rich_spans.clone())
+                                },
                                 heading_level: None,
                                 ordered: None,
                                 list_items: None,
@@ -566,24 +742,26 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             block_index += 1;
                         }
                         current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
+                        in_block = false;
+                        bold = false;
+                        italic = false;
+                        superscript = false;
+                        href = None;
                     }
                     "td" | "th" if in_table => {
-                        let t = current_text.trim().to_string();
+                        let t = span_text.trim().to_string();
                         current_row.push(t);
-                        current_text.clear();
-                        tag_stack.pop();
+                        span_text.clear();
                     }
-                    "tr" if in_table && tag_stack.last().map(|s| s.as_str()) == Some("tr") => {
-                        tag_stack.pop();
+                    "tr" if in_table => {
                         if !current_row.is_empty() {
                             table_rows.push(current_row.clone());
                             current_row.clear();
                         }
                     }
-                    "table"
-                        if in_table && tag_stack.last().map(|s| s.as_str()) == Some("table") =>
-                    {
-                        tag_stack.pop();
+                    "table" if in_table => {
                         in_table = false;
                         if !table_rows.is_empty() {
                             let text = table_rows
@@ -611,16 +789,14 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             table_rows.clear();
                         }
                     }
-                    "li" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("li") => {
-                        tag_stack.pop();
-                        let t = current_text.trim().to_string();
+                    "li" if in_list => {
+                        let t = span_text.trim().to_string();
                         if !t.is_empty() {
                             list_items.push(t);
                         }
-                        current_text.clear();
+                        span_text.clear();
                     }
-                    "ul" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("ul") => {
-                        tag_stack.pop();
+                    "ul" if in_list => {
                         in_list = false;
                         if !list_items.is_empty() {
                             let text = list_items.join("\n");
@@ -664,8 +840,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             list_items.clear();
                         }
                     }
-                    "ol" if in_list && tag_stack.last().map(|s| s.as_str()) == Some("ol") => {
-                        tag_stack.pop();
+                    "ol" if in_list => {
                         in_list = false;
                         if !list_items.is_empty() {
                             let text = list_items.join("\n");
@@ -708,6 +883,51 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                             block_index += 1;
                             list_items.clear();
                         }
+                    }
+                    // Inline formatting end tags
+                    "strong" | "b" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        bold = false;
+                    }
+                    "em" | "i" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        italic = false;
+                    }
+                    "sup" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        superscript = false;
+                    }
+                    "a" if in_block => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        href = None;
                     }
                     _ => {}
                 }
@@ -753,7 +973,15 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     });
                     block_index += 1;
                 } else if tag == "br" && in_body {
-                    current_text.push('\n');
+                    if in_block {
+                        span_text.push('\n');
+                    } else {
+                        current_text.push('\n');
+                    }
+                } else if tag == "img" && in_block {
+                    // Inline image inside paragraph - treat as text placeholder
+                    let src = get_xml_attr(e, b"src").unwrap_or_default();
+                    span_text.push_str(&format!("[img:{}]", src));
                 }
             }
             Err(_) => break,
@@ -762,11 +990,22 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
     }
 
     // Flush any remaining text
+    flush_rich_span(
+        &mut rich_spans,
+        &mut span_text,
+        bold,
+        italic,
+        superscript,
+        &href,
+    );
     flush_block(
         &mut blocks,
         &mut current_text,
+        &mut rich_spans,
         &mut block_index,
-        BlockType::Paragraph,
+        block_type.clone(),
+        heading_level,
+        None,
     );
 
     (blocks, block_index)
@@ -775,68 +1014,108 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
 fn flush_block(
     blocks: &mut Vec<ReaderBlock>,
     text: &mut String,
+    rich_spans: &mut Vec<RichSpan>,
     index: &mut i32,
     block_type: BlockType,
+    heading_level: Option<i32>,
+    note_id: Option<String>,
 ) {
     let trimmed = text.trim().to_string();
     if !trimmed.is_empty() {
+        let rich = if rich_spans.is_empty() {
+            None
+        } else {
+            Some(rich_spans.clone())
+        };
         blocks.push(ReaderBlock {
             index: *index,
             text: trimmed,
             block_type,
             image_url: None,
             note_ref: None,
-            rich_spans: None,
-            heading_level: None,
+            rich_spans: rich,
+            heading_level,
             ordered: None,
             list_items: None,
             table_rows: None,
             image_alt: None,
             text_indent: None,
             text_align: None,
-            note_id: None,
+            note_id,
         });
         *index += 1;
     }
     text.clear();
+    rich_spans.clear();
 }
 
 fn extract_chapter_title(text: &str) -> String {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     reader.config_mut().allow_dangling_amp = true;
+    let mut in_body = false;
     let mut in_title = false;
     let mut title = String::new();
+    let mut heading_title = String::new();
+    let mut in_heading = false;
 
     loop {
         match reader.read_event() {
             Ok(Event::Eof) | Err(_) => break,
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "title" {
-                    in_title = true;
-                    title.clear();
+                match tag.as_str() {
+                    "body" => in_body = true,
+                    "title" if !in_body && heading_title.is_empty() => {
+                        in_title = true;
+                        title.clear();
+                    }
+                    t if t.starts_with('h')
+                        && t.len() == 2
+                        && in_body
+                        && heading_title.is_empty() =>
+                    {
+                        if let Some(&d) = t.as_bytes().get(1) {
+                            if d.is_ascii_digit() {
+                                in_heading = true;
+                                heading_title.clear();
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
             Ok(Event::Text(ref e)) => {
                 if in_title {
                     title.push_str(&e.xml10_content().unwrap_or_default());
+                } else if in_heading {
+                    heading_title.push_str(&e.xml10_content().unwrap_or_default());
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
                 if in_title {
                     title.push_str(&e.xml10_content().unwrap_or_default());
+                } else if in_heading {
+                    heading_title.push_str(&e.xml10_content().unwrap_or_default());
                 }
             }
             Ok(Event::End(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if tag == "title" && in_title {
-                    break;
+                    in_title = false;
+                } else if in_heading && tag.starts_with('h') && tag.len() == 2 {
+                    in_heading = false;
                 }
             }
             _ => {}
         }
     }
 
-    title.trim().to_string()
+    // Prefer heading from body over <title>
+    let result = if !heading_title.is_empty() {
+        heading_title
+    } else {
+        title
+    };
+    result.trim().to_string()
 }

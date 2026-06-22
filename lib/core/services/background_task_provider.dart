@@ -1,24 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'background_task_provider.freezed.dart';
 
 enum BackgroundTaskType { import, coverExtraction, directoryScan, cacheClear }
 
 enum BackgroundTaskStatus { running, completed, failed }
 
-@freezed
-abstract class BackgroundTask with _$BackgroundTask {
-  const factory BackgroundTask({
-    required String id,
-    required BackgroundTaskType type,
-    required BackgroundTaskStatus status,
-    required String message,
-    required DateTime startedAt,
-    DateTime? completedAt,
-  }) = _BackgroundTask;
+class BackgroundTask {
+  const BackgroundTask({
+    required this.id,
+    required this.type,
+    required this.status,
+    required this.message,
+    required this.startedAt,
+    this.completedAt,
+  });
 
-  const BackgroundTask._();
+  final String id;
+  final BackgroundTaskType type;
+  final BackgroundTaskStatus status;
+  final String message;
+  final DateTime startedAt;
+  final DateTime? completedAt;
+
+  BackgroundTask copyWith({
+    BackgroundTaskStatus? status,
+    String? message,
+    DateTime? completedAt,
+  }) {
+    return BackgroundTask(
+      id: id,
+      type: type,
+      status: status ?? this.status,
+      message: message ?? this.message,
+      startedAt: startedAt,
+      completedAt: completedAt ?? this.completedAt,
+    );
+  }
 }
 
 class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {

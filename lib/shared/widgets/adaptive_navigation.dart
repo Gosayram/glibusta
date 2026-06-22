@@ -343,12 +343,9 @@ class ShellWithNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final capabilities = ref.watch(platformCapabilitiesProvider);
-
-    // Fallback for non-StatefulShellRoute routes (catalog, collections, etc.)
     final shell = navigationShell;
 
-    if (capabilities.hasNativeMenuBar) {
+    if (hasNativeMenuBar) {
       return shell != null
           ? MacOSShell(navigationShell: shell)
           : const Scaffold(body: SizedBox.shrink());

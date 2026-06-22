@@ -19,7 +19,6 @@ import '../data/reader_colors.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
-import 'full_text_translation_view.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
@@ -49,7 +48,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
-  Timer? _translationPollTimer;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _fullscreenMode = false;
@@ -83,14 +81,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         if (prev != null) _handleLayoutChange(prev, next);
         if (prev == null || prev.orientationLock != next.orientationLock) {
           _syncOrientation(next.orientationLock);
-        }
-      });
-      // Periodic check for pending translation from double-tap
-      _translationPollTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-        if (!mounted) return;
-        final text = _ctrl.consumePendingTranslation();
-        if (text != null && context.mounted) {
-          unawaited(FullTextTranslationView.show(context: context, originalText: text));
         }
       });
     });
@@ -228,7 +218,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
-    _translationPollTimer?.cancel();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     unawaited(SystemChrome.setPreferredOrientations([]));

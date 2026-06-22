@@ -1,9 +1,25 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
+use crate::book::normalize_whitespace;
 use anyhow::Result;
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
-    let encoding_name = forced_encoding.unwrap_or("utf-8");
-    let text = decode_text(bytes, encoding_name)?;
+    let text = if let Some(enc) = forced_encoding {
+        decode_text(bytes, enc)?
+    } else {
+        // Try UTF-8 first, fall back to windows-1251 then koi8-r
+        match std::str::from_utf8(bytes) {
+            Ok(s) => s.to_string(),
+            Err(_) => {
+                if let Some(s) = try_decode(bytes, "windows-1251") {
+                    s
+                } else if let Some(s) = try_decode(bytes, "koi8-r") {
+                    s
+                } else {
+                    decode_text(bytes, "utf-8")?
+                }
+            }
+        }
+    };
 
     let paragraphs: Vec<String> = text
         .split("\n\n")
@@ -72,33 +88,11 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
     }
 }
 
-fn normalize_whitespace(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut prev_was_space = false;
-
-    for ch in text.chars() {
-        match ch {
-            '\r' => continue,
-            '\n' => {
-                if !prev_was_space {
-                    result.push(' ');
-                }
-                prev_was_space = true;
-            }
-            ' ' | '\t' => {
-                if !prev_was_space {
-                    result.push(' ');
-                }
-                prev_was_space = true;
-            }
-            _ => {
-                result.push(ch);
-                prev_was_space = false;
-            }
-        }
-    }
-
-    result.trim().to_string()
+fn try_decode(bytes: &[u8], encoding_name: &str) -> Option<String> {
+    let encoding = encoding_rs::Encoding::for_label_no_replacement(encoding_name.as_bytes())?;
+    encoding
+        .decode_without_bom_handling_and_without_replacement(bytes)
+        .map(|cow| cow.into_owned())
 }
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {

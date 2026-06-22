@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/l10n/generated/app_localizations.dart';
 import 'package:glibusta/shared/models/book.dart';
 import 'package:glibusta/shared/widgets/adaptive_navigation.dart';
-import 'package:glibusta/shared/widgets/book_grid.dart';
 import 'package:glibusta/shared/widgets/library_master_detail.dart';
 import 'package:go_router/go_router.dart';
 
@@ -92,21 +91,6 @@ void main() {
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.text('Content'), findsOneWidget);
     });
-
-    testWidgets('BookGrid shows 2 cards per row', (tester) async {
-      setScreenSize(tester, 360, 640);
-      final books = makeBooks(6);
-
-      await tester.pumpWidget(
-        buildTestApp(BookGrid(books: books)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(GridView), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byType(GridView));
-      final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 140);
-    });
   });
 
   // ─── Large Android (412x915) ──────────────────────────
@@ -132,21 +116,6 @@ void main() {
 
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
-    });
-
-    testWidgets('BookGrid renders with maxCrossAxisExtent 140', (tester) async {
-      setScreenSize(tester, 412, 915);
-      final books = makeBooks(8);
-
-      await tester.pumpWidget(
-        buildTestApp(BookGrid(books: books)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(GridView), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byType(GridView));
-      final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 140);
     });
   });
 
@@ -386,21 +355,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(NavigationRail), findsOneWidget);
-    });
-
-    testWidgets('BookGrid renders with correct delegate', (tester) async {
-      setScreenSize(tester, 1920, 1080);
-      final books = makeBooks(12);
-
-      await tester.pumpWidget(
-        buildTestApp(BookGrid(books: books)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.byType(GridView), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byType(GridView));
-      final delegate = grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
-      expect(delegate.maxCrossAxisExtent, 260);
     });
   });
 

@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/features/reader/data/parsers/fb2_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
-import 'package:glibusta/features/reader/data/parsers/txt_parser.dart';
+import 'package:glibusta/features/reader/data/parsers/rust_book_parser.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/epub/epub_book_adapter.dart';
 import 'package:glibusta/features/reader/epub/epub_image_store.dart';
@@ -159,7 +158,7 @@ void main() {
     for (final file in fb2Files) {
       final name = p.basename(file.path);
       test('$name: parse → serialize → deserialize preserves content', () async {
-        final parser = Fb2Parser();
+        final parser = RustBookParser();
         final normalized = await parser.parseFile(file.path);
 
         expect(normalized.title, isNotEmpty, reason: '$name: title should not be empty');
@@ -190,7 +189,7 @@ void main() {
       final file = File(p.join(testDir, '431001.txt'));
       expect(await file.exists(), isTrue);
 
-      final parser = TxtBookParser();
+      final parser = RustBookParser();
       final normalized = await parser.parseFile(file.path);
 
       expect(normalized.title, isNotEmpty);
