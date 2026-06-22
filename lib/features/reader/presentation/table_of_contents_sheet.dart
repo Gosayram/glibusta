@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
+import 'toc_hierarchy.dart';
 
 class TableOfContentsSheet extends StatelessWidget {
   final NormalizedBookMetadata metadata;
@@ -58,22 +59,6 @@ class TableOfContentsSheet extends StatelessWidget {
   }
 }
 
-class _TocEntry {
-  final int index;
-  final String title;
-  final int depth;
-  final bool isGroup;
-  final int groupId;
-
-  const _TocEntry({
-    required this.index,
-    required this.title,
-    required this.depth,
-    required this.isGroup,
-    required this.groupId,
-  });
-}
-
 class _TableOfContentsContent extends StatefulWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
@@ -98,62 +83,8 @@ class _TableOfContentsContent extends StatefulWidget {
 class _TableOfContentsContentState extends State<_TableOfContentsContent> {
   final Set<int> _collapsedGroups = {};
 
-  List<_TocEntry> _buildHierarchy() {
-    final titles = widget.metadata.chapterTitles;
-    final entries = <_TocEntry>[];
-    final depthStack = <({int depth, int groupId, String title})>[];
-
-    for (var i = 0; i < titles.length; i++) {
-      final title = i < titles.length ? titles[i] : '';
-      final depth = _detectDepth(title);
-
-      while (depthStack.isNotEmpty && depthStack.last.depth >= depth) {
-        depthStack.removeLast();
-      }
-
-      final groupId = depthStack.isNotEmpty ? depthStack.last.groupId : i;
-      entries.add(
-        _TocEntry(
-          index: i,
-          title: title,
-          depth: depth,
-          isGroup: false,
-          groupId: groupId,
-        ),
-      );
-      depthStack.add((depth: depth, groupId: i, title: title));
-    }
-
-    final childGroupIds = <int>{};
-    for (final entry in entries) {
-      if (entries.any((e) => e.groupId == entry.index && e.index != entry.index)) {
-        childGroupIds.add(entry.index);
-      }
-    }
-
-    return entries.map((e) {
-      if (childGroupIds.contains(e.index)) {
-        return _TocEntry(
-          index: e.index,
-          title: e.title,
-          depth: e.depth,
-          isGroup: true,
-          groupId: e.groupId,
-        );
-      }
-      return e;
-    }).toList();
-  }
-
-  int _detectDepth(String title) {
-    final trimmed = title.trim();
-    final match = RegExp(r'^(\d+(?:[.\-]\d+)*)\s').firstMatch(trimmed);
-    if (match != null) {
-      return match.group(1)!.split(RegExp(r'[.\-]')).length - 1;
-    }
-    if (trimmed.startsWith(RegExp(r'[IVX]+\s'))) return 1;
-    return 0;
-  }
+  // ponytail: shared with reader_side_panel via toc_hierarchy.dart
+  List<TocEntry> _buildHierarchy() => buildTocHierarchy(widget.metadata.chapterTitles);
 
   @override
   Widget build(BuildContext context) {

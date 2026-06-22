@@ -7,6 +7,7 @@ import '../../notes/data/note_repository.dart';
 import '../../quotes/data/quote_repository.dart';
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
+import 'toc_hierarchy.dart';
 
 class ReaderSidePanel extends ConsumerStatefulWidget {
   const ReaderSidePanel({
@@ -140,61 +141,8 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
     );
   }
 
-  List<_TocItem> _buildHierarchy() {
-    final titles = widget.metadata.chapterTitles;
-    final items = <_TocItem>[];
-    final depthStack = <_DepthInfo>[];
-
-    for (var i = 0; i < titles.length; i++) {
-      final title = i < titles.length ? titles[i] : '';
-      final depth = _detectDepth(title);
-
-      while (depthStack.isNotEmpty && depthStack.last.depth >= depth) {
-        depthStack.removeLast();
-      }
-
-      final groupId = depthStack.isNotEmpty ? depthStack.last.groupId : i;
-
-      items.add(
-        _TocItem(
-          index: i,
-          title: title,
-          depth: depth,
-          isGroup: false,
-          groupId: groupId,
-        ),
-      );
-
-      depthStack.add(_DepthInfo(depth: depth, groupId: i, title: title));
-    }
-
-    // Mark parents: any index that appears in depthStack as a groupId for later items
-    final parentIndices = <int>{};
-    for (final item in items) {
-      if (items.any((other) => other.groupId == item.index && other.index != item.index)) {
-        parentIndices.add(item.index);
-      }
-    }
-
-    return items.map((item) {
-      if (parentIndices.contains(item.index)) {
-        final titleIdx = depthStack.indexWhere((d) => d.groupId == item.index);
-        final title = titleIdx >= 0 ? depthStack[titleIdx].title : item.title;
-        return item.copyWith(isGroup: true, title: title);
-      }
-      return item;
-    }).toList();
-  }
-
-  int _detectDepth(String title) {
-    final trimmed = title.trim();
-    final match = RegExp(r'^(\d+(?:[.\-]\d+)*)\s').firstMatch(trimmed);
-    if (match != null) {
-      return match.group(1)!.split(RegExp(r'[.\-]')).length - 1;
-    }
-    if (trimmed.startsWith(RegExp(r'[IVX]+\s'))) return 1;
-    return 0;
-  }
+  // ponytail: shared with table_of_contents_sheet via toc_hierarchy.dart
+  List<TocEntry> _buildHierarchy() => buildTocHierarchy(widget.metadata.chapterTitles);
 
   Widget _buildBookmarks() {
     return StreamBuilder<List<Bookmark>>(
@@ -331,44 +279,4 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   String _positionText(int chapterIndex) {
     return 'Глава ${chapterIndex + 1}';
   }
-}
-
-class _TocItem {
-  final int index;
-  final String title;
-  final int depth;
-  final bool isGroup;
-  final int groupId;
-
-  const _TocItem({
-    required this.index,
-    required this.title,
-    required this.depth,
-    required this.isGroup,
-    required this.groupId,
-  });
-
-  _TocItem copyWith({
-    int? index,
-    String? title,
-    int? depth,
-    bool? isGroup,
-    int? groupId,
-  }) {
-    return _TocItem(
-      index: index ?? this.index,
-      title: title ?? this.title,
-      depth: depth ?? this.depth,
-      isGroup: isGroup ?? this.isGroup,
-      groupId: groupId ?? this.groupId,
-    );
-  }
-}
-
-class _DepthInfo {
-  final int depth;
-  final int groupId;
-  final String title;
-
-  const _DepthInfo({required this.depth, required this.groupId, required this.title});
 }
