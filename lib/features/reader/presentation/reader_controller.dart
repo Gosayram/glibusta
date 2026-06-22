@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/database/app_database.dart';
@@ -817,9 +816,15 @@ class ReaderController {
     if (paragraphIndex < 0 || paragraphIndex >= chapter.blocks.length) return;
     final text = chapter.blocks[paragraphIndex].text;
     if (text.isEmpty) return;
-    final encoded = Uri.encodeComponent(text);
-    final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$encoded');
-    unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+    _pendingTranslation = text;
+  }
+
+  String? _pendingTranslation;
+
+  String? consumePendingTranslation() {
+    final t = _pendingTranslation;
+    _pendingTranslation = null;
+    return t;
   }
 
   void handleLongPress() {

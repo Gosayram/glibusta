@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,7 @@ import '../data/reader_colors.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'full_text_translation_view.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
@@ -47,10 +49,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
+  Timer? _translationPollTimer;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _fullscreenMode = false;
   String? _selectedText;
+  int _batteryLevel = -1;
 
   Future<void> _checkForSelectedText() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -69,6 +73,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
+    unawaited(_fetchBatteryLevel());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -78,6 +83,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         if (prev != null) _handleLayoutChange(prev, next);
         if (prev == null || prev.orientationLock != next.orientationLock) {
           _syncOrientation(next.orientationLock);
+        }
+      });
+      // Periodic check for pending translation from double-tap
+      _translationPollTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (!mounted) return;
+        final text = _ctrl.consumePendingTranslation();
+        if (text != null && context.mounted) {
+          unawaited(FullTextTranslationView.show(context: context, originalText: text));
         }
       });
     });
@@ -215,6 +228,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    _translationPollTimer?.cancel();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     unawaited(SystemChrome.setPreferredOrientations([]));
@@ -794,8 +808,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.bookProgress =>
           '${readerState.currentPosition.chapterIndex + 1}/${readerState.chapterCount}',
         InfoSlotMode.time => _formatTime(),
-        InfoSlotMode.battery => '',
-        InfoSlotMode.batteryAndTime => _formatTime(),
+        InfoSlotMode.battery => _formatBattery(),
+        InfoSlotMode.batteryAndTime => '${_formatBattery()} ${_formatTime()}',
         InfoSlotMode.none => '',
       };
       return Text(
@@ -832,6 +846,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String _formatTime() {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _fetchBatteryLevel() async {
+    try {
+      final level = await Battery().batteryLevel;
+      if (mounted) setState(() => _batteryLevel = level);
+    } on Object catch (_) {}
+  }
+
+  String _formatBattery() {
+    if (_batteryLevel < 0) return '';
+    return '$_batteryLevel%';
   }
 
   void _cycleColorPreset(int direction) {
