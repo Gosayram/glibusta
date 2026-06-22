@@ -108,6 +108,7 @@ class ReaderContentBody extends StatefulWidget {
     this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
+    this.customColors,
   });
 
   final NormalizedBookMetadata metadata;
@@ -121,6 +122,7 @@ class ReaderContentBody extends StatefulWidget {
   final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
+  final ReaderColors? customColors;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -160,6 +162,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         ttsHighlightIndex: widget.ttsHighlightIndex,
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
+        customColors: widget.customColors,
       );
     }
 
@@ -724,7 +727,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors = ReaderColors.forTheme(settings.theme);
+    final colors = widget.customColors ?? ReaderColors.forTheme(settings.theme);
     final String fontFamily;
     switch (settings.font) {
       case ReaderFont.inter:
@@ -884,6 +887,7 @@ class _PaginatedContentBody extends StatefulWidget {
     this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
+    this.customColors,
   });
 
   final NormalizedBookMetadata metadata;
@@ -895,6 +899,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
+  final ReaderColors? customColors;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -1515,7 +1520,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors = ReaderColors.forTheme(settings.theme);
+    final colors = widget.customColors ?? ReaderColors.forTheme(settings.theme);
     final String fontFamily;
     switch (settings.font) {
       case ReaderFont.inter:

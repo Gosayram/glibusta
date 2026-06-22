@@ -14,9 +14,10 @@ import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
-import '../data/auto_theme_service.dart';
 import '../data/reader_colors.dart';
+import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
+import 'color_preset_provider.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
@@ -28,7 +29,10 @@ import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
 import 'reader_side_panel.dart';
+import 'reading_info_provider.dart';
 import 'table_of_contents_sheet.dart';
+
+enum _ReadingInfoPosition { header, footer }
 
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({super.key, required this.bookId});
@@ -282,8 +286,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   Widget _buildForState(BuildContext context, ReaderState readerState) {
     final settings = ref.watch(readerSettingsProvider);
-    final resolvedTheme = _resolveTheme(settings);
-    final theme = _getThemeData(resolvedTheme);
+    final theme = _getThemeData(settings);
 
     if (readerState.isLoading) {
       return AnimatedTheme(
@@ -458,6 +461,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
         ),
         if (!_isDistractionFree(settings)) ...[
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.header,
+          ),
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.footer,
+          ),
           Positioned(
             top: 0,
             left: 0,
@@ -647,6 +662,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               initialPage: readerState.currentPosition.chapterIndex,
               highlightQuery: readerState.highlightedQuery,
               chapterHighlights: _buildChapterHighlights(),
+              customColors: _resolveCustomColors(settings),
             ),
           ),
         ),
@@ -667,7 +683,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         : 0.0;
 
     return Scaffold(
-      backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
+      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
       body: _buildReaderContentStack(
         context,
         readerState,
@@ -691,7 +707,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
 
     return Scaffold(
-      backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
+      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
       body: _buildReaderContentStack(
         context,
         readerState,
@@ -718,7 +734,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final horizontalPadding = ((availableWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
 
     return Scaffold(
-      backgroundColor: _getThemeData(settings.theme).scaffoldBackgroundColor,
+      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
       body: Row(
         children: [
           if (readerState.metadata != null)
@@ -748,28 +764,78 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  ReaderTheme _resolveTheme(ReaderSettings settings) {
-    if (settings.autoThemeMode != AutoThemeMode.off) {
-      return AutoThemeService().resolveTheme(
-        settings.autoThemeMode,
-        settings.theme,
-      );
-    }
-    if (settings.theme == ReaderTheme.system) {
-      return MediaQuery.platformBrightnessOf(context) == Brightness.dark
-          ? ReaderTheme.dark
-          : ReaderTheme.light;
-    }
-    return settings.theme;
-  }
-
-  ThemeData _getThemeData(ReaderTheme theme) {
+  ThemeData _getThemeData(ReaderSettings settings) {
     final base = Theme.of(context);
-    final colors = ReaderColors.forTheme(theme);
+    final custom = _resolveCustomColors(settings);
+    final colors = custom ?? ReaderColors.forTheme(settings.theme);
     return base.copyWith(
       scaffoldBackgroundColor: colors.scaffold,
       textTheme: base.textTheme.apply(bodyColor: colors.text),
     );
+  }
+
+  Widget _buildReadingInfoBar(
+    BuildContext context,
+    ReaderState readerState,
+    ReaderSettings settings, {
+    required _ReadingInfoPosition position,
+  }) {
+    final infoConfig = ref.watch(readingInfoProvider);
+    final colors = _resolveCustomColors(settings) ?? ReaderColors.forTheme(settings.theme);
+    final List<InfoSlotMode> slots = position == _ReadingInfoPosition.header
+        ? [infoConfig.headerLeft, infoConfig.headerCenter, infoConfig.headerRight]
+        : [infoConfig.footerLeft, infoConfig.footerCenter, infoConfig.footerRight];
+
+    if (slots.every((s) => s == InfoSlotMode.none)) return const SizedBox.shrink();
+
+    Widget buildSlot(InfoSlotMode mode) {
+      if (mode == InfoSlotMode.none) return const SizedBox.shrink();
+      final text = switch (mode) {
+        InfoSlotMode.chapterTitle => readerState.chapterTitle(
+          readerState.currentPosition.chapterIndex,
+        ),
+        InfoSlotMode.chapterProgress => '${(readerState.scrollProgress * 100).round()}%',
+        InfoSlotMode.bookProgress =>
+          '${readerState.currentPosition.chapterIndex + 1}/${readerState.chapterCount}',
+        InfoSlotMode.time => _formatTime(),
+        InfoSlotMode.battery => '',
+        InfoSlotMode.batteryAndTime => _formatTime(),
+        InfoSlotMode.none => '',
+      };
+      return Text(
+        text,
+        style: TextStyle(
+          fontSize: infoConfig.fontSize,
+          color: colors.text.withValues(alpha: 0.6),
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final bar = Container(
+      padding: EdgeInsets.symmetric(horizontal: infoConfig.margin, vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: buildSlot(slots[0])),
+          Expanded(child: Center(child: buildSlot(slots[1]))),
+          Expanded(
+            child: Align(alignment: Alignment.centerRight, child: buildSlot(slots[2])),
+          ),
+        ],
+      ),
+    );
+
+    if (position == _ReadingInfoPosition.header) {
+      return Positioned(top: 0, left: 0, right: 0, child: SafeArea(bottom: false, child: bar));
+    }
+    return Positioned(bottom: 0, left: 0, right: 0, child: SafeArea(top: false, child: bar));
+  }
+
+  String _formatTime() {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
   void _showQuickSettings(BuildContext context) {
@@ -873,6 +939,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       }
     }
     return result;
+  }
+
+  ReaderColors? _resolveCustomColors(ReaderSettings settings) {
+    final presetsAsync = ref.read(colorPresetListProvider);
+    final presets = presetsAsync.value;
+    if (presets == null) return null;
+    try {
+      final preset = presets.firstWhere((p) => p.id == settings.activeColorPresetId);
+      return ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
+    } on Object catch (_) {
+      return null;
+    }
   }
 }
 

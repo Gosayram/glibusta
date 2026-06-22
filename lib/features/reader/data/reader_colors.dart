@@ -8,6 +8,10 @@ class ReaderColors {
 
   const ReaderColors({required this.scaffold, required this.text});
 
+  factory ReaderColors.fromPreset(Color bgColor, Color fgColor) {
+    return ReaderColors(scaffold: bgColor, text: fgColor);
+  }
+
   static const _light = ReaderColors(scaffold: Colors.white, text: Colors.black87);
   static const _paper = ReaderColors(scaffold: Color(0xFFF5F0E6), text: Color(0xFF3E3225));
   static const _sepia = ReaderColors(scaffold: Color(0xFFF4ecd8), text: Color(0xFF5B4636));

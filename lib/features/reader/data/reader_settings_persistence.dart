@@ -111,6 +111,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['imageColorEffect'],
           orElse: () => ImageColorEffect.off,
         ),
+        activeColorPresetId: map['activeColorPresetId'] as String? ?? 'blue_light',
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -168,6 +169,7 @@ class ReaderSettingsPersistence {
         'imageAlignment': settings.imageAlignment.name,
         'imageWidth': settings.imageWidth,
         'imageColorEffect': settings.imageColorEffect.name,
+        'activeColorPresetId': settings.activeColorPresetId,
       }),
     );
   }

@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/color_preset_service.dart';
 import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
+import 'color_preset_provider.dart';
 import 'reader_providers.dart';
 
 class ReaderQuickSettingsSheet extends ConsumerStatefulWidget {
@@ -138,6 +142,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       children: [
         const _SectionTitle('Тема'),
         _buildThemeRow(context, settings, notifier),
+        const SizedBox(height: 8),
+        _buildColorPresetRow(context, ref, settings, notifier),
         const SizedBox(height: 16),
         const _SectionTitle('Шрифт'),
         _buildFontRow(settings, notifier),
@@ -399,6 +405,238 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildColorPresetRow(
+    BuildContext context,
+    WidgetRef ref,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final presetsAsync = ref.watch(colorPresetListProvider);
+    return presetsAsync.when(
+      data: (presets) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 48,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: presets.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final preset = presets[index];
+                final isSelected = settings.activeColorPresetId == preset.id;
+                return GestureDetector(
+                  onTap: () => notifier.updateActiveColorPresetId(preset.id),
+                  onLongPress: () => _showColorPresetEditor(
+                    context,
+                    ref,
+                    preset,
+                    notifier,
+                  ),
+                  child: Tooltip(
+                    message: preset.name,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: preset.backgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Aa',
+                          style: TextStyle(
+                            color: preset.fontColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => _showColorPresetEditor(context, ref, null, notifier),
+                child: Icon(
+                  Icons.add_circle_outline,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Добавить / Долгое нажатие — редактировать',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+
+  void _showColorPresetEditor(
+    BuildContext context,
+    WidgetRef ref,
+    ColorPreset? existing,
+    ReaderSettingsNotifier notifier,
+  ) {
+    var bgColor = existing?.backgroundColor ?? Colors.white;
+    var fgColor = existing?.fontColor ?? Colors.black87;
+    final nameController = TextEditingController(text: existing?.name ?? '');
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: Text(existing != null ? 'Редактировать' : 'Новый пресет'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Название'),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Column(
+                      children: [
+                        const Text('Фон', style: TextStyle(fontSize: 12)),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () async {
+                            final color = await showColorPicker(
+                              context: ctx,
+                              initialColor: bgColor,
+                            );
+                            if (color != null) setDialogState(() => bgColor = color);
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: bgColor,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        const Text('Текст', style: TextStyle(fontSize: 12)),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () async {
+                            final color = await showColorPicker(
+                              context: ctx,
+                              initialColor: fgColor,
+                            );
+                            if (color != null) setDialogState(() => fgColor = color);
+                          },
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: fgColor,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        const Text('Превью', style: TextStyle(fontSize: 12)),
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Aa',
+                              style: TextStyle(color: fgColor, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              if (existing != null)
+                TextButton(
+                  onPressed: () {
+                    unawaited(ref.read(colorPresetListProvider.notifier).remove(existing.id));
+                    final currentSettings = ref.read(readerSettingsProvider);
+                    if (currentSettings.activeColorPresetId == existing.id) {
+                      notifier.updateActiveColorPresetId('blue_light');
+                    }
+                    Navigator.of(ctx).pop();
+                  },
+                  child: const Text('Удалить'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final name = nameController.text.trim().isEmpty
+                      ? 'Мой'
+                      : nameController.text.trim();
+                  final preset = ColorPreset(
+                    id: existing?.id ?? 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                    name: name,
+                    backgroundColor: bgColor,
+                    fontColor: fgColor,
+                  );
+                  if (existing != null) {
+                    unawaited(ref.read(colorPresetListProvider.notifier).updatePreset(preset));
+                  } else {
+                    unawaited(ref.read(colorPresetListProvider.notifier).add(preset));
+                  }
+                  notifier.updateActiveColorPresetId(preset.id);
+                  Navigator.of(ctx).pop();
+                },
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1110,4 +1348,62 @@ class _SectionTitle extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<Color?> showColorPicker({
+  required BuildContext context,
+  required Color initialColor,
+}) {
+  final colors = [
+    Colors.white,
+    Colors.black,
+    Colors.grey.shade800,
+    Colors.grey.shade500,
+    Colors.red.shade700,
+    Colors.pink.shade300,
+    Colors.purple.shade300,
+    Colors.deepPurple.shade300,
+    Colors.blue.shade700,
+    Colors.blue.shade300,
+    Colors.cyan.shade300,
+    Colors.teal.shade300,
+    Colors.green.shade700,
+    Colors.lightGreen.shade300,
+    Colors.amber.shade700,
+    Colors.orange.shade700,
+    const Color(0xFFF5F0E6),
+    const Color(0xFFF4ECD8),
+    const Color(0xFF111318),
+    const Color(0xFF1A1612),
+    const Color(0xFFFAF8FF),
+    const Color(0xFF2C2C2C),
+  ];
+  return showDialog<Color>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Выберите цвет'),
+      content: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: colors.map((c) {
+          final isSelected = c.toARGB32() == initialColor.toARGB32();
+          return GestureDetector(
+            onTap: () => Navigator.of(ctx).pop(c),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: c,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isSelected ? Colors.blue : Colors.grey.withValues(alpha: 0.3),
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    ),
+  );
 }

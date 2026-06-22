@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reader.freezed.dart';
@@ -120,6 +118,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ImageAlignment.center) ImageAlignment imageAlignment,
     @Default(1.0) double imageWidth,
     @Default(ImageColorEffect.off) ImageColorEffect imageColorEffect,
+    @Default('blue_light') String activeColorPresetId,
   }) = _ReaderSettings;
 }
 
@@ -226,10 +225,4 @@ class ReadingProfile {
       ),
     ),
   ];
-}
-
-abstract class BookParser {
-  Future<String> parseFb2(Uint8List bytes);
-  Future<String> parseEpub(Uint8List bytes);
-  Future<String> parseTxt(Uint8List bytes);
 }

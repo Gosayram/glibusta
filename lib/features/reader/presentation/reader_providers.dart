@@ -228,6 +228,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(imageColorEffect: value);
   }
 
+  void updateActiveColorPresetId(String value) {
+    state = state.copyWith(activeColorPresetId: value);
+  }
+
   void applyProfile(ReaderSettings profile) {
     state = profile;
   }
