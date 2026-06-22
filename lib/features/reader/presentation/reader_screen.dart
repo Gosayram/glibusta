@@ -441,25 +441,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             bottom: 60,
             child: _ScrollbarIndicator(progress: readerState.scrollProgress),
           ),
-        Positioned(
-          right: 0,
-          top: 48,
-          bottom: 60,
-          width: 20,
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onHorizontalDragEnd: (details) {
-              final v = details.primaryVelocity ?? 0;
-              if (v.abs() < 100) return;
-              final themes = ReaderTheme.values;
-              final current = themes.indexOf(settings.theme);
-              final next = v > 0
-                  ? (current + 1) % themes.length
-                  : (current - 1 + themes.length) % themes.length;
-              ref.read(readerSettingsProvider.notifier).updateTheme(themes[next]);
-            },
+        if (!_isDistractionFree(settings))
+          Positioned(
+            left: 48,
+            right: 48,
+            top: 48,
+            height: 48,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragEnd: (details) {
+                final v = details.primaryVelocity ?? 0;
+                if (v.abs() < 200) return;
+                _cycleColorPreset(v > 0 ? 1 : -1);
+              },
+            ),
           ),
-        ),
         if (!_isDistractionFree(settings)) ...[
           _buildReadingInfoBar(
             context,
@@ -838,6 +834,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
+  void _cycleColorPreset(int direction) {
+    final presetsAsync = ref.read(colorPresetListProvider);
+    final presets = presetsAsync.value;
+    if (presets == null || presets.isEmpty) return;
+    final currentSettings = ref.read(readerSettingsProvider);
+    final currentId = currentSettings.activeColorPresetId;
+    final currentIndex = presets.indexWhere((p) => p.id == currentId);
+    final nextIndex = (currentIndex + direction).clamp(0, presets.length - 1);
+    ref.read(readerSettingsProvider.notifier).updateActiveColorPresetId(presets[nextIndex].id);
+  }
+
   void _showQuickSettings(BuildContext context) {
     _ctrl.saveCheckpoint();
     _ctrl.onBottomSheetOpen();
@@ -899,6 +906,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   bool _shouldShowProgressBar(ReaderSettings settings, ReaderState readerState) {
     if (settings.progressBarPosition == ProgressBarPosition.hidden) return false;
     if (_isDistractionFree(settings)) return false;
+    if (!readerState.uiVisible) return false;
     return readerState.scrollProgress > 0;
   }
 

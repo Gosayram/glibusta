@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
@@ -74,11 +75,9 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               label: 'Поделиться',
               onTap: () async {
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final uri = Uri(
-                    scheme: 'mailto',
-                    queryParameters: {'body': _selectedText},
+                  await SharePlus.instance.share(
+                    ShareParams(text: _selectedText),
                   );
-                  await launchUrl(uri);
                 }
                 widget.onDismiss();
               },
@@ -113,7 +112,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               onTap: () async {
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
                   final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://api.dictionaryapi.dev/api/v2/entries/en/$query');
+                  final uri = Uri.parse('https://www.google.com/search?q=$query+meaning');
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
                 widget.onDismiss();

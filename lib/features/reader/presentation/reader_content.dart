@@ -10,14 +10,18 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'highlighted_text.dart';
 
-List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
+List<InlineSpan> _bionicReadingSpans(
+  String text,
+  TextStyle style, [
+  FontWeight thickness = FontWeight.w700,
+]) {
   final spans = <InlineSpan>[];
   final buffer = StringBuffer();
   for (var i = 0; i < text.length; i++) {
     final ch = text[i];
     if (ch == ' ' || ch == '\n' || ch == '\t') {
       if (buffer.isNotEmpty) {
-        _appendBionicWord(spans, buffer.toString(), style);
+        _appendBionicWord(spans, buffer.toString(), style, thickness);
         buffer.clear();
       }
       spans.add(TextSpan(text: ch, style: style));
@@ -26,21 +30,38 @@ List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
     }
   }
   if (buffer.isNotEmpty) {
-    _appendBionicWord(spans, buffer.toString(), style);
+    _appendBionicWord(spans, buffer.toString(), style, thickness);
   }
   return spans;
 }
 
-void _appendBionicWord(List<InlineSpan> spans, String word, TextStyle style) {
-  final boldLen = (word.length * 0.4).ceil().clamp(1, word.length);
+void _appendBionicWord(
+  List<InlineSpan> spans,
+  String word,
+  TextStyle style,
+  FontWeight thickness,
+) {
+  // Skip leading digits (e.g. "1.2" — digits are not part of the reading word)
+  var start = 0;
+  while (start < word.length &&
+      word[start].codeUnitAt(0) >= 0x30 &&
+      word[start].codeUnitAt(0) <= 0x39) {
+    start++;
+  }
+  if (start > 0) {
+    spans.add(TextSpan(text: word.substring(0, start), style: style));
+  }
+  final wordPart = word.substring(start);
+  if (wordPart.isEmpty) return;
+  final boldLen = (wordPart.length * 0.4).ceil().clamp(1, wordPart.length);
   spans.add(
     TextSpan(
-      text: word.substring(0, boldLen),
-      style: style.copyWith(fontWeight: FontWeight.w700),
+      text: wordPart.substring(0, boldLen),
+      style: style.copyWith(fontWeight: thickness),
     ),
   );
-  if (boldLen < word.length) {
-    spans.add(TextSpan(text: word.substring(boldLen), style: style));
+  if (boldLen < wordPart.length) {
+    spans.add(TextSpan(text: wordPart.substring(boldLen), style: style));
   }
 }
 
@@ -204,43 +225,49 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             children: [
               ScrollConfiguration(
                 behavior: const _SmoothScrollBehavior(),
-                child: ListView.builder(
+                child: Scrollbar(
                   controller: scrollController,
-                  padding: effectiveMargin,
-                  itemCount: metadata.chapterCount,
-                  addAutomaticKeepAlives: false,
-                  itemBuilder: (context, index) {
-                    final chapter = loadedChapters[index];
-                    final isLast = index == metadata.chapterCount - 1;
-                    final nextTitle = index + 1 < metadata.chapterTitles.length
-                        ? metadata.chapterTitles[index + 1]
-                        : '';
-                    return Column(
-                      key: ValueKey('chapter-$index'),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (chapter != null)
-                          _buildChapterContent(chapter, settings, index)
-                        else
-                          _buildLoadingPlaceholder(settings, index),
-                        if (!isLast && chapter != null && loadedChapters[index + 1] != null)
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: settings.paragraphSpacing * 3,
-                            ),
-                            child: Center(
-                              child: Text(
-                                '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
-                                style: _getReaderStyle(settings).copyWith(
-                                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                  thumbVisibility: true,
+                  thickness: 3,
+                  radius: const Radius.circular(1.5),
+                  child: ListView.builder(
+                    controller: scrollController,
+                    padding: effectiveMargin,
+                    itemCount: metadata.chapterCount,
+                    addAutomaticKeepAlives: false,
+                    itemBuilder: (context, index) {
+                      final chapter = loadedChapters[index];
+                      final isLast = index == metadata.chapterCount - 1;
+                      final nextTitle = index + 1 < metadata.chapterTitles.length
+                          ? metadata.chapterTitles[index + 1]
+                          : '';
+                      return Column(
+                        key: ValueKey('chapter-$index'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (chapter != null)
+                            _buildChapterContent(chapter, settings, index)
+                          else
+                            _buildLoadingPlaceholder(settings, index),
+                          if (!isLast && chapter != null && loadedChapters[index + 1] != null)
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: settings.paragraphSpacing * 3,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
+                                  style: _getReaderStyle(settings).copyWith(
+                                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ),
-                          ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
               if (settings.perceptionExpander) ...[
