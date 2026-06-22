@@ -115,6 +115,552 @@ ColorFilter? _imageColorFilter(ReaderSettings? s) {
   };
 }
 
+// --- Shared reader block rendering (used by both continuous and paginated modes) ---
+
+TextAlign _resolveTextAlign(ReaderTextAlign a) {
+  return switch (a) {
+    ReaderTextAlign.left => TextAlign.left,
+    ReaderTextAlign.justify => TextAlign.justify,
+    ReaderTextAlign.center => TextAlign.center,
+    ReaderTextAlign.right => TextAlign.right,
+  };
+}
+
+double _headingScale(int level) => switch (level) {
+  1 => 1.8,
+  2 => 1.5,
+  3 => 1.25,
+  _ => 1.1,
+};
+double _headingSpacing(double ps, int level) => switch (level) {
+  1 => ps * 3,
+  2 => ps * 2,
+  _ => ps * 1.5,
+};
+
+class ReaderCtx {
+  final ReaderSettings settings;
+  final ReaderColors? customColors;
+  final String? highlightQuery;
+  final Color linkColor;
+  final Brightness brightness;
+
+  const ReaderCtx({
+    required this.settings,
+    this.customColors,
+    this.highlightQuery,
+    required this.linkColor,
+    required this.brightness,
+  });
+
+  ReaderColors get colors =>
+      customColors ?? ReaderColors.forThemeWithContext(settings.theme, brightness);
+  TextStyle get style => _readerTextStyle(settings, colors);
+}
+
+TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
+  final fontFamily = s.font == ReaderFont.inter ? 'Inter' : 'Literata';
+  final fw = (s.fontWeightDelta > 0.33)
+      ? FontWeight.w600
+      : (s.fontWeightDelta > 0)
+      ? FontWeight.w500
+      : (s.fontWeightDelta < -0.33)
+      ? FontWeight.w300
+      : FontWeight.w400;
+  return TextStyle(
+    fontFamily: fontFamily,
+    fontSize: s.fontSize,
+    height: s.lineHeight,
+    color: colors.text,
+    letterSpacing: s.letterSpacing,
+    fontWeight: fw,
+  );
+}
+
+Widget _buildReaderBlock(
+  ReaderCtx ctx,
+  ReaderBlock block,
+  TextAlign textAlign, {
+  List<TextHighlight>? blockHighlights,
+}) {
+  final s = ctx.settings;
+  final style = ctx.style;
+  switch (block.type) {
+    case BlockType.heading:
+      final level = block.headingLevel ?? 2;
+      final scale = _headingScale(level);
+      final spacing = _headingSpacing(s.paragraphSpacing, level);
+      return Padding(
+        padding: EdgeInsets.only(top: spacing, bottom: s.paragraphSpacing),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontSize: s.fontSize * scale, fontWeight: FontWeight.bold),
+          block.textAlign ?? TextAlign.left,
+        ),
+      );
+    case BlockType.subtitle:
+      return Padding(
+        padding: EdgeInsets.only(top: s.paragraphSpacing * 2, bottom: s.paragraphSpacing),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontStyle: FontStyle.italic, fontSize: s.fontSize * 1.1),
+          block.textAlign ?? TextAlign.center,
+        ),
+      );
+    case BlockType.epigraph:
+      return Container(
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 2),
+        padding: EdgeInsets.symmetric(horizontal: s.margin * 0.5, vertical: 12),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontStyle: FontStyle.italic, fontSize: s.fontSize * 0.95),
+          block.textAlign ?? TextAlign.right,
+        ),
+      );
+    case BlockType.poem:
+      return Container(
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 2),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontStyle: FontStyle.italic),
+          TextAlign.center,
+        ),
+      );
+    case BlockType.cite:
+      return Container(
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
+        padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),
+          ),
+        ),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontStyle: FontStyle.italic),
+          TextAlign.left,
+        ),
+      );
+    case BlockType.textAuthor:
+      return Padding(
+        padding: EdgeInsets.only(top: s.paragraphSpacing, left: s.margin),
+        child: _readerHighlightedText(
+          ctx,
+          '— ${block.text}',
+          style.copyWith(
+            fontSize: s.fontSize * 0.9,
+            fontStyle: FontStyle.italic,
+            color: (style.color ?? Colors.black).withValues(alpha: 0.6),
+          ),
+          TextAlign.right,
+          richSpans: block.richSpans,
+        ),
+      );
+    case BlockType.quote:
+      return Container(
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
+        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),
+          ),
+        ),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontStyle: FontStyle.italic),
+          textAlign,
+        ),
+      );
+    case BlockType.separator:
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 2),
+        child: Center(child: Text('* * *', style: style)),
+      );
+    case BlockType.image:
+      if (!s.showImages) return const SizedBox.shrink();
+      if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
+        return Padding(
+          padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
+          child: Align(
+            alignment: switch (s.imageAlignment) {
+              ImageAlignment.start => Alignment.centerLeft,
+              ImageAlignment.center => Alignment.center,
+              ImageAlignment.end => Alignment.centerRight,
+            },
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 600 * s.imageWidth),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(s.imageCornerRadius),
+                child: _readerImageWidget(block.imageUrl!, style.color, s),
+              ),
+            ),
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    case BlockType.footnote:
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing / 2),
+        child: _readerHighlightedText(
+          ctx,
+          block.text,
+          style.copyWith(fontSize: s.fontSize * 0.85),
+          textAlign,
+        ),
+      );
+    case BlockType.table:
+      return _readerTableBlock(block, s, style);
+    case BlockType.list:
+      return _readerListBlock(ctx, block, textAlign);
+    case BlockType.paragraph:
+      final indentValue = (block.textIndent != null && block.textIndent! > 0)
+          ? block.textIndent!
+          : s.paragraphFirstLineIndent;
+      return Padding(
+        padding: EdgeInsets.only(bottom: s.paragraphSpacing),
+        child: blockHighlights != null && blockHighlights.isNotEmpty
+            ? Padding(
+                padding: EdgeInsets.only(left: indentValue),
+                child: HighlightedText(
+                  text: block.text,
+                  style: style,
+                  textAlign: block.textAlign ?? textAlign,
+                  highlights: blockHighlights,
+                ),
+              )
+            : _readerHighlightedText(
+                ctx,
+                block.text,
+                style,
+                block.textAlign ?? textAlign,
+                richSpans: block.richSpans,
+                firstLineIndent: indentValue,
+              ),
+      );
+  }
+}
+
+Widget _readerHighlightedText(
+  ReaderCtx ctx,
+  String text,
+  TextStyle style,
+  TextAlign textAlign, {
+  List<RichSpan>? richSpans,
+  double firstLineIndent = 0,
+}) {
+  final query = ctx.highlightQuery?.trim();
+  if (query == null || query.isEmpty) {
+    if (richSpans != null && richSpans.isNotEmpty) {
+      final spans = _readerRichTextSpans(richSpans, style, ctx.linkColor);
+      if (firstLineIndent > 0) {
+        spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+      }
+      return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+    }
+    if (ctx.settings.bionicReading) {
+      final spans = _bionicReadingSpans(text, style);
+      if (firstLineIndent > 0) {
+        spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+      }
+      return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+    }
+    if (firstLineIndent > 0) {
+      return Text.rich(
+        TextSpan(
+          children: [
+            WidgetSpan(child: SizedBox(width: firstLineIndent)),
+            TextSpan(text: text),
+          ],
+        ),
+        style: style,
+        textAlign: textAlign,
+      );
+    }
+    return Text(text, style: style, textAlign: textAlign);
+  }
+  return Text.rich(
+    TextSpan(children: _readerHighlightedSpans(text, style, query)),
+    textAlign: textAlign,
+  );
+}
+
+List<InlineSpan> _readerRichTextSpans(
+  List<RichSpan> richSpans,
+  TextStyle baseStyle,
+  Color linkColor,
+) {
+  final spans = <InlineSpan>[];
+  for (final span in richSpans) {
+    if (span.lineBreak) {
+      spans.add(const TextSpan(text: '\n'));
+      continue;
+    }
+    var spanStyle = baseStyle;
+    if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
+    if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
+    if (span.href != null) {
+      spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
+    }
+    if (span.superscript) {
+      final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          child: Transform.translate(
+            offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+            child: Text(span.text, style: spanStyle.copyWith(fontSize: supFontSize)),
+          ),
+        ),
+      );
+      continue;
+    }
+    spans.add(TextSpan(text: span.text, style: spanStyle));
+  }
+  return spans;
+}
+
+List<InlineSpan> _readerHighlightedSpans(String text, TextStyle style, String query) {
+  final regex = RegExp(RegExp.escape(query), caseSensitive: false);
+  final matches = regex.allMatches(text).toList();
+  if (matches.isEmpty) return [TextSpan(text: text, style: style)];
+  final spans = <InlineSpan>[];
+  var start = 0;
+  for (final match in matches) {
+    if (match.start > start) {
+      spans.add(TextSpan(text: text.substring(start, match.start), style: style));
+    }
+    spans.add(
+      TextSpan(
+        text: match.group(0),
+        style: style.copyWith(backgroundColor: const Color(0x66FFEB3B)),
+      ),
+    );
+    start = match.end;
+  }
+  if (start < text.length) {
+    spans.add(TextSpan(text: text.substring(start), style: style));
+  }
+  return spans;
+}
+
+Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings settings) {
+  final colorFilter = _imageColorFilter(settings);
+  final uri = Uri.tryParse(imageUrl);
+  final isDataUri = uri != null && uri.scheme == 'data';
+  final isFileUri = uri != null && uri.scheme == 'file';
+  final isPlainPath = uri == null || !uri.isAbsolute;
+
+  Widget wrap(Widget img) =>
+      colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
+
+  if (isDataUri) {
+    final data = imageUrl.split(',');
+    if (data.length == 2) {
+      return wrap(
+        InteractiveViewer(
+          maxScale: 4.0,
+          child: Image.memory(
+            base64Decode(data.last),
+            fit: BoxFit.contain,
+            errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
+          ),
+        ),
+      );
+    }
+  }
+  if (isFileUri || isPlainPath) {
+    return wrap(
+      InteractiveViewer(
+        maxScale: 4.0,
+        child: Image.file(
+          File(isFileUri ? uri.path : imageUrl),
+          fit: BoxFit.contain,
+          errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
+        ),
+      ),
+    );
+  }
+  return Icon(Icons.broken_image, size: 64, color: errorColor);
+}
+
+Widget _readerTableBlock(ReaderBlock block, ReaderSettings settings, TextStyle baseStyle) {
+  final rows = block.tableRows;
+  if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+  final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
+  final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
+  return Padding(
+    padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultColumnWidth: const IntrinsicColumnWidth(),
+        border: TableBorder.all(color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15)),
+        children: rows.asMap().entries.map((entry) {
+          final isHeader = entry.key == 0;
+          return TableRow(
+            children: entry.value
+                .map(
+                  (cell) => Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                  ),
+                )
+                .toList(),
+          );
+        }).toList(),
+      ),
+    ),
+  );
+}
+
+Widget _readerListBlock(ReaderCtx ctx, ReaderBlock block, TextAlign textAlign) {
+  final items = block.listItems;
+  if (items == null || items.isEmpty) return const SizedBox.shrink();
+  final isOrdered = block.ordered ?? false;
+  final style = ctx.style;
+  return Padding(
+    padding: EdgeInsets.symmetric(vertical: ctx.settings.paragraphSpacing),
+    child: ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        final bullet = isOrdered ? '${index + 1}.' : '\u2022';
+        return Padding(
+          padding: const EdgeInsets.only(left: 24, bottom: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('$bullet ', style: style),
+              Expanded(
+                child: _readerHighlightedText(
+                  ctx,
+                  item.text,
+                  style,
+                  textAlign,
+                  richSpans: item.richSpans,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+TextDirection _readerTextDirection(ReaderTextDirection td, BuildContext context) {
+  return switch (td) {
+    ReaderTextDirection.ltr => TextDirection.ltr,
+    ReaderTextDirection.rtl => TextDirection.rtl,
+    ReaderTextDirection.auto => Directionality.of(context),
+  };
+}
+
+Widget _readerLoadingPlaceholder(
+  ReaderSettings settings,
+  int index,
+  List<String> chapterTitles,
+  TextStyle style,
+) {
+  final title = index < chapterTitles.length ? chapterTitles[index] : 'Глава ${index + 1}';
+  return Padding(
+    padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: settings.paragraphSpacing * 3),
+        Center(
+          child: SizedBox(
+            width: settings.fontSize * 1.5,
+            height: settings.fontSize * 1.5,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: style.color?.withValues(alpha: 0.3),
+            ),
+          ),
+        ),
+        SizedBox(height: settings.paragraphSpacing * 2),
+        ...List.generate(
+          3,
+          (i) => Padding(
+            padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
+            child: Container(
+              height: settings.fontSize * settings.lineHeight,
+              decoration: BoxDecoration(
+                color: style.color?.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+List<Widget> _readerOverlays(ReaderSettings s, Color textColor) {
+  return [
+    if (s.perceptionExpander) ...[
+      Positioned(
+        left: s.margin - 1,
+        top: 0,
+        bottom: 0,
+        child: Container(width: 1, color: textColor.withValues(alpha: 0.15)),
+      ),
+      Positioned(
+        right: s.margin - 1,
+        top: 0,
+        bottom: 0,
+        child: Container(width: 1, color: textColor.withValues(alpha: 0.15)),
+      ),
+    ],
+    if (s.horizontalLimiter) ...[
+      Positioned(
+        left: 0,
+        right: 0,
+        top: 0,
+        height: _limiterTopOffset(s),
+        child: ColoredBox(color: textColor.withValues(alpha: s.horizontalLimiterDimming)),
+      ),
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: _limiterBottomOffset(s),
+        child: ColoredBox(color: textColor.withValues(alpha: s.horizontalLimiterDimming)),
+      ),
+      if (s.horizontalLimiterLines) ...[
+        Positioned(
+          left: s.margin,
+          right: s.margin,
+          top: _limiterTopOffset(s),
+          child: Container(height: 1, color: textColor.withValues(alpha: 0.2)),
+        ),
+        Positioned(
+          left: s.margin,
+          right: s.margin,
+          bottom: _limiterBottomOffset(s),
+          child: Container(height: 1, color: textColor.withValues(alpha: 0.2)),
+        ),
+      ],
+    ],
+  ];
+}
+
 class ReaderContentBody extends StatefulWidget {
   const ReaderContentBody({
     super.key,
@@ -162,24 +708,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
   @override
   Widget build(BuildContext context) {
-    final metadata = widget.metadata;
-    final loadedChapters = widget.loadedChapters;
     final settings = widget.settings;
-    final scrollController = widget.scrollController;
-    final onTap = widget.onTap;
-    final initialProgress = widget.initialProgress;
-    final initialPage = widget.initialPage;
-    final highlightQuery = widget.highlightQuery;
-
     final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
     if (effectiveMode == ReaderMode.paginated || effectiveMode == ReaderMode.twoPage) {
       return _PaginatedContentBody(
-        metadata: metadata,
-        loadedChapters: loadedChapters,
+        metadata: widget.metadata,
+        loadedChapters: widget.loadedChapters,
         settings: settings,
-        onTap: onTap,
-        initialPage: initialPage,
-        highlightQuery: highlightQuery,
+        onTap: widget.onTap,
+        initialPage: widget.initialPage,
+        highlightQuery: widget.highlightQuery,
         ttsHighlightIndex: widget.ttsHighlightIndex,
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
@@ -189,22 +727,19 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
     final isFocus = effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
     final effectiveMargin = isFocus
-        ? EdgeInsets.symmetric(
-            horizontal: settings.margin * 1.5,
-            vertical: settings.margin,
-          )
+        ? EdgeInsets.symmetric(horizontal: settings.margin * 1.5, vertical: settings.margin)
         : EdgeInsets.all(settings.margin);
-    final textDirection = _effectiveTextDirection(context, settings);
+    final textDirection = _readerTextDirection(settings.textDirection, context);
 
-    if (!_didScrollToProgress && initialProgress > 0) {
+    if (!_didScrollToProgress && widget.initialProgress > 0) {
       _didScrollToProgress = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!scrollController.hasClients) return;
-        final maxScroll = scrollController.position.maxScrollExtent;
+        if (!widget.scrollController.hasClients) return;
+        final maxScroll = widget.scrollController.position.maxScrollExtent;
         if (maxScroll > 0) {
           unawaited(
-            scrollController.animateTo(
-              (initialProgress * maxScroll).clamp(0.0, maxScroll),
+            widget.scrollController.animateTo(
+              (widget.initialProgress * maxScroll).clamp(0.0, maxScroll),
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
             ),
@@ -218,7 +753,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       bottom: false,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTapUp: onTap,
+        onTapUp: widget.onTap,
         child: Directionality(
           textDirection: textDirection,
           child: Stack(
@@ -226,21 +761,22 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
               ScrollConfiguration(
                 behavior: const _SmoothScrollBehavior(),
                 child: Scrollbar(
-                  controller: scrollController,
+                  controller: widget.scrollController,
                   thumbVisibility: true,
                   thickness: 3,
                   radius: const Radius.circular(1.5),
                   child: ListView.builder(
-                    controller: scrollController,
+                    controller: widget.scrollController,
                     padding: effectiveMargin,
-                    itemCount: metadata.chapterCount,
+                    itemCount: widget.metadata.chapterCount,
                     addAutomaticKeepAlives: false,
                     itemBuilder: (context, index) {
-                      final chapter = loadedChapters[index];
-                      final isLast = index == metadata.chapterCount - 1;
-                      final nextTitle = index + 1 < metadata.chapterTitles.length
-                          ? metadata.chapterTitles[index + 1]
+                      final chapter = widget.loadedChapters[index];
+                      final isLast = index == widget.metadata.chapterCount - 1;
+                      final nextTitle = index + 1 < widget.metadata.chapterTitles.length
+                          ? widget.metadata.chapterTitles[index + 1]
                           : '';
+                      final dividerStyle = _getReaderStyle(settings);
                       return Column(
                         key: ValueKey('chapter-$index'),
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,7 +785,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                             _buildChapterContent(chapter, settings, index)
                           else
                             _buildLoadingPlaceholder(settings, index),
-                          if (!isLast && chapter != null && loadedChapters[index + 1] != null)
+                          if (!isLast &&
+                              chapter != null &&
+                              widget.loadedChapters[index + 1] != null)
                             Padding(
                               padding: EdgeInsets.symmetric(
                                 vertical: settings.paragraphSpacing * 3,
@@ -257,8 +795,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                               child: Center(
                                 child: Text(
                                   '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
-                                  style: _getReaderStyle(settings).copyWith(
-                                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.4),
+                                  style: dividerStyle.copyWith(
+                                    color: dividerStyle.color?.withValues(alpha: 0.4),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -270,81 +808,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                   ),
                 ),
               ),
-              if (settings.perceptionExpander) ...[
-                Positioned(
-                  left: settings.margin - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 1,
-                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.15),
-                  ),
-                ),
-                Positioned(
-                  right: settings.margin - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 1,
-                    color: _getReaderStyle(settings).color?.withValues(alpha: 0.15),
-                  ),
-                ),
-              ],
-              if (settings.horizontalLimiter) ...[
-                // Top dimming zone
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  height: _limiterTopOffset(settings),
-                  child: ColoredBox(
-                    color:
-                        _getReaderStyle(
-                          settings,
-                        ).color?.withValues(alpha: settings.horizontalLimiterDimming) ??
-                        Colors.black.withValues(alpha: settings.horizontalLimiterDimming),
-                  ),
-                ),
-                // Bottom dimming zone
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: _limiterBottomOffset(settings),
-                  child: ColoredBox(
-                    color:
-                        _getReaderStyle(
-                          settings,
-                        ).color?.withValues(alpha: settings.horizontalLimiterDimming) ??
-                        Colors.black.withValues(alpha: settings.horizontalLimiterDimming),
-                  ),
-                ),
-                // Top ruler line
-                if (settings.horizontalLimiterLines) ...[
-                  Positioned(
-                    left: settings.margin,
-                    right: settings.margin,
-                    top: _limiterTopOffset(settings),
-                    child: Container(
-                      height: 1,
-                      color:
-                          _getReaderStyle(settings).color?.withValues(alpha: 0.2) ??
-                          Colors.black.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  Positioned(
-                    left: settings.margin,
-                    right: settings.margin,
-                    bottom: _limiterBottomOffset(settings),
-                    child: Container(
-                      height: 1,
-                      color:
-                          _getReaderStyle(settings).color?.withValues(alpha: 0.2) ??
-                          Colors.black.withValues(alpha: 0.2),
-                    ),
-                  ),
-                ],
-              ],
+              ..._readerOverlays(settings, _getReaderStyle(settings).color ?? Colors.black),
             ],
           ),
         ),
@@ -353,58 +817,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
-    final title = index < widget.metadata.chapterTitles.length
-        ? widget.metadata.chapterTitles[index]
-        : 'Глава ${index + 1}';
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 1.4,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: settings.paragraphSpacing * 3),
-          Center(
-            child: SizedBox(
-              width: settings.fontSize * 1.5,
-              height: settings.fontSize * 1.5,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _getReaderStyle(settings).color?.withValues(alpha: 0.3),
-              ),
-            ),
-          ),
-          SizedBox(height: settings.paragraphSpacing * 2),
-          ...List.generate(
-            3,
-            (i) => Padding(
-              padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-              child: Container(
-                height: settings.fontSize * settings.lineHeight,
-                decoration: BoxDecoration(
-                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _readerLoadingPlaceholder(
+      settings,
+      index,
+      widget.metadata.chapterTitles,
+      _getReaderStyle(settings),
     );
   }
 
   Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
-    final textAlign = switch (settings.textAlign) {
-      ReaderTextAlign.left => TextAlign.left,
-      ReaderTextAlign.justify => TextAlign.justify,
-      ReaderTextAlign.center => TextAlign.center,
-      ReaderTextAlign.right => TextAlign.right,
-    };
+    final textAlign = _resolveTextAlign(settings.textAlign);
 
     final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
@@ -448,209 +870,23 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     );
   }
 
+  ReaderCtx _ctx(ReaderSettings settings) {
+    return ReaderCtx(
+      settings: settings,
+      customColors: widget.customColors,
+      highlightQuery: widget.highlightQuery,
+      linkColor: Theme.of(context).colorScheme.primary,
+      brightness: MediaQuery.platformBrightnessOf(context),
+    );
+  }
+
   Widget _buildBlock(
     ReaderBlock block,
     ReaderSettings settings,
     TextAlign textAlign, {
     List<TextHighlight>? blockHighlights,
   }) {
-    switch (block.type) {
-      case BlockType.heading:
-        final level = block.headingLevel ?? 2;
-        final scale = switch (level) {
-          1 => 1.8,
-          2 => 1.5,
-          3 => 1.25,
-          _ => 1.1,
-        };
-        final spacing = switch (level) {
-          1 => settings.paragraphSpacing * 3,
-          2 => settings.paragraphSpacing * 2,
-          _ => settings.paragraphSpacing * 1.5,
-        };
-        return Padding(
-          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * scale,
-              fontWeight: FontWeight.bold,
-            ),
-            block.textAlign ?? TextAlign.left,
-          ),
-        );
-      case BlockType.subtitle:
-        return Padding(
-          padding: EdgeInsets.only(
-            top: settings.paragraphSpacing * 2,
-            bottom: settings.paragraphSpacing,
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 1.1,
-              fontStyle: FontStyle.italic,
-            ),
-            block.textAlign ?? TextAlign.center,
-          ),
-        );
-      case BlockType.epigraph:
-        return Container(
-          margin: EdgeInsets.symmetric(
-            vertical: settings.paragraphSpacing * 2,
-            horizontal: settings.margin * 0.5,
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildHighlightedText(
-                block.text,
-                _getReaderStyle(settings).copyWith(
-                  fontStyle: FontStyle.italic,
-                  fontSize: settings.fontSize * 0.95,
-                ),
-                TextAlign.right,
-              ),
-            ],
-          ),
-        );
-      case BlockType.poem:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(
-              fontStyle: FontStyle.italic,
-            ),
-            TextAlign.center,
-          ),
-        );
-      case BlockType.cite:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.3),
-                width: 3,
-              ),
-            ),
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
-            TextAlign.left,
-          ),
-        );
-      case BlockType.textAuthor:
-        return Padding(
-          padding: EdgeInsets.only(
-            top: settings.paragraphSpacing,
-            left: settings.margin,
-          ),
-          child: _buildHighlightedText(
-            '— ${block.text}',
-            _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 0.9,
-              fontStyle: FontStyle.italic,
-              color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.6),
-            ),
-            TextAlign.right,
-            richSpans: block.richSpans,
-          ),
-        );
-      case BlockType.quote:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: (_getReaderStyle(settings).color ?? Colors.black).withValues(alpha: 0.3),
-                width: 3,
-              ),
-            ),
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(fontStyle: FontStyle.italic),
-            textAlign,
-          ),
-        );
-      case BlockType.separator:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-          child: Center(child: Text('* * *', style: _getReaderStyle(settings))),
-        );
-      case BlockType.image:
-        if (!settings.showImages) return const SizedBox.shrink();
-        if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-            child: Align(
-              alignment: switch (settings.imageAlignment) {
-                ImageAlignment.start => Alignment.centerLeft,
-                ImageAlignment.center => Alignment.center,
-                ImageAlignment.end => Alignment.centerRight,
-              },
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 600 * settings.imageWidth),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(settings.imageCornerRadius),
-                  child: _buildImageWidget(
-                    block.imageUrl!,
-                    _getReaderStyle(settings).color,
-                    settings,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      case BlockType.footnote:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
-          child: _buildHighlightedText(
-            block.text,
-            _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 0.85,
-            ),
-            textAlign,
-          ),
-        );
-      case BlockType.table:
-        return _buildTable(block, settings);
-      case BlockType.list:
-        return _buildList(block, settings, textAlign);
-      case BlockType.paragraph:
-        final indentValue = (block.textIndent != null && block.textIndent! > 0)
-            ? block.textIndent!
-            : settings.paragraphFirstLineIndent;
-        return Padding(
-          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: blockHighlights != null && blockHighlights.isNotEmpty
-              ? Padding(
-                  padding: EdgeInsets.only(left: indentValue),
-                  child: HighlightedText(
-                    text: block.text,
-                    style: _getReaderStyle(settings),
-                    textAlign: block.textAlign ?? textAlign,
-                    highlights: blockHighlights,
-                  ),
-                )
-              : _buildHighlightedText(
-                  block.text,
-                  _getReaderStyle(settings),
-                  block.textAlign ?? textAlign,
-                  richSpans: block.richSpans,
-                  firstLineIndent: indentValue,
-                ),
-        );
-    }
+    return _buildReaderBlock(_ctx(settings), block, textAlign, blockHighlights: blockHighlights);
   }
 
   Widget _buildHighlightedText(
@@ -660,273 +896,24 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     List<RichSpan>? richSpans,
     double firstLineIndent = 0,
   }) {
-    final query = widget.highlightQuery?.trim();
-    if (query == null || query.isEmpty) {
-      if (richSpans != null && richSpans.isNotEmpty) {
-        final spans = _buildRichTextSpans(richSpans, style);
-        if (firstLineIndent > 0) {
-          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
-        }
-        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
-      }
-      if (widget.settings.bionicReading) {
-        final spans = _bionicReadingSpans(text, style);
-        if (firstLineIndent > 0) {
-          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
-        }
-        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
-      }
-      if (firstLineIndent > 0) {
-        return Text.rich(
-          TextSpan(
-            children: [
-              WidgetSpan(child: SizedBox(width: firstLineIndent)),
-              TextSpan(text: text),
-            ],
-          ),
-          style: style,
-          textAlign: textAlign,
-        );
-      }
-      return Text(text, style: style, textAlign: textAlign);
-    }
-
-    return Text.rich(
-      TextSpan(children: _buildHighlightedSpans(text, style, query)),
-      textAlign: textAlign,
+    return _readerHighlightedText(
+      _ctx(widget.settings),
+      text,
+      style,
+      textAlign,
+      richSpans: richSpans,
+      firstLineIndent: firstLineIndent,
     );
-  }
-
-  List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
-    final linkColor = Theme.of(context).colorScheme.primary;
-    final spans = <InlineSpan>[];
-    for (final span in richSpans) {
-      if (span.lineBreak) {
-        spans.add(const TextSpan(text: '\n'));
-        continue;
-      }
-      var spanStyle = baseStyle;
-      if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
-      if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
-      if (span.href != null) {
-        spanStyle = spanStyle.copyWith(
-          color: linkColor,
-          decoration: TextDecoration.underline,
-        );
-      }
-      if (span.superscript) {
-        final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: Transform.translate(
-              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
-              child: Text(
-                span.text,
-                style: spanStyle.copyWith(fontSize: supFontSize),
-              ),
-            ),
-          ),
-        );
-        continue;
-      }
-      spans.add(TextSpan(text: span.text, style: spanStyle));
-    }
-    return spans;
-  }
-
-  List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
-    final regex = RegExp(RegExp.escape(query), caseSensitive: false);
-    final matches = regex.allMatches(text).toList();
-    if (matches.isEmpty) {
-      return [TextSpan(text: text, style: style)];
-    }
-
-    final spans = <InlineSpan>[];
-    var start = 0;
-    for (final match in matches) {
-      if (match.start > start) {
-        spans.add(TextSpan(text: text.substring(start, match.start), style: style));
-      }
-      spans.add(
-        TextSpan(
-          text: match.group(0),
-          style: style.copyWith(
-            backgroundColor: const Color(0x66FFEB3B),
-          ),
-        ),
-      );
-      start = match.end;
-    }
-    if (start < text.length) {
-      spans.add(TextSpan(text: text.substring(start), style: style));
-    }
-    return spans;
-  }
-
-  static TextDirection _effectiveTextDirection(
-    BuildContext context,
-    ReaderSettings settings,
-  ) {
-    switch (settings.textDirection) {
-      case ReaderTextDirection.ltr:
-        return TextDirection.ltr;
-      case ReaderTextDirection.rtl:
-        return TextDirection.rtl;
-      case ReaderTextDirection.auto:
-        return Directionality.of(context);
-    }
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors =
-        widget.customColors ??
-        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
-    final String fontFamily;
-    switch (settings.font) {
-      case ReaderFont.inter:
-        fontFamily = 'Inter';
-        break;
-      case ReaderFont.literata:
-        fontFamily = 'Literata';
-        break;
-    }
-    FontWeight fontWeight = FontWeight.normal;
-    if (settings.fontWeightDelta > 0.33) {
-      fontWeight = FontWeight.w600;
-    } else if (settings.fontWeightDelta > 0) {
-      fontWeight = FontWeight.w500;
-    } else if (settings.fontWeightDelta < -0.33) {
-      fontWeight = FontWeight.w300;
-    } else if (settings.fontWeightDelta < 0) {
-      fontWeight = FontWeight.w400;
-    }
-    return TextStyle(
-      fontFamily: fontFamily,
-      fontSize: settings.fontSize,
-      height: settings.lineHeight,
-      color: colors.text,
-      letterSpacing: settings.letterSpacing,
-      fontWeight: fontWeight,
-    );
-  }
-
-  Widget _buildImageWidget(String imageUrl, Color? errorColor, [ReaderSettings? settings]) {
-    final colorFilter = _imageColorFilter(settings);
-    final uri = Uri.tryParse(imageUrl);
-    final isDataUri = uri != null && uri.scheme == 'data';
-    final isFileUri = uri != null && uri.scheme == 'file';
-    final isPlainPath = uri == null || !uri.isAbsolute;
-
-    if (isDataUri) {
-      final data = imageUrl.split(',');
-      if (data.length == 2) {
-        final bytes = base64Decode(data.last);
-        final img = InteractiveViewer(
-          maxScale: 4.0,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            errorBuilder: (ctx, e, s) => Icon(
-              Icons.broken_image,
-              size: 64,
-              color: errorColor,
-            ),
+    return _readerTextStyle(
+      settings,
+      widget.customColors ??
+          ReaderColors.forThemeWithContext(
+            settings.theme,
+            MediaQuery.platformBrightnessOf(context),
           ),
-        );
-        return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
-      }
-    }
-
-    if (isFileUri || isPlainPath) {
-      final filePath = isFileUri ? uri.path : imageUrl;
-      final img = InteractiveViewer(
-        maxScale: 4.0,
-        child: Image.file(
-          File(filePath),
-          fit: BoxFit.contain,
-          errorBuilder: (ctx, e, s) => Icon(
-            Icons.broken_image,
-            size: 64,
-            color: errorColor,
-          ),
-        ),
-      );
-      return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
-    }
-
-    return Icon(Icons.broken_image, size: 64, color: errorColor);
-  }
-
-  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
-    final rows = block.tableRows;
-    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
-    final baseStyle = _getReaderStyle(settings);
-    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
-    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          defaultColumnWidth: const IntrinsicColumnWidth(),
-          border: TableBorder.all(
-            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
-          ),
-          children: rows.asMap().entries.map((entry) {
-            final isHeader = entry.key == 0;
-            return TableRow(
-              children: entry.value.map((cell) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
-                );
-              }).toList(),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
-    final items = block.listItems;
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
-    final isOrdered = block.ordered ?? false;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
-          return Padding(
-            padding: const EdgeInsets.only(left: 24, bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$bullet ',
-                  style: _getReaderStyle(settings),
-                ),
-                Expanded(
-                  child: _buildHighlightedText(
-                    item.text,
-                    _getReaderStyle(settings),
-                    textAlign,
-                    richSpans: item.richSpans,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }
@@ -1075,17 +1062,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     switch (block.type) {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
-        final scale = switch (level) {
-          1 => 1.8,
-          2 => 1.5,
-          3 => 1.25,
-          _ => 1.1,
-        };
-        final spacing = switch (level) {
-          1 => ps * 3,
-          2 => ps * 2,
-          _ => ps * 1.5,
-        };
+        final scale = _headingScale(level);
+        final spacing = _headingSpacing(ps, level);
         return _measureTextHeight(
               block.text,
               settings.fontSize * scale,
@@ -1156,21 +1134,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   double _measureTextHeight(String text, double fontSize, double lineHeight, double maxWidth) {
     if (text.isEmpty) return fontSize * lineHeight;
-    final settings = widget.settings;
+    final s = widget.settings;
     final colors =
         widget.customColors ??
-        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
-    final fontFamily = settings.font == ReaderFont.inter ? 'Inter' : 'Literata';
+        ReaderColors.forThemeWithContext(s.theme, MediaQuery.platformBrightnessOf(context));
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          fontFamily: fontFamily,
-          fontSize: fontSize,
-          height: lineHeight,
-          letterSpacing: settings.letterSpacing,
-          color: colors.text,
-        ),
+        style: _readerTextStyle(s, colors).copyWith(fontSize: fontSize, height: lineHeight),
       ),
       textDirection: TextDirection.ltr,
     );
@@ -1184,12 +1155,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final page = _pages[index];
     final settings = widget.settings;
     final chapter = widget.loadedChapters[page.chapterIndex];
-    final textAlign = switch (settings.textAlign) {
-      ReaderTextAlign.left => TextAlign.left,
-      ReaderTextAlign.justify => TextAlign.justify,
-      ReaderTextAlign.center => TextAlign.center,
-      ReaderTextAlign.right => TextAlign.right,
-    };
+    final textAlign = _resolveTextAlign(settings.textAlign);
     final chapterHighlights = widget.chapterHighlights[page.chapterIndex];
 
     if (chapter == null) {
@@ -1243,7 +1209,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       top: false,
       bottom: false,
       child: Directionality(
-        textDirection: _effectiveTextDirection(context),
+        textDirection: _readerTextDirection(widget.settings.textDirection, context),
         child: Padding(
           padding: effectiveMargin,
           child: Column(
@@ -1256,48 +1222,21 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
-    final title = index < widget.metadata.chapterTitles.length
-        ? widget.metadata.chapterTitles[index]
-        : 'Глава ${index + 1}';
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: _getReaderStyle(settings).copyWith(
-              fontSize: settings.fontSize * 1.4,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: settings.paragraphSpacing * 3),
-          Center(
-            child: SizedBox(
-              width: settings.fontSize * 1.5,
-              height: settings.fontSize * 1.5,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: _getReaderStyle(settings).color?.withValues(alpha: 0.3),
-              ),
-            ),
-          ),
-          SizedBox(height: settings.paragraphSpacing * 2),
-          ...List.generate(
-            3,
-            (i) => Padding(
-              padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-              child: Container(
-                height: settings.fontSize * settings.lineHeight,
-                decoration: BoxDecoration(
-                  color: _getReaderStyle(settings).color?.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return _readerLoadingPlaceholder(
+      settings,
+      index,
+      widget.metadata.chapterTitles,
+      _getReaderStyle(settings),
+    );
+  }
+
+  ReaderCtx _ctx(ReaderSettings settings) {
+    return ReaderCtx(
+      settings: settings,
+      customColors: widget.customColors,
+      highlightQuery: widget.highlightQuery,
+      linkColor: Theme.of(context).colorScheme.primary,
+      brightness: MediaQuery.platformBrightnessOf(context),
     );
   }
 
@@ -1306,198 +1245,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     TextAlign textAlign, {
     List<TextHighlight>? blockHighlights,
   }) {
-    final settings = widget.settings;
-    final style = _getReaderStyle(settings);
-
-    switch (block.type) {
-      case BlockType.heading:
-        final level = block.headingLevel ?? 2;
-        final scale = switch (level) {
-          1 => 1.8,
-          2 => 1.5,
-          3 => 1.25,
-          _ => 1.1,
-        };
-        final spacing = switch (level) {
-          1 => settings.paragraphSpacing * 3,
-          2 => settings.paragraphSpacing * 2,
-          _ => settings.paragraphSpacing * 1.5,
-        };
-        return Padding(
-          padding: EdgeInsets.only(top: spacing, bottom: settings.paragraphSpacing),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(
-              fontSize: settings.fontSize * scale,
-              fontWeight: FontWeight.bold,
-            ),
-            block.textAlign ?? TextAlign.left,
-          ),
-        );
-      case BlockType.subtitle:
-        return Padding(
-          padding: EdgeInsets.only(
-            top: settings.paragraphSpacing * 2,
-            bottom: settings.paragraphSpacing,
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(
-              fontSize: settings.fontSize * 1.1,
-              fontStyle: FontStyle.italic,
-            ),
-            block.textAlign ?? TextAlign.center,
-          ),
-        );
-      case BlockType.epigraph:
-        return Container(
-          margin: EdgeInsets.symmetric(
-            vertical: settings.paragraphSpacing * 2,
-            horizontal: settings.margin * 0.5,
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              _buildHighlightedText(
-                block.text,
-                style.copyWith(
-                  fontStyle: FontStyle.italic,
-                  fontSize: settings.fontSize * 0.95,
-                ),
-                TextAlign.right,
-              ),
-            ],
-          ),
-        );
-      case BlockType.poem:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(fontStyle: FontStyle.italic),
-            TextAlign.center,
-          ),
-        );
-      case BlockType.cite:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-          padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: (style.color ?? Colors.black).withValues(alpha: 0.3),
-                width: 3,
-              ),
-            ),
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(fontStyle: FontStyle.italic),
-            TextAlign.left,
-          ),
-        );
-      case BlockType.textAuthor:
-        return Padding(
-          padding: EdgeInsets.only(
-            top: settings.paragraphSpacing,
-            left: settings.margin,
-          ),
-          child: _buildHighlightedText(
-            '— ${block.text}',
-            style.copyWith(
-              fontSize: settings.fontSize * 0.9,
-              fontStyle: FontStyle.italic,
-              color: (style.color ?? Colors.black).withValues(alpha: 0.6),
-            ),
-            TextAlign.right,
-            richSpans: block.richSpans,
-          ),
-        );
-      case BlockType.quote:
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(
-                color: (style.color ?? Colors.black).withValues(alpha: 0.3),
-                width: 3,
-              ),
-            ),
-          ),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(fontStyle: FontStyle.italic),
-            textAlign,
-          ),
-        );
-      case BlockType.separator:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing * 2),
-          child: Center(child: Text('* * *', style: style)),
-        );
-      case BlockType.image:
-        if (!widget.settings.showImages) return const SizedBox.shrink();
-        if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-          return Padding(
-            padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-            child: Align(
-              alignment: switch (widget.settings.imageAlignment) {
-                ImageAlignment.start => Alignment.centerLeft,
-                ImageAlignment.center => Alignment.center,
-                ImageAlignment.end => Alignment.centerRight,
-              },
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 600 * widget.settings.imageWidth),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(widget.settings.imageCornerRadius),
-                  child: _buildImageWidget(block.imageUrl!, style.color, widget.settings),
-                ),
-              ),
-            ),
-          );
-        }
-        return const SizedBox.shrink();
-      case BlockType.footnote:
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing / 2),
-          child: _buildHighlightedText(
-            block.text,
-            style.copyWith(fontSize: settings.fontSize * 0.85),
-            textAlign,
-          ),
-        );
-      case BlockType.table:
-        return _buildTable(block, settings);
-      case BlockType.list:
-        return _buildList(block, settings, textAlign);
-      case BlockType.paragraph:
-        final indentValue = (block.textIndent != null && block.textIndent! > 0)
-            ? block.textIndent!
-            : settings.paragraphFirstLineIndent;
-        return Padding(
-          padding: EdgeInsets.only(bottom: settings.paragraphSpacing),
-          child: blockHighlights != null && blockHighlights.isNotEmpty
-              ? Padding(
-                  padding: EdgeInsets.only(left: indentValue),
-                  child: HighlightedText(
-                    text: block.text,
-                    style: style,
-                    textAlign: block.textAlign ?? textAlign,
-                    highlights: blockHighlights,
-                  ),
-                )
-              : _buildHighlightedText(
-                  block.text,
-                  style,
-                  block.textAlign ?? textAlign,
-                  richSpans: block.richSpans,
-                  firstLineIndent: indentValue,
-                ),
-        );
-    }
+    return _buildReaderBlock(
+      _ctx(widget.settings),
+      block,
+      textAlign,
+      blockHighlights: blockHighlights,
+    );
   }
 
   Widget _buildHighlightedText(
@@ -1507,167 +1260,32 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     List<RichSpan>? richSpans,
     double firstLineIndent = 0,
   }) {
-    final query = widget.highlightQuery?.trim();
-    if (query == null || query.isEmpty) {
-      if (richSpans != null && richSpans.isNotEmpty) {
-        final spans = _buildRichTextSpans(richSpans, style);
-        if (firstLineIndent > 0) {
-          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
-        }
-        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
-      }
-      if (widget.settings.bionicReading) {
-        final spans = _bionicReadingSpans(text, style);
-        if (firstLineIndent > 0) {
-          spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
-        }
-        return Text.rich(TextSpan(children: spans), textAlign: textAlign);
-      }
-      if (firstLineIndent > 0) {
-        return Text.rich(
-          TextSpan(
-            children: [
-              WidgetSpan(child: SizedBox(width: firstLineIndent)),
-              TextSpan(text: text),
-            ],
-          ),
-          style: style,
-          textAlign: textAlign,
-        );
-      }
-      return Text(text, style: style, textAlign: textAlign);
-    }
-
-    return Text.rich(
-      TextSpan(children: _buildHighlightedSpans(text, style, query)),
-      textAlign: textAlign,
+    return _readerHighlightedText(
+      _ctx(widget.settings),
+      text,
+      style,
+      textAlign,
+      richSpans: richSpans,
+      firstLineIndent: firstLineIndent,
     );
-  }
-
-  List<InlineSpan> _buildRichTextSpans(List<RichSpan> richSpans, TextStyle baseStyle) {
-    final linkColor = Theme.of(context).colorScheme.primary;
-    final spans = <InlineSpan>[];
-    for (final span in richSpans) {
-      if (span.lineBreak) {
-        spans.add(const TextSpan(text: '\n'));
-        continue;
-      }
-      var spanStyle = baseStyle;
-      if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
-      if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
-      if (span.href != null) {
-        spanStyle = spanStyle.copyWith(
-          color: linkColor,
-          decoration: TextDecoration.underline,
-        );
-      }
-      if (span.superscript) {
-        final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
-        spans.add(
-          WidgetSpan(
-            alignment: PlaceholderAlignment.baseline,
-            baseline: TextBaseline.alphabetic,
-            child: Transform.translate(
-              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
-              child: Text(
-                span.text,
-                style: spanStyle.copyWith(fontSize: supFontSize),
-              ),
-            ),
-          ),
-        );
-        continue;
-      }
-      spans.add(TextSpan(text: span.text, style: spanStyle));
-    }
-    return spans;
-  }
-
-  List<InlineSpan> _buildHighlightedSpans(String text, TextStyle style, String query) {
-    final regex = RegExp(RegExp.escape(query), caseSensitive: false);
-    final matches = regex.allMatches(text).toList();
-    if (matches.isEmpty) {
-      return [TextSpan(text: text, style: style)];
-    }
-
-    final spans = <InlineSpan>[];
-    var start = 0;
-    for (final match in matches) {
-      if (match.start > start) {
-        spans.add(TextSpan(text: text.substring(start, match.start), style: style));
-      }
-      spans.add(
-        TextSpan(
-          text: match.group(0),
-          style: style.copyWith(
-            backgroundColor: const Color(0x66FFEB3B),
-          ),
-        ),
-      );
-      start = match.end;
-    }
-    if (start < text.length) {
-      spans.add(TextSpan(text: text.substring(start), style: style));
-    }
-    return spans;
-  }
-
-  TextDirection _effectiveTextDirection(BuildContext context) {
-    switch (widget.settings.textDirection) {
-      case ReaderTextDirection.ltr:
-        return TextDirection.ltr;
-      case ReaderTextDirection.rtl:
-        return TextDirection.rtl;
-      case ReaderTextDirection.auto:
-        return Directionality.of(context);
-    }
   }
 
   TextStyle _getReaderStyle(ReaderSettings settings) {
-    final colors =
-        widget.customColors ??
-        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
-    final String fontFamily;
-    switch (settings.font) {
-      case ReaderFont.inter:
-        fontFamily = 'Inter';
-        break;
-      case ReaderFont.literata:
-        fontFamily = 'Literata';
-        break;
-    }
-    FontWeight fontWeight = FontWeight.normal;
-    if (settings.fontWeightDelta > 0.33) {
-      fontWeight = FontWeight.w600;
-    } else if (settings.fontWeightDelta > 0) {
-      fontWeight = FontWeight.w500;
-    } else if (settings.fontWeightDelta < -0.33) {
-      fontWeight = FontWeight.w300;
-    } else if (settings.fontWeightDelta < 0) {
-      fontWeight = FontWeight.w400;
-    }
-    return TextStyle(
-      fontFamily: fontFamily,
-      fontSize: settings.fontSize,
-      height: settings.lineHeight,
-      color: colors.text,
-      letterSpacing: settings.letterSpacing,
-      fontWeight: fontWeight,
+    return _readerTextStyle(
+      settings,
+      widget.customColors ??
+          ReaderColors.forThemeWithContext(
+            settings.theme,
+            MediaQuery.platformBrightnessOf(context),
+          ),
     );
-  }
-
-  Widget _buildPage(int index, BuildContext context) {
-    if (index < _pages.length) {
-      return _buildPaginatedPage(index, context);
-    }
-    return const SizedBox.shrink();
   }
 
   Widget _buildTwoPage(int index, BuildContext context) {
     final leftIndex = index * 2;
     final rightIndex = index * 2 + 1;
     return Directionality(
-      textDirection: _effectiveTextDirection(context),
+      textDirection: _readerTextDirection(widget.settings.textDirection, context),
       child: Row(
         children: [
           Expanded(
@@ -1728,261 +1346,50 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           if (useTwoPageLayout) {
             return _buildTwoPage(index, context);
           }
-          return _buildPage(index, context);
+          return index < _pages.length
+              ? _buildPaginatedPage(index, context)
+              : const SizedBox.shrink();
         }
 
-        Widget pageContent;
-        switch (widget.settings.pageTurnAnimation) {
-          case PageTurnAnimation.none:
-            pageContent = GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapUp: widget.onTap,
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                padEnds: false,
-                itemCount: effectivePageCount,
-                itemBuilder: itemBuilder,
-              ),
-            );
+        final anim = widget.settings.pageTurnAnimation;
+        final useSwitcher = anim == PageTurnAnimation.fade || anim == PageTurnAnimation.curl;
+        final switcherDuration = anim == PageTurnAnimation.curl ? 400 : 200;
+        final physics = anim == PageTurnAnimation.none
+            ? const NeverScrollableScrollPhysics()
+            : const BouncingScrollPhysics();
 
-          case PageTurnAnimation.fade:
-            pageContent = GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapUp: widget.onTap,
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const BouncingScrollPhysics(),
-                padEnds: false,
-                itemCount: effectivePageCount,
-                itemBuilder: (context, index) {
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: itemBuilder(context, index),
-                  );
-                },
-              ),
-            );
-
-          case PageTurnAnimation.curl:
-            pageContent = GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapUp: widget.onTap,
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const BouncingScrollPhysics(),
-                padEnds: false,
-                itemCount: effectivePageCount,
-                itemBuilder: (context, index) {
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
+        final Widget pageContent = GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTap,
+          child: PageView.builder(
+            controller: _pageController,
+            physics: physics,
+            padEnds: false,
+            itemCount: effectivePageCount,
+            itemBuilder: useSwitcher
+                ? (context, index) => AnimatedSwitcher(
+                    duration: Duration(milliseconds: switcherDuration),
                     switchInCurve: Curves.easeInOut,
                     switchOutCurve: Curves.easeInOut,
                     child: itemBuilder(context, index),
-                  );
-                },
-              ),
-            );
-
-          case PageTurnAnimation.slide:
-            pageContent = GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTapUp: widget.onTap,
-              child: PageView.builder(
-                controller: _pageController,
-                physics: const BouncingScrollPhysics(),
-                padEnds: false,
-                itemCount: effectivePageCount,
-                itemBuilder: itemBuilder,
-              ),
-            );
-        }
+                  )
+                : itemBuilder,
+          ),
+        );
 
         if (widget.settings.perceptionExpander || widget.settings.horizontalLimiter) {
-          final colors = ReaderColors.forTheme(widget.settings.theme);
           return Stack(
             children: [
               pageContent,
-              if (widget.settings.perceptionExpander) ...[
-                Positioned(
-                  left: widget.settings.margin - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 1,
-                    color: colors.text.withValues(alpha: 0.15),
-                  ),
-                ),
-                Positioned(
-                  right: widget.settings.margin - 1,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 1,
-                    color: colors.text.withValues(alpha: 0.15),
-                  ),
-                ),
-              ],
-              if (widget.settings.horizontalLimiter) ...[
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  height: _limiterTopOffset(widget.settings),
-                  child: ColoredBox(
-                    color: colors.text.withValues(alpha: widget.settings.horizontalLimiterDimming),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: _limiterBottomOffset(widget.settings),
-                  child: ColoredBox(
-                    color: colors.text.withValues(alpha: widget.settings.horizontalLimiterDimming),
-                  ),
-                ),
-                if (widget.settings.horizontalLimiterLines) ...[
-                  Positioned(
-                    left: widget.settings.margin,
-                    right: widget.settings.margin,
-                    top: _limiterTopOffset(widget.settings),
-                    child: Container(
-                      height: 1,
-                      color: colors.text.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  Positioned(
-                    left: widget.settings.margin,
-                    right: widget.settings.margin,
-                    bottom: _limiterBottomOffset(widget.settings),
-                    child: Container(
-                      height: 1,
-                      color: colors.text.withValues(alpha: 0.2),
-                    ),
-                  ),
-                ],
-              ],
+              ..._readerOverlays(
+                widget.settings,
+                _getReaderStyle(widget.settings).color ?? Colors.black,
+              ),
             ],
           );
         }
         return pageContent;
       },
-    );
-  }
-
-  Widget _buildImageWidget(String imageUrl, Color? errorColor, [ReaderSettings? settings]) {
-    final colorFilter = _imageColorFilter(settings);
-    final uri = Uri.tryParse(imageUrl);
-    final isDataUri = uri != null && uri.scheme == 'data';
-    final isFileUri = uri != null && uri.scheme == 'file';
-    final isPlainPath = uri == null || !uri.isAbsolute;
-
-    if (isDataUri) {
-      final data = imageUrl.split(',');
-      if (data.length == 2) {
-        final bytes = base64Decode(data.last);
-        final img = InteractiveViewer(
-          maxScale: 4.0,
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            errorBuilder: (ctx, e, s) => Icon(
-              Icons.broken_image,
-              size: 64,
-              color: errorColor,
-            ),
-          ),
-        );
-        return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
-      }
-    }
-
-    if (isFileUri || isPlainPath) {
-      final filePath = isFileUri ? uri.path : imageUrl;
-      final img = InteractiveViewer(
-        maxScale: 4.0,
-        child: Image.file(
-          File(filePath),
-          fit: BoxFit.contain,
-          errorBuilder: (ctx, e, s) => Icon(
-            Icons.broken_image,
-            size: 64,
-            color: errorColor,
-          ),
-        ),
-      );
-      return colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
-    }
-
-    return Icon(Icons.broken_image, size: 64, color: errorColor);
-  }
-
-  Widget _buildTable(ReaderBlock block, ReaderSettings settings) {
-    final rows = block.tableRows;
-    if (rows == null || rows.isEmpty) return const SizedBox.shrink();
-    final baseStyle = _getReaderStyle(settings);
-    final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
-    final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Table(
-          defaultColumnWidth: const IntrinsicColumnWidth(),
-          border: TableBorder.all(
-            color: (baseStyle.color ?? Colors.black).withValues(alpha: 0.15),
-          ),
-          children: rows.asMap().entries.map((entry) {
-            final isHeader = entry.key == 0;
-            return TableRow(
-              children: entry.value.map((cell) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
-                );
-              }).toList(),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildList(ReaderBlock block, ReaderSettings settings, TextAlign textAlign) {
-    final items = block.listItems;
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
-    final isOrdered = block.ordered ?? false;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: settings.paragraphSpacing),
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          final bullet = isOrdered ? '${index + 1}.' : '\u2022';
-          return Padding(
-            padding: const EdgeInsets.only(left: 24, bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('$bullet ', style: _getReaderStyle(settings)),
-                Expanded(
-                  child: _buildHighlightedText(
-                    item.text,
-                    _getReaderStyle(settings),
-                    textAlign,
-                    richSpans: item.richSpans,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 }
