@@ -34,13 +34,4 @@ class ColorPresetList extends _$ColorPresetList {
     await ColorPresetService.save(updated);
     state = AsyncData(updated);
   }
-
-  Future<void> reorder(int oldIndex, int newIndex) async {
-    final current = await future;
-    final list = List<ColorPreset>.from(current);
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
-    await ColorPresetService.save(list);
-    state = AsyncData(list);
-  }
 }

@@ -10,18 +10,14 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'highlighted_text.dart';
 
-List<InlineSpan> _bionicReadingSpans(
-  String text,
-  TextStyle style, [
-  FontWeight thickness = FontWeight.w700,
-]) {
+List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
   final spans = <InlineSpan>[];
   final buffer = StringBuffer();
   for (var i = 0; i < text.length; i++) {
     final ch = text[i];
     if (ch == ' ' || ch == '\n' || ch == '\t') {
       if (buffer.isNotEmpty) {
-        _appendBionicWord(spans, buffer.toString(), style, thickness);
+        _appendBionicWord(spans, buffer.toString(), style);
         buffer.clear();
       }
       spans.add(TextSpan(text: ch, style: style));
@@ -30,17 +26,12 @@ List<InlineSpan> _bionicReadingSpans(
     }
   }
   if (buffer.isNotEmpty) {
-    _appendBionicWord(spans, buffer.toString(), style, thickness);
+    _appendBionicWord(spans, buffer.toString(), style);
   }
   return spans;
 }
 
-void _appendBionicWord(
-  List<InlineSpan> spans,
-  String word,
-  TextStyle style,
-  FontWeight thickness,
-) {
+void _appendBionicWord(List<InlineSpan> spans, String word, TextStyle style) {
   // Skip leading digits (e.g. "1.2" — digits are not part of the reading word)
   var start = 0;
   while (start < word.length &&
@@ -57,7 +48,7 @@ void _appendBionicWord(
   spans.add(
     TextSpan(
       text: wordPart.substring(0, boldLen),
-      style: style.copyWith(fontWeight: thickness),
+      style: style.copyWith(fontWeight: FontWeight.w700),
     ),
   );
   if (boldLen < wordPart.length) {
@@ -137,6 +128,13 @@ double _headingSpacing(double ps, int level) => switch (level) {
   2 => ps * 2,
   _ => ps * 1.5,
 };
+
+EdgeInsets _effectiveMargin(ReaderSettings s, ReaderMode mode) {
+  final isFocus = mode == ReaderMode.focus || mode == ReaderMode.fullscreen;
+  return isFocus
+      ? EdgeInsets.symmetric(horizontal: s.margin * 1.5, vertical: s.margin)
+      : EdgeInsets.all(s.margin);
+}
 
 class ReaderCtx {
   final ReaderSettings settings;
@@ -672,7 +670,6 @@ class ReaderContentBody extends StatefulWidget {
     this.initialProgress = 0.0,
     this.initialPage = 0,
     this.highlightQuery,
-    this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
     this.customColors,
@@ -686,7 +683,6 @@ class ReaderContentBody extends StatefulWidget {
   final double initialProgress;
   final int initialPage;
   final String? highlightQuery;
-  final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
@@ -718,17 +714,13 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         onTap: widget.onTap,
         initialPage: widget.initialPage,
         highlightQuery: widget.highlightQuery,
-        ttsHighlightIndex: widget.ttsHighlightIndex,
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
         customColors: widget.customColors,
       );
     }
 
-    final isFocus = effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
-    final effectiveMargin = isFocus
-        ? EdgeInsets.symmetric(horizontal: settings.margin * 1.5, vertical: settings.margin)
-        : EdgeInsets.all(settings.margin);
+    final effectiveMargin = _effectiveMargin(settings, effectiveMode);
     final textDirection = _readerTextDirection(settings.textDirection, context);
 
     if (!_didScrollToProgress && widget.initialProgress > 0) {
@@ -784,7 +776,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                           if (chapter != null)
                             _buildChapterContent(chapter, settings, index)
                           else
-                            _buildLoadingPlaceholder(settings, index),
+                            _readerLoadingPlaceholder(
+                              settings,
+                              index,
+                              widget.metadata.chapterTitles,
+                              _getReaderStyle(settings),
+                            ),
                           if (!isLast &&
                               chapter != null &&
                               widget.loadedChapters[index + 1] != null)
@@ -816,24 +813,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     );
   }
 
-  Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
-    return _readerLoadingPlaceholder(
-      settings,
-      index,
-      widget.metadata.chapterTitles,
-      _getReaderStyle(settings),
-    );
-  }
-
   Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
     final textAlign = _resolveTextAlign(settings.textAlign);
-
+    final ctx = _ctx(settings);
     final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
     final header = chapter.title.isNotEmpty
         ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: _buildHighlightedText(
+            child: _readerHighlightedText(
+              ctx,
               chapter.title,
               _getReaderStyle(settings).copyWith(
                 fontSize: settings.fontSize * 1.4,
@@ -857,9 +846,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
               block = transformed;
             }
           }
-          return _buildBlock(
+          return _buildReaderBlock(
+            ctx,
             block,
-            settings,
             textAlign,
             blockHighlights: chapterHighlights
                 ?.where((TextHighlight h) => h.blockIndex == entry.key)
@@ -877,32 +866,6 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       highlightQuery: widget.highlightQuery,
       linkColor: Theme.of(context).colorScheme.primary,
       brightness: MediaQuery.platformBrightnessOf(context),
-    );
-  }
-
-  Widget _buildBlock(
-    ReaderBlock block,
-    ReaderSettings settings,
-    TextAlign textAlign, {
-    List<TextHighlight>? blockHighlights,
-  }) {
-    return _buildReaderBlock(_ctx(settings), block, textAlign, blockHighlights: blockHighlights);
-  }
-
-  Widget _buildHighlightedText(
-    String text,
-    TextStyle style,
-    TextAlign textAlign, {
-    List<RichSpan>? richSpans,
-    double firstLineIndent = 0,
-  }) {
-    return _readerHighlightedText(
-      _ctx(widget.settings),
-      text,
-      style,
-      textAlign,
-      richSpans: richSpans,
-      firstLineIndent: firstLineIndent,
     );
   }
 
@@ -926,7 +889,6 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.onTap,
     required this.initialPage,
     this.highlightQuery,
-    this.ttsHighlightIndex,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
     this.customColors,
@@ -938,7 +900,6 @@ class _PaginatedContentBody extends StatefulWidget {
   final GestureTapUpCallback onTap;
   final int initialPage;
   final String? highlightQuery;
-  final int? ttsHighlightIndex;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
@@ -1159,9 +1120,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final chapterHighlights = widget.chapterHighlights[page.chapterIndex];
 
     if (chapter == null) {
-      return _buildLoadingPlaceholder(settings, page.chapterIndex);
+      return _readerLoadingPlaceholder(
+        settings,
+        page.chapterIndex,
+        widget.metadata.chapterTitles,
+        _getReaderStyle(settings),
+      );
     }
 
+    final ctx = _ctx(settings);
     final style = _getReaderStyle(settings);
     final content = <Widget>[];
 
@@ -1169,7 +1136,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       content.add(
         Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-          child: _buildHighlightedText(
+          child: _readerHighlightedText(
+            ctx,
             chapter.title,
             style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
             textAlign,
@@ -1188,7 +1156,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
       }
       content.add(
-        _buildBlock(
+        _buildReaderBlock(
+          ctx,
           block,
           textAlign,
           blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
@@ -1196,37 +1165,20 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       );
     }
 
-    final isFocus = settings.mode == ReaderMode.focus || settings.mode == ReaderMode.fullscreen;
-    final effectiveMargin = isFocus
-        ? EdgeInsets.symmetric(
-            horizontal: settings.margin * 1.5,
-            vertical: settings.margin,
-          )
-        : EdgeInsets.all(settings.margin);
-
     return SafeArea(
       key: ValueKey('page-$index'),
       top: false,
       bottom: false,
       child: Directionality(
-        textDirection: _readerTextDirection(widget.settings.textDirection, context),
+        textDirection: _readerTextDirection(settings.textDirection, context),
         child: Padding(
-          padding: effectiveMargin,
+          padding: _effectiveMargin(settings, settings.mode),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: content,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLoadingPlaceholder(ReaderSettings settings, int index) {
-    return _readerLoadingPlaceholder(
-      settings,
-      index,
-      widget.metadata.chapterTitles,
-      _getReaderStyle(settings),
     );
   }
 
@@ -1237,36 +1189,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       highlightQuery: widget.highlightQuery,
       linkColor: Theme.of(context).colorScheme.primary,
       brightness: MediaQuery.platformBrightnessOf(context),
-    );
-  }
-
-  Widget _buildBlock(
-    ReaderBlock block,
-    TextAlign textAlign, {
-    List<TextHighlight>? blockHighlights,
-  }) {
-    return _buildReaderBlock(
-      _ctx(widget.settings),
-      block,
-      textAlign,
-      blockHighlights: blockHighlights,
-    );
-  }
-
-  Widget _buildHighlightedText(
-    String text,
-    TextStyle style,
-    TextAlign textAlign, {
-    List<RichSpan>? richSpans,
-    double firstLineIndent = 0,
-  }) {
-    return _readerHighlightedText(
-      _ctx(widget.settings),
-      text,
-      style,
-      textAlign,
-      richSpans: richSpans,
-      firstLineIndent: firstLineIndent,
     );
   }
 
@@ -1295,7 +1217,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ),
           Container(
             width: 1,
-            color: ReaderColors.forTheme(widget.settings.theme).text.withValues(alpha: 0.1),
+            color: _getReaderStyle(widget.settings).color?.withValues(alpha: 0.1),
           ),
           Expanded(
             child: rightIndex < _pages.length

@@ -144,10 +144,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
   }
 
-  void _handleVerticalDragEnd(DragEndDetails details) {
-    // Nothing needed
-  }
-
   // Trackpad/mouse wheel scroll → page turn
   double _scrollAccumulator = 0;
   static const double _scrollThreshold = 50;
@@ -613,10 +609,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
               ? _handleVerticalDragUpdate
               : null,
-          onVerticalDragEnd:
-              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
-              ? _handleVerticalDragEnd
-              : null,
           onDoubleTap:
               _gestureCoordinator.shouldHandleDoubleTap &&
                   settings.doubleTapAction != DoubleTapAction.disabled
@@ -867,15 +859,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     unawaited(
       showAdaptivePanel<void>(
         context: context,
-        child: ReaderQuickSettingsSheet(
-          bookId: widget.bookId,
-          onDismiss: () {
-            _ctrl.onBottomSheetClose();
-            _gestureCoordinator.onBottomSheetClosed();
-            Navigator.of(context).pop();
-          },
-        ),
-      ),
+        child: ReaderQuickSettingsSheet(bookId: widget.bookId),
+      ).then((_) {
+        _ctrl.onBottomSheetClose();
+        _gestureCoordinator.onBottomSheetClosed();
+      }),
     );
   }
 

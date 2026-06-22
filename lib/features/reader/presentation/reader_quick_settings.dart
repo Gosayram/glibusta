@@ -11,9 +11,8 @@ import 'color_preset_provider.dart';
 import 'reader_providers.dart';
 
 class ReaderQuickSettingsSheet extends ConsumerStatefulWidget {
-  const ReaderQuickSettingsSheet({super.key, this.onDismiss, this.bookId});
+  const ReaderQuickSettingsSheet({super.key, this.bookId});
 
-  final VoidCallback? onDismiss;
   final String? bookId;
 
   @override

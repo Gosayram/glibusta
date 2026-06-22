@@ -871,10 +871,6 @@ class ReaderController {
     );
   }
 
-  void clearHighlight() {
-    _updateState(_state.copyWith(clearHighlight: true));
-  }
-
   // ── Theme / system ────────────────────────────────────
 
   Future<void> _applyPerBookSettings() async {

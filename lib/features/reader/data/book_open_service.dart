@@ -2,10 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/database/app_database.dart';
 import '../../../core/database/full_text_search.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
@@ -15,33 +13,24 @@ import '../../library/domain/book_file_repository.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
-import 'parsers/epub_parser.dart' as legacy_epub;
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
 import 'reader_cache_service.dart';
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
-  final database = ref.watch(databaseProvider);
   final storage = ref.watch(appFileStorageProvider);
   final fileRepo = ref.watch(bookFileRepositoryProvider);
   final ftsService = ref.watch(fullTextSearchProvider);
-  return BookOpenService(database, storage, fileRepo, ftsService);
-});
-
-final openedBookProvider = FutureProvider.family<NormalizedBook, String>((ref, bookId) async {
-  final service = ref.watch(bookOpenServiceProvider);
-  return service.openBookWithCache(bookId);
+  return BookOpenService(storage, fileRepo, ftsService);
 });
 
 class BookOpenService {
-  final AppDatabase _database;
   final BookFileRepository _fileRepo;
   final _logger = AppLogger();
   late final ReaderCacheService cache;
 
   BookOpenService(
-    this._database,
     AppFileStorage storage,
     this._fileRepo, [
     FullTextSearchService? ftsService,
@@ -137,33 +126,8 @@ class BookOpenService {
       } on TimeoutException {
         rethrow;
       } on Object catch (e, st) {
-        _logger.severe(
-          'New EPUB parser failed, falling back to legacy: $e',
-          name: 'Reader',
-          error: e,
-          st: st,
-        );
-        try {
-          return await legacy_epub.EpubParser()
-              .parseFile(filePath)
-              .timeout(
-                _parsingTimeout,
-                onTimeout: () => throw TimeoutException(
-                  'Разбор EPUB (legacy) занял слишком много времени. '
-                  'Попробуйте повторить.',
-                ),
-              );
-        } on TimeoutException {
-          rethrow;
-        } on Object catch (e, st) {
-          _logger.severe(
-            'Legacy EPUB parser also failed: $e',
-            name: 'Reader',
-            error: e,
-            st: st,
-          );
-          rethrow;
-        }
+        _logger.severe('EPUB parser failed: $e', name: 'Reader', error: e, st: st);
+        rethrow;
       }
     }
 
@@ -185,46 +149,6 @@ class BookOpenService {
     final name = filePath.split('/').last;
     final dotIndex = name.lastIndexOf('.');
     return dotIndex > 0 ? name.substring(0, dotIndex) : name;
-  }
-
-  /// Re-parse a book with a forced encoding and update the DB metadata.
-  Future<NormalizedBook> reloadWithEncoding(
-    String bookId,
-    String encoding,
-  ) async {
-    final filePath = await _fileRepo.getFilePath(bookId);
-    if (filePath == null || !await File(filePath).exists()) {
-      throw BookMissingFailure('Файл книги не найден: $bookId');
-    }
-
-    final format = detectBookFormat(filePath);
-    if (format == BookFormat.unknown ||
-        format == BookFormat.pdf ||
-        format == BookFormat.mobi ||
-        format == BookFormat.azw3 ||
-        format == BookFormat.prc ||
-        format == BookFormat.djvu) {
-      throw UnsupportedFormatFailure('Формат не поддерживается: ${format.name}');
-    }
-
-    final parser = _registry.parserForFormat(format);
-    if (parser == null) {
-      throw UnsupportedFormatFailure('Парсер не найден: ${format.name}');
-    }
-
-    // Parse with forced encoding
-    final book = await parser.parseFile(filePath, forcedEncoding: encoding);
-
-    // Update encoding metadata in DB
-    await (_database.update(_database.savedBooks)..where((t) => t.id.equals(bookId))).write(
-      SavedBooksCompanion(
-        detectedEncoding: Value(encoding),
-        encodingSource: const Value('manual'),
-        userForcedEncoding: Value(encoding),
-      ),
-    );
-
-    return book;
   }
 
   Future<CacheSourceFingerprint?> _computeCacheFingerprint(
@@ -254,17 +178,12 @@ class BookOpenService {
 
   Future<ReaderChapter?> loadChapter(String bookId, int index) => cache.getChapter(bookId, index);
 
-  Future<void> saveChapter(String bookId, ReaderChapter chapter) =>
-      cache.putChapter(bookId, chapter);
-
   Future<void> invalidateBookCache(
     String bookId, {
     bool preserveImages = false,
   }) => cache.invalidate(bookId, preserveImages: preserveImages);
 
   Future<NormalizedBook?> getCachedBook(String bookId) => cache.getCachedBook(bookId);
-
-  Future<void> saveToCache(String bookId, NormalizedBook book) => cache.saveToCache(bookId, book);
 
   Future<NormalizedBook> openBookWithCache(
     String bookId, {

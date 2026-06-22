@@ -15,7 +15,7 @@ import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 
 class _FakeBookOpenService extends BookOpenService {
   _FakeBookOpenService(AppDatabase database)
-    : super(database, AppFileStorageImpl(), BookFileRepositoryImpl(database));
+    : super(AppFileStorageImpl(), BookFileRepositoryImpl(database));
 
   static const _chapter = ReaderChapter(
     index: 0,
@@ -75,9 +75,7 @@ void main() {
   group('ReaderQuickSettingsSheet', () {
     testWidgets('renders all section labels', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -92,9 +90,7 @@ void main() {
 
     testWidgets('renders all 7 theme swatches', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -103,9 +99,7 @@ void main() {
 
     testWidgets('renders all 2 font chips', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -115,9 +109,7 @@ void main() {
 
     testWidgets('renders mode choice chips', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -130,9 +122,7 @@ void main() {
 
     testWidgets('default font size shows 18', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -141,9 +131,7 @@ void main() {
 
     testWidgets('font size minus button enabled at default 18', (tester) async {
       await tester.pumpWidget(
-        wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-        ),
+        wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
 
@@ -156,8 +144,7 @@ void main() {
     testWidgets('font size minus disabled at minimum 12', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-          initialSettings: const ReaderSettings(fontSize: 12),
+          const ReaderQuickSettingsSheet(),
         ),
       );
       await tester.pumpAndSettle();
@@ -171,8 +158,7 @@ void main() {
     testWidgets('font size plus disabled at maximum 32', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-          initialSettings: const ReaderSettings(fontSize: 32),
+          const ReaderQuickSettingsSheet(),
         ),
       );
       await tester.pumpAndSettle();
@@ -186,10 +172,7 @@ void main() {
     testWidgets('auto-theme custom shows hour dropdowns', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-          initialSettings: const ReaderSettings(
-            autoThemeMode: AutoThemeMode.custom,
-          ),
+          const ReaderQuickSettingsSheet(),
         ),
       );
       await tester.pumpAndSettle();
@@ -202,8 +185,7 @@ void main() {
     testWidgets('auto-theme off hides hour dropdowns', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
-          const ReaderQuickSettingsSheet(onDismiss: SizedBox.new),
-          initialSettings: const ReaderSettings(),
+          const ReaderQuickSettingsSheet(),
         ),
       );
       await tester.pumpAndSettle();
