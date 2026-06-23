@@ -6,22 +6,19 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
-import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/download_task.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../domain/download_repository.dart';
 
 final downloadRepositoryProvider = Provider<DownloadRepository>((ref) {
   final db = ref.watch(databaseProvider);
-  final storage = ref.watch(appFileStorageProvider);
-  return DownloadRepositoryImpl(db, storage);
+  return DownloadRepositoryImpl(db);
 });
 
 class DownloadRepositoryImpl implements DownloadRepository {
   final AppDatabase _db;
-  final AppFileStorage _storage;
 
-  DownloadRepositoryImpl(this._db, this._storage);
+  DownloadRepositoryImpl(this._db);
 
   @override
   Stream<List<DownloadTask>> watchAllDownloads() {
@@ -53,8 +50,8 @@ class DownloadRepositoryImpl implements DownloadRepository {
     const uuid = Uuid();
     final taskId = uuid.v4();
 
-    final bookFile = await _storage.bookFile(bookId, format);
-    final targetPath = bookFile.path;
+    final fileName = '${_sanitizeId(bookId)}.${format.name}';
+    final targetPath = '/storage/emulated/0/Download/Glibusta/$fileName';
 
     await _db.downloadDao.insertDownload(
       DownloadsCompanion(
@@ -159,4 +156,15 @@ class DownloadRepositoryImpl implements DownloadRepository {
       DownloadStatusDb.canceled => DownloadStatus.canceled,
     };
   }
+}
+
+String _sanitizeId(String id) {
+  var s = id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+  while (s.startsWith('.')) {
+    s = s.substring(1);
+  }
+  s = s.trim();
+  if (s.isEmpty) s = 'unnamed';
+  if (s.length > 200) s = s.substring(0, 200);
+  return s;
 }

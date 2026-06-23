@@ -2,22 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
-import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/highlights/presentation/highlights_notes_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 
 part 'routes.g.dart';
-
-@TypedGoRoute<CatalogRoute>(path: '/catalog', name: 'catalog')
-class CatalogRoute extends GoRouteData with $CatalogRoute {
-  const CatalogRoute();
-
-  @override
-  Widget build(BuildContext context, GoRouterState state) {
-    return const CatalogScreen();
-  }
-}
 
 @TypedGoRoute<CollectionsRoute>(path: '/collections', name: 'collections')
 class CollectionsRoute extends GoRouteData with $CollectionsRoute {

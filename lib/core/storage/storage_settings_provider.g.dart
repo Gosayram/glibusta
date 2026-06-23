@@ -80,7 +80,7 @@ final class StorageModeNotifierProvider
   }
 }
 
-String _$storageModeNotifierHash() => r'8915f55cbd8f516a33dbc336098d35105afd7395';
+String _$storageModeNotifierHash() => r'736844511256b98081d243ba965d1fb45f9c0c19';
 
 abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
   StorageMode build();

@@ -9,6 +9,7 @@ import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/bookmarks/presentation/bookmarks_screen.dart';
 import '../features/catalog/presentation/author_detail_screen.dart';
+import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
 import '../features/catalog/presentation/genre_list_screen.dart';
 import '../features/catalog/presentation/opds_catalog_screen.dart';
@@ -86,6 +87,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/downloads',
                 name: 'downloads',
                 builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
+              ),
+            ],
+          ),
+          // ── Catalog ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/catalog',
+                name: 'catalog',
+                builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
               ),
             ],
           ),

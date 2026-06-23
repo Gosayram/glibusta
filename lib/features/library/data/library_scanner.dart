@@ -69,17 +69,28 @@ class LibraryScanner {
   }
 
   Future<ScanResult> _doScan() async {
+    final dirsToScan = <String>[];
+
     final booksDir = await _storage.booksDir();
-    if (!await booksDir.exists()) {
-      return const ScanResult();
+    if (await booksDir.exists()) {
+      dirsToScan.add(booksDir.path);
     }
 
+    const downloadDir = '/storage/emulated/0/Download/Glibusta';
+    if (await Directory(downloadDir).exists()) {
+      dirsToScan.add(downloadDir);
+    }
+
+    if (dirsToScan.isEmpty) return const ScanResult();
+
     final importableFiles = <File>[];
-    await for (final entity in booksDir.list(recursive: true)) {
-      if (entity is File) {
-        final ext = entity.path.split('.').last.toLowerCase();
-        if (importableExtensions.contains(ext)) {
-          importableFiles.add(entity);
+    for (final dirPath in dirsToScan) {
+      await for (final entity in Directory(dirPath).list(recursive: true)) {
+        if (entity is File) {
+          final ext = entity.path.split('.').last.toLowerCase();
+          if (importableExtensions.contains(ext)) {
+            importableFiles.add(entity);
+          }
         }
       }
     }
