@@ -198,6 +198,37 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl.scrollToPrevious();
   }
 
+  void _handleLinkTap(String href, ReaderState readerState) {
+    // Strip leading # to get the anchor id
+    final anchor = href.startsWith('#') ? href.substring(1) : href;
+    if (anchor.isEmpty) return;
+
+    // Search current chapter for a block with matching noteId
+    final chapterIndex = readerState.currentPosition.chapterIndex;
+    final chapter = readerState.loadedChapters[chapterIndex];
+    if (chapter == null) return;
+
+    for (int i = 0; i < chapter.blocks.length; i++) {
+      final block = chapter.blocks[i];
+      if (block.noteId == anchor) {
+        // Found the target — scroll to it
+        _ctrl.jumpToPosition(
+          readerState.currentPosition.copyWith(
+            bookId: widget.bookId,
+            chapterIndex: chapterIndex,
+            paragraphIndex: i,
+          ),
+        );
+        return;
+      }
+    }
+
+    // If not found by noteId, try matching href in rich spans
+    // (some books use id attributes on the target element)
+    // For now, just show a subtle feedback
+    unawaited(HapticFeedback.selectionClick());
+  }
+
   @override
   void dispose() {
     _lifecycleListener?.dispose();
@@ -637,6 +668,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               highlightQuery: readerState.highlightedQuery,
               chapterHighlights: _buildChapterHighlights(),
               customColors: _resolveCustomColors(settings),
+              onLinkTap: (href) => _handleLinkTap(href, readerState),
             ),
           ),
         ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
@@ -139,6 +140,7 @@ class ReaderCtx {
   final String? highlightQuery;
   final Color linkColor;
   final Brightness brightness;
+  final ValueChanged<String>? onLinkTap;
 
   const ReaderCtx({
     required this.settings,
@@ -146,6 +148,7 @@ class ReaderCtx {
     this.highlightQuery,
     required this.linkColor,
     required this.brightness,
+    this.onLinkTap,
   });
 
   ReaderColors get colors =>
@@ -170,6 +173,20 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
   );
+}
+
+bool _blockNeedsExtraGap(BlockType prev, BlockType next) {
+  // Paragraphs following paragraphs — standard spacing (already have padding)
+  if (prev == BlockType.paragraph && next == BlockType.paragraph) return false;
+  // Separator already has generous vertical padding
+  if (prev == BlockType.separator || next == BlockType.separator) return false;
+  // Headings/subtitles have their own top/bottom spacing
+  if (next == BlockType.heading || next == BlockType.subtitle) return false;
+  // Epigraphs/poems/cites have generous margins
+  if (prev == BlockType.epigraph || prev == BlockType.poem || prev == BlockType.cite) return false;
+  if (next == BlockType.epigraph || next == BlockType.poem || next == BlockType.cite) return false;
+  // Everything else gets a small gap
+  return true;
 }
 
 Widget _buildReaderBlock(
@@ -353,7 +370,12 @@ Widget _readerHighlightedText(
   final query = ctx.highlightQuery?.trim();
   if (query == null || query.isEmpty) {
     if (richSpans != null && richSpans.isNotEmpty) {
-      final spans = _readerRichTextSpans(richSpans, style, ctx.linkColor);
+      final spans = _readerRichTextSpans(
+        richSpans,
+        style,
+        ctx.linkColor,
+        onLinkTap: ctx.onLinkTap,
+      );
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
       }
@@ -389,8 +411,9 @@ Widget _readerHighlightedText(
 List<InlineSpan> _readerRichTextSpans(
   List<RichSpan> richSpans,
   TextStyle baseStyle,
-  Color linkColor,
-) {
+  Color linkColor, {
+  ValueChanged<String>? onLinkTap,
+}) {
   final spans = <InlineSpan>[];
   for (final span in richSpans) {
     if (span.lineBreak) {
@@ -405,19 +428,48 @@ List<InlineSpan> _readerRichTextSpans(
     }
     if (span.superscript) {
       final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.baseline,
-          baseline: TextBaseline.alphabetic,
-          child: Transform.translate(
-            offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
-            child: Text(span.text, style: spanStyle.copyWith(fontSize: supFontSize)),
+      final supStyle = spanStyle.copyWith(fontSize: supFontSize);
+      if (span.href != null && onLinkTap != null) {
+        final href = span.href!;
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Transform.translate(
+              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              child: GestureDetector(
+                onTap: () => onLinkTap(href),
+                child: Text(span.text, style: supStyle),
+              ),
+            ),
           ),
-        ),
-      );
+        );
+      } else {
+        spans.add(
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: Transform.translate(
+              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              child: Text(span.text, style: supStyle),
+            ),
+          ),
+        );
+      }
       continue;
     }
-    spans.add(TextSpan(text: span.text, style: spanStyle));
+    if (span.href != null && onLinkTap != null) {
+      final href = span.href!;
+      spans.add(
+        TextSpan(
+          text: span.text,
+          style: spanStyle,
+          recognizer: TapGestureRecognizer()..onTap = () => onLinkTap(href),
+        ),
+      );
+    } else {
+      spans.add(TextSpan(text: span.text, style: spanStyle));
+    }
   }
   return spans;
 }
@@ -670,6 +722,7 @@ class ReaderContentBody extends StatefulWidget {
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
     this.customColors,
+    this.onLinkTap,
   });
 
   final NormalizedBookMetadata metadata;
@@ -683,6 +736,7 @@ class ReaderContentBody extends StatefulWidget {
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
+  final ValueChanged<String>? onLinkTap;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -713,6 +767,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
         customColors: widget.customColors,
+        onLinkTap: widget.onLinkTap,
       );
     }
 
@@ -862,6 +917,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       highlightQuery: widget.highlightQuery,
       linkColor: Theme.of(context).colorScheme.primary,
       brightness: MediaQuery.platformBrightnessOf(context),
+      onLinkTap: widget.onLinkTap,
     );
   }
 
@@ -888,6 +944,7 @@ class _PaginatedContentBody extends StatefulWidget {
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
     this.customColors,
+    this.onLinkTap,
   });
 
   final NormalizedBookMetadata metadata;
@@ -899,6 +956,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
+  final ValueChanged<String>? onLinkTap;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -961,6 +1019,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final settings = widget.settings;
     final style = _getReaderStyle(settings);
     final pages = <_PageContent>[];
+    const minFillRatio = 0.3;
 
     for (int chIdx = 0; chIdx < widget.metadata.chapterCount; chIdx++) {
       final chapter = widget.loadedChapters[chIdx];
@@ -982,29 +1041,50 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
 
         if (currentHeight + blockHeight > availableHeight && i > pageStart) {
-          pages.add(
-            _PageContent(
-              chapterIndex: chIdx,
-              blockStart: pageStart,
-              blockEnd: i,
-              showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
-            ),
-          );
-          pageStart = i;
-          currentHeight = blockHeight;
+          // Don't break if current page is mostly empty (< 30% filled)
+          if (currentHeight > availableHeight * minFillRatio) {
+            pages.add(
+              _PageContent(
+                chapterIndex: chIdx,
+                blockStart: pageStart,
+                blockEnd: i,
+                showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
+              ),
+            );
+            pageStart = i;
+            currentHeight = blockHeight;
+          } else {
+            // Page is too empty — let block overflow, accept slight overfill
+            currentHeight += blockHeight;
+          }
         } else {
           currentHeight += blockHeight;
         }
       }
 
-      pages.add(
-        _PageContent(
-          chapterIndex: chIdx,
-          blockStart: pageStart,
+      // Final page: if it would be very short (< 25%), merge with previous page
+      if (pageStart > 0 &&
+          pages.isNotEmpty &&
+          pages.last.chapterIndex == chIdx &&
+          currentHeight < availableHeight * 0.25) {
+        // Extend previous page to include remaining blocks
+        final lastPage = pages.last;
+        pages[pages.length - 1] = _PageContent(
+          chapterIndex: lastPage.chapterIndex,
+          blockStart: lastPage.blockStart,
           blockEnd: chapter.blocks.length,
-          showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
-        ),
-      );
+          showChapterTitle: lastPage.showChapterTitle,
+        );
+      } else {
+        pages.add(
+          _PageContent(
+            chapterIndex: chIdx,
+            blockStart: pageStart,
+            blockEnd: chapter.blocks.length,
+            showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
+          ),
+        );
+      }
     }
     return pages;
   }
@@ -1151,6 +1231,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           block = transformed;
         }
       }
+      // Add spacing between consecutive blocks (except after first block)
+      if (i > page.blockStart) {
+        final prevBlock = chapter.blocks[i - 1];
+        final needsExtraGap = _blockNeedsExtraGap(prevBlock.type, block.type);
+        if (needsExtraGap) {
+          content.add(SizedBox(height: settings.paragraphSpacing * 0.5));
+        }
+      }
       content.add(
         _buildReaderBlock(
           ctx,
@@ -1185,6 +1273,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       highlightQuery: widget.highlightQuery,
       linkColor: Theme.of(context).colorScheme.primary,
       brightness: MediaQuery.platformBrightnessOf(context),
+      onLinkTap: widget.onLinkTap,
     );
   }
 
