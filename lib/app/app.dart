@@ -15,6 +15,7 @@ import '../core/platform/share_handler.dart';
 import '../features/downloads/data/download_listener.dart';
 import '../features/library/data/book_import_service.dart';
 import '../features/library/data/library_scanner.dart';
+import '../features/library/presentation/library_screen.dart' show libraryBooksProvider;
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
@@ -123,6 +124,9 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   Future<void> _scanLibrary() async {
     final scanner = ref.read(libraryScannerProvider);
     await scanner.scanLazy();
+    if (mounted) {
+      ref.invalidate(libraryBooksProvider);
+    }
   }
 
   Future<void> _requestNotificationPermission() async {

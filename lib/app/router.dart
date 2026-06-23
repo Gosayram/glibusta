@@ -80,16 +80,6 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          // ── Downloads ──
-          StatefulShellBranch(
-            routes: <RouteBase>[
-              GoRoute(
-                path: '/downloads',
-                name: 'downloads',
-                builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
-              ),
-            ],
-          ),
           // ── Catalog ──
           StatefulShellBranch(
             routes: <RouteBase>[
@@ -97,6 +87,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/catalog',
                 name: 'catalog',
                 builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
+              ),
+            ],
+          ),
+          // ── Downloads ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/downloads',
+                name: 'downloads',
+                builder: (BuildContext context, GoRouterState state) => const DownloadsScreen(),
               ),
             ],
           ),

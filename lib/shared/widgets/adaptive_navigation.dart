@@ -110,8 +110,8 @@ class SidebarNavigation extends StatelessWidget {
     final items = [
       _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
       _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
-      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
       _SidebarItem(icon: Icons.explore, label: l10n.catalogTitle, route: '/catalog'),
+      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
       _SidebarItem(
         icon: Icons.collections_bookmark,
         label: l10n.collectionsTitle,
