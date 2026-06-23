@@ -42,9 +42,9 @@ class DownloadListener {
     await Future<void>.delayed(const Duration(seconds: 3));
     try {
       final allTasks = await _repository.getAllDownloads();
-      final stale = allTasks.where((t) =>
-          t.status == DownloadStatus.running ||
-          t.status == DownloadStatus.queued).toList();
+      final stale = allTasks
+          .where((t) => t.status == DownloadStatus.running || t.status == DownloadStatus.queued)
+          .toList();
       if (stale.isEmpty) return;
       _logger.info(
         'Recovering ${stale.length} stale download(s)',

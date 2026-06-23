@@ -21,8 +21,10 @@ import '../../../core/services/content_safety_service.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
 import '../../../core/storage/storage_mode.dart';
 import '../../../core/storage/storage_settings_provider.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import '../../auth/presentation/login_screen.dart';
 import '../../library/data/library_scanner.dart';
+import '../../library/presentation/library_screen.dart' show libraryBooksProvider;
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -37,15 +39,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final settings = ref.watch(appSettingsControllerProvider);
     final authData = ref.watch(authStateProvider).value;
     final isAuthenticated = authData?.isAuthenticated ?? false;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Настройки'),
+        title: Text(l10n.settingsTitle),
         automaticallyImplyLeading: false,
       ),
       body: ListView(
         children: [
-          const _SectionHeader(title: 'Аккаунт'),
+          _SectionHeader(title: l10n.settingsAccount),
           if (isAuthenticated)
             _SettingsTile(
               icon: Icons.person,
@@ -62,39 +65,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
 
           const Divider(),
-          const _SectionHeader(title: 'Источник'),
+          _SectionHeader(title: l10n.settingsSource),
           _SettingsTile(
             icon: Icons.language,
-            title: 'Базовый URL',
+            title: l10n.settingsBaseUrl,
             subtitle: settings.baseUrl,
             onTap: () => _editBaseUrl(context, ref, settings),
           ),
           _SettingsTile(
             icon: Icons.dns,
-            title: 'Зеркала',
+            title: l10n.settingsMirrors,
             subtitle: settings.mirrors.isEmpty
-                ? 'Не настроены'
+                ? l10n.settingsNotConfigured
                 : '${settings.mirrors.length} зеркал(а)',
             onTap: () => _editMirrors(context, ref, settings),
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'Загрузки'),
+          _SectionHeader(title: l10n.settingsDownloads),
           _SettingsTile(
             icon: Icons.speed,
-            title: 'Параллельные загрузки',
+            title: l10n.settingsParallelDownloads,
             subtitle: '${settings.maxConcurrentDownloads}',
             onTap: () => _editMaxConcurrent(context, ref, settings),
           ),
           SwitchListTile(
             secondary: const Icon(Icons.cell_tower),
-            title: const Text(
-              'Скачивать через мобильную сеть',
+            title: Text(
+              l10n.settingsMobileDownloads,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            subtitle: const Text(
-              'По умолчанию только Wi-Fi',
+            subtitle: Text(
+              l10n.settingsMobileDownloadsSub,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -103,13 +106,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           SwitchListTile(
             secondary: const Icon(Icons.play_circle),
-            title: const Text(
-              'Авто-продолжение при Wi-Fi',
+            title: Text(
+              l10n.settingsAutoResume,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            subtitle: const Text(
-              'Возобновлять загрузки при появлении сети',
+            subtitle: Text(
+              l10n.settingsAutoResumeSub,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -118,30 +121,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'Хранилище библиотеки'),
-          _buildStorageModeTile(context, ref),
-          _SettingsTile(
-            icon: Icons.folder_copy_outlined,
-            title: 'Управление папками',
-            subtitle: 'Сохранённые папки и доступ',
-            onTap: () => _showPersistedUrisDialog(context),
-          ),
+          _SectionHeader(title: l10n.settingsStorage),
+          _buildStorageModeTile(context, ref, l10n),
           _SettingsTile(
             icon: Icons.storage,
-            title: 'Управление хранилищем',
-            subtitle: 'Размер данных, очистка кеша',
+            title: l10n.settingsStorageManagement,
+            subtitle: l10n.settingsStorageManagementSub,
             onTap: () => context.push('/settings/storage'),
           ),
           _SettingsTile(
             icon: Icons.refresh,
-            title: 'Обновить библиотеку',
-            subtitle: 'Просканировать папку на новые книги',
+            title: l10n.settingsRefreshLibrary,
+            subtitle: l10n.settingsRefreshLibrarySub,
             onTap: () => _rescanLibrary(context, ref),
           ),
           _SettingsTile(
             icon: Icons.label,
-            title: 'Теги',
-            subtitle: 'Управление тегами книг',
+            title: l10n.settingsTags,
+            subtitle: l10n.settingsTagsSub,
             onTap: () => context.push('/settings/tags'),
           ),
           _SettingsTile(
@@ -158,12 +155,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'Отображение'),
+          _SectionHeader(title: l10n.settingsAppearance),
           SwitchListTile(
             secondary: const Icon(Icons.dark_mode),
-            title: const Text('Тёмная тема', maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: const Text(
-              'Использовать тёмную тему',
+            title: Text(l10n.settingsDarkTheme, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              l10n.settingsDarkThemeSub,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -178,45 +175,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           _SettingsTile(
             icon: Icons.shield_outlined,
-            title: 'Фильтр контента',
-            subtitle: 'Настройка безопасности',
+            title: l10n.settingsContentFilter,
+            subtitle: l10n.settingsContentFilterSub,
             onTap: () => _showContentSafety(context),
           ),
           _SettingsTile(
             icon: Icons.font_download,
-            title: 'Шрифты',
-            subtitle: 'Скачать дополнительные шрифты',
+            title: l10n.settingsFonts,
+            subtitle: l10n.settingsFontsSub,
             onTap: () => context.push('/settings/fonts'),
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'Данные'),
+          _SectionHeader(title: l10n.settingsData),
           _SettingsTile(
             icon: Icons.upload_file,
-            title: 'Экспорт данных',
-            subtitle: 'Сохранить закладки, заметки, цитаты, коллекции',
+            title: l10n.settingsExport,
+            subtitle: l10n.settingsExportSub,
             onTap: () => _exportData(context),
           ),
           _SettingsTile(
             icon: Icons.download,
-            title: 'Импорт данных',
-            subtitle: 'Восстановить из файла резервной копии',
+            title: l10n.settingsImport,
+            subtitle: l10n.settingsImportSub,
             onTap: () => _importData(context),
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'О приложении'),
+          _SectionHeader(title: l10n.settingsAbout),
           const _VersionTile(),
           _SettingsTile(
             icon: Icons.keyboard,
-            title: 'Горячие клавиши',
-            subtitle: 'Список сочетаний клавиш',
+            title: l10n.settingsShortcuts,
+            subtitle: l10n.settingsShortcutsSub,
             onTap: () => _showShortcuts(context),
           ),
           _SettingsTile(
             icon: Icons.bug_report_outlined,
-            title: 'Диагностика',
-            subtitle: 'Информация для отладки',
+            title: l10n.settingsDiagnostics,
+            subtitle: l10n.settingsDiagnosticsSub,
             onTap: () => context.push('/settings/diagnostics'),
           ),
         ],
@@ -566,26 +563,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildStorageModeTile(BuildContext context, WidgetRef ref) {
+  Widget _buildStorageModeTile(BuildContext context, WidgetRef ref, AppLocalizations l10n) {
     final mode = ref.watch(storageModeProvider);
     final folder = ref.watch(externalFolderProvider);
 
-    final modeLabels = {
-      StorageMode.downloads: 'Downloads/Glibusta',
-      StorageMode.external: 'Выбранная папка',
-    };
-
     final subtitles = {
-      StorageMode.downloads: 'Доступна из файлового менеджера',
-      StorageMode.external: folder.name ?? 'Папка не выбрана',
+      StorageMode.downloads: l10n.settingsStorageModeAccessible,
+      StorageMode.external: folder.name ?? l10n.settingsStorageModeNotSelected,
     };
 
     return ListTile(
       leading: const Icon(Icons.folder),
-      title: const Text('Хранилище', maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(l10n.settingsStorageMode, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(subtitles[mode]!, maxLines: 2, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => _showStorageModeDialog(context, ref, mode, modeLabels),
+      onTap: () => _showStorageModeDialog(context, ref, mode, l10n),
       dense: true,
       minLeadingWidth: 20,
       visualDensity: VisualDensity.compact,
@@ -596,8 +588,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     BuildContext context,
     WidgetRef ref,
     StorageMode currentMode,
-    Map<StorageMode, String> modeLabels,
+    AppLocalizations l10n,
   ) async {
+    final modeLabels = {
+      StorageMode.downloads: l10n.settingsStorageModeDownloads,
+      StorageMode.external: l10n.settingsStorageModeExternal,
+    };
+
     await showDialog<void>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -662,121 +659,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _showPersistedUrisDialog(BuildContext context) async {
-    final bridge = ref.read(storageBridgeProvider);
-    final uris = await bridge.getPersistedUris();
-    final currentFolder = ref.read(externalFolderProvider);
-
-    if (!context.mounted) return;
-
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: const Text('Сохранённые папки'),
-                content: SizedBox(
-                  width: double.maxFinite,
-                  child: uris.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: Text('Нет сохранённых папок'),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: uris.length,
-                          itemBuilder: (context, index) {
-                            final uri = uris[index];
-                            final name = uri == currentFolder.uri
-                                ? '${currentFolder.name ?? uri} (активна)'
-                                : uri.split('/').last;
-                            final isActive = uri == currentFolder.uri;
-                            return ListTile(
-                              leading: Icon(
-                                isActive ? Icons.folder_open : Icons.folder_outlined,
-                                color: isActive ? Theme.of(context).colorScheme.primary : null,
-                              ),
-                              title: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                uri,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: 'Забыть',
-                                onPressed: () async {
-                                  final ok = await bridge.forgetUri(uri);
-                                  if (ok) {
-                                    setDialogState(() {
-                                      uris.removeAt(index);
-                                    });
-                                    if (isActive) {
-                                      await ref.read(externalFolderProvider.notifier).clearFolder();
-                                    }
-                                  }
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Закрыть'),
-                  ),
-                  TextButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Добавить'),
-                    onPressed: () async {
-                      final uri = await bridge.pickFolder();
-                      if (uri != null && context.mounted) {
-                        final scanned = await bridge.scanBooks(uri);
-                        final name = uri.split('/').last;
-                        await ref
-                            .read(externalFolderProvider.notifier)
-                            .updateFolder(uri: uri, name: name);
-                        setDialogState(() {
-                          if (!uris.contains(uri)) uris.add(uri);
-                        });
-                        if (context.mounted) {
-                          unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
-                        }
-                      }
-                    },
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _rescanLibrary(BuildContext context, WidgetRef ref) async {
     final scanner = ref.read(libraryScannerProvider);
     if (scanner.isScanning) {
-      unawaited(SmartDialog.showToast('Сканирование уже выполняется'));
+      unawaited(SmartDialog.showToast(AppLocalizations.of(context).storageAlreadyScanning));
       return;
     }
-    unawaited(SmartDialog.showToast('Сканирование папки...'));
+    unawaited(SmartDialog.showToast(AppLocalizations.of(context).storageScanning));
     final result = await scanner.scanWithResult();
     if (!context.mounted) return;
+    ref.invalidate(libraryBooksProvider);
     if (result.hasError) {
       unawaited(SmartDialog.showToast('Ошибка: ${result.error}'));
     } else {
+      final l10n = AppLocalizations.of(context);
       unawaited(
         SmartDialog.showToast(
-          'Импортировано: ${result.imported}, пропущено: ${result.skipped}',
+          l10n.storageScanResult(result.imported, result.skipped),
         ),
       );
     }

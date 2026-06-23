@@ -69,7 +69,10 @@ class DownloadsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   FilledButton.tonal(
-                    onPressed: () => context.push('/catalog'),
+                    onPressed: () {
+                      final shell = StatefulNavigationShell.of(context);
+                      shell.goBranch(2, initialLocation: true);
+                    },
                     child: const Text('Перейти в каталог'),
                   ),
                 ],

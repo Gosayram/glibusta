@@ -34,17 +34,22 @@ class StorageInfoModel {
 Future<StorageInfoModel> computeStorageInfo(AppDatabase db) async {
   final storage = AppFileStorageImpl();
 
-  final dbSize = await _dirSize(p.dirname(await _dbPath(db)));
+  final dbFile = File(p.join((await storage.dbDir()).path, 'glibusta.sqlite'));
+  final dbSize = await dbFile.exists() ? await dbFile.length() : 0;
   final booksSize = await _dirSize((await storage.booksDir()).path);
   final coversSize = await _dirSize((await storage.coversDir()).path);
   final catalogCoversSize = await _dirSize((await storage.catalogCoversDir()).path);
   final cacheSize = await _dirSize((await storage.cacheDir()).path);
   final tempSize = await _dirSize((await storage.tempDir()).path);
 
+  const downloadDir = '/storage/emulated/0/Download/Glibusta';
+  final downloadSize = await _dirSize(downloadDir);
+
   return StorageInfoModel(
     categories: [
       StorageCategory(name: 'База данных', icon: 'database', sizeBytes: dbSize),
-      StorageCategory(name: 'Книги', icon: 'book', sizeBytes: booksSize),
+      StorageCategory(name: 'Книги (внутр.)', icon: 'book', sizeBytes: booksSize),
+      StorageCategory(name: 'Загрузки', icon: 'download', sizeBytes: downloadSize),
       StorageCategory(name: 'Обложки', icon: 'image', sizeBytes: coversSize),
       StorageCategory(name: 'Обложки каталога', icon: 'catalog', sizeBytes: catalogCoversSize),
       StorageCategory(name: 'Кеш', icon: 'cache', sizeBytes: cacheSize),
@@ -66,11 +71,6 @@ Future<int> _dirSize(String path) async {
     }
   } on Object catch (_) {}
   return total;
-}
-
-Future<String> _dbPath(AppDatabase db) async {
-  final dir = await AppFileStorageImpl().dbDir();
-  return p.join(dir.path, 'glibusta.sqlite');
 }
 
 final storageInfoProvider = FutureProvider<StorageInfoModel>((ref) {

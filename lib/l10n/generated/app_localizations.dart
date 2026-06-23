@@ -379,6 +379,462 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} p.'**
   String pagesLabel(Object count);
+
+  /// No description provided for @settingsAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsAccount;
+
+  /// No description provided for @settingsSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get settingsSource;
+
+  /// No description provided for @settingsDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get settingsDownloads;
+
+  /// No description provided for @settingsStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Library Storage'**
+  String get settingsStorage;
+
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
+  /// No description provided for @settingsData.
+  ///
+  /// In en, this message translates to:
+  /// **'Data'**
+  String get settingsData;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// No description provided for @settingsBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Base URL'**
+  String get settingsBaseUrl;
+
+  /// No description provided for @settingsMirrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Mirrors'**
+  String get settingsMirrors;
+
+  /// No description provided for @settingsNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get settingsNotConfigured;
+
+  /// No description provided for @settingsParallelDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Parallel downloads'**
+  String get settingsParallelDownloads;
+
+  /// No description provided for @settingsMobileDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Download over mobile'**
+  String get settingsMobileDownloads;
+
+  /// No description provided for @settingsMobileDownloadsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi only by default'**
+  String get settingsMobileDownloadsSub;
+
+  /// No description provided for @settingsAutoResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-resume on Wi-Fi'**
+  String get settingsAutoResume;
+
+  /// No description provided for @settingsAutoResumeSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume downloads when network appears'**
+  String get settingsAutoResumeSub;
+
+  /// No description provided for @settingsStorageMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get settingsStorageMode;
+
+  /// No description provided for @settingsStorageModeDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads/Glibusta'**
+  String get settingsStorageModeDownloads;
+
+  /// No description provided for @settingsStorageModeExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected folder'**
+  String get settingsStorageModeExternal;
+
+  /// No description provided for @settingsStorageModeAccessible.
+  ///
+  /// In en, this message translates to:
+  /// **'Accessible from file manager'**
+  String get settingsStorageModeAccessible;
+
+  /// No description provided for @settingsStorageModeNotSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No folder selected'**
+  String get settingsStorageModeNotSelected;
+
+  /// No description provided for @settingsStorageManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Management'**
+  String get settingsStorageManagement;
+
+  /// No description provided for @settingsStorageManagementSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Data size, cache cleanup'**
+  String get settingsStorageManagementSub;
+
+  /// No description provided for @settingsRefreshLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Library'**
+  String get settingsRefreshLibrary;
+
+  /// No description provided for @settingsRefreshLibrarySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan folder for new books'**
+  String get settingsRefreshLibrarySub;
+
+  /// No description provided for @settingsTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get settingsTags;
+
+  /// No description provided for @settingsTagsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage book tags'**
+  String get settingsTagsSub;
+
+  /// No description provided for @settingsDarkTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark theme'**
+  String get settingsDarkTheme;
+
+  /// No description provided for @settingsDarkThemeSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Use dark theme'**
+  String get settingsDarkThemeSub;
+
+  /// No description provided for @settingsContentFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Content Filter'**
+  String get settingsContentFilter;
+
+  /// No description provided for @settingsContentFilterSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Security settings'**
+  String get settingsContentFilterSub;
+
+  /// No description provided for @settingsFonts.
+  ///
+  /// In en, this message translates to:
+  /// **'Fonts'**
+  String get settingsFonts;
+
+  /// No description provided for @settingsFontsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Download additional fonts'**
+  String get settingsFontsSub;
+
+  /// No description provided for @settingsExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Data'**
+  String get settingsExport;
+
+  /// No description provided for @settingsExportSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Save bookmarks, notes, quotes, collections'**
+  String get settingsExportSub;
+
+  /// No description provided for @settingsImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Data'**
+  String get settingsImport;
+
+  /// No description provided for @settingsImportSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup file'**
+  String get settingsImportSub;
+
+  /// No description provided for @settingsShortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard Shortcuts'**
+  String get settingsShortcuts;
+
+  /// No description provided for @settingsShortcutsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'List of key combinations'**
+  String get settingsShortcutsSub;
+
+  /// No description provided for @settingsDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get settingsDiagnostics;
+
+  /// No description provided for @settingsDiagnosticsSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Debug information'**
+  String get settingsDiagnosticsSub;
+
+  /// No description provided for @settingsVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get settingsVersion;
+
+  /// No description provided for @settingsUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get settingsUnknown;
+
+  /// No description provided for @storageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Management'**
+  String get storageTitle;
+
+  /// No description provided for @storageTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {size}'**
+  String storageTotal(Object size);
+
+  /// No description provided for @storageDb.
+  ///
+  /// In en, this message translates to:
+  /// **'Database'**
+  String get storageDb;
+
+  /// No description provided for @storageBooksInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Books (internal)'**
+  String get storageBooksInternal;
+
+  /// No description provided for @storageDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get storageDownloads;
+
+  /// No description provided for @storageCovers.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers'**
+  String get storageCovers;
+
+  /// No description provided for @storageCatalogCovers.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog Covers'**
+  String get storageCatalogCovers;
+
+  /// No description provided for @storageCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache'**
+  String get storageCache;
+
+  /// No description provided for @storageTemp.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary'**
+  String get storageTemp;
+
+  /// No description provided for @storageActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get storageActions;
+
+  /// No description provided for @storageCleanTemp.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean Temporary Files'**
+  String get storageCleanTemp;
+
+  /// No description provided for @storageCleanTempSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Files older than 1 hour'**
+  String get storageCleanTempSub;
+
+  /// No description provided for @storageCleanCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean Cache'**
+  String get storageCleanCache;
+
+  /// No description provided for @storageCleanCacheSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache files older than 7 days'**
+  String get storageCleanCacheSub;
+
+  /// No description provided for @storageFindOrphans.
+  ///
+  /// In en, this message translates to:
+  /// **'Find Orphan Files'**
+  String get storageFindOrphans;
+
+  /// No description provided for @storageFindOrphansSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Files without DB records'**
+  String get storageFindOrphansSub;
+
+  /// No description provided for @storageFindHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'Heavy Books'**
+  String get storageFindHeavy;
+
+  /// No description provided for @storageFindHeavySub.
+  ///
+  /// In en, this message translates to:
+  /// **'Books larger than 5 MB'**
+  String get storageFindHeavySub;
+
+  /// No description provided for @storageCleanCatalogCovers.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean Catalog Cover Cache'**
+  String get storageCleanCatalogCovers;
+
+  /// No description provided for @storageCleanCatalogCoversSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all cached covers'**
+  String get storageCleanCatalogCoversSub;
+
+  /// No description provided for @storageCleanExpiredCovers.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean Expired Covers'**
+  String get storageCleanExpiredCovers;
+
+  /// No description provided for @storageCleanExpiredCoversSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Covers older than 30 days'**
+  String get storageCleanExpiredCoversSub;
+
+  /// No description provided for @storageCleaning.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaning in progress...'**
+  String get storageCleaning;
+
+  /// No description provided for @storageOrphansFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} orphan files found'**
+  String storageOrphansFound(Object count);
+
+  /// No description provided for @storageNoOrphans.
+  ///
+  /// In en, this message translates to:
+  /// **'No orphan files found'**
+  String get storageNoOrphans;
+
+  /// No description provided for @storageHeavyFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} heavy books found'**
+  String storageHeavyFound(Object count);
+
+  /// No description provided for @storageNoHeavy.
+  ///
+  /// In en, this message translates to:
+  /// **'No heavy books found'**
+  String get storageNoHeavy;
+
+  /// No description provided for @storageTempCleaned.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted {count} files ({size})'**
+  String storageTempCleaned(Object count, Object size);
+
+  /// No description provided for @storageCacheCleaned.
+  ///
+  /// In en, this message translates to:
+  /// **'Cleaned {count} cache files'**
+  String storageCacheCleaned(Object count);
+
+  /// No description provided for @storageCatalogCoversCleaned.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog cover cache cleared'**
+  String get storageCatalogCoversCleaned;
+
+  /// No description provided for @storageExpiredCoversCleaned.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired covers deleted'**
+  String get storageExpiredCoversCleaned;
+
+  /// No description provided for @storageAlreadyScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan already in progress'**
+  String get storageAlreadyScanning;
+
+  /// No description provided for @storageScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning folder...'**
+  String get storageScanning;
+
+  /// No description provided for @storageScanResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported: {imported}, skipped: {skipped}'**
+  String storageScanResult(Object imported, Object skipped);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
