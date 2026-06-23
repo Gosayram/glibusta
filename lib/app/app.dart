@@ -11,6 +11,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
+import '../features/downloads/data/download_listener.dart';
 import '../features/library/data/book_import_service.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
@@ -49,6 +50,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   late final LifecycleObserver _lifecycleObserver;
   final _shareHandler = ShareHandler();
   bool _shareHandlerInitialized = false;
+  bool _downloadListenerInitialized = false;
 
   @override
   void initState() {
@@ -65,6 +67,11 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       _shareHandlerInitialized = true;
       final importService = ref.read(bookImportServiceProvider);
       _shareHandler.init(context, importService);
+    }
+    if (!_downloadListenerInitialized) {
+      _downloadListenerInitialized = true;
+      final listener = ref.read(downloadListenerProvider);
+      listener.startListening();
     }
   }
 

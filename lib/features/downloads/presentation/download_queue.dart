@@ -1,19 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:glibusta/features/downloads/data/download_listener.dart' show DownloadListener;
 
-import '../../../core/http/http_client.dart';
+import '../../../core/logging/app_logger.dart';
 import '../../../core/notifications/download_notification_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../library/data/book_import_service.dart';
+import '../data/background_download_service.dart';
 import '../data/download_repository.dart';
 import '../domain/download_repository.dart';
 
 final downloadQueueProvider = Provider<DownloadQueue>((ref) {
   final repository = ref.watch(downloadRepositoryProvider);
-  final httpClient = ref.watch(httpClientProvider);
+  final bgDownload = ref.watch(backgroundDownloadServiceProvider);
   final notificationService = ref.watch(downloadNotificationServiceProvider);
-  final queue = DownloadQueue(repository, httpClient, notificationService);
+  final bookImport = ref.watch(bookImportServiceProvider);
+  final queue = DownloadQueue(repository, bgDownload, notificationService, bookImport);
   ref.onDispose(() => queue.dispose());
   return queue;
 });
@@ -23,34 +27,30 @@ final activeDownloadsProvider = StreamProvider<List<DownloadTask>>((ref) {
   return queue.onDownloadsChanged;
 });
 
+/// Orchestrates downloads using background_downloader.
+///
+/// The actual download is delegated to [BackgroundDownloadService].
+/// This class manages the in-memory state and emits UI updates.
 class DownloadQueue {
-  final DownloadRepository _repository;
-  final HttpClient _httpClient;
-  final DownloadNotificationService _notificationService;
-  final StreamController<List<DownloadTask>> _downloadsController =
-      StreamController<List<DownloadTask>>.broadcast();
-  final StreamController<DownloadTask> _progressController =
-      StreamController<DownloadTask>.broadcast();
-
-  final List<DownloadTask> _pendingQueue = [];
-  final Map<String, DownloadTask> _tasks = {};
-  final Map<String, _SpeedTracker> _speedTrackers = {};
-  final Map<String, Completer<void>> _cancelCompleters = {};
-  final Set<String> _cancelledIds = {};
-  final Map<String, int> _retryAttempts = {};
-  List<DownloadTask> _latestTasks = [];
-  int _maxConcurrent = 3;
-  int _runningCount = 0;
-  bool _disposed = false;
-  static const int maxRetryAttempts = 3;
-
   DownloadQueue(
     this._repository,
-    this._httpClient,
+    this._bgDownload,
     this._notificationService,
-  ) {
-    _downloadsController.add([]);
-  }
+    this._bookImport,
+  );
+
+  final DownloadRepository _repository;
+  final BackgroundDownloadService _bgDownload;
+  final DownloadNotificationService _notificationService;
+  final BookImportService _bookImport;
+  final _logger = AppLogger();
+
+  final _downloadsController = StreamController<List<DownloadTask>>.broadcast();
+  final _progressController = StreamController<DownloadTask>.broadcast();
+
+  final Map<String, DownloadTask> _tasks = {};
+  List<DownloadTask> _latestTasks = [];
+  bool _disposed = false;
 
   Stream<List<DownloadTask>> get onDownloadsChanged async* {
     yield _latestTasks;
@@ -59,9 +59,9 @@ class DownloadQueue {
 
   Stream<DownloadTask> get onProgress => _progressController.stream;
 
-  void setMaxConcurrent(int max) {
-    _maxConcurrent = max;
-    _processQueue();
+  /// Initialize the background downloader. Call once at app start.
+  void initialize() {
+    _bgDownload.initialize();
   }
 
   Future<String> enqueue({
@@ -70,6 +70,7 @@ class DownloadQueue {
     required BookFormat format,
     required String sourceUrl,
   }) async {
+    // Deduplicate: skip if same bookId+format is already active.
     for (final existing in _tasks.values) {
       if (existing.bookId == bookId &&
           existing.format == format &&
@@ -87,9 +88,17 @@ class DownloadQueue {
     );
 
     _tasks[task.id] = task;
-    _pendingQueue.add(task);
     _emitUpdate();
-    _processQueue();
+
+    // Enqueue in background_downloader.
+    await _bgDownload.enqueue(
+      taskId: task.id,
+      bookId: bookId,
+      bookTitle: bookTitle,
+      format: format,
+      sourceUrl: sourceUrl,
+    );
+
     return task.id;
   }
 
@@ -97,22 +106,9 @@ class DownloadQueue {
     final task = _tasks[taskId];
     if (task == null || task.status != DownloadStatus.running) return;
 
-    final paused = DownloadTask(
-      id: task.id,
-      bookId: task.bookId,
-      bookTitle: task.bookTitle,
-      format: task.format,
-      sourceUrl: task.sourceUrl,
-      targetPath: task.targetPath,
-      status: DownloadStatus.paused,
-      downloadedBytes: task.downloadedBytes,
-      totalBytes: task.totalBytes,
-    );
-
-    _tasks[taskId] = paused;
-    _speedTrackers.remove(taskId);
-    await _notificationService.cancel(taskId);
+    await _bgDownload.pause(taskId);
     await _repository.updateStatus(taskId, DownloadStatus.paused);
+    _tasks[taskId] = task.copyWith(status: DownloadStatus.paused);
     _emitUpdate();
   }
 
@@ -120,220 +116,102 @@ class DownloadQueue {
     final task = _tasks[taskId];
     if (task == null || task.status != DownloadStatus.paused) return;
 
-    final queued = DownloadTask(
-      id: task.id,
-      bookId: task.bookId,
-      bookTitle: task.bookTitle,
-      format: task.format,
-      sourceUrl: task.sourceUrl,
-      targetPath: task.targetPath,
-      status: DownloadStatus.queued,
-      downloadedBytes: task.downloadedBytes,
-      totalBytes: task.totalBytes,
-    );
-
-    _tasks[taskId] = queued;
-    _pendingQueue.add(queued);
+    await _bgDownload.resume(taskId);
     await _repository.updateStatus(taskId, DownloadStatus.queued);
+    _tasks[taskId] = task.copyWith(status: DownloadStatus.queued);
     _emitUpdate();
-    _processQueue();
   }
 
   Future<void> cancel(String taskId) async {
     final task = _tasks[taskId];
     if (task == null) return;
 
-    _cancelledIds.add(taskId);
-    _cancelCompleters[taskId]?.complete();
-
-    final canceled = DownloadTask(
-      id: task.id,
-      bookId: task.bookId,
-      bookTitle: task.bookTitle,
-      format: task.format,
-      sourceUrl: task.sourceUrl,
-      targetPath: task.targetPath,
-      status: DownloadStatus.canceled,
-      downloadedBytes: task.downloadedBytes,
-      totalBytes: task.totalBytes,
-    );
-
-    _tasks[taskId] = canceled;
-    _speedTrackers.remove(taskId);
-    _retryAttempts.remove(taskId);
-    _pendingQueue.removeWhere((t) => t.id == taskId);
-    await _notificationService.cancel(taskId);
+    await _bgDownload.cancel(taskId);
     await _repository.cancelDownload(taskId);
+    _tasks[taskId] = task.copyWith(status: DownloadStatus.canceled);
+    _bgDownload.removeTask(taskId);
     _emitUpdate();
   }
 
   Future<void> remove(String taskId) async {
     _tasks.remove(taskId);
-    _speedTrackers.remove(taskId);
-    _retryAttempts.remove(taskId);
-    _pendingQueue.removeWhere((t) => t.id == taskId);
-    await _notificationService.cancel(taskId);
+    _bgDownload.removeTask(taskId);
     await _repository.removeDownload(taskId);
     _emitUpdate();
   }
 
-  void _processQueue() {
-    while (_runningCount < _maxConcurrent && _pendingQueue.isNotEmpty) {
-      final next = _pendingQueue.removeAt(0);
-      if (next.status == DownloadStatus.queued) {
-        unawaited(_startTask(next));
+  /// Called by [DownloadListener] when a download completes.
+  /// Runs the full BookImportService pipeline.
+  Future<void> onDownloadComplete(String taskId) async {
+    final task = _tasks[taskId];
+    if (task == null) return;
+
+    _tasks[taskId] = task.copyWith(status: DownloadStatus.completed);
+    _bgDownload.removeTask(taskId);
+    _emitUpdate();
+
+    // Show completed notification.
+    unawaited(_notificationService.showCompleted(task));
+
+    // Run full import pipeline: parse metadata, cover, authors, DB.
+    if (task.targetPath != null) {
+      try {
+        final result = await _bookImport.importFile(task.targetPath!);
+        if (result.isSuccess) {
+          _logger.info(
+            'Book imported after download: ${result.title}',
+            name: 'DownloadQueue',
+          );
+        } else if (result.isDuplicate) {
+          _logger.info(
+            'Downloaded book is duplicate: ${result.title}',
+            name: 'DownloadQueue',
+          );
+        } else {
+          _logger.warning(
+            'Import failed after download: ${result.error}',
+            name: 'DownloadQueue',
+          );
+        }
+      } on Object catch (e) {
+        _logger.warning(
+          'Import error after download for $taskId: $e',
+          name: 'DownloadQueue',
+        );
       }
     }
   }
 
-  Future<void> _startTask(DownloadTask task) async {
-    _runningCount++;
-    final running = DownloadTask(
-      id: task.id,
-      bookId: task.bookId,
-      bookTitle: task.bookTitle,
-      format: task.format,
-      sourceUrl: task.sourceUrl,
-      targetPath: task.targetPath,
-      status: DownloadStatus.running,
-      downloadedBytes: task.downloadedBytes,
-      totalBytes: task.totalBytes,
-    );
-    _tasks[task.id] = running;
-    _speedTrackers[task.id] = _SpeedTracker();
-    await _repository.updateStatus(task.id, DownloadStatus.running);
+  /// Called by [DownloadListener] when a download status changes.
+  void onStatusChanged(String taskId, DownloadStatus status) {
+    final task = _tasks[taskId];
+    if (task == null) return;
+
+    _tasks[taskId] = task.copyWith(status: status);
+    if (status == DownloadStatus.canceled || status == DownloadStatus.failed) {
+      _bgDownload.removeTask(taskId);
+    }
     _emitUpdate();
 
-    try {
-      final targetPath = task.targetPath;
-      if (targetPath == null) {
-        throw StateError('No target path for download ${task.id}');
-      }
-      final cancelCompleter = Completer<void>();
-      _cancelCompleters[task.id] = cancelCompleter;
-      final onCancel = cancelCompleter.future;
-
-      await _httpClient.download(
-        task.sourceUrl,
-        targetPath,
-        onCancel: onCancel,
-        onProgress: (int received, int total) {
-          final speedTracker = _speedTrackers[task.id];
-          final speed = speedTracker?.update(received) ?? 0;
-
-          final updated = DownloadTask(
-            id: task.id,
-            bookId: task.bookId,
-            bookTitle: task.bookTitle ?? '',
-
-            format: task.format,
-            sourceUrl: task.sourceUrl,
-            targetPath: task.targetPath,
-            status: DownloadStatus.running,
-            downloadedBytes: received,
-            totalBytes: total > 0 ? total : null,
-          );
-          _tasks[task.id] = updated;
-          _progressController.add(updated);
-
-          if (speedTracker != null && speedTracker.shouldNotify()) {
-            unawaited(_repository.updateProgress(task.id, received, total));
-            unawaited(
-              _notificationService.showProgress(
-                task: updated,
-                speedBytesPerSec: speed,
-              ),
-            );
-          }
-        },
-      );
-
-      final latest = _tasks[task.id] ?? task;
-      final completed = DownloadTask(
-        id: task.id,
-        bookId: task.bookId,
-        bookTitle: task.bookTitle,
-        format: task.format,
-        sourceUrl: task.sourceUrl,
-        targetPath: task.targetPath,
-        status: DownloadStatus.completed,
-        downloadedBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
-        totalBytes: latest.totalBytes ?? latest.downloadedBytes ?? 0,
-      );
-      _tasks[task.id] = completed;
-      _speedTrackers.remove(task.id);
-      _retryAttempts.remove(task.id);
-      await _repository.updateStatus(task.id, DownloadStatus.completed);
-      await _notificationService.showCompleted(completed);
-    } on Object {
-      final isCancelled = _cancelledIds.contains(task.id);
-      if (!isCancelled) {
-        final attempts = _retryAttempts[task.id] ?? 0;
-        if (attempts < maxRetryAttempts && !_disposed) {
-          _retryAttempts[task.id] = attempts + 1;
-          final delayMs = 1000 * (1 << attempts); // 1s, 2s, 4s
-          await Future<void>.delayed(Duration(milliseconds: delayMs));
-          if (_cancelledIds.contains(task.id) || _disposed) {
-            _retryAttempts.remove(task.id);
-          } else {
-            final retried = DownloadTask(
-              id: task.id,
-              bookId: task.bookId,
-              bookTitle: task.bookTitle ?? '',
-              format: task.format,
-              sourceUrl: task.sourceUrl,
-              targetPath: task.targetPath,
-              status: DownloadStatus.queued,
-              downloadedBytes: task.downloadedBytes,
-              totalBytes: task.totalBytes,
-            );
-            _tasks[task.id] = retried;
-            _pendingQueue.add(retried);
-            _emitUpdate();
-            return; // don't process as failed
-          }
-        }
-      }
-      _retryAttempts.remove(task.id);
-      final status = isCancelled ? DownloadStatus.canceled : DownloadStatus.failed;
-      final failed = DownloadTask(
-        id: task.id,
-        bookId: task.bookId,
-        bookTitle: task.bookTitle,
-        format: task.format,
-        sourceUrl: task.sourceUrl,
-        targetPath: task.targetPath,
-        status: status,
-        downloadedBytes: task.downloadedBytes,
-        totalBytes: task.totalBytes,
-      );
-      _tasks[task.id] = failed;
-      _speedTrackers.remove(task.id);
-      await _repository.updateStatus(task.id, status);
-      if (isCancelled) {
-        await _notificationService.cancel(task.id);
-      } else {
-        await _notificationService.showFailed(failed, null);
-      }
-    } finally {
-      _cancelCompleters.remove(task.id);
-      _cancelledIds.remove(task.id);
-      _runningCount--;
-      _emitUpdate();
-      _processQueue();
+    // Show notification for terminal states.
+    if (status == DownloadStatus.failed) {
+      unawaited(_notificationService.showFailed(task, null));
+    } else if (status == DownloadStatus.canceled) {
+      unawaited(_notificationService.cancel(taskId));
     }
+  }
 
-    try {
-      await _repository.registerInLibrary(
-        bookId: task.bookId,
-        bookTitle: task.bookTitle ?? '',
-        format: task.format.name,
-        filePath: task.targetPath ?? '',
-      );
-    } on Object {
-      // Non-fatal: download already completed, library registration failure
-      // is logged but doesn't affect download status.
-    }
+  /// Called by [DownloadListener] when progress updates.
+  void onProgressChanged(String taskId, int downloaded, int total) {
+    final task = _tasks[taskId];
+    if (task == null) return;
+
+    final updated = task.copyWith(
+      downloadedBytes: downloaded,
+      totalBytes: total,
+    );
+    _tasks[taskId] = updated;
+    _progressController.add(updated);
   }
 
   void _emitUpdate() {
@@ -344,45 +222,8 @@ class DownloadQueue {
 
   void dispose() {
     _disposed = true;
-    for (final entry in _cancelCompleters.entries) {
-      if (!entry.value.isCompleted) {
-        _cancelledIds.add(entry.key);
-        entry.value.complete();
-      }
-    }
-    _cancelCompleters.clear();
     _tasks.clear();
-    _speedTrackers.clear();
-    _pendingQueue.clear();
     unawaited(_downloadsController.close());
     unawaited(_progressController.close());
-  }
-}
-
-class _SpeedTracker {
-  int _lastBytes = 0;
-  int _lastTimestamp = 0;
-  int _notificationCounter = 0;
-
-  _SpeedTracker() {
-    _lastTimestamp = DateTime.now().millisecondsSinceEpoch;
-  }
-
-  double update(int currentBytes) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final elapsed = now - _lastTimestamp;
-    if (elapsed <= 0) return 0;
-
-    final deltaBytes = currentBytes - _lastBytes;
-    final speed = deltaBytes * 1000.0 / elapsed;
-
-    _lastBytes = currentBytes;
-    _lastTimestamp = now;
-    return speed;
-  }
-
-  bool shouldNotify() {
-    _notificationCounter++;
-    return _notificationCounter % 3 == 0;
   }
 }

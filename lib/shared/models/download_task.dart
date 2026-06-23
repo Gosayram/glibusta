@@ -24,6 +24,30 @@ class DownloadTask {
     required this.downloadedBytes,
     required this.totalBytes,
   });
+
+  DownloadTask copyWith({
+    String? id,
+    String? bookId,
+    String? bookTitle,
+    BookFormat? format,
+    String? sourceUrl,
+    String? targetPath,
+    DownloadStatus? status,
+    int? downloadedBytes,
+    int? totalBytes,
+  }) {
+    return DownloadTask(
+      id: id ?? this.id,
+      bookId: bookId ?? this.bookId,
+      bookTitle: bookTitle ?? this.bookTitle,
+      format: format ?? this.format,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
+      targetPath: targetPath ?? this.targetPath,
+      status: status ?? this.status,
+      downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
+    );
+  }
 }
 
 class BookDetails {

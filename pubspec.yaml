@@ -21,6 +21,9 @@ dependencies:
   # HTTP client
   dio: ^5.9.2
 
+  # Background downloads
+  background_downloader: ^9.5.5
+
   # HTML parsing
   html: ^0.15.1
 
