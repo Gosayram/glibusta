@@ -27,6 +27,9 @@ FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release --obfuscate --split-de
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debug-info=$(DEBUG_INFO_MACOS)
 CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check
+ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
+CARGO_NDK := cargo ndk
+JNILIBS_DIR := android/app/src/main/jniLibs
 
 ##@ Build
 
@@ -36,6 +39,17 @@ rust-build-release: require-rust ## Build Rust native library in release mode
 	$(CARGO_BUILD_RELEASE)
 	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || true
 	@$(PRINT_OK) "Rust release build complete"
+
+.PHONY: rust-build-android
+rust-build-android: require-rust ## Build Rust native libraries for Android (arm64-v8a + armeabi-v7a)
+	@$(PRINT_STEP) "Building Rust libraries for Android"
+	@export ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)"; \
+	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a; \
+	cd rust && $(CARGO_NDK) -t arm64-v8a build --release && \
+	$(CARGO_NDK) -t armeabi-v7a build --release
+	cp rust/target/aarch64-linux-android/release/libglibusta_core.so $(JNILIBS_DIR)/arm64-v8a/
+	cp rust/target/armv7-linux-androideabi/release/libglibusta_core.so $(JNILIBS_DIR)/armeabi-v7a/
+	@$(PRINT_OK) "Android Rust libraries built and copied to $(JNILIBS_DIR)"
 
 .PHONY: rust-build-check
 rust-build-check: require-rust ## Verify Rust code compiles
@@ -133,7 +147,7 @@ macos-available: ## Verify macOS platform files exist
 	@test -d macos || { $(PRINT_ERROR) "macOS platform directory is missing"; exit 1; }
 
 .PHONY: build-android-apk
-build-android-apk: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
+build-android-apk: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
 	@$(PRINT_STEP) "Building signed Android APK $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK)
 	@test -f "$(ANDROID_APK_SOURCE)" || { $(PRINT_ERROR) "APK not found: $(ANDROID_APK_SOURCE)"; exit 1; }
@@ -141,7 +155,7 @@ build-android-apk: clean-build bump-build require-flutter android-available sign
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
 .PHONY: build-android-apk-split
-build-android-apk-split: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
+build-android-apk-split: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
 	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK_SPLIT) || true
 	@for abi in arm64-v8a armeabi-v7a; do \
@@ -153,7 +167,7 @@ build-android-apk-split: clean-build bump-build require-flutter android-availabl
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab
-build-android-aab: clean-build bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
+build-android-aab: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
 	@$(PRINT_STEP) "Building signed Android App Bundle $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_AAB)
 	@test -f "$(ANDROID_AAB_SOURCE)" || { $(PRINT_ERROR) "AAB not found: $(ANDROID_AAB_SOURCE)"; exit 1; }

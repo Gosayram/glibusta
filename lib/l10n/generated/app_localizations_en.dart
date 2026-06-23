@@ -247,6 +247,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsStorageManagementSub => 'Data size, cache cleanup';
 
   @override
+  String get settingsStoragePermission => 'File Access';
+
+  @override
+  String get settingsStoragePermissionSub => 'Allow reading from Downloads folder';
+
+  @override
+  String get settingsStoragePermissionGranted => 'File access already granted';
+
+  @override
+  String get settingsStoragePermissionOpenSettings => 'Open settings and grant file access';
+
+  @override
   String get settingsRefreshLibrary => 'Refresh Library';
 
   @override

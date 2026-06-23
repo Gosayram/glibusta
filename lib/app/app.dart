@@ -122,10 +122,21 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   Future<void> _scanLibrary() async {
+    await _ensureStoragePermission();
     final scanner = ref.read(libraryScannerProvider);
     await scanner.scanLazy();
     if (mounted) {
       ref.invalidate(libraryBooksProvider);
+    }
+  }
+
+  Future<void> _ensureStoragePermission() async {
+    try {
+      final granted = await _platform.invokeMethod<bool>('checkStoragePermission');
+      if (granted == true) return;
+      await _platform.invokeMethod<bool>('requestStoragePermission');
+    } on MissingPluginException {
+      // Not on Android — ignore
     }
   }
 

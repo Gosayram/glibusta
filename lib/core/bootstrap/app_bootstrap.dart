@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
 
+import '../../src/rust/api/frb_generated.dart';
 import '../logging/app_logger.dart';
 
 class AppBootstrap {
   AppBootstrap._();
 
   static Future<void> init() async {
+    await RustLib.init();
     await dotenv.load();
     if (!dotenv.isEveryDefined(['BASE_URL'])) {
       throw StateError(

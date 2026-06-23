@@ -253,6 +253,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsStorageManagementSub => 'Размер данных, очистка кеша';
 
   @override
+  String get settingsStoragePermission => 'Доступ к файлам';
+
+  @override
+  String get settingsStoragePermissionSub => 'Разрешить чтение из папки загрузок';
+
+  @override
+  String get settingsStoragePermissionGranted => 'Доступ к файлам уже предоставлен';
+
+  @override
+  String get settingsStoragePermissionOpenSettings =>
+      'Откройте настройки и разрешите доступ к файлам';
+
+  @override
   String get settingsRefreshLibrary => 'Обновить библиотеку';
 
   @override

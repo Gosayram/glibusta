@@ -512,6 +512,30 @@ abstract class AppLocalizations {
   /// **'Data size, cache cleanup'**
   String get settingsStorageManagementSub;
 
+  /// No description provided for @settingsStoragePermission.
+  ///
+  /// In en, this message translates to:
+  /// **'File Access'**
+  String get settingsStoragePermission;
+
+  /// No description provided for @settingsStoragePermissionSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow reading from Downloads folder'**
+  String get settingsStoragePermissionSub;
+
+  /// No description provided for @settingsStoragePermissionGranted.
+  ///
+  /// In en, this message translates to:
+  /// **'File access already granted'**
+  String get settingsStoragePermissionGranted;
+
+  /// No description provided for @settingsStoragePermissionOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings and grant file access'**
+  String get settingsStoragePermissionOpenSettings;
+
   /// No description provided for @settingsRefreshLibrary.
   ///
   /// In en, this message translates to:

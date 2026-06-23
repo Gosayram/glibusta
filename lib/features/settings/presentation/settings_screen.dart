@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -123,6 +124,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const Divider(),
           _SectionHeader(title: l10n.settingsStorage),
           _buildStorageModeTile(context, ref, l10n),
+          _SettingsTile(
+            icon: Icons.folder_open,
+            title: l10n.settingsStoragePermission,
+            subtitle: l10n.settingsStoragePermissionSub,
+            onTap: () => _checkStoragePermission(context),
+          ),
           _SettingsTile(
             icon: Icons.storage,
             title: l10n.settingsStorageManagement,
@@ -656,6 +663,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (context.mounted) {
         unawaited(SmartDialog.showToast('Ошибка: $e'));
       }
+    }
+  }
+
+  Future<void> _checkStoragePermission(BuildContext context) async {
+    const channel = MethodChannel('com.gosayram.glibusta/storage_bridge');
+    try {
+      final granted = await channel.invokeMethod<bool>('checkStoragePermission');
+      if (!context.mounted) return;
+      if (granted == true) {
+        unawaited(
+          SmartDialog.showToast(AppLocalizations.of(context).settingsStoragePermissionGranted),
+        );
+        return;
+      }
+      await channel.invokeMethod<bool>('requestStoragePermission');
+      if (!context.mounted) return;
+      unawaited(
+        SmartDialog.showToast(AppLocalizations.of(context).settingsStoragePermissionOpenSettings),
+      );
+    } on MissingPluginException {
+      if (!context.mounted) return;
+      unawaited(SmartDialog.showToast('Недоступно на этой платформе'));
     }
   }
 
