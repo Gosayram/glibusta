@@ -86,9 +86,10 @@ clean-artifacts: ## Remove generated release artifacts
 	rm -rf "$(DIST_DIR)"
 
 .PHONY: clean-build
-clean-build: ## Remove all build artifacts and caches for a fresh build
+clean-build: ## Remove all build artifacts, caches and release artifacts for a fresh build
 	@$(PRINT_STEP) "Cleaning build artifacts and caches"
 	rm -rf "$(BUILD_DIR)"
+	rm -rf "$(DIST_DIR)"
 	rm -rf .dart_tool
 	rm -rf .flutter-plugins
 	rm -rf .flutter-plugins-dependencies
