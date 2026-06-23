@@ -20,8 +20,9 @@ class ReaderSettingsPersistence {
         ),
         mode: ReaderMode.values.firstWhere(
           (e) => e.name == map['mode'],
-          orElse: () => ReaderMode.auto,
+          orElse: () => ReaderMode.paginated,
         ),
+        twoPageEnabled: map['twoPageEnabled'] as bool? ?? false,
         fontSize: (map['fontSize'] as num?)?.toDouble() ?? 18.0,
         lineHeight: (map['lineHeight'] as num?)?.toDouble() ?? 1.55,
         margin: (map['margin'] as num?)?.toDouble() ?? 16.0,
@@ -125,6 +126,7 @@ class ReaderSettingsPersistence {
       jsonEncode({
         'theme': settings.theme.name,
         'mode': settings.mode.name,
+        'twoPageEnabled': settings.twoPageEnabled,
         'fontSize': settings.fontSize,
         'lineHeight': settings.lineHeight,
         'margin': settings.margin,

@@ -130,10 +130,7 @@ double _headingSpacing(double ps, int level) => switch (level) {
 };
 
 EdgeInsets _effectiveMargin(ReaderSettings s, ReaderMode mode) {
-  final isFocus = mode == ReaderMode.focus || mode == ReaderMode.fullscreen;
-  return isFocus
-      ? EdgeInsets.symmetric(horizontal: s.margin * 1.5, vertical: s.margin)
-      : EdgeInsets.all(s.margin);
+  return EdgeInsets.all(s.margin);
 }
 
 class ReaderCtx {
@@ -705,8 +702,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   @override
   Widget build(BuildContext context) {
     final settings = widget.settings;
-    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
-    if (effectiveMode == ReaderMode.paginated || effectiveMode == ReaderMode.twoPage) {
+    if (settings.mode == ReaderMode.paginated) {
       return _PaginatedContentBody(
         metadata: widget.metadata,
         loadedChapters: widget.loadedChapters,
@@ -720,7 +716,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       );
     }
 
-    final effectiveMargin = _effectiveMargin(settings, effectiveMode);
+    final effectiveMargin = _effectiveMargin(settings, settings.mode);
     final textDirection = _readerTextDirection(settings.textDirection, context);
 
     if (!_didScrollToProgress && widget.initialProgress > 0) {
@@ -1241,8 +1237,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return const SizedBox.shrink();
         }
 
-        final isTwoPage = widget.settings.mode == ReaderMode.twoPage;
-        final useTwoPageLayout = isTwoPage && context.canUseTwoPageMode;
+        final useTwoPageLayout = widget.settings.twoPageEnabled && context.canUseTwoPageMode;
         final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
         if (!_didRestoreInitialPage && widget.initialPage > 0) {

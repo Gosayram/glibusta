@@ -4,7 +4,7 @@ part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { auto, paginated, continuous, twoPage, focus, fullscreen }
+enum ReaderMode { paginated, continuous }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -54,7 +54,7 @@ enum PageTurnAnimation { none, slide, fade, curl }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 
-enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, translate, disabled }
+enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
 
@@ -72,7 +72,8 @@ enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
     @Default(ReaderTheme.system) ReaderTheme theme,
-    @Default(ReaderMode.auto) ReaderMode mode,
+    @Default(ReaderMode.paginated) ReaderMode mode,
+    @Default(false) bool twoPageEnabled,
     @Default(18.0) double fontSize,
     @Default(1.6) double lineHeight,
     @Default(20.0) double margin,

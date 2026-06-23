@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/platform/adaptive_context.dart';
 import '../data/color_preset_service.dart';
 import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
@@ -232,15 +233,26 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _enumChoiceChips(
           current: settings.mode,
           labels: const {
-            ReaderMode.auto: 'Авто',
-            ReaderMode.continuous: 'Прокрутка',
             ReaderMode.paginated: 'Страницы',
-            ReaderMode.twoPage: '2 колонки',
-            ReaderMode.focus: 'Фокус',
-            ReaderMode.fullscreen: 'Полный',
+            ReaderMode.continuous: 'Прокрутка',
           },
           onChanged: (v) => notifier.updateMode(v),
         ),
+        if (settings.mode == ReaderMode.paginated) ...[
+          const SizedBox(height: 12),
+          Builder(
+            builder: (context) {
+              final canTwoPage = context.canUseTwoPageMode;
+              if (!canTwoPage) return const SizedBox.shrink();
+              return _buildToggleRow(
+                'Две колонки',
+                Icons.view_column,
+                settings.twoPageEnabled,
+                (v) => notifier.updateTwoPageEnabled(v),
+              );
+            },
+          ),
+        ],
         const SizedBox(height: 16),
         const _SectionTitle('Текст и переносы'),
         _buildTextDirectionRow(settings, notifier),
@@ -1107,7 +1119,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     labels: const {
       DoubleTapAction.toggleUI: 'Скрыть/показать UI',
       DoubleTapAction.addBookmark: 'Закладка',
-      DoubleTapAction.toggleFullscreen: 'Полноэкранный',
       DoubleTapAction.translate: 'Перевести абзац',
       DoubleTapAction.disabled: 'Выкл',
     },

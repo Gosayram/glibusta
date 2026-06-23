@@ -231,7 +231,6 @@ class ReaderBottomBar extends StatelessWidget {
 
   Widget _buildModeSwitcher(ReaderColors colors) {
     const modes = <ReaderMode, String>{
-      ReaderMode.auto: 'Авто',
       ReaderMode.paginated: 'Страницы',
       ReaderMode.continuous: 'Прокрутка',
     };

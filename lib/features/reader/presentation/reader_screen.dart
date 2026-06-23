@@ -50,7 +50,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
-  bool _fullscreenMode = false;
   String? _selectedText;
   int _batteryLevel = -1;
 
@@ -75,26 +74,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _syncFullscreen(ref.read(readerSettingsProvider).mode);
       ref.listenManual(readerSettingsProvider, (prev, next) {
-        _syncFullscreen(next.mode);
         if (prev != null) _handleLayoutChange(prev, next);
         if (prev == null || prev.orientationLock != next.orientationLock) {
           _syncOrientation(next.orientationLock);
         }
       });
     });
-  }
-
-  void _syncFullscreen(ReaderMode mode) {
-    final isFullscreen = mode == ReaderMode.fullscreen;
-    if (isFullscreen == _fullscreenMode) return;
-    _fullscreenMode = isFullscreen;
-    if (isFullscreen) {
-      _ctrl.enableFullscreen();
-    } else {
-      _ctrl.disableFullscreen();
-    }
   }
 
   void _syncOrientation(OrientationLock lock) {
@@ -440,145 +426,142 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             bottom: 60,
             child: _ScrollbarIndicator(progress: readerState.scrollProgress),
           ),
-        if (!_isDistractionFree(settings))
-          Positioned(
-            left: 48,
-            right: 48,
-            top: 48,
-            height: 48,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragEnd: (details) {
-                final v = details.primaryVelocity ?? 0;
-                if (v.abs() < 200) return;
-                _cycleColorPreset(v > 0 ? 1 : -1);
+        Positioned(
+          left: 48,
+          right: 48,
+          top: 48,
+          height: 48,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: (details) {
+              final v = details.primaryVelocity ?? 0;
+              if (v.abs() < 200) return;
+              _cycleColorPreset(v > 0 ? 1 : -1);
+            },
+          ),
+        ),
+        _buildReadingInfoBar(
+          context,
+          readerState,
+          settings,
+          position: _ReadingInfoPosition.header,
+        ),
+        _buildReadingInfoBar(
+          context,
+          readerState,
+          settings,
+          position: _ReadingInfoPosition.footer,
+        ),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: AnimatedSlide(
+            offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
+            duration: AppDuration.fast,
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: readerState.uiVisible ? 1.0 : 0.0,
+              duration: AppDuration.fast,
+              child: ReaderTopBar(
+                settings: settings,
+                bookTitle: readerState.metadata?.title ?? '',
+                onBack: () => Navigator.of(context).pop(),
+                onSettings: () => _showQuickSettings(context),
+                onSearch: () {
+                  _ctrl.toggleSearch();
+                  if (_ctrl.state.isSearchOpen) {
+                    _gestureCoordinator.onSearchOpened();
+                  } else {
+                    _gestureCoordinator.onSearchClosed();
+                  }
+                },
+                onMore: readerState.metadata != null
+                    ? () {
+                        _ctrl.saveCheckpoint();
+                        TableOfContentsSheet.show(
+                          context,
+                          metadata: readerState.metadata!,
+                          currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          onJumpToPosition: _ctrl.jumpToPosition,
+                          loadedChapters: readerState.loadedChapters,
+                          isDynamicallyLoading: readerState.isDynamicallyLoading,
+                        );
+                      }
+                    : () {},
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: AnimatedSlide(
+            offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
+            duration: AppDuration.fast,
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: readerState.uiVisible ? 1.0 : 0.0,
+              duration: AppDuration.fast,
+              child: ReaderBottomBar(
+                settings: settings,
+                currentChapterIndex: readerState.currentPosition.chapterIndex,
+                totalChapters: readerState.chapterCount,
+                scrollProgress: readerState.scrollProgress,
+                estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
+                onJumpToProgress: _ctrl.jumpToProgress,
+                onModeChanged: (mode) {
+                  ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                },
+                checkpoints: readerState.checkpoints,
+                onCheckpointForward: _ctrl.hasCheckpointAhead
+                    ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
+                    : null,
+                onCheckpointBack: _ctrl.hasCheckpointBehind
+                    ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                    : null,
+              ),
+            ),
+          ),
+        ),
+        if (readerState.isSearchOpen && readerState.metadata != null)
+          Positioned.fill(
+            child: Builder(
+              builder: (context) {
+                final searchService = _ctrl.createSearchService();
+                if (searchService == null) return const SizedBox.shrink();
+                return BookSearchOverlay(
+                  searchService: searchService,
+                  onJumpToResult: (position, query) {
+                    _ctrl.closeSearch();
+                    _ctrl.highlightSearchQuery(query);
+                    _ctrl.jumpToPosition(
+                      position.copyWith(bookId: widget.bookId),
+                    );
+                  },
+                  onDismiss: () {
+                    _ctrl.closeSearch();
+                    _gestureCoordinator.onSearchClosed();
+                  },
+                  theme: settings.theme,
+                );
               },
             ),
           ),
-        if (!_isDistractionFree(settings)) ...[
-          _buildReadingInfoBar(
-            context,
-            readerState,
-            settings,
-            position: _ReadingInfoPosition.header,
-          ),
-          _buildReadingInfoBar(
-            context,
-            readerState,
-            settings,
-            position: _ReadingInfoPosition.footer,
-          ),
+        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: AnimatedSlide(
-              offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
-              duration: AppDuration.fast,
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: readerState.uiVisible ? 1.0 : 0.0,
-                duration: AppDuration.fast,
-                child: ReaderTopBar(
-                  settings: settings,
-                  bookTitle: readerState.metadata?.title ?? '',
-                  onBack: () => Navigator.of(context).pop(),
-                  onSettings: () => _showQuickSettings(context),
-                  onSearch: () {
-                    _ctrl.toggleSearch();
-                    if (_ctrl.state.isSearchOpen) {
-                      _gestureCoordinator.onSearchOpened();
-                    } else {
-                      _gestureCoordinator.onSearchClosed();
-                    }
-                  },
-                  onMore: readerState.metadata != null
-                      ? () {
-                          _ctrl.saveCheckpoint();
-                          TableOfContentsSheet.show(
-                            context,
-                            metadata: readerState.metadata!,
-                            currentChapterIndex: readerState.currentPosition.chapterIndex,
-                            onJumpToPosition: _ctrl.jumpToPosition,
-                            loadedChapters: readerState.loadedChapters,
-                            isDynamicallyLoading: readerState.isDynamicallyLoading,
-                          );
-                        }
-                      : () {},
-                ),
-              ),
+            bottom: MediaQuery.paddingOf(context).bottom + 80,
+            left: 24,
+            right: 24,
+            child: ReaderSelectionToolbar(
+              bookId: widget.bookId,
+              chapterIndex: readerState.currentPosition.chapterIndex,
+              paragraphIndex: readerState.currentPosition.paragraphIndex,
+              onDismiss: () => setState(() => _selectedText = null),
             ),
           ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: AnimatedSlide(
-              offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
-              duration: AppDuration.fast,
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: readerState.uiVisible ? 1.0 : 0.0,
-                duration: AppDuration.fast,
-                child: ReaderBottomBar(
-                  settings: settings,
-                  currentChapterIndex: readerState.currentPosition.chapterIndex,
-                  totalChapters: readerState.chapterCount,
-                  scrollProgress: readerState.scrollProgress,
-                  estimatedMinutesLeft: readerState.estimatedMinutesLeft,
-                  chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
-                  onJumpToProgress: _ctrl.jumpToProgress,
-                  onModeChanged: (mode) {
-                    ref.read(readerSettingsProvider.notifier).updateMode(mode);
-                  },
-                  checkpoints: readerState.checkpoints,
-                  onCheckpointForward: _ctrl.hasCheckpointAhead
-                      ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
-                      : null,
-                  onCheckpointBack: _ctrl.hasCheckpointBehind
-                      ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
-                      : null,
-                ),
-              ),
-            ),
-          ),
-          if (readerState.isSearchOpen && readerState.metadata != null)
-            Positioned.fill(
-              child: Builder(
-                builder: (context) {
-                  final searchService = _ctrl.createSearchService();
-                  if (searchService == null) return const SizedBox.shrink();
-                  return BookSearchOverlay(
-                    searchService: searchService,
-                    onJumpToResult: (position, query) {
-                      _ctrl.closeSearch();
-                      _ctrl.highlightSearchQuery(query);
-                      _ctrl.jumpToPosition(
-                        position.copyWith(bookId: widget.bookId),
-                      );
-                    },
-                    onDismiss: () {
-                      _ctrl.closeSearch();
-                      _gestureCoordinator.onSearchClosed();
-                    },
-                    theme: settings.theme,
-                  );
-                },
-              ),
-            ),
-          if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
-            Positioned(
-              bottom: MediaQuery.paddingOf(context).bottom + 80,
-              left: 24,
-              right: 24,
-              child: ReaderSelectionToolbar(
-                bookId: widget.bookId,
-                chapterIndex: readerState.currentPosition.chapterIndex,
-                paragraphIndex: readerState.currentPosition.paragraphIndex,
-                onDismiss: () => setState(() => _selectedText = null),
-              ),
-            ),
-        ],
       ],
     );
   }
@@ -908,14 +891,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   bool _shouldShowProgressBar(ReaderSettings settings, ReaderState readerState) {
     if (settings.progressBarPosition == ProgressBarPosition.hidden) return false;
-    if (_isDistractionFree(settings)) return false;
     if (!readerState.uiVisible) return false;
     return readerState.scrollProgress > 0;
-  }
-
-  bool _isDistractionFree(ReaderSettings settings) {
-    final effectiveMode = settings.mode == ReaderMode.auto ? ReaderMode.paginated : settings.mode;
-    return effectiveMode == ReaderMode.focus || effectiveMode == ReaderMode.fullscreen;
   }
 
   Widget _buildWarmthOverlay(ReaderSettings settings) {

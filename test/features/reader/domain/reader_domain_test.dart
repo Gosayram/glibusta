@@ -114,7 +114,7 @@ void main() {
     test('default values', () {
       const settings = ReaderSettings();
       expect(settings.theme, ReaderTheme.system);
-      expect(settings.mode, ReaderMode.auto);
+      expect(settings.mode, ReaderMode.paginated);
       expect(settings.fontSize, 18.0);
       expect(settings.lineHeight, 1.55);
       expect(settings.margin, 20.0);

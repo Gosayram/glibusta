@@ -156,7 +156,6 @@ class ReaderController {
   final _stateController = StreamController<ReaderState>.broadcast();
   bool _disposed = false;
   bool _loaded = false;
-  bool _fullscreenEnabled = false;
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
@@ -176,7 +175,6 @@ class ReaderController {
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
-    disableFullscreen();
     _flushSessionTime();
     saveProgress();
     unawaited(WakelockPlus.disable());
@@ -326,16 +324,7 @@ class ReaderController {
     return !_disposed && loadGeneration == _loadGeneration;
   }
 
-  /// Resolves ReaderMode.auto to an actual mode based on device type.
-  /// Auto defaults to paginated on phones, continuous for very long TXT.
-  ReaderMode _resolveAutoMode(ReaderMode mode) {
-    if (mode != ReaderMode.auto) return mode;
-    return ReaderMode.paginated;
-  }
-
-  ReaderMode get effectiveMode => _resolveAutoMode(
-    _ref.read(readerSettingsProvider).mode,
-  );
+  ReaderMode get effectiveMode => _ref.read(readerSettingsProvider).mode;
 
   static ReaderErrorKind _classifyError(Object error) => switch (error) {
     BookMissingFailure() => ReaderErrorKind.bookMissing,
@@ -540,7 +529,7 @@ class ReaderController {
 
   void _restoreSavedPosition(ReaderPosition position) {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+    if (mode == ReaderMode.paginated) {
       _updateState(_state.copyWith(currentPosition: position));
       return;
     }
@@ -642,8 +631,9 @@ class ReaderController {
 
   void scrollToNext() {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
-      final step = mode == ReaderMode.twoPage ? 2 : 1;
+    if (mode == ReaderMode.paginated) {
+      final settings = _ref.read(readerSettingsProvider);
+      final step = settings.twoPageEnabled ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
         _state.chapterCount - 1,
@@ -673,8 +663,9 @@ class ReaderController {
 
   void scrollToPrevious() {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
-      final step = mode == ReaderMode.twoPage ? 2 : 1;
+    if (mode == ReaderMode.paginated) {
+      final settings = _ref.read(readerSettingsProvider);
+      final step = settings.twoPageEnabled ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
         _state.chapterCount - 1,
@@ -706,7 +697,7 @@ class ReaderController {
     if (total == 0) return;
     final clamped = position.clamp(chapterCount: total);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+    if (mode == ReaderMode.paginated) {
       _updateState(_state.copyWith(currentPosition: clamped));
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
@@ -735,7 +726,7 @@ class ReaderController {
     unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) return;
+    if (mode == ReaderMode.paginated) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
@@ -792,13 +783,6 @@ class ReaderController {
         break;
       case DoubleTapAction.addBookmark:
         addBookmark();
-        break;
-      case DoubleTapAction.toggleFullscreen:
-        final notifier = _ref.read(readerSettingsProvider.notifier);
-        final currentMode = effectiveMode;
-        notifier.updateMode(
-          currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
-        );
         break;
       case DoubleTapAction.translate:
         break;
@@ -891,18 +875,6 @@ class ReaderController {
     } else {
       unawaited(WakelockPlus.disable());
     }
-  }
-
-  void enableFullscreen() {
-    if (_fullscreenEnabled) return;
-    _fullscreenEnabled = true;
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
-  }
-
-  void disableFullscreen() {
-    if (!_fullscreenEnabled) return;
-    _fullscreenEnabled = false;
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   }
 
   void _checkAutoTheme() {

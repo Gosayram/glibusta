@@ -52,6 +52,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(mode: mode);
   }
 
+  void updateTwoPageEnabled(bool enabled) {
+    state = state.copyWith(twoPageEnabled: enabled);
+  }
+
   void updateFont(ReaderFont font) {
     state = state.copyWith(font: font);
   }

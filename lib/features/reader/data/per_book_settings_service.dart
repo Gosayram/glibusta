@@ -50,6 +50,7 @@ class PerBookSettingsService {
     return ReaderSettings(
       theme: _enumOverride(overrides, 'theme', ReaderTheme.values, global.theme),
       mode: _enumOverride(overrides, 'mode', ReaderMode.values, global.mode),
+      twoPageEnabled: overrides['twoPageEnabled'] as bool? ?? global.twoPageEnabled,
       fontSize: (overrides['fontSize'] as num?)?.toDouble() ?? global.fontSize,
       lineHeight: (overrides['lineHeight'] as num?)?.toDouble() ?? global.lineHeight,
       margin: (overrides['margin'] as num?)?.toDouble() ?? global.margin,

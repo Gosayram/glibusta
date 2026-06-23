@@ -33,7 +33,7 @@ final class ColorPresetListProvider
   ColorPresetList create() => ColorPresetList();
 }
 
-String _$colorPresetListHash() => r'1e69b4f9a986f19125b3d9a522e866781ebda4d8';
+String _$colorPresetListHash() => r'8e9dae3da06c704ca5033fa5c443f785809dd3ee';
 
 abstract class _$ColorPresetList extends $AsyncNotifier<List<ColorPreset>> {
   FutureOr<List<ColorPreset>> build();
