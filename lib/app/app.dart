@@ -14,6 +14,7 @@ import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
 import '../features/downloads/data/download_listener.dart';
 import '../features/library/data/book_import_service.dart';
+import '../features/library/data/library_scanner.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
@@ -53,6 +54,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   bool _shareHandlerInitialized = false;
   bool _downloadListenerInitialized = false;
   bool _notifPermRequested = false;
+  bool _libraryScanned = false;
   StreamSubscription<String>? _notificationTapSub;
 
   @override
@@ -84,6 +86,10 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       final notifService = ref.read(downloadNotificationServiceProvider);
       _notificationTapSub = notifService.onTapBookId.listen(_onNotificationTap);
     }
+    if (!_libraryScanned) {
+      _libraryScanned = true;
+      unawaited(_scanLibrary());
+    }
   }
 
   void _initPlatform() {
@@ -112,6 +118,11 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     if (ctx != null) {
       ctx.go('/reader/$bookId');
     }
+  }
+
+  Future<void> _scanLibrary() async {
+    final scanner = ref.read(libraryScannerProvider);
+    await scanner.scanLazy();
   }
 
   Future<void> _requestNotificationPermission() async {

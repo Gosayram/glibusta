@@ -22,6 +22,7 @@ import '../../../core/storage/storage_bridge_impl.dart';
 import '../../../core/storage/storage_mode.dart';
 import '../../../core/storage/storage_settings_provider.dart';
 import '../../auth/presentation/login_screen.dart';
+import '../../library/data/library_scanner.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -130,6 +131,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Управление хранилищем',
             subtitle: 'Размер данных, очистка кеша',
             onTap: () => context.push('/settings/storage'),
+          ),
+          _SettingsTile(
+            icon: Icons.refresh,
+            title: 'Обновить библиотеку',
+            subtitle: 'Просканировать папку на новые книги',
+            onTap: () => _rescanLibrary(context, ref),
           ),
           _SettingsTile(
             icon: Icons.label,
@@ -753,6 +760,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _rescanLibrary(BuildContext context, WidgetRef ref) async {
+    final scanner = ref.read(libraryScannerProvider);
+    if (scanner.isScanning) {
+      unawaited(SmartDialog.showToast('Сканирование уже выполняется'));
+      return;
+    }
+    unawaited(SmartDialog.showToast('Сканирование папки...'));
+    final result = await scanner.scanWithResult();
+    if (!context.mounted) return;
+    if (result.hasError) {
+      unawaited(SmartDialog.showToast('Ошибка: ${result.error}'));
+    } else {
+      unawaited(
+        SmartDialog.showToast(
+          'Импортировано: ${result.imported}, пропущено: ${result.skipped}',
+        ),
+      );
+    }
   }
 }
 
