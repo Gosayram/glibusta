@@ -113,13 +113,9 @@ class DownloadRepositoryImpl implements DownloadRepository {
     required String format,
     required String filePath,
   }) async {
-    final existing = await (_db.select(
-      _db.savedBooks,
-    )..where((t) => t.id.equals(bookId))).getSingleOrNull();
-    if (existing != null) return;
     await _db
         .into(_db.savedBooks)
-        .insert(
+        .insertOnConflictUpdate(
           SavedBooksCompanion.insert(
             id: bookId,
             title: bookTitle,

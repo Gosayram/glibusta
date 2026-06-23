@@ -264,12 +264,6 @@ class DownloadQueue {
       _speedTrackers.remove(task.id);
       _retryAttempts.remove(task.id);
       await _repository.updateStatus(task.id, DownloadStatus.completed);
-      await _repository.registerInLibrary(
-        bookId: task.bookId,
-        bookTitle: task.bookTitle ?? '',
-        format: task.format.name,
-        filePath: task.targetPath ?? '',
-      );
       await _notificationService.showCompleted(completed);
     } on Object {
       final isCancelled = _cancelledIds.contains(task.id);
@@ -327,6 +321,18 @@ class DownloadQueue {
       _runningCount--;
       _emitUpdate();
       _processQueue();
+    }
+
+    try {
+      await _repository.registerInLibrary(
+        bookId: task.bookId,
+        bookTitle: task.bookTitle ?? '',
+        format: task.format.name,
+        filePath: task.targetPath ?? '',
+      );
+    } on Object {
+      // Non-fatal: download already completed, library registration failure
+      // is logged but doesn't affect download status.
     }
   }
 

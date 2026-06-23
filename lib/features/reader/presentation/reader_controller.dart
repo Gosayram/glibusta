@@ -160,6 +160,7 @@ class ReaderController {
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
   double _lastScrollOffset = 0;
+  final List<ReaderPosition> _linkBackStack = [];
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -169,6 +170,7 @@ class ReaderController {
 
   void dispose() {
     _loadGeneration++;
+    _linkBackStack.clear();
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
     _hideTimer?.cancel();
@@ -716,6 +718,21 @@ class ReaderController {
       ),
     );
   }
+
+  bool get hasLinkBack => _linkBackStack.isNotEmpty;
+
+  void pushLinkPosition() {
+    _linkBackStack.add(_state.currentPosition);
+  }
+
+  bool popLinkPosition() {
+    if (_linkBackStack.isEmpty) return false;
+    final position = _linkBackStack.removeLast();
+    jumpToPosition(position);
+    return true;
+  }
+
+  void clearLinkBackStack() => _linkBackStack.clear();
 
   void jumpToProgress(double progress) {
     final bounded = progress.clamp(0.0, 1.0);

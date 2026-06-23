@@ -211,7 +211,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     for (int i = 0; i < chapter.blocks.length; i++) {
       final block = chapter.blocks[i];
       if (block.noteId == anchor) {
-        // Found the target — scroll to it
+        _ctrl.pushLinkPosition();
         _ctrl.jumpToPosition(
           readerState.currentPosition.copyWith(
             bookId: widget.bookId,
@@ -396,6 +396,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         canPop: false,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
+          if (_ctrl.popLinkPosition()) return;
           _ctrl.saveProgress();
           Navigator.of(context).pop();
         },
@@ -410,7 +411,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             final newSize = (settings.fontSize - 2.0).clamp(12.0, 32.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
-          onClosePanel: () => Navigator.of(context).pop(),
+          onClosePanel: () {
+            if (_ctrl.popLinkPosition()) return;
+            Navigator.of(context).pop();
+          },
           child: LayoutBuilder(
             builder: (context, constraints) {
               final wc = windowClassOf(context);
@@ -497,7 +501,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               child: ReaderTopBar(
                 settings: settings,
                 bookTitle: readerState.metadata?.title ?? '',
-                onBack: () => Navigator.of(context).pop(),
+                onBack: () {
+                  if (_ctrl.popLinkPosition()) return;
+                  Navigator.of(context).pop();
+                },
                 onSettings: () => _showQuickSettings(context),
                 onSearch: () {
                   _ctrl.toggleSearch();
