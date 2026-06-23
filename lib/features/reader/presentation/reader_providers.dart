@@ -128,10 +128,6 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(hyphenation: hyphenation);
   }
 
-  void updateTapZoneLayout(TapZoneLayout layout) {
-    state = state.copyWith(tapZoneLayout: layout);
-  }
-
   void updatePageTurnAnimation(PageTurnAnimation animation) {
     state = state.copyWith(pageTurnAnimation: animation);
   }

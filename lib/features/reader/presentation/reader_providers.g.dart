@@ -41,7 +41,7 @@ final class ReaderSettingsNotifierProvider
   }
 }
 
-String _$readerSettingsNotifierHash() => r'35f23f9df5d14aa52ee8ac78fa5c37525c153962';
+String _$readerSettingsNotifierHash() => r'aca8b78e818562e148711ddc696730e2d29b013e';
 
 abstract class _$ReaderSettingsNotifier extends $Notifier<ReaderSettings> {
   ReaderSettings build();

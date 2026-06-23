@@ -383,9 +383,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Ориентация экрана'),
         _buildOrientationLockRow(settings, notifier),
         const SizedBox(height: 16),
-        const _SectionTitle('Зоны касания'),
-        _buildTapZoneRow(settings, notifier),
-        const SizedBox(height: 12),
         const _SectionTitle('Двойной тап'),
         _buildDoubleTapActionRow(settings, notifier),
         const SizedBox(height: 12),
@@ -1040,19 +1037,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       BottomBarContent.none: 'Скрыта',
     },
     onChanged: (v) => notifier.updateBottomBarContent(v),
-  );
-
-  static Widget _buildTapZoneRow(
-    ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) => _enumChoiceChips(
-    current: settings.tapZoneLayout,
-    labels: const {
-      TapZoneLayout.third: '1/3',
-      TapZoneLayout.quarter: '1/4',
-      TapZoneLayout.edge: 'Край',
-    },
-    onChanged: (v) => notifier.updateTapZoneLayout(v),
   );
 
   static Widget _buildPageTurnAnimationRow(

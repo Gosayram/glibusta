@@ -57,10 +57,6 @@ class ReaderSettingsPersistence {
         ),
         paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 0.0,
         hyphenation: map['hyphenation'] as bool? ?? true,
-        tapZoneLayout: TapZoneLayout.values.firstWhere(
-          (e) => e.name == map['tapZoneLayout'],
-          orElse: () => TapZoneLayout.quarter,
-        ),
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],
           orElse: () => PageTurnAnimation.slide,
@@ -146,7 +142,6 @@ class ReaderSettingsPersistence {
         'bottomBarContent': settings.bottomBarContent.name,
         'paragraphFirstLineIndent': settings.paragraphFirstLineIndent,
         'hyphenation': settings.hyphenation,
-        'tapZoneLayout': settings.tapZoneLayout.name,
         'pageTurnAnimation': settings.pageTurnAnimation.name,
         'textDirection': settings.textDirection.name,
         'readerWidth': settings.readerWidth,

@@ -48,8 +48,6 @@ enum ProgressBarPosition { top, bottom, hidden }
 
 enum BottomBarContent { percent, page, chapter, time, none }
 
-enum TapZoneLayout { third, quarter, edge }
-
 enum PageTurnAnimation { none, slide, fade, curl }
 
 enum ReaderTextDirection { ltr, rtl, auto }
@@ -93,7 +91,6 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(BottomBarContent.percent) BottomBarContent bottomBarContent,
     @Default(16.0) double paragraphFirstLineIndent,
     @Default(true) bool hyphenation,
-    @Default(TapZoneLayout.quarter) TapZoneLayout tapZoneLayout,
     @Default(PageTurnAnimation.slide) PageTurnAnimation pageTurnAnimation,
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,

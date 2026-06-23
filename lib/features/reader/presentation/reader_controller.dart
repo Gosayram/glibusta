@@ -758,21 +758,7 @@ class ReaderController {
   // ── Gestures ──────────────────────────────────────────
 
   void handleTap(TapUpDetails details, double width) {
-    final settings = _ref.read(readerSettingsProvider);
-    final x = details.localPosition.dx;
-    final threshold1 = switch (settings.tapZoneLayout) {
-      TapZoneLayout.third => width / 3,
-      TapZoneLayout.quarter => width / 4,
-      TapZoneLayout.edge => width * 0.15,
-    };
-    final threshold2 = width - threshold1;
-    if (x < threshold1) {
-      scrollToPrevious();
-    } else if (x > threshold2) {
-      scrollToNext();
-    } else {
-      toggleUi();
-    }
+    toggleUi();
   }
 
   void handleDoubleTap() {
