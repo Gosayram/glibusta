@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart' as bd;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,6 +33,44 @@ class DownloadListener {
     unawaited(_subscription?.cancel());
     _subscription = bd.FileDownloader().updates.listen(_onUpdate);
     _logger.info('DownloadListener started', name: 'DownloadListener');
+    unawaited(_recoverStaleDownloads());
+  }
+
+  /// Recover downloads stuck in running/queued status from a previous app session.
+  /// background_downloader does not replay completed events on restart.
+  Future<void> _recoverStaleDownloads() async {
+    await Future<void>.delayed(const Duration(seconds: 3));
+    try {
+      final allTasks = await _repository.getAllDownloads();
+      final stale = allTasks.where((t) =>
+          t.status == DownloadStatus.running ||
+          t.status == DownloadStatus.queued).toList();
+      if (stale.isEmpty) return;
+      _logger.info(
+        'Recovering ${stale.length} stale download(s)',
+        name: 'DownloadListener',
+      );
+      for (final task in stale) {
+        final path = task.targetPath;
+        if (path != null && await File(path).exists()) {
+          _logger.info(
+            'Stale download file exists, completing: ${task.id}',
+            name: 'DownloadListener',
+          );
+          await _repository.updateStatus(task.id, DownloadStatus.completed);
+          unawaited(_queue.onDownloadComplete(task.id));
+        } else {
+          _logger.warning(
+            'Stale download file missing, marking failed: ${task.id}',
+            name: 'DownloadListener',
+          );
+          await _repository.updateStatus(task.id, DownloadStatus.failed);
+          _queue.onStatusChanged(task.id, DownloadStatus.failed);
+        }
+      }
+    } on Object catch (e) {
+      _logger.warning('Stale recovery failed: $e', name: 'DownloadListener');
+    }
   }
 
   Future<void> _onUpdate(bd.TaskUpdate update) async {
