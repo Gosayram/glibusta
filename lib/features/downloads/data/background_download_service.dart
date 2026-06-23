@@ -5,25 +5,33 @@ import 'package:background_downloader/background_downloader.dart' as bd;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/logging/app_logger.dart';
-import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/book.dart';
 import '../domain/download_repository.dart';
 import 'download_repository.dart';
 
+String sanitizeBookId(String id) {
+  var s = id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+  while (s.startsWith('.')) {
+    s = s.substring(1);
+  }
+  s = s.trim();
+  if (s.isEmpty) s = 'unnamed';
+  if (s.length > 200) s = s.substring(0, 200);
+  return s;
+}
+
 final backgroundDownloadServiceProvider = Provider<BackgroundDownloadService>((ref) {
   final repository = ref.watch(downloadRepositoryProvider);
-  final storage = ref.watch(appFileStorageProvider);
-  return BackgroundDownloadService(repository, storage);
+  return BackgroundDownloadService(repository);
 });
 
 /// Wraps [bd.FileDownloader] from background_downloader to handle
 /// enqueue/pause/resume/cancel with proper model mapping.
 class BackgroundDownloadService {
-  BackgroundDownloadService(this._repository, this._storage);
+  BackgroundDownloadService(this._repository);
 
   // ignore: unused_field // ponytail: kept for future use (book metadata)
   final DownloadRepository _repository;
-  final AppFileStorage _storage;
   final _logger = AppLogger();
   final _fileDownloader = bd.FileDownloader();
 
@@ -40,12 +48,13 @@ class BackgroundDownloadService {
     required BookFormat format,
     required String sourceUrl,
   }) async {
-    final bookFile = await _storage.bookFile(bookId, format);
+    final fileName = '${sanitizeBookId(bookId)}.${format.name}';
 
     final bdTask = bd.DownloadTask(
       url: sourceUrl,
-      filename: bookFile.path.split('/').last,
-      directory: 'glibusta/books',
+      filename: fileName,
+      baseDirectory: bd.BaseDirectory.root,
+      directory: '/storage/emulated/0/Download/Glibusta',
       updates: bd.Updates.statusAndProgress,
       allowPause: true,
       retries: 3,

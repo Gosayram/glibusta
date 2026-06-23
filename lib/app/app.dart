@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../core/notifications/download_notification_service.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
@@ -52,6 +53,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   bool _shareHandlerInitialized = false;
   bool _downloadListenerInitialized = false;
   bool _notifPermRequested = false;
+  StreamSubscription<String>? _notificationTapSub;
 
   @override
   void initState() {
@@ -78,6 +80,10 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       _notifPermRequested = true;
       unawaited(_requestNotificationPermission());
     }
+    if (_notificationTapSub == null) {
+      final notifService = ref.read(downloadNotificationServiceProvider);
+      _notificationTapSub = notifService.onTapBookId.listen(_onNotificationTap);
+    }
   }
 
   void _initPlatform() {
@@ -99,6 +105,14 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   static const _platform = MethodChannel('com.gosayram.glibusta/storage_bridge');
+
+  void _onNotificationTap(String bookId) {
+    if (bookId.isEmpty) return;
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx != null) {
+      ctx.go('/reader/$bookId');
+    }
+  }
 
   Future<void> _requestNotificationPermission() async {
     try {
@@ -124,6 +138,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
 
   @override
   void dispose() {
+    unawaited(_notificationTapSub?.cancel());
     _shareHandler.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

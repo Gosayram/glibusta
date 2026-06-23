@@ -31,9 +31,9 @@ import '../features/settings/presentation/tag_management_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 import 'routes.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final rootNavigatorKey = GlobalKey<NavigatorState>();
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/library',

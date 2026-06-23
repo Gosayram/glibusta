@@ -359,6 +359,17 @@ Widget _buildReaderBlock(
   }
 }
 
+Widget _buildCoverPage(String coverUrl, ReaderSettings settings, TextStyle baseStyle) {
+  return SizedBox.expand(
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: _readerImageWidget(coverUrl, baseStyle.color, settings),
+      ),
+    ),
+  );
+}
+
 Widget _readerHighlightedText(
   ReaderCtx ctx,
   String text,
@@ -773,6 +784,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
     final effectiveMargin = _effectiveMargin(settings, settings.mode);
     final textDirection = _readerTextDirection(settings.textDirection, context);
+    final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
 
     if (!_didScrollToProgress && widget.initialProgress > 0) {
       _didScrollToProgress = true;
@@ -790,6 +802,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         }
       });
     }
+
+    final itemCount = widget.metadata.chapterCount + (hasCover ? 1 : 0);
 
     return SafeArea(
       top: false,
@@ -811,38 +825,46 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                   child: ListView.builder(
                     controller: widget.scrollController,
                     padding: effectiveMargin,
-                    itemCount: widget.metadata.chapterCount,
+                    itemCount: itemCount,
                     addAutomaticKeepAlives: false,
                     itemBuilder: (context, index) {
-                      final chapter = widget.loadedChapters[index];
-                      final isLast = index == widget.metadata.chapterCount - 1;
-                      final nextTitle = index + 1 < widget.metadata.chapterTitles.length
-                          ? widget.metadata.chapterTitles[index + 1]
+                      if (hasCover && index == 0) {
+                        return _buildCoverPage(
+                          widget.metadata.coverUrl!,
+                          settings,
+                          _getReaderStyle(settings),
+                        );
+                      }
+                      final chapterIndex = index - (hasCover ? 1 : 0);
+                      final chapter = widget.loadedChapters[chapterIndex];
+                      final isLast = chapterIndex == widget.metadata.chapterCount - 1;
+                      final nextTitle = chapterIndex + 1 < widget.metadata.chapterTitles.length
+                          ? widget.metadata.chapterTitles[chapterIndex + 1]
                           : '';
                       final dividerStyle = _getReaderStyle(settings);
                       return Column(
-                        key: ValueKey('chapter-$index'),
+                        key: ValueKey('chapter-$chapterIndex'),
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (chapter != null)
-                            _buildChapterContent(chapter, settings, index)
+                            _buildChapterContent(chapter, settings, chapterIndex)
                           else
                             _readerLoadingPlaceholder(
                               settings,
-                              index,
+                              chapterIndex,
                               widget.metadata.chapterTitles,
                               _getReaderStyle(settings),
                             ),
                           if (!isLast &&
                               chapter != null &&
-                              widget.loadedChapters[index + 1] != null)
+                              widget.loadedChapters[chapterIndex + 1] != null)
                             Padding(
                               padding: EdgeInsets.symmetric(
                                 vertical: settings.paragraphSpacing * 3,
                               ),
                               child: Center(
                                 child: Text(
-                                  '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${index + 2}"} —',
+                                  '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${chapterIndex + 2}"} —',
                                   style: dividerStyle.copyWith(
                                     color: dividerStyle.color?.withValues(alpha: 0.4),
                                   ),
@@ -971,12 +993,14 @@ class _PageContent {
   final int blockStart;
   final int blockEnd;
   final bool showChapterTitle;
+  final bool isCover;
 
   const _PageContent({
     required this.chapterIndex,
     required this.blockStart,
     required this.blockEnd,
     this.showChapterTitle = false,
+    this.isCover = false,
   });
 }
 
@@ -1024,6 +1048,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final style = _getReaderStyle(settings);
     final pages = <_PageContent>[];
     const minFillRatio = 0.3;
+
+    final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
+    if (hasCover) {
+      pages.add(const _PageContent(chapterIndex: 0, blockStart: 0, blockEnd: 0, isCover: true));
+    }
 
     for (int chIdx = 0; chIdx < widget.metadata.chapterCount; chIdx++) {
       final chapter = widget.loadedChapters[chIdx];
@@ -1195,6 +1224,20 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   Widget _buildPaginatedPage(int index, BuildContext context) {
     final page = _pages[index];
     final settings = widget.settings;
+    final style = _getReaderStyle(settings);
+
+    if (page.isCover) {
+      return SafeArea(
+        key: ValueKey('page-$index'),
+        top: false,
+        bottom: false,
+        child: Directionality(
+          textDirection: _readerTextDirection(settings.textDirection, context),
+          child: _buildCoverPage(widget.metadata.coverUrl!, settings, style),
+        ),
+      );
+    }
+
     final chapter = widget.loadedChapters[page.chapterIndex];
     final textAlign = _resolveTextAlign(settings.textAlign);
     final chapterHighlights = widget.chapterHighlights[page.chapterIndex];
@@ -1209,7 +1252,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
 
     final ctx = _ctx(settings);
-    final style = _getReaderStyle(settings);
     final content = <Widget>[];
 
     if (page.showChapterTitle && chapter.title.isNotEmpty) {
@@ -1334,11 +1376,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
         if (!_didRestoreInitialPage && widget.initialPage > 0) {
-          final targetPage = (useTwoPageLayout ? widget.initialPage ~/ 2 : widget.initialPage)
-              .clamp(
-                0,
-                effectivePageCount - 1,
-              );
+          final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
+          final pageOffset = hasCover ? 1 : 0;
+          final targetPage =
+              (useTwoPageLayout
+                      ? (widget.initialPage + pageOffset) ~/ 2
+                      : widget.initialPage + pageOffset)
+                  .clamp(0, effectivePageCount - 1);
           _didRestoreInitialPage = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_disposed || !_pageController.hasClients) return;

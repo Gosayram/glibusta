@@ -221,9 +221,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         AnimatedSize(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
-          child: _filtersExpanded
-              ? _buildFilters(context, state)
-              : const SizedBox.shrink(),
+          child: _filtersExpanded ? _buildFilters(context, state) : const SizedBox.shrink(),
         ),
         const Divider(height: 1),
         if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
@@ -302,21 +300,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final filters = state.filters;
     final chips = <Widget>[];
     if (filters.format != null) {
-      chips.add(_buildMiniChip(context, filters.format!.name.toUpperCase(), () {
-        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(format: null));
-      }));
+      chips.add(
+        _buildMiniChip(context, filters.format!.name.toUpperCase(), () {
+          ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(format: null));
+        }),
+      );
     }
     if (filters.genre != null && filters.genre!.isNotEmpty) {
-      chips.add(_buildMiniChip(context, filters.genre!, () {
-        _genreController.clear();
-        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(genre: null));
-      }));
+      chips.add(
+        _buildMiniChip(context, filters.genre!, () {
+          _genreController.clear();
+          ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(genre: null));
+        }),
+      );
     }
     if (filters.language != null && filters.language!.isNotEmpty) {
-      chips.add(_buildMiniChip(context, filters.language!, () {
-        _languageController.clear();
-        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(language: null));
-      }));
+      chips.add(
+        _buildMiniChip(context, filters.language!, () {
+          _languageController.clear();
+          ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(language: null));
+        }),
+      );
     }
     return Flexible(
       child: SingleChildScrollView(
@@ -448,13 +452,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Expanded(
               child: TextField(
                 controller: _genreController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Жанр',
                   hintText: 'фантастика',
                   isDense: true,
-                  prefixIcon: const Icon(Icons.category_outlined, size: 20),
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  prefixIcon: Icon(Icons.category_outlined, size: 20),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
                   _debounceTimer?.cancel();
@@ -472,13 +476,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Expanded(
               child: TextField(
                 controller: _languageController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Язык',
                   hintText: 'ru',
                   isDense: true,
-                  prefixIcon: const Icon(Icons.translate, size: 20),
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  prefixIcon: Icon(Icons.translate, size: 20),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
                   _debounceTimer?.cancel();
@@ -588,7 +592,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? cs.primary : cs.outlineVariant,
-            width: 1,
           ),
         ),
         child: Text(

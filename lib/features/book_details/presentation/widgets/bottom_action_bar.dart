@@ -24,7 +24,8 @@ class BottomActionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final downloadStateAsync = ref.watch(bookDownloadStateProvider(book.id));
-    final downloadState = downloadStateAsync.value ?? BookDownloadState.notDownloaded;
+    final downloadState =
+        downloadStateAsync.whenOrNull(data: (s) => s) ?? BookDownloadState.notDownloaded;
     final isDownloading = downloadState == BookDownloadState.downloading;
     final isDownloaded = downloadState == BookDownloadState.downloaded;
     final hasFormats = details.availableFormats.isNotEmpty;
@@ -110,7 +111,6 @@ class BottomActionBar extends ConsumerWidget {
         format: selectedFormat,
         sourceUrl: url,
       );
-      ref.invalidate(bookDownloadStateProvider(book.id));
       if (context.mounted) {
         unawaited(SmartDialog.showToast('Загрузка ${book.title} (${selectedFormat.name})'));
       }
