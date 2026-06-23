@@ -72,10 +72,13 @@ class ColorPresetService {
     for (var i = 0; i < presets.length; i++) {
       indexed.add(presets[i].copyWith(order: i));
     }
-    await prefs.setString(
+    final ok = await prefs.setString(
       _key,
       jsonEncode(indexed.map((p) => p.toJson()).toList()),
     );
+    if (!ok) {
+      throw StateError('Failed to persist color presets');
+    }
   }
 
   static final _defaults = [

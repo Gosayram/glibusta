@@ -635,13 +635,22 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             actions: [
               if (existing != null)
                 TextButton(
-                  onPressed: () {
-                    unawaited(ref.read(colorPresetListProvider.notifier).remove(existing.id));
+                  onPressed: () async {
+                    final presets =
+                        ref.read(colorPresetListProvider).value ?? const <ColorPreset>[];
+                    var fallbackId = 'blue_light';
+                    for (final p in presets) {
+                      if (p.id != existing.id) {
+                        fallbackId = p.id;
+                        break;
+                      }
+                    }
+                    await ref.read(colorPresetListProvider.notifier).remove(existing.id);
                     final currentSettings = ref.read(readerSettingsProvider);
                     if (currentSettings.activeColorPresetId == existing.id) {
-                      notifier.updateActiveColorPresetId('blue_light');
+                      notifier.updateActiveColorPresetId(fallbackId);
                     }
-                    Navigator.of(ctx).pop();
+                    if (ctx.mounted) Navigator.of(ctx).pop();
                   },
                   child: const Text('Удалить'),
                 ),

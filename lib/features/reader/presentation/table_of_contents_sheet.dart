@@ -89,6 +89,9 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
   @override
   Widget build(BuildContext context) {
     final entries = _buildHierarchy();
+    final visibleEntries = entries
+        .where((e) => e.isGroup || !_collapsedGroups.contains(e.groupId))
+        .toList();
     return Column(
       children: [
         Padding(
@@ -132,9 +135,9 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
         Expanded(
           child: ListView.builder(
             controller: widget.scrollController,
-            itemCount: entries.length,
+            itemCount: visibleEntries.length,
             itemBuilder: (context, index) {
-              final entry = entries[index];
+              final entry = visibleEntries[index];
               final title = entry.title.isNotEmpty ? entry.title : 'Глава ${entry.index + 1}';
               final isActive = entry.index == widget.currentChapterIndex;
               final isGroup = entry.isGroup;

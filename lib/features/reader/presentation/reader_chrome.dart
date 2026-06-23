@@ -215,7 +215,6 @@ class ReaderBottomBar extends StatelessWidget {
                     size: Size.infinite,
                     painter: _CheckpointMarkerPainter(
                       checkpoints: checkpoints,
-                      progress: scrollProgress,
                       color: colors.text,
                     ),
                   ),
@@ -304,12 +303,10 @@ class ReaderProgressBar extends StatelessWidget {
 class _CheckpointMarkerPainter extends CustomPainter {
   _CheckpointMarkerPainter({
     required this.checkpoints,
-    required this.progress,
     required this.color,
   });
 
   final List<double> checkpoints;
-  final double progress;
   final Color color;
 
   @override
@@ -327,5 +324,5 @@ class _CheckpointMarkerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CheckpointMarkerPainter oldDelegate) =>
-      checkpoints != oldDelegate.checkpoints || progress != oldDelegate.progress;
+      checkpoints != oldDelegate.checkpoints;
 }

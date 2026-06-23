@@ -969,7 +969,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   ReaderColors? _resolveCustomColors(ReaderSettings settings) {
-    final presetsAsync = ref.read(colorPresetListProvider);
+    final presetsAsync = ref.watch(colorPresetListProvider);
     final presets = presetsAsync.value;
     if (presets == null) return null;
     try {

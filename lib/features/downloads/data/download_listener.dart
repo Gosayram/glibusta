@@ -29,7 +29,7 @@ class DownloadListener {
   StreamSubscription<bd.TaskUpdate>? _subscription;
 
   void startListening() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel());
     _subscription = bd.FileDownloader().updates.listen(_onUpdate);
     _logger.info('DownloadListener started', name: 'DownloadListener');
   }
@@ -97,7 +97,7 @@ class DownloadListener {
   }
 
   void dispose() {
-    _subscription?.cancel();
+    unawaited(_subscription?.cancel());
     _subscription = null;
   }
 }

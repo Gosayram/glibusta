@@ -89,7 +89,16 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
                   final query = Uri.encodeComponent(_selectedText!);
                   final uri = Uri.parse('https://www.google.com/search?q=$query');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
                 }
                 widget.onDismiss();
               },
@@ -101,7 +110,16 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
                   final query = Uri.encodeComponent(_selectedText!);
                   final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$query');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
                 }
                 widget.onDismiss();
               },
@@ -113,7 +131,16 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
                   final query = Uri.encodeComponent(_selectedText!);
                   final uri = Uri.parse('https://www.google.com/search?q=$query+meaning');
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
                 }
                 widget.onDismiss();
               },

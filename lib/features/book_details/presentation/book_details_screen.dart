@@ -278,6 +278,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
                   child: SeriesInfoSection(bookId: widget.bookId),
                 ),
               ),
+              SliverPadding(
+                padding: const EdgeInsets.all(24),
+                sliver: SliverToBoxAdapter(
+                  child: BottomActionBar(book: book, details: widget.details),
+                ),
+              ),
             ],
           ),
         ),

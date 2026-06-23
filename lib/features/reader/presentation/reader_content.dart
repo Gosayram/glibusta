@@ -659,7 +659,7 @@ Widget _readerLoadingPlaceholder(
   );
 }
 
-List<Widget> _readerOverlays(ReaderSettings s, Color textColor) {
+List<Widget> _readerOverlays(ReaderSettings s, Color textColor, double availableHeight) {
   return [
     if (s.perceptionExpander) ...[
       Positioned(
@@ -680,27 +680,27 @@ List<Widget> _readerOverlays(ReaderSettings s, Color textColor) {
         left: 0,
         right: 0,
         top: 0,
-        height: _limiterTopOffset(s),
+        height: _limiterTopOffset(s) * availableHeight,
         child: ColoredBox(color: textColor.withValues(alpha: s.horizontalLimiterDimming)),
       ),
       Positioned(
         left: 0,
         right: 0,
         bottom: 0,
-        height: _limiterBottomOffset(s),
+        height: _limiterBottomOffset(s) * availableHeight,
         child: ColoredBox(color: textColor.withValues(alpha: s.horizontalLimiterDimming)),
       ),
       if (s.horizontalLimiterLines) ...[
         Positioned(
           left: s.margin,
           right: s.margin,
-          top: _limiterTopOffset(s),
+          top: _limiterTopOffset(s) * availableHeight,
           child: Container(height: 1, color: textColor.withValues(alpha: 0.2)),
         ),
         Positioned(
           left: s.margin,
           right: s.margin,
-          bottom: _limiterBottomOffset(s),
+          bottom: _limiterBottomOffset(s) * availableHeight,
           child: Container(height: 1, color: textColor.withValues(alpha: 0.2)),
         ),
       ],
@@ -856,7 +856,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                   ),
                 ),
               ),
-              ..._readerOverlays(settings, _getReaderStyle(settings).color ?? Colors.black),
+              ..._readerOverlays(
+                settings,
+                _getReaderStyle(settings).color ?? Colors.black,
+                MediaQuery.sizeOf(context).height,
+              ),
             ],
           ),
         ),
@@ -1390,6 +1394,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               ..._readerOverlays(
                 widget.settings,
                 _getReaderStyle(widget.settings).color ?? Colors.black,
+                MediaQuery.sizeOf(context).height,
               ),
             ],
           );

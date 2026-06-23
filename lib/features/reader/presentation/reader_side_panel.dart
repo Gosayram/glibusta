@@ -80,10 +80,13 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
 
   Widget _buildTableOfContents(BuildContext context) {
     final chapters = _buildHierarchy();
+    final visibleChapters = chapters
+        .where((item) => item.isGroup || !_collapsedGroups.contains(item.groupId))
+        .toList();
     return ListView.builder(
-      itemCount: chapters.length,
+      itemCount: visibleChapters.length,
       itemBuilder: (context, index) {
-        final item = chapters[index];
+        final item = visibleChapters[index];
         final title = item.title.isNotEmpty ? item.title : 'Глава ${item.index + 1}';
         final isActive = item.index == widget.currentChapterIndex;
         final isGroup = item.isGroup;
