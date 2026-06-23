@@ -564,13 +564,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final folder = ref.watch(externalFolderProvider);
 
     final modeLabels = {
-      StorageMode.internal: 'Внутренняя библиотека',
       StorageMode.downloads: 'Downloads/Glibusta',
       StorageMode.external: 'Выбранная папка',
     };
 
     final subtitles = {
-      StorageMode.internal: 'Стабильный режим, файлы в sandbox приложения',
       StorageMode.downloads: 'Доступна из файлового менеджера',
       StorageMode.external: folder.name ?? 'Папка не выбрана',
     };

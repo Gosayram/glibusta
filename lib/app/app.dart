@@ -51,6 +51,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   final _shareHandler = ShareHandler();
   bool _shareHandlerInitialized = false;
   bool _downloadListenerInitialized = false;
+  bool _notifPermRequested = false;
 
   @override
   void initState() {
@@ -73,6 +74,10 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       final listener = ref.read(downloadListenerProvider);
       listener.startListening();
     }
+    if (!_notifPermRequested && supportsPredictiveBack) {
+      _notifPermRequested = true;
+      unawaited(_requestNotificationPermission());
+    }
   }
 
   void _initPlatform() {
@@ -91,6 +96,16 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+  }
+
+  static const _platform = MethodChannel('com.gosayram.glibusta/storage_bridge');
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      await _platform.invokeMethod<bool>('requestNotificationPermission');
+    } on MissingPluginException {
+      // Not on Android — ignore
+    }
   }
 
   void _initLifecycle() {

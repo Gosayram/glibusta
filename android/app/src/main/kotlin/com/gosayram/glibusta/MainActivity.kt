@@ -1,10 +1,13 @@
 package com.gosayram.glibusta
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.DocumentsContract
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import io.flutter.embedding.android.FlutterFragmentActivity
@@ -20,6 +23,13 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private val DJVU_CHANNEL = "glibusta/djvu"
     private var pendingResult: MethodChannel.Result? = null
+    private var pendingPermResult: MethodChannel.Result? = null
+
+    private val notifPermLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            pendingPermResult?.success(granted)
+            pendingPermResult = null
+        }
 
     private val openTreeLauncher: ActivityResultLauncher<Uri?> =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
@@ -107,6 +117,19 @@ class MainActivity : FlutterFragmentActivity() {
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("FORGET_ERROR", e.message, null)
+                }
+            }
+            "requestNotificationPermission" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val perm = android.Manifest.permission.POST_NOTIFICATIONS
+                    if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) {
+                        result.success(true)
+                    } else {
+                        pendingPermResult = result
+                        notifPermLauncher.launch(perm)
+                    }
+                } else {
+                    result.success(true)
                 }
             }
             else -> result.notImplemented()

@@ -143,17 +143,30 @@ class DownloadQueue {
   /// Called by [DownloadListener] when a download completes.
   /// Runs the full BookImportService pipeline.
   Future<void> onDownloadComplete(String taskId) async {
-    final task = _tasks[taskId];
-    if (task == null) return;
+    var task = _tasks[taskId];
+
+    // After restart, _tasks is empty. Load from DB.
+    if (task == null) {
+      final dbTask = await _repository.getDownloadById(taskId);
+      if (dbTask == null) {
+        _logger.warning(
+          'onDownloadComplete: taskId $taskId not found in DB',
+          name: 'DownloadQueue',
+        );
+        return;
+      }
+      task = dbTask;
+      _tasks[taskId] = task;
+    }
+
+    if (task.status == DownloadStatus.completed) return;
 
     _tasks[taskId] = task.copyWith(status: DownloadStatus.completed);
     _bgDownload.removeTask(taskId);
     _emitUpdate();
 
-    // Show completed notification.
     unawaited(_notificationService.showCompleted(task));
 
-    // Run full import pipeline: parse metadata, cover, authors, DB.
     if (task.targetPath != null) {
       try {
         final result = await _bookImport.importFile(task.targetPath!);

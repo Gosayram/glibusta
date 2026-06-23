@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -48,6 +49,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
+  bool _sidePanelVisible = false;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   String? _selectedText;
@@ -71,6 +73,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
     unawaited(_fetchBatteryLevel());
+    _enterImmersiveMode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -231,10 +234,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    _exitImmersiveMode();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     unawaited(SystemChrome.setPreferredOrientations([]));
     super.dispose();
+  }
+
+  void _enterImmersiveMode() {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    }
+  }
+
+  void _exitImmersiveMode() {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+      );
+    }
   }
 
   void _handleAppLifecycleState(AppLifecycleState state) {
@@ -516,15 +540,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 },
                 onMore: readerState.metadata != null
                     ? () {
-                        _ctrl.saveCheckpoint();
-                        TableOfContentsSheet.show(
-                          context,
-                          metadata: readerState.metadata!,
-                          currentChapterIndex: readerState.currentPosition.chapterIndex,
-                          onJumpToPosition: _ctrl.jumpToPosition,
-                          loadedChapters: readerState.loadedChapters,
-                          isDynamicallyLoading: readerState.isDynamicallyLoading,
-                        );
+                        final wc = windowClassOf(context);
+                        if (wc == WindowClass.medium) {
+                          setState(() => _sidePanelVisible = !_sidePanelVisible);
+                        } else {
+                          _ctrl.saveCheckpoint();
+                          TableOfContentsSheet.show(
+                            context,
+                            metadata: readerState.metadata!,
+                            currentChapterIndex: readerState.currentPosition.chapterIndex,
+                            onJumpToPosition: _ctrl.jumpToPosition,
+                            loadedChapters: readerState.loadedChapters,
+                            isDynamicallyLoading: readerState.isDynamicallyLoading,
+                          );
+                        }
                       }
                     : () {},
               ),
@@ -715,21 +744,59 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings,
   ) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
+    const sidePanelWidth = 250.0;
+
+    if (!_sidePanelVisible) {
+      final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
+      final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
+      final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
+
+      return Scaffold(
+        backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
+        body: _buildReaderContentStack(
+          context,
+          readerState,
+          settings,
+          content: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: _buildGestureWrappedContent(context, readerState, settings),
+          ),
+        ),
+      );
+    }
+
+    final availableWidth = screenWidth - sidePanelWidth - 1.0;
+    final maxContentWidth = (availableWidth - 32.0).clamp(600.0, availableWidth);
     final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
+    final horizontalPadding = ((availableWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: _buildReaderContentStack(
-        context,
-        readerState,
-        settings,
-        content: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: _buildGestureWrappedContent(context, readerState, settings),
-        ),
+      body: Row(
+        children: [
+          if (readerState.metadata != null)
+            ReaderSidePanel(
+              metadata: readerState.metadata!,
+              currentChapterIndex: readerState.currentPosition.chapterIndex,
+              scrollController: _ctrl.scrollController,
+              width: sidePanelWidth,
+              onJumpToPosition: _ctrl.jumpToPosition,
+            ),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: _buildReaderContentStack(
+              context,
+              readerState,
+              settings,
+              content: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: _buildGestureWrappedContent(context, readerState, settings),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
