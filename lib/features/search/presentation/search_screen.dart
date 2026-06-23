@@ -22,10 +22,11 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  final SearchController _searchController = SearchController();
-  final TextEditingController _genreController = TextEditingController();
-  final TextEditingController _languageController = TextEditingController();
+  final _searchController = SearchController();
+  final _genreController = TextEditingController();
+  final _languageController = TextEditingController();
   Timer? _debounceTimer;
+  bool _filtersExpanded = false;
 
   @override
   void initState() {
@@ -180,9 +181,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildPhoneLayout(BuildContext context, SearchState state) {
+    final theme = Theme.of(context);
     return Column(
       children: [
-        _buildFilters(context, state),
+        Material(
+          child: InkWell(
+            onTap: () => setState(() => _filtersExpanded = !_filtersExpanded),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    _filtersExpanded ? Icons.filter_list_off : Icons.filter_list,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Фильтры',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (!_filtersExpanded && state.filters.hasFilters) ...[
+                    const SizedBox(width: 8),
+                    _buildActiveFilterChips(context, state),
+                  ],
+                  const Spacer(),
+                  Icon(
+                    _filtersExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: _filtersExpanded
+              ? _buildFilters(context, state)
+              : const SizedBox.shrink(),
+        ),
+        const Divider(height: 1),
         if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
           const LinearProgressIndicator(),
         if (state.error != null) _buildErrorCard(context, state),
@@ -195,30 +238,53 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildTabletLayout(BuildContext context, SearchState state) {
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final theme = Theme.of(context);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 300,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                right: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding + 24),
-              child: _buildFilters(context, state),
-            ),
-          ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          width: _filtersExpanded ? 300 : 0,
+          child: _filtersExpanded
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                      right: BorderSide(color: theme.colorScheme.outlineVariant),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, bottomPadding + 24),
+                    child: _buildFilters(context, state),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        _filtersExpanded ? Icons.filter_list_off : Icons.filter_list,
+                        size: 20,
+                      ),
+                      tooltip: _filtersExpanded ? 'Скрыть фильтры' : 'Показать фильтры',
+                      onPressed: () => setState(() => _filtersExpanded = !_filtersExpanded),
+                    ),
+                    if (!_filtersExpanded && state.filters.hasFilters) ...[
+                      const SizedBox(width: 4),
+                      _buildActiveFilterChips(context, state),
+                    ],
+                  ],
+                ),
+              ),
               if (state.isLoading && state.books.isEmpty && state.authors.isEmpty)
                 const LinearProgressIndicator(),
               if (state.error != null) _buildErrorCard(context, state),
@@ -229,6 +295,48 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildActiveFilterChips(BuildContext context, SearchState state) {
+    final filters = state.filters;
+    final chips = <Widget>[];
+    if (filters.format != null) {
+      chips.add(_buildMiniChip(context, filters.format!.name.toUpperCase(), () {
+        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(format: null));
+      }));
+    }
+    if (filters.genre != null && filters.genre!.isNotEmpty) {
+      chips.add(_buildMiniChip(context, filters.genre!, () {
+        _genreController.clear();
+        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(genre: null));
+      }));
+    }
+    if (filters.language != null && filters.language!.isNotEmpty) {
+      chips.add(_buildMiniChip(context, filters.language!, () {
+        _languageController.clear();
+        ref.read(searchControllerProvider.notifier).setFilters(filters.copyWith(language: null));
+      }));
+    }
+    return Flexible(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(spacing: 6, children: chips),
+      ),
+    );
+  }
+
+  Widget _buildMiniChip(BuildContext context, String label, VoidCallback onRemove) {
+    final cs = Theme.of(context).colorScheme;
+    return Chip(
+      label: Text(label, style: TextStyle(fontSize: 12, color: cs.onSecondaryContainer)),
+      backgroundColor: cs.secondaryContainer,
+      deleteIcon: Icon(Icons.close, size: 14, color: cs.onSecondaryContainer),
+      onDeleted: onRemove,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      labelPadding: const EdgeInsets.only(left: 8, right: 2),
     );
   }
 
@@ -288,49 +396,65 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildFilters(BuildContext context, SearchState state) {
     final filters = state.filters;
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Фильтры',
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: theme.colorScheme.primary,
+          'Формат',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            FilterChip(
-              label: const Text('Все'),
+            _buildFormatChip(
+              context,
+              label: 'Все',
               selected: filters.format == null,
-              onSelected: (_) => _setFormatFilter(null),
+              onTap: () => _setFormatFilter(null),
             ),
             ...BookFormat.values
                 .where((f) => f != BookFormat.unknown)
                 .map(
-                  (format) => FilterChip(
-                    label: Text(format.name.toUpperCase()),
+                  (format) => _buildFormatChip(
+                    context,
+                    label: format.name.toUpperCase(),
                     selected: filters.format == format,
-                    onSelected: (selected) => _setFormatFilter(selected ? format : null),
+                    onTap: () => _setFormatFilter(
+                      filters.format == format ? null : format,
+                    ),
                   ),
                 ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+        Text(
+          'Параметры',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
               child: TextField(
                 controller: _genreController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Жанр',
-                  hintText: 'Например: фантастика',
+                  hintText: 'фантастика',
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.category_outlined, size: 20),
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
                   _debounceTimer?.cancel();
@@ -348,11 +472,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             Expanded(
               child: TextField(
                 controller: _languageController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Язык',
-                  hintText: 'Например: ru',
+                  hintText: 'ru',
                   isDense: true,
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.translate, size: 20),
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
                   _debounceTimer?.cancel();
@@ -366,15 +492,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 },
               ),
             ),
-            if (filters.hasFilters)
-              IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Сбросить фильтры',
-                onPressed: _clearFilters,
-              ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
@@ -386,7 +506,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       : 'Дата от',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onPressed: () async {
                   final picked = await showDatePicker(
@@ -411,7 +534,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       : 'Дата до',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onPressed: () async {
                   final picked = await showDatePicker(
@@ -428,7 +554,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           ],
         ),
+        if (filters.hasFilters) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Сбросить фильтры'),
+              onPressed: _clearFilters,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildFormatChip(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? cs.primary : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? cs.primary : cs.outlineVariant,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: selected ? cs.onPrimary : cs.onSurface,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ),
     );
   }
 
