@@ -24,18 +24,18 @@ class ReaderSettingsPersistence {
         ),
         twoPageEnabled: map['twoPageEnabled'] as bool? ?? false,
         fontSize: (map['fontSize'] as num?)?.toDouble() ?? 18.0,
-        lineHeight: (map['lineHeight'] as num?)?.toDouble() ?? 1.55,
-        margin: (map['margin'] as num?)?.toDouble() ?? 16.0,
+        lineHeight: (map['lineHeight'] as num?)?.toDouble() ?? 1.6,
+        margin: (map['margin'] as num?)?.toDouble() ?? 20.0,
         font: ReaderFont.values.firstWhere(
           (e) => e.name == map['font'],
           orElse: () => ReaderFont.literata,
         ),
-        paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 8.0,
+        paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 12.0,
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
         fontWeightDelta: (map['fontWeightDelta'] as num?)?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(
           (e) => e.name == map['textAlign'],
-          orElse: () => ReaderTextAlign.left,
+          orElse: () => ReaderTextAlign.justify,
         ),
         autoThemeMode: AutoThemeMode.values.firstWhere(
           (e) => e.name == map['autoThemeMode'],
@@ -55,7 +55,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['bottomBarContent'],
           orElse: () => BottomBarContent.percent,
         ),
-        paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 0.0,
+        paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 16.0,
         hyphenation: map['hyphenation'] as bool? ?? true,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],

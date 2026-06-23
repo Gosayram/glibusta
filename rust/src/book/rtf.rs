@@ -23,8 +23,10 @@ pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         }]
     };
 
+    let id = crate::book::sha256_hex(bytes);
+
     Ok(NormalizedBook {
-        id: String::new(),
+        id,
         title: String::new(),
         authors: Vec::new(),
         description: None,

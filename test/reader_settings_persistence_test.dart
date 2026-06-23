@@ -17,12 +17,12 @@ void main() {
         expect(settings.theme, ReaderTheme.system);
         expect(settings.mode, ReaderMode.paginated);
         expect(settings.fontSize, 18.0);
-        expect(settings.lineHeight, 1.55);
+        expect(settings.lineHeight, 1.6);
         expect(settings.margin, 20.0);
         expect(settings.font, ReaderFont.literata);
         expect(settings.paragraphSpacing, 12.0);
         expect(settings.letterSpacing, 0.0);
-        expect(settings.textAlign, ReaderTextAlign.left);
+        expect(settings.textAlign, ReaderTextAlign.justify);
         expect(settings.autoThemeMode, AutoThemeMode.off);
         expect(settings.customDayHour, 7);
         expect(settings.customNightHour, 20);
@@ -50,7 +50,7 @@ void main() {
         expect(loaded.font, ReaderFont.literata);
         expect(loaded.paragraphSpacing, 12.0);
         expect(loaded.letterSpacing, 0.5);
-        expect(loaded.textAlign, ReaderTextAlign.left);
+        expect(loaded.textAlign, ReaderTextAlign.justify);
         expect(loaded.autoThemeMode, AutoThemeMode.sunset);
         expect(loaded.customDayHour, 8);
         expect(loaded.customNightHour, 21);
@@ -75,7 +75,7 @@ void main() {
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.theme, ReaderTheme.paper);
         expect(settings.fontSize, 18.0); // default
-        expect(settings.lineHeight, 1.55); // default
+        expect(settings.lineHeight, 1.6); // default
       });
 
       test('handles unknown theme name gracefully', () async {

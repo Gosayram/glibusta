@@ -575,6 +575,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block {
                         span_text.push_str(&text);
+                        current_text.push_str(&text);
                     } else if in_table {
                         // Inside td/th - accumulate for cell
                         span_text.push_str(&text);
@@ -588,6 +589,9 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block || in_table {
                         span_text.push_str(&text);
+                        if in_block {
+                            current_text.push_str(&text);
+                        }
                     } else {
                         current_text.push_str(&text);
                     }
@@ -598,6 +602,9 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block || in_table {
                         span_text.push_str(&text);
+                        if in_block {
+                            current_text.push_str(&text);
+                        }
                     } else {
                         current_text.push_str(&text);
                     }
