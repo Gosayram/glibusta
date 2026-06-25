@@ -1489,7 +1489,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
         final anim = widget.settings.pageTurnAnimation;
         final useSwitcher = anim == PageTurnAnimation.fade || anim == PageTurnAnimation.curl;
-        final switcherDuration = anim == PageTurnAnimation.curl ? 400 : 200;
+        final switcherDuration = anim == PageTurnAnimation.curl ? 350 : 200;
         final physics = anim == PageTurnAnimation.none
             ? const NeverScrollableScrollPhysics()
             : const BouncingScrollPhysics();
@@ -1508,12 +1508,44 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               }
             },
             itemBuilder: useSwitcher
-                ? (context, index) => AnimatedSwitcher(
-                    duration: Duration(milliseconds: switcherDuration),
-                    switchInCurve: Curves.easeInOut,
-                    switchOutCurve: Curves.easeInOut,
-                    child: itemBuilder(context, index),
-                  )
+                ? (context, index) {
+                    final child = itemBuilder(context, index);
+                    if (anim == PageTurnAnimation.curl) {
+                      return AnimatedSwitcher(
+                        duration: Duration(milliseconds: switcherDuration),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            child: child,
+                            builder: (context, child) {
+                              final t = animation.value;
+                              final rotation = (1 - t) * 0.4;
+                              final opacity = t.clamp(0.0, 1.0);
+                              return Transform(
+                                alignment: Alignment.centerRight,
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.002)
+                                  ..rotateY(-rotation),
+                                child: Opacity(
+                                  opacity: opacity,
+                                  child: child,
+                                ),
+                              );
+                            },
+                          );
+                        },
+                        child: child,
+                      );
+                    }
+                    return AnimatedSwitcher(
+                      duration: Duration(milliseconds: switcherDuration),
+                      switchInCurve: Curves.easeInOut,
+                      switchOutCurve: Curves.easeInOut,
+                      child: child,
+                    );
+                  }
                 : itemBuilder,
           ),
         );
