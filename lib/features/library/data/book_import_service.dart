@@ -16,7 +16,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
-import '../../../core/utils/fire_and_log.dart';
+
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../../reader/data/parsers/parser_registry.dart';
@@ -367,16 +367,18 @@ class BookImportService {
   }
 
   void _scheduleCoverExtraction(_ImportCtx ctx) {
-    fireAndLog(
-      () => _extractCoverBackground(
-        ctx.bookId,
-        ctx.targetFile!.path,
-        ctx.ext,
-        coverBytes: ctx.coverBytes,
-      ),
-      name: 'Import',
-      context: 'Cover extraction for ${ctx.bookId}',
-    );
+    unawaited(() async {
+      try {
+        await _extractCoverBackground(
+          ctx.bookId,
+          ctx.targetFile!.path,
+          ctx.ext,
+          coverBytes: ctx.coverBytes,
+        );
+      } on Object catch (e, st) {
+        _logger.warning('Cover extraction for ${ctx.bookId}: $e', name: 'Import', error: e, st: st);
+      }
+    }());
   }
 
   Future<void> _cleanupFailedImport(_ImportCtx ctx) async {
@@ -558,11 +560,13 @@ class BookImportService {
             );
       });
 
-      fireAndLog(
-        () => _extractCoverBackground(bookId, targetFile.path, ext, coverBytes: extCoverBytes),
-        name: 'Import',
-        context: 'Cover extraction for $bookId',
-      );
+      unawaited(() async {
+        try {
+          await _extractCoverBackground(bookId, targetFile.path, ext, coverBytes: extCoverBytes);
+        } on Object catch (e, st) {
+          _logger.warning('Cover extraction for $bookId: $e', name: 'Import', error: e, st: st);
+        }
+      }());
 
       return ImportResult.success(book.title);
     } on Object catch (e) {
@@ -606,96 +610,6 @@ class BookImportService {
       return 'Ошибка файловой системы: $e';
     }
     return 'Ошибка при импорте: $e';
-  }
-
-  /// Import a book from a network URL.
-  ///
-  /// Downloads the file to a temp location, then runs the standard import pipeline.
-  /// Supports direct links to .epub/.fb2/.txt/.mobi/.rtf files.
-  Future<ImportResult> importFromUrl(
-    String url, {
-    required HttpClient httpClient,
-    void Function(double progress)? onProgress,
-  }) async {
-    _logger.info('Import from URL: $url', name: 'Import');
-
-    // Extract filename from URL path
-    final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasScheme) {
-      return ImportResult.failure('Некорректный URL: $url');
-    }
-
-    var fileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : '';
-    if (fileName.isEmpty) {
-      fileName = 'downloaded_book';
-    }
-
-    // Ensure we have an extension
-    if (!fileName.contains('.')) {
-      fileName = '$fileName.epub';
-    }
-
-    final ext = fileName.split('.').last.toLowerCase();
-    if (!importableExtensions.contains(ext)) {
-      return ImportResult.failure('Формат не поддерживается: .$ext');
-    }
-
-    File? tempFile;
-    try {
-      // Download to temp file
-      final tempDir = await Directory.systemTemp.createTemp('glibusta_import_');
-      tempFile = File('${tempDir.path}/$fileName');
-
-      final response = await httpClient.dio.download(
-        url,
-        tempFile.path,
-        onReceiveProgress: (received, total) {
-          if (total > 0 && onProgress != null) {
-            onProgress(received / total);
-          }
-        },
-      );
-
-      if (response.statusCode != 200) {
-        await _tryDelete(tempFile.path);
-        return ImportResult.failure('Ошибка загрузки: HTTP ${response.statusCode}');
-      }
-
-      final fileSize = await tempFile.length();
-      if (fileSize < 100) {
-        await _tryDelete(tempFile.path);
-        return ImportResult.failure('Файл слишком мал: $fileSize байт');
-      }
-
-      final format = bookFormatForImportExtension(ext);
-      if (isBookFileTooLarge(format, fileSize)) {
-        await _tryDelete(tempFile.path);
-        return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
-      }
-
-      // Run standard import pipeline
-      final result = await importFile(tempFile.path);
-
-      // If import failed, clean up temp file
-      if (!result.isSuccess) {
-        await _tryDelete(tempFile.path);
-      }
-
-      // Clean up temp directory
-      try {
-        await tempDir.delete(recursive: true);
-      } on Object {
-        // Best-effort cleanup
-      }
-
-      return result;
-    } on Object catch (e) {
-      _logger.warning('URL import failed for $url: $e', name: 'Import', error: e);
-      if (tempFile != null) {
-        await _tryDelete(tempFile.path);
-      }
-      return ImportResult.failure(_friendlyImportError(e));
-    }
   }
 
   Future<ImportBatchResult> importDirectory(

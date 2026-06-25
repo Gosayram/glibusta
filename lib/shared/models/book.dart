@@ -102,15 +102,3 @@ class Author {
     required this.bookIds,
   });
 }
-
-class Genre {
-  final String id;
-  final String name;
-  final String? parentId;
-
-  const Genre({
-    required this.id,
-    required this.name,
-    required this.parentId,
-  });
-}

@@ -14,9 +14,6 @@ extension AppAnimationsExt on Animate {
   Animate bookCardTransition({Duration? delay}) =>
       fadeIn(delay: delay, duration: 300.ms).slideX(begin: 0.05, delay: delay, duration: 300.ms);
 
-  /// Section header fading in.
-  Animate sectionFadeIn({Duration? delay}) => fadeIn(delay: delay, duration: 300.ms);
-
   /// List tile (bookmark, note, quote, series) appearing.
   Animate listTileTransition({Duration? delay}) =>
       fadeIn(delay: delay, duration: 300.ms).slideX(begin: 0.03, delay: delay, duration: 300.ms);
