@@ -141,16 +141,16 @@ class ReaderBottomBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            // Page / percent info
+            // Progress info — respects bottomBarContent setting
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '$page / $totalChapters',
+                  _leftLabel(settings, page, totalChapters, percent),
                   style: TextStyle(color: colors.text, fontSize: 12),
                 ),
                 Text(
-                  '$percent%',
+                  _rightLabel(settings, page, totalChapters, percent, estimatedMinutesLeft),
                   style: TextStyle(color: colors.text, fontSize: 12),
                 ),
               ],
@@ -219,6 +219,36 @@ class ReaderBottomBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _leftLabel(ReaderSettings settings, int page, int totalChapters, int percent) {
+    switch (settings.bottomBarContent) {
+      case BottomBarContent.page:
+        return '$page / $totalChapters';
+      case BottomBarContent.percent:
+        return '$percent%';
+      case BottomBarContent.chapter:
+        return '$page / $totalChapters';
+      case BottomBarContent.time:
+        return '$page / $totalChapters';
+      case BottomBarContent.none:
+        return '';
+    }
+  }
+
+  String _rightLabel(ReaderSettings settings, int page, int totalChapters, int percent, int minutesLeft) {
+    switch (settings.bottomBarContent) {
+      case BottomBarContent.page:
+        return '$percent%';
+      case BottomBarContent.percent:
+        return '$page / $totalChapters';
+      case BottomBarContent.chapter:
+        return '$percent%';
+      case BottomBarContent.time:
+        return minutesLeft > 0 ? '~$minutesLeft мин' : '$percent%';
+      case BottomBarContent.none:
+        return '';
+    }
   }
 
   Widget _buildModeSwitcher(ReaderColors colors) {
