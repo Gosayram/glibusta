@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 
@@ -199,11 +200,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _handleLinkTap(String href, ReaderState readerState) {
-    // Strip leading # to get the anchor id
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      _showExternalLinkDialog(href);
+      return;
+    }
     final anchor = href.startsWith('#') ? href.substring(1) : href;
     if (anchor.isEmpty) return;
 
-    // Search current chapter for a block with matching noteId
     final chapterIndex = readerState.currentPosition.chapterIndex;
     final chapter = readerState.loadedChapters[chapterIndex];
     if (chapter == null) return;
@@ -223,10 +226,33 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       }
     }
 
-    // If not found by noteId, try matching href in rich spans
-    // (some books use id attributes on the target element)
-    // For now, just show a subtle feedback
     unawaited(HapticFeedback.selectionClick());
+  }
+
+  void _showExternalLinkDialog(String href) {
+    final uri = Uri.tryParse(href);
+    if (uri == null) return;
+    final host = uri.host.isNotEmpty ? uri.host : href;
+    unawaited(showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Внешняя ссылка'),
+        content: Text('Открыть ссылку?\n$host'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+            },
+            child: const Text('Открыть'),
+          ),
+        ],
+      ),
+    ));
   }
 
   @override
