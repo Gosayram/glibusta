@@ -30,9 +30,7 @@ import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
-import 'reader_side_panel.dart';
 import 'reading_info_provider.dart';
-import 'table_of_contents_sheet.dart';
 
 enum _ReadingInfoPosition { header, footer }
 
@@ -49,7 +47,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
   AppLifecycleListener? _lifecycleListener;
-  bool _sidePanelVisible = false;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   String? _selectedText;
@@ -529,7 +526,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   if (_ctrl.popLinkPosition()) return;
                   Navigator.of(context).pop();
                 },
-                onSettings: () => _showQuickSettings(context),
                 onSearch: () {
                   _ctrl.toggleSearch();
                   if (_ctrl.state.isSearchOpen) {
@@ -538,24 +534,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     _gestureCoordinator.onSearchClosed();
                   }
                 },
-                onMore: readerState.metadata != null
-                    ? () {
-                        final wc = windowClassOf(context);
-                        if (wc == WindowClass.medium) {
-                          setState(() => _sidePanelVisible = !_sidePanelVisible);
-                        } else {
-                          _ctrl.saveCheckpoint();
-                          TableOfContentsSheet.show(
-                            context,
-                            metadata: readerState.metadata!,
-                            currentChapterIndex: readerState.currentPosition.chapterIndex,
-                            onJumpToPosition: _ctrl.jumpToPosition,
-                            loadedChapters: readerState.loadedChapters,
-                            isDynamicallyLoading: readerState.isDynamicallyLoading,
-                          );
-                        }
-                      }
-                    : () {},
+                onMore: () => _showQuickSettings(context),
               ),
             ),
           ),
@@ -745,59 +724,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings,
   ) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    const sidePanelWidth = 250.0;
-
-    if (!_sidePanelVisible) {
-      final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
-      final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-      final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
-
-      return Scaffold(
-        backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-        body: _buildReaderContentStack(
-          context,
-          readerState,
-          settings,
-          content: Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: _buildGestureWrappedContent(context, readerState, settings),
-          ),
-        ),
-      );
-    }
-
-    final availableWidth = screenWidth - sidePanelWidth - 1.0;
-    final maxContentWidth = (availableWidth - 32.0).clamp(600.0, availableWidth);
+    final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
     final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-    final horizontalPadding = ((availableWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
+    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: Row(
-        children: [
-          if (readerState.metadata != null)
-            ReaderSidePanel(
-              metadata: readerState.metadata!,
-              currentChapterIndex: readerState.currentPosition.chapterIndex,
-              scrollController: _ctrl.scrollController,
-              width: sidePanelWidth,
-              onJumpToPosition: _ctrl.jumpToPosition,
-            ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: _buildReaderContentStack(
-              context,
-              readerState,
-              settings,
-              content: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: _buildGestureWrappedContent(context, readerState, settings),
-              ),
-            ),
-          ),
-        ],
+      body: _buildReaderContentStack(
+        context,
+        readerState,
+        settings,
+        content: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: _buildGestureWrappedContent(context, readerState, settings),
+        ),
       ),
     );
   }
@@ -808,39 +749,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings,
   ) {
     final screenWidth = MediaQuery.sizeOf(context).width;
-    const sidePanelWidth = 250.0;
-    final availableWidth = screenWidth - sidePanelWidth - 1.0;
-    final maxContentWidth = (availableWidth - 32.0).clamp(600.0, availableWidth);
+    final maxContentWidth = (screenWidth - 32.0).clamp(600.0, screenWidth);
     final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-    final horizontalPadding = ((availableWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
+    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
 
     return Scaffold(
       backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: Row(
-        children: [
-          if (readerState.metadata != null)
-            ReaderSidePanel(
-              metadata: readerState.metadata!,
-              currentChapterIndex: readerState.currentPosition.chapterIndex,
-              scrollController: _ctrl.scrollController,
-              width: sidePanelWidth,
-              onJumpToPosition: _ctrl.jumpToPosition,
-            ),
-          const VerticalDivider(width: 1),
-          Expanded(
-            flex: 3,
-            child: _buildReaderContentStack(
-              context,
-              readerState,
-              settings,
-              content: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: _buildGestureWrappedContent(context, readerState, settings),
-              ),
-            ),
-          ),
-        ],
+      body: _buildReaderContentStack(
+        context,
+        readerState,
+        settings,
+        content: Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+          child: _buildGestureWrappedContent(context, readerState, settings),
+        ),
       ),
     );
   }

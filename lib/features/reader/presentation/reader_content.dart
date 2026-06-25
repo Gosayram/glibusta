@@ -1029,7 +1029,19 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (_disposed || !_pageController.hasClients) return;
         final pageCount = _pages.length;
         if (pageCount == 0) return;
-        final targetPage = widget.initialPage.clamp(0, pageCount - 1);
+        // Find first page matching the target chapter index
+        final targetChapter = widget.initialPage;
+        var targetPage = pageCount - 1;
+        for (var i = 0; i < _pages.length; i++) {
+          if (_pages[i].chapterIndex == targetChapter && !_pages[i].isCover) {
+            targetPage = i;
+            break;
+          }
+        }
+        // For two-page layout, snap to even index
+        if (widget.settings.twoPageEnabled && targetPage.isOdd) {
+          targetPage = (targetPage - 1).clamp(0, pageCount - 1);
+        }
         unawaited(
           _pageController.animateToPage(
             targetPage,
@@ -1377,7 +1389,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return const SizedBox.shrink();
         }
 
-        final useTwoPageLayout = widget.settings.twoPageEnabled && context.canUseTwoPageMode;
+        final useTwoPageLayout = context.canUseTwoPageMode;
         final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
         if (!_didRestoreInitialPage && widget.initialPage > 0) {

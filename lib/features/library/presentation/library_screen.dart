@@ -10,7 +10,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/logging/app_logger.dart';
-import '../../../core/platform/adaptive_context.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/background_task_provider.dart';
 import '../../../core/services/tag_service.dart';
@@ -21,7 +20,6 @@ import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
-import '../../../shared/widgets/library_master_detail.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../../reader/data/per_book_settings_service.dart';
 import '../data/book_delete_service.dart';
@@ -524,12 +522,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ],
         ).animate().fadeIn(duration: 250.ms),
       );
-    }
-
-    if (context.isCompact) {
-      // Phone: fall through to grid view below
-    } else {
-      return LibraryMasterDetail(books: books);
     }
 
     final pinnedIds = switch (ref.watch(pinnedBooksProvider)) {

@@ -202,7 +202,7 @@ void main() {
             settings: ReaderSettings(),
             bookTitle: 'Test Book Title',
             onBack: SizedBox.new,
-            onSettings: SizedBox.new,
+
           ),
         ),
       );
@@ -218,7 +218,7 @@ void main() {
             settings: ReaderSettings(),
             bookTitle: 'Book',
             onBack: SizedBox.new,
-            onSettings: SizedBox.new,
+
           ),
         ),
       );
@@ -234,7 +234,7 @@ void main() {
             settings: ReaderSettings(),
             bookTitle: 'Book',
             onBack: SizedBox.new,
-            onSettings: SizedBox.new,
+
           ),
         ),
       );

@@ -9,7 +9,6 @@ class ReaderTopBar extends StatelessWidget {
     required this.settings,
     required this.bookTitle,
     required this.onBack,
-    required this.onSettings,
     this.onSearch,
     this.onMore,
   });
@@ -17,7 +16,6 @@ class ReaderTopBar extends StatelessWidget {
   final ReaderSettings settings;
   final String bookTitle;
   final VoidCallback onBack;
-  final VoidCallback onSettings;
   final VoidCallback? onSearch;
   final VoidCallback? onMore;
 
@@ -61,14 +59,9 @@ class ReaderTopBar extends StatelessWidget {
               onPressed: onSearch ?? () {},
             ),
             IconButton(
-              icon: Icon(Icons.tune, color: colors.text),
-              tooltip: 'Настройки чтения',
-              onPressed: onSettings,
-            ),
-            IconButton(
               icon: const Icon(Icons.more_vert),
               color: colors.text,
-              tooltip: 'Ещё',
+              tooltip: 'Настройки',
               onPressed: onMore,
             ),
           ],
