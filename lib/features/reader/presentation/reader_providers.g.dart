@@ -41,7 +41,8 @@ final class ReaderSettingsNotifierProvider
   }
 }
 
-String _$readerSettingsNotifierHash() => r'aca8b78e818562e148711ddc696730e2d29b013e';
+String _$readerSettingsNotifierHash() =>
+    r'4d21417f2b8cada8ca8eb68345723667cdac23ed';
 
 abstract class _$ReaderSettingsNotifier extends $Notifier<ReaderSettings> {
   ReaderSettings build();
@@ -93,7 +94,8 @@ final class ReadingProgressNotifierProvider
   }
 }
 
-String _$readingProgressNotifierHash() => r'78ab1521caae67849152f0b424b3ac9ecd2a8181';
+String _$readingProgressNotifierHash() =>
+    r'78ab1521caae67849152f0b424b3ac9ecd2a8181';
 
 abstract class _$ReadingProgressNotifier extends $Notifier<ReadingProgress?> {
   ReadingProgress? build();

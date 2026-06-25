@@ -13,7 +13,12 @@ part of 'reading_stats_provider.dart';
 final readingStatsProvider = ReadingStatsProvider._();
 
 final class ReadingStatsProvider
-    extends $FunctionalProvider<AsyncValue<ReadingStats>, ReadingStats, FutureOr<ReadingStats>>
+    extends
+        $FunctionalProvider<
+          AsyncValue<ReadingStats>,
+          ReadingStats,
+          FutureOr<ReadingStats>
+        >
     with $FutureModifier<ReadingStats>, $FutureProvider<ReadingStats> {
   ReadingStatsProvider._()
     : super(

@@ -19,7 +19,9 @@ final class AuthorDetailProvider
           AuthorDetailResponse,
           FutureOr<AuthorDetailResponse>
         >
-    with $FutureModifier<AuthorDetailResponse>, $FutureProvider<AuthorDetailResponse> {
+    with
+        $FutureModifier<AuthorDetailResponse>,
+        $FutureProvider<AuthorDetailResponse> {
   AuthorDetailProvider._({
     required AuthorDetailFamily super.from,
     required String super.argument,

@@ -794,7 +794,15 @@ class ReaderController {
   // ── Gestures ──────────────────────────────────────────
 
   void handleTap(TapUpDetails details, double width) {
-    toggleUi();
+    final x = details.localPosition.dx;
+    final third = width / 3;
+    if (x < third) {
+      scrollToPrevious();
+    } else if (x > width - third) {
+      scrollToNext();
+    } else {
+      toggleUi();
+    }
   }
 
   void handleDoubleTap() {

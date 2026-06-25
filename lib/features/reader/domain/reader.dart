@@ -78,6 +78,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderFont.literata) ReaderFont font,
     @Default(20.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
+    @Default(0.0) double wordSpacing,
     @Default(0.0) double fontWeightDelta,
     @Default(ReaderTextAlign.justify) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,

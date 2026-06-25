@@ -32,6 +32,7 @@ class ReaderSettingsPersistence {
         ),
         paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 20.0,
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
+        wordSpacing: (map['wordSpacing'] as num?)?.toDouble() ?? 0.0,
         fontWeightDelta: (map['fontWeightDelta'] as num?)?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(
           (e) => e.name == map['textAlign'],
@@ -129,6 +130,7 @@ class ReaderSettingsPersistence {
         'font': settings.font.name,
         'paragraphSpacing': settings.paragraphSpacing,
         'letterSpacing': settings.letterSpacing,
+        'wordSpacing': settings.wordSpacing,
         'fontWeightDelta': settings.fontWeightDelta,
         'textAlign': settings.textAlign.name,
         'autoThemeMode': settings.autoThemeMode.name,

@@ -58,6 +58,7 @@ class PerBookSettingsService {
       paragraphSpacing:
           (overrides['paragraphSpacing'] as num?)?.toDouble() ?? global.paragraphSpacing,
       letterSpacing: (overrides['letterSpacing'] as num?)?.toDouble() ?? global.letterSpacing,
+      wordSpacing: (overrides['wordSpacing'] as num?)?.toDouble() ?? global.wordSpacing,
       textAlign: _enumOverride(
         overrides,
         'textAlign',

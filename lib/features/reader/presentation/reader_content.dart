@@ -173,7 +173,7 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
     color: colors.text,
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
-    wordSpacing: s.hyphenation && s.textAlign == ReaderTextAlign.justify ? -0.5 : 0,
+    wordSpacing: s.wordSpacing + (s.hyphenation && s.textAlign == ReaderTextAlign.justify ? -0.5 : 0),
   );
 }
 

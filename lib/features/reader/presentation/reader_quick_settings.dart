@@ -166,6 +166,15 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           (v) => notifier.updateLetterSpacing(v * 1.0 - 0.5),
         ),
         const SizedBox(height: 12),
+        const _SectionTitle('Межсловный интервал'),
+        _buildSliderRow(
+          'Шаг',
+          (settings.wordSpacing + 2.0) / 4.0,
+          0.0,
+          1.0,
+          (v) => notifier.updateWordSpacing(v * 4.0 - 2.0),
+        ),
+        const SizedBox(height: 12),
         const _SectionTitle('Отступ первой строки'),
         _buildSliderRow(
           'Шаг',

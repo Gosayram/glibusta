@@ -76,6 +76,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(letterSpacing: spacing);
   }
 
+  void updateWordSpacing(double spacing) {
+    state = state.copyWith(wordSpacing: spacing);
+  }
+
   void updateFontWeightDelta(double delta) {
     state = state.copyWith(fontWeightDelta: delta);
   }
