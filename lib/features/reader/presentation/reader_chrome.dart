@@ -294,27 +294,42 @@ class _CheckpointMarkerPainter extends CustomPainter {
   _CheckpointMarkerPainter({
     required this.checkpoints,
     required this.color,
+    this.totalChapters = 0,
   });
 
   final List<double> checkpoints;
   final Color color;
+  final int totalChapters;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    // Chapter boundary markers — thin dots
+    if (totalChapters > 1) {
+      final dotPaint = Paint()
+        ..color = color.withValues(alpha: 0.2)
+        ..strokeWidth = 1
+        ..strokeCap = StrokeCap.round;
+      for (var i = 1; i < totalChapters; i++) {
+        final x = (i / totalChapters).clamp(0.0, 1.0) * size.width;
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), dotPaint);
+      }
+    }
+
+    // Checkpoint markers — thick lines
+    final cpPaint = Paint()
       ..color = color.withValues(alpha: 0.4)
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
 
     for (final cp in checkpoints) {
       final x = cp.clamp(0.0, 1.0) * size.width;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), cpPaint);
     }
   }
 
   @override
   bool shouldRepaint(_CheckpointMarkerPainter oldDelegate) =>
-      checkpoints != oldDelegate.checkpoints;
+      checkpoints != oldDelegate.checkpoints || totalChapters != oldDelegate.totalChapters;
 }
 
 class _SliderWithPreview extends StatefulWidget {
@@ -454,7 +469,7 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
               ),
           ],
         ),
-        if (widget.checkpoints.isNotEmpty)
+        if (widget.totalChapters > 1 || widget.checkpoints.isNotEmpty)
           SizedBox(
             height: 6,
             child: CustomPaint(
@@ -462,6 +477,7 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
               painter: _CheckpointMarkerPainter(
                 checkpoints: widget.checkpoints,
                 color: widget.colors.text,
+                totalChapters: widget.totalChapters,
               ),
             ),
           ),
