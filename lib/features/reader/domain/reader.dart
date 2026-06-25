@@ -76,7 +76,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(1.6) double lineHeight,
     @Default(20.0) double margin,
     @Default(ReaderFont.literata) ReaderFont font,
-    @Default(12.0) double paragraphSpacing,
+    @Default(20.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
     @Default(0.0) double fontWeightDelta,
     @Default(ReaderTextAlign.justify) ReaderTextAlign textAlign,

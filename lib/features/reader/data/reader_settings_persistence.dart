@@ -30,7 +30,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['font'],
           orElse: () => ReaderFont.literata,
         ),
-        paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 12.0,
+        paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 20.0,
         letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
         fontWeightDelta: (map['fontWeightDelta'] as num?)?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(

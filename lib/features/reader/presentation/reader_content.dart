@@ -245,8 +245,8 @@ Widget _buildReaderBlock(
       );
     case BlockType.cite:
       return Container(
-        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
-        padding: const EdgeInsets.fromLTRB(24, 8, 8, 8),
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 1.5),
+        padding: const EdgeInsets.fromLTRB(24, 12, 12, 12),
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),
@@ -276,8 +276,8 @@ Widget _buildReaderBlock(
       );
     case BlockType.quote:
       return Container(
-        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+        margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 1.5),
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
         decoration: BoxDecoration(
           border: Border(
             left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),

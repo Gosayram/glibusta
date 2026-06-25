@@ -332,6 +332,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
     let mut in_block = false; // inside p, h1-h6, blockquote
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
+    let mut blockquote_depth: i32 = 0;
 
     // Rich span tracking
     let mut rich_spans: Vec<RichSpan> = Vec::new();
@@ -379,7 +380,11 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         rich_spans.clear();
                         span_text.clear();
                         in_block = true;
-                        block_type = BlockType::Paragraph;
+                        block_type = if blockquote_depth > 0 {
+                            BlockType::Quote
+                        } else {
+                            BlockType::Paragraph
+                        };
                         heading_level = None;
                     }
                     t if t.starts_with('h') && t.len() == 2 && in_body => {
@@ -435,6 +440,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                         in_block = true;
                         block_type = BlockType::Quote;
                         heading_level = None;
+                        blockquote_depth += 1;
                     }
                     "table" if in_body => {
                         flush_rich_span(
@@ -566,6 +572,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                     }
                     "br" if in_block => {
                         span_text.push('\n');
+                        current_text.push('\n');
                     }
                     _ => {}
                 }
@@ -706,11 +713,12 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                     current_text.clear();
                                     rich_spans.clear();
                                     span_text.clear();
-                                    in_block = false;
-                                    bold = false;
-                                    italic = false;
-                                    superscript = false;
-                                    href = None;
+                        in_block = false;
+                        bold = false;
+                        italic = false;
+                        superscript = false;
+                        href = None;
+                        blockquote_depth = (blockquote_depth - 1).max(0);
                                 }
                             }
                         }

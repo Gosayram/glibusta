@@ -57,6 +57,10 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_coverpage = false;
     let mut in_binary = false;
     let mut in_text_author = false;
+    let mut in_poem = false;
+    let mut in_stanza = false;
+    let mut in_cite = false;
+    let mut in_pre = false;
 
     let mut current_text = String::new();
     let mut current_author_parts: Vec<String> = Vec::new();
@@ -113,6 +117,34 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "empty-line" if in_body => in_empty_line = true,
                     "image" if in_body && !in_coverpage => in_image = true,
                     "text-author" if in_body => in_text_author = true,
+                    "poem" if in_body => in_poem = true,
+                    "stanza" if in_body && in_poem => {
+                        // Insert separator between stanzas
+                        if !current_text.trim().is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: current_text.trim().to_string(),
+                                block_type: BlockType::Poem,
+                                ..default_block()
+                            });
+                            block_index += 1;
+                        }
+                        current_text.clear();
+                        in_stanza = true;
+                    }
+                    "v" if in_body && in_poem => {
+                        // Verse line — treated like <p> inside poem
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            if in_cite { BlockType::Cite } else { BlockType::Poem },
+                        );
+                    }
+                    "cite" if in_body => in_cite = true,
+                    "pre" if in_body => in_pre = true,
                     "strong" if in_p || in_subtitle => {
                         flush_rich_span(
                             &mut current_rich_spans,
@@ -427,6 +459,73 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         }
                         in_text_author = false;
                     }
+                    "poem" if in_body && in_poem => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Poem,
+                        );
+                        in_poem = false;
+                        in_stanza = false;
+                    }
+                    "stanza" if in_body && in_stanza => {
+                        // Flush any remaining verse text in this stanza
+                        if !current_text.trim().is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: current_text.trim().to_string(),
+                                block_type: BlockType::Poem,
+                                ..default_block()
+                            });
+                            block_index += 1;
+                        }
+                        current_text.clear();
+                        // Add stanza separator (empty line)
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Separator,
+                            ..default_block()
+                        });
+                        block_index += 1;
+                        in_stanza = false;
+                    }
+                    "v" if in_body && in_poem => {
+                        // Verse end — flush as poem line
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Poem,
+                        );
+                    }
+                    "cite" if in_body && in_cite => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Cite,
+                        );
+                        in_cite = false;
+                    }
+                    "pre" if in_body && in_pre => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Paragraph,
+                        );
+                        in_pre = false;
+                    }
                     "empty-line" if in_body => {
                         body_blocks.push(ReaderBlock {
                             index: block_index,
@@ -640,4 +739,69 @@ fn detect_fb2_encoding(bytes: &[u8]) -> String {
         }
     }
     "utf-8".to_string()
+}
+
+fn default_block() -> ReaderBlock {
+    ReaderBlock {
+        index: 0,
+        text: String::new(),
+        block_type: BlockType::Paragraph,
+        image_url: None,
+        note_ref: None,
+        rich_spans: None,
+        heading_level: None,
+        ordered: None,
+        list_items: None,
+        table_rows: None,
+        image_alt: None,
+        text_indent: None,
+        text_align: None,
+        note_id: None,
+    }
+}
+
+fn flush_fb2_block(
+    blocks: &mut Vec<ReaderBlock>,
+    current_text: &mut String,
+    current_rich_spans: &mut Vec<RichSpan>,
+    current_span_text: &mut String,
+    block_index: &mut i32,
+    block_type: BlockType,
+) {
+    flush_rich_span(
+        current_rich_spans,
+        current_span_text,
+        false,
+        false,
+        false,
+        &None,
+    );
+    let t = current_text.trim().to_string();
+    if !t.is_empty() {
+        let rich = if current_rich_spans.is_empty() {
+            None
+        } else {
+            Some(current_rich_spans.clone())
+        };
+        blocks.push(ReaderBlock {
+            index: *block_index,
+            text: t,
+            block_type,
+            image_url: None,
+            note_ref: None,
+            rich_spans: rich,
+            heading_level: None,
+            ordered: None,
+            list_items: None,
+            table_rows: None,
+            image_alt: None,
+            text_indent: None,
+            text_align: None,
+            note_id: None,
+        });
+        *block_index += 1;
+    }
+    current_text.clear();
+    current_rich_spans.clear();
+    current_span_text.clear();
 }
