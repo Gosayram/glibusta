@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../../core/platform/adaptive_context.dart';
+
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
@@ -436,18 +436,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             if (_ctrl.popLinkPosition()) return;
             Navigator.of(context).pop();
           },
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wc = windowClassOf(context);
-              if (wc == WindowClass.compact) {
-                return _buildPhoneLayout(context, readerState, settings);
-              } else if (wc == WindowClass.medium) {
-                return _buildTabletLayout(context, readerState, settings);
-              } else {
-                return _buildDesktopLayout(context, readerState, settings);
-              }
-            },
-          ),
+          child: _buildReaderLayout(context, readerState, settings),
         ),
       ),
     );
@@ -631,35 +620,35 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         onPointerSignal: _handlePointerSignal,
         child: GestureDetector(
           onVerticalDragStart:
-              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+              _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragStart
               : null,
           onVerticalDragUpdate:
-              _gestureCoordinator.shouldHandleVerticalDrag && settings.verticalSwipeBrightness
+              _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragUpdate
               : null,
           onDoubleTap:
-              _gestureCoordinator.shouldHandleDoubleTap &&
+              _gestureCoordinator.canInteract &&
                   settings.doubleTapAction != DoubleTapAction.disabled
               ? _ctrl.handleDoubleTap
               : null,
           onHorizontalDragStart:
-              _gestureCoordinator.shouldHandleVerticalDrag &&
+              _gestureCoordinator.canInteract &&
                   settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragStart
               : null,
           onHorizontalDragUpdate:
-              _gestureCoordinator.shouldHandleVerticalDrag &&
+              _gestureCoordinator.canInteract &&
                   settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragUpdate
               : null,
           onHorizontalDragEnd:
-              _gestureCoordinator.shouldHandleVerticalDrag &&
+              _gestureCoordinator.canInteract &&
                   settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragEnd
               : null,
           onLongPress:
-              _gestureCoordinator.shouldHandleLongPress &&
+              _gestureCoordinator.canInteract &&
                   settings.longPressAction != LongPressAction.disabled
               ? () {
                   _ctrl.handleLongPress();
@@ -675,7 +664,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               loadedChapters: readerState.loadedChapters,
               settings: settings,
               scrollController: _ctrl.scrollController,
-              onTap: _gestureCoordinator.shouldHandleTap
+              onTap: _gestureCoordinator.canInteract
                   ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
                   : (_) {},
               initialProgress: readerState.scrollProgress,
@@ -692,17 +681,31 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
-  Widget _buildPhoneLayout(
+  Widget _buildReaderLayout(
     BuildContext context,
     ReaderState readerState,
     ReaderSettings settings,
   ) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
-    final maxContentWidth = isLandscape ? 720.0 : double.infinity;
-    final horizontalPadding = isLandscape
-        ? ((screenWidth - maxContentWidth) / 2).clamp(16.0, 48.0)
-        : 0.0;
+    final double horizontalPadding;
+    if (screenWidth >= 840) {
+      // Desktop: readerWidth with clamping
+      final maxContentWidth = (screenWidth - 32.0).clamp(600.0, screenWidth);
+      final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
+      horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
+    } else if (screenWidth >= 600) {
+      // Tablet
+      final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
+      final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
+      horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
+    } else {
+      // Phone
+      final maxContentWidth = isLandscape ? 720.0 : double.infinity;
+      horizontalPadding = isLandscape
+          ? ((screenWidth - maxContentWidth) / 2).clamp(16.0, 48.0)
+          : 0.0;
+    }
 
     return Scaffold(
       backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
@@ -711,56 +714,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         readerState,
         settings,
         content: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: _buildGestureWrappedContent(context, readerState, settings),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabletLayout(
-    BuildContext context,
-    ReaderState readerState,
-    ReaderSettings settings,
-  ) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxContentWidth = screenWidth > 640 ? 720.0 : screenWidth - 32.0;
-    final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(16.0, 48.0);
-
-    return Scaffold(
-      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: _buildReaderContentStack(
-        context,
-        readerState,
-        settings,
-        content: Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: _buildGestureWrappedContent(context, readerState, settings),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(
-    BuildContext context,
-    ReaderState readerState,
-    ReaderSettings settings,
-  ) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxContentWidth = (screenWidth - 32.0).clamp(600.0, screenWidth);
-    final effectiveWidth = settings.readerWidth.clamp(600.0, maxContentWidth);
-    final horizontalPadding = ((screenWidth - effectiveWidth) / 2).clamp(0.0, double.infinity);
-
-    return Scaffold(
-      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: _buildReaderContentStack(
-        context,
-        readerState,
-        settings,
-        content: Container(
-          width: double.infinity,
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: _buildGestureWrappedContent(context, readerState, settings),
         ),

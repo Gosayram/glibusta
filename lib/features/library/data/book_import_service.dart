@@ -11,7 +11,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
-import '../../../core/http/http_client.dart';
+
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
