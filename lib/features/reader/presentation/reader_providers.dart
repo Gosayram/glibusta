@@ -84,6 +84,26 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(fontWeightDelta: delta);
   }
 
+  void applyTypographyPreset({
+    required ReaderFont font,
+    required int fontSize,
+    required double lineHeight,
+    required double margin,
+    required double paragraphSpacing,
+    required double paragraphFirstLineIndent,
+    required ReaderTextAlign textAlign,
+  }) {
+    state = state.copyWith(
+      font: font,
+      fontSize: fontSize.toDouble(),
+      lineHeight: lineHeight,
+      margin: margin,
+      paragraphSpacing: paragraphSpacing,
+      paragraphFirstLineIndent: paragraphFirstLineIndent,
+      textAlign: textAlign,
+    );
+  }
+
   void updateTextAlign(ReaderTextAlign align) {
     state = state.copyWith(textAlign: align);
   }

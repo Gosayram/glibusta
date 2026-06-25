@@ -11,6 +11,18 @@ import '../domain/reader.dart';
 import 'color_preset_provider.dart';
 import 'reader_providers.dart';
 
+class _TypographyPreset {
+  const _TypographyPreset(this.name, this.font, this.fontSize, this.lineHeight, this.margin, this.paragraphSpacing, this.paragraphFirstLineIndent, this.textAlign);
+  final String name;
+  final ReaderFont font;
+  final int fontSize;
+  final double lineHeight;
+  final double margin;
+  final double paragraphSpacing;
+  final double paragraphFirstLineIndent;
+  final ReaderTextAlign textAlign;
+}
+
 class ReaderQuickSettingsSheet extends ConsumerStatefulWidget {
   const ReaderQuickSettingsSheet({super.key, this.bookId});
 
@@ -140,6 +152,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
+        const _SectionTitle('Пресеты'),
+        _buildPresetRow(settings, notifier),
+        const SizedBox(height: 16),
         const _SectionTitle('Тема'),
         _buildThemeRow(context, settings, notifier),
         const SizedBox(height: 8),
@@ -407,6 +422,78 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Нижняя панель'),
         _buildBottomBarContentRow(settings, notifier),
       ],
+    );
+  }
+
+  // ── Typography presets ──
+
+  static Widget _buildPresetRow(ReaderSettings settings, ReaderSettingsNotifier notifier) {
+    const presets = <_TypographyPreset>[
+      _TypographyPreset('Классика', ReaderFont.literata, 18, 1.6, 20, 20, 0, ReaderTextAlign.justify),
+      _TypographyPreset('Компактно', ReaderFont.inter, 14, 1.3, 12, 14, 0, ReaderTextAlign.left),
+      _TypographyPreset('Комфортно', ReaderFont.literata, 22, 1.8, 24, 24, 16, ReaderTextAlign.justify),
+      _TypographyPreset('Минимализм', ReaderFont.system, 16, 1.5, 16, 18, 0, ReaderTextAlign.left),
+    ];
+
+    return SizedBox(
+      height: 72,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, i) {
+          final p = presets[i];
+          final active = settings.font == p.font &&
+              settings.fontSize.round() == p.fontSize &&
+              settings.lineHeight == p.lineHeight;
+          return GestureDetector(
+            onTap: () => notifier.applyTypographyPreset(
+              font: p.font,
+              fontSize: p.fontSize,
+              lineHeight: p.lineHeight,
+              margin: p.margin,
+              paragraphSpacing: p.paragraphSpacing,
+              paragraphFirstLineIndent: p.paragraphFirstLineIndent,
+              textAlign: p.textAlign,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 100,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: active ? Colors.blue.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: active ? Colors.blue.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    p.name,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: active ? Colors.blue : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Aa ${p.fontSize}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: p.font.fontFamily,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
