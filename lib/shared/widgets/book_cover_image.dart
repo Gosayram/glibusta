@@ -44,16 +44,14 @@ class BookCoverImage extends ConsumerWidget {
           ),
         ],
       );
-      return useHero
-          ? Hero(tag: 'book_cover_${book.id}', child: imageWidget)
-          : imageWidget;
+      return useHero ? Hero(tag: 'book_cover_${book.id}', child: imageWidget) : imageWidget;
     }
 
     // coverUrl: only valid for HTTP(S) URLs — skip data: URIs
-    final isHttpUrl = book.coverUrl != null &&
+    final isHttpUrl =
+        book.coverUrl != null &&
         book.coverUrl!.isNotEmpty &&
-        (book.coverUrl!.startsWith('http://') ||
-            book.coverUrl!.startsWith('https://'));
+        (book.coverUrl!.startsWith('http://') || book.coverUrl!.startsWith('https://'));
 
     if (!isHttpUrl) {
       return _buildPlaceholder(context);

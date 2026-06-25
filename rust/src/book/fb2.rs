@@ -140,7 +140,11 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             &mut current_rich_spans,
                             &mut current_span_text,
                             &mut block_index,
-                            if in_cite { BlockType::Cite } else { BlockType::Poem },
+                            if in_cite {
+                                BlockType::Cite
+                            } else {
+                                BlockType::Poem
+                            },
                         );
                     }
                     "cite" if in_body => in_cite = true,

@@ -713,12 +713,12 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                     current_text.clear();
                                     rich_spans.clear();
                                     span_text.clear();
-                        in_block = false;
-                        bold = false;
-                        italic = false;
-                        superscript = false;
-                        href = None;
-                        blockquote_depth = (blockquote_depth - 1).max(0);
+                                    in_block = false;
+                                    bold = false;
+                                    italic = false;
+                                    superscript = false;
+                                    href = None;
+                                    blockquote_depth = (blockquote_depth - 1).max(0);
                                 }
                             }
                         }

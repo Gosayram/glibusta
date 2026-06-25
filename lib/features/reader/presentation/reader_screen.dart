@@ -619,12 +619,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       child: Listener(
         onPointerSignal: _handlePointerSignal,
         child: GestureDetector(
-          onVerticalDragStart:
-              _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
+          onVerticalDragStart: _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragStart
               : null,
-          onVerticalDragUpdate:
-              _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
+          onVerticalDragUpdate: _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragUpdate
               : null,
           onDoubleTap:
@@ -633,18 +631,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ? _ctrl.handleDoubleTap
               : null,
           onHorizontalDragStart:
-              _gestureCoordinator.canInteract &&
-                  settings.horizontalGesture != HorizontalGesture.off
+              _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragStart
               : null,
           onHorizontalDragUpdate:
-              _gestureCoordinator.canInteract &&
-                  settings.horizontalGesture != HorizontalGesture.off
+              _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragUpdate
               : null,
           onHorizontalDragEnd:
-              _gestureCoordinator.canInteract &&
-                  settings.horizontalGesture != HorizontalGesture.off
+              _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragEnd
               : null,
           onLongPress:
