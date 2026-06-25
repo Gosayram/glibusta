@@ -33,6 +33,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   bool _hasSearched = false;
   bool _isSearching = false;
   bool _searchCurrentChapter = false;
+  bool _matchCase = false;
 
   @override
   void initState() {
@@ -73,6 +74,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
     final results = await widget.searchService.search(
       query,
       chapterIndex: _searchCurrentChapter ? widget.currentChapterIndex : null,
+      matchCase: _matchCase,
     );
     if (!mounted) return;
     setState(() {
@@ -145,6 +147,23 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                         }
                       },
                     ),
+                  IconButton(
+                    icon: Text(
+                      'Aa',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: _matchCase ? FontWeight.w700 : FontWeight.w400,
+                        color: _matchCase ? Colors.blue : textColor,
+                      ),
+                    ),
+                    tooltip: _matchCase ? 'С учётом регистра' : 'Без регистра',
+                    onPressed: () {
+                      setState(() => _matchCase = !_matchCase);
+                      if (_controller.text.isNotEmpty) {
+                        unawaited(_performSearch(_controller.text));
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
