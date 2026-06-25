@@ -173,6 +173,7 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
     color: colors.text,
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
+    wordSpacing: s.hyphenation && s.textAlign == ReaderTextAlign.justify ? -0.5 : 0,
   );
 }
 
@@ -379,6 +380,7 @@ Widget _readerHighlightedText(
   List<RichSpan>? richSpans,
   double firstLineIndent = 0,
 }) {
+  final locale = ctx.settings.hyphenation ? const Locale('ru') : null;
   final query = ctx.highlightQuery?.trim();
   if (query == null || query.isEmpty) {
     if (richSpans != null && richSpans.isNotEmpty) {
@@ -391,14 +393,14 @@ Widget _readerHighlightedText(
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
       }
-      return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+      return Text.rich(TextSpan(children: spans), textAlign: textAlign, locale: locale);
     }
     if (ctx.settings.bionicReading) {
       final spans = _bionicReadingSpans(text, style);
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
       }
-      return Text.rich(TextSpan(children: spans), textAlign: textAlign);
+      return Text.rich(TextSpan(children: spans), textAlign: textAlign, locale: locale);
     }
     if (firstLineIndent > 0) {
       return Text.rich(
@@ -410,13 +412,15 @@ Widget _readerHighlightedText(
         ),
         style: style,
         textAlign: textAlign,
+        locale: locale,
       );
     }
-    return Text(text, style: style, textAlign: textAlign);
+    return Text(text, style: style, textAlign: textAlign, locale: locale);
   }
   return Text.rich(
     TextSpan(children: _readerHighlightedSpans(text, style, query)),
     textAlign: textAlign,
+    locale: locale,
   );
 }
 
