@@ -333,12 +333,14 @@ class _SliderWithPreview extends StatefulWidget {
 class _SliderWithPreviewState extends State<_SliderWithPreview> {
   bool _dragging = false;
   double _dragValue = 0;
+  double _preDragValue = 0;
 
   @override
   Widget build(BuildContext context) {
     final value = _dragging ? _dragValue : widget.value;
     final dragPercent = (value * 100).round();
     final dragChapter = (value * widget.totalChapters).ceil().clamp(1, widget.totalChapters);
+    final moved = _dragging && (value - _preDragValue).abs() > 0.005;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -352,13 +354,38 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
                 color: widget.colors.text.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                'Глава $dragChapter / ${widget.totalChapters}  ·  $dragPercent%',
-                style: TextStyle(
-                  color: widget.colors.scaffold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Глава $dragChapter / ${widget.totalChapters}  ·  $dragPercent%',
+                    style: TextStyle(
+                      color: widget.colors.scaffold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (moved) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _dragValue = _preDragValue;
+                          _dragging = false;
+                        });
+                        widget.onChanged(_preDragValue);
+                      },
+                      child: Text(
+                        'Отмена',
+                        style: TextStyle(
+                          color: widget.colors.scaffold.withValues(alpha: 0.7),
+                          fontSize: 11,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
@@ -390,6 +417,7 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
                   onChangeStart: (v) => setState(() {
                     _dragging = true;
                     _dragValue = v;
+                    _preDragValue = widget.value;
                   }),
                   onChanged: (v) => setState(() => _dragValue = v),
                   onChangeEnd: (v) {
