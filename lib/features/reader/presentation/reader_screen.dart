@@ -537,6 +537,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               child: ReaderTopBar(
                 settings: settings,
                 bookTitle: readerState.metadata?.title ?? '',
+                bookAuthor: readerState.metadata?.authors.join(', '),
                 onBack: () {
                   if (_ctrl.popLinkPosition()) return;
                   Navigator.of(context).pop();
