@@ -11,7 +11,9 @@ class ReaderTopBar extends StatelessWidget {
     required this.onBack,
     this.bookAuthor,
     this.onSearch,
+    this.onBookmark,
     this.onMore,
+    this.isBookmarked = false,
   });
 
   final ReaderSettings settings;
@@ -19,7 +21,9 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback onBack;
   final String? bookAuthor;
   final VoidCallback? onSearch;
+  final VoidCallback? onBookmark;
   final VoidCallback? onMore;
+  final bool isBookmarked;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +76,15 @@ class ReaderTopBar extends StatelessWidget {
               tooltip: 'Поиск по книге',
               onPressed: onSearch ?? () {},
             ),
+            if (onBookmark != null)
+              IconButton(
+                icon: Icon(
+                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  color: isBookmarked ? Colors.amber : colors.text,
+                ),
+                tooltip: isBookmarked ? 'Убрать закладку' : 'Добавить закладку',
+                onPressed: onBookmark,
+              ),
             IconButton(
               icon: const Icon(Icons.more_vert),
               color: colors.text,

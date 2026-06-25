@@ -538,6 +538,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 settings: settings,
                 bookTitle: readerState.metadata?.title ?? '',
                 bookAuthor: readerState.metadata?.authors.join(', '),
+                isBookmarked: readerState.checkpoints.any(
+                  (c) => (c - readerState.scrollProgress).abs() < 0.02,
+                ),
                 onBack: () {
                   if (_ctrl.popLinkPosition()) return;
                   Navigator.of(context).pop();
@@ -550,6 +553,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     _gestureCoordinator.onSearchClosed();
                   }
                 },
+                onBookmark: () => _ctrl.addBookmark(),
                 onMore: () => _showQuickSettings(context),
               ),
             ),
