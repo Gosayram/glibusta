@@ -158,7 +158,6 @@ class ReaderCtx {
 }
 
 TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
-  final fontFamily = s.font == ReaderFont.inter ? 'Inter' : 'Literata';
   final fw = (s.fontWeightDelta > 0.33)
       ? FontWeight.w600
       : (s.fontWeightDelta > 0)
@@ -167,13 +166,13 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       ? FontWeight.w300
       : FontWeight.w400;
   return TextStyle(
-    fontFamily: fontFamily,
+    fontFamily: s.font.fontFamily,
     fontSize: s.fontSize,
     height: s.lineHeight,
     color: colors.text,
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
-    wordSpacing: s.wordSpacing + (s.hyphenation && s.textAlign == ReaderTextAlign.justify ? -0.5 : 0),
+    wordSpacing: s.wordSpacing,
   );
 }
 

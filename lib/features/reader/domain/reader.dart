@@ -28,10 +28,23 @@ enum AutoThemeMode {
 
 enum ReaderFont {
   literata('Literata'),
-  inter('Inter');
+  inter('Inter'),
+  serif('Serif'),
+  sans('Sans-Serif'),
+  mono('Monospace'),
+  system('Системный');
 
   const ReaderFont(this.displayName);
   final String displayName;
+
+  String get fontFamily => switch (this) {
+    ReaderFont.literata => 'Literata',
+    ReaderFont.inter => 'Inter',
+    ReaderFont.serif => 'serif',
+    ReaderFont.sans => 'sans-serif',
+    ReaderFont.mono => 'monospace',
+    ReaderFont.system => '',
+  };
 }
 
 enum ReaderTextAlign {
