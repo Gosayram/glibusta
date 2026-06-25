@@ -712,23 +712,23 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       children: [
         IconButton(
           icon: const Icon(Icons.remove, size: 20),
-          onPressed: settings.fontSize > 12
+          onPressed: settings.fontSize > 10
               ? () => notifier.updateFontSize(settings.fontSize - 1)
               : null,
         ),
         Expanded(
           child: Slider(
             value: settings.fontSize,
-            min: 12,
-            max: 32,
-            divisions: 20,
+            min: 10,
+            max: 40,
+            divisions: 30,
             label: '${settings.fontSize.round()}px',
             onChanged: (v) => notifier.updateFontSize(v),
           ),
         ),
         IconButton(
           icon: const Icon(Icons.add, size: 20),
-          onPressed: settings.fontSize < 32
+          onPressed: settings.fontSize < 40
               ? () => notifier.updateFontSize(settings.fontSize + 1)
               : null,
         ),

@@ -425,11 +425,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           onNextPage: () => _goToNextPage(),
           onPreviousPage: () => _goToPreviousPage(),
           onIncreaseFontSize: () {
-            final newSize = (settings.fontSize + 2.0).clamp(12.0, 32.0);
+            final newSize = (settings.fontSize + 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onDecreaseFontSize: () {
-            final newSize = (settings.fontSize - 2.0).clamp(12.0, 32.0);
+            final newSize = (settings.fontSize - 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onClosePanel: () {
