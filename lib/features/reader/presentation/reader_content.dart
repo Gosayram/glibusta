@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../../../app/router.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../data/parsers/normalized_book.dart';
@@ -516,8 +517,13 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
   final isFileUri = uri != null && uri.scheme == 'file';
   final isPlainPath = uri == null || !uri.isAbsolute;
 
-  Widget wrap(Widget img) =>
-      colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
+  Widget wrap(Widget img) {
+    final filtered = colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
+    return GestureDetector(
+      onTap: () => _showFullscreenImage(imageUrl),
+      child: filtered,
+    );
+  }
 
   if (isDataUri) {
     final data = imageUrl.split(',');
@@ -547,6 +553,60 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
     );
   }
   return Icon(Icons.broken_image, size: 64, color: errorColor);
+}
+
+void _showFullscreenImage(String imageUrl) {
+  final context = rootNavigatorKey.currentContext;
+  if (context == null) return;
+  unawaited(Navigator.of(context).push<void>(
+    PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black87,
+      barrierDismissible: true,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (ctx, a, b) => _FullscreenImageViewer(imageUrl: imageUrl),
+    ),
+  ));
+}
+
+class _FullscreenImageViewer extends StatelessWidget {
+  const _FullscreenImageViewer({required this.imageUrl});
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).pop(),
+      child: Center(
+        child: InteractiveViewer(
+          maxScale: 5.0,
+          minScale: 0.5,
+          child: _buildImage(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImage() {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        return Image.memory(base64Decode(data.last), fit: BoxFit.contain);
+      }
+    }
+    if (isFileUri || isPlainPath) {
+      return Image.file(
+        File(isFileUri ? uri.path : imageUrl),
+        fit: BoxFit.contain,
+      );
+    }
+    return const Icon(Icons.broken_image, size: 64, color: Colors.white);
+  }
 }
 
 Widget _readerTableBlock(ReaderBlock block, ReaderSettings settings, TextStyle baseStyle) {
