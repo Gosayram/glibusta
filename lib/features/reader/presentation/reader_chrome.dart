@@ -126,7 +126,6 @@ class ReaderBottomBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Chapter title
             if (chapterTitle.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -141,7 +140,6 @@ class ReaderBottomBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            // Progress info — respects bottomBarContent setting
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -155,65 +153,20 @@ class ReaderBottomBar extends StatelessWidget {
                 ),
               ],
             ),
-            // Slider
             if (onJumpToProgress != null) ...[
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  if (onCheckpointBack != null)
-                    GestureDetector(
-                      onTap: onCheckpointBack,
-                      child: Icon(
-                        Icons.bookmark,
-                        size: 16,
-                        color: checkpoints.any((c) => c < scrollProgress - 0.02)
-                            ? colors.text.withValues(alpha: 0.6)
-                            : colors.text.withValues(alpha: 0.15),
-                      ),
-                    ),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderThemeData(
-                        activeTrackColor: colors.text.withValues(alpha: 0.4),
-                        inactiveTrackColor: colors.text.withValues(alpha: 0.15),
-                        thumbColor: colors.text.withValues(alpha: 0.7),
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        trackHeight: 2,
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                      ),
-                      child: Slider(
-                        value: scrollProgress.clamp(0.0, 1.0),
-                        onChanged: onJumpToProgress,
-                      ),
-                    ),
-                  ),
-                  if (onCheckpointForward != null)
-                    GestureDetector(
-                      onTap: onCheckpointForward,
-                      child: Icon(
-                        Icons.bookmark,
-                        size: 16,
-                        color: checkpoints.any((c) => c > scrollProgress + 0.02)
-                            ? colors.text.withValues(alpha: 0.6)
-                            : colors.text.withValues(alpha: 0.15),
-                      ),
-                    ),
-                ],
+              _SliderWithPreview(
+                value: scrollProgress,
+                totalChapters: totalChapters,
+                currentChapterIndex: currentChapterIndex,
+                settings: settings,
+                colors: colors,
+                onChanged: onJumpToProgress!,
+                checkpoints: checkpoints,
+                onCheckpointBack: onCheckpointBack,
+                onCheckpointForward: onCheckpointForward,
               ),
-              // Checkpoint markers
-              if (checkpoints.isNotEmpty)
-                SizedBox(
-                  height: 6,
-                  child: CustomPaint(
-                    size: Size.infinite,
-                    painter: _CheckpointMarkerPainter(
-                      checkpoints: checkpoints,
-                      color: colors.text,
-                    ),
-                  ),
-                ),
             ],
-            // Mode switcher
             if (onModeChanged != null) _buildModeSwitcher(colors),
           ],
         ),
@@ -348,4 +301,129 @@ class _CheckpointMarkerPainter extends CustomPainter {
   @override
   bool shouldRepaint(_CheckpointMarkerPainter oldDelegate) =>
       checkpoints != oldDelegate.checkpoints;
+}
+
+class _SliderWithPreview extends StatefulWidget {
+  const _SliderWithPreview({
+    required this.value,
+    required this.totalChapters,
+    required this.currentChapterIndex,
+    required this.settings,
+    required this.colors,
+    required this.onChanged,
+    this.checkpoints = const [],
+    this.onCheckpointBack,
+    this.onCheckpointForward,
+  });
+
+  final double value;
+  final int totalChapters;
+  final int currentChapterIndex;
+  final ReaderSettings settings;
+  final ReaderColors colors;
+  final ValueChanged<double> onChanged;
+  final List<double> checkpoints;
+  final VoidCallback? onCheckpointBack;
+  final VoidCallback? onCheckpointForward;
+
+  @override
+  State<_SliderWithPreview> createState() => _SliderWithPreviewState();
+}
+
+class _SliderWithPreviewState extends State<_SliderWithPreview> {
+  bool _dragging = false;
+  double _dragValue = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = _dragging ? _dragValue : widget.value;
+    final dragPercent = (value * 100).round();
+    final dragChapter = (value * widget.totalChapters).ceil().clamp(1, widget.totalChapters);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_dragging)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: widget.colors.text.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Глава $dragChapter / ${widget.totalChapters}  ·  $dragPercent%',
+                style: TextStyle(
+                  color: widget.colors.scaffold,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        Row(
+          children: [
+            if (widget.onCheckpointBack != null)
+              GestureDetector(
+                onTap: widget.onCheckpointBack,
+                child: Icon(
+                  Icons.bookmark,
+                  size: 16,
+                  color: widget.checkpoints.any((c) => c < widget.value - 0.02)
+                      ? widget.colors.text.withValues(alpha: 0.6)
+                      : widget.colors.text.withValues(alpha: 0.15),
+                ),
+              ),
+            Expanded(
+              child: SliderTheme(
+                data: SliderThemeData(
+                  activeTrackColor: widget.colors.text.withValues(alpha: 0.4),
+                  inactiveTrackColor: widget.colors.text.withValues(alpha: 0.15),
+                  thumbColor: widget.colors.text.withValues(alpha: 0.7),
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  trackHeight: 2,
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: Slider(
+                  value: value.clamp(0.0, 1.0),
+                  onChangeStart: (v) => setState(() {
+                    _dragging = true;
+                    _dragValue = v;
+                  }),
+                  onChanged: (v) => setState(() => _dragValue = v),
+                  onChangeEnd: (v) {
+                    setState(() => _dragging = false);
+                    widget.onChanged(v);
+                  },
+                ),
+              ),
+            ),
+            if (widget.onCheckpointForward != null)
+              GestureDetector(
+                onTap: widget.onCheckpointForward,
+                child: Icon(
+                  Icons.bookmark,
+                  size: 16,
+                  color: widget.checkpoints.any((c) => c > widget.value + 0.02)
+                      ? widget.colors.text.withValues(alpha: 0.6)
+                      : widget.colors.text.withValues(alpha: 0.15),
+                ),
+              ),
+          ],
+        ),
+        if (widget.checkpoints.isNotEmpty)
+          SizedBox(
+            height: 6,
+            child: CustomPaint(
+              size: Size.infinite,
+              painter: _CheckpointMarkerPainter(
+                checkpoints: widget.checkpoints,
+                color: widget.colors.text,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
