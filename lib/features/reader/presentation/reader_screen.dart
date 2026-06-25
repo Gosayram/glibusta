@@ -464,7 +464,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               theme: settings.theme,
             ),
           ),
-        if (settings.scrollbarIndicator)
+        if (settings.scrollbarIndicator && settings.mode == ReaderMode.continuous)
           Positioned(
             right: 2,
             top: 48,

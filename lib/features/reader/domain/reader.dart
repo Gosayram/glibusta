@@ -111,7 +111,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(0.5) double horizontalLimiterOffset,
     @Default(0.15) double horizontalLimiterDimming,
     @Default(true) bool horizontalLimiterLines,
-    @Default(false) bool scrollbarIndicator,
+    @Default(true) bool scrollbarIndicator,
     @Default(true) bool showImages,
     @Default(0.0) double imageCornerRadius,
     @Default(ImageAlignment.center) ImageAlignment imageAlignment,
