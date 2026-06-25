@@ -892,6 +892,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                     controller: widget.scrollController,
                     padding: effectiveMargin,
                     itemCount: itemCount,
+                    // ignore: deprecated_member_use
+                    cacheExtent: 500,
                     addAutomaticKeepAlives: false,
                     itemBuilder: (context, index) {
                       if (hasCover && index == 0) {
