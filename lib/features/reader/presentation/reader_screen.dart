@@ -705,6 +705,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               chapterHighlights: _buildChapterHighlights(),
               customColors: _resolveCustomColors(settings),
               onLinkTap: (href) => _handleLinkTap(href, readerState),
+              onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
             ),
           ),
         ),

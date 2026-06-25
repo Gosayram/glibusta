@@ -381,6 +381,25 @@ class ReaderController {
 
   // ── Chapter windowing ─────────────────────────────────
 
+  /// Called when the paginated reader swipes to a new page.
+  /// Triggers chapter loading for the page's chapter + eviction of distant ones.
+  void handlePageChanged(int chapterIndex) {
+    if (_disposed || _state.chapterCount == 0) return;
+    final clamped = chapterIndex.clamp(0, _state.chapterCount - 1);
+    if (clamped != _state.currentPosition.chapterIndex) {
+      _updateState(
+        _state.copyWith(
+          currentPosition: _state.currentPosition.copyWith(chapterIndex: clamped),
+        ),
+      );
+    }
+    _chapterLoadDebouncer.call(() {
+      if (_disposed) return;
+      unawaited(_ensureChaptersLoaded(clamped));
+      _evictDistantChapters(clamped);
+    });
+  }
+
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
     final generation = ++_chapterLoadGeneration;
     if (_loaded && !_state.isLoading) {

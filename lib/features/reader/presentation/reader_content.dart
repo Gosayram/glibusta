@@ -734,6 +734,7 @@ class ReaderContentBody extends StatefulWidget {
     this.blockTransformers,
     this.customColors,
     this.onLinkTap,
+    this.onPageChanged,
   });
 
   final NormalizedBookMetadata metadata;
@@ -748,6 +749,7 @@ class ReaderContentBody extends StatefulWidget {
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
   final ValueChanged<String>? onLinkTap;
+  final ValueChanged<int>? onPageChanged;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -779,6 +781,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         blockTransformers: widget.blockTransformers,
         customColors: widget.customColors,
         onLinkTap: widget.onLinkTap,
+        onPageChanged: widget.onPageChanged,
       );
     }
 
@@ -971,6 +974,7 @@ class _PaginatedContentBody extends StatefulWidget {
     this.blockTransformers,
     this.customColors,
     this.onLinkTap,
+    this.onPageChanged,
   });
 
   final NormalizedBookMetadata metadata;
@@ -983,6 +987,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
   final ValueChanged<String>? onLinkTap;
+  final ValueChanged<int>? onPageChanged;
 
   @override
   State<_PaginatedContentBody> createState() => _PaginatedContentBodyState();
@@ -1420,6 +1425,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             physics: physics,
             padEnds: false,
             itemCount: effectivePageCount,
+            onPageChanged: (index) {
+              if (_pages.isNotEmpty && index < _pages.length) {
+                widget.onPageChanged?.call(_pages[index].chapterIndex);
+              }
+            },
             itemBuilder: useSwitcher
                 ? (context, index) => AnimatedSwitcher(
                     duration: Duration(milliseconds: switcherDuration),
