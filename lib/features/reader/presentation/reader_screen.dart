@@ -581,6 +581,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     _gestureCoordinator.onSearchClosed();
                   },
                   theme: settings.theme,
+                  currentChapterIndex: _ctrl.state.currentPosition.chapterIndex,
                 );
               },
             ),

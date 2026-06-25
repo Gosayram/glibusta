@@ -47,13 +47,14 @@ class BookSearchService {
 
   int get totalParagraphs => _paragraphs.length;
 
-  Future<List<BookSearchResult>> search(String query, {int maxResults = 50}) async {
+  Future<List<BookSearchResult>> search(String query, {int maxResults = 50, int? chapterIndex}) async {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
     final lowerQuery = query.toLowerCase();
     final results = <BookSearchResult>[];
 
     for (var i = 0; i < _paragraphs.length; i++) {
+      if (chapterIndex != null && _chapterIndices[i] != chapterIndex) continue;
       if (i % 500 == 0) {
         await Future<void>.delayed(Duration.zero);
         if (gen != _searchGeneration) return const [];

@@ -12,12 +12,14 @@ class BookSearchOverlay extends StatefulWidget {
     required this.onJumpToResult,
     required this.onDismiss,
     required this.theme,
+    this.currentChapterIndex,
   });
 
   final BookSearchService searchService;
   final void Function(ReaderPosition position, String query) onJumpToResult;
   final VoidCallback onDismiss;
   final ReaderTheme theme;
+  final int? currentChapterIndex;
 
   @override
   State<BookSearchOverlay> createState() => _BookSearchOverlayState();
@@ -30,6 +32,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   List<BookSearchResult> _results = [];
   bool _hasSearched = false;
   bool _isSearching = false;
+  bool _searchCurrentChapter = false;
 
   @override
   void initState() {
@@ -67,7 +70,10 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       _isSearching = true;
       _hasSearched = true;
     });
-    final results = await widget.searchService.search(query);
+    final results = await widget.searchService.search(
+      query,
+      chapterIndex: _searchCurrentChapter ? widget.currentChapterIndex : null,
+    );
     if (!mounted) return;
     setState(() {
       _results = results;
@@ -122,6 +128,21 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       onPressed: () {
                         _controller.clear();
                         unawaited(_performSearch(''));
+                      },
+                    ),
+                  if (widget.currentChapterIndex != null)
+                    IconButton(
+                      icon: Icon(
+                        _searchCurrentChapter ? Icons.book : Icons.menu_book,
+                        size: 20,
+                      ),
+                      color: _searchCurrentChapter ? Colors.blue : textColor,
+                      tooltip: _searchCurrentChapter ? 'Текущая глава' : 'Вся книга',
+                      onPressed: () {
+                        setState(() => _searchCurrentChapter = !_searchCurrentChapter);
+                        if (_controller.text.isNotEmpty) {
+                          unawaited(_performSearch(_controller.text));
+                        }
                       },
                     ),
                 ],
