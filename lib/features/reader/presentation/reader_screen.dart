@@ -32,6 +32,7 @@ import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
 import 'reading_info_provider.dart';
+import 'table_of_contents_sheet.dart';
 
 enum _ReadingInfoPosition { header, footer }
 
@@ -553,6 +554,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     _gestureCoordinator.onSearchClosed();
                   }
                 },
+                onToc: readerState.metadata != null
+                    ? () {
+                        _ctrl.saveCheckpoint();
+                        TableOfContentsSheet.show(
+                          context,
+                          metadata: readerState.metadata!,
+                          currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          onJumpToPosition: _ctrl.jumpToPosition,
+                          loadedChapters: readerState.loadedChapters,
+                          isDynamicallyLoading: readerState.isDynamicallyLoading,
+                        );
+                      }
+                    : null,
                 onBookmark: () => _ctrl.addBookmark(),
                 onMore: () => _showQuickSettings(context),
               ),

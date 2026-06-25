@@ -11,6 +11,7 @@ class ReaderTopBar extends StatelessWidget {
     required this.onBack,
     this.bookAuthor,
     this.onSearch,
+    this.onToc,
     this.onBookmark,
     this.onMore,
     this.isBookmarked = false,
@@ -21,6 +22,7 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback onBack;
   final String? bookAuthor;
   final VoidCallback? onSearch;
+  final VoidCallback? onToc;
   final VoidCallback? onBookmark;
   final VoidCallback? onMore;
   final bool isBookmarked;
@@ -70,12 +72,20 @@ class ReaderTopBar extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.search),
-              color: colors.text,
-              tooltip: 'Поиск по книге',
-              onPressed: onSearch ?? () {},
-            ),
+            if (onSearch != null)
+              IconButton(
+                icon: const Icon(Icons.search),
+                color: colors.text,
+                tooltip: 'Поиск по книге',
+                onPressed: onSearch,
+              ),
+            if (onToc != null)
+              IconButton(
+                icon: const Icon(Icons.list),
+                color: colors.text,
+                tooltip: 'Содержание',
+                onPressed: onToc,
+              ),
             if (onBookmark != null)
               IconButton(
                 icon: Icon(
