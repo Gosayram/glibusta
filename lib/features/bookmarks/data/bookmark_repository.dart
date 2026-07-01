@@ -84,14 +84,18 @@ class BookmarkRepository {
 
   Future<String> exportToJson(String bookId) async {
     final bookmarks = await getAllBookmarks(bookId);
-    final list = bookmarks.map((b) => {
-      'id': b.id,
-      'chapterIndex': b.chapterIndex,
-      'paragraphIndex': b.paragraphIndex,
-      'selectedText': b.selectedText,
-      'note': b.note,
-      'createdAt': b.createdAt.toIso8601String(),
-    }).toList();
+    final list = bookmarks
+        .map(
+          (b) => {
+            'id': b.id,
+            'chapterIndex': b.chapterIndex,
+            'paragraphIndex': b.paragraphIndex,
+            'selectedText': b.selectedText,
+            'note': b.note,
+            'createdAt': b.createdAt.toIso8601String(),
+          },
+        )
+        .toList();
     // ponytail: simple JSON encode, no dependency needed
     final buf = StringBuffer('[');
     for (var i = 0; i < list.length; i++) {

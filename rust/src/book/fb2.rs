@@ -708,7 +708,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             .map(|blocks| {
                 let ch_title = blocks
                     .iter()
-                    .find(|b| b.block_type == BlockType::Heading || b.block_type == BlockType::Subtitle)
+                    .find(|b| {
+                        b.block_type == BlockType::Heading || b.block_type == BlockType::Subtitle
+                    })
                     .map(|b| b.text.clone())
                     .unwrap_or_else(|| title.clone());
                 let chapter = ReaderChapter {

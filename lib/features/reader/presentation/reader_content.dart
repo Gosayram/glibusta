@@ -322,7 +322,12 @@ Widget _buildReaderBlock(
               constraints: BoxConstraints(maxWidth: 600 * s.imageWidth),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(s.imageCornerRadius),
-                child: _readerImageWidget(block.imageUrl!, style.color, s, allImages: chapterImages),
+                child: _readerImageWidget(
+                  block.imageUrl!,
+                  style.color,
+                  s,
+                  allImages: chapterImages,
+                ),
               ),
             ),
           ),
@@ -366,9 +371,8 @@ Widget _buildReaderBlock(
       return _readerListBlock(ctx, block, textAlign);
     case BlockType.paragraph:
       final indentValue = switch (s.paragraphIndentMode) {
-        ParagraphIndentMode.asInBook => (block.textIndent != null && block.textIndent! > 0)
-            ? block.textIndent!
-            : 0.0,
+        ParagraphIndentMode.asInBook =>
+          (block.textIndent != null && block.textIndent! > 0) ? block.textIndent! : 0.0,
         ParagraphIndentMode.firstLine => s.paragraphFirstLineIndent,
         ParagraphIndentMode.emptyLine => 0.0,
         ParagraphIndentMode.custom => s.paragraphFirstLineIndent,
@@ -465,7 +469,9 @@ Widget _readerHighlightedText(
     return Text(text, style: style, textAlign: textAlign, locale: locale);
   }
   return Text.rich(
-    TextSpan(children: _readerHighlightedSpans(text, style, query, highlightColor: ctx.colors.highlight)),
+    TextSpan(
+      children: _readerHighlightedSpans(text, style, query, highlightColor: ctx.colors.highlight),
+    ),
     textAlign: textAlign,
     locale: locale,
   );
@@ -1119,7 +1125,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           return _buildReaderBlock(
             ctx,
             block,
-            isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
+            isAsInBook
+                ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
+                : baseAlign,
             blockHighlights: chapterHighlights
                 ?.where((TextHighlight h) => h.blockIndex == entry.key)
                 .toList(),
@@ -1131,7 +1139,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   ReaderCtx _ctx(ReaderSettings settings) {
-    final c = widget.customColors ??
+    final c =
+        widget.customColors ??
         ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     return ReaderCtx(
       settings: settings,
@@ -1385,11 +1394,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {
           return imgHeight +
               _measureTextHeight(
-                    block.imageCaption!,
-                    settings.fontSize * 0.8,
-                    settings.lineHeight,
-                    width,
-                  ) +
+                block.imageCaption!,
+                settings.fontSize * 0.8,
+                settings.lineHeight,
+                width,
+              ) +
               ps;
         }
         return imgHeight;
@@ -1418,7 +1427,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           ParagraphIndentMode.emptyLine => 0.0,
           ParagraphIndentMode.custom => settings.paragraphFirstLineIndent,
         };
-        final bottomPad = settings.paragraphIndentMode == ParagraphIndentMode.emptyLine ? ps * 2 : ps;
+        final bottomPad = settings.paragraphIndentMode == ParagraphIndentMode.emptyLine
+            ? ps * 2
+            : ps;
         return _measureTextHeight(
               block.text,
               settings.fontSize,
@@ -1517,7 +1528,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         _buildReaderBlock(
           ctx,
           block,
-          isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
+          isAsInBook
+              ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
+              : baseAlign,
           blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
         ),
       );
@@ -1541,7 +1554,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   ReaderCtx _ctx(ReaderSettings settings) {
-    final c = widget.customColors ??
+    final c =
+        widget.customColors ??
         ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     return ReaderCtx(
       settings: settings,

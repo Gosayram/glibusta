@@ -11,9 +11,8 @@ mixin _$HighlightDaoMixin on DatabaseAccessor<AppDatabase> {
 class HighlightDaoManager {
   final _$HighlightDaoMixin _db;
   HighlightDaoManager(this._db);
-  $$TextHighlightsTableTableManager get textHighlights =>
-      $$TextHighlightsTableTableManager(
-        _db.attachedDatabase,
-        _db.textHighlights,
-      );
+  $$TextHighlightsTableTableManager get textHighlights => $$TextHighlightsTableTableManager(
+    _db.attachedDatabase,
+    _db.textHighlights,
+  );
 }

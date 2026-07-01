@@ -231,7 +231,9 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                     ? Text(
                         'прочитано',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                       )
                     : isUnloaded

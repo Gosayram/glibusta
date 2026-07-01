@@ -289,17 +289,15 @@ class ReaderController {
       final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
           ? (loadedWords / loadedCount * totalCount).round()
           : loadedWords;
-      final totalSeconds = _accumulatedSeconds + (_sessionStopwatch.isRunning
-          ? _sessionStopwatch.elapsed.inSeconds
-          : 0);
+      final totalSeconds =
+          _accumulatedSeconds +
+          (_sessionStopwatch.isRunning ? _sessionStopwatch.elapsed.inSeconds : 0);
       final wpm = totalSeconds > 60 && _sessionWordsRead > 0
           ? (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800)
           : 200;
       _updateState(
         _state.copyWith(
-          estimatedMinutesLeft: estimatedTotalWords > 0
-              ? (estimatedTotalWords / wpm).ceil()
-              : 0,
+          estimatedMinutesLeft: estimatedTotalWords > 0 ? (estimatedTotalWords / wpm).ceil() : 0,
         ),
       );
 
@@ -804,7 +802,10 @@ class ReaderController {
   void handleTap(TapUpDetails details, double width) {
     final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
-    final zoneWidth = (width * settings.tapZoneWidth).clamp(48.0, double.infinity); // MD-24.3: 48dp min
+    final zoneWidth = (width * settings.tapZoneWidth).clamp(
+      48.0,
+      double.infinity,
+    ); // MD-24.3: 48dp min
     const snapMargin = 20.0; // ponytail: magnetic edge snapping
     if (x < zoneWidth + snapMargin) {
       scrollToPrevious();

@@ -13,12 +13,7 @@ part of 'lifecycle_service.dart';
 final lifecycleServiceProvider = LifecycleServiceProvider._();
 
 final class LifecycleServiceProvider
-    extends
-        $FunctionalProvider<
-          LifecycleService,
-          LifecycleService,
-          LifecycleService
-        >
+    extends $FunctionalProvider<LifecycleService, LifecycleService, LifecycleService>
     with $Provider<LifecycleService> {
   LifecycleServiceProvider._()
     : super(

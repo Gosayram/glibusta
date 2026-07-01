@@ -15,6 +15,7 @@ class ReaderTopBar extends StatelessWidget {
     this.onBookmark,
     this.onMore,
     this.isBookmarked = false,
+    this.hasLinkBack = false,
   });
 
   final ReaderSettings settings;
@@ -26,6 +27,7 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback? onBookmark;
   final VoidCallback? onMore;
   final bool isBookmarked;
+  final bool hasLinkBack;
 
   @override
   Widget build(BuildContext context) {
@@ -48,13 +50,16 @@ class ReaderTopBar extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // HG-22.3: link back history indicator
             Semantics(
               button: true,
               label: 'Назад',
               child: IconButton(
-                icon: const Icon(Icons.arrow_back),
+                icon: hasLinkBack
+                    ? const Icon(Icons.subdirectory_arrow_left)
+                    : const Icon(Icons.arrow_back),
                 color: colors.text,
-                tooltip: 'Назад',
+                tooltip: hasLinkBack ? 'Назад по ссылке' : 'Назад',
                 onPressed: onBack,
               ),
             ),
@@ -73,7 +78,10 @@ class ReaderTopBar extends StatelessWidget {
                         if (bookAuthor != null && bookAuthor!.isNotEmpty)
                           Text(
                             bookAuthor!,
-                            style: TextStyle(color: colors.text.withValues(alpha: 0.6), fontSize: 11),
+                            style: TextStyle(
+                              color: colors.text.withValues(alpha: 0.6),
+                              fontSize: 11,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                       ],

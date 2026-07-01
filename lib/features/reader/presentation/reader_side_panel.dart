@@ -230,7 +230,10 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
                   await Clipboard.setData(ClipboardData(text: buf.toString()));
                   if (mounted) {
                     messenger.showSnackBar(
-                      const SnackBar(content: Text('Заметки скопированы'), duration: Duration(seconds: 1)),
+                      const SnackBar(
+                        content: Text('Заметки скопированы'),
+                        duration: Duration(seconds: 1),
+                      ),
                     );
                   }
                 },
@@ -241,17 +244,21 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
                 itemCount: notes.length,
                 itemBuilder: (context, index) {
                   final note = notes[index];
-            return _buildPositionTile(
-              title: 'Заметка',
-              subtitle: note.content,
-              position: _toReaderPosition(note.chapterIndex, note.paragraphIndex, note.localOffset),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _notes.deleteNote(note.id),
+                  return _buildPositionTile(
+                    title: 'Заметка',
+                    subtitle: note.content,
+                    position: _toReaderPosition(
+                      note.chapterIndex,
+                      note.paragraphIndex,
+                      note.localOffset,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _notes.deleteNote(note.id),
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
             ),
           ],
         );

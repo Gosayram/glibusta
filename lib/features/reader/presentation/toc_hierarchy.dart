@@ -96,21 +96,25 @@ List<TocEntry> buildTocFromHeadings(
       final chTitle = currentChapter < chapterTitles.length
           ? chapterTitles[currentChapter]
           : 'Глава ${currentChapter + 1}';
-      items.add(TocEntry(
-        index: currentChapter,
-        title: chTitle,
-        depth: 0,
-        isGroup: allHeadings.any((x) => x.chapterIndex == currentChapter && x != h),
-        groupId: currentChapter,
-      ));
+      items.add(
+        TocEntry(
+          index: currentChapter,
+          title: chTitle,
+          depth: 0,
+          isGroup: allHeadings.any((x) => x.chapterIndex == currentChapter && x != h),
+          groupId: currentChapter,
+        ),
+      );
     }
-    items.add(TocEntry(
-      index: currentChapter,
-      title: h.title,
-      depth: h.level,
-      isGroup: false,
-      groupId: currentChapter,
-    ));
+    items.add(
+      TocEntry(
+        index: currentChapter,
+        title: h.title,
+        depth: h.level,
+        isGroup: false,
+        groupId: currentChapter,
+      ),
+    );
   }
 
   return items;
