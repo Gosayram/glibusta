@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
@@ -57,6 +58,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   double _dragStartFontSize = 0.0;
   String? _selectedText;
   int _batteryLevel = -1;
+  bool _finishedDialogShown = false;
 
   Future<void> _checkForSelectedText() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -380,6 +382,53 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  void _checkBookFinished(ReaderState readerState) {
+    if (_finishedDialogShown) return;
+    if (readerState.scrollProgress < 0.99) return;
+    _finishedDialogShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_showNextBookDialog());
+    });
+  }
+
+  Future<void> _showNextBookDialog() async {
+    final db = ref.read(databaseProvider);
+    final series = await db.seriesDao.getSeriesForBook(widget.bookId);
+    if (series.isEmpty || !context.mounted) {
+      unawaited(SmartDialog.showToast('Книга прочитана!'));
+      return;
+    }
+    final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
+    allBooks.sort((a, b) => (a.sequenceNumber ?? 0).compareTo(b.sequenceNumber ?? 0));
+    final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
+    if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !context.mounted) {
+      unawaited(SmartDialog.showToast('Книга прочитана!'));
+      return;
+    }
+    final nextBookId = allBooks[currentIdx + 1].bookId;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Книга прочитана'),
+        content: const Text('Хотите перейти к следующей книге в серии?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Закрыть'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Перейти'),
+          ),
+        ],
+      ),
+    );
+    if (proceed == true && context.mounted) {
+      GoRouter.of(context).go('/reader/$nextBookId');
+    }
+  }
+
   @override
   void dispose() {
     _exitImmersiveMode();
@@ -567,6 +616,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
+    _checkBookFinished(readerState);
     return AnimatedTheme(
       data: theme,
       duration: AppDuration.readerThemeTransition,
