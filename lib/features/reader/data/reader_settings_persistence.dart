@@ -61,6 +61,8 @@ class ReaderSettingsPersistence {
         oldStyleFigures: map['oldStyleFigures'] as bool? ?? false,
         smallCaps: map['smallCaps'] as bool? ?? false,
         rsvpWpm: (map['rsvpWpm'] as num?)?.toInt() ?? 300,
+        ignoreBookAlignment: map['ignoreBookAlignment'] as bool? ?? false,
+        ignoreBookIndent: map['ignoreBookIndent'] as bool? ?? false,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],
           orElse: () => PageTurnAnimation.slide,
@@ -150,6 +152,8 @@ class ReaderSettingsPersistence {
         'oldStyleFigures': settings.oldStyleFigures,
         'smallCaps': settings.smallCaps,
         'rsvpWpm': settings.rsvpWpm,
+        'ignoreBookAlignment': settings.ignoreBookAlignment,
+        'ignoreBookIndent': settings.ignoreBookIndent,
         'pageTurnAnimation': settings.pageTurnAnimation.name,
         'textDirection': settings.textDirection.name,
         'readerWidth': settings.readerWidth,

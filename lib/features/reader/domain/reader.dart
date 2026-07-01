@@ -178,6 +178,8 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(false) bool oldStyleFigures,
     @Default(false) bool smallCaps,
     @Default(300) int rsvpWpm,
+    @Default(false) bool ignoreBookAlignment,
+    @Default(false) bool ignoreBookIndent,
   }) = _ReaderSettings;
 }
 

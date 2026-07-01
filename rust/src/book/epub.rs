@@ -423,6 +423,7 @@ fn apply_css_props(
     }
 }
 
+/// ponytail: text-indent, text-align, margin-left, page-break-before.
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     if let Some(indent) = props.get("text-indent") {
         if let Some(v) = parse_css_length(indent) {
@@ -431,9 +432,6 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     }
     if let Some(align) = props.get("text-align") {
         block.text_align = Some(align.clone());
-    }
-    if let Some(_fs) = props.get("font-style") {
-        // ponytail: font-style not applied; use rich spans for italic
     }
     // MD-1.2: margin-left as text-indent fallback for indented blocks
     if block.text_indent.is_none() {

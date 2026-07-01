@@ -379,8 +379,9 @@ Widget _buildReaderBlock(
       return _readerListBlock(ctx, block, textAlign);
     case BlockType.paragraph:
       final indentValue = switch (s.paragraphIndentMode) {
-        ParagraphIndentMode.asInBook =>
+        ParagraphIndentMode.asInBook when !s.ignoreBookIndent =>
           (block.textIndent != null && block.textIndent! > 0) ? block.textIndent! : 0.0,
+        ParagraphIndentMode.asInBook => 0.0,
         ParagraphIndentMode.firstLine => s.paragraphFirstLineIndent,
         ParagraphIndentMode.emptyLine => 0.0,
         ParagraphIndentMode.custom => s.paragraphFirstLineIndent,
@@ -396,7 +397,7 @@ Widget _buildReaderBlock(
                 child: HighlightedText(
                   text: block.text,
                   style: style,
-                  textAlign: block.textAlign ?? textAlign,
+                  textAlign: s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign),
                   highlights: blockHighlights,
                 ),
               )
@@ -404,7 +405,7 @@ Widget _buildReaderBlock(
                 ctx,
                 block.text,
                 style,
-                block.textAlign ?? textAlign,
+                s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign),
                 richSpans: block.richSpans,
                 firstLineIndent: indentValue,
               ),
@@ -1580,7 +1581,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         return totalHeight;
       case BlockType.paragraph:
         final indent = switch (settings.paragraphIndentMode) {
-          ParagraphIndentMode.asInBook => (block.textIndent ?? 0.0),
+          ParagraphIndentMode.asInBook when !settings.ignoreBookIndent => (block.textIndent ?? 0.0),
+          ParagraphIndentMode.asInBook => 0.0,
           ParagraphIndentMode.firstLine => settings.paragraphFirstLineIndent,
           ParagraphIndentMode.emptyLine => 0.0,
           ParagraphIndentMode.custom => settings.paragraphFirstLineIndent,

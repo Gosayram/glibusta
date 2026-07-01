@@ -468,6 +468,21 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 16),
         // LW-10.1: Custom CSS editor
         _buildCustomCssSection(settings, notifier),
+        const SizedBox(height: 12),
+        // LW-10.3: Ignore book CSS overrides
+        _buildToggleRow(
+          'Игнорировать выравнивание книги',
+          Icons.format_align_left,
+          settings.ignoreBookAlignment,
+          (v) => notifier.updateIgnoreBookAlignment(v),
+        ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Игнорировать отступы книги',
+          Icons.format_indent_increase,
+          settings.ignoreBookIndent,
+          (v) => notifier.updateIgnoreBookIndent(v),
+        ),
       ],
     );
   }

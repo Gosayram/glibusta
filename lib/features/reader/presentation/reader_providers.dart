@@ -236,6 +236,14 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(customCss: css);
   }
 
+  void updateIgnoreBookAlignment(bool value) {
+    state = state.copyWith(ignoreBookAlignment: value);
+  }
+
+  void updateIgnoreBookIndent(bool value) {
+    state = state.copyWith(ignoreBookIndent: value);
+  }
+
   void updateForcedEncoding(String? encoding) {
     state = state.copyWith(forcedEncoding: encoding);
   }

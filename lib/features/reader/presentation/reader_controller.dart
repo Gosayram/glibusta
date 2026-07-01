@@ -263,6 +263,14 @@ class ReaderController {
 
       // Apply per-book settings if available
       await _applyPerBookSettings();
+
+      // MD-11.4: auto dark theme for manga/comics
+      if (!_isActiveLoad(loadGeneration)) return;
+      _autoMangaTheme(meta);
+
+      // MD-11.3: auto font by genre
+      unawaited(_autoGenreFont(_bookId));
+
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
@@ -989,6 +997,50 @@ class ReaderController {
       }
     } on Object catch (e) {
       AppLogger().warning('Failed to apply per-book settings: $e');
+    }
+  }
+
+  // MD-11.4: auto dark theme for manga — check title/description for keywords
+  static final _mangaPattern = RegExp(
+    r'manga|манга|комикс|comic|manga\b',
+    caseSensitive: false,
+  );
+
+  void _autoMangaTheme(NormalizedBookMetadata meta) {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.autoThemeMode != AutoThemeMode.off) return;
+    final isCurrentDark =
+        settings.theme == ReaderTheme.dark ||
+        settings.theme == ReaderTheme.oled ||
+        settings.theme == ReaderTheme.bedtime;
+    if (isCurrentDark) return;
+    final combined = '${meta.title} ${meta.description ?? ''}';
+    if (_mangaPattern.hasMatch(combined)) {
+      _ref.read(readerSettingsProvider.notifier).updateTheme(ReaderTheme.dark);
+    }
+  }
+
+  // MD-11.3: auto font by genre — technical/non-fiction → Inter, fiction → Literata
+  static final _technicalGenrePattern = RegExp(
+    r'техничес|программирован|наук|учебн|справоч|计算机|компьютер|информатик|математик',
+    caseSensitive: false,
+  );
+
+  Future<void> _autoGenreFont(String bookId) async {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.font != ReaderFont.literata) return; // user chose something else
+    try {
+      final db = _ref.read(databaseProvider);
+      final book = await db.bookDao.getBookById(bookId);
+      if (book == null) return;
+      final allGenres = await db.genreDao.getAllGenres();
+      final genreMap = {for (final g in allGenres) g.id: g.name};
+      final names = book.genreIds.map((id) => genreMap[id] ?? id).join(' ');
+      if (_technicalGenrePattern.hasMatch(names)) {
+        _ref.read(readerSettingsProvider.notifier).updateFont(ReaderFont.inter);
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Auto genre font failed: $e');
     }
   }
 
