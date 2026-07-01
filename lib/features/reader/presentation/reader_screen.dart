@@ -51,6 +51,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
+  bool _dragStartedInTopZone = false;
   String? _selectedText;
   int _batteryLevel = -1;
 
@@ -118,6 +119,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _handleVerticalDragStart(DragStartDetails details) {
     final settings = ref.read(readerSettingsProvider);
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    _dragStartedInTopZone = details.globalPosition.dy < screenHeight * 0.1;
     if (!settings.verticalSwipeBrightness) return;
     _dragStartBrightness = settings.brightness;
     _dragStartY = details.globalPosition.dy;
@@ -130,6 +133,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final brightnessChange = -deltaY / 500.0;
     final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
     ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+  }
+
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    if (_dragStartedInTopZone && details.primaryVelocity != null && details.primaryVelocity! > 300) {
+      Navigator.of(context).pop();
+    }
   }
 
   // Trackpad/mouse wheel scroll → page turn
@@ -672,6 +681,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               : null,
           onVerticalDragUpdate: _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragUpdate
+              : null,
+          onVerticalDragEnd: _gestureCoordinator.canInteract
+              ? _handleVerticalDragEnd
               : null,
           onDoubleTap:
               _gestureCoordinator.canInteract &&

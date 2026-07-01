@@ -79,6 +79,16 @@ enum ImageAlignment { start, center, end }
 
 enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
 
+enum ParagraphIndentMode {
+  asInBook('Как в книге'),
+  firstLine('Первая строка'),
+  emptyLine('Пустая строка'),
+  custom('Свой отступ');
+
+  const ParagraphIndentMode(this.displayName);
+  final String displayName;
+}
+
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({

@@ -1,3 +1,5 @@
+import '../data/parsers/normalized_book.dart';
+
 class TocEntry {
   final int index;
   final String title;
@@ -61,4 +63,55 @@ List<TocEntry> buildTocHierarchy(List<String> titles) {
     }
     return item;
   }).toList();
+}
+
+List<TocEntry> buildTocFromHeadings(
+  List<String> chapterTitles,
+  Map<int, ReaderChapter> loadedChapters,
+) {
+  final allHeadings = <({int chapterIndex, String title, int level})>[];
+  for (final entry in loadedChapters.entries) {
+    for (final block in entry.value.blocks) {
+      if (block.type == BlockType.heading && block.headingLevel != null) {
+        final text = block.text.trim();
+        if (text.isNotEmpty) {
+          allHeadings.add((
+            chapterIndex: entry.key,
+            title: text,
+            level: block.headingLevel!,
+          ));
+        }
+      }
+    }
+  }
+  if (allHeadings.isEmpty) return buildTocHierarchy(chapterTitles);
+
+  final items = <TocEntry>[];
+  var currentChapter = -1;
+
+  for (var i = 0; i < allHeadings.length; i++) {
+    final h = allHeadings[i];
+    if (h.chapterIndex != currentChapter) {
+      currentChapter = h.chapterIndex;
+      final chTitle = currentChapter < chapterTitles.length
+          ? chapterTitles[currentChapter]
+          : 'Глава ${currentChapter + 1}';
+      items.add(TocEntry(
+        index: currentChapter,
+        title: chTitle,
+        depth: 0,
+        isGroup: allHeadings.any((x) => x.chapterIndex == currentChapter && x != h),
+        groupId: currentChapter,
+      ));
+    }
+    items.add(TocEntry(
+      index: currentChapter,
+      title: h.title,
+      depth: h.level,
+      isGroup: false,
+      groupId: currentChapter,
+    ));
+  }
+
+  return items;
 }

@@ -84,7 +84,14 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
   final Set<int> _collapsedGroups = {};
 
   // ponytail: shared with reader_side_panel via toc_hierarchy.dart
-  List<TocEntry> _buildHierarchy() => buildTocHierarchy(widget.metadata.chapterTitles);
+  List<TocEntry> _buildHierarchy() {
+    final defaultHierarchy = buildTocHierarchy(widget.metadata.chapterTitles);
+    final allFlat = defaultHierarchy.every((e) => e.depth == 0 && !e.isGroup);
+    if (allFlat && widget.loadedChapters.isNotEmpty) {
+      return buildTocFromHeadings(widget.metadata.chapterTitles, widget.loadedChapters);
+    }
+    return defaultHierarchy;
+  }
 
   @override
   Widget build(BuildContext context) {
