@@ -13,6 +13,7 @@ class BookSearchOverlay extends StatefulWidget {
     required this.onDismiss,
     required this.theme,
     this.currentChapterIndex,
+    this.initialQuery,
   });
 
   final BookSearchService searchService;
@@ -20,6 +21,7 @@ class BookSearchOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
   final ReaderTheme theme;
   final int? currentChapterIndex;
+  final String? initialQuery;
 
   @override
   State<BookSearchOverlay> createState() => _BookSearchOverlayState();
@@ -38,8 +40,14 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _controller.text = widget.initialQuery!;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
+      if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+        _onQueryChanged(widget.initialQuery!);
+      }
     });
   }
 

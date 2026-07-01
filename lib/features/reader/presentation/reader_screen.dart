@@ -246,6 +246,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   final Map<int, Offset> _activePointers = {};
   double _pinchStartDistance = 0;
   double _scaleStartFontSize = 0;
+  String? _pendingSearchQuery;
 
   void _handlePointerDown(PointerDownEvent event) {
     if (!_gestureCoordinator.canInteract) return;
@@ -278,6 +279,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       _showExternalLinkDialog(href);
       return;
     }
+
+    // HG-21.2: image links → show in dialog
+    final imageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    if (imageExt.any((ext) => href.toLowerCase().contains(ext))) {
+      _showImageDialog(href);
+      return;
+    }
+
     final anchor = href.startsWith('#') ? href.substring(1) : href;
     if (anchor.isEmpty) return;
 
@@ -301,6 +310,38 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     unawaited(HapticFeedback.selectionClick());
+  }
+
+  void _showImageDialog(String imageUrl) {
+    // ponytail: simple dialog, pinch-to-zoom if needed later
+    if (!context.mounted) return;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: InteractiveViewer(
+            maxScale: 5,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (
+                context,
+                error,
+                stackTrace,
+              ) {
+                return Container(
+                  width: 200,
+                  height: 200,
+                  color: Colors.black26,
+                  child: const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 48)),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showExternalLinkDialog(String href) {
@@ -756,6 +797,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               builder: (context) {
                 final searchService = _ctrl.createSearchService();
                 if (searchService == null) return const SizedBox.shrink();
+                final initialQuery = _pendingSearchQuery;
+                _pendingSearchQuery = null;
                 return BookSearchOverlay(
                   searchService: searchService,
                   onJumpToResult: (position, query) {
@@ -771,6 +814,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   },
                   theme: settings.theme,
                   currentChapterIndex: _ctrl.state.currentPosition.chapterIndex,
+                  initialQuery: initialQuery,
                 );
               },
             ),
@@ -785,6 +829,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               chapterIndex: readerState.currentPosition.chapterIndex,
               paragraphIndex: readerState.currentPosition.paragraphIndex,
               onDismiss: () => setState(() => _selectedText = null),
+              onSearchInBook: (query) {
+                setState(() {
+                  _pendingSearchQuery = query;
+                  _selectedText = null;
+                });
+                _ctrl.toggleSearch();
+              },
             ),
           ),
       ],

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -15,6 +16,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final int chapterIndex;
   final int paragraphIndex;
   final VoidCallback onDismiss;
+  final ValueChanged<String>? onSearchInBook;
 
   const ReaderSelectionToolbar({
     super.key,
@@ -22,6 +24,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
     required this.chapterIndex,
     required this.paragraphIndex,
     required this.onDismiss,
+    this.onSearchInBook,
   });
 
   @override
@@ -103,6 +106,16 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 widget.onDismiss();
               },
             ),
+            // HG-7.5: in-book search from context
+            if (widget.onSearchInBook != null && _selectedText != null)
+              _ToolbarButton(
+                icon: Icons.menu_book,
+                label: 'В книге',
+                onTap: () {
+                  widget.onSearchInBook!(_selectedText!);
+                  widget.onDismiss();
+                },
+              ),
             _ToolbarButton(
               icon: Icons.translate,
               label: 'Перевод',
@@ -167,6 +180,16 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 widget.onDismiss();
               },
             ),
+            // HG-7.6: TTS from context
+            if (_selectedText != null && _selectedText!.isNotEmpty)
+              _ToolbarButton(
+                icon: Icons.volume_up,
+                label: 'Озвучить',
+                onTap: () {
+                  unawaited(_speakText(_selectedText!));
+                  widget.onDismiss();
+                },
+              ),
             _ToolbarButton(
               icon: Icons.bookmark_add,
               label: 'Закладка',
@@ -425,6 +448,17 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       unawaited(SmartDialog.showToast('Текст выделен'));
     }
     widget.onDismiss();
+  }
+
+  Future<void> _speakText(String text) async {
+    try {
+      final tts = FlutterTts();
+      await tts.setLanguage('ru-RU');
+      await tts.setSpeechRate(0.5);
+      await tts.speak(text);
+    } on Object catch (e) {
+      debugPrint('TTS error: $e');
+    }
   }
 }
 
