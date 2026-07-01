@@ -12,7 +12,16 @@ import 'color_preset_provider.dart';
 import 'reader_providers.dart';
 
 class _TypographyPreset {
-  const _TypographyPreset(this.name, this.font, this.fontSize, this.lineHeight, this.margin, this.paragraphSpacing, this.paragraphFirstLineIndent, this.textAlign);
+  const _TypographyPreset(
+    this.name,
+    this.font,
+    this.fontSize,
+    this.lineHeight,
+    this.margin,
+    this.paragraphSpacing,
+    this.paragraphFirstLineIndent,
+    this.textAlign,
+  );
   final String name;
   final ReaderFont font;
   final int fontSize;
@@ -429,9 +438,27 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
 
   static Widget _buildPresetRow(ReaderSettings settings, ReaderSettingsNotifier notifier) {
     const presets = <_TypographyPreset>[
-      _TypographyPreset('Классика', ReaderFont.literata, 18, 1.6, 20, 20, 0, ReaderTextAlign.justify),
+      _TypographyPreset(
+        'Классика',
+        ReaderFont.literata,
+        18,
+        1.6,
+        20,
+        20,
+        0,
+        ReaderTextAlign.justify,
+      ),
       _TypographyPreset('Компактно', ReaderFont.inter, 14, 1.3, 12, 14, 0, ReaderTextAlign.left),
-      _TypographyPreset('Комфортно', ReaderFont.literata, 22, 1.8, 24, 24, 16, ReaderTextAlign.justify),
+      _TypographyPreset(
+        'Комфортно',
+        ReaderFont.literata,
+        22,
+        1.8,
+        24,
+        24,
+        16,
+        ReaderTextAlign.justify,
+      ),
       _TypographyPreset('Минимализм', ReaderFont.system, 16, 1.5, 16, 18, 0, ReaderTextAlign.left),
     ];
 
@@ -443,7 +470,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final p = presets[i];
-          final active = settings.font == p.font &&
+          final active =
+              settings.font == p.font &&
               settings.fontSize.round() == p.fontSize &&
               settings.lineHeight == p.lineHeight;
           return GestureDetector(
@@ -461,10 +489,14 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               width: 100,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: active ? Colors.blue.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.08),
+                color: active
+                    ? Colors.blue.withValues(alpha: 0.15)
+                    : Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: active ? Colors.blue.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.15),
+                  color: active
+                      ? Colors.blue.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.15),
                 ),
               ),
               child: Column(

@@ -41,8 +41,7 @@ final class ReadingInfoNotifierProvider
   }
 }
 
-String _$readingInfoNotifierHash() =>
-    r'99d7caee0548d5ce53fa7b221e65392dd1ef09b7';
+String _$readingInfoNotifierHash() => r'99d7caee0548d5ce53fa7b221e65392dd1ef09b7';
 
 abstract class _$ReadingInfoNotifier extends $Notifier<ReadingInfoModel> {
   ReadingInfoModel build();

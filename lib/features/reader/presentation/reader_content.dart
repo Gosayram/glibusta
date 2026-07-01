@@ -392,14 +392,22 @@ Widget _readerHighlightedText(
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
       }
-      return Text.rich(TextSpan(children: spans), textAlign: textAlign, locale: locale);
+      return Text.rich(
+        TextSpan(children: spans),
+        textAlign: textAlign,
+        locale: locale,
+      );
     }
     if (ctx.settings.bionicReading) {
       final spans = _bionicReadingSpans(text, style);
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
       }
-      return Text.rich(TextSpan(children: spans), textAlign: textAlign, locale: locale);
+      return Text.rich(
+        TextSpan(children: spans),
+        textAlign: textAlign,
+        locale: locale,
+      );
     }
     if (firstLineIndent > 0) {
       return Text.rich(
@@ -521,7 +529,9 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
   final isPlainPath = uri == null || !uri.isAbsolute;
 
   Widget wrap(Widget img) {
-    final filtered = colorFilter != null ? ColorFiltered(colorFilter: colorFilter, child: img) : img;
+    final filtered = colorFilter != null
+        ? ColorFiltered(colorFilter: colorFilter, child: img)
+        : img;
     return GestureDetector(
       onTap: () => _showFullscreenImage(imageUrl),
       child: filtered,
@@ -561,15 +571,17 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
 void _showFullscreenImage(String imageUrl) {
   final context = rootNavigatorKey.currentContext;
   if (context == null) return;
-  unawaited(Navigator.of(context).push<void>(
-    PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black87,
-      barrierDismissible: true,
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (ctx, a, b) => _FullscreenImageViewer(imageUrl: imageUrl),
+  unawaited(
+    Navigator.of(context).push<void>(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, a, b) => _FullscreenImageViewer(imageUrl: imageUrl),
+      ),
     ),
-  ));
+  );
 }
 
 class _FullscreenImageViewer extends StatelessWidget {

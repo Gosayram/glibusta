@@ -47,7 +47,12 @@ class BookSearchService {
 
   int get totalParagraphs => _paragraphs.length;
 
-  Future<List<BookSearchResult>> search(String query, {int maxResults = 50, int? chapterIndex, bool matchCase = false}) async {
+  Future<List<BookSearchResult>> search(
+    String query, {
+    int maxResults = 50,
+    int? chapterIndex,
+    bool matchCase = false,
+  }) async {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
     final lowerQuery = matchCase ? query : query.toLowerCase();

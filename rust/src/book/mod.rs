@@ -38,7 +38,7 @@ pub(crate) fn flush_rich_span(
     span_text.clear();
 }
 
-/// Collapse whitespace: newlines/tabs to spaces, collapse runs, trim.
+/// Collapse whitespace + normalize typography (dashes, quotes, ellipsis).
 pub(crate) fn normalize_whitespace(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut prev_was_space = false;
@@ -57,5 +57,60 @@ pub(crate) fn normalize_whitespace(text: &str) -> String {
             }
         }
     }
-    result.trim().to_string()
+    normalize_typography(result.trim())
+}
+
+/// Normalize Russian/English typography:
+/// - " - " → " — " (em dash for isolated hyphens)
+/// - "--" → "—"
+/// - "..." → "…"
+/// - Straight quotes "..." → «...» (Russian guillemets)
+pub(crate) fn normalize_typography(text: &str) -> String {
+    let mut s = text.to_string();
+
+    // Double hyphen → em dash
+    s = s.replace("--", "\u{2014}");
+
+    // Isolated hyphen surrounded by spaces → em dash
+    s = s.replace(" - ", " \u{2014} ");
+
+    // Three dots → ellipsis
+    s = s.replace("...", "\u{2026}");
+
+    // Straight double quotes → Russian guillemets «...»
+    let bytes = s.as_bytes();
+    let mut result = String::with_capacity(s.len());
+    let mut open_quote = true;
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'"' {
+            if open_quote {
+                result.push('\u{00AB}');
+            } else {
+                result.push('\u{00BB}');
+            }
+            open_quote = !open_quote;
+            i += 1;
+        } else {
+            // Copy UTF-8 char safely
+            let ch_start = i;
+            let first = bytes[i];
+            let len = if first < 0x80 {
+                1
+            } else if first & 0xE0 == 0xC0 {
+                2
+            } else if first & 0xF0 == 0xE0 {
+                3
+            } else {
+                4
+            };
+            let end = (i + len).min(bytes.len());
+            if let Ok(slice) = std::str::from_utf8(&bytes[ch_start..end]) {
+                result.push_str(slice);
+            }
+            i = end;
+        }
+    }
+
+    result
 }

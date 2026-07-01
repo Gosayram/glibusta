@@ -10,8 +10,7 @@ part of 'download_notification_service.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(downloadNotificationService)
-final downloadNotificationServiceProvider =
-    DownloadNotificationServiceProvider._();
+final downloadNotificationServiceProvider = DownloadNotificationServiceProvider._();
 
 final class DownloadNotificationServiceProvider
     extends
@@ -55,5 +54,4 @@ final class DownloadNotificationServiceProvider
   }
 }
 
-String _$downloadNotificationServiceHash() =>
-    r'5ab5f38fc23b362e356c93754917779ffa88a665';
+String _$downloadNotificationServiceHash() => r'5ab5f38fc23b362e356c93754917779ffa88a665';

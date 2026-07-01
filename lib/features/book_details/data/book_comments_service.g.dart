@@ -13,12 +13,7 @@ part of 'book_comments_service.dart';
 final bookCommentsServiceProvider = BookCommentsServiceProvider._();
 
 final class BookCommentsServiceProvider
-    extends
-        $FunctionalProvider<
-          BookCommentsService,
-          BookCommentsService,
-          BookCommentsService
-        >
+    extends $FunctionalProvider<BookCommentsService, BookCommentsService, BookCommentsService>
     with $Provider<BookCommentsService> {
   BookCommentsServiceProvider._()
     : super(
@@ -54,5 +49,4 @@ final class BookCommentsServiceProvider
   }
 }
 
-String _$bookCommentsServiceHash() =>
-    r'5cea0b4f9ab8ccc72cc6e09c7bf950cf349489e6';
+String _$bookCommentsServiceHash() => r'5cea0b4f9ab8ccc72cc6e09c7bf950cf349489e6';

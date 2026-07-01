@@ -15,11 +15,10 @@ class CollectionDaoManager {
   CollectionDaoManager(this._db);
   $$CollectionsTableTableManager get collections =>
       $$CollectionsTableTableManager(_db.attachedDatabase, _db.collections);
-  $$BookCollectionsTableTableManager get bookCollections =>
-      $$BookCollectionsTableTableManager(
-        _db.attachedDatabase,
-        _db.bookCollections,
-      );
+  $$BookCollectionsTableTableManager get bookCollections => $$BookCollectionsTableTableManager(
+    _db.attachedDatabase,
+    _db.bookCollections,
+  );
   $$SavedBooksTableTableManager get savedBooks =>
       $$SavedBooksTableTableManager(_db.attachedDatabase, _db.savedBooks);
 }

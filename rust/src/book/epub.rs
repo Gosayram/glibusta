@@ -1035,7 +1035,7 @@ fn flush_block(
     heading_level: Option<i32>,
     note_id: Option<String>,
 ) {
-    let trimmed = text.trim().to_string();
+    let trimmed = crate::book::normalize_typography(text.trim());
     if !trimmed.is_empty() {
         let rich = if rich_spans.is_empty() {
             None

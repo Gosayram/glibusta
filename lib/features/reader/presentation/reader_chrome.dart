@@ -226,7 +226,13 @@ class ReaderBottomBar extends StatelessWidget {
     }
   }
 
-  String _rightLabel(ReaderSettings settings, int page, int totalChapters, int percent, int minutesLeft) {
+  String _rightLabel(
+    ReaderSettings settings,
+    int page,
+    int totalChapters,
+    int percent,
+    int minutesLeft,
+  ) {
     switch (settings.bottomBarContent) {
       case BottomBarContent.page:
         return '$percent%';

@@ -15,14 +15,12 @@ class BookDaoManager {
   BookDaoManager(this._db);
   $$SavedBooksTableTableManager get savedBooks =>
       $$SavedBooksTableTableManager(_db.attachedDatabase, _db.savedBooks);
-  $$ReadingProgressTableTableManager get readingProgress =>
-      $$ReadingProgressTableTableManager(
-        _db.attachedDatabase,
-        _db.readingProgress,
-      );
-  $$ReadingSessionsTableTableManager get readingSessions =>
-      $$ReadingSessionsTableTableManager(
-        _db.attachedDatabase,
-        _db.readingSessions,
-      );
+  $$ReadingProgressTableTableManager get readingProgress => $$ReadingProgressTableTableManager(
+    _db.attachedDatabase,
+    _db.readingProgress,
+  );
+  $$ReadingSessionsTableTableManager get readingSessions => $$ReadingSessionsTableTableManager(
+    _db.attachedDatabase,
+    _db.readingSessions,
+  );
 }

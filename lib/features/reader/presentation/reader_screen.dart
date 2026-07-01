@@ -234,26 +234,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final uri = Uri.tryParse(href);
     if (uri == null) return;
     final host = uri.host.isNotEmpty ? uri.host : href;
-    unawaited(showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Внешняя ссылка'),
-        content: Text('Открыть ссылку?\n$host'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
-            },
-            child: const Text('Открыть'),
-          ),
-        ],
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Внешняя ссылка'),
+          content: Text('Открыть ссылку?\n$host'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
+              },
+              child: const Text('Открыть'),
+            ),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   @override

@@ -780,7 +780,7 @@ fn flush_fb2_block(
         false,
         &None,
     );
-    let t = current_text.trim().to_string();
+    let t = crate::book::normalize_typography(current_text.trim());
     if !t.is_empty() {
         let rich = if current_rich_spans.is_empty() {
             None
