@@ -1426,6 +1426,16 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       _cacheKey = null;
       _cachedPages = const [];
     }
+    // MD-2.3: clear per-chapter cache when settings affect layout
+    if (widget.settings.fontSize != oldWidget.settings.fontSize ||
+        widget.settings.lineHeight != oldWidget.settings.lineHeight ||
+        widget.settings.margin != oldWidget.settings.margin ||
+        widget.settings.font != oldWidget.settings.font ||
+        widget.settings.hyphenation != oldWidget.settings.hyphenation ||
+        widget.settings.paragraphIndentMode != oldWidget.settings.paragraphIndentMode) {
+      _chapterPageCache.clear();
+      _cacheKey = null;
+    }
     if (widget.initialPage != oldWidget.initialPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_disposed || !_pageController.hasClients) return;
@@ -1501,7 +1511,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final remainingHeight = remainingBlocks > 0
             ? chapter.blocks
                   .skip(i)
-                  .fold<double>(0, (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth))
+                  .fold<double>(
+                    0,
+                    (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth),
+                  )
             : 0.0;
         final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
         if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {
@@ -1550,7 +1563,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final pages = <_PageContent>[];
 
     // MD-2.3: per-chapter settings key for cache
-    final chKey = '${settings.fontSize}_${settings.lineHeight}_${settings.margin}_'
+    final chKey =
+        '${settings.fontSize}_${settings.lineHeight}_${settings.margin}_'
         '${settings.paragraphSpacing}_${settings.letterSpacing}_${settings.paragraphFirstLineIndent}_'
         '${settings.font}_${settings.hyphenation}_${settings.textAlign.name}_'
         '${settings.paragraphIndentMode.name}_${availableHeight.toStringAsFixed(1)}_'
@@ -1568,13 +1582,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       for (final p in chapterPages) {
         // Fix showChapterTitle: true for first page of each chapter
         final showTitle = chIdx != lastChIdx;
-        pages.add(_PageContent(
-          chapterIndex: p.chapterIndex,
-          blockStart: p.blockStart,
-          blockEnd: p.blockEnd,
-          isCover: p.isCover,
-          showChapterTitle: showTitle,
-        ));
+        pages.add(
+          _PageContent(
+            chapterIndex: p.chapterIndex,
+            blockStart: p.blockStart,
+            blockEnd: p.blockEnd,
+            isCover: p.isCover,
+            showChapterTitle: showTitle,
+          ),
+        );
       }
       lastChIdx = chIdx;
     }
