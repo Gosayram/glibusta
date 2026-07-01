@@ -358,7 +358,7 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
                     for line in style_content.lines() {
                         let line = line.trim();
                         // Match: .className { ... }
-                            if let Some(body_start) = line.find('{') {
+                        if let Some(body_start) = line.find('{') {
                             if let Some(body_end) = line.rfind('}') {
                                 let selector = &line[..body_start].trim();
                                 let body = &line[body_start + 1..body_end];
@@ -378,9 +378,7 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
                                     continue;
                                 };
                                 if !selector.is_empty() {
-                                    let props = rules
-                                        .entry(selector.to_string())
-                                        .or_default();
+                                    let props = rules.entry(selector.to_string()).or_default();
                                     for prop in body.split(';') {
                                         let prop = prop.trim();
                                         if let Some(colon) = prop.find(':') {
@@ -852,7 +850,8 @@ fn parse_xhtml_to_blocks(
                                         });
                                         if let Some(ref cls) = current_class {
                                             if let Some(last) = blocks.last_mut() {
-                                                let htag = format!("h{}", heading_level.unwrap_or(1));
+                                                let htag =
+                                                    format!("h{}", heading_level.unwrap_or(1));
                                                 apply_css_props(last, &htag, Some(cls), css);
                                             }
                                         }

@@ -16,7 +16,7 @@ void main() {
       overrides: [
         readingStatsProvider.overrideWithValue(
           AsyncData(
-              stats ??
+            stats ??
                 const ReadingStats(
                   currentStreak: 0,
                   longestStreak: 0,

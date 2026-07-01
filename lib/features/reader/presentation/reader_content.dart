@@ -1014,68 +1014,89 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           textDirection: textDirection,
           child: Stack(
             children: [
-              ScrollConfiguration(
-                behavior: _SmoothScrollBehavior(inertia: settings.scrollInertia),
-                child: Scrollbar(
-                  controller: widget.scrollController,
-                  thumbVisibility: true,
-                  thickness: 3,
-                  radius: const Radius.circular(1.5),
-                  child: ListView.builder(
+              NotificationListener<ScrollEndNotification>(
+                onNotification: (notification) {
+                  if (settings.mode != ReaderMode.continuous) return false;
+                  if (itemCount == 0) return false;
+                  final pos = notification.metrics;
+                  if (pos.maxScrollExtent <= 0) return false;
+                  final avg = pos.maxScrollExtent / itemCount;
+                  final target = ((pos.pixels / avg).round() * avg).clamp(0.0, pos.maxScrollExtent);
+                  if ((pos.pixels - target).abs() > 8) {
+                    unawaited(
+                      widget.scrollController.animateTo(
+                        target,
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOut,
+                      ),
+                    );
+                    return true;
+                  }
+                  return false;
+                },
+                child: ScrollConfiguration(
+                  behavior: _SmoothScrollBehavior(inertia: settings.scrollInertia),
+                  child: Scrollbar(
                     controller: widget.scrollController,
-                    padding: effectiveMargin,
-                    itemCount: itemCount,
-                    // ignore: deprecated_member_use
-                    cacheExtent: 500,
-                    addAutomaticKeepAlives: false,
-                    itemBuilder: (context, index) {
-                      if (hasCover && index == 0) {
-                        return _buildCoverPage(
-                          widget.metadata.coverUrl!,
-                          settings,
-                          _getReaderStyle(settings),
-                        );
-                      }
-                      final chapterIndex = index - (hasCover ? 1 : 0);
-                      final chapter = widget.loadedChapters[chapterIndex];
-                      final isLast = chapterIndex == widget.metadata.chapterCount - 1;
-                      final nextTitle = chapterIndex + 1 < widget.metadata.chapterTitles.length
-                          ? widget.metadata.chapterTitles[chapterIndex + 1]
-                          : '';
-                      final dividerStyle = _getReaderStyle(settings);
-                      return Column(
-                        key: ValueKey('chapter-$chapterIndex'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (chapter != null)
-                            _buildChapterContent(chapter, settings, chapterIndex)
-                          else
-                            _readerLoadingPlaceholder(
-                              settings,
-                              chapterIndex,
-                              widget.metadata.chapterTitles,
-                              _getReaderStyle(settings),
-                            ),
-                          if (!isLast &&
-                              chapter != null &&
-                              widget.loadedChapters[chapterIndex + 1] != null)
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                vertical: settings.paragraphSpacing * 3,
+                    thumbVisibility: true,
+                    thickness: 3,
+                    radius: const Radius.circular(1.5),
+                    child: ListView.builder(
+                      controller: widget.scrollController,
+                      padding: effectiveMargin,
+                      itemCount: itemCount,
+                      // ignore: deprecated_member_use
+                      cacheExtent: 500,
+                      addAutomaticKeepAlives: false,
+                      itemBuilder: (context, index) {
+                        if (hasCover && index == 0) {
+                          return _buildCoverPage(
+                            widget.metadata.coverUrl!,
+                            settings,
+                            _getReaderStyle(settings),
+                          );
+                        }
+                        final chapterIndex = index - (hasCover ? 1 : 0);
+                        final chapter = widget.loadedChapters[chapterIndex];
+                        final isLast = chapterIndex == widget.metadata.chapterCount - 1;
+                        final nextTitle = chapterIndex + 1 < widget.metadata.chapterTitles.length
+                            ? widget.metadata.chapterTitles[chapterIndex + 1]
+                            : '';
+                        final dividerStyle = _getReaderStyle(settings);
+                        return Column(
+                          key: ValueKey('chapter-$chapterIndex'),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (chapter != null)
+                              _buildChapterContent(chapter, settings, chapterIndex)
+                            else
+                              _readerLoadingPlaceholder(
+                                settings,
+                                chapterIndex,
+                                widget.metadata.chapterTitles,
+                                _getReaderStyle(settings),
                               ),
-                              child: Center(
-                                child: Text(
-                                  '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${chapterIndex + 2}"} —',
-                                  style: dividerStyle.copyWith(
-                                    color: dividerStyle.color?.withValues(alpha: 0.4),
+                            if (!isLast &&
+                                chapter != null &&
+                                widget.loadedChapters[chapterIndex + 1] != null)
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: settings.paragraphSpacing * 3,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${chapterIndex + 2}"} —',
+                                    style: dividerStyle.copyWith(
+                                      color: dividerStyle.color?.withValues(alpha: 0.4),
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
                               ),
-                            ),
-                        ],
-                      );
-                    },
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
