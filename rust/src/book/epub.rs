@@ -67,21 +67,51 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
         let xhtml_text = decode_bytes(&xhtml_bytes, encoding_name);
         let css = extract_css(&xhtml_text);
-        let (blocks, next_block_index) = parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
+        let (blocks, next_block_index, page_breaks_in_file) =
+            parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
         block_index = next_block_index;
 
         if blocks.is_empty() {
             continue;
         }
 
+        // MD-1.4: split chapter at CSS page-break-before points
         let chapter_title = extract_chapter_title(&xhtml_text);
-
-        chapters.push(ReaderChapter {
-            index: chapter_index,
-            title: chapter_title,
-            blocks,
-        });
-        chapter_index += 1;
+        if page_breaks_in_file.is_empty() {
+            chapters.push(ReaderChapter {
+                index: chapter_index,
+                title: chapter_title.clone(),
+                blocks,
+            });
+            chapter_index += 1;
+        } else {
+            let mut start = 0;
+            for &break_idx in &page_breaks_in_file {
+                if break_idx > start && break_idx <= blocks.len() {
+                    let sub: Vec<ReaderBlock> = blocks[start..break_idx].to_vec();
+                    if !sub.is_empty() {
+                        chapters.push(ReaderChapter {
+                            index: chapter_index,
+                            title: chapter_title.clone(),
+                            blocks: sub,
+                        });
+                        chapter_index += 1;
+                    }
+                }
+                start = break_idx;
+            }
+            if start < blocks.len() {
+                let sub: Vec<ReaderBlock> = blocks[start..].to_vec();
+                if !sub.is_empty() {
+                    chapters.push(ReaderChapter {
+                        index: chapter_index,
+                        title: chapter_title.clone(),
+                        blocks: sub,
+                    });
+                    chapter_index += 1;
+                }
+            }
+        }
     }
 
     let id = crate::book::sha256_hex(bytes);
@@ -443,6 +473,30 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     }
 }
 
+/// MD-1.4: check if CSS has page-break-before: always for given tag/class.
+fn css_has_page_break(
+    css: &HashMap<String, HashMap<String, String>>,
+    tag: &str,
+    class: Option<&str>,
+) -> bool {
+    for props in css
+        .get(tag)
+        .into_iter()
+        .chain(css.get(&format!(".{}", class.unwrap_or(""))))
+    {
+        if let Some(val) = props
+            .get("page-break-before")
+            .or_else(|| props.get("break-before"))
+        {
+            let v = val.trim();
+            if v == "always" || v == "page" {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// MD-1.2: convert CSS length units to pixels. Default base = 16px (browser standard).
 fn parse_css_length(value: &str) -> Option<f64> {
     let v = value.trim();
@@ -476,11 +530,12 @@ fn parse_xhtml_to_blocks(
     text: &str,
     mut block_index: i32,
     css: &HashMap<String, HashMap<String, String>>,
-) -> (Vec<ReaderBlock>, i32) {
+) -> (Vec<ReaderBlock>, i32, Vec<usize>) {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     reader.config_mut().allow_dangling_amp = true;
     let mut blocks: Vec<ReaderBlock> = Vec::new();
+    let mut page_breaks: Vec<usize> = Vec::new();
     let mut current_text = String::new();
     let mut in_body = false;
     let mut in_block = false; // inside p, h1-h6, blockquote
@@ -818,6 +873,12 @@ fn parse_xhtml_to_blocks(
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "p", Some(cls), css);
                                 }
+                                // MD-1.4: track page-break-before
+                                if css_has_page_break(css, "p", Some(cls)) {
+                                    page_breaks.push(blocks.len());
+                                }
+                            } else if css_has_page_break(css, "p", None) {
+                                page_breaks.push(blocks.len());
                             }
                             block_index += 1;
                         }
@@ -874,6 +935,16 @@ fn parse_xhtml_to_blocks(
                                                 let htag =
                                                     format!("h{}", heading_level.unwrap_or(1));
                                                 apply_css_props(last, &htag, Some(cls), css);
+                                            }
+                                            // MD-1.4: track page-break-before on headings
+                                            let htag = format!("h{}", heading_level.unwrap_or(1));
+                                            if css_has_page_break(css, &htag, Some(cls)) {
+                                                page_breaks.push(blocks.len());
+                                            }
+                                        } else {
+                                            let htag = format!("h{}", heading_level.unwrap_or(1));
+                                            if css_has_page_break(css, &htag, None) {
+                                                page_breaks.push(blocks.len());
                                             }
                                         }
                                         block_index += 1;
@@ -1247,7 +1318,7 @@ fn parse_xhtml_to_blocks(
         apply_css_props(block, tag, None, css);
     }
 
-    (blocks, block_index)
+    (blocks, block_index, page_breaks)
 }
 
 #[allow(dead_code)]
