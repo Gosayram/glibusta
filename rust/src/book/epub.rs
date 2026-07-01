@@ -425,11 +425,7 @@ fn apply_css_props(
 
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     if let Some(indent) = props.get("text-indent") {
-        let cleaned: String = indent
-            .chars()
-            .take_while(|c| c.is_ascii_digit() || *c == '.')
-            .collect();
-        if let Ok(v) = cleaned.parse::<f64>() {
+        if let Some(v) = parse_css_length(indent) {
             block.text_indent = Some(v);
         }
     }
@@ -438,6 +434,33 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     }
     if let Some(_fs) = props.get("font-style") {
         // ponytail: font-style not applied; use rich spans for italic
+    }
+    // MD-1.2: margin-left as text-indent fallback for indented blocks
+    if block.text_indent.is_none() {
+        if let Some(ml) = props.get("margin-left") {
+            if let Some(v) = parse_css_length(ml) {
+                block.text_indent = Some(v);
+            }
+        }
+    }
+}
+
+/// MD-1.2: convert CSS length units to pixels. Default base = 16px (browser standard).
+fn parse_css_length(value: &str) -> Option<f64> {
+    let v = value.trim();
+    // ponytail: 16px base font, 96/72 pt→px
+    if let Some(rest) = v.strip_suffix("em").or_else(|| v.strip_suffix("rem")) {
+        rest.trim().parse::<f64>().ok().map(|n| n * 16.0)
+    } else if let Some(rest) = v.strip_suffix("px") {
+        rest.trim().parse::<f64>().ok()
+    } else if let Some(rest) = v.strip_suffix("pt") {
+        rest.trim().parse::<f64>().ok().map(|n| n * 96.0 / 72.0)
+    } else if let Some(rest) = v.strip_suffix('%') {
+        // ponytail: percentage of base font width (approx)
+        rest.trim().parse::<f64>().ok().map(|n| n * 16.0 / 100.0)
+    } else {
+        // No unit → assume px
+        v.parse::<f64>().ok()
     }
 }
 
