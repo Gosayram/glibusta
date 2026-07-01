@@ -244,6 +244,7 @@ Widget _buildReaderBlock(
           block.textAlign ?? TextAlign.right,
         ),
       );
+    // HG-16.3: poems preserve line structure — no text wrapping
     case BlockType.poem:
       return Container(
         margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 2),
@@ -253,6 +254,7 @@ Widget _buildReaderBlock(
           block.text,
           style.copyWith(fontStyle: FontStyle.italic),
           TextAlign.center,
+          softWrap: false,
         ),
       );
     case BlockType.cite:
@@ -423,6 +425,7 @@ Widget _readerHighlightedText(
   TextAlign textAlign, {
   List<RichSpan>? richSpans,
   double firstLineIndent = 0,
+  bool softWrap = true,
 }) {
   final locale = ctx.settings.hyphenation ? const Locale('ru') : null;
   final query = ctx.highlightQuery?.trim();
@@ -441,6 +444,7 @@ Widget _readerHighlightedText(
         TextSpan(children: spans),
         textAlign: textAlign,
         locale: locale,
+        softWrap: softWrap,
       );
     }
     if (ctx.settings.bionicReading) {
@@ -452,6 +456,7 @@ Widget _readerHighlightedText(
         TextSpan(children: spans),
         textAlign: textAlign,
         locale: locale,
+        softWrap: softWrap,
       );
     }
     if (firstLineIndent > 0) {
@@ -465,9 +470,10 @@ Widget _readerHighlightedText(
         style: style,
         textAlign: textAlign,
         locale: locale,
+        softWrap: softWrap,
       );
     }
-    return Text(text, style: style, textAlign: textAlign, locale: locale);
+    return Text(text, style: style, textAlign: textAlign, locale: locale, softWrap: softWrap);
   }
   return Text.rich(
     TextSpan(
@@ -475,6 +481,7 @@ Widget _readerHighlightedText(
     ),
     textAlign: textAlign,
     locale: locale,
+    softWrap: softWrap,
   );
 }
 

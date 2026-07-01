@@ -6,7 +6,7 @@ use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -66,7 +66,8 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         };
 
         let xhtml_text = decode_bytes(&xhtml_bytes, encoding_name);
-        let (blocks, next_block_index) = parse_xhtml_to_blocks(&xhtml_text, block_index);
+        let css = extract_css(&xhtml_text);
+        let (blocks, next_block_index) = parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
         block_index = next_block_index;
 
         if blocks.is_empty() {
@@ -322,7 +323,141 @@ fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {
     format!("data:{};base64,{}", mime, STANDARD.encode(bytes))
 }
 
-fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>, i32) {
+/// Collect CSS class→properties map from inline `<style>` elements in XHTML.
+/// CRT-1.11: parses simple `.class { name: value; }` rules.
+/// ponytail: no cascade, no inheritance, no `@` rules, no compound selectors.
+/// Upgrade to a full CSS engine if EPUB styling quality matters.
+fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
+    let mut rules: HashMap<String, HashMap<String, String>> = HashMap::new();
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+
+    let mut in_style = false;
+    let mut style_content = String::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "style" {
+                    in_style = true;
+                    style_content.clear();
+                }
+            }
+            Ok(Event::Text(ref e)) if in_style => {
+                style_content.push_str(&e.xml10_content().unwrap_or_default());
+            }
+            Ok(Event::CData(ref e)) if in_style => {
+                style_content.push_str(&e.xml10_content().unwrap_or_default());
+            }
+            Ok(Event::End(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "style" && in_style {
+                    in_style = false;
+                    for line in style_content.lines() {
+                        let line = line.trim();
+                        // Match: .className { ... }
+                            if let Some(body_start) = line.find('{') {
+                            if let Some(body_end) = line.rfind('}') {
+                                let selector = &line[..body_start].trim();
+                                let body = &line[body_start + 1..body_end];
+                                let selector = if selector.starts_with('.') {
+                                    selector
+                                } else if !selector.contains(' ') && !selector.contains('#') {
+                                    // Pure tag selector — prefix with "tag:" for disambiguation
+                                    let tag = selector.trim();
+                                    if !tag.is_empty() {
+                                        selector
+                                    } else {
+                                        continue;
+                                    }
+                                } else {
+                                    // Compound/other selectors: skip for now
+                                    // ponytail: no compound selectors, no pseudo-classes, no @rules
+                                    continue;
+                                };
+                                if !selector.is_empty() {
+                                    let props = rules
+                                        .entry(selector.to_string())
+                                        .or_default();
+                                    for prop in body.split(';') {
+                                        let prop = prop.trim();
+                                        if let Some(colon) = prop.find(':') {
+                                            let name = prop[..colon].trim().to_string();
+                                            let value = prop[colon + 1..].trim().to_string();
+                                            if !name.is_empty() && !value.is_empty() {
+                                                props.insert(name, value);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    // ponytail: case-insensitive matching would be more correct but CSS is author-controlled
+    rules
+}
+
+/// Apply CSS properties to a ReaderBlock by matching tag/class selectors.
+/// ponytail: only text-indent and text-align; no cascade, no inheritance, no compound selectors.
+fn apply_css_props(
+    block: &mut ReaderBlock,
+    tag: &str,
+    class: Option<&str>,
+    css: &HashMap<String, HashMap<String, String>>,
+) {
+    // Check tag-based selector (e.g., "p", "h1", "blockquote")
+    if let Some(props) = css.get(tag) {
+        apply_props(block, props);
+    }
+    // Check class-based selector (e.g., ".poem", ".epigraph")
+    if let Some(class) = class {
+        let class_sel = format!(".{}", class);
+        if let Some(props) = css.get(&class_sel) {
+            apply_props(block, props);
+        }
+    }
+}
+
+fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
+    if let Some(indent) = props.get("text-indent") {
+        let cleaned: String = indent
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        if let Ok(v) = cleaned.parse::<f64>() {
+            block.text_indent = Some(v);
+        }
+    }
+    if let Some(align) = props.get("text-align") {
+        block.text_align = Some(align.clone());
+    }
+    if let Some(_fs) = props.get("font-style") {
+        // ponytail: font-style not applied; use rich spans for italic
+    }
+}
+
+/// Extract class attribute value from a quick-xml element.
+fn get_class_attr(e: &BytesStart<'_>) -> Option<String> {
+    for attr in e.attributes().flatten() {
+        if attr.key.local_name().as_ref() == b"class" {
+            return Some(String::from_utf8_lossy(&attr.value).to_string());
+        }
+    }
+    None
+}
+
+fn parse_xhtml_to_blocks(
+    text: &str,
+    mut block_index: i32,
+    css: &HashMap<String, HashMap<String, String>>,
+) -> (Vec<ReaderBlock>, i32) {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     reader.config_mut().allow_dangling_amp = true;
@@ -333,6 +468,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
     let mut blockquote_depth: i32 = 0;
+    let mut current_class: Option<String> = None;
 
     // Rich span tracking
     let mut rich_spans: Vec<RichSpan> = Vec::new();
@@ -356,6 +492,7 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                current_class = get_class_attr(e);
                 match tag.as_str() {
                     "body" => in_body = true,
                     "p" if in_body => {
@@ -658,6 +795,11 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                 text_align: None,
                                 note_id: None,
                             });
+                            if let Some(ref cls) = current_class {
+                                if let Some(last) = blocks.last_mut() {
+                                    apply_css_props(last, "p", Some(cls), css);
+                                }
+                            }
                             block_index += 1;
                         }
                         current_text.clear();
@@ -708,6 +850,12 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                             text_align: None,
                                             note_id: None,
                                         });
+                                        if let Some(ref cls) = current_class {
+                                            if let Some(last) = blocks.last_mut() {
+                                                let htag = format!("h{}", heading_level.unwrap_or(1));
+                                                apply_css_props(last, &htag, Some(cls), css);
+                                            }
+                                        }
                                         block_index += 1;
                                     }
                                     current_text.clear();
@@ -754,6 +902,11 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
                                 text_align: None,
                                 note_id: None,
                             });
+                            if let Some(ref cls) = current_class {
+                                if let Some(last) = blocks.last_mut() {
+                                    apply_css_props(last, "blockquote", Some(cls), css);
+                                }
+                            }
                             block_index += 1;
                         }
                         current_text.clear();
@@ -1023,7 +1176,84 @@ fn parse_xhtml_to_blocks(text: &str, mut block_index: i32) -> (Vec<ReaderBlock>,
         None,
     );
 
+    // CRT-1.11: apply CSS tag-based selectors to all blocks
+    // ponytail: no class tracking in post-process; only tag selectors apply here
+    for block in &mut blocks {
+        let tag = match block.block_type {
+            BlockType::Paragraph => "p",
+            BlockType::Heading => {
+                if let Some(lvl) = block.heading_level {
+                    match lvl {
+                        1 => "h1",
+                        2 => "h2",
+                        3 => "h3",
+                        _ => "h4",
+                    }
+                } else {
+                    "h1"
+                }
+            }
+            BlockType::Quote => "blockquote",
+            BlockType::Epigraph => "blockquote",
+            BlockType::Poem => "p",
+            BlockType::Cite => "cite",
+            BlockType::List => "ul",
+            BlockType::Table => "table",
+            BlockType::Separator => "hr",
+            _ => "p",
+        };
+        apply_css_props(block, tag, None, css);
+    }
+
     (blocks, block_index)
+}
+
+#[allow(dead_code)]
+fn push_block(
+    blocks: &mut Vec<ReaderBlock>,
+    text: String,
+    block_type: BlockType,
+    heading_level: Option<i32>,
+    note_id: Option<String>,
+    rich_spans: Option<Vec<RichSpan>>,
+    class: Option<&str>,
+    css: &HashMap<String, HashMap<String, String>>,
+    index: &mut i32,
+) {
+    if text.is_empty() && rich_spans.is_none() {
+        return;
+    }
+    let tag = match block_type {
+        BlockType::Paragraph => "p",
+        BlockType::Heading => "h1",
+        BlockType::Quote => "blockquote",
+        BlockType::Epigraph => "blockquote",
+        BlockType::Poem => "p",
+        BlockType::Cite => "cite",
+        BlockType::List => "ul",
+        BlockType::Table => "table",
+        BlockType::Separator => "hr",
+        _ => "p",
+    };
+    let mut block = ReaderBlock {
+        index: *index,
+        text,
+        block_type,
+        image_url: None,
+        note_ref: None,
+        rich_spans,
+        heading_level,
+        ordered: None,
+        list_items: None,
+        table_rows: None,
+        image_alt: None,
+        text_indent: None,
+        text_align: None,
+        note_id,
+    };
+    apply_css_props(&mut block, tag, class, css);
+    blocks.push(block);
+    *index += 1;
 }
 
 fn flush_block(
@@ -1042,6 +1272,7 @@ fn flush_block(
         } else {
             Some(rich_spans.clone())
         };
+        // ponytail: flush_block doesn't apply CSS (used for cross-block flushes where class is stale)
         blocks.push(ReaderBlock {
             index: *index,
             text: trimmed,
