@@ -11,7 +11,7 @@ import '../../home/presentation/reading_heatmap.dart';
 import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
-import '../data/reading_stats_providers.dart';
+import '../data/reading_stats_providers.dart' as rsp;
 
 class ReadingStatsScreen extends ConsumerWidget {
   const ReadingStatsScreen({super.key});
@@ -19,7 +19,8 @@ class ReadingStatsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(readingStatsProvider);
-    final bookStatsAsync = ref.watch(bookStatsListProvider);
+    final bookStatsAsync = ref.watch(rsp.bookStatsListProvider);
+    final favGenresAsync = ref.watch(rsp.favoriteGenresProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -78,6 +79,76 @@ class ReadingStatsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: ReadingHeatmap(data: stats.heatmapData),
                 ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Любимые жанры',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              favGenresAsync.when(
+                data: (genres) {
+                  if (genres.isEmpty) return const SizedBox.shrink();
+                  final maxCount = genres.first.value;
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: genres.map((entry) {
+                          final ratio = entry.value / maxCount;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 120,
+                                  child: Text(
+                                    entry.key,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: ratio,
+                                      minHeight: 12,
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.surfaceContainerHighest,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 32,
+                                  child: Text(
+                                    '${entry.value}',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+                error: (_, _) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 24),
               Text(
