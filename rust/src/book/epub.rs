@@ -385,7 +385,9 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if tag == "style" && in_style {
                     in_style = false;
-                    for line in style_content.lines() {
+                    // LW-1.4: extract rules from @media blocks before line parsing
+                    let expanded = expand_media_queries(&style_content);
+                    for line in expanded.lines() {
                         let line = line.trim();
                         // Match: .className { ... }
                         if let Some(body_start) = line.find('{') {
@@ -430,6 +432,44 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
     }
     // ponytail: case-insensitive matching would be more correct but CSS is author-controlled
     rules
+}
+
+/// LW-1.4: expand @media blocks — extract inner rules so they participate in normal CSS matching.
+/// ponytail: treats all @media as "always apply" (screen reader = screen context).
+fn expand_media_queries(css: &str) -> String {
+    let mut result = String::with_capacity(css.len());
+    let mut i = 0;
+    let bytes = css.as_bytes();
+    while i < bytes.len() {
+        // Look for @media at start of a rule or after whitespace/newline
+        if bytes[i] == b'@' {
+            let rest = &css[i..];
+            if rest.to_lowercase().starts_with("@media") {
+                // Skip past @media <query> {
+                if let Some(open) = rest.find('{') {
+                    let mut depth = 1;
+                    let mut j = i + open + 1;
+                    while j < bytes.len() && depth > 0 {
+                        match bytes[j] {
+                            b'{' => depth += 1,
+                            b'}' => depth -= 1,
+                            _ => {}
+                        }
+                        j += 1;
+                    }
+                    // Extract inner content (between the outer braces)
+                    let inner = &css[i + open + 1..j - 1];
+                    result.push_str(inner);
+                    result.push('\n');
+                    i = j;
+                    continue;
+                }
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
 }
 
 /// Apply CSS properties to a ReaderBlock by matching tag/class selectors.
