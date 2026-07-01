@@ -166,6 +166,34 @@ class ReaderCtx {
   TextStyle get style => _readerTextStyle(settings, colors);
 }
 
+// HG-1.2: hanging punctuation — returns negative offset for paragraphs starting with quotes/brackets
+double _hangingPunctuationOffset(String text, double fontSize) {
+  if (text.isEmpty) return 0;
+  final first = text.trimLeft();
+  if (first.isEmpty) return 0;
+  final ch = first[0];
+  // ponytail: approximate width of hanging characters as 0.4× font size
+  if (ch == '\u00AB' ||
+      ch == '\u00BB' ||
+      ch == '\u201C' ||
+      ch == '\u201D' ||
+      ch == '\u201E' ||
+      ch == '\u201F' ||
+      ch == '\u2018' ||
+      ch == '\u2019' ||
+      ch == '\u0022' ||
+      ch == "\u0027" ||
+      ch == '\u0060' ||
+      ch == '(' ||
+      ch == '[' ||
+      ch == '{' ||
+      ch == '\u2039' ||
+      ch == '\u203A') {
+    return fontSize * 0.4;
+  }
+  return 0;
+}
+
 TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
   final fw = (s.fontWeightDelta > 0.33)
       ? FontWeight.w600
@@ -386,6 +414,9 @@ Widget _buildReaderBlock(
         ParagraphIndentMode.emptyLine => 0.0,
         ParagraphIndentMode.custom => s.paragraphFirstLineIndent,
       };
+      // HG-1.2: hanging punctuation — paragraphs starting with quotes/brackets get negative indent
+      final hangingOffset = _hangingPunctuationOffset(block.text, s.fontSize);
+      final effectiveIndent = (indentValue - hangingOffset).clamp(0.0, double.infinity);
       final bottomPadding = s.paragraphIndentMode == ParagraphIndentMode.emptyLine
           ? s.paragraphSpacing * 2
           : s.paragraphSpacing;
@@ -393,7 +424,7 @@ Widget _buildReaderBlock(
         padding: EdgeInsets.only(bottom: bottomPadding),
         child: blockHighlights != null && blockHighlights.isNotEmpty
             ? Padding(
-                padding: EdgeInsets.only(left: indentValue),
+                padding: EdgeInsets.only(left: effectiveIndent),
                 child: HighlightedText(
                   text: block.text,
                   style: style,
@@ -407,7 +438,7 @@ Widget _buildReaderBlock(
                 style,
                 s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign),
                 richSpans: block.richSpans,
-                firstLineIndent: indentValue,
+                firstLineIndent: effectiveIndent,
               ),
       );
   }
@@ -1375,6 +1406,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   bool _didRestoreInitialPage = false;
   bool _disposed = false;
   List<_PageContent> _pages = const [];
+  // HG-6.1: layout cache — avoid recomputing pages when settings haven't changed
+  String? _cacheKey;
+  List<_PageContent> _cachedPages = const [];
 
   @override
   void initState() {
@@ -1385,6 +1419,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   @override
   void didUpdateWidget(covariant _PaginatedContentBody oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.loadedChapters != oldWidget.loadedChapters) {
+      _cacheKey = null;
+      _cachedPages = const [];
+    }
     if (widget.initialPage != oldWidget.initialPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_disposed || !_pageController.hasClients) return;
@@ -1425,7 +1463,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final settings = widget.settings;
     final style = _getReaderStyle(settings);
     final pages = <_PageContent>[];
-    const minFillRatio = 0.3;
+    const minFillRatio = 0.35;
 
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
     if (hasCover) {
@@ -1452,8 +1490,19 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
 
         if (currentHeight + blockHeight > availableHeight && i > pageStart) {
-          // Don't break if current page is mostly empty (< 30% filled)
-          if (currentHeight > availableHeight * minFillRatio) {
+          // HG-1.4: widow control — don't leave a single block alone on the next page
+          final remainingBlocks = chapter.blocks.length - i;
+          final remainingHeight = remainingBlocks > 0
+              ? chapter.blocks
+                    .skip(i)
+                    .fold<double>(
+                      0,
+                      (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth),
+                    )
+              : 0.0;
+          final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
+          // Don't break if current page is mostly empty (< 35% filled)
+          if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {
             pages.add(
               _PageContent(
                 chapterIndex: chIdx,
@@ -1473,11 +1522,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
       }
 
-      // Final page: if it would be very short (< 25%), merge with previous page
+      // Final page: if it would be very short (< 30%), merge with previous page
       if (pageStart > 0 &&
           pages.isNotEmpty &&
           pages.last.chapterIndex == chIdx &&
-          currentHeight < availableHeight * 0.25) {
+          currentHeight < availableHeight * 0.30) {
         // Extend previous page to include remaining blocks
         final lastPage = pages.last;
         pages[pages.length - 1] = _PageContent(
@@ -1770,7 +1819,21 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       builder: (context, constraints) {
         final availableHeight = constraints.maxHeight;
         final contentWidth = constraints.maxWidth - widget.settings.margin * 2;
-        _pages = _paginateContent(availableHeight, contentWidth);
+        // HG-6.1: check layout cache
+        final s = widget.settings;
+        final key =
+            '${s.fontSize}_${s.lineHeight}_${s.margin}_${s.paragraphSpacing}_'
+            '${s.letterSpacing}_${s.paragraphFirstLineIndent}_${s.font}_'
+            '${s.hyphenation}_${s.textAlign.name}_${s.paragraphIndentMode.name}_'
+            '${availableHeight.toStringAsFixed(1)}_${contentWidth.toStringAsFixed(1)}_'
+            '${widget.loadedChapters.length}';
+        if (key == _cacheKey && _cachedPages.isNotEmpty) {
+          _pages = _cachedPages;
+        } else {
+          _pages = _paginateContent(availableHeight, contentWidth);
+          _cacheKey = key;
+          _cachedPages = _pages;
+        }
         final pageCount = _pages.length;
         if (pageCount == 0) {
           return const SizedBox.shrink();

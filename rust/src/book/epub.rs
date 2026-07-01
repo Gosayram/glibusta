@@ -43,6 +43,9 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     let mut chapter_index = 0i32;
     let mut block_index = 0i32;
+    // CRT-1.14: collect @font-face declarations across all XHTML files
+    let mut font_faces: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     for spine_id in &spine_ids {
         let Some(item) = manifest_items.get(spine_id.as_str()) else {
@@ -67,6 +70,10 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
         let xhtml_text = decode_bytes(&xhtml_bytes, encoding_name);
         let css = extract_css(&xhtml_text);
+        // CRT-1.14: extract @font-face declarations
+        for (family, src) in extract_font_faces(&xhtml_text) {
+            font_faces.entry(family).or_insert(src);
+        }
         let (blocks, next_block_index, page_breaks_in_file) =
             parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
         block_index = next_block_index;
@@ -116,6 +123,13 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
     let id = crate::book::sha256_hex(bytes);
 
+    // CRT-1.14: include font-face declarations in metadata
+    let meta = if font_faces.is_empty() {
+        None
+    } else {
+        Some(serde_json::json!({ "fonts": font_faces }))
+    };
+
     Ok(NormalizedBook {
         id,
         title,
@@ -123,7 +137,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         description,
         cover_url,
         chapters,
-        metadata: None,
+        metadata: meta,
     })
 }
 
@@ -470,6 +484,95 @@ fn expand_media_queries(css: &str) -> String {
         i += 1;
     }
     result
+}
+
+/// CRT-1.14: extract @font-face declarations from XHTML text.
+/// Returns Vec of (font-family, src-url) pairs.
+fn extract_font_faces(text: &str) -> Vec<(String, String)> {
+    let mut faces = Vec::new();
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+
+    let mut in_style = false;
+    let mut style_content = String::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "style" {
+                    in_style = true;
+                    style_content.clear();
+                }
+            }
+            Ok(Event::Text(ref e)) if in_style => {
+                style_content.push_str(&e.xml10_content().unwrap_or_default());
+            }
+            Ok(Event::CData(ref e)) if in_style => {
+                style_content.push_str(&e.xml10_content().unwrap_or_default());
+            }
+            Ok(Event::End(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "style" && in_style {
+                    in_style = false;
+                    // Find @font-face { ... } blocks
+                    let expanded = expand_media_queries(&style_content);
+                    let mut pos = 0;
+                    while let Some(start) = expanded[pos..].find("@font-face") {
+                        let abs_start = pos + start;
+                        if let Some(brace) = expanded[abs_start..].find('{') {
+                            let block_start = abs_start + brace + 1;
+                            let mut depth = 1i32;
+                            let mut j = block_start;
+                            let bytes = expanded.as_bytes();
+                            while j < bytes.len() && depth > 0 {
+                                match bytes[j] {
+                                    b'{' => depth += 1,
+                                    b'}' => depth -= 1,
+                                    _ => {}
+                                }
+                                j += 1;
+                            }
+                            let block = &expanded[block_start..j - 1];
+                            let mut font_family = String::new();
+                            let mut src = String::new();
+                            for prop in block.split(';') {
+                                let prop = prop.trim();
+                                if let Some(colon) = prop.find(':') {
+                                    let name = prop[..colon].trim();
+                                    let value = prop[colon + 1..].trim();
+                                    if name == "font-family" {
+                                        font_family = value
+                                            .trim_matches(|c| c == '\'' || c == '"')
+                                            .to_string();
+                                    } else if name == "src" {
+                                        // Extract url("...") from src
+                                        if let Some(url_start) = value.find("url(") {
+                                            let rest = &value[url_start + 4..];
+                                            if let Some(url_end) = rest.find(')') {
+                                                src = rest[..url_end]
+                                                    .trim_matches(|c| c == '\'' || c == '"')
+                                                    .to_string();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !font_family.is_empty() && !src.is_empty() {
+                                faces.push((font_family, src));
+                            }
+                            pos = j;
+                        } else {
+                            pos = abs_start + 10;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    faces
 }
 
 /// Apply CSS properties to a ReaderBlock by matching tag/class selectors.
