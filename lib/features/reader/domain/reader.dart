@@ -89,6 +89,16 @@ enum ParagraphIndentMode {
   final String displayName;
 }
 
+enum ScrollInertia {
+  none('Без инерции'),
+  light('Лёгкая'),
+  medium('Средняя'),
+  heavy('Тяжёлая');
+
+  const ScrollInertia(this.displayName);
+  final String displayName;
+}
+
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
@@ -122,6 +132,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ParagraphIndentMode.firstLine) ParagraphIndentMode paragraphIndentMode,
     @Default(true) bool hyphenation,
     @Default(PageTurnAnimation.slide) PageTurnAnimation pageTurnAnimation,
+    @Default(ScrollInertia.medium) ScrollInertia scrollInertia,
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
     @Default(true) bool verticalSwipeBrightness,

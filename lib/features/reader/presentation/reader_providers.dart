@@ -180,6 +180,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(pageTurnAnimation: animation);
   }
 
+  void updateScrollInertia(ScrollInertia inertia) {
+    state = state.copyWith(scrollInertia: inertia);
+  }
+
   void updateTextDirection(ReaderTextDirection direction) {
     state = state.copyWith(textDirection: direction);
   }

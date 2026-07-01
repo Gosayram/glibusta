@@ -937,7 +937,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           child: Stack(
             children: [
               ScrollConfiguration(
-                behavior: const _SmoothScrollBehavior(),
+                behavior: _SmoothScrollBehavior(inertia: settings.scrollInertia),
                 child: Scrollbar(
                   controller: widget.scrollController,
                   thumbVisibility: true,
@@ -1645,11 +1645,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 }
 
 class _SmoothScrollBehavior extends ScrollBehavior {
-  const _SmoothScrollBehavior();
+  const _SmoothScrollBehavior({this.inertia = ScrollInertia.medium});
+  final ScrollInertia inertia;
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
     final platform = Theme.of(context).platform;
+    if (inertia == ScrollInertia.none) {
+      return const ClampingScrollPhysics();
+    }
     return switch (platform) {
       TargetPlatform.android ||
       TargetPlatform.macOS ||
