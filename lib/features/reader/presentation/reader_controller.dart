@@ -55,6 +55,7 @@ class ReaderState {
   final String? highlightedQuery;
   final bool isDynamicallyLoading;
   final List<double> checkpoints;
+  final int wpm;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -75,6 +76,7 @@ class ReaderState {
     this.highlightedQuery,
     this.isDynamicallyLoading = false,
     this.checkpoints = const [],
+    this.wpm = 200,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;
@@ -115,6 +117,7 @@ class ReaderState {
     bool clearLoadingMessage = false,
     bool? isDynamicallyLoading,
     List<double>? checkpoints,
+    int? wpm,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
@@ -134,6 +137,7 @@ class ReaderState {
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
       isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
       checkpoints: checkpoints ?? this.checkpoints,
+      wpm: wpm ?? this.wpm,
     );
   }
 }
@@ -298,6 +302,7 @@ class ReaderController {
       _updateState(
         _state.copyWith(
           estimatedMinutesLeft: estimatedTotalWords > 0 ? (estimatedTotalWords / wpm).ceil() : 0,
+          wpm: wpm,
         ),
       );
 

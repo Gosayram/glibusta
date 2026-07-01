@@ -182,6 +182,7 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
     wordSpacing: s.wordSpacing,
+    fontFeatures: const [FontFeature.enable('liga'), FontFeature.enable('kern')],
   );
 }
 

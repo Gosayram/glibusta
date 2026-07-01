@@ -326,18 +326,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             maxScale: 5,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.network(imageUrl, fit: BoxFit.contain, errorBuilder: (
-                context,
-                error,
-                stackTrace,
-              ) {
-                return Container(
-                  width: 200,
-                  height: 200,
-                  color: Colors.black26,
-                  child: const Center(child: Icon(Icons.broken_image, color: Colors.white54, size: 48)),
-                );
-              }),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder:
+                    (
+                      context,
+                      error,
+                      stackTrace,
+                    ) {
+                      return Container(
+                        width: 200,
+                        height: 200,
+                        color: Colors.black26,
+                        child: const Center(
+                          child: Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                        ),
+                      );
+                    },
+              ),
             ),
           ),
         ),
@@ -1010,6 +1017,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           readerState.chapterCount - readerState.currentPosition.chapterIndex,
         ),
         InfoSlotMode.none => '',
+        InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
       };
       return Text(
         text,
@@ -1111,53 +1119,53 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     final db = ref.read(databaseProvider);
-    unawaited(db.bookDao.getReadingProgress(widget.bookId).then((progress) {
-      if (!context.mounted) return;
-      final totalSeconds = progress != null
-          ? DateTime.now().difference(progress.lastRead).inSeconds
-          : 0;
-      final minutes = totalSeconds ~/ 60;
-      final hours = minutes ~/ 60;
-      final timeStr = hours > 0
-          ? '$hours ч ${minutes % 60} мин'
-          : '$minutes мин';
+    unawaited(
+      db.bookDao.getReadingProgress(widget.bookId).then((progress) {
+        if (!context.mounted) return;
+        final totalSeconds = progress != null
+            ? DateTime.now().difference(progress.lastRead).inSeconds
+            : 0;
+        final minutes = totalSeconds ~/ 60;
+        final hours = minutes ~/ 60;
+        final timeStr = hours > 0 ? '$hours ч ${minutes % 60} мин' : '$minutes мин';
 
-      unawaited(
-        showDialog<void>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(Icons.info_outline, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                const Text('О книге'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _statRow(theme, 'Главы', '${meta.chapterCount}'),
-                _statRow(theme, 'Абзацев', '$totalBlocks'),
-                _statRow(theme, 'Иллюстраций', '$totalImages'),
-                if (totalTables > 0) _statRow(theme, 'Таблиц', '$totalTables'),
-                if (progress != null && progress.progressPercent > 0) ...[
-                  const Divider(height: 24),
-                  _statRow(theme, 'Прогресс', '${(progress.progressPercent * 100).round()}%'),
-                  _statRow(theme, 'Прочитано', timeStr),
+        unawaited(
+          showDialog<void>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  const Text('О книге'),
                 ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _statRow(theme, 'Главы', '${meta.chapterCount}'),
+                  _statRow(theme, 'Абзацев', '$totalBlocks'),
+                  _statRow(theme, 'Иллюстраций', '$totalImages'),
+                  if (totalTables > 0) _statRow(theme, 'Таблиц', '$totalTables'),
+                  if (progress != null && progress.progressPercent > 0) ...[
+                    const Divider(height: 24),
+                    _statRow(theme, 'Прогресс', '${(progress.progressPercent * 100).round()}%'),
+                    _statRow(theme, 'Прочитано', timeStr),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Закрыть'),
+                ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Закрыть'),
-              ),
-            ],
           ),
-        ),
-      );
-    }));
+        );
+      }),
+    );
   }
 
   Widget _statRow(ThemeData theme, String label, String value) {
@@ -1166,12 +1174,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          )),
-          Text(value, style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          )),
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

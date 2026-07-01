@@ -41,6 +41,29 @@ class ReadingStatsScreen extends ConsumerWidget {
             children: [
               _SummaryCards(stats: stats),
               const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timeline, size: 20),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Средняя сессия',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const Spacer(),
+                      Text(
+                        _formatMinutes(stats.avgSessionMinutes.round()),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               _GoalCard(todayMinutes: stats.todayMinutes),
               const SizedBox(height: 24),
               Text(
@@ -226,13 +249,13 @@ class _SummaryCards extends StatelessWidget {
       ],
     );
   }
+}
 
-  String _formatMinutes(int minutes) {
-    final h = minutes ~/ 60;
-    final m = minutes % 60;
-    if (h == 0) return '$m мин';
-    return m > 0 ? '$h ч $m мин' : '$h ч';
-  }
+String _formatMinutes(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '$m мин';
+  return m > 0 ? '$h ч $m мин' : '$h ч';
 }
 
 class _StatCard extends StatelessWidget {
