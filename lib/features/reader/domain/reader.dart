@@ -32,10 +32,13 @@ enum ReaderFont {
   serif('Serif'),
   sans('Sans-Serif'),
   mono('Monospace'),
-  system('Системный');
+  system('Системный'),
+  custom('Свой');
 
   const ReaderFont(this.displayName);
   final String displayName;
+
+  static String? activeCustomFontFamily;
 
   String get fontFamily => switch (this) {
     ReaderFont.literata => 'Literata',
@@ -44,6 +47,7 @@ enum ReaderFont {
     ReaderFont.sans => 'sans-serif',
     ReaderFont.mono => 'monospace',
     ReaderFont.system => '',
+    ReaderFont.custom => activeCustomFontFamily ?? '',
   };
 }
 

@@ -11,7 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
-
+import '../../../core/fonts/custom_font_helper.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
@@ -78,6 +78,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
     unawaited(_fetchBatteryLevel());
+    unawaited(CustomFontHelper.loadSaved());
     _enterImmersiveMode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

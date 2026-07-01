@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/fonts/custom_font_helper.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../data/color_preset_service.dart';
 import '../data/per_book_settings_service.dart';
@@ -171,6 +173,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 16),
         const _SectionTitle('Шрифт'),
         _buildFontRow(settings, notifier),
+        _buildCustomFontTile(context, ref, settings, notifier),
         const SizedBox(height: 12),
         const _SectionTitle('Размер шрифта'),
         _buildFontSizeRow(settings, notifier),
@@ -834,6 +837,65 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         );
       }).toList(),
     );
+  }
+
+  static Widget _buildCustomFontTile(
+    BuildContext context,
+    WidgetRef ref,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final hasActive = settings.font == ReaderFont.custom;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          if (hasActive)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                ReaderFont.activeCustomFontFamily ?? 'Свой',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.font_download_outlined, size: 18),
+            label: Text(hasActive ? 'Сменить' : 'Загрузить .ttf'),
+            onPressed: () => _pickCustomFont(context, ref, settings, notifier),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Future<void> _pickCustomFont(
+    BuildContext context,
+    WidgetRef ref,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) async {
+    try {
+      final file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['ttf', 'otf', 'woff', 'woff2'],
+      );
+      if (file == null || file.path == null) return;
+      final familyName = file.name.replaceAll(RegExp(r'\.[^.]+$'), '');
+      final ok = await CustomFontHelper.pickAndLoad(file.path!, familyName);
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось загрузить шрифт')),
+        );
+        return;
+      }
+      notifier.updateFont(ReaderFont.custom);
+    } on Object catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
+        );
+      }
+    }
   }
 
   static Widget _buildFontSizeRow(
