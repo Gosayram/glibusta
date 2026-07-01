@@ -324,7 +324,7 @@ Widget _buildReaderBlock(
         child: _readerHighlightedText(
           ctx,
           block.text,
-          style.copyWith(fontSize: s.fontSize * 0.85),
+          style.copyWith(fontSize: s.fontSize * 0.85, color: ctx.colors.footnote),
           textAlign,
         ),
       );
@@ -425,7 +425,7 @@ Widget _readerHighlightedText(
     return Text(text, style: style, textAlign: textAlign, locale: locale);
   }
   return Text.rich(
-    TextSpan(children: _readerHighlightedSpans(text, style, query)),
+    TextSpan(children: _readerHighlightedSpans(text, style, query, highlightColor: ctx.colors.highlight)),
     textAlign: textAlign,
     locale: locale,
   );
@@ -497,7 +497,12 @@ List<InlineSpan> _readerRichTextSpans(
   return spans;
 }
 
-List<InlineSpan> _readerHighlightedSpans(String text, TextStyle style, String query) {
+List<InlineSpan> _readerHighlightedSpans(
+  String text,
+  TextStyle style,
+  String query, {
+  Color highlightColor = const Color(0x66FFEB3B),
+}) {
   final regex = RegExp(RegExp.escape(query), caseSensitive: false);
   final matches = regex.allMatches(text).toList();
   if (matches.isEmpty) return [TextSpan(text: text, style: style)];
@@ -510,7 +515,7 @@ List<InlineSpan> _readerHighlightedSpans(String text, TextStyle style, String qu
     spans.add(
       TextSpan(
         text: match.group(0),
-        style: style.copyWith(backgroundColor: const Color(0x66FFEB3B)),
+        style: style.copyWith(backgroundColor: highlightColor),
       ),
     );
     start = match.end;
@@ -1017,11 +1022,13 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   ReaderCtx _ctx(ReaderSettings settings) {
+    final c = widget.customColors ??
+        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     return ReaderCtx(
       settings: settings,
       customColors: widget.customColors,
       highlightQuery: widget.highlightQuery,
-      linkColor: Theme.of(context).colorScheme.primary,
+      linkColor: c.link,
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
     );
@@ -1407,11 +1414,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   }
 
   ReaderCtx _ctx(ReaderSettings settings) {
+    final c = widget.customColors ??
+        ReaderColors.forThemeWithContext(settings.theme, MediaQuery.platformBrightnessOf(context));
     return ReaderCtx(
       settings: settings,
       customColors: widget.customColors,
       highlightQuery: widget.highlightQuery,
-      linkColor: Theme.of(context).colorScheme.primary,
+      linkColor: c.link,
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
     );
