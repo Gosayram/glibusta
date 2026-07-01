@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
-import '../../core/platform/app_file_storage.dart';
+import '../platform/app_file_storage.dart';
 
 final catalogCoverCacheServiceProvider = Provider<CatalogCoverCacheService>((
   ref,

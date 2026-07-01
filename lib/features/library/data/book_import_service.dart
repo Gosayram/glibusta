@@ -20,7 +20,7 @@ import '../../../core/storage/storage_bridge.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../../reader/data/parsers/parser_registry.dart';
-import '../data/cover_extraction_service.dart';
+import 'cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
 final bookImportServiceProvider = Provider<BookImportService>((ref) {

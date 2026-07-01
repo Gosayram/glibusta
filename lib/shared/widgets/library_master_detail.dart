@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/models/book.dart';
-import '../../../shared/widgets/book_cover_image.dart';
+import '../models/book.dart';
+import 'book_cover_image.dart';
 
 class LibraryMasterDetail extends StatefulWidget {
   final List<Book> books;

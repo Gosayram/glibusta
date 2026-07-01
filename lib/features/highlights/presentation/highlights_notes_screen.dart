@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../highlights/presentation/highlight_providers.dart';
+import 'highlight_providers.dart';
 
 class HighlightsNotesScreen extends ConsumerWidget {
   final String bookId;

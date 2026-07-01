@@ -1,6 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 
-import '../../core/formats/supported_extensions.dart';
+import '../formats/supported_extensions.dart';
 
 /// Unified file picker that delegates to the best native picker per platform.
 ///
