@@ -29,3 +29,15 @@ final favoriteGenresProvider = FutureProvider.autoDispose<List<MapEntry<String, 
     ..sort((a, b) => b.value.compareTo(a.value));
   return sorted.take(5).toList();
 });
+
+final readingHoursProvider = FutureProvider.autoDispose<List<int>>((ref) async {
+  final db = ref.watch(databaseProvider);
+  final hourly = await db.readingTimeDao.getReadingHours(30);
+  final result = List<int>.filled(24, 0);
+  for (final entry in hourly.entries) {
+    if (entry.key >= 0 && entry.key < 24) {
+      result[entry.key] = entry.value;
+    }
+  }
+  return result;
+});

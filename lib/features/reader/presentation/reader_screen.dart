@@ -825,6 +825,25 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               ),
             ),
           ),
+        // MD-24.5: one-handed prev/next buttons when chrome hidden
+        if (!readerState.uiVisible)
+          Positioned(
+            bottom: 40,
+            left: 16,
+            child: _ReaderNavButton(
+              icon: Icons.chevron_left,
+              onTap: _ctrl.scrollToPrevious,
+            ),
+          ),
+        if (!readerState.uiVisible)
+          Positioned(
+            bottom: 40,
+            right: 16,
+            child: _ReaderNavButton(
+              icon: Icons.chevron_right,
+              onTap: _ctrl.scrollToNext,
+            ),
+          ),
         // MD-6.1: sticky header — chapter name persists while bars hidden
         if (!readerState.uiVisible)
           Positioned(
@@ -1406,6 +1425,35 @@ class _ScrollbarIndicator extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _ReaderNavButton extends StatelessWidget {
+  const _ReaderNavButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onTap,
+        child: Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          child: Icon(icon, color: theme.colorScheme.onSurface, size: 28),
+        ),
+      ),
     );
   }
 }

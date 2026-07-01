@@ -82,6 +82,15 @@ class ReadingStatsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               Text(
+                'Время чтения',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _ReadingHoursChart(),
+              const SizedBox(height: 24),
+              Text(
                 'Любимые жанры',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
@@ -524,6 +533,93 @@ class _GoalCard extends ConsumerWidget {
       },
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _ReadingHoursChart extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hoursAsync = ref.watch(rsp.readingHoursProvider);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: hoursAsync.when(
+          data: (hours) {
+            final maxVal = hours.cast<num?>().reduce(
+              (a, b) => (a ?? 0) > (b ?? 0) ? a : b,
+            );
+            if (maxVal == null || maxVal == 0) {
+              return const SizedBox(
+                height: 60,
+                child: Center(child: Text('Нет данных')),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'По часам',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 100,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: List.generate(24, (i) {
+                      final value = hours[i];
+                      final ratio = maxVal > 0 ? value / maxVal : 0.0;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 1),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  width: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color: ratio > 0
+                                        ? Theme.of(context).colorScheme.primary.withValues(
+                                          alpha: 0.3 + ratio * 0.7,
+                                        )
+                                        : Colors.transparent,
+                                    borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '$i',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const SizedBox(
+            height: 60,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+          error: (_, _) => const SizedBox(
+            height: 60,
+            child: Center(child: Text('Ошибка')),
+          ),
+        ),
+      ),
     );
   }
 }

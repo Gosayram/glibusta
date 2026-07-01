@@ -153,6 +153,20 @@ struct RtfFmt {
     bold: bool,
     italic: bool,
     superscript: bool,
+    font_size_half_pts: i32,
+}
+
+impl RtfFmt {
+    fn heading_level(&self) -> Option<i32> {
+        const DEFAULT: i32 = 24;
+        let ratio = self.font_size_half_pts as f64 / DEFAULT as f64;
+        // ponytail: font-size ratio → heading, common RTF convention
+        if ratio >= 3.0 { Some(1) }
+        else if ratio >= 2.0 { Some(2) }
+        else if ratio >= 1.5 { Some(3) }
+        else if ratio >= 1.2 { Some(4) }
+        else { None }
+    }
 }
 
 fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
@@ -291,7 +305,21 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                         fmt.superscript = false;
                     }
                     "ul" | "ulnone" | "strike" | "scaps" | "highlight" => {}
-                    "fs" | "f" | "cf" | "cb" | "shd" | "lang" | "fcharset" | "pn" => {
+                    "fs" => {
+                        let size_start = i;
+                        while i < bytes.len() && bytes[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        if size_start < i {
+                            if let Ok(size) = std::str::from_utf8(&bytes[size_start..i])
+                                .unwrap_or("24")
+                                .parse::<i32>()
+                            {
+                                fmt.font_size_half_pts = size;
+                            }
+                        }
+                    }
+                    "f" | "cf" | "cb" | "shd" | "lang" | "fcharset" | "pn" => {
                         while i < bytes.len() && bytes[i].is_ascii_digit() {
                             i += 1;
                         }
@@ -416,7 +444,7 @@ fn push_rtf_paragraph(
             } else {
                 Some(rich_spans.clone())
             },
-            heading_level: None,
+            heading_level: fmt.heading_level(),
             ordered: None,
             list_items: None,
             table_rows: None,

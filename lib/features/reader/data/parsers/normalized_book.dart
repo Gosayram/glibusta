@@ -138,10 +138,22 @@ class ReaderChapter {
         [],
   );
 
+  static final _pageNumberRegExp = RegExp(
+    r'^[\[\(\-—–]\s*\d+\s*[\]\)\-—–]$',
+  );
+
+  static bool _looksLikePageNumber(String text) {
+    if (text.length > 10) return false;
+    return _pageNumberRegExp.hasMatch(text);
+  }
+
   ReaderChapter withCleanedBlocks() {
     final cleaned = <ReaderBlock>[];
     for (final block in blocks) {
       if (block.type == BlockType.paragraph && block.text.trim().isEmpty) {
+        continue;
+      }
+      if (block.type == BlockType.paragraph && _looksLikePageNumber(block.text.trim())) {
         continue;
       }
       cleaned.add(block);
@@ -205,6 +217,31 @@ class ReaderBlock {
     if (noteId != null) 'noteId': noteId,
   };
 
+  // CRT-21.1: normalize whitespace before typography processing
+  static String _normalizeWhitespace(String text) {
+    final cleaned = text
+        .replaceAll('\r\n', ' ')
+        .replaceAll('\r', ' ')
+        .replaceAll('\n', ' ')
+        .trim();
+    // Collapse 2+ consecutive spaces into one
+    final sb = StringBuffer();
+    var prevSpace = false;
+    for (var i = 0; i < cleaned.length; i++) {
+      final c = cleaned[i];
+      if (c == ' ' || c == '\t' || c == '\u{00A0}') {
+        if (!prevSpace) {
+          sb.write(c);
+          prevSpace = true;
+        }
+      } else {
+        sb.write(c);
+        prevSpace = false;
+      }
+    }
+    return sb.toString();
+  }
+
   // HG-1.1: replace spaces with NBSP after initials, between digits, after short words
   // ponytail: char-level scan, no regex. Runs once per block at load time.
   static String _applyNonBreakingSpaces(String text) {
@@ -256,7 +293,19 @@ class ReaderBlock {
       }
       result.write(chars[i]);
     }
-    return result.toString();
+    // HG-1.5: protect against orphan word on last line (>=8 words → NBSP between last two)
+    final out = result.toString();
+    var sc = 0;
+    for (var i = 0; i < out.length; i++) {
+      if (out[i] == ' ') sc++;
+    }
+    if (sc >= 7) {
+      final ls = out.lastIndexOf(' ');
+      if (ls > 0) {
+        return '${out.substring(0, ls)}\u{00A0}${out.substring(ls + 1)}';
+      }
+    }
+    return out;
   }
 
   static bool _isDigit(String c) => c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x39;
@@ -273,7 +322,7 @@ class ReaderBlock {
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
     index: json['index'] as int,
-    text: _applyNonBreakingSpaces(json['text'] as String),
+    text: _applyNonBreakingSpaces(_normalizeWhitespace(json['text'] as String)),
     type: BlockType.values.firstWhere(
       (e) => e.name == json['type'],
       orElse: () => BlockType.paragraph,
