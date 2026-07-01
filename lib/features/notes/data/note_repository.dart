@@ -81,4 +81,14 @@ class NoteRepository {
           ..orderBy([(n) => OrderingTerm.desc(n.createdAt)]))
         .watch();
   }
+
+  Future<String> exportToText(String bookId) async {
+    final notes = await getAllNotes(bookId);
+    final buf = StringBuffer();
+    for (final n in notes) {
+      buf.writeln('Глава ${n.chapterIndex + 1}: ${n.content}');
+      buf.writeln();
+    }
+    return buf.toString();
+  }
 }

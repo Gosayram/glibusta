@@ -213,10 +213,34 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
       builder: (context, snapshot) {
         final notes = snapshot.data ?? const <Note>[];
         if (notes.isEmpty) return const Center(child: Text('Нет заметок'));
-        return ListView.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            final note = notes[index];
+        return Column(
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: 'Копировать все заметки',
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final buf = StringBuffer();
+                  for (final n in notes) {
+                    buf.writeln('Глава ${n.chapterIndex + 1}: ${n.content}');
+                    buf.writeln();
+                  }
+                  await Clipboard.setData(ClipboardData(text: buf.toString()));
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Заметки скопированы'), duration: Duration(seconds: 1)),
+                    );
+                  }
+                },
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  final note = notes[index];
             return _buildPositionTile(
               title: 'Заметка',
               subtitle: note.content,
@@ -227,6 +251,9 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
               ),
             );
           },
+        ),
+            ),
+          ],
         );
       },
     );
