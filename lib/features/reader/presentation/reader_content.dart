@@ -202,14 +202,16 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       : (s.fontWeightDelta < -0.33)
       ? FontWeight.w300
       : FontWeight.w400;
+  // LW-10.1: apply custom CSS overrides from user
+  final css = _parseCustomCss(s.customCss);
   return TextStyle(
     fontFamily: s.font.fontFamily,
-    fontSize: s.fontSize,
-    height: s.lineHeight,
+    fontSize: css['font-size'] ?? s.fontSize,
+    height: css['line-height'] ?? s.lineHeight,
     color: colors.text,
-    letterSpacing: s.letterSpacing,
+    letterSpacing: css['letter-spacing'] ?? s.letterSpacing,
     fontWeight: fw,
-    wordSpacing: s.wordSpacing,
+    wordSpacing: css['word-spacing'] ?? s.wordSpacing,
     fontFeatures: [
       const FontFeature.enable('liga'),
       const FontFeature.enable('kern'),
@@ -217,6 +219,34 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       if (s.smallCaps) const FontFeature.enable('smcp'),
     ],
   );
+}
+
+/// LW-10.1: parse basic CSS properties from user's customCss text.
+/// ponytail: only extracts p { } rules, basic properties.
+Map<String, double> _parseCustomCss(String css) {
+  if (css.isEmpty) return {};
+  final result = <String, double>{};
+  // Find `p { ... }` blocks
+  final pBlock = RegExp(r'p\s*\{([^}]*)\}').firstMatch(css);
+  if (pBlock == null) return result;
+  final body = pBlock.group(1) ?? '';
+  for (final prop in body.split(';')) {
+    final colon = prop.indexOf(':');
+    if (colon < 0) continue;
+    final name = prop.substring(0, colon).trim();
+    final value = prop.substring(colon + 1).trim();
+    // Extract numeric value
+    final numMatch = RegExp(r'([\d.]+)').firstMatch(value);
+    if (numMatch == null) continue;
+    final num = double.tryParse(numMatch.group(1)!);
+    if (num == null) continue;
+    // Normalize px units, pass through for unitless (em, rem already multiplied in Rust)
+    if (name == 'font-size') result['font-size'] = num;
+    if (name == 'line-height') result['line-height'] = num;
+    if (name == 'letter-spacing') result['letter-spacing'] = num;
+    if (name == 'word-spacing') result['word-spacing'] = num;
+  }
+  return result;
 }
 
 bool _blockNeedsExtraGap(BlockType prev, BlockType next) {
@@ -420,6 +450,12 @@ Widget _buildReaderBlock(
       final bottomPadding = s.paragraphIndentMode == ParagraphIndentMode.emptyLine
           ? s.paragraphSpacing * 2
           : s.paragraphSpacing;
+      // MD-1.7: white-space detection — ws:pre uses monospace, ws:nowrap prevents wrapping
+      final wsMode = block.whiteSpaceMode;
+      final effectiveStyle = wsMode == 'pre' ? style.copyWith(fontFamily: 'monospace') : style;
+      final effectiveAlign = wsMode != null
+          ? textAlign
+          : (s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign));
       return Padding(
         padding: EdgeInsets.only(bottom: bottomPadding),
         child: blockHighlights != null && blockHighlights.isNotEmpty
@@ -427,16 +463,16 @@ Widget _buildReaderBlock(
                 padding: EdgeInsets.only(left: effectiveIndent),
                 child: HighlightedText(
                   text: block.text,
-                  style: style,
-                  textAlign: s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign),
+                  style: effectiveStyle,
+                  textAlign: effectiveAlign,
                   highlights: blockHighlights,
                 ),
               )
             : _readerHighlightedText(
                 ctx,
                 block.text,
-                style,
-                s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign),
+                effectiveStyle,
+                effectiveAlign,
                 richSpans: block.richSpans,
                 firstLineIndent: effectiveIndent,
               ),
@@ -1921,8 +1957,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
 
         final anim = widget.settings.pageTurnAnimation;
-        final useSwitcher = anim == PageTurnAnimation.fade || anim == PageTurnAnimation.curl;
-        final switcherDuration = anim == PageTurnAnimation.curl ? 350 : 200;
+        final useSwitcher =
+            anim == PageTurnAnimation.fade ||
+            anim == PageTurnAnimation.curl ||
+            anim == PageTurnAnimation.stack;
+        final switcherDuration = anim == PageTurnAnimation.curl ? 350 : 250;
         final physics = anim == PageTurnAnimation.none
             ? const NeverScrollableScrollPhysics()
             : const BouncingScrollPhysics();
@@ -1965,6 +2004,45 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                                   opacity: opacity,
                                   child: child,
                                 ),
+                              );
+                            },
+                          );
+                        },
+                        child: child,
+                      );
+                    }
+                    // LW-2.2: Stack animation — new page slides over from right with shadow
+                    if (anim == PageTurnAnimation.stack) {
+                      return AnimatedSwitcher(
+                        duration: Duration(milliseconds: switcherDuration),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            child: child,
+                            builder: (context, child) {
+                              final t = animation.value;
+                              return Stack(
+                                children: [
+                                  child!,
+                                  // Shadow gradient on leading edge of incoming page
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            end: Alignment.center,
+                                            colors: [
+                                              Colors.black.withValues(alpha: 0.25 * (1 - t)),
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           );

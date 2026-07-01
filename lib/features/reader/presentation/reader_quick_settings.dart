@@ -1363,6 +1363,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       PageTurnAnimation.slide: 'Слайд',
       PageTurnAnimation.fade: 'Затухание',
       PageTurnAnimation.curl: 'Свертывание',
+      PageTurnAnimation.stack: 'Стопка',
     },
     onChanged: (v) => notifier.updatePageTurnAnimation(v),
   );

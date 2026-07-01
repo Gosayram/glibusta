@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/fonts/custom_font_helper.dart';
+import '../../../core/services/tts_controller.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
@@ -82,6 +83,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
     unawaited(_fetchBatteryLevel());
     unawaited(CustomFontHelper.loadSaved());
+    // LW-11.1: init TTS headphone auto-pause listener
+    unawaited(TtsController.instance.init());
     _enterImmersiveMode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

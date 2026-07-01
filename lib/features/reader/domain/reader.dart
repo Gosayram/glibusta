@@ -66,7 +66,7 @@ enum ProgressBarPosition { top, bottom, hidden }
 
 enum BottomBarContent { percent, page, chapter, time, none }
 
-enum PageTurnAnimation { none, slide, fade, curl }
+enum PageTurnAnimation { none, slide, fade, curl, stack }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 

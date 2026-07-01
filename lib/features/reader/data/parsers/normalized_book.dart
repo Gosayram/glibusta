@@ -178,6 +178,7 @@ class ReaderBlock {
   final double? textIndent;
   final TextAlign? textAlign;
   final String? noteId;
+  final String? whiteSpaceMode; // MD-1.7: 'pre', 'pre-wrap', 'nowrap'
 
   const ReaderBlock({
     required this.index,
@@ -195,6 +196,7 @@ class ReaderBlock {
     this.textIndent,
     this.textAlign,
     this.noteId,
+    this.whiteSpaceMode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -215,6 +217,7 @@ class ReaderBlock {
     if (textIndent != null) 'textIndent': textIndent,
     if (textAlign != null) 'textAlign': textAlign!.name,
     if (noteId != null) 'noteId': noteId,
+    if (whiteSpaceMode != null) 'textAlign': 'ws:$whiteSpaceMode',
   };
 
   // CRT-21.1: normalize whitespace before typography processing
@@ -339,13 +342,25 @@ class ReaderBlock {
     imageAlt: json['imageAlt'] as String?,
     imageCaption: json['imageCaption'] as String?,
     textIndent: (json['textIndent'] as num?)?.toDouble(),
-    textAlign: json['textAlign'] != null
-        ? TextAlign.values.firstWhere(
-            (e) => e.name == json['textAlign'],
-            orElse: () => TextAlign.left,
-          )
-        : null,
+    textAlign: _parseTextAlign(json['textAlign']),
     noteId: json['noteId'] as String?,
+    whiteSpaceMode: _parseWhiteSpaceMode(json['textAlign']),
+  );
+}
+
+// MD-1.7: extract white-space mode from raw text_align value
+String? _parseWhiteSpaceMode(dynamic raw) {
+  if (raw is! String) return null;
+  if (raw.startsWith('ws:')) return raw.substring(3);
+  return null;
+}
+
+TextAlign? _parseTextAlign(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is String && raw.startsWith('ws:')) return null; // white-space directive, not alignment
+  return TextAlign.values.firstWhere(
+    (e) => e.name == raw,
+    orElse: () => TextAlign.left,
   );
 }
 

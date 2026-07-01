@@ -583,15 +583,27 @@ fn apply_css_props(
     class: Option<&str>,
     css: &HashMap<String, HashMap<String, String>>,
 ) {
-    // Check tag-based selector (e.g., "p", "h1", "blockquote")
+    // MD-1.1: cascade by specificity — tag < class
+    // Tag selector (lowest specificity)
     if let Some(props) = css.get(tag) {
         apply_props(block, props);
     }
-    // Check class-based selector (e.g., ".poem", ".epigraph")
-    if let Some(class) = class {
-        let class_sel = format!(".{}", class);
-        if let Some(props) = css.get(&class_sel) {
-            apply_props(block, props);
+    // MD-1.1: multiple classes — HTML allows class="poem italic", apply each in order
+    if let Some(class_str) = class {
+        for cls in class_str.split_whitespace() {
+            let class_sel = format!(".{}", cls);
+            if let Some(props) = css.get(&class_sel) {
+                apply_props(block, props);
+            }
+        }
+    }
+    // Compound selector: tag.class (e.g., "p.poem")
+    if let Some(class_str) = class {
+        for cls in class_str.split_whitespace() {
+            let compound = format!("{}.{}", tag, cls);
+            if let Some(props) = css.get(&compound) {
+                apply_props(block, props);
+            }
         }
     }
 }
@@ -605,6 +617,13 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     }
     if let Some(align) = props.get("text-align") {
         block.text_align = Some(align.clone());
+    }
+    // MD-1.7: white-space: pre/pre-wrap — store as special text_align value
+    if let Some(ws) = props.get("white-space") {
+        let v = ws.trim();
+        if v == "pre" || v == "pre-wrap" || v == "nowrap" {
+            block.text_align = Some(format!("ws:{v}"));
+        }
     }
     // MD-1.2: margin-left as text-indent fallback for indented blocks
     if block.text_indent.is_none() {

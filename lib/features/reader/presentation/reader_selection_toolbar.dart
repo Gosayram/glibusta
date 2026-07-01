@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/tts_controller.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -461,10 +462,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   Future<void> _speakText(String text) async {
     try {
-      final tts = FlutterTts();
-      await tts.setLanguage('ru-RU');
-      await tts.setSpeechRate(0.5);
-      await tts.speak(text);
+      await TtsController.instance.speak(text, lang: 'ru-RU', rate: 0.5);
     } on Object catch (e) {
       debugPrint('TTS error: $e');
     }

@@ -208,9 +208,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: ReaderEntryScreen(bookId: bookId),
+            // LW-2.3: cover animation — 3D book-opening effect
             transitionsBuilder: (_, animation, second, child) {
-              return FadeTransition(
-                opacity: animation,
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (_, c) {
+                  final t = Curves.easeOutCubic.transform(animation.value);
+                  final rotation = (1 - t) * 0.8;
+                  return Transform(
+                    alignment: Alignment.centerRight,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.001)
+                      ..rotateY(-rotation),
+                    child: Opacity(opacity: t.clamp(0.0, 1.0), child: c),
+                  );
+                },
                 child: child,
               );
             },
