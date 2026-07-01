@@ -105,6 +105,12 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
     final visibleEntries = entries
         .where((e) => e.isGroup || !_collapsedGroups.contains(e.groupId))
         .toList();
+
+    // MD-8.1: compute max chapter size for visual bars
+    final maxSize = widget.loadedChapters.values.fold<int>(
+      0,
+      (max, ch) => max > ch.blocks.length ? max : ch.blocks.length,
+    );
     return Column(
       children: [
         Padding(
@@ -157,6 +163,11 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
               final isCollapsed = _collapsedGroups.contains(entry.groupId);
               final isLoaded = widget.loadedChapters.containsKey(entry.index);
               final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
+
+              // MD-8.1: chapter size bar
+              final ch = widget.loadedChapters[entry.index];
+              final blockCount = ch?.blocks.length ?? 0;
+              final barFraction = maxSize > 0 ? blockCount / maxSize : 0.0;
 
               return ListTile(
                 contentPadding: EdgeInsets.only(
@@ -244,6 +255,39 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                         ),
                       )
                     : null,
+                trailing: isGroup || blockCount == 0
+                    ? null
+                    : SizedBox(
+                        width: 40,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              height: 4,
+                              width: 40 * barFraction.clamp(0.05, 1.0),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$blockCount',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();

@@ -242,6 +242,37 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl.scrollToPrevious();
   }
 
+  // MD-19.1: pinch-to-zoom font size (like Apple Books)
+  final Map<int, Offset> _activePointers = {};
+  double _pinchStartDistance = 0;
+  double _scaleStartFontSize = 0;
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (!_gestureCoordinator.canInteract) return;
+    _activePointers[event.pointer] = event.position;
+    if (_activePointers.length == 2) {
+      final points = _activePointers.values.toList();
+      _pinchStartDistance = (points[0] - points[1]).distance;
+      _scaleStartFontSize = ref.read(readerSettingsProvider).fontSize;
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    if (!_gestureCoordinator.canInteract) return;
+    _activePointers[event.pointer] = event.position;
+    if (_activePointers.length != 2) return;
+    final points = _activePointers.values.toList();
+    final currentDistance = (points[0] - points[1]).distance;
+    if (_pinchStartDistance <= 0) return;
+    final scale = currentDistance / _pinchStartDistance;
+    final newSize = (_scaleStartFontSize * scale).clamp(10.0, 40.0);
+    ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _activePointers.remove(event.pointer);
+  }
+
   void _handleLinkTap(String href, ReaderState readerState) {
     if (href.startsWith('http://') || href.startsWith('https://')) {
       _showExternalLinkDialog(href);
@@ -777,6 +808,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       },
       child: Listener(
         onPointerSignal: _handlePointerSignal,
+        onPointerDown: _handlePointerDown,
+        onPointerMove: _handlePointerMove,
+        onPointerUp: _handlePointerUp,
         child: GestureDetector(
           onVerticalDragStart: _gestureCoordinator.canInteract && settings.verticalSwipeBrightness
               ? _handleVerticalDragStart

@@ -130,7 +130,29 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               onTap: () async {
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
                   final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://www.google.com/search?q=$query+meaning');
+                  final uri = Uri.parse('https://en.wiktionary.org/wiki/$query');
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
+                }
+                widget.onDismiss();
+              },
+            ),
+            // HG-7.7: Wikipedia search
+            _ToolbarButton(
+              icon: Icons.language,
+              label: 'Википедия',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://ru.wikipedia.org/wiki/$query');
                   try {
                     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
                     if (!launched && context.mounted) {
