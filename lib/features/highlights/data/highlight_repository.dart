@@ -189,22 +189,21 @@ class HighlightRepository {
     return null;
   }
 
-  Future<String> exportToMarkdown(String bookId) async {
+  Future<String> exportToMarkdown(String bookId, {String? bookTitle}) async {
     final highlights = await getHighlightsForBook(bookId);
     final buf = StringBuffer();
-    buf.writeln('# Highlights & Notes\n');
+    buf.writeln('# ${bookTitle ?? 'Книга'} — Выделения и заметки\n');
 
     var lastChapter = -1;
     for (final h in highlights) {
       if (h.chapterIndex != lastChapter) {
         lastChapter = h.chapterIndex;
-        buf.writeln('---\n## Chapter ${h.chapterIndex + 1}\n');
+        buf.writeln('---\n## Глава ${h.chapterIndex + 1}\n');
       }
       buf.writeln('> ${h.selectedText}\n');
       if (h.noteText != null && h.noteText!.isNotEmpty) {
-        buf.writeln('*Note: ${h.noteText}*\n');
+        buf.writeln('*Заметка: ${h.noteText}*\n');
       }
-      buf.writeln('Color: ${h.color} | Block: ${h.blockIndex}\n');
     }
 
     return buf.toString();

@@ -56,6 +56,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   double _dragStartFontSize = 0.0;
   String? _selectedText;
   int _batteryLevel = -1;
+  bool _ghostHeaderVisible = false;
+
+  void _showGhostHeader() {
+    if (!mounted) return;
+    setState(() => _ghostHeaderVisible = true);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _ghostHeaderVisible = false);
+    });
+  }
 
   Future<void> _checkForSelectedText() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -651,6 +660,53 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             );
           }),
         ),
+        // MD-20.1: floating progress dot when bars hidden
+        if (!readerState.uiVisible && settings.progressBarPosition != ProgressBarPosition.hidden)
+          Positioned(
+            bottom: 12,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ReaderColors.progressColor(settings.theme).withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+        // MD-20.2: ghost header — chapter name appears briefly on tap
+        if (_ghostHeaderVisible && !readerState.uiVisible)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: _ghostHeaderVisible ? 1.0 : 0.0,
+                duration: AppDuration.fast,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    readerState.chapterTitle(readerState.currentPosition.chapterIndex),
+                    style: TextStyle(
+                      color: ReaderColors.forTheme(settings.theme).text.withValues(alpha: 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (readerState.isSearchOpen && readerState.metadata != null)
           Positioned.fill(
             child: Builder(
@@ -754,7 +810,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               settings: settings,
               scrollController: _ctrl.scrollController,
               onTap: _gestureCoordinator.canInteract
-                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
+                  ? (details) {
+                      _ctrl.handleTap(details, MediaQuery.sizeOf(context).width);
+                      _showGhostHeader();
+                    }
                   : (_) {},
               initialProgress: readerState.scrollProgress,
               initialPage: readerState.currentPosition.chapterIndex,

@@ -41,7 +41,7 @@ class ReaderTopBar extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              colors.scaffold.withValues(alpha: 0.95),
+              colors.scaffold.withValues(alpha: 0.85),
               colors.scaffold.withValues(alpha: 0.0),
             ],
           ),
@@ -179,7 +179,7 @@ class ReaderBottomBar extends StatelessWidget {
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              colors.scaffold.withValues(alpha: 0.95),
+              colors.scaffold.withValues(alpha: 0.85),
               colors.scaffold.withValues(alpha: 0.0),
             ],
           ),
