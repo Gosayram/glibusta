@@ -3,6 +3,8 @@ import '../data/book_open_service.dart';
 import '../data/parsers/normalized_book.dart';
 
 const int chapterWindowSize = 2;
+// MD-2.3: max loaded chapters before eviction kicks in
+const int maxLoadedChapters = 20;
 
 class ReaderContentHelper {
   ReaderContentHelper(this._service, this._bookId);
@@ -24,18 +26,26 @@ class ReaderContentHelper {
     return book.toMetadata();
   }
 
+  /// MD-2.3: adaptive window — larger books get a bigger preload window
+  int _adaptiveWindow(int chapterCount) {
+    if (chapterCount > 500) return 4;
+    if (chapterCount > 200) return 3;
+    return chapterWindowSize;
+  }
+
   Future<Map<int, ReaderChapter>> ensureChaptersLoaded(
     int centerIndex,
     Map<int, ReaderChapter> currentlyLoaded, {
     required int chapterCount,
-    int windowSize = chapterWindowSize,
+    int? windowSize,
   }) async {
     if (chapterCount <= 0) return currentlyLoaded;
 
     final lastIndex = chapterCount - 1;
     final safeCenter = centerIndex.clamp(0, lastIndex);
-    final minIdx = (safeCenter - windowSize).clamp(0, lastIndex);
-    final maxIdx = (safeCenter + windowSize).clamp(0, lastIndex);
+    final win = windowSize ?? _adaptiveWindow(chapterCount);
+    final minIdx = (safeCenter - win).clamp(0, lastIndex);
+    final maxIdx = (safeCenter + win).clamp(0, lastIndex);
 
     final toLoad = <int>[];
     for (var i = minIdx; i <= maxIdx; i++) {
@@ -48,12 +58,16 @@ class ReaderContentHelper {
 
     _logger.fine('Loading chapters: $toLoad', name: 'Reader');
     final updates = Map<int, ReaderChapter>.from(currentlyLoaded);
-    for (final idx in toLoad) {
-      final chapter = await _service.loadChapter(_bookId, idx);
+    // MD-2.3: parallel batch loading instead of sequential
+    final results = await Future.wait(
+      toLoad.map((idx) => _service.loadChapter(_bookId, idx)),
+    );
+    for (var i = 0; i < toLoad.length; i++) {
+      final chapter = results[i];
       if (chapter != null) {
-        updates[idx] = chapter;
+        updates[toLoad[i]] = chapter;
       } else {
-        _logger.warning('Chapter $idx returned null', name: 'Reader');
+        _logger.warning('Chapter ${toLoad[i]} returned null', name: 'Reader');
       }
     }
     return updates;
@@ -62,10 +76,11 @@ class ReaderContentHelper {
   Map<int, ReaderChapter> evictDistantChapters(
     int centerIndex,
     Map<int, ReaderChapter> loaded, {
-    int windowSize = chapterWindowSize + 1,
+    int? windowSize,
   }) {
-    final minKeep = (centerIndex - windowSize).clamp(0, centerIndex + windowSize);
-    final maxKeep = centerIndex + windowSize;
+    final win = (windowSize ?? chapterWindowSize + 1);
+    final minKeep = (centerIndex - win).clamp(0, centerIndex + win);
+    final maxKeep = centerIndex + win;
 
     final updated = Map<int, ReaderChapter>.from(loaded);
     final keysToRemove = <int>[];
@@ -74,11 +89,20 @@ class ReaderContentHelper {
         keysToRemove.add(key);
       }
     }
-    if (keysToRemove.isNotEmpty) {
-      for (final key in keysToRemove) {
-        updated.remove(key);
+    for (final key in keysToRemove) {
+      updated.remove(key);
+    }
+
+    // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
+    if (updated.length > maxLoadedChapters) {
+      final sortedKeys = updated.keys.toList()
+        ..sort((a, b) => (a - centerIndex).abs().compareTo((b - centerIndex).abs()));
+      while (updated.length > maxLoadedChapters) {
+        final farthest = sortedKeys.removeLast();
+        updated.remove(farthest);
       }
     }
+
     return updated;
   }
 
