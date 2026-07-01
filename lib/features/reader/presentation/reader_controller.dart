@@ -706,6 +706,7 @@ class ReaderController {
       _advanceFocusParagraph(direction: 1);
       return;
     }
+    if (mode == ReaderMode.rsvp) return; // RSVP handles its own play/pause
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     final currentScroll = _scrollController!.offset;
@@ -781,6 +782,7 @@ class ReaderController {
       _advanceFocusParagraph(direction: -1);
       return;
     }
+    if (mode == ReaderMode.rsvp) return; // RSVP handles its own navigation
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final currentScroll = _scrollController!.offset;
     final viewportHeight = _scrollController!.position.viewportDimension;
@@ -882,10 +884,16 @@ class ReaderController {
       double.infinity,
     ); // MD-24.3: 48dp min
     const snapMargin = 20.0; // ponytail: magnetic edge snapping
+
+    // LW-7.2: RTL swap — in manga RTL, left=next, right=prev
+    final isRtl = settings.textDirection == ReaderTextDirection.rtl;
+    final leftAction = isRtl ? scrollToNext : scrollToPrevious;
+    final rightAction = isRtl ? scrollToPrevious : scrollToNext;
+
     if (x < zoneWidth + snapMargin) {
-      scrollToPrevious();
+      leftAction();
     } else if (x > width - zoneWidth - snapMargin) {
-      scrollToNext();
+      rightAction();
     } else {
       toggleUi();
     }

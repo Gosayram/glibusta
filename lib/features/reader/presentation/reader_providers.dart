@@ -188,6 +188,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(smallCaps: value);
   }
 
+  void updateRsvpWpm(int value) {
+    state = state.copyWith(rsvpWpm: value.clamp(100, 1000));
+  }
+
   void updatePageTurnAnimation(PageTurnAnimation animation) {
     state = state.copyWith(pageTurnAnimation: animation);
   }

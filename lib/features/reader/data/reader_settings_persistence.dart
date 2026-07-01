@@ -60,6 +60,7 @@ class ReaderSettingsPersistence {
         hyphenation: map['hyphenation'] as bool? ?? true,
         oldStyleFigures: map['oldStyleFigures'] as bool? ?? false,
         smallCaps: map['smallCaps'] as bool? ?? false,
+        rsvpWpm: (map['rsvpWpm'] as num?)?.toInt() ?? 300,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],
           orElse: () => PageTurnAnimation.slide,
@@ -148,6 +149,7 @@ class ReaderSettingsPersistence {
         'hyphenation': settings.hyphenation,
         'oldStyleFigures': settings.oldStyleFigures,
         'smallCaps': settings.smallCaps,
+        'rsvpWpm': settings.rsvpWpm,
         'pageTurnAnimation': settings.pageTurnAnimation.name,
         'textDirection': settings.textDirection.name,
         'readerWidth': settings.readerWidth,

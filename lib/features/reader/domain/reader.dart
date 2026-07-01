@@ -4,7 +4,7 @@ part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { paginated, continuous, focus }
+enum ReaderMode { paginated, continuous, focus, rsvp }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -177,6 +177,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default('blue_light') String activeColorPresetId,
     @Default(false) bool oldStyleFigures,
     @Default(false) bool smallCaps,
+    @Default(300) int rsvpWpm,
   }) = _ReaderSettings;
 }
 

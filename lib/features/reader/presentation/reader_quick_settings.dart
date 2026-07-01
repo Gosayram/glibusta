@@ -278,6 +278,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             ReaderMode.paginated: 'Страницы',
             ReaderMode.continuous: 'Прокрутка',
             ReaderMode.focus: 'Фокус',
+            ReaderMode.rsvp: 'RSVP',
           },
           onChanged: (v) => notifier.updateMode(v),
         ),
@@ -294,6 +295,16 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                 (v) => notifier.updateTwoPageEnabled(v),
               );
             },
+          ),
+        ],
+        if (settings.mode == ReaderMode.rsvp) ...[
+          const SizedBox(height: 12),
+          _buildSliderRow(
+            'Скорость (слов/мин)',
+            (settings.rsvpWpm - 100) / 900,
+            0.0,
+            1.0,
+            (v) => notifier.updateRsvpWpm((v * 900 + 100).round()),
           ),
         ],
         const SizedBox(height: 16),
@@ -454,6 +465,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 12),
         const _SectionTitle('Нижняя панель'),
         _buildBottomBarContentRow(settings, notifier),
+        const SizedBox(height: 16),
+        // LW-10.1: Custom CSS editor
+        _buildCustomCssSection(settings, notifier),
       ],
     );
   }
@@ -1151,6 +1165,48 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ),
         const Icon(Icons.wb_sunny, size: 20, color: Colors.orange),
+      ],
+    );
+  }
+
+  // LW-10.1: Custom CSS editor
+  static Widget _buildCustomCssSection(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionTitle('Пользовательский CSS'),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.black.withValues(alpha: 0.05),
+          ),
+          child: TextField(
+            controller: TextEditingController(text: settings.customCss)
+              ..selection = TextSelection.collapsed(offset: settings.customCss.length),
+            onChanged: notifier.updateCustomCss,
+            maxLines: 4,
+            minLines: 2,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
+            decoration: InputDecoration(
+              hintText: 'p { text-indent: 2em; }\n.epigraph { color: gray; }',
+              hintStyle: TextStyle(
+                color: Colors.black.withValues(alpha: 0.3),
+                fontSize: 12,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -1001,6 +1001,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       );
     }
 
+    if (settings.mode == ReaderMode.rsvp) {
+      return _RsvpModeBody(
+        metadata: widget.metadata,
+        loadedChapters: widget.loadedChapters,
+        settings: settings,
+        initialChapterIndex: widget.initialPage,
+        customColors: widget.customColors,
+      );
+    }
+
     final effectiveMargin = _effectiveMargin(settings, settings.mode);
     final textDirection = _readerTextDirection(settings.textDirection, context);
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
@@ -1896,5 +1906,195 @@ class _SmoothScrollBehavior extends ScrollBehavior {
       TargetPlatform.linux => const ClampingScrollPhysics(),
       TargetPlatform.iOS => const BouncingScrollPhysics(),
     };
+  }
+}
+
+// LW-3.1/3.2: RSVP speed-reading mode — one word at a time
+class _RsvpModeBody extends StatefulWidget {
+  const _RsvpModeBody({
+    required this.metadata,
+    required this.loadedChapters,
+    required this.settings,
+    required this.initialChapterIndex,
+    this.customColors,
+  });
+
+  final NormalizedBookMetadata metadata;
+  final Map<int, ReaderChapter> loadedChapters;
+  final ReaderSettings settings;
+  final int initialChapterIndex;
+  final ReaderColors? customColors;
+
+  @override
+  State<_RsvpModeBody> createState() => _RsvpModeBodyState();
+}
+
+class _RsvpModeBodyState extends State<_RsvpModeBody> {
+  late List<String> _words;
+  int _wordIndex = 0;
+  bool _playing = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _words = _buildWordList();
+  }
+
+  @override
+  void didUpdateWidget(_RsvpModeBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.loadedChapters != widget.loadedChapters) {
+      final newIndex = _wordIndex;
+      _words = _buildWordList();
+      if (newIndex >= _words.length) _wordIndex = 0;
+    }
+  }
+
+  List<String> _buildWordList() {
+    final words = <String>[];
+    for (var ch = 0; ch < widget.metadata.chapterCount; ch++) {
+      final chapter = widget.loadedChapters[ch];
+      if (chapter == null) continue;
+      for (final block in chapter.blocks) {
+        if (block.text.isNotEmpty) {
+          words.addAll(block.text.split(RegExp(r'\s+')));
+        }
+      }
+    }
+    return words;
+  }
+
+  void _togglePlay() {
+    if (_playing) {
+      _timer?.cancel();
+      _timer = null;
+      setState(() => _playing = false);
+    } else {
+      setState(() => _playing = true);
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    final interval = Duration(milliseconds: (60000 / widget.settings.rsvpWpm).round());
+    _timer = Timer.periodic(interval, (_) {
+      if (!mounted) return;
+      if (_wordIndex < _words.length - 1) {
+        setState(() => _wordIndex++);
+      } else {
+        _timer?.cancel();
+        _timer = null;
+        setState(() => _playing = false);
+      }
+    });
+  }
+
+  void _skip(int delta) {
+    _timer?.cancel();
+    setState(() {
+      _wordIndex = (_wordIndex + delta).clamp(0, _words.length - 1);
+      if (_playing) _startTimer();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.settings;
+    final colors =
+        widget.customColors ??
+        ReaderColors.forThemeWithContext(s.theme, MediaQuery.platformBrightnessOf(context));
+    final word = _words.isEmpty ? '' : _words[_wordIndex];
+    final progress = _words.isEmpty ? 0.0 : (_wordIndex + 1) / _words.length;
+
+    return ColoredBox(
+      color: colors.scaffold,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Progress bar
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 2,
+              backgroundColor: colors.text.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation(colors.text.withValues(alpha: 0.4)),
+            ),
+            // Word display
+            Expanded(
+              child: GestureDetector(
+                onTap: _togglePlay,
+                onLongPress: () => _skip(-10),
+                onHorizontalDragEnd: (_) => _skip(0),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      word,
+                      style: TextStyle(
+                        fontSize: s.fontSize * 1.8,
+                        height: 1.3,
+                        color: colors.text,
+                        fontFamily: s.font.fontFamily,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Controls
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous),
+                    color: colors.text.withValues(alpha: 0.6),
+                    onPressed: () => _skip(-10),
+                  ),
+                  const SizedBox(width: 16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.text.withValues(alpha: 0.15),
+                    ),
+                    child: IconButton(
+                      icon: Icon(_playing ? Icons.pause : Icons.play_arrow, size: 32),
+                      color: colors.text,
+                      onPressed: _togglePlay,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next),
+                    color: colors.text.withValues(alpha: 0.6),
+                    onPressed: () => _skip(10),
+                  ),
+                ],
+              ),
+            ),
+            // WPM label
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                '${s.rsvpWpm} сл/мин  ·  ${_wordIndex + 1}/${_words.length}',
+                style: TextStyle(
+                  color: colors.text.withValues(alpha: 0.4),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

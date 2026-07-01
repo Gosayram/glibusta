@@ -300,6 +300,7 @@ class ReaderBottomBar extends StatelessWidget {
       ReaderMode.paginated: 'Страницы',
       ReaderMode.continuous: 'Прокрутка',
       ReaderMode.focus: 'Фокус',
+      ReaderMode.rsvp: 'RSVP',
     };
 
     return Row(
