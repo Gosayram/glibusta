@@ -1141,8 +1141,7 @@ fn parse_xhtml_to_blocks(
                     block_index += 1;
                 } else if tag == "image" && in_body {
                     // CRT-1.15: SVG <image> tags — extract raster fallback from xlink:href or href
-                    let src = get_xml_attr(e, b"xlink:href")
-                        .or_else(|| get_xml_attr(e, b"href"));
+                    let src = get_xml_attr(e, b"xlink:href").or_else(|| get_xml_attr(e, b"href"));
                     if let Some(image_src) = src {
                         blocks.push(ReaderBlock {
                             index: block_index,

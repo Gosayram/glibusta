@@ -180,6 +180,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(hyphenation: hyphenation);
   }
 
+  void updateOldStyleFigures(bool value) {
+    state = state.copyWith(oldStyleFigures: value);
+  }
+
   void updatePageTurnAnimation(PageTurnAnimation animation) {
     state = state.copyWith(pageTurnAnimation: animation);
   }

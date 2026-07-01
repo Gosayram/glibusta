@@ -182,7 +182,11 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
     letterSpacing: s.letterSpacing,
     fontWeight: fw,
     wordSpacing: s.wordSpacing,
-    fontFeatures: const [FontFeature.enable('liga'), FontFeature.enable('kern')],
+    fontFeatures: [
+      const FontFeature.enable('liga'),
+      const FontFeature.enable('kern'),
+      if (s.oldStyleFigures) const FontFeature.enable('onum'),
+    ],
   );
 }
 
@@ -1220,13 +1224,13 @@ class _FocusModeBody extends StatelessWidget {
     this.customColors,
     this.onLinkTap,
     this.onPageChanged,
-  }) : initialParagraphIndex = 0;
+  });
 
   final NormalizedBookMetadata metadata;
   final Map<int, ReaderChapter> loadedChapters;
   final ReaderSettings settings;
   final int initialChapterIndex;
-  final int initialParagraphIndex;
+  static const int initialParagraphIndex = 0;
   final String? highlightQuery;
   final Map<int, List<TextHighlight>>? chapterHighlights;
   final List<BlockTransformer>? blockTransformers;

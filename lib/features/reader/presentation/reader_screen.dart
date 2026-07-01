@@ -436,7 +436,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
     allBooks.sort((a, b) => (a.sequenceNumber ?? 0).compareTo(b.sequenceNumber ?? 0));
     final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
-    if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !context.mounted) {
+    if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
       _closeReader();
       return;
@@ -459,9 +459,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         ],
       ),
     );
-    if (proceed == true && context.mounted) {
+    if (proceed == true && mounted) {
       GoRouter.of(context).go('/reader/$nextBookId');
-    } else if (context.mounted) {
+    } else if (mounted) {
       _closeReader();
     }
   }

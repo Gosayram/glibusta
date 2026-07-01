@@ -41,4 +41,4 @@ final class ReadingStatsProvider
   }
 }
 
-String _$readingStatsHash() => r'7068c87eeced165054bfe1bf35046f47c5d8320b';
+String _$readingStatsHash() => r'f22636a746184d8deacc296669482e277e83f6a6';
