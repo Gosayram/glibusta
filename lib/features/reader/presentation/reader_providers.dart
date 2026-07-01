@@ -112,6 +112,7 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     required double paragraphSpacing,
     required double paragraphFirstLineIndent,
     required ReaderTextAlign textAlign,
+    ReaderTheme? theme,
   }) {
     state = state.copyWith(
       font: font,
@@ -122,6 +123,9 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
       paragraphFirstLineIndent: paragraphFirstLineIndent,
       textAlign: textAlign,
     );
+    if (theme != null) {
+      state = state.copyWith(theme: theme);
+    }
   }
 
   void updateTextAlign(ReaderTextAlign align) {

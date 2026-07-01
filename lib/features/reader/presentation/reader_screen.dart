@@ -398,6 +398,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final series = await db.seriesDao.getSeriesForBook(widget.bookId);
     if (series.isEmpty || !context.mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
+      _closeReader();
       return;
     }
     final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
@@ -405,6 +406,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
     if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !context.mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
+      _closeReader();
       return;
     }
     final nextBookId = allBooks[currentIdx + 1].bookId;
@@ -427,7 +429,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
     if (proceed == true && context.mounted) {
       GoRouter.of(context).go('/reader/$nextBookId');
+    } else if (context.mounted) {
+      _closeReader();
     }
+  }
+
+  void _closeReader() {
+    _ctrl.saveProgress();
+    _ctrl.saveCheckpoint();
+    GoRouter.of(context).go('/');
   }
 
   @override
@@ -641,6 +651,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             final newSize = (settings.fontSize - 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
+          onSearch: () => _ctrl.toggleSearch(),
+          onBookmarks: () {
+            _ctrl.saveCheckpoint();
+            TableOfContentsSheet.show(
+              context,
+              metadata: readerState.metadata!,
+              currentChapterIndex: readerState.currentPosition.chapterIndex,
+              currentChapterProgress: readerState.scrollProgress,
+              onJumpToPosition: _ctrl.jumpToPosition,
+              loadedChapters: readerState.loadedChapters,
+              isDynamicallyLoading: readerState.isDynamicallyLoading,
+            );
+          },
+          onLibrary: () {
+            if (_ctrl.popLinkPosition()) return;
+            Navigator.of(context).pop();
+          },
+          onSettings: () => _showQuickSettings(context),
           onClosePanel: () {
             if (_ctrl.popLinkPosition()) return;
             Navigator.of(context).pop();

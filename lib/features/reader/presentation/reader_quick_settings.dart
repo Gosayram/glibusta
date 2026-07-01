@@ -23,6 +23,7 @@ class _TypographyPreset {
     this.paragraphSpacing,
     this.paragraphFirstLineIndent,
     this.textAlign,
+    this.theme,
   );
   final String name;
   final ReaderFont font;
@@ -32,6 +33,7 @@ class _TypographyPreset {
   final double paragraphSpacing;
   final double paragraphFirstLineIndent;
   final ReaderTextAlign textAlign;
+  final ReaderTheme theme;
 }
 
 class ReaderQuickSettingsSheet extends ConsumerStatefulWidget {
@@ -455,8 +457,19 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         20,
         0,
         ReaderTextAlign.justify,
+        ReaderTheme.sepia,
       ),
-      _TypographyPreset('Компактно', ReaderFont.inter, 14, 1.3, 12, 14, 0, ReaderTextAlign.left),
+      _TypographyPreset(
+        'Компактно',
+        ReaderFont.inter,
+        14,
+        1.3,
+        12,
+        14,
+        0,
+        ReaderTextAlign.left,
+        ReaderTheme.light,
+      ),
       _TypographyPreset(
         'Комфортно',
         ReaderFont.literata,
@@ -466,8 +479,19 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         24,
         16,
         ReaderTextAlign.justify,
+        ReaderTheme.paper,
       ),
-      _TypographyPreset('Минимализм', ReaderFont.system, 16, 1.5, 16, 18, 0, ReaderTextAlign.left),
+      _TypographyPreset(
+        'Минимализм',
+        ReaderFont.system,
+        16,
+        1.5,
+        16,
+        18,
+        0,
+        ReaderTextAlign.left,
+        ReaderTheme.system,
+      ),
     ];
 
     return SizedBox(
@@ -491,6 +515,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               paragraphSpacing: p.paragraphSpacing,
               paragraphFirstLineIndent: p.paragraphFirstLineIndent,
               textAlign: p.textAlign,
+              theme: p.theme,
             ),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
