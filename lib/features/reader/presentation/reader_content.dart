@@ -186,6 +186,7 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       const FontFeature.enable('liga'),
       const FontFeature.enable('kern'),
       if (s.oldStyleFigures) const FontFeature.enable('onum'),
+      if (s.smallCaps) const FontFeature.enable('smcp'),
     ],
   );
 }

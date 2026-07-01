@@ -313,6 +313,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           settings.oldStyleFigures,
           (v) => notifier.updateOldStyleFigures(v),
         ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Капители',
+          Icons.text_fields,
+          settings.smallCaps,
+          (v) => notifier.updateSmallCaps(v),
+        ),
         const SizedBox(height: 16),
         const _SectionTitle('Анимация страниц'),
         _buildPageTurnAnimationRow(settings, notifier),

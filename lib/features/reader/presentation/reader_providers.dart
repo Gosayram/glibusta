@@ -184,6 +184,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(oldStyleFigures: value);
   }
 
+  void updateSmallCaps(bool value) {
+    state = state.copyWith(smallCaps: value);
+  }
+
   void updatePageTurnAnimation(PageTurnAnimation animation) {
     state = state.copyWith(pageTurnAnimation: animation);
   }

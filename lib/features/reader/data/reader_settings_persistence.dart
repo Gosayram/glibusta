@@ -59,6 +59,7 @@ class ReaderSettingsPersistence {
         paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 16.0,
         hyphenation: map['hyphenation'] as bool? ?? true,
         oldStyleFigures: map['oldStyleFigures'] as bool? ?? false,
+        smallCaps: map['smallCaps'] as bool? ?? false,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
           (e) => e.name == map['pageTurnAnimation'],
           orElse: () => PageTurnAnimation.slide,
@@ -146,6 +147,7 @@ class ReaderSettingsPersistence {
         'paragraphFirstLineIndent': settings.paragraphFirstLineIndent,
         'hyphenation': settings.hyphenation,
         'oldStyleFigures': settings.oldStyleFigures,
+        'smallCaps': settings.smallCaps,
         'pageTurnAnimation': settings.pageTurnAnimation.name,
         'textDirection': settings.textDirection.name,
         'readerWidth': settings.readerWidth,

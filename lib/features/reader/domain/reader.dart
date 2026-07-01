@@ -176,6 +176,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ImageColorEffect.off) ImageColorEffect imageColorEffect,
     @Default('blue_light') String activeColorPresetId,
     @Default(false) bool oldStyleFigures,
+    @Default(false) bool smallCaps,
   }) = _ReaderSettings;
 }
 

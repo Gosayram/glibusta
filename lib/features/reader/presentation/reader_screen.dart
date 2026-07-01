@@ -926,28 +926,45 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onTap: _ctrl.scrollToNext,
             ),
           ),
-        // MD-6.1: sticky header — chapter name persists while bars hidden
-        if (!readerState.uiVisible)
+        // MD-6.1/15.1: sticky header — breadcrumb "Book / Chapter" persists while bars hidden
+        if (!readerState.uiVisible && readerState.metadata != null)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 4,
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  readerState.chapterTitle(readerState.currentPosition.chapterIndex),
-                  style: TextStyle(
-                    color: ReaderColors.forTheme(settings.theme).text.withValues(alpha: 0.6),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+              child: GestureDetector(
+                // MD-15.2: tap breadcrumb → open TOC
+                onTap: () {
+                  TableOfContentsSheet.show(
+                    context,
+                    metadata: readerState.metadata!,
+                    currentChapterIndex: readerState.currentPosition.chapterIndex,
+                    currentChapterProgress: readerState.scrollProgress,
+                    onJumpToPosition: _ctrl.jumpToPosition,
+                    loadedChapters: readerState.loadedChapters,
+                    isDynamicallyLoading: readerState.isDynamicallyLoading,
+                  );
+                },
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Text(
+                    // MD-15.1: breadcrumb path "Book › Chapter"
+                    '${readerState.metadata!.title}  ›  ${readerState.chapterTitle(readerState.currentPosition.chapterIndex)}',
+                    style: TextStyle(
+                      color: ReaderColors.forTheme(settings.theme).text.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
             ),
