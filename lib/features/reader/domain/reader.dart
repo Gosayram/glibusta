@@ -99,6 +99,15 @@ enum ScrollInertia {
   final String displayName;
 }
 
+enum FullScreenMode {
+  immersive('Полный экран'),
+  keepPanels('С панелями'),
+  followSystem('Как в системе');
+
+  const FullScreenMode(this.displayName);
+  final String displayName;
+}
+
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
@@ -142,6 +151,8 @@ abstract class ReaderSettings with _$ReaderSettings {
     String? forcedEncoding,
     @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,
     @Default(HorizontalGestureScroll.half) HorizontalGestureScroll horizontalGestureScroll,
+    @Default(0.33) double tapZoneWidth,
+    @Default(FullScreenMode.immersive) FullScreenMode fullScreenMode,
     @Default(false) bool perceptionExpander,
     @Default(false) bool hideBarsOnFastScroll,
     @Default(OrientationLock.none) OrientationLock orientationLock,

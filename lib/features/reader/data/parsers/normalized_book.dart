@@ -53,6 +53,18 @@ class NormalizedBook {
         [],
     metadata: json['metadata'] as Map<String, dynamic>?,
   );
+
+  NormalizedBook withCleanedBlocks() {
+    return NormalizedBook(
+      id: id,
+      title: title,
+      authors: authors,
+      description: description,
+      coverUrl: coverUrl,
+      chapters: chapters.map((ch) => ch.withCleanedBlocks()).toList(),
+      metadata: metadata,
+    );
+  }
 }
 
 class NormalizedBookMetadata {
@@ -125,6 +137,17 @@ class ReaderChapter {
             .toList() ??
         [],
   );
+
+  ReaderChapter withCleanedBlocks() {
+    final cleaned = <ReaderBlock>[];
+    for (final block in blocks) {
+      if (block.type == BlockType.paragraph && block.text.trim().isEmpty) {
+        continue;
+      }
+      cleaned.add(block);
+    }
+    return ReaderChapter(index: index, title: title, blocks: cleaned);
+  }
 }
 
 class ReaderBlock {

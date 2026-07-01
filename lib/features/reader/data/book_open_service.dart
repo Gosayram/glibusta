@@ -122,7 +122,7 @@ class BookOpenService {
           'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
           name: 'Reader',
         );
-        return normalized;
+        return normalized.withCleanedBlocks();
       } on TimeoutException {
         rethrow;
       } on Object catch (e, st) {
@@ -142,7 +142,8 @@ class BookOpenService {
           onTimeout: () => throw TimeoutException(
             'Разбор ${bookFormat.name} занял слишком много времени.',
           ),
-        );
+        )
+        .then((book) => book.withCleanedBlocks());
   }
 
   String _extractBookId(String filePath) {

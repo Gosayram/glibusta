@@ -287,8 +287,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _enterImmersiveMode() {
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    final settings = ref.read(readerSettingsProvider);
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    switch (settings.fullScreenMode) {
+      case FullScreenMode.immersive:
+        unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+      case FullScreenMode.keepPanels:
+        unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+      case FullScreenMode.followSystem:
+        unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     }
   }
 
@@ -582,6 +589,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           context,
                           metadata: readerState.metadata!,
                           currentChapterIndex: readerState.currentPosition.chapterIndex,
+                          currentChapterProgress: readerState.scrollProgress,
                           onJumpToPosition: _ctrl.jumpToPosition,
                           loadedChapters: readerState.loadedChapters,
                           isDynamicallyLoading: readerState.isDynamicallyLoading,

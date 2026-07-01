@@ -203,6 +203,7 @@ Widget _buildReaderBlock(
   ReaderBlock block,
   TextAlign textAlign, {
   List<TextHighlight>? blockHighlights,
+  List<String> chapterImages = const [],
 }) {
   final s = ctx.settings;
   final style = ctx.style;
@@ -320,7 +321,7 @@ Widget _buildReaderBlock(
               constraints: BoxConstraints(maxWidth: 600 * s.imageWidth),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(s.imageCornerRadius),
-                child: _readerImageWidget(block.imageUrl!, style.color, s),
+                child: _readerImageWidget(block.imageUrl!, style.color, s, allImages: chapterImages),
               ),
             ),
           ),
@@ -564,7 +565,12 @@ List<InlineSpan> _readerHighlightedSpans(
   return spans;
 }
 
-Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings settings) {
+Widget _readerImageWidget(
+  String imageUrl,
+  Color? errorColor,
+  ReaderSettings settings, {
+  List<String> allImages = const [],
+}) {
   final colorFilter = _imageColorFilter(settings);
   final uri = Uri.tryParse(imageUrl);
   final isDataUri = uri != null && uri.scheme == 'data';
@@ -576,7 +582,7 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
         ? ColorFiltered(colorFilter: colorFilter, child: img)
         : img;
     return GestureDetector(
-      onTap: () => _showFullscreenImage(imageUrl),
+      onTap: () => _showFullscreenImage(imageUrl, allImages: allImages),
       child: filtered,
     );
   }
@@ -611,9 +617,11 @@ Widget _readerImageWidget(String imageUrl, Color? errorColor, ReaderSettings set
   return Icon(Icons.broken_image, size: 64, color: errorColor);
 }
 
-void _showFullscreenImage(String imageUrl) {
+void _showFullscreenImage(String imageUrl, {List<String> allImages = const []}) {
   final context = rootNavigatorKey.currentContext;
   if (context == null) return;
+  final images = allImages.isNotEmpty ? allImages : [imageUrl];
+  final initialIndex = images.indexOf(imageUrl).clamp(0, images.length - 1);
   unawaited(
     Navigator.of(context).push<void>(
       PageRouteBuilder(
@@ -621,31 +629,86 @@ void _showFullscreenImage(String imageUrl) {
         barrierColor: Colors.black87,
         barrierDismissible: true,
         transitionDuration: const Duration(milliseconds: 200),
-        pageBuilder: (ctx, a, b) => _FullscreenImageViewer(imageUrl: imageUrl),
+        pageBuilder: (ctx, a, b) => _FullscreenImageViewer(
+          images: images,
+          initialIndex: initialIndex,
+        ),
       ),
     ),
   );
 }
 
-class _FullscreenImageViewer extends StatelessWidget {
-  const _FullscreenImageViewer({required this.imageUrl});
-  final String imageUrl;
+class _FullscreenImageViewer extends StatefulWidget {
+  const _FullscreenImageViewer({required this.images, this.initialIndex = 0});
+  final List<String> images;
+  final int initialIndex;
+
+  @override
+  State<_FullscreenImageViewer> createState() => _FullscreenImageViewerState();
+}
+
+class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
+  late final PageController _pageController;
+  late int _currentIndex;
+  bool _fillMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).pop(),
-      child: Center(
-        child: InteractiveViewer(
-          maxScale: 5.0,
-          minScale: 0.5,
-          child: _buildImage(),
-        ),
+      onDoubleTap: () => setState(() => _fillMode = !_fillMode),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.images.length,
+            onPageChanged: (index) => setState(() => _currentIndex = index),
+            itemBuilder: (context, index) => Center(
+              child: InteractiveViewer(
+                maxScale: 5.0,
+                minScale: 0.5,
+                child: _buildImage(
+                  widget.images[index],
+                  fit: _fillMode ? BoxFit.cover : BoxFit.contain,
+                ),
+              ),
+            ),
+          ),
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentIndex + 1} / ${widget.images.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildImage() {
+  Widget _buildImage(String imageUrl, {BoxFit fit = BoxFit.contain}) {
     final uri = Uri.tryParse(imageUrl);
     final isDataUri = uri != null && uri.scheme == 'data';
     final isFileUri = uri != null && uri.scheme == 'file';
@@ -654,13 +717,13 @@ class _FullscreenImageViewer extends StatelessWidget {
     if (isDataUri) {
       final data = imageUrl.split(',');
       if (data.length == 2) {
-        return Image.memory(base64Decode(data.last), fit: BoxFit.contain);
+        return Image.memory(base64Decode(data.last), fit: fit);
       }
     }
     if (isFileUri || isPlainPath) {
       return Image.file(
         File(isFileUri ? uri.path : imageUrl),
-        fit: BoxFit.contain,
+        fit: fit,
       );
     }
     return const Icon(Icons.broken_image, size: 64, color: Colors.white);
@@ -1018,6 +1081,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     final ctx = _ctx(settings);
     final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
+    final chapterImages = chapter.blocks
+        .where((b) => b.type == BlockType.image && b.imageUrl != null && b.imageUrl!.isNotEmpty)
+        .map((b) => b.imageUrl!)
+        .toList();
+
     final header = chapter.title.isNotEmpty
         ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
@@ -1053,6 +1121,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             blockHighlights: chapterHighlights
                 ?.where((TextHighlight h) => h.blockIndex == entry.key)
                 .toList(),
+            chapterImages: chapterImages,
           );
         }),
       ],

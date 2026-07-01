@@ -9,6 +9,7 @@ import 'toc_hierarchy.dart';
 class TableOfContentsSheet extends StatelessWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
+  final double currentChapterProgress;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final Map<int, ReaderChapter> loadedChapters;
   final bool isDynamicallyLoading;
@@ -17,6 +18,7 @@ class TableOfContentsSheet extends StatelessWidget {
     super.key,
     required this.metadata,
     required this.currentChapterIndex,
+    this.currentChapterProgress = 0.0,
     required this.onJumpToPosition,
     this.loadedChapters = const {},
     this.isDynamicallyLoading = false,
@@ -26,6 +28,7 @@ class TableOfContentsSheet extends StatelessWidget {
     BuildContext context, {
     required NormalizedBookMetadata metadata,
     required int currentChapterIndex,
+    double currentChapterProgress = 0.0,
     required ValueChanged<ReaderPosition> onJumpToPosition,
     Map<int, ReaderChapter> loadedChapters = const {},
     bool isDynamicallyLoading = false,
@@ -43,6 +46,7 @@ class TableOfContentsSheet extends StatelessWidget {
           builder: (context, scrollController) => _TableOfContentsContent(
             metadata: metadata,
             currentChapterIndex: currentChapterIndex,
+            currentChapterProgress: currentChapterProgress,
             onJumpToPosition: onJumpToPosition,
             scrollController: scrollController,
             loadedChapters: loadedChapters,
@@ -62,6 +66,7 @@ class TableOfContentsSheet extends StatelessWidget {
 class _TableOfContentsContent extends StatefulWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
+  final double currentChapterProgress;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final ScrollController scrollController;
   final Map<int, ReaderChapter> loadedChapters;
@@ -70,6 +75,7 @@ class _TableOfContentsContent extends StatefulWidget {
   const _TableOfContentsContent({
     required this.metadata,
     required this.currentChapterIndex,
+    this.currentChapterProgress = 0.0,
     required this.onJumpToPosition,
     required this.scrollController,
     this.loadedChapters = const {},
@@ -210,16 +216,22 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                         : null,
                   ),
                 ),
-                subtitle: isActive
+                subtitle: isGroup
+                    ? null
+                    : isActive
                     ? Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: LinearProgressIndicator(
-                          value: widget.metadata.chapterCount <= 1
-                              ? 0.0
-                              : (widget.currentChapterIndex / (widget.metadata.chapterCount - 1))
-                                    .clamp(0.0, 1.0),
+                          value: widget.currentChapterProgress.clamp(0.0, 1.0),
                           minHeight: 2,
                           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        ),
+                      )
+                    : entry.index < widget.currentChapterIndex
+                    ? Text(
+                        'прочитано',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                       )
                     : isUnloaded

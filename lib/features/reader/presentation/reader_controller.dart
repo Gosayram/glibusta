@@ -801,11 +801,12 @@ class ReaderController {
   // ── Gestures ──────────────────────────────────────────
 
   void handleTap(TapUpDetails details, double width) {
+    final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
-    final third = width / 3;
-    if (x < third) {
+    final zoneWidth = width * settings.tapZoneWidth;
+    if (x < zoneWidth) {
       scrollToPrevious();
-    } else if (x > width - third) {
+    } else if (x > width - zoneWidth) {
       scrollToNext();
     } else {
       toggleUi();

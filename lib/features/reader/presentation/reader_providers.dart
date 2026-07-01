@@ -208,6 +208,14 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(restoreLastPosition: restore);
   }
 
+  void updateTapZoneWidth(double width) {
+    state = state.copyWith(tapZoneWidth: width.clamp(0.1, 0.5));
+  }
+
+  void updateFullScreenMode(FullScreenMode mode) {
+    state = state.copyWith(fullScreenMode: mode);
+  }
+
   void updateForcedEncoding(String? encoding) {
     state = state.copyWith(forcedEncoding: encoding);
   }
