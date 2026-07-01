@@ -1139,6 +1139,29 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                     });
                     block_index += 1;
+                } else if tag == "image" && in_body {
+                    // CRT-1.15: SVG <image> tags — extract raster fallback from xlink:href or href
+                    let src = get_xml_attr(e, b"xlink:href")
+                        .or_else(|| get_xml_attr(e, b"href"));
+                    if let Some(image_src) = src {
+                        blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Image,
+                            image_url: Some(image_src),
+                            note_ref: None,
+                            rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        block_index += 1;
+                    }
                 } else if tag == "br" && in_body {
                     if in_block {
                         span_text.push('\n');

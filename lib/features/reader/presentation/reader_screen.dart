@@ -294,6 +294,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final anchor = href.startsWith('#') ? href.substring(1) : href;
     if (anchor.isEmpty) return;
 
+    // CRT-1.13: check footnotes from metadata first
+    final footnotes = readerState.metadata?.metadata?['footnotes'];
+    if (footnotes is Map<String, dynamic>) {
+      final noteText = footnotes[anchor] as String?;
+      if (noteText != null && noteText.isNotEmpty) {
+        _showFootnotePopover(anchor, noteText);
+        return;
+      }
+    }
+
+    // Fallback: search for block with matching noteId (legacy)
     final chapterIndex = readerState.currentPosition.chapterIndex;
     final chapter = readerState.loadedChapters[chapterIndex];
     if (chapter == null) return;
@@ -314,6 +325,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
 
     unawaited(HapticFeedback.selectionClick());
+  }
+
+  void _showFootnotePopover(String noteId, String text) {
+    unawaited(HapticFeedback.selectionClick());
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Примечание $noteId'),
+          content: SingleChildScrollView(
+            child: Text(text, style: const TextStyle(fontSize: 15, height: 1.5)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showImageDialog(String imageUrl) {
@@ -819,6 +851,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     chapterTitle: readerState.chapterTitle(
                       readerState.currentPosition.chapterIndex,
                     ),
+                    chapterTitleAt: readerState.chapterTitle,
                     onJumpToProgress: _ctrl.jumpToProgress,
                     onModeChanged: (mode) {
                       ref.read(readerSettingsProvider.notifier).updateMode(mode);

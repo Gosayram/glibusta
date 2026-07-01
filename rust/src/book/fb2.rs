@@ -63,6 +63,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_cite = false;
     let mut in_pre = false;
 
+    // CRT-1.13: FB2 footnotes parsing
+    let mut in_notes_body = false;
+    let mut current_note_id: Option<String> = None;
+    let mut current_note_text = String::new();
+    let mut footnotes: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut current_note_ref: Option<String> = None;
+
     let mut current_text = String::new();
     let mut current_author_parts: Vec<String> = Vec::new();
     let mut current_rich_spans: Vec<RichSpan> = Vec::new();
@@ -107,21 +114,36 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         }
                         current_text.clear();
                     }
-                    "body" => in_body = true,
+                    "body" => {
+                        let body_name = get_xml_attr(e, b"name");
+                        in_body = true;
+                        in_notes_body = body_name.as_deref() == Some("notes");
+                    }
                     "section" if in_body => {
-                        section_depth += 1;
-                        if section_depth == 1 {
-                            // Start new chapter for top-level sections
-                            if !body_blocks.is_empty() {
-                                chapters_blocks.push(std::mem::take(&mut body_blocks));
-                            }
-                            chapters_blocks.push(Vec::new());
-                            in_section = true;
+                        if in_notes_body {
+                            // CRT-1.13: capture footnote section
+                            current_note_id = get_xml_attr(e, b"id");
+                            current_note_text.clear();
                         } else {
-                            in_section = true;
+                            section_depth += 1;
+                            if section_depth == 1 {
+                                // Start new chapter for top-level sections
+                                if !body_blocks.is_empty() {
+                                    chapters_blocks.push(std::mem::take(&mut body_blocks));
+                                }
+                                chapters_blocks.push(Vec::new());
+                                in_section = true;
+                            } else {
+                                in_section = true;
+                            }
                         }
                     }
-                    "p" if in_body => in_p = true,
+                    "p" if in_body => {
+                        if in_notes_body {
+                            // Accumulate footnote text — handled in text event and section end
+                        }
+                        in_p = true;
+                    }
                     "subtitle" if in_body => in_subtitle = true,
                     "epigraph" if in_body => in_epigraph = true,
                     "empty-line" if in_body => in_empty_line = true,
@@ -191,6 +213,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             &current_span_href,
                         );
                         current_span_href = get_xml_attr(e, b"href");
+                        // CRT-1.13: capture footnote reference
+                        let a_type = get_xml_attr(e, b"type");
+                        if a_type.as_deref() == Some("note") {
+                            if let Some(ref href) = current_span_href {
+                                current_note_ref = Some(href.trim_start_matches('#').to_string());
+                            }
+                        }
                     }
                     "sup" if in_p || in_subtitle => {
                         flush_rich_span(
@@ -208,7 +237,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             }
             Ok(Event::Text(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default().to_string();
-                if in_book_title && title.is_empty() {
+                if in_notes_body && in_p {
+                    current_note_text.push_str(&text);
+                } else if in_book_title && title.is_empty() {
                     title = text.clone();
                 } else if in_first_name || in_middle_name || in_last_name {
                     current_author_parts.push(text.clone());
@@ -237,7 +268,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             }
             Ok(Event::GeneralRef(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default().to_string();
-                if in_book_title && title.is_empty() {
+                if in_notes_body && in_p {
+                    current_note_text.push_str(&text);
+                } else if in_book_title && title.is_empty() {
                     title = text.clone();
                 } else if in_first_name || in_middle_name || in_last_name {
                     current_author_parts.push(text.clone());
@@ -328,16 +361,31 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         current_binary_id = None;
                         current_text.clear();
                     }
-                    "body" => in_body = false,
+                    "body" => {
+                        in_body = false;
+                        in_notes_body = false;
+                    }
                     "section" => {
-                        if section_depth > 0 {
-                            section_depth -= 1;
-                        }
-                        if section_depth == 0 {
-                            in_section = false;
-                            // Finalize current chapter
-                            if !body_blocks.is_empty() {
-                                chapters_blocks.push(std::mem::take(&mut body_blocks));
+                        if in_notes_body {
+                            // CRT-1.13: store footnote
+                            if let Some(ref id) = current_note_id {
+                                let text = current_note_text.trim().to_string();
+                                if !text.is_empty() {
+                                    footnotes.insert(id.clone(), text);
+                                }
+                            }
+                            current_note_id = None;
+                            current_note_text.clear();
+                        } else {
+                            if section_depth > 0 {
+                                section_depth -= 1;
+                            }
+                            if section_depth == 0 {
+                                in_section = false;
+                                // Finalize current chapter
+                                if !body_blocks.is_empty() {
+                                    chapters_blocks.push(std::mem::take(&mut body_blocks));
+                                }
                             }
                         }
                     }
@@ -384,7 +432,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                                 text,
                                 block_type: BlockType::Paragraph,
                                 image_url: None,
-                                note_ref: None,
+                                note_ref: current_note_ref.take(),
                                 rich_spans: rich,
                                 heading_level: None,
                                 ordered: None,
@@ -734,6 +782,12 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
 
     let id = crate::book::sha256_hex(bytes);
 
+    let metadata = if footnotes.is_empty() {
+        None
+    } else {
+        Some(serde_json::json!({ "footnotes": footnotes }))
+    };
+
     Ok(NormalizedBook {
         id,
         title,
@@ -741,7 +795,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         description,
         cover_url,
         chapters,
-        metadata: None,
+        metadata,
     })
 }
 

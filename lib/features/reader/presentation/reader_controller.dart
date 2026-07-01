@@ -576,7 +576,7 @@ class ReaderController {
           if (maxScroll <= 0) return;
           unawaited(
             _scrollController!.animateTo(
-              (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
+              _semanticAnchor(position).clamp(0.0, maxScroll) * maxScroll,
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
             ),
@@ -584,6 +584,29 @@ class ReaderController {
         });
       }),
     );
+  }
+
+  // CRT-22.1: use stable chapter/paragraph instead of visual progressPercent
+  double _semanticAnchor(ReaderPosition position) {
+    if (_state.chapterCount <= 1) {
+      final chapter = _state.chapterAt(0);
+      final count = chapter?.blocks.length ?? 1;
+      return (position.paragraphIndex / count).clamp(0.0, 1.0);
+    }
+    var totalBlocks = 0;
+    var blocksBeforeTarget = 0;
+    for (var ch = 0; ch < _state.chapterCount; ch++) {
+      final chapter = _state.chapterAt(ch);
+      final count = chapter?.blocks.length ?? 1;
+      if (ch < position.chapterIndex) {
+        blocksBeforeTarget += count;
+      } else if (ch == position.chapterIndex) {
+        blocksBeforeTarget += (position.paragraphIndex).clamp(0, count - 1);
+      }
+      totalBlocks += count;
+    }
+    if (totalBlocks <= 0) return 0.0;
+    return (blocksBeforeTarget / totalBlocks).clamp(0.0, 1.0);
   }
 
   void saveProgress() {
@@ -651,7 +674,7 @@ class ReaderController {
       if (maxScroll <= 0) return;
       unawaited(
         _scrollController!.animateTo(
-          (savedPosition.progressPercent * maxScroll).clamp(0.0, maxScroll),
+          _semanticAnchor(savedPosition).clamp(0.0, maxScroll) * maxScroll,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         ),

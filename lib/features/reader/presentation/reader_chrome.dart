@@ -162,6 +162,7 @@ class ReaderBottomBar extends StatelessWidget {
     required this.scrollProgress,
     required this.estimatedMinutesLeft,
     required this.chapterTitle,
+    this.chapterTitleAt,
     this.onJumpToProgress,
     this.onModeChanged,
     this.checkpoints = const [],
@@ -175,6 +176,7 @@ class ReaderBottomBar extends StatelessWidget {
   final double scrollProgress;
   final int estimatedMinutesLeft;
   final String chapterTitle;
+  final String Function(int chapterIndex)? chapterTitleAt;
   final ValueChanged<double>? onJumpToProgress;
   final ValueChanged<ReaderMode>? onModeChanged;
   final List<double> checkpoints;
@@ -244,6 +246,7 @@ class ReaderBottomBar extends StatelessWidget {
                 settings: settings,
                 colors: colors,
                 onChanged: onJumpToProgress!,
+                chapterTitleAt: chapterTitleAt,
                 checkpoints: checkpoints,
                 onCheckpointBack: onCheckpointBack,
                 onCheckpointForward: onCheckpointForward,
@@ -420,6 +423,7 @@ class _SliderWithPreview extends StatefulWidget {
     required this.settings,
     required this.colors,
     required this.onChanged,
+    this.chapterTitleAt,
     this.checkpoints = const [],
     this.onCheckpointBack,
     this.onCheckpointForward,
@@ -431,6 +435,7 @@ class _SliderWithPreview extends StatefulWidget {
   final ReaderSettings settings;
   final ReaderColors colors;
   final ValueChanged<double> onChanged;
+  final String Function(int chapterIndex)? chapterTitleAt;
   final List<double> checkpoints;
   final VoidCallback? onCheckpointBack;
   final VoidCallback? onCheckpointForward;
@@ -450,6 +455,7 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
     final dragPercent = (value * 100).round();
     final dragChapter = (value * widget.totalChapters).ceil().clamp(1, widget.totalChapters);
     final moved = _dragging && (value - _preDragValue).abs() > 0.005;
+    final chapterTitle = widget.chapterTitleAt?.call(dragChapter - 1) ?? '';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -458,42 +464,60 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
             child: Container(
+              constraints: const BoxConstraints(maxWidth: 320),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: widget.colors.text.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Глава $dragChapter / ${widget.totalChapters}  ·  $dragPercent%',
-                    style: TextStyle(
-                      color: widget.colors.scaffold,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  if (moved) ...[
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _dragValue = _preDragValue;
-                          _dragging = false;
-                        });
-                        widget.onChanged(_preDragValue);
-                      },
-                      child: Text(
-                        'Отмена',
-                        style: TextStyle(
-                          color: widget.colors.scaffold.withValues(alpha: 0.7),
-                          fontSize: 11,
-                          decoration: TextDecoration.underline,
-                        ),
+                  if (chapterTitle.isNotEmpty)
+                    Text(
+                      chapterTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: widget.colors.scaffold,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Глава $dragChapter / ${widget.totalChapters}  ·  $dragPercent%',
+                        style: TextStyle(
+                          color: widget.colors.scaffold.withValues(alpha: 0.8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      if (moved) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _dragValue = _preDragValue;
+                              _dragging = false;
+                            });
+                            widget.onChanged(_preDragValue);
+                          },
+                          child: Text(
+                            'Отмена',
+                            style: TextStyle(
+                              color: widget.colors.scaffold.withValues(alpha: 0.7),
+                              fontSize: 11,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
