@@ -139,6 +139,7 @@ class ReaderBlock {
   final List<ReaderBlock>? listItems;
   final List<List<String>>? tableRows;
   final String? imageAlt;
+  final String? imageCaption;
   final double? textIndent;
   final TextAlign? textAlign;
   final String? noteId;
@@ -155,6 +156,7 @@ class ReaderBlock {
     this.listItems,
     this.tableRows,
     this.imageAlt,
+    this.imageCaption,
     this.textIndent,
     this.textAlign,
     this.noteId,
@@ -174,6 +176,7 @@ class ReaderBlock {
       'listItems': listItems!.map((b) => b.toJson()).toList(),
     if (tableRows != null && tableRows!.isNotEmpty) 'tableRows': tableRows,
     if (imageAlt != null) 'imageAlt': imageAlt,
+    if (imageCaption != null) 'imageCaption': imageCaption,
     if (textIndent != null) 'textIndent': textIndent,
     if (textAlign != null) 'textAlign': textAlign!.name,
     if (noteId != null) 'noteId': noteId,
@@ -200,6 +203,7 @@ class ReaderBlock {
         ?.map((row) => (row as List<dynamic>).cast<String>())
         .toList(),
     imageAlt: json['imageAlt'] as String?,
+    imageCaption: json['imageCaption'] as String?,
     textIndent: (json['textIndent'] as num?)?.toDouble(),
     textAlign: json['textAlign'] != null
         ? TextAlign.values.firstWhere(

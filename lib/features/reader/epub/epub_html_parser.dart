@@ -84,6 +84,9 @@ final class EpubHtmlParser {
         if (text.isEmpty) return null;
         return HeadingBlock(text, level);
 
+      case 'figure':
+        return _processFigure(el, chapterPath);
+
       case 'img':
         return _processImage(el, chapterPath);
 
@@ -214,6 +217,31 @@ final class EpubHtmlParser {
         );
       }
     }
+  }
+
+  Future<ReaderBlock?> _processFigure(XmlElement el, String chapterPath) async {
+    // Look for <img> inside <figure>
+    XmlElement? imgEl;
+    String? caption;
+    for (final child in el.descendants.whereType<XmlElement>()) {
+      if (child.localName == 'img' && imgEl == null) {
+        imgEl = child;
+      } else if (child.localName == 'figcaption' && caption == null) {
+        caption = child.innerText.trim();
+      }
+    }
+    if (imgEl == null) return null;
+    final imgResult = await _processImage(imgEl, chapterPath);
+    if (imgResult == null || imgResult is! ImageBlock) return null;
+    if (caption != null && caption.isNotEmpty) {
+      return ImageBlock(
+        resourceId: imgResult.resourceId,
+        localPath: imgResult.localPath,
+        alt: imgResult.alt,
+        caption: caption,
+      );
+    }
+    return imgResult;
   }
 
   Future<ReaderBlock?> _processImage(XmlElement el, String chapterPath) async {

@@ -57,12 +57,13 @@ class EpubBookAdapter {
         type: BlockType.heading,
         headingLevel: level,
       ),
-      epub.ImageBlock(:final localPath, :final alt) => ReaderBlock(
+      epub.ImageBlock(:final localPath, :final alt, :final caption) => ReaderBlock(
         index: index,
-        text: alt ?? '',
+        text: alt ?? caption ?? '',
         type: BlockType.image,
         imageUrl: localPath,
         imageAlt: alt,
+        imageCaption: caption,
       ),
       epub.ListBlock(:final ordered, :final items) => ReaderBlock(
         index: index,

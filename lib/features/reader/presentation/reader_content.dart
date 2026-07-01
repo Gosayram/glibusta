@@ -299,7 +299,8 @@ Widget _buildReaderBlock(
     case BlockType.image:
       if (!s.showImages) return const SizedBox.shrink();
       if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
-        return Padding(
+        final caption = block.imageCaption;
+        final imgWidget = Padding(
           padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
           child: Align(
             alignment: switch (s.imageAlignment) {
@@ -316,6 +317,27 @@ Widget _buildReaderBlock(
             ),
           ),
         );
+        if (caption != null && caption.isNotEmpty) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              imgWidget,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: s.margin * 0.5),
+                child: Text(
+                  caption,
+                  style: style.copyWith(
+                    fontSize: s.fontSize * 0.8,
+                    fontStyle: FontStyle.italic,
+                    color: (style.color ?? Colors.black).withValues(alpha: 0.6),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          );
+        }
+        return imgWidget;
       }
       return const SizedBox.shrink();
     case BlockType.footnote:
@@ -1272,7 +1294,18 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         return ps * 4;
       case BlockType.image:
         final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
-        return (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
+        final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
+        if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {
+          return imgHeight +
+              _measureTextHeight(
+                    block.imageCaption!,
+                    settings.fontSize * 0.8,
+                    settings.lineHeight,
+                    width,
+                  ) +
+              ps;
+        }
+        return imgHeight;
       case BlockType.footnote:
         return _measureTextHeight(
               block.text,

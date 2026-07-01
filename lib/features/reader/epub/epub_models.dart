@@ -58,10 +58,12 @@ final class ImageBlock extends ReaderBlock {
     required this.resourceId,
     required this.localPath,
     this.alt,
+    this.caption,
   });
   final String resourceId;
   final String localPath;
   final String? alt;
+  final String? caption;
 }
 
 final class ListBlock extends ReaderBlock {
