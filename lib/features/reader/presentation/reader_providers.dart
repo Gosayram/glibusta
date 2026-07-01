@@ -68,6 +68,26 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(margin: margin);
   }
 
+  void updateSeparateMargins(bool enabled) {
+    state = state.copyWith(separateMargins: enabled);
+  }
+
+  void updateMarginTop(double value) {
+    state = state.copyWith(marginTop: value);
+  }
+
+  void updateMarginBottom(double value) {
+    state = state.copyWith(marginBottom: value);
+  }
+
+  void updateMarginLeft(double value) {
+    state = state.copyWith(marginLeft: value);
+  }
+
+  void updateMarginRight(double value) {
+    state = state.copyWith(marginRight: value);
+  }
+
   void updateParagraphSpacing(double spacing) {
     state = state.copyWith(paragraphSpacing: spacing);
   }

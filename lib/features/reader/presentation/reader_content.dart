@@ -132,6 +132,14 @@ double _headingSpacing(double ps, int level) => switch (level) {
 };
 
 EdgeInsets _effectiveMargin(ReaderSettings s, ReaderMode mode) {
+  if (s.separateMargins) {
+    return EdgeInsets.only(
+      top: s.marginTop,
+      bottom: s.marginBottom,
+      left: s.marginLeft,
+      right: s.marginRight,
+    );
+  }
   return EdgeInsets.all(s.margin);
 }
 
