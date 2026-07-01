@@ -1409,6 +1409,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   // HG-6.1: layout cache — avoid recomputing pages when settings haven't changed
   String? _cacheKey;
   List<_PageContent> _cachedPages = const [];
+  // MD-2.3: per-chapter pagination cache — survives chapter eviction+reload
+  final Map<String, List<_PageContent>> _chapterPageCache = {};
+  static const int _maxCachedChapters = 30;
 
   @override
   void initState() {
@@ -1459,92 +1462,121 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     super.dispose();
   }
 
-  List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
+  /// MD-2.3: paginate a single chapter, with per-chapter caching.
+  List<_PageContent> _paginateSingleChapter(
+    int chIdx,
+    double availableHeight,
+    double contentWidth,
+    String settingsKey,
+  ) {
+    final cacheKey = '${chIdx}_$settingsKey';
+    final cached = _chapterPageCache[cacheKey];
+    if (cached != null) return cached;
+
     final settings = widget.settings;
     final style = _getReaderStyle(settings);
+    final chapter = widget.loadedChapters[chIdx];
     final pages = <_PageContent>[];
+
+    if (chapter == null || chapter.blocks.isEmpty) {
+      pages.add(_PageContent(chapterIndex: chIdx, blockStart: 0, blockEnd: 0));
+      _chapterPageCache[cacheKey] = pages;
+      _trimChapterCache();
+      return pages;
+    }
+
     const minFillRatio = 0.35;
+    final titleHeight = chapter.title.isNotEmpty
+        ? settings.fontSize * 1.4 * settings.lineHeight + settings.paragraphSpacing * 2
+        : 0.0;
+    var currentHeight = titleHeight;
+    var pageStart = 0;
+
+    for (int i = 0; i < chapter.blocks.length; i++) {
+      final block = chapter.blocks[i];
+      final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
+
+      if (currentHeight + blockHeight > availableHeight && i > pageStart) {
+        final remainingBlocks = chapter.blocks.length - i;
+        final remainingHeight = remainingBlocks > 0
+            ? chapter.blocks
+                  .skip(i)
+                  .fold<double>(0, (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth))
+            : 0.0;
+        final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
+        if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {
+          pages.add(_PageContent(chapterIndex: chIdx, blockStart: pageStart, blockEnd: i));
+          pageStart = i;
+          currentHeight = blockHeight;
+        } else {
+          currentHeight += blockHeight;
+        }
+      } else {
+        currentHeight += blockHeight;
+      }
+    }
+
+    // Final page merge
+    if (pageStart > 0 &&
+        pages.isNotEmpty &&
+        pages.last.chapterIndex == chIdx &&
+        currentHeight < availableHeight * 0.30) {
+      final lastPage = pages.last;
+      pages[pages.length - 1] = _PageContent(
+        chapterIndex: lastPage.chapterIndex,
+        blockStart: lastPage.blockStart,
+        blockEnd: chapter.blocks.length,
+      );
+    } else {
+      pages.add(
+        _PageContent(chapterIndex: chIdx, blockStart: pageStart, blockEnd: chapter.blocks.length),
+      );
+    }
+
+    _chapterPageCache[cacheKey] = pages;
+    _trimChapterCache();
+    return pages;
+  }
+
+  /// Evict oldest entries when cache exceeds limit.
+  void _trimChapterCache() {
+    while (_chapterPageCache.length > _maxCachedChapters) {
+      _chapterPageCache.remove(_chapterPageCache.keys.first);
+    }
+  }
+
+  List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
+    final settings = widget.settings;
+    final pages = <_PageContent>[];
+
+    // MD-2.3: per-chapter settings key for cache
+    final chKey = '${settings.fontSize}_${settings.lineHeight}_${settings.margin}_'
+        '${settings.paragraphSpacing}_${settings.letterSpacing}_${settings.paragraphFirstLineIndent}_'
+        '${settings.font}_${settings.hyphenation}_${settings.textAlign.name}_'
+        '${settings.paragraphIndentMode.name}_${availableHeight.toStringAsFixed(1)}_'
+        '${contentWidth.toStringAsFixed(1)}';
 
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
     if (hasCover) {
       pages.add(const _PageContent(chapterIndex: 0, blockStart: 0, blockEnd: 0, isCover: true));
     }
 
+    // MD-2.3: use per-chapter cache for each chapter
+    var lastChIdx = -1;
     for (int chIdx = 0; chIdx < widget.metadata.chapterCount; chIdx++) {
-      final chapter = widget.loadedChapters[chIdx];
-      if (chapter == null || chapter.blocks.isEmpty) {
-        pages.add(
-          _PageContent(chapterIndex: chIdx, blockStart: 0, blockEnd: 0, showChapterTitle: true),
-        );
-        continue;
+      final chapterPages = _paginateSingleChapter(chIdx, availableHeight, contentWidth, chKey);
+      for (final p in chapterPages) {
+        // Fix showChapterTitle: true for first page of each chapter
+        final showTitle = chIdx != lastChIdx;
+        pages.add(_PageContent(
+          chapterIndex: p.chapterIndex,
+          blockStart: p.blockStart,
+          blockEnd: p.blockEnd,
+          isCover: p.isCover,
+          showChapterTitle: showTitle,
+        ));
       }
-
-      final titleHeight = chapter.title.isNotEmpty
-          ? settings.fontSize * 1.4 * settings.lineHeight + settings.paragraphSpacing * 2
-          : 0.0;
-      var currentHeight = titleHeight;
-      var pageStart = 0;
-
-      for (int i = 0; i < chapter.blocks.length; i++) {
-        final block = chapter.blocks[i];
-        final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
-
-        if (currentHeight + blockHeight > availableHeight && i > pageStart) {
-          // HG-1.4: widow control — don't leave a single block alone on the next page
-          final remainingBlocks = chapter.blocks.length - i;
-          final remainingHeight = remainingBlocks > 0
-              ? chapter.blocks
-                    .skip(i)
-                    .fold<double>(
-                      0,
-                      (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth),
-                    )
-              : 0.0;
-          final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
-          // Don't break if current page is mostly empty (< 35% filled)
-          if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {
-            pages.add(
-              _PageContent(
-                chapterIndex: chIdx,
-                blockStart: pageStart,
-                blockEnd: i,
-                showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
-              ),
-            );
-            pageStart = i;
-            currentHeight = blockHeight;
-          } else {
-            // Page is too empty — let block overflow, accept slight overfill
-            currentHeight += blockHeight;
-          }
-        } else {
-          currentHeight += blockHeight;
-        }
-      }
-
-      // Final page: if it would be very short (< 30%), merge with previous page
-      if (pageStart > 0 &&
-          pages.isNotEmpty &&
-          pages.last.chapterIndex == chIdx &&
-          currentHeight < availableHeight * 0.30) {
-        // Extend previous page to include remaining blocks
-        final lastPage = pages.last;
-        pages[pages.length - 1] = _PageContent(
-          chapterIndex: lastPage.chapterIndex,
-          blockStart: lastPage.blockStart,
-          blockEnd: chapter.blocks.length,
-          showChapterTitle: lastPage.showChapterTitle,
-        );
-      } else {
-        pages.add(
-          _PageContent(
-            chapterIndex: chIdx,
-            blockStart: pageStart,
-            blockEnd: chapter.blocks.length,
-            showChapterTitle: pages.isEmpty || pages.last.chapterIndex != chIdx,
-          ),
-        );
-      }
+      lastChIdx = chIdx;
     }
     return pages;
   }
