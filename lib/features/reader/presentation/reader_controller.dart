@@ -561,7 +561,7 @@ class ReaderController {
 
   void _restoreSavedPosition(ReaderPosition position) {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated) {
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) {
       _updateState(_state.copyWith(currentPosition: position));
       return;
     }
@@ -679,6 +679,10 @@ class ReaderController {
       _evictDistantChapters(nextChapter);
       return;
     }
+    if (mode == ReaderMode.focus) {
+      _advanceFocusParagraph(direction: 1);
+      return;
+    }
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     final currentScroll = _scrollController!.offset;
@@ -689,6 +693,45 @@ class ReaderController {
         nextOffset.clamp(0.0, maxScroll),
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  void _advanceFocusParagraph({required int direction}) {
+    final ch = _state.currentPosition.chapterIndex;
+    final para = _state.currentPosition.paragraphIndex;
+    var newCh = ch;
+    var newPara = para + direction;
+
+    // Check bounds within current chapter
+    final chapter = _state.loadedChapters[ch];
+    if (chapter != null) {
+      if (newPara < 0 && ch > 0) {
+        // Go to previous chapter's last paragraph
+        newCh = ch - 1;
+        final prev = _state.loadedChapters[newCh];
+        newPara = prev != null ? prev.blocks.length - 1 : 0;
+      } else if (newPara >= (chapter.blocks.length)) {
+        // Go to next chapter's first paragraph
+        if (ch + 1 < _state.chapterCount) {
+          newCh = ch + 1;
+          newPara = 0;
+        } else {
+          newPara = chapter.blocks.length - 1;
+        }
+      }
+    }
+
+    if (newCh != ch) {
+      unawaited(_ensureChaptersLoaded(newCh));
+      _evictDistantChapters(newCh);
+    }
+    _updateState(
+      _state.copyWith(
+        currentPosition: _state.currentPosition.copyWith(
+          chapterIndex: newCh,
+          paragraphIndex: newPara,
+        ),
       ),
     );
   }
@@ -711,6 +754,10 @@ class ReaderController {
       _evictDistantChapters(previousChapter);
       return;
     }
+    if (mode == ReaderMode.focus) {
+      _advanceFocusParagraph(direction: -1);
+      return;
+    }
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final currentScroll = _scrollController!.offset;
     final viewportHeight = _scrollController!.position.viewportDimension;
@@ -729,7 +776,7 @@ class ReaderController {
     if (total == 0) return;
     final clamped = position.clamp(chapterCount: total);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated) {
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) {
       _updateState(_state.copyWith(currentPosition: clamped));
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
@@ -773,7 +820,7 @@ class ReaderController {
     unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated) return;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(

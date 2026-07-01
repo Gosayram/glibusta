@@ -981,6 +981,21 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       );
     }
 
+    if (settings.mode == ReaderMode.focus) {
+      return _FocusModeBody(
+        metadata: widget.metadata,
+        loadedChapters: widget.loadedChapters,
+        settings: settings,
+        initialChapterIndex: widget.initialPage,
+        highlightQuery: widget.highlightQuery,
+        chapterHighlights: widget.chapterHighlights,
+        blockTransformers: widget.blockTransformers,
+        customColors: widget.customColors,
+        onLinkTap: widget.onLinkTap,
+        onPageChanged: widget.onPageChanged,
+      );
+    }
+
     final effectiveMargin = _effectiveMargin(settings, settings.mode);
     final textDirection = _readerTextDirection(settings.textDirection, context);
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
@@ -1191,6 +1206,105 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           ),
     );
   }
+}
+
+class _FocusModeBody extends StatelessWidget {
+  const _FocusModeBody({
+    required this.metadata,
+    required this.loadedChapters,
+    required this.settings,
+    required this.initialChapterIndex,
+    this.highlightQuery,
+    this.chapterHighlights,
+    this.blockTransformers,
+    this.customColors,
+    this.onLinkTap,
+    this.onPageChanged,
+  }) : initialParagraphIndex = 0;
+
+  final NormalizedBookMetadata metadata;
+  final Map<int, ReaderChapter> loadedChapters;
+  final ReaderSettings settings;
+  final int initialChapterIndex;
+  final int initialParagraphIndex;
+  final String? highlightQuery;
+  final Map<int, List<TextHighlight>>? chapterHighlights;
+  final List<BlockTransformer>? blockTransformers;
+  final ReaderColors? customColors;
+  final ValueChanged<String>? onLinkTap;
+  final ValueChanged<int>? onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = <_FocusBlock>[];
+    for (var ch = 0; ch < metadata.chapterCount; ch++) {
+      final chapter = loadedChapters[ch];
+      if (chapter == null) continue;
+      for (var blk = 0; blk < chapter.blocks.length; blk++) {
+        blocks.add(_FocusBlock(chapterIndex: ch, blockIndex: blk));
+      }
+    }
+
+    final initialIndex = blocks.indexWhere(
+      (b) => b.chapterIndex == initialChapterIndex && b.blockIndex == initialParagraphIndex,
+    );
+    final controller = PageController(initialPage: initialIndex >= 0 ? initialIndex : 0);
+
+    return PageView.builder(
+      controller: controller,
+      scrollDirection: Axis.vertical,
+      itemCount: blocks.length,
+      onPageChanged: (index) {
+        if (index < blocks.length) {
+          onPageChanged?.call(blocks[index].chapterIndex);
+        }
+      },
+      itemBuilder: (context, index) {
+        final fb = blocks[index];
+        final chapter = loadedChapters[fb.chapterIndex];
+        if (chapter == null || fb.blockIndex >= chapter.blocks.length) {
+          return const SizedBox.shrink();
+        }
+        final block = chapter.blocks[fb.blockIndex];
+        final margin = settings.separateMargins
+            ? EdgeInsets.only(
+                top: settings.marginTop,
+                bottom: settings.marginBottom,
+                left: settings.marginLeft,
+                right: settings.marginRight,
+              )
+            : EdgeInsets.all(settings.margin);
+
+        final readerCtx = ReaderCtx(
+          settings: settings,
+          customColors: customColors,
+          highlightQuery: highlightQuery,
+          linkColor: ReaderColors.forTheme(settings.theme).link,
+          brightness: Theme.of(context).brightness,
+          onLinkTap: onLinkTap,
+        );
+
+        return Padding(
+          padding: margin,
+          child: Center(
+            child: SingleChildScrollView(
+              child: _buildReaderBlock(
+                readerCtx,
+                block,
+                block.textAlign ?? TextAlign.center,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FocusBlock {
+  const _FocusBlock({required this.chapterIndex, required this.blockIndex});
+  final int chapterIndex;
+  final int blockIndex;
 }
 
 class _PaginatedContentBody extends StatefulWidget {

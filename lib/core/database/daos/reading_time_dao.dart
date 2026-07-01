@@ -94,9 +94,9 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
   Future<Map<int, int>> getReadingHours(int days) async {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
-    final results = await (select(readingTime)
-          ..where((t) => t.date.isBiggerOrEqualValue(start)))
-        .get();
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.isBiggerOrEqualValue(start))).get();
 
     final hourlySeconds = <int, int>{};
     for (final row in results) {

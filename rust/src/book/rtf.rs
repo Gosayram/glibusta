@@ -161,11 +161,17 @@ impl RtfFmt {
         const DEFAULT: i32 = 24;
         let ratio = self.font_size_half_pts as f64 / DEFAULT as f64;
         // ponytail: font-size ratio → heading, common RTF convention
-        if ratio >= 3.0 { Some(1) }
-        else if ratio >= 2.0 { Some(2) }
-        else if ratio >= 1.5 { Some(3) }
-        else if ratio >= 1.2 { Some(4) }
-        else { None }
+        if ratio >= 3.0 {
+            Some(1)
+        } else if ratio >= 2.0 {
+            Some(2)
+        } else if ratio >= 1.5 {
+            Some(3)
+        } else if ratio >= 1.2 {
+            Some(4)
+        } else {
+            None
+        }
     }
 }
 

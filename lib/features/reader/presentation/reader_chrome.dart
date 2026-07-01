@@ -296,6 +296,7 @@ class ReaderBottomBar extends StatelessWidget {
     const modes = <ReaderMode, String>{
       ReaderMode.paginated: 'Страницы',
       ReaderMode.continuous: 'Прокрутка',
+      ReaderMode.focus: 'Фокус',
     };
 
     return Row(

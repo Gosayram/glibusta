@@ -25,8 +25,7 @@ final favoriteGenresProvider = FutureProvider.autoDispose<List<MapEntry<String, 
       counts[name] = (counts[name] ?? 0) + 1;
     }
   }
-  final sorted = counts.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
+  final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
   return sorted.take(5).toList();
 });
 

@@ -275,6 +275,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           labels: const {
             ReaderMode.paginated: 'Страницы',
             ReaderMode.continuous: 'Прокрутка',
+            ReaderMode.focus: 'Фокус',
           },
           onChanged: (v) => notifier.updateMode(v),
         ),

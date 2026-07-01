@@ -219,11 +219,7 @@ class ReaderBlock {
 
   // CRT-21.1: normalize whitespace before typography processing
   static String _normalizeWhitespace(String text) {
-    final cleaned = text
-        .replaceAll('\r\n', ' ')
-        .replaceAll('\r', ' ')
-        .replaceAll('\n', ' ')
-        .trim();
+    final cleaned = text.replaceAll('\r\n', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ').trim();
     // Collapse 2+ consecutive spaces into one
     final sb = StringBuffer();
     var prevSpace = false;

@@ -584,8 +584,8 @@ class _ReadingHoursChart extends ConsumerWidget {
                                   decoration: BoxDecoration(
                                     color: ratio > 0
                                         ? Theme.of(context).colorScheme.primary.withValues(
-                                          alpha: 0.3 + ratio * 0.7,
-                                        )
+                                            alpha: 0.3 + ratio * 0.7,
+                                          )
                                         : Colors.transparent,
                                     borderRadius: const BorderRadius.vertical(
                                       top: Radius.circular(2),

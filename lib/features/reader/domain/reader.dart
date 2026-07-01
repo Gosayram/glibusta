@@ -4,7 +4,7 @@ part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { paginated, continuous }
+enum ReaderMode { paginated, continuous, focus }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
