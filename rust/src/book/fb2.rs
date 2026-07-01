@@ -35,6 +35,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut description: Option<String> = None;
     let mut cover_data: Option<String> = None;
     let mut body_blocks: Vec<ReaderBlock> = Vec::new();
+    let mut chapters_blocks: Vec<Vec<ReaderBlock>> = Vec::new();
     let mut block_index = 0i32;
     let chapter_index = 0i32;
 
@@ -108,8 +109,17 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     }
                     "body" => in_body = true,
                     "section" if in_body => {
-                        in_section = true;
                         section_depth += 1;
+                        if section_depth == 1 {
+                            // Start new chapter for top-level sections
+                            if !body_blocks.is_empty() {
+                                chapters_blocks.push(std::mem::take(&mut body_blocks));
+                            }
+                            chapters_blocks.push(Vec::new());
+                            in_section = true;
+                        } else {
+                            in_section = true;
+                        }
                     }
                     "p" if in_body => in_p = true,
                     "subtitle" if in_body => in_subtitle = true,
@@ -325,6 +335,10 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         }
                         if section_depth == 0 {
                             in_section = false;
+                            // Finalize current chapter
+                            if !body_blocks.is_empty() {
+                                chapters_blocks.push(std::mem::take(&mut body_blocks));
+                            }
                         }
                     }
                     "p" if in_body => {
@@ -681,7 +695,32 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
 
     let cover_url = cover_data.map(|d| format!("data:image/jpeg;base64,{}", d));
 
-    let chapters = if body_blocks.is_empty() {
+    let chapters = if !chapters_blocks.is_empty() {
+        // Sections were found — build chapters from them
+        if !body_blocks.is_empty() {
+            // Preamble before first section
+            chapters_blocks.insert(0, std::mem::take(&mut body_blocks));
+        }
+        let mut idx = 0i32;
+        chapters_blocks
+            .into_iter()
+            .filter(|blocks| !blocks.is_empty())
+            .map(|blocks| {
+                let ch_title = blocks
+                    .iter()
+                    .find(|b| b.block_type == BlockType::Heading || b.block_type == BlockType::Subtitle)
+                    .map(|b| b.text.clone())
+                    .unwrap_or_else(|| title.clone());
+                let chapter = ReaderChapter {
+                    index: idx,
+                    title: ch_title,
+                    blocks,
+                };
+                idx += 1;
+                chapter
+            })
+            .collect()
+    } else if body_blocks.is_empty() {
         vec![]
     } else {
         vec![ReaderChapter {
