@@ -59,6 +59,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String? _selectedText;
   int _batteryLevel = -1;
   bool _finishedDialogShown = false;
+  // HG-6.4: spinner during layout recalculation
+  Timer? _relayoutTimer;
+  bool _isRelayouting = false;
 
   Future<void> _checkForSelectedText() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -119,7 +122,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         prev.readerWidth != next.readerWidth ||
         prev.hyphenation != next.hyphenation;
     if (layoutChanged) {
+      // HG-6.4: show spinner if relayout takes >300ms
+      _relayoutTimer?.cancel();
+      _relayoutTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted) setState(() => _isRelayouting = true);
+      });
       _ctrl.reanchorAfterLayoutChange();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _relayoutTimer?.cancel();
+        if (mounted && _isRelayouting) setState(() => _isRelayouting = false);
+      });
     }
   }
 
@@ -474,6 +486,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    _relayoutTimer?.cancel();
     _exitImmersiveMode();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
@@ -720,6 +733,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     return Stack(
       children: [
         content,
+        // HG-6.4: spinner overlay during layout recalculation
+        if (_isRelayouting)
+          Positioned.fill(
+            child: ColoredBox(
+              color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.5),
+              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          ),
         _buildWarmthOverlay(settings),
         _buildBrightnessOverlay(settings),
         _buildEdgeFadeOverlay(settings),
