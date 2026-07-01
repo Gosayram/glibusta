@@ -16,6 +16,7 @@ class ReaderTopBar extends StatelessWidget {
     this.onMore,
     this.isBookmarked = false,
     this.hasLinkBack = false,
+    this.onBookInfo,
   });
 
   final ReaderSettings settings;
@@ -28,6 +29,7 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback? onMore;
   final bool isBookmarked;
   final bool hasLinkBack;
+  final VoidCallback? onBookInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +123,17 @@ class ReaderTopBar extends StatelessWidget {
                   ),
                   tooltip: isBookmarked ? 'Убрать закладку' : 'Добавить закладку',
                   onPressed: onBookmark,
+                ),
+              ),
+            if (onBookInfo != null)
+              Semantics(
+                button: true,
+                label: 'О книге',
+                child: IconButton(
+                  icon: const Icon(Icons.info_outline),
+                  color: colors.text,
+                  tooltip: 'О книге',
+                  onPressed: onBookInfo,
                 ),
               ),
             Semantics(

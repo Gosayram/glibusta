@@ -17,6 +17,7 @@ import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
+import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
@@ -700,6 +701,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                         : null,
                     onBookmark: () => _ctrl.addBookmark(),
                     onMore: () => _showQuickSettings(context),
+                    onBookInfo: () => _showBookStats(context, readerState),
                   ),
                 ),
               );
@@ -1091,6 +1093,87 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _ctrl.onBottomSheetClose();
         _gestureCoordinator.onBottomSheetClosed();
       }),
+    );
+  }
+
+  void _showBookStats(BuildContext context, ReaderState readerState) {
+    final meta = readerState.metadata;
+    if (meta == null) return;
+    final theme = Theme.of(context);
+
+    int totalBlocks = 0;
+    int totalImages = 0;
+    int totalTables = 0;
+    for (final ch in readerState.loadedChapters.values) {
+      totalBlocks += ch.blocks.length;
+      totalImages += ch.blocks.where((b) => b.type == BlockType.image).length;
+      totalTables += ch.blocks.where((b) => b.type == BlockType.table).length;
+    }
+
+    final db = ref.read(databaseProvider);
+    unawaited(db.bookDao.getReadingProgress(widget.bookId).then((progress) {
+      if (!context.mounted) return;
+      final totalSeconds = progress != null
+          ? DateTime.now().difference(progress.lastRead).inSeconds
+          : 0;
+      final minutes = totalSeconds ~/ 60;
+      final hours = minutes ~/ 60;
+      final timeStr = hours > 0
+          ? '$hours ч ${minutes % 60} мин'
+          : '$minutes мин';
+
+      unawaited(
+        showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                const Text('О книге'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _statRow(theme, 'Главы', '${meta.chapterCount}'),
+                _statRow(theme, 'Абзацев', '$totalBlocks'),
+                _statRow(theme, 'Иллюстраций', '$totalImages'),
+                if (totalTables > 0) _statRow(theme, 'Таблиц', '$totalTables'),
+                if (progress != null && progress.progressPercent > 0) ...[
+                  const Divider(height: 24),
+                  _statRow(theme, 'Прогресс', '${(progress.progressPercent * 100).round()}%'),
+                  _statRow(theme, 'Прочитано', timeStr),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }));
+  }
+
+  Widget _statRow(ThemeData theme, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          )),
+          Text(value, style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          )),
+        ],
+      ),
     );
   }
 
