@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -137,22 +139,15 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 widget.onDismiss();
               },
             ),
+            // MD-3.2: inline dictionary popup via Wiktionary REST API
             _ToolbarButton(
               icon: Icons.menu_book,
               label: 'Словарь',
               onTap: () async {
                 if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://en.wiktionary.org/wiki/$query');
-                  try {
-                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    if (!launched && context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  } on Object {
-                    if (context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
+                  final query = _selectedText!.trim();
+                  if (context.mounted) {
+                    unawaited(_showDictPopup(context, query));
                   }
                 }
                 widget.onDismiss();
@@ -408,6 +403,60 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       unawaited(SmartDialog.showToast('Текст выделен'));
     }
     widget.onDismiss();
+  }
+
+  // ponytail: single Wiktionary API, no offline cache, no multi-lang picker
+  Future<void> _showDictPopup(BuildContext context, String query) async {
+    try {
+      final client = HttpClient();
+      final uri = Uri.https(
+        'en.wiktionary.org',
+        '/api/rest_v1/page/summary/${Uri.encodeComponent(query)}',
+      );
+      final request = await client.getUrl(uri);
+      request.headers.set('Accept', 'application/json');
+      final response = await request.close();
+
+      if (!context.mounted) {
+        client.close();
+        return;
+      }
+
+      if (response.statusCode != 200) {
+        client.close();
+        unawaited(SmartDialog.showToast('Ничего не найдено'));
+        return;
+      }
+
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final title = data['title'] as String? ?? query;
+      final extract = data['extract'] as String? ?? '';
+
+      if (!context.mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Text(extract.isNotEmpty ? extract : 'Нет определения'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      );
+    } on Object catch (e) {
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Ошибка словаря: $e'));
+      }
+    }
   }
 
   Future<void> _speakText(String text) async {
