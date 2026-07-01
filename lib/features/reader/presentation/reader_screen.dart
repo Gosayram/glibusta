@@ -508,6 +508,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         content,
         _buildWarmthOverlay(settings),
         _buildBrightnessOverlay(settings),
+        _buildEdgeFadeOverlay(settings),
         if (_shouldShowProgressBar(settings, readerState))
           Positioned(
             top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
@@ -556,84 +557,90 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           top: 0,
           left: 0,
           right: 0,
-          child: AnimatedSlide(
-            offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
-            duration: AppDuration.fast,
-            curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: readerState.uiVisible ? 1.0 : 0.0,
-              duration: AppDuration.fast,
-              child: ReaderTopBar(
-                settings: settings,
-                bookTitle: readerState.metadata?.title ?? '',
-                bookAuthor: readerState.metadata?.authors.join(', '),
-                isBookmarked: readerState.checkpoints.any(
-                  (c) => (c - readerState.scrollProgress).abs() < 0.02,
+          child: Builder(builder: (context) {
+            final dur = MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppDuration.fast;
+            return AnimatedSlide(
+              offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
+              duration: dur,
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: readerState.uiVisible ? 1.0 : 0.0,
+                duration: dur,
+                child: ReaderTopBar(
+                  settings: settings,
+                  bookTitle: readerState.metadata?.title ?? '',
+                  bookAuthor: readerState.metadata?.authors.join(', '),
+                  isBookmarked: readerState.checkpoints.any(
+                    (c) => (c - readerState.scrollProgress).abs() < 0.02,
+                  ),
+                  onBack: () {
+                    if (_ctrl.popLinkPosition()) return;
+                    Navigator.of(context).pop();
+                  },
+                  onSearch: () {
+                    _ctrl.toggleSearch();
+                    if (_ctrl.state.isSearchOpen) {
+                      _gestureCoordinator.onSearchOpened();
+                    } else {
+                      _gestureCoordinator.onSearchClosed();
+                    }
+                  },
+                  onToc: readerState.metadata != null
+                      ? () {
+                          _ctrl.saveCheckpoint();
+                          TableOfContentsSheet.show(
+                            context,
+                            metadata: readerState.metadata!,
+                            currentChapterIndex: readerState.currentPosition.chapterIndex,
+                            currentChapterProgress: readerState.scrollProgress,
+                            onJumpToPosition: _ctrl.jumpToPosition,
+                            loadedChapters: readerState.loadedChapters,
+                            isDynamicallyLoading: readerState.isDynamicallyLoading,
+                          );
+                        }
+                      : null,
+                  onBookmark: () => _ctrl.addBookmark(),
+                  onMore: () => _showQuickSettings(context),
                 ),
-                onBack: () {
-                  if (_ctrl.popLinkPosition()) return;
-                  Navigator.of(context).pop();
-                },
-                onSearch: () {
-                  _ctrl.toggleSearch();
-                  if (_ctrl.state.isSearchOpen) {
-                    _gestureCoordinator.onSearchOpened();
-                  } else {
-                    _gestureCoordinator.onSearchClosed();
-                  }
-                },
-                onToc: readerState.metadata != null
-                    ? () {
-                        _ctrl.saveCheckpoint();
-                        TableOfContentsSheet.show(
-                          context,
-                          metadata: readerState.metadata!,
-                          currentChapterIndex: readerState.currentPosition.chapterIndex,
-                          currentChapterProgress: readerState.scrollProgress,
-                          onJumpToPosition: _ctrl.jumpToPosition,
-                          loadedChapters: readerState.loadedChapters,
-                          isDynamicallyLoading: readerState.isDynamicallyLoading,
-                        );
-                      }
-                    : null,
-                onBookmark: () => _ctrl.addBookmark(),
-                onMore: () => _showQuickSettings(context),
               ),
-            ),
-          ),
+            );
+          }),
         ),
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
-          child: AnimatedSlide(
-            offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
-            duration: AppDuration.fast,
-            curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: readerState.uiVisible ? 1.0 : 0.0,
-              duration: AppDuration.fast,
-              child: ReaderBottomBar(
-                settings: settings,
-                currentChapterIndex: readerState.currentPosition.chapterIndex,
-                totalChapters: readerState.chapterCount,
-                scrollProgress: readerState.scrollProgress,
-                estimatedMinutesLeft: readerState.estimatedMinutesLeft,
-                chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
-                onJumpToProgress: _ctrl.jumpToProgress,
-                onModeChanged: (mode) {
-                  ref.read(readerSettingsProvider.notifier).updateMode(mode);
-                },
-                checkpoints: readerState.checkpoints,
-                onCheckpointForward: _ctrl.hasCheckpointAhead
-                    ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
-                    : null,
-                onCheckpointBack: _ctrl.hasCheckpointBehind
-                    ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
-                    : null,
+          child: Builder(builder: (context) {
+            final dur = MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppDuration.fast;
+            return AnimatedSlide(
+              offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
+              duration: dur,
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: readerState.uiVisible ? 1.0 : 0.0,
+                duration: dur,
+                child: ReaderBottomBar(
+                  settings: settings,
+                  currentChapterIndex: readerState.currentPosition.chapterIndex,
+                  totalChapters: readerState.chapterCount,
+                  scrollProgress: readerState.scrollProgress,
+                  estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                  chapterTitle: readerState.chapterTitle(readerState.currentPosition.chapterIndex),
+                  onJumpToProgress: _ctrl.jumpToProgress,
+                  onModeChanged: (mode) {
+                    ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                  },
+                  checkpoints: readerState.checkpoints,
+                  onCheckpointForward: _ctrl.hasCheckpointAhead
+                      ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
+                      : null,
+                  onCheckpointBack: _ctrl.hasCheckpointBehind
+                      ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                      : null,
+                ),
               ),
-            ),
-          ),
+            );
+          }),
         ),
         if (readerState.isSearchOpen && readerState.metadata != null)
           Positioned.fill(
@@ -984,6 +991,50 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       child: IgnorePointer(
         child: Container(
           color: Color.fromRGBO(0, 0, 0, dimAlpha),
+        ),
+      ),
+    );
+  }
+
+  // ponytail: subtle fade gradient on top/bottom edges for immersion
+  Widget _buildEdgeFadeOverlay(ReaderSettings settings) {
+    final scaffoldColor = ReaderColors.forTheme(settings.theme).scaffold;
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      scaffoldColor.withValues(alpha: 0.6),
+                      scaffoldColor.withValues(alpha: 0.0),
+                    ],
+                    stops: const [0.0, 0.08],
+                  ),
+                ),
+              ),
+            ),
+            const Spacer(),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      scaffoldColor.withValues(alpha: 0.0),
+                      scaffoldColor.withValues(alpha: 0.6),
+                    ],
+                    stops: const [0.92, 1.0],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

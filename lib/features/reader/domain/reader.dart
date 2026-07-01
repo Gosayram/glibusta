@@ -51,7 +51,8 @@ enum ReaderTextAlign {
   left('По левому краю'),
   justify('По ширине'),
   center('По центру'),
-  right('По правому краю');
+  right('По правому краю'),
+  asInBook('Как в книге');
 
   const ReaderTextAlign(this.displayName);
   final String displayName;
@@ -153,6 +154,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(HorizontalGestureScroll.half) HorizontalGestureScroll horizontalGestureScroll,
     @Default(0.33) double tapZoneWidth,
     @Default(FullScreenMode.immersive) FullScreenMode fullScreenMode,
+    @Default('') String customCss,
     @Default(false) bool perceptionExpander,
     @Default(false) bool hideBarsOnFastScroll,
     @Default(OrientationLock.none) OrientationLock orientationLock,

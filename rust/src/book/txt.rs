@@ -1,6 +1,7 @@
 use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
 use crate::book::normalize_whitespace;
 use anyhow::Result;
+use regex::Regex;
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let text = if let Some(enc) = forced_encoding {
@@ -51,15 +52,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
 
     let title = extract_title_from_first_line(&blocks);
 
-    let chapters = if blocks.is_empty() {
-        vec![]
-    } else {
-        vec![ReaderChapter {
-            index: 0,
-            title: title.clone(),
-            blocks,
-        }]
-    };
+    let chapters = split_into_chapters(blocks, &title);
 
     Ok(NormalizedBook {
         id,
@@ -97,4 +90,113 @@ fn try_decode(bytes: &[u8], encoding_name: &str) -> Option<String> {
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
     blocks.first().map(|b| b.text.clone()).unwrap_or_default()
+}
+
+fn is_chapter_heading(text: &str, re: &Regex) -> bool {
+    re.is_match(text)
+}
+
+fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<ReaderChapter> {
+    if blocks.is_empty() {
+        return vec![];
+    }
+
+    let re = Regex::new(
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue)\s+[\dIVXLCDM]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s",
+    )
+    .unwrap();
+
+    let mut chapter_indices: Vec<usize> = Vec::new();
+    for (i, block) in blocks.iter().enumerate() {
+        if is_chapter_heading(&block.text, &re) {
+            chapter_indices.push(i);
+        }
+    }
+
+    if chapter_indices.is_empty() {
+        return vec![ReaderChapter {
+            index: 0,
+            title: book_title.to_string(),
+            blocks,
+        }];
+    }
+
+    let mut chapters: Vec<ReaderChapter> = Vec::new();
+
+    if chapter_indices[0] > 0 {
+        let preamble_blocks: Vec<ReaderBlock> = blocks[0..chapter_indices[0]]
+            .iter()
+            .enumerate()
+            .map(|(i, b)| ReaderBlock {
+                index: i as i32,
+                text: b.text.clone(),
+                block_type: b.block_type.clone(),
+                image_url: None,
+                note_ref: None,
+                rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
+            })
+            .collect();
+        if !preamble_blocks.is_empty() {
+            chapters.push(ReaderChapter {
+                index: 0,
+                title: book_title.to_string(),
+                blocks: preamble_blocks,
+            });
+        }
+    }
+
+    for (ci, &ch_idx) in chapter_indices.iter().enumerate() {
+        let end = if ci + 1 < chapter_indices.len() {
+            chapter_indices[ci + 1]
+        } else {
+            blocks.len()
+        };
+
+        let chapter_blocks: Vec<ReaderBlock> = blocks[ch_idx..end]
+            .iter()
+            .enumerate()
+            .map(|(i, b)| ReaderBlock {
+                index: i as i32,
+                text: b.text.clone(),
+                block_type: b.block_type.clone(),
+                image_url: None,
+                note_ref: None,
+                rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
+            })
+            .collect();
+
+        let title = chapter_blocks
+            .first()
+            .map(|b| b.text.clone())
+            .unwrap_or_else(|| format!("Глава {}", chapters.len() + 1));
+
+        chapters.push(ReaderChapter {
+            index: chapters.len() as i32,
+            title,
+            blocks: chapter_blocks,
+        });
+    }
+
+    // Re-index chapters
+    for (i, ch) in chapters.iter_mut().enumerate() {
+        ch.index = i as i32;
+    }
+
+    chapters
 }

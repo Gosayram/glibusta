@@ -216,6 +216,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(fullScreenMode: mode);
   }
 
+  void updateCustomCss(String css) {
+    state = state.copyWith(customCss: css);
+  }
+
   void updateForcedEncoding(String? encoding) {
     state = state.copyWith(forcedEncoding: encoding);
   }

@@ -30,6 +30,8 @@ class ReaderTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = ReaderColors.forTheme(settings.theme);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final showTitle = screenWidth > 400; // ponytail: hide title on small screens
     return SafeArea(
       bottom: false,
       child: Container(
@@ -53,24 +55,26 @@ class ReaderTopBar extends StatelessWidget {
               onPressed: onBack,
             ),
             Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bookTitle,
-                    style: TextStyle(color: colors.text, fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
-                    semanticsLabel: 'Книга: $bookTitle',
-                  ),
-                  if (bookAuthor != null && bookAuthor!.isNotEmpty)
-                    Text(
-                      bookAuthor!,
-                      style: TextStyle(color: colors.text.withValues(alpha: 0.6), fontSize: 11),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
+              child: showTitle
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          bookTitle,
+                          style: TextStyle(color: colors.text, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                          semanticsLabel: 'Книга: $bookTitle',
+                        ),
+                        if (bookAuthor != null && bookAuthor!.isNotEmpty)
+                          Text(
+                            bookAuthor!,
+                            style: TextStyle(color: colors.text.withValues(alpha: 0.6), fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    )
+                  : const SizedBox.shrink(),
             ),
             if (onSearch != null)
               IconButton(

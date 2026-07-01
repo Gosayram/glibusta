@@ -110,12 +110,13 @@ ColorFilter? _imageColorFilter(ReaderSettings? s) {
 
 // --- Shared reader block rendering (used by both continuous and paginated modes) ---
 
-TextAlign _resolveTextAlign(ReaderTextAlign a) {
+TextAlign _resolveTextAlign(ReaderTextAlign a, {TextAlign? blockAlign}) {
   return switch (a) {
     ReaderTextAlign.left => TextAlign.left,
     ReaderTextAlign.justify => TextAlign.justify,
     ReaderTextAlign.center => TextAlign.center,
     ReaderTextAlign.right => TextAlign.right,
+    ReaderTextAlign.asInBook => blockAlign ?? TextAlign.justify,
   };
 }
 
@@ -1077,7 +1078,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
-    final textAlign = _resolveTextAlign(settings.textAlign);
+    final baseAlign = _resolveTextAlign(settings.textAlign);
+    final isAsInBook = settings.textAlign == ReaderTextAlign.asInBook;
     final ctx = _ctx(settings);
     final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
@@ -1096,7 +1098,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                 fontSize: settings.fontSize * 1.4,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign,
+              baseAlign,
             ),
           )
         : const SizedBox.shrink();
@@ -1117,7 +1119,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           return _buildReaderBlock(
             ctx,
             block,
-            textAlign,
+            isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
             blockHighlights: chapterHighlights
                 ?.where((TextHighlight h) => h.blockIndex == entry.key)
                 .toList(),
@@ -1464,7 +1466,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
 
     final chapter = widget.loadedChapters[page.chapterIndex];
-    final textAlign = _resolveTextAlign(settings.textAlign);
+    final baseAlign = _resolveTextAlign(settings.textAlign);
+    final isAsInBook = settings.textAlign == ReaderTextAlign.asInBook;
     final chapterHighlights = widget.chapterHighlights[page.chapterIndex];
 
     if (chapter == null) {
@@ -1487,7 +1490,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ctx,
             chapter.title,
             style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
-            textAlign,
+            baseAlign,
           ),
         ),
       );
@@ -1514,7 +1517,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         _buildReaderBlock(
           ctx,
           block,
-          textAlign,
+          isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
           blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
         ),
       );

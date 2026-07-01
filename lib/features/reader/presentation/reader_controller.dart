@@ -804,9 +804,10 @@ class ReaderController {
     final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
     final zoneWidth = width * settings.tapZoneWidth;
-    if (x < zoneWidth) {
+    const snapMargin = 20.0; // ponytail: magnetic edge snapping
+    if (x < zoneWidth + snapMargin) {
       scrollToPrevious();
-    } else if (x > width - zoneWidth) {
+    } else if (x > width - zoneWidth - snapMargin) {
       scrollToNext();
     } else {
       toggleUi();
