@@ -188,14 +188,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _handleHorizontalDragEnd(DragEndDetails details) {
     if (!_isHorizontalDrag) return;
     final settings = ref.read(readerSettingsProvider);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    // MD-21.1: right-edge swipe → add bookmark
+    const edgeZone = 30.0;
+    final deltaX = details.globalPosition.dx - _dragStartX;
+    if (_dragStartX > screenWidth - edgeZone && deltaX < -40) {
+      unawaited(HapticFeedback.mediumImpact());
+      _ctrl.addBookmark();
+      return;
+    }
+
     final sensitivity = switch (settings.horizontalGestureScroll) {
       HorizontalGestureScroll.half => 0.5,
       HorizontalGestureScroll.twoThirds => 0.67,
       HorizontalGestureScroll.threeQuarters => 0.75,
     };
-    final screenWidth = MediaQuery.sizeOf(context).width;
     final threshold = screenWidth * sensitivity;
-    final deltaX = details.globalPosition.dx - _dragStartX;
     final velocity = details.primaryVelocity ?? 0;
 
     if (deltaX.abs() > threshold || velocity.abs() > 500) {

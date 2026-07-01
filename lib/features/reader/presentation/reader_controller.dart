@@ -12,6 +12,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
+import '../../highlights/presentation/highlight_providers.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/book_search_service.dart';
@@ -803,7 +804,7 @@ class ReaderController {
   void handleTap(TapUpDetails details, double width) {
     final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
-    final zoneWidth = width * settings.tapZoneWidth;
+    final zoneWidth = (width * settings.tapZoneWidth).clamp(48.0, double.infinity); // MD-24.3: 48dp min
     const snapMargin = 20.0; // ponytail: magnetic edge snapping
     if (x < zoneWidth + snapMargin) {
       scrollToPrevious();
@@ -1043,6 +1044,45 @@ class ReaderController {
     final diagnostics = buildDiagnostics();
     unawaited(Clipboard.setData(ClipboardData(text: diagnostics)));
   }
+
+  // CRT-10.7: search highlights
+  Future<void> searchHighlights(BuildContext context) async {
+    if (!_loaded || _disposed) return;
+    final query = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _HighlightSearchDialog(bookId: _bookId),
+    );
+    if (query == null || query.trim().isEmpty || _disposed || !context.mounted) return;
+    final repo = _ref.read(highlightRepositoryProvider);
+    final results = await repo.searchHighlights(_bookId, query.trim());
+    if (_disposed || !context.mounted) return;
+    if (results.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выделений не найдено'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    // Jump to first result
+    final first = results.first;
+    jumpToPosition(
+      ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: first.chapterIndex,
+        paragraphIndex: first.blockIndex,
+        progressPercent: _state.chapterCount > 1
+            ? first.chapterIndex / (_state.chapterCount - 1)
+            : 0.0,
+        updatedAt: DateTime.now(),
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Найдено ${results.length} выделений'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
 }
 
 final readerControllerProvider = Provider.autoDispose.family<ReaderController, String>((
@@ -1054,3 +1094,47 @@ final readerControllerProvider = Provider.autoDispose.family<ReaderController, S
   ref.onDispose(controller.dispose);
   return controller;
 });
+
+class _HighlightSearchDialog extends StatefulWidget {
+  const _HighlightSearchDialog({required this.bookId});
+  final String bookId;
+
+  @override
+  State<_HighlightSearchDialog> createState() => _HighlightSearchDialogState();
+}
+
+class _HighlightSearchDialogState extends State<_HighlightSearchDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Поиск выделений'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Введите текст...',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Найти'),
+        ),
+      ],
+    );
+  }
+}

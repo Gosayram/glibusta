@@ -48,11 +48,15 @@ class ReaderTopBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              color: colors.text,
-              tooltip: 'Назад',
-              onPressed: onBack,
+            Semantics(
+              button: true,
+              label: 'Назад',
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: colors.text,
+                tooltip: 'Назад',
+                onPressed: onBack,
+              ),
             ),
             Expanded(
               child: showTitle
@@ -77,33 +81,49 @@ class ReaderTopBar extends StatelessWidget {
                   : const SizedBox.shrink(),
             ),
             if (onSearch != null)
-              IconButton(
-                icon: const Icon(Icons.search),
-                color: colors.text,
-                tooltip: 'Поиск по книге',
-                onPressed: onSearch,
+              Semantics(
+                button: true,
+                label: 'Поиск по книге',
+                child: IconButton(
+                  icon: const Icon(Icons.search),
+                  color: colors.text,
+                  tooltip: 'Поиск по книге',
+                  onPressed: onSearch,
+                ),
               ),
             if (onToc != null)
-              IconButton(
-                icon: const Icon(Icons.list),
-                color: colors.text,
-                tooltip: 'Содержание',
-                onPressed: onToc,
+              Semantics(
+                button: true,
+                label: 'Содержание',
+                child: IconButton(
+                  icon: const Icon(Icons.list),
+                  color: colors.text,
+                  tooltip: 'Содержание',
+                  onPressed: onToc,
+                ),
               ),
             if (onBookmark != null)
-              IconButton(
-                icon: Icon(
-                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                  color: isBookmarked ? Colors.amber : colors.text,
+              Semantics(
+                button: true,
+                label: isBookmarked ? 'Убрать закладку' : 'Добавить закладку',
+                child: IconButton(
+                  icon: Icon(
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    color: isBookmarked ? Colors.amber : colors.text,
+                  ),
+                  tooltip: isBookmarked ? 'Убрать закладку' : 'Добавить закладку',
+                  onPressed: onBookmark,
                 ),
-                tooltip: isBookmarked ? 'Убрать закладку' : 'Добавить закладку',
-                onPressed: onBookmark,
               ),
-            IconButton(
-              icon: const Icon(Icons.more_vert),
-              color: colors.text,
-              tooltip: 'Настройки',
-              onPressed: onMore,
+            Semantics(
+              button: true,
+              label: 'Настройки',
+              child: IconButton(
+                icon: const Icon(Icons.settings),
+                color: colors.text,
+                tooltip: 'Настройки',
+                onPressed: onMore,
+              ),
             ),
           ],
         ),
@@ -263,27 +283,32 @@ class ReaderBottomBar extends StatelessWidget {
         final isSelected = settings.mode == entry.key;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: GestureDetector(
-            onTap: () => onModeChanged?.call(entry.key),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? colors.text.withValues(alpha: 0.15)
-                    : colors.text.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
+          child: Semantics(
+            button: true,
+            label: entry.value,
+            selected: isSelected,
+            child: GestureDetector(
+              onTap: () => onModeChanged?.call(entry.key),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
                   color: isSelected
-                      ? colors.text.withValues(alpha: 0.3)
-                      : colors.text.withValues(alpha: 0.1),
+                      ? colors.text.withValues(alpha: 0.15)
+                      : colors.text.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isSelected
+                        ? colors.text.withValues(alpha: 0.3)
+                        : colors.text.withValues(alpha: 0.1),
+                  ),
                 ),
-              ),
-              child: Text(
-                entry.value,
-                style: TextStyle(
-                  color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                child: Text(
+                  entry.value,
+                  style: TextStyle(
+                    color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
                 ),
               ),
             ),

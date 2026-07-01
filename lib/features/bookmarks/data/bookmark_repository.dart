@@ -81,4 +81,38 @@ class BookmarkRepository {
           ..orderBy([(b) => OrderingTerm.asc(b.createdAt)]))
         .watch();
   }
+
+  Future<String> exportToJson(String bookId) async {
+    final bookmarks = await getAllBookmarks(bookId);
+    final list = bookmarks.map((b) => {
+      'id': b.id,
+      'chapterIndex': b.chapterIndex,
+      'paragraphIndex': b.paragraphIndex,
+      'selectedText': b.selectedText,
+      'note': b.note,
+      'createdAt': b.createdAt.toIso8601String(),
+    }).toList();
+    // ponytail: simple JSON encode, no dependency needed
+    final buf = StringBuffer('[');
+    for (var i = 0; i < list.length; i++) {
+      if (i > 0) buf.write(',');
+      buf.write('{');
+      var first = true;
+      for (final e in list[i].entries) {
+        if (!first) buf.write(',');
+        first = false;
+        buf.write('"${e.key}":');
+        if (e.value == null) {
+          buf.write('null');
+        } else if (e.value is String) {
+          buf.write('"${e.value.toString().replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"');
+        } else {
+          buf.write(e.value);
+        }
+      }
+      buf.write('}');
+    }
+    buf.write(']');
+    return buf.toString();
+  }
 }

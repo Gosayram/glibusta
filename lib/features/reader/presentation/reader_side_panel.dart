@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -17,6 +18,7 @@ class ReaderSidePanel extends ConsumerStatefulWidget {
     required this.scrollController,
     required this.width,
     this.onJumpToPosition,
+    this.bookTitle,
   });
 
   final NormalizedBookMetadata metadata;
@@ -24,6 +26,7 @@ class ReaderSidePanel extends ConsumerStatefulWidget {
   final ScrollController scrollController;
   final double width;
   final ValueChanged<ReaderPosition>? onJumpToPosition;
+  final String? bookTitle;
 
   @override
   ConsumerState<ReaderSidePanel> createState() => _ReaderSidePanelState();
@@ -153,27 +156,55 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
       builder: (context, snapshot) {
         final bookmarks = snapshot.data ?? const <Bookmark>[];
         if (bookmarks.isEmpty) return const Center(child: Text('Нет закладок'));
-        return ListView.builder(
-          itemCount: bookmarks.length,
-          itemBuilder: (context, index) {
-            final bookmark = bookmarks[index];
-            return _buildPositionTile(
-              title: 'Закладка',
-              subtitle: bookmark.selectedText ?? _positionText(bookmark.chapterIndex),
-              position: _toReaderPosition(
-                bookmark.chapterIndex,
-                bookmark.paragraphIndex,
-                bookmark.localOffset,
+        return Column(
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: 'Копировать все закладки',
+                onPressed: () => _exportBookmarks(bookmarks),
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _bookmarks.deleteBookmark(bookmark.id),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: bookmarks.length,
+                itemBuilder: (context, index) {
+                  final bookmark = bookmarks[index];
+                  return _buildPositionTile(
+                    title: 'Закладка',
+                    subtitle: bookmark.selectedText ?? _positionText(bookmark.chapterIndex),
+                    position: _toReaderPosition(
+                      bookmark.chapterIndex,
+                      bookmark.paragraphIndex,
+                      bookmark.localOffset,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _bookmarks.deleteBookmark(bookmark.id),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
+  }
+
+  Future<void> _exportBookmarks(List<Bookmark> bookmarks) async {
+    final buf = StringBuffer();
+    for (final b in bookmarks) {
+      final text = b.selectedText ?? _positionText(b.chapterIndex);
+      buf.writeln('• $text');
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Закладки скопированы'), duration: Duration(seconds: 1)),
+      );
+    }
   }
 
   Widget _buildNotes() {
@@ -220,15 +251,37 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
               title: 'Цитата',
               subtitle: subtitle,
               position: _toReaderPosition(quote.chapterIndex, quote.paragraphIndex, 0.0),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _quotes.deleteQuote(quote.id),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 20),
+                    tooltip: 'Копировать с атрибуцией',
+                    onPressed: () => _copyQuoteWithAttribution(quote),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: () => _quotes.deleteQuote(quote.id),
+                  ),
+                ],
               ),
             );
           },
         );
       },
     );
+  }
+
+  Future<void> _copyQuoteWithAttribution(Quote quote) async {
+    final title = widget.bookTitle ?? 'Книга';
+    final chapter = 'Глава ${quote.chapterIndex + 1}';
+    final text = '"${quote.selectedText}" — $title, $chapter';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Цитата скопирована'), duration: Duration(seconds: 1)),
+      );
+    }
   }
 
   Widget _buildPositionTile({
