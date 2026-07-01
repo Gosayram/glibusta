@@ -355,11 +355,19 @@ Widget _buildReaderBlock(
     case BlockType.list:
       return _readerListBlock(ctx, block, textAlign);
     case BlockType.paragraph:
-      final indentValue = (block.textIndent != null && block.textIndent! > 0)
-          ? block.textIndent!
-          : s.paragraphFirstLineIndent;
+      final indentValue = switch (s.paragraphIndentMode) {
+        ParagraphIndentMode.asInBook => (block.textIndent != null && block.textIndent! > 0)
+            ? block.textIndent!
+            : 0.0,
+        ParagraphIndentMode.firstLine => s.paragraphFirstLineIndent,
+        ParagraphIndentMode.emptyLine => 0.0,
+        ParagraphIndentMode.custom => s.paragraphFirstLineIndent,
+      };
+      final bottomPadding = s.paragraphIndentMode == ParagraphIndentMode.emptyLine
+          ? s.paragraphSpacing * 2
+          : s.paragraphSpacing;
       return Padding(
-        padding: EdgeInsets.only(bottom: s.paragraphSpacing),
+        padding: EdgeInsets.only(bottom: bottomPadding),
         child: blockHighlights != null && blockHighlights.isNotEmpty
             ? Padding(
                 padding: EdgeInsets.only(left: indentValue),
@@ -1325,14 +1333,20 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
         return totalHeight;
       case BlockType.paragraph:
-        final indent = (block.textIndent ?? settings.paragraphFirstLineIndent);
+        final indent = switch (settings.paragraphIndentMode) {
+          ParagraphIndentMode.asInBook => (block.textIndent ?? 0.0),
+          ParagraphIndentMode.firstLine => settings.paragraphFirstLineIndent,
+          ParagraphIndentMode.emptyLine => 0.0,
+          ParagraphIndentMode.custom => settings.paragraphFirstLineIndent,
+        };
+        final bottomPad = settings.paragraphIndentMode == ParagraphIndentMode.emptyLine ? ps * 2 : ps;
         return _measureTextHeight(
               block.text,
               settings.fontSize,
               settings.lineHeight,
               width - indent,
             ) +
-            ps;
+            bottomPad;
     }
   }
 

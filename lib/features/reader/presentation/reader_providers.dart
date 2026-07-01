@@ -148,6 +148,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(paragraphFirstLineIndent: indent);
   }
 
+  void updateParagraphIndentMode(ParagraphIndentMode mode) {
+    state = state.copyWith(paragraphIndentMode: mode);
+  }
+
   void updateHyphenation(bool hyphenation) {
     state = state.copyWith(hyphenation: hyphenation);
   }

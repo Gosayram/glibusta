@@ -148,6 +148,7 @@ class ReaderController {
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   final _sessionStopwatch = Stopwatch();
   int _accumulatedSeconds = 0;
+  int _sessionWordsRead = 0;
   bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
@@ -279,22 +280,28 @@ class ReaderController {
       _sessionStopwatch.start();
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
-      const wordsPerMinute = 200;
+      final settings = _ref.read(readerSettingsProvider);
       final loadedWords = _content.computeTotalWords(_state.loadedChapters);
+      _sessionWordsRead = loadedWords;
       final loadedCount = _state.loadedChapters.length;
       final totalCount = _state.chapterCount;
       final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
           ? (loadedWords / loadedCount * totalCount).round()
           : loadedWords;
+      final totalSeconds = _accumulatedSeconds + (_sessionStopwatch.isRunning
+          ? _sessionStopwatch.elapsed.inSeconds
+          : 0);
+      final wpm = totalSeconds > 60 && _sessionWordsRead > 0
+          ? (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800)
+          : 200;
       _updateState(
         _state.copyWith(
           estimatedMinutesLeft: estimatedTotalWords > 0
-              ? (estimatedTotalWords / wordsPerMinute).ceil()
+              ? (estimatedTotalWords / wpm).ceil()
               : 0,
         ),
       );
 
-      final settings = _ref.read(readerSettingsProvider);
       if (settings.restoreLastPosition && savedPosition.progressPercent > 0) {
         _restoreSavedPosition(savedPosition);
       }

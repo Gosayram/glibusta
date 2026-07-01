@@ -199,14 +199,18 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           (v) => notifier.updateWordSpacing(v * 4.0 - 2.0),
         ),
         const SizedBox(height: 12),
-        const _SectionTitle('Отступ первой строки'),
-        _buildSliderRow(
-          'Шаг',
-          settings.paragraphFirstLineIndent / 64.0,
-          0.0,
-          1.0,
-          (v) => notifier.updateParagraphFirstLineIndent(v * 64.0),
-        ),
+        const _SectionTitle('Отступ абзацев'),
+        _buildParagraphIndentModeRow(settings, notifier),
+        const SizedBox(height: 8),
+        if (settings.paragraphIndentMode != ParagraphIndentMode.emptyLine) ...[
+          _buildSliderRow(
+            'Шаг',
+            settings.paragraphFirstLineIndent / 64.0,
+            0.0,
+            1.0,
+            (v) => notifier.updateParagraphFirstLineIndent(v * 64.0),
+          ),
+        ],
         const SizedBox(height: 12),
         const _SectionTitle('Отступы'),
         _buildMarginRow(settings, notifier),
@@ -1297,6 +1301,20 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       OrientationLock.landscape: 'Альбомная',
     },
     onChanged: (v) => notifier.updateOrientationLock(v),
+  );
+
+  static Widget _buildParagraphIndentModeRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) => _enumChoiceChips(
+    current: settings.paragraphIndentMode,
+    labels: const {
+      ParagraphIndentMode.asInBook: 'Как в книге',
+      ParagraphIndentMode.firstLine: 'Первая строка',
+      ParagraphIndentMode.emptyLine: 'Пустая строка',
+      ParagraphIndentMode.custom: 'Свой',
+    },
+    onChanged: (v) => notifier.updateParagraphIndentMode(v),
   );
 
   static const _encodingOptions = <String?>[

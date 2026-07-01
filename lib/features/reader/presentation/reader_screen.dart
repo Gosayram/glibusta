@@ -52,6 +52,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _dragStartedInTopZone = false;
+  bool _dragStartedInLeftHalf = false;
+  double _dragStartFontSize = 0.0;
   String? _selectedText;
   int _batteryLevel = -1;
 
@@ -119,10 +121,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _handleVerticalDragStart(DragStartDetails details) {
     final settings = ref.read(readerSettingsProvider);
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    _dragStartedInTopZone = details.globalPosition.dy < screenHeight * 0.1;
+    final screenSize = MediaQuery.sizeOf(context);
+    _dragStartedInTopZone = details.globalPosition.dy < screenSize.height * 0.1;
+    _dragStartedInLeftHalf = details.globalPosition.dx < screenSize.width / 2;
     if (!settings.verticalSwipeBrightness) return;
     _dragStartBrightness = settings.brightness;
+    _dragStartFontSize = settings.fontSize;
     _dragStartY = details.globalPosition.dy;
   }
 
@@ -130,9 +134,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final settings = ref.read(readerSettingsProvider);
     if (!settings.verticalSwipeBrightness) return;
     final deltaY = details.globalPosition.dy - _dragStartY;
-    final brightnessChange = -deltaY / 500.0;
-    final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
-    ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+    if (_dragStartedInLeftHalf) {
+      final brightnessChange = -deltaY / 500.0;
+      final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
+      ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+    } else {
+      final fontChange = -deltaY / 200.0;
+      final newFontSize = (_dragStartFontSize + fontChange).clamp(10.0, 32.0);
+      ref.read(readerSettingsProvider.notifier).updateFontSize(newFontSize);
+    }
   }
 
   void _handleVerticalDragEnd(DragEndDetails details) {
@@ -812,6 +822,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.time => _formatTime(),
         InfoSlotMode.battery => _formatBattery(),
         InfoSlotMode.batteryAndTime => '${_formatBattery()} ${_formatTime()}',
+        InfoSlotMode.remainingChapter => _formatRemaining(
+          readerState.scrollProgress,
+          readerState.chapterCount - readerState.currentPosition.chapterIndex,
+        ),
+        InfoSlotMode.remainingBook => _formatRemaining(
+          readerState.currentPosition.chapterIndex / readerState.chapterCount.clamp(1, 9999),
+          readerState.chapterCount - readerState.currentPosition.chapterIndex,
+        ),
         InfoSlotMode.none => '',
       };
       return Text(
@@ -860,6 +878,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String _formatBattery() {
     if (_batteryLevel < 0) return '';
     return '$_batteryLevel%';
+  }
+
+  String _formatRemaining(double progress, int chaptersLeft) {
+    final remaining = (1.0 - progress).clamp(0.0, 1.0);
+    final percent = (remaining * 100).round();
+    if (chaptersLeft <= 1) return '$percent%';
+    return '$percent% · $chaptersLeft гл.';
   }
 
   void _cycleColorPreset(int direction) {

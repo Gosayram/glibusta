@@ -13,7 +13,12 @@ part of 'book_inspection_provider.dart';
 final bookFileInspectorProvider = BookFileInspectorProvider._();
 
 final class BookFileInspectorProvider
-    extends $FunctionalProvider<BookFileInspector, BookFileInspector, BookFileInspector>
+    extends
+        $FunctionalProvider<
+          BookFileInspector,
+          BookFileInspector,
+          BookFileInspector
+        >
     with $Provider<BookFileInspector> {
   BookFileInspectorProvider._()
     : super(
@@ -61,7 +66,9 @@ final class BookFileInspectionProvider
           BookFileInspectionResult,
           FutureOr<BookFileInspectionResult>
         >
-    with $FutureModifier<BookFileInspectionResult>, $FutureProvider<BookFileInspectionResult> {
+    with
+        $FutureModifier<BookFileInspectionResult>,
+        $FutureProvider<BookFileInspectionResult> {
   BookFileInspectionProvider._({
     required BookFileInspectionFamily super.from,
     required String super.argument,
@@ -106,7 +113,8 @@ final class BookFileInspectionProvider
   }
 }
 
-String _$bookFileInspectionHash() => r'4b3e587715ef50f44f2140bafb3c8bc143348030';
+String _$bookFileInspectionHash() =>
+    r'4b3e587715ef50f44f2140bafb3c8bc143348030';
 
 final class BookFileInspectionFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<BookFileInspectionResult>, String> {

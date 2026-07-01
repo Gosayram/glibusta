@@ -6,6 +6,8 @@ enum InfoSlotMode {
   battery,
   time,
   batteryAndTime,
+  remainingChapter,
+  remainingBook,
 }
 
 class ReadingInfoModel {

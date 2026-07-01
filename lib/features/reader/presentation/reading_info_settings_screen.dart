@@ -171,6 +171,10 @@ class _SlotPicker extends StatelessWidget {
         return 'Time';
       case InfoSlotMode.batteryAndTime:
         return 'Battery + Time';
+      case InfoSlotMode.remainingChapter:
+        return 'Remaining Chapter';
+      case InfoSlotMode.remainingBook:
+        return 'Remaining Book';
     }
   }
 }
@@ -255,6 +259,10 @@ class _PreviewWidget extends StatelessWidget {
             Text('14:30', style: style),
           ],
         );
+      case InfoSlotMode.remainingChapter:
+        return Text('58% · 3 гл.', style: style, textAlign: TextAlign.center);
+      case InfoSlotMode.remainingBook:
+        return Text('32% · 8 гл.', style: style, textAlign: TextAlign.center);
     }
   }
 }
