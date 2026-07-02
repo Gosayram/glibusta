@@ -9,9 +9,11 @@ import '../../../app/router.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
 import '../data/parsers/normalized_book.dart';
+import '../data/parsers/quiz_parser.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'highlighted_text.dart';
+import 'quiz_widget.dart';
 
 List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
   final spans = <InlineSpan>[];
@@ -1320,32 +1322,43 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           )
         : const SizedBox.shrink();
 
+    // LW-9.1: detect quiz groups and replace with QuizWidget
+    final builtWidgets = <Widget>[];
+    var skipUntil = -1;
+    for (var i = 0; i < chapter.blocks.length; i++) {
+      if (i <= skipUntil) continue;
+      var block = chapter.blocks[i];
+      var blockSkipped = false;
+      if (widget.blockTransformers != null) {
+        for (final t in widget.blockTransformers!) {
+          final transformed = t(block);
+          if (transformed == null) { blockSkipped = true; break; }
+          block = transformed;
+        }
+      }
+      if (blockSkipped) continue;
+      // Check if this block starts a quiz sequence
+      if (block.text.length > 10 && block.text.contains('?')) {
+        final endIdx = (i + 8).clamp(0, chapter.blocks.length);
+        final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
+        final quiz = QuizParser.tryParse(texts);
+        if (quiz != null && quiz.isNotEmpty) {
+          builtWidgets.add(QuizWidget(blocks: quiz, key: ValueKey('quiz-$chapterIndex-$i')));
+          skipUntil = i + texts.length - 1;
+          continue;
+        }
+      }
+      builtWidgets.add(_buildReaderBlock(
+        ctx, block,
+        isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
+        blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
+        chapterImages: chapterImages,
+      ));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        header,
-        ...chapter.blocks.asMap().entries.map((entry) {
-          var block = entry.value;
-          if (widget.blockTransformers != null) {
-            for (final t in widget.blockTransformers!) {
-              final transformed = t(block);
-              if (transformed == null) return const SizedBox.shrink();
-              block = transformed;
-            }
-          }
-          return _buildReaderBlock(
-            ctx,
-            block,
-            isAsInBook
-                ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
-                : baseAlign,
-            blockHighlights: chapterHighlights
-                ?.where((TextHighlight h) => h.blockIndex == entry.key)
-                .toList(),
-            chapterImages: chapterImages,
-          );
-        }),
-      ],
+      children: [header, ...builtWidgets],
     );
   }
 

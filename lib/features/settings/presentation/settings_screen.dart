@@ -18,7 +18,9 @@ import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/backup_service.dart';
+import '../../../core/services/calibre_client.dart';
 import '../../../core/services/content_safety_service.dart';
+import '../../../core/services/webdav_client.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
 import '../../../core/storage/storage_mode.dart';
 import '../../../core/storage/storage_settings_provider.dart';
@@ -206,6 +208,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: l10n.settingsImport,
             subtitle: l10n.settingsImportSub,
             onTap: () => _importData(context),
+          ),
+
+          const Divider(),
+          const _SectionHeader(title: 'Синхронизация'),
+          _SettingsTile(
+            icon: Icons.cloud_sync,
+            title: 'WebDAV',
+            subtitle: 'Настройка WebDAV сервера для синхронизации',
+            onTap: () => _showWebDavDialog(context),
+          ),
+          _SettingsTile(
+            icon: Icons.library_books,
+            title: 'Calibre',
+            subtitle: 'Подключение к Calibre Content Server',
+            onTap: () => _showCalibreDialog(context),
           ),
 
           const Divider(),
@@ -708,6 +725,131 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
+  }
+
+  // MD-13.1: WebDAV sync settings dialog
+  void _showWebDavDialog(BuildContext context) {
+    final urlCtl = TextEditingController();
+    final userCtl = TextEditingController();
+    final passCtl = TextEditingController();
+    var connected = false;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setSt) => AlertDialog(
+            title: const Text('WebDAV'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: urlCtl,
+                    decoration: const InputDecoration(
+                      labelText: 'Server URL',
+                      hintText: 'https://example.com/dav/',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: userCtl,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: passCtl,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Password'),
+                  ),
+                  const SizedBox(height: 12),
+                  if (connected)
+                    const Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 18),
+                        SizedBox(width: 8),
+                        Text('Connected ✓', style: TextStyle(color: Colors.green)),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  final url = urlCtl.text.trim();
+                  if (url.isEmpty) return;
+                  final client = WebDavClient(baseUrl: url);
+                  final ok = await client.ping();
+                  setSt(() => connected = ok);
+                },
+                child: const Text('Test Connection'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // MD-13.2: Calibre Content Server settings dialog
+  void _showCalibreDialog(BuildContext context) {
+    final urlCtl = TextEditingController();
+    var connected = false;
+
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setSt) => AlertDialog(
+            title: const Text('Calibre Content Server'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: urlCtl,
+                    decoration: const InputDecoration(
+                      labelText: 'Server URL',
+                      hintText: 'http://192.168.1.100:8080',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (connected)
+                    const Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.green, size: 18),
+                        SizedBox(width: 8),
+                        Text('Connected ✓', style: TextStyle(color: Colors.green)),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  final url = urlCtl.text.trim();
+                  if (url.isEmpty) return;
+                  final client = CalibreClient(baseUrl: url);
+                  final ok = await client.ping();
+                  setSt(() => connected = ok);
+                },
+                child: const Text('Test Connection'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
