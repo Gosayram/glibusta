@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' show TextAlign;
 
+import 'smil_parser.dart';
+
 class NormalizedBook {
   final String id;
   final String title;
@@ -115,17 +117,31 @@ class ReaderChapter {
   final int index;
   final String title;
   final List<ReaderBlock> blocks;
+  final List<SmilEntry>? smilEntries;
 
   const ReaderChapter({
     required this.index,
     required this.title,
     required this.blocks,
+    this.smilEntries,
   });
 
   Map<String, dynamic> toJson() => {
     'index': index,
     'title': title,
     'blocks': blocks.map((b) => b.toJson()).toList(),
+    if (smilEntries != null && smilEntries!.isNotEmpty)
+      'smil': smilEntries!
+          .map(
+            (e) => {
+              'textRef': e.textRef,
+              if (e.paragraphId != null) 'paragraphId': e.paragraphId,
+              'audioSrc': e.audioSrc,
+              'clipBeginMs': e.clipBegin.inMilliseconds,
+              'clipEndMs': e.clipEnd.inMilliseconds,
+            },
+          )
+          .toList(),
   };
 
   factory ReaderChapter.fromJson(Map<String, dynamic> json) => ReaderChapter(
@@ -136,6 +152,16 @@ class ReaderChapter {
             ?.map((b) => ReaderBlock.fromJson(b as Map<String, dynamic>))
             .toList() ??
         [],
+    smilEntries: (json['smil'] as List<dynamic>?)?.map((s) {
+      final m = s as Map<String, dynamic>;
+      return SmilEntry(
+        textRef: m['textRef'] as String,
+        paragraphId: m['paragraphId'] as String?,
+        audioSrc: m['audioSrc'] as String,
+        clipBegin: Duration(milliseconds: (m['clipBeginMs'] as num).toInt()),
+        clipEnd: Duration(milliseconds: (m['clipEndMs'] as num).toInt()),
+      );
+    }).toList(),
   );
 
   static final _pageNumberRegExp = RegExp(
@@ -158,7 +184,7 @@ class ReaderChapter {
       }
       cleaned.add(block);
     }
-    return ReaderChapter(index: index, title: title, blocks: cleaned);
+    return ReaderChapter(index: index, title: title, blocks: cleaned, smilEntries: smilEntries);
   }
 }
 

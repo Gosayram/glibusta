@@ -24,6 +24,7 @@ import '../data/reader_colors.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'karaoke_overlay.dart';
 import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
@@ -844,7 +845,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     onBookmark: () => _ctrl.addBookmark(),
                     onMore: () => _showQuickSettings(context),
                     onBookInfo: () => _showBookStats(context, readerState),
-                    onKaraoke: () => _showKaraokeUnavailable(context),
+                    onKaraoke: () {
+                      final chapter =
+                          readerState.loadedChapters[readerState.currentPosition.chapterIndex];
+                      if (chapter?.smilEntries != null && chapter!.smilEntries!.isNotEmpty) {
+                        unawaited(_startKaraoke(context, readerState, chapter));
+                      } else {
+                        _showKaraokeUnavailable(context);
+                      }
+                    },
                   ),
                 ),
               );
@@ -1274,6 +1283,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _ctrl.onBottomSheetClose();
         _gestureCoordinator.onBottomSheetClosed();
       }),
+    );
+  }
+
+  /// LW-6.1: Open karaoke overlay with SMIL entries for current chapter.
+  Future<void> _startKaraoke(
+    BuildContext context,
+    ReaderState readerState,
+    ReaderChapter chapter,
+  ) async {
+    final entries = chapter.smilEntries!;
+    final blocks = chapter.blocks.map((b) => b.text).toList();
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => KaraokeOverlay(entries: entries, chapterBlocks: blocks),
     );
   }
 

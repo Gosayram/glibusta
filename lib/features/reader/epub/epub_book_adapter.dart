@@ -77,6 +77,7 @@ class EpubBookAdapter {
       index: index,
       title: chapter.title,
       blocks: blocks,
+      smilEntries: chapter.smilEntries,
     );
   }
 
