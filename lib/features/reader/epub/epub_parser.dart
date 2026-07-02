@@ -34,17 +34,18 @@ final class CustomEpubParser {
       final resource = opf.resources[spineItem.idref];
       if (resource == null || resource.type != EpubResourceType.xhtml) continue;
       final htmlText = epub.readText(resource.fullPath);
-      final blocks = await htmlParser.parseChapter(
+      final result = await htmlParser.parseChapter(
         chapterPath: resource.fullPath,
         htmlText: htmlText,
       );
-      final title = _extractTitle(blocks);
+      final title = _extractTitle(result.blocks);
       chapters.add(
         EpubChapter(
           id: resource.id,
           href: resource.href,
           title: title,
-          blocks: blocks,
+          blocks: result.blocks,
+          styles: result.styles,
           linear: spineItem.linear,
         ),
       );

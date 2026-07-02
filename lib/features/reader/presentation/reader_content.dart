@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../app/router.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
@@ -194,6 +195,9 @@ double _hangingPunctuationOffset(String text, double fontSize) {
   return 0;
 }
 
+// LW-10.2: current chapter for per-chapter CSS override
+int? _currentChapterForCss;
+
 TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
   final fw = (s.fontWeightDelta > 0.33)
       ? FontWeight.w600
@@ -203,7 +207,7 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       ? FontWeight.w300
       : FontWeight.w400;
   // LW-10.1: apply custom CSS overrides from user
-  final css = _parseCustomCss(s.customCss);
+  final css = _parseCustomCss(s.customCss, chapterIndex: _currentChapterForCss);
   return TextStyle(
     fontFamily: s.font.fontFamily,
     fontSize: css['font-size'] ?? s.fontSize,
@@ -577,6 +581,50 @@ Widget _readerHighlightedText(
   );
 }
 
+/// HG-17.2: convert CSS color string to Flutter Color.
+/// Supports hex (#fff, #ffffff), named colors (red, blue), rgb(r,g,b).
+Color? _cssColorFromString(String raw) {
+  final css = raw.trim();
+  if (css.startsWith('#')) {
+    final hex = css.substring(1);
+    final fullHex = hex.length == 3 ? hex.split('').map((c) => '$c$c').join() : hex;
+    final v = int.tryParse(fullHex, radix: 16);
+    if (v == null) return null;
+    return Color(0xFF000000 | v);
+  }
+  if (css.startsWith('rgb(') && css.endsWith(')')) {
+    final parts = css.substring(4, css.length - 1).split(',');
+    if (parts.length < 3) return null;
+    final r = int.tryParse(parts[0].trim());
+    final g = int.tryParse(parts[1].trim());
+    final b = int.tryParse(parts[2].trim());
+    if (r == null || g == null || b == null) return null;
+    return Color.fromARGB(255, r, g, b);
+  }
+  // ponytail: basic named colors
+  return switch (css.toLowerCase()) {
+    'red' => Colors.red,
+    'blue' => Colors.blue,
+    'green' => Colors.green,
+    'black' => Colors.black,
+    'white' => Colors.white,
+    'gray' || 'grey' => Colors.grey,
+    'yellow' => Colors.yellow,
+    'orange' => Colors.orange,
+    'purple' => Colors.purple,
+    'pink' => Colors.pink,
+    'brown' => Colors.brown,
+    'navy' => const Color(0xFF000080),
+    'darkred' => const Color(0xFF8B0000),
+    'darkblue' => const Color(0xFF00008B),
+    'darkgreen' => const Color(0xFF006400),
+    'maroon' => const Color(0xFF800000),
+    'teal' => const Color(0xFF008080),
+    'olive' => const Color(0xFF808000),
+    _ => null,
+  };
+}
+
 List<InlineSpan> _readerRichTextSpans(
   List<RichSpan> richSpans,
   TextStyle baseStyle,
@@ -594,6 +642,10 @@ List<InlineSpan> _readerRichTextSpans(
     if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
     if (span.href != null) {
       spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
+    }
+    if (span.color != null) {
+      final cssColor = _cssColorFromString(span.color!);
+      if (cssColor != null) spanStyle = spanStyle.copyWith(color: cssColor);
     }
     if (span.superscript) {
       final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
@@ -710,14 +762,25 @@ Widget _readerImageWidget(
     }
   }
   if (isFileUri || isPlainPath) {
+    final path = isFileUri ? uri.path : imageUrl;
+    final isSvg = path.toLowerCase().endsWith('.svg');
     return wrap(
       InteractiveViewer(
         maxScale: 4.0,
-        child: Image.file(
-          File(isFileUri ? uri.path : imageUrl),
-          fit: BoxFit.contain,
-          errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
-        ),
+        child: isSvg
+            ? SvgPicture.file(
+                File(path),
+                placeholderBuilder: (_) => const SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              )
+            : Image.file(
+                File(path),
+                fit: BoxFit.contain,
+                errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
+              ),
       ),
     );
   }
@@ -1230,6 +1293,8 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
+    // LW-10.2: set current chapter for per-chapter CSS override
+    _currentChapterForCss = chapterIndex;
     final baseAlign = _resolveTextAlign(settings.textAlign);
     final isAsInBook = settings.textAlign == ReaderTextAlign.asInBook;
     final ctx = _ctx(settings);
@@ -1774,6 +1839,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   Widget _buildPaginatedPage(int index, BuildContext context) {
     final page = _pages[index];
     final settings = widget.settings;
+    // LW-10.2: set current chapter for per-chapter CSS
+    _currentChapterForCss = page.chapterIndex;
     final style = _getReaderStyle(settings);
 
     if (page.isCover) {

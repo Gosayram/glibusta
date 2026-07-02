@@ -16,14 +16,55 @@ final class EpubHtmlParser {
   final EpubImageStore imageStore;
   final EpubArchive epub;
 
-  Future<List<ReaderBlock>> parseChapter({
+  Future<({List<ReaderBlock> blocks, Map<String, Map<String, String>>? styles})> parseChapter({
     required String chapterPath,
     required String htmlText,
   }) async {
     final doc = XmlDocument.parse(htmlText);
+    final styles = _extractCss(doc);
     final body = _findBody(doc);
-    if (body == null) return const [];
-    return _processChildren(body, chapterPath);
+    if (body == null) return (blocks: const <ReaderBlock>[], styles: styles);
+    final blocks = await _processChildren(body, chapterPath);
+    return (blocks: blocks, styles: styles);
+  }
+
+  /// MD-1.1: Extract CSS rules from <style> tags in the document.
+  /// ponytail: simple rule parser — tag, .class, tag.class selectors only.
+  Map<String, Map<String, String>>? _extractCss(XmlDocument doc) {
+    Map<String, Map<String, String>>? rules;
+    for (final style in doc.findAllElements('style')) {
+      final text = style.innerText.trim();
+      if (text.isEmpty) continue;
+      for (final raw in text.split('}')) {
+        final trimmed = raw.trim();
+        if (trimmed.isEmpty) continue;
+        final brace = trimmed.indexOf('{');
+        if (brace < 0) continue;
+        final selector = trimmed.substring(0, brace).trim();
+        final body = trimmed.substring(brace + 1).trim();
+        if (selector.isEmpty || body.isEmpty) continue;
+        // Skip descendant selectors, pseudo-classes, @rules
+        if (selector.contains(' ') || selector.contains(':')) continue;
+        (rules ??= {})[selector] = (rules[selector] ?? {})..addAll(_parseCssBody(body));
+      }
+    }
+    return rules;
+  }
+
+  Map<String, String> _parseCssBody(String body) {
+    final props = <String, String>{};
+    for (final decl in body.split(';')) {
+      final d = decl.trim();
+      if (d.isEmpty) continue;
+      final colon = d.indexOf(':');
+      if (colon < 0) continue;
+      final name = d.substring(0, colon).trim();
+      final value = d.substring(colon + 1).trim();
+      if (name.isNotEmpty && value.isNotEmpty) {
+        props[name] = value;
+      }
+    }
+    return props;
   }
 
   XmlElement? _findBody(XmlDocument doc) {
@@ -135,6 +176,21 @@ final class EpubHtmlParser {
     return spans;
   }
 
+  /// HG-17.2: extract CSS color value from inline style attribute.
+  String? _styleColor(String? style) {
+    if (style == null) return null;
+    final lower = style.toLowerCase();
+    final idx = lower.indexOf('color:');
+    if (idx < 0) return null;
+    // Skip if it's background-color
+    if (idx > 4 && lower.substring(idx - 11, idx) == 'background') return null;
+    var val = style.substring(idx + 6).trim();
+    final end = val.indexOf(';');
+    if (end >= 0) val = val.substring(0, end);
+    val = val.trim();
+    return val.isEmpty ? null : val;
+  }
+
   void _walkInline(
     XmlElement el,
     List<TextSpan> spans,
@@ -143,7 +199,10 @@ final class EpubHtmlParser {
     required bool italic,
     required bool superscript,
     String? href,
+    String? color,
   }) {
+    // HG-17.2: inherit parent color, override if this element has its own
+    color ??= _styleColor(el.getAttribute('style'));
     for (final node in el.children) {
       if (node is XmlText) {
         final text = node.value;
@@ -155,6 +214,7 @@ final class EpubHtmlParser {
               italic: italic,
               superscript: superscript,
               href: href,
+              color: color,
             ),
           );
         }
@@ -189,9 +249,8 @@ final class EpubHtmlParser {
             break;
         }
 
-        final xmlChildren = node.children;
-        if (tag == 'a' && xmlChildren.length == 1 && xmlChildren.first is XmlText) {
-          final text = (xmlChildren.first as XmlText).value;
+        if (tag == 'a' && node.children.length == 1 && node.children.first is XmlText) {
+          final text = (node.children.first as XmlText).value;
           if (text.isNotEmpty) {
             spans.add(
               TextSpan(
@@ -200,6 +259,7 @@ final class EpubHtmlParser {
                 italic: newItalic,
                 superscript: newSuperscript,
                 href: newHref,
+                color: color,
               ),
             );
             continue;
@@ -214,6 +274,7 @@ final class EpubHtmlParser {
           italic: newItalic,
           superscript: newSuperscript,
           href: newHref,
+          color: color,
         );
       }
     }

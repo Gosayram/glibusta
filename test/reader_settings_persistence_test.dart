@@ -20,7 +20,7 @@ void main() {
         expect(settings.lineHeight, 1.6);
         expect(settings.margin, 20.0);
         expect(settings.font, ReaderFont.literata);
-        expect(settings.paragraphSpacing, 12.0);
+        expect(settings.paragraphSpacing, 20.0);
         expect(settings.letterSpacing, 0.0);
         expect(settings.textAlign, ReaderTextAlign.justify);
         expect(settings.autoThemeMode, AutoThemeMode.off);
@@ -48,7 +48,7 @@ void main() {
         expect(loaded.lineHeight, 1.7);
         expect(loaded.margin, 24.0);
         expect(loaded.font, ReaderFont.literata);
-        expect(loaded.paragraphSpacing, 12.0);
+        expect(loaded.paragraphSpacing, 20.0);
         expect(loaded.letterSpacing, 0.5);
         expect(loaded.textAlign, ReaderTextAlign.justify);
         expect(loaded.autoThemeMode, AutoThemeMode.sunset);

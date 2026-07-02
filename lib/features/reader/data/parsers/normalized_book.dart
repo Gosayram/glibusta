@@ -215,9 +215,12 @@ class ReaderBlock {
     if (imageAlt != null) 'imageAlt': imageAlt,
     if (imageCaption != null) 'imageCaption': imageCaption,
     if (textIndent != null) 'textIndent': textIndent,
-    if (textAlign != null) 'textAlign': textAlign!.name,
+    if (textAlign != null || whiteSpaceMode != null)
+      'textAlign': [
+        if (textAlign != null) textAlign!.name,
+        if (whiteSpaceMode != null) 'ws:$whiteSpaceMode',
+      ].join('|'),
     if (noteId != null) 'noteId': noteId,
-    if (whiteSpaceMode != null) 'textAlign': 'ws:$whiteSpaceMode',
   };
 
   // CRT-21.1: normalize whitespace before typography processing
@@ -348,20 +351,72 @@ class ReaderBlock {
   );
 }
 
+// Parse pipe-separated CSS properties from text_align field.
+// Format: "left|ws:pre|fg:#333|lh:1.5|fw:700|fs:italic|bg:#fff"
+List<String> _splitCssProps(String raw) => raw.split('|');
+
+String? _extractProp(String rawData, String prefix) {
+  for (final part in _splitCssProps(rawData)) {
+    if (part.startsWith('$prefix:')) return part.substring(prefix.length + 1);
+  }
+  return null;
+}
+
 // MD-1.7: extract white-space mode from raw text_align value
 String? _parseWhiteSpaceMode(dynamic raw) {
   if (raw is! String) return null;
-  if (raw.startsWith('ws:')) return raw.substring(3);
-  return null;
+  return _extractProp(raw, 'ws');
 }
 
 TextAlign? _parseTextAlign(dynamic raw) {
   if (raw == null) return null;
-  if (raw is String && raw.startsWith('ws:')) return null; // white-space directive, not alignment
+  final r = raw as String;
+  // Check for pipe-separated format first
+  if (r.contains('|')) {
+    for (final part in _splitCssProps(r)) {
+      if (!part.contains(':')) {
+        return TextAlign.values.firstWhere(
+          (e) => e.name == part,
+          orElse: () => TextAlign.left,
+        );
+      }
+    }
+    return null;
+  }
+  // Simple format: just a name or ws: prefix
+  if (r.startsWith('ws:')) return null;
   return TextAlign.values.firstWhere(
-    (e) => e.name == raw,
+    (e) => e.name == r,
     orElse: () => TextAlign.left,
   );
+}
+
+/// Extract CSS color (fg: prefix) from raw text_align value.
+String? parseCssColor(dynamic raw) {
+  if (raw is! String) return null;
+  return _extractProp(raw, 'fg');
+}
+
+/// Extract CSS background-color (bg: prefix) from raw text_align value.
+String? parseCssBgColor(dynamic raw) {
+  if (raw is! String) return null;
+  return _extractProp(raw, 'bg');
+}
+
+/// Extract CSS line-height (lh: prefix) from raw text_align value.
+double? parseCssLineHeight(dynamic raw) {
+  if (raw is! String) return null;
+  final v = _extractProp(raw, 'lh');
+  if (v == null) return null;
+  return double.tryParse(v);
+}
+
+/// Extract CSS font-weight (fw: prefix) from raw text_align value.
+int? parseCssFontWeight(dynamic raw) {
+  if (raw is! String) return null;
+  final v = _extractProp(raw, 'fw');
+  if (v == null) return null;
+  return int.tryParse(v);
 }
 
 /// Signature for a block transformer hook.
@@ -376,6 +431,7 @@ class RichSpan {
   final bool superscript;
   final bool lineBreak;
   final String? href;
+  final String? color;
 
   const RichSpan({
     required this.text,
@@ -384,6 +440,7 @@ class RichSpan {
     this.superscript = false,
     this.lineBreak = false,
     this.href,
+    this.color,
   });
 
   Map<String, dynamic> toJson() => {
@@ -393,6 +450,7 @@ class RichSpan {
     if (superscript) 'superscript': true,
     if (lineBreak) 'lineBreak': true,
     if (href != null) 'href': href,
+    if (color != null) 'color': color,
   };
 
   factory RichSpan.fromJson(Map<String, dynamic> json) => RichSpan(
@@ -402,6 +460,7 @@ class RichSpan {
     superscript: json['superscript'] as bool? ?? false,
     lineBreak: json['lineBreak'] as bool? ?? false,
     href: json['href'] as String?,
+    color: json['color'] as String?,
   );
 }
 

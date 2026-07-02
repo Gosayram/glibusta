@@ -1,3 +1,5 @@
+import 'dart:ui' show TextAlign;
+
 import '../data/parsers/normalized_book.dart';
 import 'epub_models.dart' as epub;
 
@@ -23,17 +25,52 @@ class EpubBookAdapter {
   }
 
   ReaderChapter _toChapter(epub.EpubChapter chapter, int index) {
+    final styles = chapter.styles;
+    // MD-1.1: Extract text-indent/text-align from p selector, apply to all ParagraphBlocks
+    final double? pIndent;
+    final String? pAlign;
+    if (styles != null && styles.containsKey('p')) {
+      final pStyle = styles['p']!;
+      pIndent = _parsePx(pStyle['text-indent']);
+      pAlign = pStyle['text-align'];
+    } else {
+      pIndent = null;
+      pAlign = null;
+    }
+
+    ReaderBlock applyCss(epub.ReaderBlock block, int idx) {
+      final mapped = _toBlock(block, idx);
+      if (mapped == null) return ReaderBlock(index: idx, text: '');
+      if (block is epub.ParagraphBlock && (pIndent != null || pAlign != null)) {
+        final align = pAlign != null
+            ? (TextAlign.values.firstWhere(
+                (e) => e.name == pAlign,
+                orElse: () => TextAlign.left,
+              ))
+            : null;
+        return ReaderBlock(
+          index: mapped.index,
+          text: mapped.text,
+          type: mapped.type,
+          richSpans: mapped.richSpans,
+          textIndent: pIndent ?? mapped.textIndent,
+          textAlign: align,
+        );
+      }
+      return mapped;
+    }
+
     final blocks = <ReaderBlock>[];
     for (var i = 0; i < chapter.blocks.length; i++) {
       final block = chapter.blocks[i];
       if (block is epub.SectionBlock) {
         for (var j = 0; j < block.children.length; j++) {
-          final child = _toBlock(block.children[j], j);
-          if (child != null) blocks.add(child);
+          final child = applyCss(block.children[j], j);
+          if (child.text.isNotEmpty || child.imageUrl != null) blocks.add(child);
         }
       } else {
-        final mapped = _toBlock(block, i);
-        if (mapped != null) blocks.add(mapped);
+        final mapped = applyCss(block, i);
+        if (mapped.text.isNotEmpty || mapped.imageUrl != null) blocks.add(mapped);
       }
     }
     return ReaderChapter(
@@ -92,9 +129,21 @@ class EpubBookAdapter {
     };
   }
 
+  /// MD-1.2: parse CSS px/em length to double. ponytail: only px and em.
+  static double? _parsePx(String? val) {
+    if (val == null) return null;
+    final v = val.trim();
+    if (v.endsWith('px')) return double.tryParse(v.substring(0, v.length - 2).trim());
+    if (v.endsWith('em')) {
+      final n = double.tryParse(v.substring(0, v.length - 2).trim());
+      return n != null ? n * 16.0 : null;
+    }
+    return double.tryParse(v);
+  }
+
   List<RichSpan>? _toRichSpans(List<epub.TextSpan> spans) {
     final hasFormatting = spans.any(
-      (s) => s.bold || s.italic || s.superscript || s.href != null,
+      (s) => s.bold || s.italic || s.superscript || s.href != null || s.color != null,
     );
     if (!hasFormatting) return null;
     return spans
@@ -105,6 +154,7 @@ class EpubBookAdapter {
             italic: s.italic,
             superscript: s.superscript,
             href: s.href,
+            color: s.color,
           ),
         )
         .toList();

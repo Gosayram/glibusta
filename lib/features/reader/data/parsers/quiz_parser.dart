@@ -26,13 +26,20 @@ class QuizParser {
       if (trimmed.isEmpty) continue;
 
       // Detect question patterns:
-      // "1. What is...?" or "Q: What is...?" or "Что такое...?"
+      // "1. What is...?" or "Q: What is...?" or "Что такое...?" or "Какой...?"
       final questionMatch = RegExp(
-        r'^(?:\d+[\.\)]\s*|Q:\s*|Вопрос\s*\d*[:\.]?\s*)(.+)\?$',
+        r'^(?:\d+[\.\)]\s*|Q:\s*|Вопрос\s*\d*[:\.]?\s*)?(.+?)\?+$',
         caseSensitive: false,
       ).firstMatch(trimmed);
 
-      if (questionMatch != null) {
+      // Only treat as question if it has a prefix OR is short enough
+      final hasPrefix = RegExp(
+        r'^(?:\d+[\.\)]\s*|Q:\s*|Вопрос)',
+        caseSensitive: false,
+      ).hasMatch(trimmed);
+      final isShortQuestion = trimmed.length < 200;
+
+      if (questionMatch != null && (hasPrefix || isShortQuestion)) {
         // Save previous question if exists
         if (currentQuestion != null && currentOptions.isNotEmpty) {
           quizzes.add(

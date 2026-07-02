@@ -410,8 +410,8 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
                                 let body = &line[body_start + 1..body_end];
                                 let selector = if selector.starts_with('.') {
                                     selector
-                                } else if !selector.contains(' ') && !selector.contains('#') {
-                                    // Pure tag selector — prefix with "tag:" for disambiguation
+                                } else if !selector.contains(' ') && !selector.contains(':') {
+                                    // Tag selector (e.g. "p") or compound (e.g. "p.class", "div#id")
                                     let tag = selector.trim();
                                     if !tag.is_empty() {
                                         selector
@@ -419,8 +419,8 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
                                         continue;
                                     }
                                 } else {
-                                    // Compound/other selectors: skip for now
-                                    // ponytail: no compound selectors, no pseudo-classes, no @rules
+                                    // Skip pseudo-classes, descendant selectors, @rules
+                                    // ponytail: no descendant selectors, no pseudo-classes
                                     continue;
                                 };
                                 if !selector.is_empty() {
@@ -583,8 +583,14 @@ fn apply_css_props(
     class: Option<&str>,
     css: &HashMap<String, HashMap<String, String>>,
 ) {
-    // MD-1.1: cascade by specificity — tag < class
-    // Tag selector (lowest specificity)
+    // MD-1.1: CSS inheritance — body properties apply to all blocks first (lowest priority)
+    if tag != "body" {
+        if let Some(props) = css.get("body") {
+            apply_props(block, props);
+        }
+    }
+    // MD-1.1: cascade by specificity — tag < class < compound
+    // Tag selector
     if let Some(props) = css.get(tag) {
         apply_props(block, props);
     }
@@ -608,7 +614,7 @@ fn apply_css_props(
     }
 }
 
-/// ponytail: text-indent, text-align, margin-left, page-break-before.
+/// ponytail: text-indent, text-align, white-space, margin-left, line-height, font-weight, font-style, color.
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     if let Some(indent) = props.get("text-indent") {
         if let Some(v) = parse_css_length(indent) {
@@ -618,11 +624,16 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
     if let Some(align) = props.get("text-align") {
         block.text_align = Some(align.clone());
     }
-    // MD-1.7: white-space: pre/pre-wrap — store as special text_align value
+    // MD-1.7: white-space: pre/pre-wrap — store as special value with ws: prefix
     if let Some(ws) = props.get("white-space") {
         let v = ws.trim();
         if v == "pre" || v == "pre-wrap" || v == "nowrap" {
-            block.text_align = Some(format!("ws:{v}"));
+            let ws_val = format!("ws:{v}");
+            let new_align = match block.text_align.take() {
+                Some(existing) => format!("{existing}|{ws_val}"),
+                None => ws_val,
+            };
+            block.text_align = Some(new_align);
         }
     }
     // MD-1.2: margin-left as text-indent fallback for indented blocks
@@ -631,6 +642,25 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
             if let Some(v) = parse_css_length(ml) {
                 block.text_indent = Some(v);
             }
+        }
+    }
+    // Store extra CSS properties as pipe-separated prefixes in text_align
+    // Format: "left|fg:#333|lh:1.5|fw:700|fs:italic"
+    let extra: &[(&str, &str)] = &[
+        ("color", "fg"),
+        ("background-color", "bg"),
+        ("line-height", "lh"),
+        ("font-weight", "fw"),
+        ("font-style", "fs"),
+    ];
+    for &(css_prop, prefix) in extra {
+        if let Some(val) = props.get(css_prop) {
+            let stored = format!("{prefix}:{}", val.trim());
+            let new_align = match block.text_align.take() {
+                Some(existing) => format!("{existing}|{stored}"),
+                None => stored,
+            };
+            block.text_align = Some(new_align);
         }
     }
 }
