@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 enum BlockType {
   paragraph,
@@ -34,6 +34,32 @@ enum BlockType {
       RustLib.instance.api.crateApiModelsBlockTypeFromStr(s: s);
 }
 
+/// Lightweight book metadata — no chapters, no blocks.
+/// Used by extract_metadata() for fast scanning.
+class BookMeta {
+  final String title;
+  final List<String> authors;
+  final String? description;
+
+  const BookMeta({
+    required this.title,
+    required this.authors,
+    this.description,
+  });
+
+  @override
+  int get hashCode => title.hashCode ^ authors.hashCode ^ description.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookMeta &&
+          runtimeType == other.runtimeType &&
+          title == other.title &&
+          authors == other.authors &&
+          description == other.description;
+}
+
 class NormalizedBook {
   final String id;
   final String title;
@@ -56,9 +82,10 @@ class NormalizedBook {
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 
-  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-    that: this,
-  );
+  Future<String> toJsonString() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+        that: this,
+      );
 
   @override
   int get hashCode =>

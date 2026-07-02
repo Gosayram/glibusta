@@ -9,7 +9,10 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
-// These functions are ignored because they are not marked as `pub`: `detect_encoding_inner`
+/// Extract blocks from HTML content using html5ever + scraper.
+/// Returns a JSON-serialized list of ReaderBlock for Dart consumption.
+Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
+    RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);
 
 Future<NormalizedBook> parseFb2({
   required List<int> bytes,
@@ -88,4 +91,38 @@ Future<NormalizedBook> parseBook({
   bytes: bytes,
   format: format,
   forcedEncoding: forcedEncoding,
+);
+
+/// Extract metadata (title, authors, description) without full chapter parsing.
+/// Faster than parse_book when only metadata is needed.
+Future<BookMeta> extractMetadata({
+  required List<int> bytes,
+  required String format,
+  String? forcedEncoding,
+}) => RustLib.instance.api.crateApiApiExtractMetadata(
+  bytes: bytes,
+  format: format,
+  forcedEncoding: forcedEncoding,
+);
+
+/// Extract cover image bytes (if available). Returns empty Vec if no cover.
+Future<Uint8List> extractCover({
+  required List<int> bytes,
+  required String format,
+  String? forcedEncoding,
+}) => RustLib.instance.api.crateApiApiExtractCover(
+  bytes: bytes,
+  format: format,
+  forcedEncoding: forcedEncoding,
+);
+
+/// Stub when pdf feature is disabled.
+Future<Uint8List> renderPdfThumbnail({
+  required String path,
+  required int pageIndex,
+  required int width,
+}) => RustLib.instance.api.crateApiApiRenderPdfThumbnail(
+  path: path,
+  pageIndex: pageIndex,
+  width: width,
 );

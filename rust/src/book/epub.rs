@@ -394,84 +394,62 @@ fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {
     format!("data:{};base64,{}", mime, STANDARD.encode(bytes))
 }
 
-/// Collect CSS class→properties map from inline `<style>` elements in XHTML.
-/// CRT-1.11: parses simple `.class { name: value; }` rules.
-/// ponytail: no cascade, no inheritance, no `@` rules, no compound selectors.
-/// Upgrade to a full CSS engine if EPUB styling quality matters.
+/// Collect CSS class→properties map from `<style>` elements in XHTML.
+/// Uses html5ever (via scraper) for robust extraction from malformed HTML.
 fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
+    let mut all_style = String::new();
+    let doc = scraper::Html::parse_document(text);
+    let sel = scraper::Selector::parse("style").unwrap();
+    for style in doc.select(&sel) {
+        if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
+            all_style.push_str(content);
+            all_style.push('\n');
+        }
+    }
+    if all_style.is_empty() {
+        return HashMap::new();
+    }
+    parse_css_rules(&all_style)
+}
+
+/// Parse CSS rule blocks from concatenated style content.
+fn parse_css_rules(css: &str) -> HashMap<String, HashMap<String, String>> {
     let mut rules: HashMap<String, HashMap<String, String>> = HashMap::new();
-    let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
-
-    let mut in_style = false;
-    let mut style_content = String::new();
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Eof) => break,
-            Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "style" {
-                    in_style = true;
-                    style_content.clear();
-                }
-            }
-            Ok(Event::Text(ref e)) if in_style => {
-                style_content.push_str(&e.xml10_content().unwrap_or_default());
-            }
-            Ok(Event::CData(ref e)) if in_style => {
-                style_content.push_str(&e.xml10_content().unwrap_or_default());
-            }
-            Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "style" && in_style {
-                    in_style = false;
-                    // LW-1.4: extract rules from @media blocks before line parsing
-                    let expanded = expand_media_queries(&style_content);
-                    for line in expanded.lines() {
-                        let line = line.trim();
-                        // Match: .className { ... }
-                        if let Some(body_start) = line.find('{') {
-                            if let Some(body_end) = line.rfind('}') {
-                                let selector = &line[..body_start].trim();
-                                let body = &line[body_start + 1..body_end];
-                                let selector = if selector.starts_with('.') {
-                                    selector
-                                } else if !selector.contains(' ') && !selector.contains(':') {
-                                    // Tag selector (e.g. "p") or compound (e.g. "p.class", "div#id")
-                                    let tag = selector.trim();
-                                    if !tag.is_empty() {
-                                        selector
-                                    } else {
-                                        continue;
-                                    }
-                                } else {
-                                    // Skip pseudo-classes, descendant selectors, @rules
-                                    // ponytail: no descendant selectors, no pseudo-classes
-                                    continue;
-                                };
-                                if !selector.is_empty() {
-                                    let props = rules.entry(selector.to_string()).or_default();
-                                    for prop in body.split(';') {
-                                        let prop = prop.trim();
-                                        if let Some(colon) = prop.find(':') {
-                                            let name = prop[..colon].trim().to_string();
-                                            let value = prop[colon + 1..].trim().to_string();
-                                            if !name.is_empty() && !value.is_empty() {
-                                                props.insert(name, value);
-                                            }
-                                        }
-                                    }
-                                }
+    let expanded = expand_media_queries(css);
+    for line in expanded.lines() {
+        let line = line.trim();
+        if let Some(body_start) = line.find('{') {
+            if let Some(body_end) = line.rfind('}') {
+                let selector = &line[..body_start].trim();
+                let body = &line[body_start + 1..body_end];
+                let selector = if selector.starts_with('.') {
+                    selector
+                } else if !selector.contains(' ') && !selector.contains(':') {
+                    let tag = selector.trim();
+                    if !tag.is_empty() {
+                        selector
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                };
+                if !selector.is_empty() {
+                    let props = rules.entry(selector.to_string()).or_default();
+                    for prop in body.split(';') {
+                        let prop = prop.trim();
+                        if let Some(colon) = prop.find(':') {
+                            let name = prop[..colon].trim().to_string();
+                            let value = prop[colon + 1..].trim().to_string();
+                            if !name.is_empty() && !value.is_empty() {
+                                props.insert(name, value);
                             }
                         }
                     }
                 }
             }
-            _ => {}
         }
     }
-    // ponytail: case-insensitive matching would be more correct but CSS is author-controlled
     rules
 }
 
@@ -514,89 +492,62 @@ fn expand_media_queries(css: &str) -> String {
 }
 
 /// CRT-1.14: extract @font-face declarations from XHTML text.
-/// Returns Vec of (font-family, src-url) pairs.
+/// Uses html5ever (via scraper) for robust extraction from malformed HTML.
 fn extract_font_faces(text: &str) -> Vec<(String, String)> {
     let mut faces = Vec::new();
-    let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
-
-    let mut in_style = false;
-    let mut style_content = String::new();
-
-    loop {
-        match reader.read_event() {
-            Ok(Event::Eof) => break,
-            Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "style" {
-                    in_style = true;
-                    style_content.clear();
-                }
-            }
-            Ok(Event::Text(ref e)) if in_style => {
-                style_content.push_str(&e.xml10_content().unwrap_or_default());
-            }
-            Ok(Event::CData(ref e)) if in_style => {
-                style_content.push_str(&e.xml10_content().unwrap_or_default());
-            }
-            Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "style" && in_style {
-                    in_style = false;
-                    // Find @font-face { ... } blocks
-                    let expanded = expand_media_queries(&style_content);
-                    let mut pos = 0;
-                    while let Some(start) = expanded[pos..].find("@font-face") {
-                        let abs_start = pos + start;
-                        if let Some(brace) = expanded[abs_start..].find('{') {
-                            let block_start = abs_start + brace + 1;
-                            let mut depth = 1i32;
-                            let mut j = block_start;
-                            let bytes = expanded.as_bytes();
-                            while j < bytes.len() && depth > 0 {
-                                match bytes[j] {
-                                    b'{' => depth += 1,
-                                    b'}' => depth -= 1,
-                                    _ => {}
-                                }
-                                j += 1;
-                            }
-                            let block = &expanded[block_start..j - 1];
-                            let mut font_family = String::new();
-                            let mut src = String::new();
-                            for prop in block.split(';') {
-                                let prop = prop.trim();
-                                if let Some(colon) = prop.find(':') {
-                                    let name = prop[..colon].trim();
-                                    let value = prop[colon + 1..].trim();
-                                    if name == "font-family" {
-                                        font_family = value
+    let doc = scraper::Html::parse_document(text);
+    let sel = scraper::Selector::parse("style").unwrap();
+    for style in doc.select(&sel) {
+        if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
+            let style_text = content.to_string();
+            let expanded = expand_media_queries(&style_text);
+            let mut pos = 0;
+            while let Some(start) = expanded[pos..].find("@font-face") {
+                let abs_start = pos + start;
+                if let Some(brace) = expanded[abs_start..].find('{') {
+                    let block_start = abs_start + brace + 1;
+                    let mut depth = 1i32;
+                    let mut j = block_start;
+                    let bytes = expanded.as_bytes();
+                    while j < bytes.len() && depth > 0 {
+                        match bytes[j] {
+                            b'{' => depth += 1,
+                            b'}' => depth -= 1,
+                            _ => {}
+                        }
+                        j += 1;
+                    }
+                    let block = &expanded[block_start..j - 1];
+                    let mut font_family = String::new();
+                    let mut src = String::new();
+                    for prop in block.split(';') {
+                        let prop = prop.trim();
+                        if let Some(colon) = prop.find(':') {
+                            let name = prop[..colon].trim();
+                            let value = prop[colon + 1..].trim();
+                            if name == "font-family" {
+                                font_family =
+                                    value.trim_matches(|c| c == '\'' || c == '"').to_string();
+                            } else if name == "src" {
+                                if let Some(url_start) = value.find("url(") {
+                                    let rest = &value[url_start + 4..];
+                                    if let Some(url_end) = rest.find(')') {
+                                        src = rest[..url_end]
                                             .trim_matches(|c| c == '\'' || c == '"')
                                             .to_string();
-                                    } else if name == "src" {
-                                        // Extract url("...") from src
-                                        if let Some(url_start) = value.find("url(") {
-                                            let rest = &value[url_start + 4..];
-                                            if let Some(url_end) = rest.find(')') {
-                                                src = rest[..url_end]
-                                                    .trim_matches(|c| c == '\'' || c == '"')
-                                                    .to_string();
-                                            }
-                                        }
                                     }
                                 }
                             }
-                            if !font_family.is_empty() && !src.is_empty() {
-                                faces.push((font_family, src));
-                            }
-                            pos = j;
-                        } else {
-                            pos = abs_start + 10;
                         }
                     }
+                    if !font_family.is_empty() && !src.is_empty() {
+                        faces.push((font_family, src));
+                    }
+                    pos = j;
+                } else {
+                    pos = abs_start + 10;
                 }
             }
-            _ => {}
         }
     }
     faces
