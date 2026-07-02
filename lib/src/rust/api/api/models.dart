@@ -82,10 +82,9 @@ class NormalizedBook {
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 
-  Future<String> toJsonString() =>
-      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-        that: this,
-      );
+  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+    that: this,
+  );
 
   @override
   int get hashCode =>
