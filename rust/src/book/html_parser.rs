@@ -1,25 +1,53 @@
 use crate::api::models::{BlockType, ReaderBlock, RichSpan};
-use scraper::{Element, ElementRef, Html};
+use scraper::{ElementRef, Html, Selector};
 
 /// Parse HTML content into ReaderBlocks using html5ever + scraper.
 ///
-/// Unlike the streaming quick-xml parser in epub.rs, this uses the
-/// spec-compliant HTML5 parser from Servo, correctly handling
+/// Uses the spec-compliant HTML5 parser from Servo, correctly handling
 /// malformed HTML, self-closing tags, and Unicode.
 ///
-/// ponytail: supports p, h1-h6, blockquote, ul, ol, li, img, pre, div.
-/// No table support — EPUB tables are rare. Add when needed.
+/// ponytail: supports p, h1-h6, blockquote, ul, ol, li, img, pre, div, hr.
+/// No table support. Add when EPUB tables appear in test corpus.
 #[allow(dead_code)]
 pub(crate) fn html_to_blocks(text: &str, block_offset: i32) -> (Vec<ReaderBlock>, i32) {
     let document = Html::parse_document(text);
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut next_index = block_offset;
 
-    if let Some(body) = document.root_element().first_element_child() {
+    let body_sel = Selector::parse("body").unwrap();
+    if let Some(body) = document.select(&body_sel).next() {
         walk_children(body, &mut blocks, &mut next_index, 0, false);
     }
 
     (blocks, next_index)
+}
+
+fn emit_block(
+    blocks: &mut Vec<ReaderBlock>,
+    index: &mut i32,
+    text: String,
+    block_type: BlockType,
+    heading_level: Option<i32>,
+    rich_spans: Option<Vec<RichSpan>>,
+    text_align: Option<String>,
+) {
+    blocks.push(ReaderBlock {
+        index: *index,
+        text,
+        block_type,
+        image_url: None,
+        note_ref: None,
+        rich_spans,
+        heading_level,
+        ordered: None,
+        list_items: None,
+        table_rows: None,
+        image_alt: None,
+        text_indent: None,
+        text_align,
+        note_id: None,
+    });
+    *index += 1;
 }
 
 fn walk_children(
@@ -29,136 +57,52 @@ fn walk_children(
     blockquote_depth: i32,
     in_list: bool,
 ) {
-    for child in parent.children() {
-        if let Some(el) = ElementRef::wrap(child) {
-            let tag = el.value().name.local.as_ref();
-            match tag {
-                "p" | "div" if !in_list => {
-                    let text = collect_text(el);
-                    if !text.trim().is_empty() {
-                        let rich = collect_rich_spans(el);
-                        blocks.push(ReaderBlock {
-                            index: *index,
-                            text: text.trim().to_string(),
-                            block_type: if blockquote_depth > 0 {
-                                BlockType::Quote
-                            } else {
-                                BlockType::Paragraph
-                            },
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: if rich.is_empty() { None } else { Some(rich) },
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        *index += 1;
-                    }
+    for el in parent.child_elements() {
+        let tag: &str = el.value().name();
+        match tag {
+            "p" | "div" if !in_list => {
+                let text = collect_text(el);
+                if !text.is_empty() {
+                    let rich = collect_rich_spans(el);
+                    let bt = if blockquote_depth > 0 {
+                        BlockType::Quote
+                    } else {
+                        BlockType::Paragraph
+                    };
+                    emit_block(
+                        blocks,
+                        index,
+                        text,
+                        bt,
+                        None,
+                        if rich.is_empty() { None } else { Some(rich) },
+                        None,
+                    );
                 }
-                h_tag if is_heading(h_tag) && !in_list => {
-                    let level = h_tag.as_bytes().get(1).map(|d| (d - b'0') as i32);
-                    let text = collect_text(el);
-                    if !text.trim().is_empty() {
-                        blocks.push(ReaderBlock {
-                            index: *index,
-                            text: text.trim().to_string(),
-                            block_type: BlockType::Heading,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: level,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        *index += 1;
-                    }
+            }
+            h_tag if is_heading(h_tag) && !in_list => {
+                let level = h_tag.as_bytes().get(1).map(|d| (d - b'0') as i32);
+                let text = collect_text(el);
+                if !text.is_empty() {
+                    emit_block(blocks, index, text, BlockType::Heading, level, None, None);
                 }
-                "blockquote" if !in_list => {
-                    walk_children(el, blocks, index, blockquote_depth + 1, false);
-                }
-                "ul" | "ol" => {
+            }
+            "blockquote" if !in_list => {
+                walk_children(el, blocks, index, blockquote_depth + 1, false);
+            }
+            "ul" | "ol" => {
+                let items: Vec<String> = el
+                    .child_elements()
+                    .filter(|c| c.value().name() == "li")
+                    .map(collect_text)
+                    .collect();
+                if !items.is_empty() {
                     let ordered = tag == "ol";
-                    let items = collect_list_items(el);
-                    if !items.is_empty() {
-                        let text = items.join(" | ");
-                        blocks.push(ReaderBlock {
-                            index: *index,
-                            text,
-                            block_type: BlockType::List,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: Some(ordered),
-                            list_items: Some(
-                                items
-                                    .into_iter()
-                                    .map(|s| ReaderBlock {
-                                        index: 0,
-                                        text: s,
-                                        block_type: BlockType::Paragraph,
-                                        image_url: None,
-                                        note_ref: None,
-                                        rich_spans: None,
-                                        heading_level: None,
-                                        ordered: None,
-                                        list_items: None,
-                                        table_rows: None,
-                                        image_alt: None,
-                                        text_indent: None,
-                                        text_align: None,
-                                        note_id: None,
-                                    })
-                                    .collect(),
-                            ),
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        *index += 1;
-                    }
-                }
-                "img" => {
-                    let src = el.value().attr("src").unwrap_or("").to_string();
-                    let alt = el.value().attr("alt").unwrap_or("").to_string();
-                    if !src.is_empty() {
-                        blocks.push(ReaderBlock {
-                            index: *index,
-                            text: alt.clone(),
-                            block_type: BlockType::Image,
-                            image_url: Some(src),
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: if alt.is_empty() { None } else { Some(alt) },
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        *index += 1;
-                    }
-                }
-                "pre" if !in_list => {
-                    let text = collect_text(el);
-                    if !text.trim().is_empty() {
-                        blocks.push(ReaderBlock {
-                            index: *index,
-                            text: text.to_string(),
+                    let items_blocks: Vec<ReaderBlock> = items
+                        .iter()
+                        .map(|s| ReaderBlock {
+                            index: 0,
+                            text: s.clone(),
                             block_type: BlockType::Paragraph,
                             image_url: None,
                             note_ref: None,
@@ -169,23 +113,20 @@ fn walk_children(
                             table_rows: None,
                             image_alt: None,
                             text_indent: None,
-                            text_align: Some("ws:pre".to_string()),
+                            text_align: None,
                             note_id: None,
-                        });
-                        *index += 1;
-                    }
-                }
-                "hr" => {
+                        })
+                        .collect();
                     blocks.push(ReaderBlock {
                         index: *index,
-                        text: String::new(),
-                        block_type: BlockType::Separator,
+                        text: items.join(" | "),
+                        block_type: BlockType::List,
                         image_url: None,
                         note_ref: None,
                         rich_spans: None,
                         heading_level: None,
-                        ordered: None,
-                        list_items: None,
+                        ordered: Some(ordered),
+                        list_items: Some(items_blocks),
                         table_rows: None,
                         image_alt: None,
                         text_indent: None,
@@ -194,36 +135,93 @@ fn walk_children(
                     });
                     *index += 1;
                 }
-                _ => {
-                    walk_children(el, blocks, index, blockquote_depth, in_list);
+            }
+            "img" => {
+                let src = el.attr("src").unwrap_or("").to_string();
+                let alt = el.attr("alt").unwrap_or("").to_string();
+                if !src.is_empty() {
+                    blocks.push(ReaderBlock {
+                        index: *index,
+                        text: alt.clone(),
+                        block_type: BlockType::Image,
+                        image_url: Some(src),
+                        note_ref: None,
+                        rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: if alt.is_empty() { None } else { Some(alt) },
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
+                    });
+                    *index += 1;
                 }
+            }
+            "pre" if !in_list => {
+                let text = collect_text(el);
+                if !text.is_empty() {
+                    emit_block(
+                        blocks,
+                        index,
+                        text,
+                        BlockType::Paragraph,
+                        None,
+                        None,
+                        Some("ws:pre".to_string()),
+                    );
+                }
+            }
+            "hr" => {
+                emit_block(
+                    blocks,
+                    index,
+                    String::new(),
+                    BlockType::Separator,
+                    None,
+                    None,
+                    None,
+                );
+            }
+            "head" | "script" | "style" | "noscript" => {
+                // skip non-content elements entirely
+            }
+            _ => {
+                walk_children(el, blocks, index, blockquote_depth, in_list);
             }
         }
     }
 }
 
+/// Collect text from all descendant text nodes; insert \n on <br>.
 fn collect_text(el: ElementRef<'_>) -> String {
     let mut text = String::new();
     for node in el.descendants() {
         if let Some(t) = node.value().as_text() {
             text.push_str(t);
         } else if let Some(br) = ElementRef::wrap(node) {
-            if br.value().name.local.as_ref() == "br" {
+            if br.value().name() == "br" {
                 text.push('\n');
             }
         }
     }
-    crate::book::normalize_typography(text.trim())
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    crate::book::normalize_typography(trimmed)
 }
 
+/// Collect inline formatting (b, i, sup, a) from direct children only.
 fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
     let mut spans = Vec::new();
     for child in el.children() {
         if let Some(t) = child.value().as_text() {
-            let text = t.trim().to_string();
+            let text = t.trim();
             if !text.is_empty() {
                 spans.push(RichSpan {
-                    text: crate::book::normalize_typography(&text),
+                    text: crate::book::normalize_typography(text),
                     bold: false,
                     italic: false,
                     superscript: false,
@@ -231,9 +229,9 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     line_break: false,
                 });
             }
-        } else if let Some(sub_el) = ElementRef::wrap(child) {
-            let tag = sub_el.value().name.local.as_ref();
-            let text = collect_text(sub_el);
+        } else if let Some(sub) = ElementRef::wrap(child) {
+            let tag = sub.value().name();
+            let text = collect_text(sub);
             if text.is_empty() {
                 continue;
             }
@@ -264,7 +262,7 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     line_break: false,
                 }),
                 "a" => {
-                    let href = sub_el.value().attr("href").map(|s| s.to_string());
+                    let href = sub.attr("href").map(String::from);
                     spans.push(RichSpan {
                         text: t,
                         bold: false,
@@ -294,18 +292,6 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
         }
     }
     spans
-}
-
-fn collect_list_items(el: ElementRef<'_>) -> Vec<String> {
-    let mut items = Vec::new();
-    for child in el.children() {
-        if let Some(li) = ElementRef::wrap(child) {
-            if li.value().name.local.as_ref() == "li" {
-                items.push(collect_text(li));
-            }
-        }
-    }
-    items
 }
 
 fn is_heading(tag: &str) -> bool {

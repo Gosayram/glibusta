@@ -107,10 +107,9 @@ pub fn extract_cover(
 pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> Result<Vec<u8>> {
     use pdfium_render::prelude::*;
 
-    let pdfium = Pdfium::new(
-        Pdfium::bind_to_system_library()
-            .map_err(|e| anyhow::anyhow!("Failed to bind PDFium: {}", e))?,
-    );
+    let bindings = Pdfium::bind_to_system_library()
+        .map_err(|e| anyhow::anyhow!("Failed to bind PDFium: {}", e))?;
+    let pdfium = Pdfium::new(bindings);
 
     let document = pdfium
         .load_pdf_from_file(&path, None)
@@ -121,12 +120,12 @@ pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> Result
         .get(page_index)
         .map_err(|e| anyhow::anyhow!("Failed to get page {}: {}", page_index, e))?;
 
+    let config = PdfRenderConfig::new()
+        .set_target_width(width as i32)
+        .render_form_data(true);
+
     let bitmap = page
-        .render_with_config(
-            &PdfRenderConfig::new()
-                .set_target_width(width.into())
-                .render_form_data(true),
-        )
+        .render_with_config(&config)
         .map_err(|e| anyhow::anyhow!("Failed to render page: {}", e))?;
 
     let img = bitmap.as_image();

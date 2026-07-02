@@ -10,7 +10,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [features]
 default = []
-pdf = ["pdfium-render", "image"]
+pdf = ["pdfium-render/image_api", "image"]
 
 [dependencies]
 anyhow = "1"
