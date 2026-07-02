@@ -384,6 +384,24 @@ fn is_likely_kf8(header: &MobiHeader, record0: &[u8]) -> bool {
     text.contains("BOUNDARY") || text.contains("FDST") || text.contains("RESC")
 }
 
+fn encode_cover_data_uri(bytes: &[u8]) -> Option<String> {
+    let mime = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8 {
+        "image/jpeg"
+    } else if bytes.len() >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50 {
+        "image/png"
+    } else if bytes.len() >= 3 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 {
+        "image/gif"
+    } else {
+        return None;
+    };
+    use base64::Engine;
+    Some(format!(
+        "data:{};base64,{}",
+        mime,
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
@@ -414,6 +432,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
 
     let cover_extractor = MobiCoverExtractor;
     let cover_bytes = cover_extractor.extract(bytes, &palm_db, &header, &metadata);
+    let cover_url = cover_bytes.as_ref().and_then(|b| encode_cover_data_uri(b));
 
     let mut meta = serde_json::Map::new();
     meta.insert(
@@ -466,7 +485,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
             authors
         },
         description: Some(description_for(&header)),
-        cover_url: None,
+        cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),
         book_format: BookFormat::Mobi,
