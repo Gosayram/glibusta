@@ -8,6 +8,8 @@ ignore = [
     # quick-xml vulnerabilities — no fix released yet, low risk (parse-only, trusted input)
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
+    # fxhash is unmaintained — transitive dep of scraper->selectors, no alternative without changing scraper
+    "RUSTSEC-2025-0057",
 ]
 
 [bans]
@@ -15,15 +17,21 @@ multiple-versions = "warn"
 wildcards = "allow"
 # Transitive duplicates from flutter_rust_bridge_codegen (build-time only, never in release binary)
 skip = [
+    "ahash",
     "bitflags",
     "block-buffer",
     "console",
+    "convert_case",
     "cpufeatures",
     "crypto-common",
+    "cssparser",
     "digest",
+    "ego-tree",
+    "getrandom",
     "hashbrown",
     "heck",
     "indicatif",
+    "r-efi",
     "syn",
     "toml",
     "windows-sys",

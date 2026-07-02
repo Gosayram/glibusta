@@ -1,5 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+/// Lightweight book metadata — no chapters, no blocks.
+/// Used by extract_metadata() for fast scanning.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookMeta {
+    pub title: String,
+    pub authors: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockType {
     Paragraph,

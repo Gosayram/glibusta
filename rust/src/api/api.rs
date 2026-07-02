@@ -1,4 +1,4 @@
-use crate::api::models::NormalizedBook;
+use crate::api::models::{BookMeta, NormalizedBook};
 use anyhow::{Context, Result};
 
 pub fn parse_fb2(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
@@ -40,8 +40,7 @@ pub fn extract_zip_entry(bytes: Vec<u8>, entry_name: String) -> Result<Vec<u8>> 
 }
 
 pub fn detect_encoding(bytes: Vec<u8>) -> Result<String> {
-    let encoding = detect_encoding_inner(&bytes);
-    Ok(encoding.to_string())
+    Ok(crate::book::encoding::detect_encoding(&bytes).to_string())
 }
 
 /// Compute SHA-256 hash of bytes (first `max_bytes` only for efficiency).
@@ -67,33 +66,83 @@ pub fn parse_book(
     }
 }
 
-fn detect_encoding_inner(bytes: &[u8]) -> &'static str {
-    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
-        return "utf-8";
-    }
-    if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
-        return "utf-16le";
-    }
-    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-        return "utf-16be";
-    }
+/// Extract metadata (title, authors, description) without full chapter parsing.
+/// Faster than parse_book when only metadata is needed.
+pub fn extract_metadata(
+    bytes: Vec<u8>,
+    format: String,
+    forced_encoding: Option<String>,
+) -> Result<BookMeta> {
+    let book = parse_book(bytes, format, forced_encoding)?;
+    Ok(BookMeta {
+        title: book.title,
+        authors: book.authors,
+        description: book.description,
+    })
+}
 
-    if std::str::from_utf8(bytes).is_ok() {
-        return "utf-8";
+/// Extract cover image bytes (if available). Returns empty Vec if no cover.
+pub fn extract_cover(
+    bytes: Vec<u8>,
+    format: String,
+    forced_encoding: Option<String>,
+) -> Result<Vec<u8>> {
+    let book = parse_book(bytes, format, forced_encoding)?;
+    // NormalizedBook stores cover as base64 in cover_url
+    if let Some(cover_b64) = &book.cover_url {
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let decoded = engine
+            .decode(cover_b64)
+            .context("Failed to decode cover base64")?;
+        return Ok(decoded);
     }
+    Ok(Vec::new())
+}
 
-    let (decoded, encoding_used, _) = encoding_rs::WINDOWS_1252.decode(bytes);
-    if decoded
-        .chars()
-        .all(|c| !c.is_control() || c == '\n' || c == '\r' || c == '\t')
-    {
-        return encoding_used.name();
-    }
+/// Render a PDF page as a PNG thumbnail.
+///
+/// Requires the `pdf` feature and a PDFium binary available on the system.
+#[cfg(feature = "pdf")]
+pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> Result<Vec<u8>> {
+    use pdfium_render::prelude::*;
 
-    let (decoded, _, _) = encoding_rs::UTF_8.decode(bytes);
-    if decoded.chars().any(|c| c == '\u{FFFD}') {
-        return "windows-1252";
-    }
+    let pdfium = Pdfium::new(
+        Pdfium::bind_to_system_library()
+            .map_err(|e| anyhow::anyhow!("Failed to bind PDFium: {}", e))?,
+    );
 
-    "utf-8"
+    let document = pdfium
+        .load_pdf_from_file(&path, None)
+        .map_err(|e| anyhow::anyhow!("Failed to load PDF: {}", e))?;
+
+    let page = document
+        .pages()
+        .get(page_index)
+        .map_err(|e| anyhow::anyhow!("Failed to get page {}: {}", page_index, e))?;
+
+    let bitmap = page
+        .render_with_config(
+            &PdfRenderConfig::new()
+                .set_target_width(width.into())
+                .render_form_data(true),
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to render page: {}", e))?;
+
+    let img = bitmap.as_image();
+
+    let mut bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut bytes),
+        image::ImageFormat::Png,
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to encode PNG: {}", e))?;
+
+    Ok(bytes)
+}
+
+/// Stub when pdf feature is disabled.
+#[cfg(not(feature = "pdf"))]
+pub fn render_pdf_thumbnail(_path: String, _page_index: u16, _width: u16) -> Result<Vec<u8>> {
+    anyhow::bail!("PDF support is not enabled. Rebuild with --features pdf")
 }

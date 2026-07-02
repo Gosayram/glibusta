@@ -15,3 +15,28 @@ pub(crate) fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
     let (decoded, _) = encoding.decode_without_bom_handling(bytes);
     decoded.into_owned()
 }
+
+/// Detect text encoding using chardetng, with BOM/UTF-8 fast-paths.
+pub(crate) fn detect_encoding(bytes: &[u8]) -> &'static str {
+    // BOM detection
+    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+        return "utf-8";
+    }
+    if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
+        return "utf-16le";
+    }
+    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+        return "utf-16be";
+    }
+
+    // Fast path: valid UTF-8
+    if std::str::from_utf8(bytes).is_ok() {
+        return "utf-8";
+    }
+
+    // Statistical detection via chardetng
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(bytes, true);
+    let encoding = detector.guess(None, true);
+    encoding.name()
+}

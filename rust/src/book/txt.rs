@@ -7,19 +7,8 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     let text = if let Some(enc) = forced_encoding {
         decode_text(bytes, enc)?
     } else {
-        // Try UTF-8 first, fall back to windows-1251 then koi8-r
-        match std::str::from_utf8(bytes) {
-            Ok(s) => s.to_string(),
-            Err(_) => {
-                if let Some(s) = try_decode(bytes, "windows-1251") {
-                    s
-                } else if let Some(s) = try_decode(bytes, "koi8-r") {
-                    s
-                } else {
-                    decode_text(bytes, "utf-8")?
-                }
-            }
-        }
+        let encoding = crate::book::encoding::detect_encoding(bytes);
+        decode_text(bytes, encoding)?
     };
 
     let paragraphs: Vec<String> = text
@@ -73,19 +62,11 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
             .unwrap_or(encoding_rs::UTF_8)
             .decode(bytes);
         if had_errors {
-            // Fallback to UTF-8 lossy
             Ok(String::from_utf8_lossy(bytes).into_owned())
         } else {
             Ok(decoded.into_owned())
         }
     }
-}
-
-fn try_decode(bytes: &[u8], encoding_name: &str) -> Option<String> {
-    let encoding = encoding_rs::Encoding::for_label_no_replacement(encoding_name.as_bytes())?;
-    encoding
-        .decode_without_bom_handling_and_without_replacement(bytes)
-        .map(|cow| cow.into_owned())
 }
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
