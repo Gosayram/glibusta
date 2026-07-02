@@ -185,11 +185,30 @@ fn create_minimal_epub() -> Vec<u8> {
   </metadata>
   <manifest>
     <item id="chapter1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
   </manifest>
-  <spine>
+  <spine toc="ncx">
     <itemref idref="chapter1"/>
   </spine>
 </package>"#,
+    )
+    .unwrap();
+
+    zip.start_file("toc.ncx", options).unwrap();
+    zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head>
+    <meta name="dtb:uid" content="test-id"/>
+  </head>
+  <docTitle><text>Test EPUB</text></docTitle>
+  <navMap>
+    <navPoint id="nav1" playOrder="1">
+      <navLabel><text>Chapter 1</text></navLabel>
+      <content src="chapter1.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>"#,
     )
     .unwrap();
 
@@ -222,6 +241,14 @@ fn test_epub_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert_eq!(book.chapters[0].blocks.len(), 2);
     assert_eq!(book.book_format, BookFormat::Epub);
+}
+
+#[test]
+fn test_epub_toc_ncx() {
+    let epub_bytes = create_minimal_epub();
+    let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
+    assert!(!book.toc.is_empty(), "TOC should have entries");
+    assert_eq!(book.toc[0].title, "Chapter 1");
 }
 
 // ---------------------------------------------------------------------------

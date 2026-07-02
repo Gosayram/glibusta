@@ -1,5 +1,5 @@
 use crate::api::models::{
-    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan, TocEntry,
 };
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{decode_bytes, get_xml_attr};
@@ -29,7 +29,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
     let opf_dir = opf_path.rsplit('/').nth(1).unwrap_or("");
 
-    let (metadata, manifest_items, spine_ids) = parse_opf(&opf_text)?;
+    let (metadata, manifest_items, spine_ids, ncx_id) = parse_opf(&opf_text)?;
 
     let title = metadata.get("title").cloned().unwrap_or_default();
     let authors_raw = metadata.get("creator").cloned().unwrap_or_default();
@@ -160,6 +160,9 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         Some(serde_json::json!({ "fonts": font_faces }))
     };
 
+    // ---- TOC extraction ----
+    let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name);
+
     Ok(NormalizedBook {
         id,
         title,
@@ -172,8 +175,76 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         language,
         warnings: Vec::new(),
         images: Vec::new(),
-        toc: Vec::new(),
+        toc,
     })
+}
+
+/// Find and parse EPUB table of contents (NCX for EPUB 2, nav.xhtml for EPUB 3).
+fn extract_epub_toc(
+    zip: &mut ZipFile,
+    manifest: &HashMap<String, ManifestItem>,
+    ncx_id: &Option<String>,
+    opf_dir: &str,
+    encoding_name: &str,
+) -> Vec<TocEntry> {
+    // Try EPUB 3 nav.xhtml first (preferred)
+    if let Some(toc) = try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name) {
+        if !toc.is_empty() {
+            return toc;
+        }
+    }
+
+    // Fall back to EPUB 2 NCX
+    if let Some(toc) = try_parse_ncx(zip, manifest, ncx_id, opf_dir, encoding_name) {
+        return toc;
+    }
+
+    Vec::new()
+}
+
+fn try_parse_nav_xhtml(
+    zip: &mut ZipFile,
+    manifest: &HashMap<String, ManifestItem>,
+    opf_dir: &str,
+    encoding_name: &str,
+) -> Option<Vec<TocEntry>> {
+    let nav_item = manifest.values().find(|item| {
+        item.properties.iter().any(|p| p == "nav") && item.media_type == "application/xhtml+xml"
+    })?;
+    let nav_path = if opf_dir.is_empty() {
+        nav_item.href.clone()
+    } else {
+        format!("{}/{}", opf_dir, nav_item.href)
+    };
+    let bytes = zip.find_file(&nav_path)?;
+    let text = decode_bytes(&bytes, encoding_name);
+    Some(parse_nav_xhtml(&text))
+}
+
+fn try_parse_ncx(
+    zip: &mut ZipFile,
+    manifest: &HashMap<String, ManifestItem>,
+    ncx_id: &Option<String>,
+    opf_dir: &str,
+    encoding_name: &str,
+) -> Option<Vec<TocEntry>> {
+    // Find NCX: either by spine toc attribute or by media-type
+    let ncx_item = ncx_id
+        .as_ref()
+        .and_then(|id| manifest.get(id.as_str()))
+        .or_else(|| {
+            manifest
+                .values()
+                .find(|item| item.media_type == "application/x-dtbncx+xml")
+        })?;
+    let ncx_path = if opf_dir.is_empty() {
+        ncx_item.href.clone()
+    } else {
+        format!("{}/{}", opf_dir, ncx_item.href)
+    };
+    let bytes = zip.find_file(&ncx_path)?;
+    let text = decode_bytes(&bytes, encoding_name);
+    Some(parse_ncx(&text))
 }
 
 struct ManifestItem {
@@ -216,6 +287,7 @@ type OpfResult = (
     HashMap<String, String>,
     HashMap<String, ManifestItem>,
     Vec<String>,
+    Option<String>, // ncx_id from <spine toc="...">
 );
 
 fn parse_opf(text: &str) -> Result<OpfResult> {
@@ -225,6 +297,7 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut manifest_items: HashMap<String, ManifestItem> = HashMap::new();
     let mut spine_ids: Vec<String> = Vec::new();
+    let mut ncx_id: Option<String> = None;
 
     let mut in_metadata = false;
     let mut in_manifest = false;
@@ -241,7 +314,12 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                 match tag.as_str() {
                     "metadata" => in_metadata = true,
                     "manifest" => in_manifest = true,
-                    "spine" => in_spine = true,
+                    "spine" => {
+                        in_spine = true;
+                        if let Some(toc) = get_xml_attr(e, b"toc") {
+                            ncx_id = Some(toc);
+                        }
+                    }
                     _ => {
                         // DC metadata tags: dc:title, dc:creator, etc.
                         // local_name() strips namespace prefix, so check both forms
@@ -408,7 +486,142 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
         }
     }
 
-    Ok((metadata, manifest_items, spine_ids))
+    Ok((metadata, manifest_items, spine_ids, ncx_id))
+}
+
+/// Parse NCX (EPUB 2 table of contents).
+fn parse_ncx(text: &str) -> Vec<TocEntry> {
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+    let mut entries: Vec<TocEntry> = Vec::new();
+    let mut current_title = String::new();
+    let mut in_nav_label = false;
+    let mut in_text = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                match tag.as_str() {
+                    "navLabel" => in_nav_label = true,
+                    "text" if in_nav_label => in_text = true,
+                    _ => {}
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                if in_text {
+                    current_title.push_str(&e.xml10_content().unwrap_or_default());
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                match tag.as_str() {
+                    "text" if in_nav_label => in_text = false,
+                    "navLabel" => in_nav_label = false,
+                    "navPoint" => {
+                        if !current_title.trim().is_empty() {
+                            entries.push(TocEntry {
+                                title: current_title.trim().to_string(),
+                                chapter_index: -1,
+                                children: Vec::new(),
+                            });
+                        }
+                        current_title.clear();
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    entries
+}
+
+/// Parse EPUB 3 nav.xhtml (table of contents).
+fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
+    // Look for <nav epub:type="toc"> <ol> <li> <a href="...">text</a> ...
+    let mut reader = Reader::from_str(text);
+    let mut entries: Vec<TocEntry> = Vec::new();
+    let mut stack: Vec<Vec<TocEntry>> = Vec::new();
+    let mut in_toc_nav = false;
+    let mut in_li = false;
+    let mut in_a = false;
+    let mut current_title = String::new();
+    let mut current_href = String::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if !in_toc_nav {
+                    if tag == "nav" {
+                        // Check for epub:type="toc"
+                        for attr in e.attributes().filter_map(|a| a.ok()) {
+                            if attr.key.as_ref() == b"epub:type" || attr.key.as_ref() == b"type" {
+                                let val = String::from_utf8_lossy(&attr.value);
+                                if val == "toc" {
+                                    in_toc_nav = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else if tag == "ol" {
+                    stack.push(Vec::new());
+                } else if tag == "li" {
+                    in_li = true;
+                    current_title.clear();
+                    current_href.clear();
+                } else if in_li && tag == "a" {
+                    in_a = true;
+                    if let Some(href) = get_xml_attr(e, b"href") {
+                        current_href = href;
+                    }
+                }
+            }
+            Ok(Event::Text(ref e)) => {
+                let text = e.xml10_content().unwrap_or_default().to_string();
+                if in_a {
+                    current_title.push_str(&text);
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "ol" && !stack.is_empty() {
+                    let children = stack.pop().unwrap_or_default();
+                    if let Some(parent) = stack.last_mut() {
+                        // Add the children to the last entry of the parent
+                        if let Some(last) = parent.last_mut() {
+                            last.children = children;
+                        }
+                    } else {
+                        // Top-level list
+                        entries = children;
+                    }
+                } else if tag == "li" {
+                    in_li = false;
+                    let entry = TocEntry {
+                        title: current_title.trim().to_string(),
+                        chapter_index: -1,
+                        children: Vec::new(),
+                    };
+                    if !current_title.trim().is_empty() {
+                        if let Some(top) = stack.last_mut() {
+                            top.push(entry);
+                        }
+                    }
+                    current_title.clear();
+                    current_href.clear();
+                } else if tag == "a" {
+                    in_a = false;
+                }
+            }
+            _ => {}
+        }
+    }
+    entries
 }
 
 fn extract_cover_url(
