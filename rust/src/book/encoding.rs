@@ -35,8 +35,8 @@ pub(crate) fn detect_encoding(bytes: &[u8]) -> &'static str {
     }
 
     // Statistical detection via chardetng
-    let mut detector = chardetng::EncodingDetector::new();
+    let mut detector = chardetng::EncodingDetector::new(chardetng::Iso2022JpDetection::Allow);
     detector.feed(bytes, true);
-    let encoding = detector.guess(None, true);
+    let encoding = detector.guess(None, chardetng::Utf8Detection::Allow);
     encoding.name()
 }

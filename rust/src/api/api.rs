@@ -124,7 +124,7 @@ pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> Result
 
     let page = document
         .pages()
-        .get(page_index)
+        .get(page_index as i32)
         .map_err(|e| anyhow::anyhow!("Failed to get page {}: {}", page_index, e))?;
 
     let config = PdfRenderConfig::new()
@@ -135,7 +135,9 @@ pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> Result
         .render_with_config(&config)
         .map_err(|e| anyhow::anyhow!("Failed to render page: {}", e))?;
 
-    let img = bitmap.as_image();
+    let img = bitmap
+        .as_image()
+        .map_err(|e| anyhow::anyhow!("Failed to convert bitmap to image: {}", e))?;
 
     let mut bytes = Vec::new();
     img.write_to(
