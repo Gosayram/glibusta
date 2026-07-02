@@ -1,6 +1,29 @@
 /// LW-9.1: Basic quiz/interactive content parser.
 /// ponytail: regex-based extraction of quiz structures from EPUB text blocks.
 /// Detects question patterns and answer options from plain text content.
+class FillableBlock {
+  const FillableBlock({
+    required this.textParts,
+    required this.blanks,
+  });
+
+  /// Text segments between blanks. Length = blanks.length + 1.
+  final List<String> textParts;
+
+  /// Blank definitions. Each has an optional expected answer.
+  final List<BlankDef> blanks;
+
+  String get fullText =>
+      textParts.asMap().entries.map((e) => e.value + (e.key < blanks.length ? '___' : '')).join();
+}
+
+class BlankDef {
+  const BlankDef({this.expectedAnswer, this.id});
+
+  final String? expectedAnswer;
+  final String? id;
+}
+
 class QuizBlock {
   const QuizBlock({
     required this.question,
@@ -100,5 +123,54 @@ class QuizParser {
     }
 
     return quizzes.isEmpty ? null : quizzes;
+  }
+
+  /// Try to parse fillable-field content from a list of text blocks.
+  /// Detects `___` (3+ underscores), `[expected]`, and `{expected}` patterns.
+  /// Returns null if no fillable fields detected.
+  static List<FillableBlock>? tryParseFillable(List<String> blocks) {
+    final results = <FillableBlock>[];
+    for (final block in blocks) {
+      final text = block.trim();
+      if (text.isEmpty) continue;
+
+      // Pattern 1: [expected answer] — bracket-wrapped blanks
+      final bracketMatches = RegExp(r'\[([^\]]*?)\]').allMatches(text);
+      // Pattern 2: {expected answer} — brace-wrapped blanks
+      final braceMatches = RegExp(r'\{([^\}]*?)\}').allMatches(text);
+      // Pattern 3: ___ (3+ underscores)
+      final underscoreMatches = RegExp(r'_{3,}').allMatches(text);
+
+      final allMatches = [
+        ...bracketMatches.map((m) => (m: m, type: 'bracket')),
+        ...braceMatches.map((m) => (m: m, type: 'brace')),
+        ...underscoreMatches.map((m) => (m: m, type: 'underscore')),
+      ]..sort((a, b) => a.m.start.compareTo(b.m.start));
+
+      if (allMatches.isEmpty) continue;
+
+      final blanks = <BlankDef>[];
+      var lastEnd = 0;
+      final parts = <String>[];
+      for (final match in allMatches) {
+        // Skip overlapping matches
+        if (match.m.start < lastEnd) continue;
+
+        parts.add(text.substring(lastEnd, match.m.start));
+        final content = match.m.group(1);
+        blanks.add(
+          BlankDef(
+            expectedAnswer: content != null && content.isNotEmpty ? content : null,
+            id: 'blank-${results.length}-${blanks.length}',
+          ),
+        );
+        lastEnd = match.m.end;
+      }
+      parts.add(text.substring(lastEnd));
+
+      results.add(FillableBlock(textParts: parts, blanks: blanks));
+    }
+
+    return results.isEmpty ? null : results;
   }
 }

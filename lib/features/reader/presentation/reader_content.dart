@@ -12,6 +12,7 @@ import '../data/parsers/normalized_book.dart';
 import '../data/parsers/quiz_parser.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
+import 'fillable_field_widget.dart';
 import 'highlighted_text.dart';
 import 'quiz_widget.dart';
 
@@ -1332,12 +1333,15 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       if (widget.blockTransformers != null) {
         for (final t in widget.blockTransformers!) {
           final transformed = t(block);
-          if (transformed == null) { blockSkipped = true; break; }
+          if (transformed == null) {
+            blockSkipped = true;
+            break;
+          }
           block = transformed;
         }
       }
       if (blockSkipped) continue;
-      // Check if this block starts a quiz sequence
+      // LW-9.1: Check if this block starts a quiz sequence
       if (block.text.length > 10 && block.text.contains('?')) {
         final endIdx = (i + 8).clamp(0, chapter.blocks.length);
         final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
@@ -1348,12 +1352,32 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           continue;
         }
       }
-      builtWidgets.add(_buildReaderBlock(
-        ctx, block,
-        isAsInBook ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign) : baseAlign,
-        blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
-        chapterImages: chapterImages,
-      ));
+      // LW-9.2: Check for fillable fields (___, [answer])
+      if (block.text.contains('___') || block.text.contains('[') || block.text.contains('{')) {
+        final endIdx = (i + 4).clamp(0, chapter.blocks.length);
+        final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
+        final fillable = QuizParser.tryParseFillable(texts);
+        if (fillable != null && fillable.isNotEmpty) {
+          for (var fi = 0; fi < fillable.length; fi++) {
+            builtWidgets.add(
+              FillableFieldWidget(block: fillable[fi], key: ValueKey('fill-$chapterIndex-$i-$fi')),
+            );
+          }
+          skipUntil = i + texts.length - 1;
+          continue;
+        }
+      }
+      builtWidgets.add(
+        _buildReaderBlock(
+          ctx,
+          block,
+          isAsInBook
+              ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
+              : baseAlign,
+          blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
+          chapterImages: chapterImages,
+        ),
+      );
     }
 
     return Column(

@@ -175,13 +175,17 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 widget.onDismiss();
               },
             ),
-            // HG-7.6: TTS from context
+            // HG-7.6: TTS from context; LW-11.2: resume last if available
             if (_selectedText != null && _selectedText!.isNotEmpty)
               _ToolbarButton(
                 icon: Icons.volume_up,
-                label: 'Озвучить',
+                label: TtsController.instance.hasLastText ? 'Возобновить' : 'Озвучить',
                 onTap: () {
-                  unawaited(_speakText(_selectedText!));
+                  if (TtsController.instance.hasLastText) {
+                    unawaited(TtsController.instance.resume());
+                  } else {
+                    unawaited(_speakText(_selectedText!));
+                  }
                   widget.onDismiss();
                 },
               ),

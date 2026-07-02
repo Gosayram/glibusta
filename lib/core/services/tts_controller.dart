@@ -14,6 +14,7 @@ class TtsController {
   bool _isPlaying = false;
   late String _lastLang;
   late double _lastRate;
+  String? _lastText;
   StreamSubscription<dynamic>? _noisySub;
 
   void _ensureTts() {
@@ -41,12 +42,20 @@ class TtsController {
 
   Future<void> speak(String text, {String? lang, double? rate}) async {
     _ensureTts();
+    _lastText = text;
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;
     await _tts.setLanguage(_lastLang);
     await _tts.setSpeechRate(_lastRate);
     _isPlaying = true;
     await _tts.speak(text);
+  }
+
+  /// Resume speaking last text.
+  Future<void> resume() async {
+    if (_lastText != null) {
+      await speak(_lastText!, lang: _lastLang, rate: _lastRate);
+    }
   }
 
   void stop() {
@@ -56,9 +65,12 @@ class TtsController {
 
   bool get isPlaying => _isPlaying;
 
+  bool get hasLastText => _lastText != null;
+
   void dispose() {
     _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
+    _lastText = null;
     _tts.stop(); // ignore: discarded_futures
     _isPlaying = false;
   }

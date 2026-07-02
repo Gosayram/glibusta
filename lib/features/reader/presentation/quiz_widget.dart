@@ -67,25 +67,27 @@ class _QuizWidgetState extends State<QuizWidget> {
         const SizedBox(height: 12),
         Text(item.question, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
         const SizedBox(height: 12),
-        ...item.options.asMap().entries.map((e) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                backgroundColor: _selected[_currentIndex] == e.key
-                    ? colors.primary.withValues(alpha: 0.1)
-                    : null,
-                foregroundColor: _selected[_currentIndex] == e.key ? colors.primary : null,
-              ),
-              onPressed: () => setState(() => _selected[_currentIndex] = e.key),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('${String.fromCharCode(0x41 + e.key)}. ${e.value}'),
+        ...item.options.asMap().entries.map(
+          (e) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: _selected[_currentIndex] == e.key
+                      ? colors.primary.withValues(alpha: 0.1)
+                      : null,
+                  foregroundColor: _selected[_currentIndex] == e.key ? colors.primary : null,
+                ),
+                onPressed: () => setState(() => _selected[_currentIndex] = e.key),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('${String.fromCharCode(0x41 + e.key)}. ${e.value}'),
+                ),
               ),
             ),
           ),
-        )),
+        ),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -139,28 +141,32 @@ class _QuizWidgetState extends State<QuizWidget> {
               color: isCorrect
                   ? Colors.green.withValues(alpha: 0.1)
                   : isWrong
-                      ? Colors.red.withValues(alpha: 0.1)
-                      : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                  ? Colors.red.withValues(alpha: 0.1)
+                  : colors.surfaceContainerHighest.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(8),
               border: isCorrect
                   ? Border.all(color: Colors.green.withValues(alpha: 0.5))
                   : isWrong
-                      ? Border.all(color: Colors.red.withValues(alpha: 0.5))
-                      : null,
+                  ? Border.all(color: Colors.red.withValues(alpha: 0.5))
+                  : null,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${idx + 1}. ${item.question}',
-                    style: const TextStyle(fontWeight: FontWeight.w500)),
+                Text(
+                  '${idx + 1}. ${item.question}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
                 const SizedBox(height: 4),
                 Text('Your answer: ${sel != null ? item.options[sel] : '(not answered)'}'),
                 if (item.correctIndex != null)
-                  Text('Correct: ${item.options[item.correctIndex!]}',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.w500,
-                      )),
+                  Text(
+                    'Correct: ${item.options[item.correctIndex!]}',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
               ],
             ),
           );
