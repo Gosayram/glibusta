@@ -70,12 +70,18 @@ final commentsForBookProvider = FutureProvider.autoDispose.family<List<BookComme
   return service.getComments(bookId);
 });
 
-final bookDownloadStateProvider = FutureProvider.autoDispose.family<BookDownloadState, String>((
+final bookDownloadStateProvider = StreamProvider.autoDispose.family<BookDownloadState, String>((
   ref,
   bookId,
-) async {
+) async* {
   final db = ref.watch(databaseProvider);
-  final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(bookId))).get();
+  final query = db.select(db.downloads)..where((d) => d.bookId.equals(bookId));
+  await for (final rows in query.watch()) {
+    yield _mapDownloadRows(rows);
+  }
+});
+
+BookDownloadState _mapDownloadRows(List<Download> rows) {
   for (final row in rows) {
     if (row.status == DownloadStatusDb.completed) {
       return BookDownloadState.downloaded;
@@ -85,6 +91,6 @@ final bookDownloadStateProvider = FutureProvider.autoDispose.family<BookDownload
     }
   }
   return BookDownloadState.notDownloaded;
-});
+}
 
 enum BookDownloadState { notDownloaded, downloading, downloaded }

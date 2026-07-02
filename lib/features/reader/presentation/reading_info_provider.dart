@@ -37,33 +37,9 @@ class ReadingInfoNotifier extends _$ReadingInfoNotifier {
     } on Object catch (_) {}
   }
 
-  void updateHeaderLeft(InfoSlotMode mode) {
-    state = state.copyWith(headerLeft: mode);
-    unawaited(_save());
-  }
-
-  void updateHeaderCenter(InfoSlotMode mode) {
-    state = state.copyWith(headerCenter: mode);
-    unawaited(_save());
-  }
-
-  void updateHeaderRight(InfoSlotMode mode) {
-    state = state.copyWith(headerRight: mode);
-    unawaited(_save());
-  }
-
-  void updateFooterLeft(InfoSlotMode mode) {
-    state = state.copyWith(footerLeft: mode);
-    unawaited(_save());
-  }
-
-  void updateFooterCenter(InfoSlotMode mode) {
-    state = state.copyWith(footerCenter: mode);
-    unawaited(_save());
-  }
-
-  void updateFooterRight(InfoSlotMode mode) {
-    state = state.copyWith(footerRight: mode);
+  // ponytail: one update() replaces 6 slot-specific methods
+  void update(ReadingInfoModel Function(ReadingInfoModel) fn) {
+    state = fn(state);
     unawaited(_save());
   }
 

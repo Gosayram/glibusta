@@ -1,5 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../features/reader/data/parsers/format_detector.dart';
 import '../../shared/models/book.dart';
 
@@ -64,7 +62,3 @@ class FormatCapabilityService {
     };
   }
 }
-
-final formatCapabilityProvider = Provider<FormatCapabilityService>((ref) {
-  return const FormatCapabilityService();
-});

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -24,6 +26,10 @@ class DownloadNotificationService {
   static const _downloadChannelDescription = 'Прогресс загрузки книг и статус';
 
   final Map<String, int> _taskNotificationIds = {};
+  final _tapController = StreamController<String>.broadcast();
+
+  /// Stream of bookIds from notification taps.
+  Stream<String> get onTapBookId => _tapController.stream;
 
   int _notificationId(String taskId) {
     return _taskNotificationIds.putIfAbsent(taskId, () => _nextId++);
@@ -37,8 +43,16 @@ class DownloadNotificationService {
             iOS: DarwinInitializationSettings(),
             macOS: DarwinInitializationSettings(),
           ),
+          onDidReceiveNotificationResponse: _onNotificationResponse,
         )
         .then((_) {});
+  }
+
+  void _onNotificationResponse(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload != null && payload.isNotEmpty) {
+      _tapController.add(payload);
+    }
   }
 
   Future<void> showProgress({
@@ -92,6 +106,7 @@ class DownloadNotificationService {
         title: title,
         body: body,
         notificationDetails: details,
+        payload: task.bookId,
       );
     } on Object catch (e) {
       _logger.warning(
@@ -126,6 +141,7 @@ class DownloadNotificationService {
         title: title,
         body: body,
         notificationDetails: details,
+        payload: task.bookId,
       );
     } on Object catch (e) {
       _logger.warning(
@@ -160,6 +176,7 @@ class DownloadNotificationService {
         title: title,
         body: body,
         notificationDetails: details,
+        payload: task.bookId,
       );
     } on Object catch (e) {
       _logger.warning(
@@ -187,5 +204,7 @@ class DownloadNotificationService {
     return '${(bytesPerSec / (1024 * 1024)).toStringAsFixed(1)} МБ/с';
   }
 
-  void dispose() {}
+  void dispose() {
+    unawaited(_tapController.close());
+  }
 }

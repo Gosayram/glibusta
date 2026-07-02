@@ -28,13 +28,30 @@ class CompositeBookSource extends BookSource {
   final List<BookSource> sources;
   final AppLogger? _logger;
 
+  // Ponytail: simple in-memory cache, max 50 entries, 5 min TTL
+  final Map<String, _CacheEntry<SearchResultPage>> _searchCache = {};
+  final Map<String, _CacheEntry<SearchAuthorsResultPage>> _authorCache = {};
+  static const _cacheTtl = Duration(minutes: 5);
+  static const _cacheMaxSize = 50;
+
+  String _searchKey(SearchQuery q) =>
+      '${q.query}|${q.page}|${q.author}|${q.title}|${q.series}|${q.genre}|${q.filters.format}|${q.filters.language}|${q.filters.dateFrom}|${q.filters.dateTo}';
+
   @override
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
+    final key = _searchKey(query);
+    final cached = _searchCache[key];
+    if (cached != null && !cached.isExpired) return cached.value;
+    _searchCache.remove(key);
+
     final errors = <AppFailure>[];
     for (final source in sources) {
       try {
         final result = await source.searchBooks(query, cancelToken: cancelToken);
-        if (result.books.isNotEmpty) return result;
+        if (result.books.isNotEmpty) {
+          _put(_searchCache, key, result);
+          return result;
+        }
       } on AppFailure catch (e) {
         _logger?.severe(
           'SearchBooks failed (${source.runtimeType}): ${e.message}',
@@ -71,11 +88,19 @@ class CompositeBookSource extends BookSource {
     SearchQuery query, {
     CancelToken? cancelToken,
   }) async {
+    final key = _searchKey(query);
+    final cached = _authorCache[key];
+    if (cached != null && !cached.isExpired) return cached.value;
+    _authorCache.remove(key);
+
     final errors = <AppFailure>[];
     for (final source in sources) {
       try {
         final result = await source.searchAuthors(query, cancelToken: cancelToken);
-        if (result.authors.isNotEmpty) return result;
+        if (result.authors.isNotEmpty) {
+          _put(_authorCache, key, result);
+          return result;
+        }
       } on AppFailure catch (e) {
         _logger?.warning(
           'SearchAuthors failed (${source.runtimeType}): ${e.message}',
@@ -179,4 +204,19 @@ class CompositeBookSource extends BookSource {
       'No download URL found for book $bookId format ${format.name}',
     );
   }
+
+  void _put<T>(Map<String, _CacheEntry<T>> cache, String key, T value) {
+    if (cache.length >= _cacheMaxSize) {
+      final oldest = cache.keys.first;
+      cache.remove(oldest);
+    }
+    cache[key] = _CacheEntry(value);
+  }
+}
+
+class _CacheEntry<T> {
+  final T value;
+  final DateTime _createdAt;
+  _CacheEntry(this.value) : _createdAt = DateTime.now();
+  bool get isExpired => DateTime.now().difference(_createdAt) > CompositeBookSource._cacheTtl;
 }

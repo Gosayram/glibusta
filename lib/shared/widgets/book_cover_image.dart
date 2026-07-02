@@ -27,7 +27,33 @@ class BookCoverImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (book.coverUrl == null || book.coverUrl!.isEmpty) {
+    // Priority: local coverPath > HTTP coverUrl > data: URI > placeholder
+    if (book.coverPath != null && book.coverPath!.isNotEmpty) {
+      final file = File(book.coverPath!);
+      final placeholder = _buildPlaceholder(context);
+      final imageWidget = Stack(
+        fit: StackFit.expand,
+        children: [
+          placeholder,
+          Image.file(
+            file,
+            width: width,
+            height: height,
+            fit: fit,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        ],
+      );
+      return useHero ? Hero(tag: 'book_cover_${book.id}', child: imageWidget) : imageWidget;
+    }
+
+    // coverUrl: only valid for HTTP(S) URLs — skip data: URIs
+    final isHttpUrl =
+        book.coverUrl != null &&
+        book.coverUrl!.isNotEmpty &&
+        (book.coverUrl!.startsWith('http://') || book.coverUrl!.startsWith('https://'));
+
+    if (!isHttpUrl) {
       return _buildPlaceholder(context);
     }
 

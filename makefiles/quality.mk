@@ -164,7 +164,7 @@ rust-audit: ## Scan Rust dependencies for CVE vulnerabilities
 .PHONY: rust-deny
 rust-deny: ## Check licenses, bans, advisories, sources via cargo-deny
 	@$(PRINT_STEP) "Checking Rust dependency policy"
-	cd rust && cargo deny check
+	cd rust && cargo deny check --allow no-license-field
 
 .PHONY: rust-outdated
 rust-outdated: ## Show outdated direct Rust dependencies

@@ -1,23 +1,44 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+};
+use crate::book::normalize_whitespace;
 use anyhow::Result;
 
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
-    let (text, _encoding) = decode_rtf(bytes, forced_encoding)?;
-    Ok(text_to_book(text))
-}
-
-fn decode_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<(String, String)> {
     let encoding_name = forced_encoding.unwrap_or_else(|| detect_rtf_encoding(bytes));
     let decoded = if encoding_name.eq_ignore_ascii_case("utf-8") {
         String::from_utf8_lossy(bytes).into_owned()
     } else {
         decode_with_encoding(bytes, encoding_name)
     };
-    let (header_end, _codepage) = find_body_start(&decoded);
-    let body = &decoded[header_end..];
-    let plain_text = rtf_to_plain(body);
-    let cleaned = clean_rtf_output(&plain_text);
-    Ok((cleaned, encoding_name.to_string()))
+    let blocks = rtf_to_rich_blocks(&decoded);
+
+    let chapters = if blocks.is_empty() {
+        vec![]
+    } else {
+        vec![ReaderChapter {
+            index: 0,
+            title: String::new(),
+            blocks,
+        }]
+    };
+
+    let id = crate::book::sha256_hex(bytes);
+
+    Ok(NormalizedBook {
+        id,
+        title: String::new(),
+        authors: Vec::new(),
+        description: None,
+        cover_url: None,
+        chapters,
+        metadata: None,
+        book_format: BookFormat::Rtf,
+        language: None,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc: Vec::new(),
+    })
 }
 
 fn detect_rtf_encoding(bytes: &[u8]) -> &str {
@@ -70,90 +91,87 @@ fn decode_with_encoding(bytes: &[u8], encoding: &str) -> String {
     decoded.into_owned()
 }
 
-fn find_body_start(text: &str) -> (usize, u16) {
-    let mut codepage: u16 = 1252;
-    let mut pos = 0;
-
-    while pos < text.len() && pos < 2000 {
-        if text[pos..].starts_with("\\ansicpg") {
-            let num_start = pos + 8;
-            let num_end = text[num_start..]
-                .find(|c: char| !c.is_ascii_digit())
-                .map(|e| num_start + e)
-                .unwrap_or(text.len());
-            if let Ok(cp) = text[num_start..num_end].parse::<u16>() {
-                codepage = cp;
-            }
-        }
-
-        if text[pos..].starts_with("\\rtf1") {
-            let mut brace_depth = 0i32;
-            let mut search_pos = pos;
-            while search_pos < text.len() && search_pos < 5000 {
-                match text.as_bytes()[search_pos] {
-                    b'{' => brace_depth += 1,
-                    b'}' => {
-                        brace_depth -= 1;
-                        if brace_depth < 0 {
-                            return (search_pos + 1, codepage);
-                        }
-                    }
-                    b'\\' => {
-                        search_pos += 1;
-                        if search_pos < text.len() {
-                            match text.as_bytes()[search_pos] {
-                                b'{' | b'}' | b'\\' => {}
-                                b'\n' | b'\r' => {}
-                                _ => {
-                                    while search_pos < text.len()
-                                        && text.as_bytes()[search_pos].is_ascii_alphanumeric()
-                                    {
-                                        search_pos += 1;
-                                    }
-                                    if search_pos < text.len()
-                                        && text.as_bytes()[search_pos] == b' '
-                                    {
-                                        search_pos += 1;
-                                    }
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                search_pos += 1;
-            }
-            break;
-        }
-        pos += 1;
-    }
-
-    (pos, codepage)
+#[derive(Clone, Default)]
+struct RtfFmt {
+    bold: bool,
+    italic: bool,
+    superscript: bool,
+    font_size_half_pts: i32,
 }
 
-fn rtf_to_plain(text: &str) -> String {
-    let bytes = text.as_bytes();
-    let mut result = String::with_capacity(text.len());
+impl RtfFmt {
+    fn heading_level(&self) -> Option<i32> {
+        const DEFAULT: i32 = 24;
+        let ratio = self.font_size_half_pts as f64 / DEFAULT as f64;
+        // ponytail: font-size ratio → heading, common RTF convention
+        if ratio >= 3.0 {
+            Some(1)
+        } else if ratio >= 2.0 {
+            Some(2)
+        } else if ratio >= 1.5 {
+            Some(3)
+        } else if ratio >= 1.2 {
+            Some(4)
+        } else {
+            None
+        }
+    }
+}
+
+/// Flush accumulated span_text into rich_spans with current formatting.
+/// Always preserves text (even without formatting) so paragraphs aren't lost.
+fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfFmt) {
+    let text = span_text.trim().to_string();
+    if !text.is_empty() {
+        rich_spans.push(RichSpan {
+            text,
+            bold: fmt.bold,
+            italic: fmt.italic,
+            superscript: fmt.superscript,
+            href: None,
+            line_break: false,
+        });
+    }
+    span_text.clear();
+}
+
+fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
+    let bytes = body.as_bytes();
     let mut i = 0;
-    let mut skip_group = false;
     let mut brace_depth = 0i32;
+    let mut skip_group = false;
+    let mut skip_depth = 0i32;
+    let mut group_stack: Vec<RtfFmt> = Vec::new();
+    let mut fmt = RtfFmt::default();
+    let mut span_text = String::new();
+    let mut rich_spans: Vec<RichSpan> = Vec::new();
+    let mut blocks: Vec<ReaderBlock> = Vec::new();
+    let mut block_index = 0i32;
 
     while i < bytes.len() {
         match bytes[i] {
             b'{' => {
                 brace_depth += 1;
-                if bytes[i + 1..].starts_with(b"\\fonttbl") {
+                if bytes[i + 1..].starts_with(b"\\fonttbl")
+                    || bytes[i + 1..].starts_with(b"\\colortbl")
+                    || bytes[i + 1..].starts_with(b"\\stylesheet")
+                    || bytes[i + 1..].starts_with(b"\\*")
+                {
                     skip_group = true;
+                    skip_depth = brace_depth;
                 }
+                group_stack.push(fmt.clone());
                 i += 1;
             }
             b'}' => {
                 if brace_depth > 0 {
                     brace_depth -= 1;
                 }
-                if brace_depth == 0 && skip_group {
+                if skip_group && brace_depth < skip_depth {
                     skip_group = false;
+                }
+                if let Some(prev) = group_stack.pop() {
+                    fmt = prev;
                 }
                 i += 1;
             }
@@ -172,25 +190,67 @@ fn rtf_to_plain(text: &str) -> String {
 
                 match cmd {
                     "par" | "line" | "newline" | "page" | "sect" => {
-                        result.push('\n');
+                        push_rtf_paragraph(
+                            &mut blocks,
+                            &mut block_index,
+                            &mut rich_spans,
+                            &mut span_text,
+                            &mut fmt,
+                        );
                     }
-                    "tab" => {
-                        result.push('\t');
-                    }
-                    "lquote" | "lq" => result.push('\u{2018}'),
-                    "rquote" | "rq" => result.push('\u{2019}'),
-                    "ldblquote" | "ldq" => result.push('\u{201C}'),
-                    "rdblquote" | "rdq" => result.push('\u{201D}'),
-                    "emdash" | "em" => result.push('\u{2014}'),
-                    "endash" | "en" => result.push('\u{2013}'),
-                    "bullet" => result.push('\u{2022}'),
+                    "tab" => span_text.push('\t'),
+                    "lquote" | "lq" => span_text.push('\u{2018}'),
+                    "rquote" | "rq" => span_text.push('\u{2019}'),
+                    "ldblquote" | "ldq" => span_text.push('\u{201C}'),
+                    "rdblquote" | "rdq" => span_text.push('\u{201D}'),
+                    "emdash" | "em" => span_text.push('\u{2014}'),
+                    "endash" | "en" => span_text.push('\u{2013}'),
+                    "bullet" => span_text.push('\u{2022}'),
                     "ansi" | "ansicpg" | "uc" | "deff" | "deflang" => {}
                     "fonttbl" | "colortbl" | "stylesheet" | "listtables" | "revtbl" => {
                         skip_group = true;
+                        skip_depth = brace_depth;
                     }
-                    "b" | "b0" | "i" | "i0" | "super" | "sub" | "ul" | "ulnone" | "strike"
-                    | "scaps" | "highlight" => {}
-                    "fs" | "f" | "cf" | "cb" | "shd" | "lang" | "fcharset" | "pn" => {
+                    "b" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.bold = true;
+                    }
+                    "b0" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.bold = false;
+                    }
+                    "i" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.italic = true;
+                    }
+                    "i0" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.italic = false;
+                    }
+                    "super" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.superscript = true;
+                    }
+                    "sub" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.superscript = false;
+                    }
+                    "ul" | "ulnone" | "strike" | "scaps" | "highlight" => {}
+                    "fs" => {
+                        let size_start = i;
+                        while i < bytes.len() && bytes[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        if size_start < i {
+                            if let Ok(size) = std::str::from_utf8(&bytes[size_start..i])
+                                .unwrap_or("24")
+                                .parse::<i32>()
+                            {
+                                fmt.font_size_half_pts = size;
+                            }
+                        }
+                    }
+                    "f" | "cf" | "cb" | "shd" | "lang" | "fcharset" | "pn" => {
                         while i < bytes.len() && bytes[i].is_ascii_digit() {
                             i += 1;
                         }
@@ -211,7 +271,7 @@ fn rtf_to_plain(text: &str) -> String {
                                     code_point += 65536;
                                 }
                                 if let Some(c) = char::from_u32(code_point as u32) {
-                                    result.push(c);
+                                    span_text.push(c);
                                 }
                             }
                         }
@@ -240,7 +300,7 @@ fn rtf_to_plain(text: &str) -> String {
                                 u8::from_str_radix(std::str::from_utf8(hex).unwrap_or("00"), 16)
                             {
                                 if byte_val >= 0x20 {
-                                    result.push(byte_val as char);
+                                    span_text.push(byte_val as char);
                                 }
                             }
                             i += 2;
@@ -257,7 +317,7 @@ fn rtf_to_plain(text: &str) -> String {
                 }
             }
             c if !skip_group && brace_depth > 0 => {
-                result.push(c as char);
+                span_text.push(c as char);
                 i += 1;
             }
             _ => {
@@ -266,85 +326,51 @@ fn rtf_to_plain(text: &str) -> String {
         }
     }
 
-    result
+    push_rtf_paragraph(
+        &mut blocks,
+        &mut block_index,
+        &mut rich_spans,
+        &mut span_text,
+        &mut fmt,
+    );
+
+    blocks
 }
 
-fn clean_rtf_output(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut prev_was_newline = false;
+fn push_rtf_paragraph(
+    blocks: &mut Vec<ReaderBlock>,
+    block_index: &mut i32,
+    rich_spans: &mut Vec<RichSpan>,
+    span_text: &mut String,
+    fmt: &mut RtfFmt,
+) {
+    // Flush any remaining span with formatting into rich_spans
+    flush_span(rich_spans, span_text, fmt);
 
-    for c in text.chars() {
-        match c {
-            '\r' => continue,
-            '\n' => {
-                if !prev_was_newline {
-                    result.push('\n');
-                }
-                prev_was_newline = true;
-            }
-            ' ' | '\t' => {
-                if !prev_was_newline {
-                    result.push(' ');
-                }
-                prev_was_newline = false;
-            }
-            _ => {
-                result.push(c);
-                prev_was_newline = false;
-            }
-        }
-    }
-
-    result.trim().to_string()
-}
-
-fn text_to_book(text: String) -> NormalizedBook {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut chapters: Vec<ReaderChapter> = Vec::new();
-    let mut current_blocks: Vec<ReaderBlock> = Vec::new();
-    let mut block_index = 0i32;
-    let mut current_text = String::new();
-
-    for line in &lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            if !current_text.is_empty() {
-                current_blocks.push(ReaderBlock {
-                    index: block_index,
-                    text: current_text.trim().to_string(),
-                    block_type: BlockType::Paragraph,
-                    image_url: None,
-                    note_ref: None,
-                    rich_spans: None,
-                    heading_level: None,
-                    ordered: None,
-                    list_items: None,
-                    table_rows: None,
-                    image_alt: None,
-                    text_indent: None,
-                    text_align: None,
-                    note_id: None,
-                });
-                block_index += 1;
-                current_text.clear();
-            }
-        } else {
-            if !current_text.is_empty() {
-                current_text.push(' ');
-            }
-            current_text.push_str(trimmed);
-        }
-    }
-
-    if !current_text.is_empty() {
-        current_blocks.push(ReaderBlock {
-            index: block_index,
-            text: current_text.trim().to_string(),
+    let text = if rich_spans.is_empty() {
+        normalize_whitespace(span_text)
+    } else {
+        normalize_whitespace(
+            &rich_spans
+                .iter()
+                .map(|s| s.text.as_str())
+                .collect::<Vec<_>>()
+                .join(""),
+        )
+    };
+    if !text.is_empty() || !rich_spans.is_empty() {
+        blocks.push(ReaderBlock {
+            index: *block_index,
+            text,
             block_type: BlockType::Paragraph,
             image_url: None,
             note_ref: None,
-            rich_spans: None,
-            heading_level: None,
+            rich_spans: if rich_spans.is_empty() {
+                None
+            } else {
+                Some(rich_spans.clone())
+            },
+            heading_level: fmt.heading_level(),
             ordered: None,
             list_items: None,
             table_rows: None,
@@ -353,23 +379,9 @@ fn text_to_book(text: String) -> NormalizedBook {
             text_align: None,
             note_id: None,
         });
+        *block_index += 1;
     }
-
-    if !current_blocks.is_empty() {
-        chapters.push(ReaderChapter {
-            index: 0,
-            title: String::new(),
-            blocks: current_blocks,
-        });
-    }
-
-    NormalizedBook {
-        id: String::new(),
-        title: String::new(),
-        authors: Vec::new(),
-        description: None,
-        cover_url: None,
-        chapters,
-        metadata: None,
-    }
+    rich_spans.clear();
+    span_text.clear();
+    *fmt = RtfFmt::default();
 }

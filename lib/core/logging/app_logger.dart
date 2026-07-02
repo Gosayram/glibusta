@@ -7,8 +7,6 @@ import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../events/app_events.dart';
-
 enum LogLevel { finest, fine, info, warning, severe, shout }
 
 class LogEntry {
@@ -305,7 +303,6 @@ class _RingBuffer<T> {
 
 final appLoggerProvider = Provider<AppLogger>((ref) {
   final logger = AppLogger();
-  final eventBus = ref.watch(eventBusProvider);
 
   Logger.root.level = Level.ALL;
   final rootLogSubscription = Logger.root.onRecord.listen((record) {
@@ -318,22 +315,7 @@ final appLoggerProvider = Provider<AppLogger>((ref) {
     );
   });
 
-  void publishSevereEvents(LogEntry entry) {
-    if (entry.level == 'SEVERE' || entry.level == 'SHOUT') {
-      eventBus.fire(
-        ErrorOccurredEvent(
-          source: entry.loggerName ?? 'unknown',
-          message: entry.message,
-          stackTrace: entry.stackTrace?.toString(),
-        ),
-      );
-    }
-  }
-
-  logger.addListener(publishSevereEvents);
-
   ref.onDispose(() {
-    logger.removeListener(publishSevereEvents);
     unawaited(rootLogSubscription.cancel());
     logger.dispose();
   });

@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/features/reader/data/parsers/fb2_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
-import 'package:glibusta/features/reader/data/parsers/txt_parser.dart';
+import 'package:glibusta/features/reader/data/parsers/rust_book_parser.dart';
 import 'package:glibusta/features/reader/epub/epub_image_store.dart';
 import 'package:glibusta/features/reader/epub/epub_parser.dart' as new_epub;
 import 'package:path/path.dart' as p;
@@ -23,12 +22,12 @@ void main() {
     for (final file in files) {
       final name = p.basename(file.path);
       test(name, () async {
-        final parser = Fb2Parser();
+        final parser = RustBookParser();
         final book = await parser.parseFile(file.path);
         expect(book.title, isNotEmpty);
         expect(book.authors, isNotEmpty);
         expect(book.chapters, isNotEmpty);
-        final total = book.chapters.fold(0, (s, ch) => s + ch.blocks.length);
+        final total = book.chapters.fold<int>(0, (int s, ch) => s + ch.blocks.length);
         expect(total, greaterThan(0), reason: 'should have blocks');
       });
     }
@@ -54,7 +53,7 @@ void main() {
           expect(book.title, isNotEmpty);
           expect(book.authors, isNotEmpty);
           expect(book.chapters, isNotEmpty);
-          final total = book.chapters.fold(0, (s, ch) => s + ch.blocks.length);
+          final total = book.chapters.fold<int>(0, (int s, ch) => s + ch.blocks.length);
           expect(total, greaterThan(0));
         } finally {
           await tempDir.delete(recursive: true);
@@ -85,11 +84,11 @@ void main() {
           print('  NOTE: $name is actually a ZIP archive');
         }
 
-        final parser = TxtBookParser();
+        final parser = RustBookParser();
         final book = await parser.parseFile(file.path);
         expect(book.title, isNotEmpty);
         expect(book.chapters, isNotEmpty);
-        final total = book.chapters.fold(0, (s, ch) => s + ch.blocks.length);
+        final total = book.chapters.fold<int>(0, (int s, ch) => s + ch.blocks.length);
         expect(total, greaterThan(0), reason: 'should have content blocks');
       });
     }

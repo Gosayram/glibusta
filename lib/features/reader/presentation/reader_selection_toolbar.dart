@@ -1,18 +1,24 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/services/tts_controller.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
   final int chapterIndex;
   final int paragraphIndex;
   final VoidCallback onDismiss;
+  final ValueChanged<String>? onSearchInBook;
 
   const ReaderSelectionToolbar({
     super.key,
@@ -20,6 +26,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
     required this.chapterIndex,
     required this.paragraphIndex,
     required this.onDismiss,
+    this.onSearchInBook,
   });
 
   @override
@@ -68,6 +75,120 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 widget.onDismiss();
               },
             ),
+            _ToolbarButton(
+              icon: Icons.share,
+              label: 'Поделиться',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  await SharePlus.instance.share(
+                    ShareParams(text: _selectedText),
+                  );
+                }
+                widget.onDismiss();
+              },
+            ),
+            _ToolbarButton(
+              icon: Icons.search,
+              label: 'В поиске',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://www.google.com/search?q=$query');
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
+                }
+                widget.onDismiss();
+              },
+            ),
+            // HG-7.5: in-book search from context
+            if (widget.onSearchInBook != null && _selectedText != null)
+              _ToolbarButton(
+                icon: Icons.menu_book,
+                label: 'В книге',
+                onTap: () {
+                  widget.onSearchInBook!(_selectedText!);
+                  widget.onDismiss();
+                },
+              ),
+            _ToolbarButton(
+              icon: Icons.translate,
+              label: 'Перевод',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$query');
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
+                }
+                widget.onDismiss();
+              },
+            ),
+            // MD-3.2: inline dictionary popup via Wiktionary REST API
+            _ToolbarButton(
+              icon: Icons.menu_book,
+              label: 'Словарь',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = _selectedText!.trim();
+                  if (context.mounted) {
+                    unawaited(_showDictPopup(context, query));
+                  }
+                }
+                widget.onDismiss();
+              },
+            ),
+            // HG-7.7: Wikipedia search
+            _ToolbarButton(
+              icon: Icons.language,
+              label: 'Википедия',
+              onTap: () async {
+                if (_selectedText != null && _selectedText!.isNotEmpty) {
+                  final query = Uri.encodeComponent(_selectedText!);
+                  final uri = Uri.parse('https://ru.wikipedia.org/wiki/$query');
+                  try {
+                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    if (!launched && context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  } on Object {
+                    if (context.mounted) {
+                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                    }
+                  }
+                }
+                widget.onDismiss();
+              },
+            ),
+            // HG-7.6: TTS from context; LW-11.2: resume last if available
+            if (_selectedText != null && _selectedText!.isNotEmpty)
+              _ToolbarButton(
+                icon: Icons.volume_up,
+                label: TtsController.instance.hasLastText ? 'Возобновить' : 'Озвучить',
+                onTap: () {
+                  if (TtsController.instance.hasLastText) {
+                    unawaited(TtsController.instance.resume());
+                  } else {
+                    unawaited(_speakText(_selectedText!));
+                  }
+                  widget.onDismiss();
+                },
+              ),
             _ToolbarButton(
               icon: Icons.bookmark_add,
               label: 'Закладка',
@@ -261,50 +382,10 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     widget.onDismiss();
   }
 
+  // MD-21.2: highlight immediately with yellow, no menu
+  // ponytail: color picker removed; add if per-color quick-highlight setting is needed
   Future<void> _addHighlight(BuildContext context) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
-
-    final colors = <String, Color>{
-      'yellow': const Color(0xFFFFEB3B),
-      'green': const Color(0xFF4CAF50),
-      'blue': const Color(0xFF2196F3),
-      'red': const Color(0xFFF44336),
-      'purple': const Color(0xFF9C27B0),
-      'orange': const Color(0xFFFF9800),
-    };
-
-    final selectedColor = await showDialog<String>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Цвет подсветки'),
-        children: colors.entries
-            .map(
-              (e) => SimpleDialogOption(
-                onPressed: () => Navigator.of(context).pop(e.key),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: e.value,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(e.key[0].toUpperCase() + e.key.substring(1)),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
-      ),
-    );
-
-    if (selectedColor == null || !context.mounted) return;
 
     final db = ref.read(databaseProvider);
     await db
@@ -319,13 +400,75 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
             startOffset: 0,
             endOffset: _selectedText!.length,
             selectedText: _selectedText!,
-            color: Value(selectedColor),
+            color: const Value('yellow'),
           ),
         );
     if (context.mounted) {
       unawaited(SmartDialog.showToast('Текст выделен'));
     }
     widget.onDismiss();
+  }
+
+  // ponytail: single Wiktionary API, no offline cache, no multi-lang picker
+  Future<void> _showDictPopup(BuildContext context, String query) async {
+    try {
+      final client = HttpClient();
+      final uri = Uri.https(
+        'en.wiktionary.org',
+        '/api/rest_v1/page/summary/${Uri.encodeComponent(query)}',
+      );
+      final request = await client.getUrl(uri);
+      request.headers.set('Accept', 'application/json');
+      final response = await request.close();
+
+      if (!context.mounted) {
+        client.close();
+        return;
+      }
+
+      if (response.statusCode != 200) {
+        client.close();
+        unawaited(SmartDialog.showToast('Ничего не найдено'));
+        return;
+      }
+
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      final title = data['title'] as String? ?? query;
+      final extract = data['extract'] as String? ?? '';
+
+      if (!context.mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Text(extract.isNotEmpty ? extract : 'Нет определения'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Закрыть'),
+            ),
+          ],
+        ),
+      );
+    } on Object catch (e) {
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Ошибка словаря: $e'));
+      }
+    }
+  }
+
+  Future<void> _speakText(String text) async {
+    try {
+      await TtsController.instance.speak(text, lang: 'ru-RU', rate: 0.5);
+    } on Object catch (e) {
+      debugPrint('TTS error: $e');
+    }
   }
 }
 

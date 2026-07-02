@@ -107,20 +107,6 @@ void main() {
     });
   });
 
-  group('Genre', () {
-    test('stores fields correctly', () {
-      const genre = Genre(id: 'g1', name: 'Фантастика', parentId: 'g0');
-      expect(genre.id, 'g1');
-      expect(genre.name, 'Фантастика');
-      expect(genre.parentId, 'g0');
-    });
-
-    test('parentId can be null', () {
-      const genre = Genre(id: 'g2', name: 'Детективы', parentId: null);
-      expect(genre.parentId, isNull);
-    });
-  });
-
   group('BookSourceInfo', () {
     test('stores sourceId and sourceUrl', () {
       const info = BookSourceInfo(

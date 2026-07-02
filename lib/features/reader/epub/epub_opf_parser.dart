@@ -28,9 +28,10 @@ final class EpubOpfData {
 }
 
 final class SpineItem {
-  const SpineItem({required this.idref, this.linear = true});
+  const SpineItem({required this.idref, this.linear = true, this.mediaOverlay});
   final String idref;
   final bool linear;
+  final String? mediaOverlay;
 }
 
 final class EpubOpfParser {
@@ -103,6 +104,7 @@ final class EpubOpfParser {
               (e) => SpineItem(
                 idref: e.getAttribute('idref')!,
                 linear: e.getAttribute('linear') != 'no',
+                mediaOverlay: e.getAttribute('media-overlay'),
               ),
             )
             .toList() ??

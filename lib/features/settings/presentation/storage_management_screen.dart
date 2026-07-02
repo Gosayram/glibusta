@@ -8,6 +8,7 @@ import '../../../core/platform/app_file_storage.dart';
 import '../../../core/services/catalog_cover_cache_service.dart';
 import '../../../core/services/smart_cleanup_service.dart';
 import '../../../core/storage/storage_info_model.dart';
+import '../../../l10n/generated/app_localizations.dart';
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
   const StorageManagementScreen({super.key});
@@ -23,10 +24,11 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
   Widget build(BuildContext context) {
     final storageAsync = ref.watch(storageInfoProvider);
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Управление хранилищем'),
+        title: Text(l10n.storageTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -45,7 +47,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Всего: ${info.totalHuman}',
+                      l10n.storageTotal(info.totalHuman),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -62,53 +64,53 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'Действия',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                l10n.storageActions,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
             const SizedBox(height: 8),
             _ActionTile(
               icon: Icons.cleaning_services,
-              title: 'Очистить временные файлы',
-              subtitle: 'Файлы старше 1 часа',
+              title: l10n.storageCleanTemp,
+              subtitle: l10n.storageCleanTempSub,
               onTap: _cleanTemp,
               enabled: !_isCleaning,
             ),
             _ActionTile(
               icon: Icons.delete_sweep,
-              title: 'Очистить кеш',
-              subtitle: 'Файлы кеша старше 7 дней',
+              title: l10n.storageCleanCache,
+              subtitle: l10n.storageCleanCacheSub,
               onTap: _cleanCache,
               enabled: !_isCleaning,
             ),
             _ActionTile(
               icon: Icons.find_in_page,
-              title: 'Найти сиротские файлы',
-              subtitle: 'Файлы книг без записи в БД',
+              title: l10n.storageFindOrphans,
+              subtitle: l10n.storageFindOrphansSub,
               onTap: _findOrphans,
               enabled: !_isCleaning,
             ),
             _ActionTile(
               icon: Icons.fitness_center,
-              title: 'Тяжёлые книги',
-              subtitle: 'Книги больше 5 МБ',
+              title: l10n.storageFindHeavy,
+              subtitle: l10n.storageFindHeavySub,
               onTap: _findHeavyBooks,
               enabled: !_isCleaning,
             ),
             _ActionTile(
               icon: Icons.image_not_supported,
-              title: 'Очистить кеш обложек каталога',
-              subtitle: 'Удалить все кешированные обложки',
+              title: l10n.storageCleanCatalogCovers,
+              subtitle: l10n.storageCleanCatalogCoversSub,
               onTap: _cleanCatalogCovers,
               enabled: !_isCleaning,
             ),
             _ActionTile(
               icon: Icons.timer,
-              title: 'Очистить устаревшие обложки',
-              subtitle: 'Обложки старше 30 дней',
+              title: l10n.storageCleanExpiredCovers,
+              subtitle: l10n.storageCleanExpiredCoversSub,
               onTap: _cleanExpiredCatalogCovers,
               enabled: !_isCleaning,
             ),
@@ -134,6 +136,8 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
         return Colors.teal;
       case 'temp':
         return Colors.grey;
+      case 'download':
+        return Colors.blue;
       default:
         return theme.colorScheme.primary;
     }
@@ -147,7 +151,8 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final (count, bytes) = await cleanup.cleanupTempFiles(tempDir);
       if (!mounted) return;
-      unawaited(SmartDialog.showToast('Удалено $count файлов (${formatBytes(bytes)})'));
+      final l10n = AppLocalizations.of(context);
+      unawaited(SmartDialog.showToast(l10n.storageTempCleaned(count, formatBytes(bytes))));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -162,7 +167,8 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final count = await cleanup.cleanupCacheFiles(cacheDir);
       if (!mounted) return;
-      unawaited(SmartDialog.showToast('Очищено $count файлов кеша'));
+      final l10n = AppLocalizations.of(context);
+      unawaited(SmartDialog.showToast(l10n.storageCacheCleaned(count)));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -177,8 +183,9 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final orphans = await cleanup.findOrphanFiles(booksDir);
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       if (orphans.isEmpty) {
-        unawaited(SmartDialog.showToast('Сиротские файлы не найдены'));
+        unawaited(SmartDialog.showToast(l10n.storageNoOrphans));
       } else {
         await showDialog<void>(
           context: context,
@@ -217,8 +224,9 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cleanup = ref.read(smartCleanupServiceProvider);
       final heavy = await cleanup.findHeavyBooks();
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       if (heavy.isEmpty) {
-        unawaited(SmartDialog.showToast('Тяжёлых книг не найдено'));
+        unawaited(SmartDialog.showToast(l10n.storageNoHeavy));
       } else {
         await showDialog<void>(
           context: context,
@@ -253,7 +261,8 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cacheService = ref.read(catalogCoverCacheServiceProvider);
       await cacheService.clearAll();
       if (!mounted) return;
-      unawaited(SmartDialog.showToast('Кеш обложек каталога очищен'));
+      final l10n = AppLocalizations.of(context);
+      unawaited(SmartDialog.showToast(l10n.storageCatalogCoversCleaned));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
@@ -266,7 +275,8 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       final cacheService = ref.read(catalogCoverCacheServiceProvider);
       await cacheService.clearExpired();
       if (!mounted) return;
-      unawaited(SmartDialog.showToast('Устаревшие обложки удалены'));
+      final l10n = AppLocalizations.of(context);
+      unawaited(SmartDialog.showToast(l10n.storageExpiredCoversCleaned));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);

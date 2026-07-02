@@ -1,9 +1,17 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, TocEntry,
+};
+use crate::book::normalize_whitespace;
 use anyhow::Result;
+use regex::Regex;
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
-    let encoding_name = forced_encoding.unwrap_or("utf-8");
-    let text = decode_text(bytes, encoding_name)?;
+    let text = if let Some(enc) = forced_encoding {
+        decode_text(bytes, enc)?
+    } else {
+        let encoding = crate::book::encoding::detect_encoding(bytes);
+        decode_text(bytes, encoding)?
+    };
 
     let paragraphs: Vec<String> = text
         .split("\n\n")
@@ -35,15 +43,15 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
 
     let title = extract_title_from_first_line(&blocks);
 
-    let chapters = if blocks.is_empty() {
-        vec![]
-    } else {
-        vec![ReaderChapter {
-            index: 0,
-            title: title.clone(),
-            blocks,
-        }]
-    };
+    let chapters = split_into_chapters(blocks, &title);
+    let toc: Vec<TocEntry> = chapters
+        .iter()
+        .map(|ch| TocEntry {
+            title: ch.title.clone(),
+            chapter_index: ch.index,
+            children: Vec::new(),
+        })
+        .collect();
 
     Ok(NormalizedBook {
         id,
@@ -53,6 +61,11 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         cover_url: None,
         chapters,
         metadata: None,
+        book_format: BookFormat::Txt,
+        language: None,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc,
     })
 }
 
@@ -64,7 +77,6 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
             .unwrap_or(encoding_rs::UTF_8)
             .decode(bytes);
         if had_errors {
-            // Fallback to UTF-8 lossy
             Ok(String::from_utf8_lossy(bytes).into_owned())
         } else {
             Ok(decoded.into_owned())
@@ -72,35 +84,137 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
     }
 }
 
-fn normalize_whitespace(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut prev_was_space = false;
+fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
+    let chapter_re =
+        Regex::new(r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+")
+            .unwrap();
+    let short_re = Regex::new(r"^[\s\d]+$").unwrap();
+    // Skip very short lines, lines that look like chapter headings, or common non-title intros
+    for block in blocks {
+        let text = block.text.trim();
+        if text.len() < 3 {
+            continue;
+        }
+        if chapter_re.is_match(text) {
+            continue;
+        }
+        if short_re.is_match(text) {
+            continue;
+        }
+        // Skip if it's a single word of 5 or fewer chars (likely metadata)
+        if text.len() <= 5 && !text.contains(' ') {
+            continue;
+        }
+        return text.to_string();
+    }
+    blocks.first().map(|b| b.text.clone()).unwrap_or_default()
+}
 
-    for ch in text.chars() {
-        match ch {
-            '\r' => continue,
-            '\n' => {
-                if !prev_was_space {
-                    result.push(' ');
-                }
-                prev_was_space = true;
-            }
-            ' ' | '\t' => {
-                if !prev_was_space {
-                    result.push(' ');
-                }
-                prev_was_space = true;
-            }
-            _ => {
-                result.push(ch);
-                prev_was_space = false;
-            }
+fn is_chapter_heading(text: &str, re: &Regex) -> bool {
+    re.is_match(text)
+}
+
+fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<ReaderChapter> {
+    if blocks.is_empty() {
+        return vec![];
+    }
+
+    let re = Regex::new(
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
+    )
+    .unwrap();
+
+    let mut chapter_indices: Vec<usize> = Vec::new();
+    for (i, block) in blocks.iter().enumerate() {
+        if is_chapter_heading(&block.text, &re) {
+            chapter_indices.push(i);
         }
     }
 
-    result.trim().to_string()
-}
+    if chapter_indices.is_empty() {
+        return vec![ReaderChapter {
+            index: 0,
+            title: book_title.to_string(),
+            blocks,
+        }];
+    }
 
-fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
-    blocks.first().map(|b| b.text.clone()).unwrap_or_default()
+    let mut chapters: Vec<ReaderChapter> = Vec::new();
+
+    if chapter_indices[0] > 0 {
+        let preamble_blocks: Vec<ReaderBlock> = blocks[0..chapter_indices[0]]
+            .iter()
+            .enumerate()
+            .map(|(i, b)| ReaderBlock {
+                index: i as i32,
+                text: b.text.clone(),
+                block_type: b.block_type.clone(),
+                image_url: None,
+                note_ref: None,
+                rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
+            })
+            .collect();
+        if !preamble_blocks.is_empty() {
+            chapters.push(ReaderChapter {
+                index: 0,
+                title: book_title.to_string(),
+                blocks: preamble_blocks,
+            });
+        }
+    }
+
+    for (ci, &ch_idx) in chapter_indices.iter().enumerate() {
+        let end = if ci + 1 < chapter_indices.len() {
+            chapter_indices[ci + 1]
+        } else {
+            blocks.len()
+        };
+
+        let chapter_blocks: Vec<ReaderBlock> = blocks[ch_idx..end]
+            .iter()
+            .enumerate()
+            .map(|(i, b)| ReaderBlock {
+                index: i as i32,
+                text: b.text.clone(),
+                block_type: b.block_type.clone(),
+                image_url: None,
+                note_ref: None,
+                rich_spans: None,
+                heading_level: None,
+                ordered: None,
+                list_items: None,
+                table_rows: None,
+                image_alt: None,
+                text_indent: None,
+                text_align: None,
+                note_id: None,
+            })
+            .collect();
+
+        let title = chapter_blocks
+            .first()
+            .map(|b| b.text.clone())
+            .unwrap_or_else(|| format!("Глава {}", chapters.len() + 1));
+
+        chapters.push(ReaderChapter {
+            index: chapters.len() as i32,
+            title,
+            blocks: chapter_blocks,
+        });
+    }
+
+    // Re-index chapters
+    for (i, ch) in chapters.iter_mut().enumerate() {
+        ch.index = i as i32;
+    }
+
+    chapters
 }

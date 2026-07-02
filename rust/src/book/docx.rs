@@ -1,4 +1,6 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
+use crate::api::models::{
+    BlockType, BookFormat, EmbeddedImage, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::decode_bytes;
 use anyhow::{Context, Result};
@@ -41,14 +43,29 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         "created": created_date,
     });
 
+    let images = extract_images(&mut zip);
+    let cover_url = images.first().and_then(|img| {
+        use base64::Engine;
+        Some(format!(
+            "data:{};base64,{}",
+            img.media_type,
+            base64::engine::general_purpose::STANDARD.encode(&img.data)
+        ))
+    });
+
     Ok(NormalizedBook {
         id,
         title: final_title,
         authors,
         description: None,
-        cover_url: None,
+        cover_url,
         chapters,
         metadata: Some(metadata),
+        book_format: BookFormat::Docx,
+        language: None,
+        warnings: Vec::new(),
+        images,
+        toc: Vec::new(),
     })
 }
 
@@ -84,6 +101,44 @@ fn parse_core_properties(
     let created = core.created.unwrap_or_default();
 
     Ok((title, authors, created))
+}
+
+/// Extract images from word/media/ directory.
+fn extract_images(zip: &mut ZipFile) -> Vec<EmbeddedImage> {
+    let media_entries: Vec<String> = zip
+        .entry_names()
+        .iter()
+        .filter(|name| name.starts_with("word/media/"))
+        .cloned()
+        .collect();
+
+    media_entries
+        .into_iter()
+        .filter_map(|name| {
+            let data = zip.find_file(&name)?;
+            let media_type = mime_from_name(&name);
+            let id = name.rsplit('/').next().unwrap_or(&name).to_string();
+            Some(EmbeddedImage {
+                id,
+                media_type,
+                data,
+            })
+        })
+        .collect()
+}
+
+fn mime_from_name(name: &str) -> String {
+    let ext = name.rsplit('.').next().unwrap_or("").to_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg".to_string(),
+        "png" => "image/png".to_string(),
+        "gif" => "image/gif".to_string(),
+        "bmp" => "image/bmp".to_string(),
+        "svg" => "image/svg+xml".to_string(),
+        "webp" => "image/webp".to_string(),
+        "tiff" | "tif" => "image/tiff".to_string(),
+        _ => "application/octet-stream".to_string(),
+    }
 }
 
 fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {

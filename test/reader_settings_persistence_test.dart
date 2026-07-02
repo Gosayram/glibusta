@@ -15,14 +15,14 @@ void main() {
       test('returns default settings when no saved data exists', () async {
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.theme, ReaderTheme.system);
-        expect(settings.mode, ReaderMode.continuous);
+        expect(settings.mode, ReaderMode.paginated);
         expect(settings.fontSize, 18.0);
-        expect(settings.lineHeight, 1.55);
+        expect(settings.lineHeight, 1.6);
         expect(settings.margin, 20.0);
         expect(settings.font, ReaderFont.literata);
-        expect(settings.paragraphSpacing, 8.0);
+        expect(settings.paragraphSpacing, 20.0);
         expect(settings.letterSpacing, 0.0);
-        expect(settings.textAlign, ReaderTextAlign.left);
+        expect(settings.textAlign, ReaderTextAlign.justify);
         expect(settings.autoThemeMode, AutoThemeMode.off);
         expect(settings.customDayHour, 7);
         expect(settings.customNightHour, 20);
@@ -31,11 +31,9 @@ void main() {
       test('loads saved settings correctly', () async {
         const savedSettings = ReaderSettings(
           theme: ReaderTheme.sepia,
-          mode: ReaderMode.paginated,
           fontSize: 22.0,
           lineHeight: 1.7,
           margin: 24.0,
-          paragraphSpacing: 12.0,
           letterSpacing: 0.5,
           autoThemeMode: AutoThemeMode.sunset,
           customDayHour: 8,
@@ -50,9 +48,9 @@ void main() {
         expect(loaded.lineHeight, 1.7);
         expect(loaded.margin, 24.0);
         expect(loaded.font, ReaderFont.literata);
-        expect(loaded.paragraphSpacing, 12.0);
+        expect(loaded.paragraphSpacing, 20.0);
         expect(loaded.letterSpacing, 0.5);
-        expect(loaded.textAlign, ReaderTextAlign.left);
+        expect(loaded.textAlign, ReaderTextAlign.justify);
         expect(loaded.autoThemeMode, AutoThemeMode.sunset);
         expect(loaded.customDayHour, 8);
         expect(loaded.customNightHour, 21);
@@ -77,7 +75,7 @@ void main() {
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.theme, ReaderTheme.paper);
         expect(settings.fontSize, 18.0); // default
-        expect(settings.lineHeight, 1.55); // default
+        expect(settings.lineHeight, 1.6); // default
       });
 
       test('handles unknown theme name gracefully', () async {
@@ -134,7 +132,7 @@ void main() {
       test('saves all fields correctly', () async {
         const settings = ReaderSettings(
           theme: ReaderTheme.sepia,
-          mode: ReaderMode.twoPage,
+          twoPageEnabled: true,
           fontSize: 16.0,
           lineHeight: 1.3,
           margin: 8.0,
@@ -150,7 +148,8 @@ void main() {
         final loaded = await ReaderSettingsPersistence.load();
 
         expect(loaded.theme, ReaderTheme.sepia);
-        expect(loaded.mode, ReaderMode.twoPage);
+        expect(loaded.mode, ReaderMode.paginated);
+        expect(loaded.twoPageEnabled, isTrue);
         expect(loaded.fontSize, 16.0);
         expect(loaded.lineHeight, 1.3);
         expect(loaded.margin, 8.0);

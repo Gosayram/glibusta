@@ -21,7 +21,7 @@ class StorageModeNotifier extends _$StorageModeNotifier {
   @override
   StorageMode build() {
     unawaited(_load());
-    return StorageMode.internal;
+    return StorageMode.downloads;
   }
 
   Future<void> _load() async {

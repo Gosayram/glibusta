@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' show TextAlign;
 
@@ -52,7 +51,7 @@ class RustBookParser implements BookParser {
     }
 
     try {
-      final book = await rust_api.parseBook(
+      final book = await rust_api.parseBookLegacy(
         bytes: bytes,
         format: _formatName(format),
         forcedEncoding: forcedEncoding,
@@ -68,16 +67,12 @@ class RustBookParser implements BookParser {
     String filePath, {
     String? forcedEncoding,
   }) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw ParserFailure('File not found: $filePath');
+    try {
+      final book = await rust_api.parseBook(path: filePath);
+      return _toNormalizedBook(book);
+    } on Object catch (e) {
+      throw ParserFailure('Rust parser failed for $filePath: $e');
     }
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw ParserFailure('File is empty: $filePath');
-    }
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    return parse(bytes, fileName: fileName, forcedEncoding: forcedEncoding);
   }
 
   Future<local.NormalizedBookMetadata?> parseMetadata(
@@ -138,12 +133,8 @@ class RustBookParser implements BookParser {
                       tableRows: rb.tableRows?.map((row) => row.cast<String>()).toList(),
                       imageAlt: rb.imageAlt,
                       textIndent: rb.textIndent,
-                      textAlign: rb.textAlign != null
-                          ? TextAlign.values.firstWhere(
-                              (e) => e.name == rb.textAlign,
-                              orElse: () => TextAlign.left,
-                            )
-                          : null,
+                      textAlign: _parseTextAlignFromRust(rb.textAlign),
+                      whiteSpaceMode: _extractProp(rb.textAlign, 'ws'),
                       noteId: rb.noteId,
                     ),
                   )
@@ -153,6 +144,45 @@ class RustBookParser implements BookParser {
           .toList(),
       metadata: r.metadata != null ? Map<String, dynamic>.from(r.metadata! as Map) : null,
     );
+  }
+
+  /// Extract a pipe-separated CSS property from the raw text_align value.
+  /// Format: "left|ws:pre|fg:#333|lh:1.5|fw:700".
+  static String? _extractProp(String? raw, String prefix) {
+    if (raw == null || !raw.contains('|')) {
+      // Simple format: just check startsWith for backward compat
+      if (raw != null && raw.startsWith('$prefix:')) {
+        return raw.substring(prefix.length + 1);
+      }
+      return null;
+    }
+    for (final part in raw.split('|')) {
+      if (part.startsWith('$prefix:')) return part.substring(prefix.length + 1);
+    }
+    return null;
+  }
+
+  /// Parse TextAlign from Rust bridge text_align (pipe-separated format).
+  static TextAlign? _parseTextAlignFromRust(String? raw) {
+    if (raw == null) return null;
+    if (!raw.contains('|')) {
+      // Simple format
+      if (raw.startsWith('ws:')) return null;
+      return TextAlign.values.firstWhere(
+        (e) => e.name == raw,
+        orElse: () => TextAlign.left,
+      );
+    }
+    // Pipe-separated: find the first part without a colon
+    for (final part in raw.split('|')) {
+      if (!part.contains(':')) {
+        return TextAlign.values.firstWhere(
+          (e) => e.name == part,
+          orElse: () => TextAlign.left,
+        );
+      }
+    }
+    return null;
   }
 
   static local.BlockType _toBlockType(rust_models.BlockType rbt) {

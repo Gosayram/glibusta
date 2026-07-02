@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../database/app_database.dart';
 import '../logging/app_logger.dart';
+import '../utils/format_utils.dart';
 
 class CleanupResult {
   const CleanupResult({
@@ -36,13 +37,7 @@ class HeavyBook {
   final String filePath;
   final int sizeBytes;
 
-  String get sizeHuman => _formatBytes(sizeBytes);
-
-  static String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
+  String get sizeHuman => formatBytes(sizeBytes);
 }
 
 class SmartCleanupService {

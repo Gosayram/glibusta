@@ -158,8 +158,15 @@ class _HighlightBlockPainter extends CustomPainter {
           yOffset += prev.height;
         }
 
+        // ponytail: 2px vertical padding on highlights, no config needed yet
+        const padding = 2.0;
         rects.add(
-          Rect.fromLTWH(startX - 2, yOffset, (endX - startX) + 4, line.height),
+          Rect.fromLTWH(
+            startX - 2,
+            yOffset + padding,
+            (endX - startX) + 4,
+            (line.height - padding * 2).clamp(2.0, line.height),
+          ),
         );
       }
 

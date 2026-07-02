@@ -5,7 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../core/logging/app_logger.dart';
+import '../logging/app_logger.dart';
 
 class DownloadableFont {
   final String id;

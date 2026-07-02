@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
-import '../../highlights/presentation/highlight_providers.dart';
+import 'highlight_providers.dart';
 
 class HighlightsNotesScreen extends ConsumerWidget {
   final String bookId;
@@ -21,6 +24,23 @@ class HighlightsNotesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Выделения и заметки'),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              final highlights = highlightsAsync.value;
+              if (highlights == null || highlights.isEmpty) return;
+              if (value == 'anki') {
+                await _exportAnki(context, ref, highlights);
+              } else if (value == 'markdown') {
+                await _exportMarkdown(context, ref, highlights);
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'anki', child: Text('Экспорт в Anki (TSV)')),
+              PopupMenuItem(value: 'markdown', child: Text('Экспорт в Markdown')),
+            ],
+          ),
+        ],
       ),
       body: highlightsAsync.when(
         data: (highlights) {
@@ -97,6 +117,71 @@ class HighlightsNotesScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  // MD-4.3: Anki TSV export — front=selected text, back=note or chapter context
+  Future<void> _exportAnki(
+    BuildContext context,
+    WidgetRef ref,
+    List<TextHighlight> highlights,
+  ) async {
+    final db = ref.read(databaseProvider);
+    final book = await db.bookDao.getBookById(bookId);
+    final bookTitle = book?.title ?? 'Книга';
+    final buffer = StringBuffer();
+    buffer.writeln('#Sep=Tab');
+    buffer.writeln('Text\tExtra\tTags');
+    for (final h in highlights) {
+      final front = h.selectedText.replaceAll('\t', ' ').replaceAll('\n', ' ');
+      final note = (h.noteText ?? '').replaceAll('\t', ' ').replaceAll('\n', ' ');
+      final back = note.isNotEmpty ? note : 'Глава ${h.chapterIndex + 1}';
+      buffer.writeln('$front\t$back\t$bookTitle');
+    }
+    await _shareFile(buffer.toString(), 'anki_cards.txt', 'Anki cards');
+  }
+
+  // MD-4.4: Markdown export with hashtags for Notion/Obsidian
+  Future<void> _exportMarkdown(
+    BuildContext context,
+    WidgetRef ref,
+    List<TextHighlight> highlights,
+  ) async {
+    final db = ref.read(databaseProvider);
+    final book = await db.bookDao.getBookById(bookId);
+    final bookTitle = book?.title ?? 'Книга';
+    final allAuthors = await db.authorDao.getAllAuthors();
+    final authorMap = {for (final a in allAuthors) a.id: a.name};
+    final authors = book?.authorIds.map((id) => authorMap[id]).whereType<String>().join(', ') ?? '';
+    final buffer = StringBuffer();
+    buffer.writeln('# Выделения — $bookTitle');
+    if (authors.isNotEmpty) buffer.writeln('_Автор: ${authors}_');
+    buffer.writeln();
+    for (final h in highlights) {
+      buffer.writeln('> ${h.selectedText}');
+      if (h.noteText != null && h.noteText!.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln('**Заметка:** ${h.noteText}');
+      }
+      buffer.writeln();
+      buffer.writeln('#${bookTitle.replaceAll(' ', '_')} #глава${h.chapterIndex + 1}');
+      buffer.writeln('---');
+      buffer.writeln();
+    }
+    await _shareFile(buffer.toString(), 'highlights.md', 'Markdown');
+  }
+
+  Future<void> _shareFile(String content, String filename, String label) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/glibusta/$filename');
+      await file.parent.create(recursive: true);
+      await file.writeAsString(content);
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.path)], text: label),
+      );
+    } on Object {
+      unawaited(SmartDialog.showToast('Не удалось экспортировать'));
+    }
   }
 
   String _countLabel(int count) {

@@ -14,6 +14,13 @@ final catalogRepositoryProvider = Provider<CatalogRepository>((ref) {
   return CatalogRepositoryImpl(source, apiClient);
 });
 
+class _CacheEntry<T> {
+  final T data;
+  final DateTime expiresAt;
+  _CacheEntry(this.data, this.expiresAt);
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+}
+
 class CatalogRepositoryImpl implements CatalogRepository {
   final BookSource _source;
   final FlibustaApiClient _apiClient;
@@ -21,11 +28,20 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   CatalogRepositoryImpl(this._source, this._apiClient);
 
+  static const _cacheTtl = Duration(minutes: 10);
+  final _categoriesCache = <String, _CacheEntry<List<String>>>{};
+  final _booksCache = <String, _CacheEntry<List<Book>>>{};
+
   @override
   Future<List<String>> getCategories() async {
+    final cached = _categoriesCache['categories'];
+    if (cached != null && !cached.isExpired) return cached.data;
+
     try {
       final response = await _apiClient.getGenreList();
-      return response.genres.map((g) => g.name).toList();
+      final result = response.genres.map((g) => g.name).toList();
+      _categoriesCache['categories'] = _CacheEntry(result, DateTime.now().add(_cacheTtl));
+      return result;
     } on Object catch (e) {
       _logger.warning('Genre list failed, using defaults: $e', name: 'Catalog');
       return const [
@@ -41,11 +57,14 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getPopularBooks() async {
+    final cached = _booksCache['popular'];
+    if (cached != null && !cached.isExpired) return cached.data;
+
     try {
       final result = await _apiClient.getPopularBooks();
       final rawBase = _apiClient.dio.options.baseUrl;
       final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
-      return result.books
+      final books = result.books
           .map(
             (item) => Book(
               id: item.id,
@@ -64,6 +83,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
             ),
           )
           .toList();
+      _booksCache['popular'] = _CacheEntry(books, DateTime.now().add(_cacheTtl));
+      return books;
     } on Object catch (e) {
       _logger.warning('Popular books query failed: $e', name: 'Catalog', error: e);
       return const [];
@@ -72,11 +93,14 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getRecentBooks() async {
+    final cached = _booksCache['recent'];
+    if (cached != null && !cached.isExpired) return cached.data;
+
     try {
       final result = await _apiClient.getRecentBooks();
       final rawBase = _apiClient.dio.options.baseUrl;
       final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
-      return result.books
+      final books = result.books
           .map(
             (item) => Book(
               id: item.id,
@@ -95,6 +119,8 @@ class CatalogRepositoryImpl implements CatalogRepository {
             ),
           )
           .toList();
+      _booksCache['recent'] = _CacheEntry(books, DateTime.now().add(_cacheTtl));
+      return books;
     } on Object catch (e) {
       _logger.warning('Recent books query failed: $e', name: 'Catalog', error: e);
       return const [];
@@ -103,9 +129,13 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<Book>> getBooksByCategory(String category) async {
+    final cached = _booksCache['cat:$category'];
+    if (cached != null && !cached.isExpired) return cached.data;
+
     final query = SearchQuery(query: category);
     try {
       final result = await _source.searchBooks(query);
+      _booksCache['cat:$category'] = _CacheEntry(result.books, DateTime.now().add(_cacheTtl));
       return result.books;
     } on Object catch (e) {
       _logger.warning('Category query failed ($category): $e', name: 'Catalog', error: e);

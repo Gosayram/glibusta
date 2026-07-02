@@ -31,6 +31,7 @@ class AdaptiveNavigation extends StatelessWidget {
     final compactDestinations = [
       NavigationDestination(icon: const Icon(Icons.library_books), label: l10n.libraryTitle),
       NavigationDestination(icon: const Icon(Icons.search), label: l10n.searchTitle),
+      NavigationDestination(icon: const Icon(Icons.explore), label: l10n.catalogTitle),
       NavigationDestination(icon: const Icon(Icons.download), label: l10n.downloadsTitle),
       NavigationDestination(icon: const Icon(Icons.settings), label: l10n.settingsTitle),
     ];
@@ -43,6 +44,10 @@ class AdaptiveNavigation extends StatelessWidget {
       NavigationRailDestination(
         icon: const Icon(Icons.search),
         label: Text(l10n.searchTitle),
+      ),
+      NavigationRailDestination(
+        icon: const Icon(Icons.explore),
+        label: Text(l10n.catalogTitle),
       ),
       NavigationRailDestination(
         icon: const Icon(Icons.download),
@@ -93,7 +98,8 @@ class SidebarNavigation extends StatelessWidget {
     0: 0,
     1: 1,
     2: 2,
-    6: 3,
+    3: 3,
+    7: 4,
   };
 
   @override
@@ -104,6 +110,7 @@ class SidebarNavigation extends StatelessWidget {
     final items = [
       _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
       _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      _SidebarItem(icon: Icons.explore, label: l10n.catalogTitle, route: '/catalog'),
       _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
       _SidebarItem(
         icon: Icons.collections_bookmark,
@@ -343,12 +350,9 @@ class ShellWithNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final capabilities = ref.watch(platformCapabilitiesProvider);
-
-    // Fallback for non-StatefulShellRoute routes (catalog, collections, etc.)
     final shell = navigationShell;
 
-    if (capabilities.hasNativeMenuBar) {
+    if (hasNativeMenuBar) {
       return shell != null
           ? MacOSShell(navigationShell: shell)
           : const Scaffold(body: SizedBox.shrink());

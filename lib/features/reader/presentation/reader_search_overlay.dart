@@ -12,12 +12,16 @@ class BookSearchOverlay extends StatefulWidget {
     required this.onJumpToResult,
     required this.onDismiss,
     required this.theme,
+    this.currentChapterIndex,
+    this.initialQuery,
   });
 
   final BookSearchService searchService;
   final void Function(ReaderPosition position, String query) onJumpToResult;
   final VoidCallback onDismiss;
   final ReaderTheme theme;
+  final int? currentChapterIndex;
+  final String? initialQuery;
 
   @override
   State<BookSearchOverlay> createState() => _BookSearchOverlayState();
@@ -30,12 +34,20 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   List<BookSearchResult> _results = [];
   bool _hasSearched = false;
   bool _isSearching = false;
+  bool _searchCurrentChapter = false;
+  bool _matchCase = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+      _controller.text = widget.initialQuery!;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
+      if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
+        _onQueryChanged(widget.initialQuery!);
+      }
     });
   }
 
@@ -67,7 +79,11 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       _isSearching = true;
       _hasSearched = true;
     });
-    final results = await widget.searchService.search(query);
+    final results = await widget.searchService.search(
+      query,
+      chapterIndex: _searchCurrentChapter ? widget.currentChapterIndex : null,
+      matchCase: _matchCase,
+    );
     if (!mounted) return;
     setState(() {
       _results = results;
@@ -124,6 +140,38 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                         unawaited(_performSearch(''));
                       },
                     ),
+                  if (widget.currentChapterIndex != null)
+                    IconButton(
+                      icon: Icon(
+                        _searchCurrentChapter ? Icons.book : Icons.menu_book,
+                        size: 20,
+                      ),
+                      color: _searchCurrentChapter ? Colors.blue : textColor,
+                      tooltip: _searchCurrentChapter ? 'Текущая глава' : 'Вся книга',
+                      onPressed: () {
+                        setState(() => _searchCurrentChapter = !_searchCurrentChapter);
+                        if (_controller.text.isNotEmpty) {
+                          unawaited(_performSearch(_controller.text));
+                        }
+                      },
+                    ),
+                  IconButton(
+                    icon: Text(
+                      'Aa',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: _matchCase ? FontWeight.w700 : FontWeight.w400,
+                        color: _matchCase ? Colors.blue : textColor,
+                      ),
+                    ),
+                    tooltip: _matchCase ? 'С учётом регистра' : 'Без регистра',
+                    onPressed: () {
+                      setState(() => _matchCase = !_matchCase);
+                      if (_controller.text.isNotEmpty) {
+                        unawaited(_performSearch(_controller.text));
+                      }
+                    },
+                  ),
                 ],
               ),
             ),

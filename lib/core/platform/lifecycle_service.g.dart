@@ -48,4 +48,4 @@ final class LifecycleServiceProvider
   }
 }
 
-String _$lifecycleServiceHash() => r'7ea414b0d5fd7c6538919abf9d943d2585473139';
+String _$lifecycleServiceHash() => r'84e47bcda991e213f50bc7ef583ac937583b6507';

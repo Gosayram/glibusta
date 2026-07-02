@@ -114,7 +114,7 @@ void main() {
     test('default values', () {
       const settings = ReaderSettings();
       expect(settings.theme, ReaderTheme.system);
-      expect(settings.mode, ReaderMode.continuous);
+      expect(settings.mode, ReaderMode.paginated);
       expect(settings.fontSize, 18.0);
       expect(settings.lineHeight, 1.55);
       expect(settings.margin, 20.0);
@@ -164,16 +164,6 @@ void main() {
       expect(progress.position, pos);
       expect(progress.totalPages, 100);
       expect(progress.lastRead, pos.updatedAt);
-    });
-  });
-
-  group('ReadingProfile', () {
-    test('defaults has 4 profiles', () {
-      expect(ReadingProfile.defaults.length, 4);
-      expect(ReadingProfile.defaults[0].name, 'Стандартный');
-      expect(ReadingProfile.defaults[1].name, 'Комфортный');
-      expect(ReadingProfile.defaults[2].name, 'Компактный');
-      expect(ReadingProfile.defaults[3].name, 'Ночной');
     });
   });
 }

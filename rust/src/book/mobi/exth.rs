@@ -6,6 +6,7 @@ pub(crate) struct MobiMetadata {
     pub title: Option<String>,
     pub author: Option<String>,
     pub language: Option<String>,
+    pub description: Option<String>,
     pub cover_record_index: Option<u32>,
     pub has_exth: bool,
 }
@@ -16,6 +17,7 @@ impl MobiMetadata {
             title: None,
             author: None,
             language: None,
+            description: None,
             cover_record_index: None,
             has_exth: false,
         }
@@ -50,6 +52,7 @@ impl ExthParser {
         let mut title: Option<String> = None;
         let mut author: Option<String> = None;
         let mut language: Option<String> = None;
+        let mut description: Option<String> = None;
         let mut cover_record_index: Option<u32> = None;
         let mut pos = exth_offset + 12;
 
@@ -75,6 +78,9 @@ impl ExthParser {
                 524 => {
                     language = Some(String::from_utf8_lossy(data).trim().to_string());
                 }
+                103 => {
+                    description = Some(String::from_utf8_lossy(data).trim().to_string());
+                }
                 201 if data.len() >= 4 => {
                     let cr = BinaryReader::new(data);
                     cover_record_index = Some(cr.u32be(0)?);
@@ -88,6 +94,7 @@ impl ExthParser {
             title,
             author,
             language,
+            description,
             cover_record_index,
             has_exth: true,
         })

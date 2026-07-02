@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:collection/collection.dart';
 
+import '../data/parsers/smil_parser.dart';
 import 'epub_archive.dart';
 import 'epub_container_parser.dart';
 import 'epub_html_parser.dart';
@@ -34,18 +35,29 @@ final class CustomEpubParser {
       final resource = opf.resources[spineItem.idref];
       if (resource == null || resource.type != EpubResourceType.xhtml) continue;
       final htmlText = epub.readText(resource.fullPath);
-      final blocks = await htmlParser.parseChapter(
+      final result = await htmlParser.parseChapter(
         chapterPath: resource.fullPath,
         htmlText: htmlText,
       );
-      final title = _extractTitle(blocks);
+      final title = _extractTitle(result.blocks);
+
+      // LW-6.1: Parse SMIL media overlay if present
+      final List<SmilEntry>? smilEntries;
+      if (spineItem.mediaOverlay != null) {
+        smilEntries = _parseSmilForChapter(epub, opf, spineItem.mediaOverlay!);
+      } else {
+        smilEntries = null;
+      }
+
       chapters.add(
         EpubChapter(
           id: resource.id,
           href: resource.href,
           title: title,
-          blocks: blocks,
+          blocks: result.blocks,
+          styles: result.styles,
           linear: spineItem.linear,
+          smilEntries: smilEntries,
         ),
       );
       chapterCount++;
@@ -67,6 +79,19 @@ final class CustomEpubParser {
       coverImagePath: coverPath,
       isFixedLayout: opf.isFixedLayout,
     );
+  }
+
+  /// LW-6.1: Parse SMIL file referenced by a spine item's media-overlay attribute.
+  List<SmilEntry>? _parseSmilForChapter(EpubArchive epub, EpubOpfData opf, String smilId) {
+    final smilResource = opf.resources[smilId];
+    if (smilResource == null || !smilResource.href.endsWith('.smil')) return null;
+    try {
+      final smilText = epub.readText(smilResource.fullPath);
+      final entries = SmilParser.parse(smilText);
+      return entries.isEmpty ? null : entries;
+    } on Object catch (_) {
+      return null;
+    }
   }
 
   Future<List<TocItem>?> _parseToc(

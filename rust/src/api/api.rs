@@ -1,61 +1,220 @@
-use crate::api::models::NormalizedBook;
-use anyhow::{Context, Result};
+use crate::api::models::{BookFormat, BookMeta, CoreError, NormalizedBook, ReaderBlock};
+use std::path::Path;
 
-pub fn parse_fb2(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
-    crate::book::fb2::parse_fb2(&bytes, forced_encoding.as_deref()).context("Failed to parse FB2")
+// ---------------------------------------------------------------------------
+// Internal helpers (not FRB-visible)
+// ---------------------------------------------------------------------------
+
+fn ext_from_path(path: &str) -> &str {
+    Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
 }
 
-pub fn parse_epub(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
+fn detect_format_from_path(path: &str) -> Result<BookFormat, CoreError> {
+    let ext = ext_from_path(path);
+    let fmt = BookFormat::from_ext(ext);
+    if fmt == BookFormat::Unknown {
+        return Err(CoreError::UnsupportedFormat(format!(
+            "Cannot detect format from extension '.{}'",
+            ext
+        )));
+    }
+    Ok(fmt)
+}
+
+fn read_file_bytes(path: &str) -> Result<Vec<u8>, CoreError> {
+    std::fs::read(path).map_err(|e| CoreError::IoError(e.to_string()))
+}
+
+fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, CoreError> {
+    match format {
+        BookFormat::Fb2 => crate::book::fb2::parse_fb2(bytes, None)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Epub => crate::book::epub::parse_epub(bytes, None)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Txt => crate::book::txt::parse_txt(bytes, None)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Docx => crate::book::docx::parse_docx(bytes, None)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Rtf => crate::book::rtf::parse_rtf(bytes, None)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Mobi | BookFormat::Azw3 | BookFormat::Prc => {
+            crate::book::mobi::parse_mobi(bytes, None)
+                .map_err(|e| CoreError::ParserFailed(e.to_string()))
+        }
+        BookFormat::Pdf => {
+            #[cfg(feature = "pdf")]
+            {
+                // PDF needs path-based rendering; for parse use placeholder
+                Err(CoreError::FeatureDisabled(
+                    "PDF full parsing not yet implemented, use render_pdf_thumbnail".into(),
+                ))
+            }
+            #[cfg(not(feature = "pdf"))]
+            Err(CoreError::FeatureDisabled(
+                "PDF support disabled, rebuild with --features pdf".into(),
+            ))
+        }
+        BookFormat::Djvu => Err(CoreError::FeatureDisabled(
+            "DJVU support not yet implemented".into(),
+        )),
+        BookFormat::Unknown => Err(CoreError::UnsupportedFormat("unknown".into())),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FRB-visible API — path-based, unified
+// ---------------------------------------------------------------------------
+
+/// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
+pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
+    let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
+    // Set format on the output
+    book.book_format = format;
+    Ok(book)
+}
+
+/// Extract metadata without full chapter parsing.
+pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
+    let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    Ok(BookMeta {
+        title: book.title,
+        authors: book.authors,
+        description: book.description,
+        language: book.language,
+        genres: Vec::new(),
+        cover_data: None,
+        toc: book.toc,
+    })
+}
+
+/// Extract cover image bytes. Returns None (empty Vec) if no cover.
+pub fn extract_cover(path: String) -> anyhow::Result<Vec<u8>> {
+    let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    if let Some(cover_b64) = &book.cover_url {
+        use base64::Engine;
+        let engine = base64::engine::general_purpose::STANDARD;
+        let decoded = engine
+            .decode(cover_b64)
+            .map_err(|e| anyhow::anyhow!("Failed to decode cover base64: {}", e))?;
+        return Ok(decoded);
+    }
+    Ok(Vec::new())
+}
+
+/// Detect book format from file extension.
+pub fn detect_format(path: String) -> anyhow::Result<String> {
+    let fmt = detect_format_from_path(&path)?;
+    Ok(fmt.as_str().to_string())
+}
+
+/// Calculate SHA-256 hash of a file (first 64KB for speed).
+pub fn calculate_hash(path: String) -> anyhow::Result<String> {
+    let bytes = read_file_bytes(&path)?;
+    let limit = 65536.min(bytes.len());
+    Ok(crate::book::sha256_hex(&bytes[..limit]))
+}
+
+// ---------------------------------------------------------------------------
+// Legacy byte-based API (still needed by some callers)
+// ---------------------------------------------------------------------------
+
+/// Extract blocks from HTML content using html5ever + scraper.
+pub fn parse_html_blocks(html: String) -> anyhow::Result<Vec<ReaderBlock>> {
+    let (blocks, _) = crate::book::html_parser::html_to_blocks(&html, 0);
+    Ok(blocks)
+}
+
+pub fn parse_fb2(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
+    crate::book::fb2::parse_fb2(&bytes, forced_encoding.as_deref())
+        .map_err(|e| anyhow::anyhow!("{}", e))
+}
+
+pub fn parse_epub(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
     crate::book::epub::parse_epub(&bytes, forced_encoding.as_deref())
-        .context("Failed to parse EPUB")
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-pub fn parse_txt(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
-    crate::book::txt::parse_txt(&bytes, forced_encoding.as_deref()).context("Failed to parse TXT")
+pub fn parse_txt(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
+    crate::book::txt::parse_txt(&bytes, forced_encoding.as_deref())
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-pub fn parse_docx(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
+pub fn parse_docx(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
     crate::book::docx::parse_docx(&bytes, forced_encoding.as_deref())
-        .context("Failed to parse DOCX")
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-pub fn parse_rtf(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
-    crate::book::rtf::parse_rtf(&bytes, forced_encoding.as_deref()).context("Failed to parse RTF")
+pub fn parse_rtf(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
+    crate::book::rtf::parse_rtf(&bytes, forced_encoding.as_deref())
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-pub fn parse_mobi(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
+pub fn parse_mobi(
+    bytes: Vec<u8>,
+    forced_encoding: Option<String>,
+) -> anyhow::Result<NormalizedBook> {
     crate::book::mobi::parse_mobi(&bytes, forced_encoding.as_deref())
-        .context("Failed to parse MOBI")
+        .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
-pub fn decode_zip_entries(bytes: Vec<u8>) -> Result<Vec<String>> {
-    let zip = crate::book::archive::decode_zip(&bytes).context("Failed to decode ZIP")?;
+pub fn decode_zip_entries(bytes: Vec<u8>) -> anyhow::Result<Vec<String>> {
+    let zip = crate::book::archive::decode_zip(&bytes)
+        .map_err(|e| anyhow::anyhow!("Failed to decode ZIP: {}", e))?;
     Ok(zip.entry_names().to_vec())
 }
 
-pub fn extract_zip_entry(bytes: Vec<u8>, entry_name: String) -> Result<Vec<u8>> {
-    let mut zip = crate::book::archive::decode_zip(&bytes).context("Failed to decode ZIP")?;
+pub fn extract_zip_entry(bytes: Vec<u8>, entry_name: String) -> anyhow::Result<Vec<u8>> {
+    let mut zip = crate::book::archive::decode_zip(&bytes)
+        .map_err(|e| anyhow::anyhow!("Failed to decode ZIP: {}", e))?;
     zip.find_file(&entry_name)
-        .with_context(|| format!("Entry '{}' not found in ZIP", entry_name))
+        .ok_or_else(|| anyhow::anyhow!("Entry '{}' not found in ZIP", entry_name))
 }
 
-pub fn detect_encoding(bytes: Vec<u8>) -> Result<String> {
-    let encoding = detect_encoding_inner(&bytes);
-    Ok(encoding.to_string())
+pub fn detect_encoding(bytes: Vec<u8>) -> anyhow::Result<String> {
+    Ok(crate::book::encoding::detect_encoding(&bytes).to_string())
 }
 
 /// Compute SHA-256 hash of bytes (first `max_bytes` only for efficiency).
-pub fn sha256_hash(bytes: Vec<u8>, max_bytes: Option<usize>) -> Result<String> {
+pub fn sha256_hash(bytes: Vec<u8>, max_bytes: Option<usize>) -> anyhow::Result<String> {
     let limit = max_bytes.unwrap_or(bytes.len());
     let to_hash = &bytes[..bytes.len().min(limit)];
     Ok(crate::book::sha256_hex(to_hash))
 }
 
-pub fn parse_book(
+/// Legacy dispatcher — kept for backward compat.
+pub fn parse_book_legacy(
     bytes: Vec<u8>,
     format: String,
     forced_encoding: Option<String>,
-) -> Result<NormalizedBook> {
+) -> anyhow::Result<NormalizedBook> {
     match format.as_str() {
         "fb2" => parse_fb2(bytes, forced_encoding),
         "epub" => parse_epub(bytes, forced_encoding),
@@ -67,33 +226,51 @@ pub fn parse_book(
     }
 }
 
-fn detect_encoding_inner(bytes: &[u8]) -> &'static str {
-    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
-        return "utf-8";
-    }
-    if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
-        return "utf-16le";
-    }
-    if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-        return "utf-16be";
-    }
+/// Render a PDF page as a PNG thumbnail.
+#[cfg(feature = "pdf")]
+pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> anyhow::Result<Vec<u8>> {
+    use pdfium_render::prelude::*;
 
-    if std::str::from_utf8(bytes).is_ok() {
-        return "utf-8";
-    }
+    let bindings = Pdfium::bind_to_system_library()
+        .map_err(|e| anyhow::anyhow!("Failed to bind PDFium: {}", e))?;
+    let pdfium = Pdfium::new(bindings);
 
-    let (decoded, encoding_used, _) = encoding_rs::WINDOWS_1252.decode(bytes);
-    if decoded
-        .chars()
-        .all(|c| !c.is_control() || c == '\n' || c == '\r' || c == '\t')
-    {
-        return encoding_used.name();
-    }
+    let document = pdfium
+        .load_pdf_from_file(&path, None)
+        .map_err(|e| anyhow::anyhow!("Failed to load PDF: {}", e))?;
 
-    let (decoded, _, _) = encoding_rs::UTF_8.decode(bytes);
-    if decoded.chars().any(|c| c == '\u{FFFD}') {
-        return "windows-1252";
-    }
+    let page = document
+        .pages()
+        .get(page_index as i32)
+        .map_err(|e| anyhow::anyhow!("Failed to get page {}: {}", page_index, e))?;
 
-    "utf-8"
+    let config = PdfRenderConfig::new()
+        .set_target_width(width as i32)
+        .render_form_data(true);
+
+    let bitmap = page
+        .render_with_config(&config)
+        .map_err(|e| anyhow::anyhow!("Failed to render page: {}", e))?;
+
+    let img = bitmap
+        .as_image()
+        .map_err(|e| anyhow::anyhow!("Failed to convert bitmap to image: {}", e))?;
+
+    let mut bytes = Vec::new();
+    img.write_to(
+        &mut std::io::Cursor::new(&mut bytes),
+        image::ImageFormat::Png,
+    )
+    .map_err(|e| anyhow::anyhow!("Failed to encode PNG: {}", e))?;
+
+    Ok(bytes)
+}
+
+#[cfg(not(feature = "pdf"))]
+pub fn render_pdf_thumbnail(
+    _path: String,
+    _page_index: u16,
+    _width: u16,
+) -> anyhow::Result<Vec<u8>> {
+    anyhow::bail!("PDF support is not enabled. Rebuild with --features pdf")
 }

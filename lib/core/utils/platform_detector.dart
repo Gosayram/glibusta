@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../utils/app_breakpoints.dart';
+import 'app_breakpoints.dart';
 
 class PlatformDetector {
   static bool get isMobile =>

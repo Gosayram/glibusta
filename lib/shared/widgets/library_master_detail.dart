@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../shared/models/book.dart';
-import '../../../shared/widgets/book_cover_image.dart';
+import '../models/book.dart';
+import 'book_cover_image.dart';
 
 class LibraryMasterDetail extends StatefulWidget {
   final List<Book> books;
@@ -102,21 +102,10 @@ class _LibraryMasterDetailState extends State<LibraryMasterDetail> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (book.coverUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: BookCoverImage(book: book, width: 120, height: 180),
-              )
-            else
-              Container(
-                width: 120,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.book, size: 48),
-              ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: BookCoverImage(book: book, width: 120, height: 180),
+            ),
             const SizedBox(width: 20),
             Expanded(
               child: Column(

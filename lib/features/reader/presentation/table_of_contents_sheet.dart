@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
+import 'toc_hierarchy.dart';
 
 class TableOfContentsSheet extends StatelessWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
+  final double currentChapterProgress;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final Map<int, ReaderChapter> loadedChapters;
   final bool isDynamicallyLoading;
@@ -16,6 +18,7 @@ class TableOfContentsSheet extends StatelessWidget {
     super.key,
     required this.metadata,
     required this.currentChapterIndex,
+    this.currentChapterProgress = 0.0,
     required this.onJumpToPosition,
     this.loadedChapters = const {},
     this.isDynamicallyLoading = false,
@@ -25,6 +28,7 @@ class TableOfContentsSheet extends StatelessWidget {
     BuildContext context, {
     required NormalizedBookMetadata metadata,
     required int currentChapterIndex,
+    double currentChapterProgress = 0.0,
     required ValueChanged<ReaderPosition> onJumpToPosition,
     Map<int, ReaderChapter> loadedChapters = const {},
     bool isDynamicallyLoading = false,
@@ -42,6 +46,7 @@ class TableOfContentsSheet extends StatelessWidget {
           builder: (context, scrollController) => _TableOfContentsContent(
             metadata: metadata,
             currentChapterIndex: currentChapterIndex,
+            currentChapterProgress: currentChapterProgress,
             onJumpToPosition: onJumpToPosition,
             scrollController: scrollController,
             loadedChapters: loadedChapters,
@@ -58,9 +63,10 @@ class TableOfContentsSheet extends StatelessWidget {
   }
 }
 
-class _TableOfContentsContent extends StatelessWidget {
+class _TableOfContentsContent extends StatefulWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
+  final double currentChapterProgress;
   final ValueChanged<ReaderPosition> onJumpToPosition;
   final ScrollController scrollController;
   final Map<int, ReaderChapter> loadedChapters;
@@ -69,6 +75,7 @@ class _TableOfContentsContent extends StatelessWidget {
   const _TableOfContentsContent({
     required this.metadata,
     required this.currentChapterIndex,
+    this.currentChapterProgress = 0.0,
     required this.onJumpToPosition,
     required this.scrollController,
     this.loadedChapters = const {},
@@ -76,7 +83,34 @@ class _TableOfContentsContent extends StatelessWidget {
   });
 
   @override
+  State<_TableOfContentsContent> createState() => _TableOfContentsContentState();
+}
+
+class _TableOfContentsContentState extends State<_TableOfContentsContent> {
+  final Set<int> _collapsedGroups = {};
+
+  // ponytail: shared with reader_side_panel via toc_hierarchy.dart
+  List<TocEntry> _buildHierarchy() {
+    final defaultHierarchy = buildTocHierarchy(widget.metadata.chapterTitles);
+    final allFlat = defaultHierarchy.every((e) => e.depth == 0 && !e.isGroup);
+    if (allFlat && widget.loadedChapters.isNotEmpty) {
+      return buildTocFromHeadings(widget.metadata.chapterTitles, widget.loadedChapters);
+    }
+    return defaultHierarchy;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final entries = _buildHierarchy();
+    final visibleEntries = entries
+        .where((e) => e.isGroup || !_collapsedGroups.contains(e.groupId))
+        .toList();
+
+    // MD-8.1: compute max chapter size for visual bars
+    final maxSize = widget.loadedChapters.values.fold<int>(
+      0,
+      (max, ch) => max > ch.blocks.length ? max : ch.blocks.length,
+    );
     return Column(
       children: [
         Padding(
@@ -107,7 +141,7 @@ class _TableOfContentsContent extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                '${metadata.chapterCount} глав',
+                '${widget.metadata.chapterCount} глав',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -119,41 +153,73 @@ class _TableOfContentsContent extends StatelessWidget {
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
-            controller: scrollController,
-            itemCount: metadata.chapterCount,
+            controller: widget.scrollController,
+            itemCount: visibleEntries.length,
             itemBuilder: (context, index) {
-              final title = index < metadata.chapterTitles.length
-                  ? metadata.chapterTitles[index]
-                  : '';
-              final isActive = index == currentChapterIndex;
-              final isLoaded = loadedChapters.containsKey(index);
-              final isUnloaded = !isLoaded && isDynamicallyLoading;
+              final entry = visibleEntries[index];
+              final title = entry.title.isNotEmpty ? entry.title : 'Глава ${entry.index + 1}';
+              final isActive = entry.index == widget.currentChapterIndex;
+              final isGroup = entry.isGroup;
+              final isCollapsed = _collapsedGroups.contains(entry.groupId);
+              final isLoaded = widget.loadedChapters.containsKey(entry.index);
+              final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
+
+              // MD-8.1: chapter size bar
+              final ch = widget.loadedChapters[entry.index];
+              final blockCount = ch?.blocks.length ?? 0;
+              final barFraction = maxSize > 0 ? blockCount / maxSize : 0.0;
+
               return ListTile(
-                leading: CircleAvatar(
-                  radius: 16,
-                  backgroundColor: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
-                  child: isUnloaded
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isActive
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                contentPadding: EdgeInsets.only(
+                  left: 16.0 + entry.depth * 16.0,
                 ),
+                leading: isGroup
+                    ? GestureDetector(
+                        onTap: () => setState(() {
+                          if (isCollapsed) {
+                            _collapsedGroups.remove(entry.groupId);
+                          } else {
+                            _collapsedGroups.add(entry.groupId);
+                          }
+                        }),
+                        child: Icon(
+                          isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      )
+                    : CircleAvatar(
+                        radius: 16,
+                        backgroundColor: isActive
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: isUnloaded
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                '${entry.index + 1}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isActive
+                                      ? Theme.of(context).colorScheme.onPrimary
+                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                      ),
                 title: Text(
-                  title.isNotEmpty ? title : 'Глава ${index + 1}',
+                  title,
                   style: TextStyle(
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isActive
+                        ? FontWeight.bold
+                        : isGroup
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    fontSize: isGroup ? 14 : 13,
                     color: isUnloaded
                         ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
                         : isActive
@@ -161,7 +227,27 @@ class _TableOfContentsContent extends StatelessWidget {
                         : null,
                   ),
                 ),
-                subtitle: isUnloaded
+                subtitle: isGroup
+                    ? null
+                    : isActive
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: LinearProgressIndicator(
+                          value: widget.currentChapterProgress.clamp(0.0, 1.0),
+                          minHeight: 2,
+                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        ),
+                      )
+                    : entry.index < widget.currentChapterIndex
+                    ? Text(
+                        'прочитано',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                      )
+                    : isUnloaded
                     ? Text(
                         'загрузка...',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -169,16 +255,49 @@ class _TableOfContentsContent extends StatelessWidget {
                         ),
                       )
                     : null,
+                trailing: isGroup || blockCount == 0
+                    ? null
+                    : SizedBox(
+                        width: 40,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              height: 4,
+                              width: 40 * barFraction.clamp(0.05, 1.0),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$blockCount',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();
-                  final progress = metadata.chapterCount <= 1
+                  final progress = widget.metadata.chapterCount <= 1
                       ? 0.0
-                      : index / (metadata.chapterCount - 1);
-                  onJumpToPosition(
+                      : entry.index / (widget.metadata.chapterCount - 1);
+                  widget.onJumpToPosition(
                     ReaderPosition(
-                      bookId: metadata.id,
-                      chapterIndex: index,
+                      bookId: widget.metadata.id,
+                      chapterIndex: entry.index,
                       paragraphIndex: 0,
                       progressPercent: progress,
                       updatedAt: DateTime.now(),

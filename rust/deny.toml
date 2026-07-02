@@ -1,18 +1,42 @@
 [advisories]
+version = 2
 ignore = [
     # derivative is unmaintained — pinned by flutter_rust_bridge_codegen, no fix available
     "RUSTSEC-2024-0388",
     # paste is unmaintained — pinned by flutter_rust_bridge_codegen, no fix available
     "RUSTSEC-2024-0436",
-    # number_prefix is unmaintained — pinned by indicatif (transitive dep of FRB codegen)
-    "RUSTSEC-2025-0119",
 ]
 
 [bans]
 multiple-versions = "warn"
 wildcards = "allow"
+# Transitive duplicates from flutter_rust_bridge_codegen (build-time only, never in release binary)
+skip = [
+    "ahash",
+    "bitflags",
+    "block-buffer",
+    "convert_case",
+    "cpufeatures",
+    "crypto-common",
+    "cssparser",
+    "cssparser-macros",
+    "digest",
+    "getrandom",
+    "hashbrown",
+    "heck",
+    "phf",
+    "phf_codegen",
+    "phf_generator",
+    "phf_macros",
+    "phf_shared",
+    "r-efi",
+    "syn",
+    "toml",
+    "windows-sys",
+]
 
 [licenses]
+version = 2
 allow = [
     "MIT",
     "Apache-2.0",

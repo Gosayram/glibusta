@@ -1,3 +1,5 @@
+import '../data/parsers/smil_parser.dart';
+
 enum EpubResourceType { xhtml, css, image, nav, ncx, font, unknown }
 
 final class EpubBook {
@@ -30,12 +32,21 @@ final class EpubChapter {
     required this.title,
     required this.blocks,
     this.linear = true,
+    this.styles,
+    this.smilEntries,
   });
   final String id;
   final String href;
   final String title;
   final List<ReaderBlock> blocks;
   final bool linear;
+
+  /// CSS rules extracted from chapter's <style> tags.
+  /// Key: selector ("p", ".poem", "p.poem"), Value: property map.
+  final Map<String, Map<String, String>>? styles;
+
+  /// LW-6.1: SMIL media overlay entries for karaoke audio sync.
+  final List<SmilEntry>? smilEntries;
 }
 
 sealed class ReaderBlock {
@@ -58,10 +69,12 @@ final class ImageBlock extends ReaderBlock {
     required this.resourceId,
     required this.localPath,
     this.alt,
+    this.caption,
   });
   final String resourceId;
   final String localPath;
   final String? alt;
+  final String? caption;
 }
 
 final class ListBlock extends ReaderBlock {
@@ -101,12 +114,14 @@ final class TextSpan {
     this.italic = false,
     this.superscript = false,
     this.href,
+    this.color,
   });
   final String text;
   final bool bold;
   final bool italic;
   final bool superscript;
   final String? href;
+  final String? color;
 }
 
 final class EpubResource {

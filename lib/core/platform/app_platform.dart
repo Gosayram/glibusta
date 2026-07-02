@@ -1,11 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../utils/platform_detector.dart';
 
-import 'platform_capabilities.dart';
-
-final platformCapabilitiesProvider = Provider<PlatformCapabilities>((ref) {
-  return const LivePlatformCapabilities();
-});
-
-extension PlatformCapabilitiesRef on WidgetRef {
-  PlatformCapabilities get platformCapabilities => read(platformCapabilitiesProvider);
-}
+bool get supportsTextSelection => PlatformDetector.isDesktop;
+bool get supportsPredictiveBack => PlatformDetector.isAndroid;
+bool get hasNativeMenuBar => PlatformDetector.isMacOS;

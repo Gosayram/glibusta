@@ -12,6 +12,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
+import '../../highlights/presentation/highlight_providers.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/book_search_service.dart';
@@ -53,6 +54,8 @@ class ReaderState {
   final bool isSearchOpen;
   final String? highlightedQuery;
   final bool isDynamicallyLoading;
+  final List<double> checkpoints;
+  final int wpm;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -72,6 +75,8 @@ class ReaderState {
     this.isSearchOpen = false,
     this.highlightedQuery,
     this.isDynamicallyLoading = false,
+    this.checkpoints = const [],
+    this.wpm = 200,
   }) : currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;
@@ -111,6 +116,8 @@ class ReaderState {
     bool clearHighlight = false,
     bool clearLoadingMessage = false,
     bool? isDynamicallyLoading,
+    List<double>? checkpoints,
+    int? wpm,
   }) {
     return ReaderState(
       metadata: metadata ?? this.metadata,
@@ -129,6 +136,8 @@ class ReaderState {
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
       isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
+      checkpoints: checkpoints ?? this.checkpoints,
+      wpm: wpm ?? this.wpm,
     );
   }
 }
@@ -144,6 +153,7 @@ class ReaderController {
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   final _sessionStopwatch = Stopwatch();
   int _accumulatedSeconds = 0;
+  int _sessionWordsRead = 0;
   bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
@@ -152,10 +162,11 @@ class ReaderController {
   final _stateController = StreamController<ReaderState>.broadcast();
   bool _disposed = false;
   bool _loaded = false;
-  bool _fullscreenEnabled = false;
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
+  double _lastScrollOffset = 0;
+  final List<ReaderPosition> _linkBackStack = [];
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -165,13 +176,13 @@ class ReaderController {
 
   void dispose() {
     _loadGeneration++;
+    _linkBackStack.clear();
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
-    disableFullscreen();
     _flushSessionTime();
     saveProgress();
     unawaited(WakelockPlus.disable());
@@ -252,6 +263,14 @@ class ReaderController {
 
       // Apply per-book settings if available
       await _applyPerBookSettings();
+
+      // MD-11.4: auto dark theme for manga/comics
+      if (!_isActiveLoad(loadGeneration)) return;
+      _autoMangaTheme(meta);
+
+      // MD-11.3: auto font by genre
+      unawaited(_autoGenreFont(_bookId));
+
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
       final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
@@ -274,22 +293,27 @@ class ReaderController {
       _sessionStopwatch.start();
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
-      const wordsPerMinute = 200;
+      final settings = _ref.read(readerSettingsProvider);
       final loadedWords = _content.computeTotalWords(_state.loadedChapters);
+      _sessionWordsRead = loadedWords;
       final loadedCount = _state.loadedChapters.length;
       final totalCount = _state.chapterCount;
       final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
           ? (loadedWords / loadedCount * totalCount).round()
           : loadedWords;
+      final totalSeconds =
+          _accumulatedSeconds +
+          (_sessionStopwatch.isRunning ? _sessionStopwatch.elapsed.inSeconds : 0);
+      final wpm = totalSeconds > 60 && _sessionWordsRead > 0
+          ? (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800)
+          : 200;
       _updateState(
         _state.copyWith(
-          estimatedMinutesLeft: estimatedTotalWords > 0
-              ? (estimatedTotalWords / wordsPerMinute).ceil()
-              : 0,
+          estimatedMinutesLeft: estimatedTotalWords > 0 ? (estimatedTotalWords / wpm).ceil() : 0,
+          wpm: wpm,
         ),
       );
 
-      final settings = _ref.read(readerSettingsProvider);
       if (settings.restoreLastPosition && savedPosition.progressPercent > 0) {
         _restoreSavedPosition(savedPosition);
       }
@@ -321,16 +345,7 @@ class ReaderController {
     return !_disposed && loadGeneration == _loadGeneration;
   }
 
-  /// Resolves ReaderMode.auto to an actual mode based on device type.
-  /// Auto defaults to paginated on phones, continuous for very long TXT.
-  ReaderMode _resolveAutoMode(ReaderMode mode) {
-    if (mode != ReaderMode.auto) return mode;
-    return ReaderMode.paginated;
-  }
-
-  ReaderMode get effectiveMode => _resolveAutoMode(
-    _ref.read(readerSettingsProvider).mode,
-  );
+  ReaderMode get effectiveMode => _ref.read(readerSettingsProvider).mode;
 
   static ReaderErrorKind _classifyError(Object error) => switch (error) {
     BookMissingFailure() => ReaderErrorKind.bookMissing,
@@ -339,7 +354,6 @@ class ReaderController {
     CacheCorruptedFailure() => ReaderErrorKind.cacheCorrupted,
     InvalidEncodingFailure() => ReaderErrorKind.invalidEncoding,
     TimeoutException() => ReaderErrorKind.parserTimeout,
-    BookOpenFailure() => ReaderErrorKind.unknown,
     _ => ReaderErrorKind.unknown,
   };
 
@@ -386,6 +400,25 @@ class ReaderController {
 
   // ── Chapter windowing ─────────────────────────────────
 
+  /// Called when the paginated reader swipes to a new page.
+  /// Triggers chapter loading for the page's chapter + eviction of distant ones.
+  void handlePageChanged(int chapterIndex) {
+    if (_disposed || _state.chapterCount == 0) return;
+    final clamped = chapterIndex.clamp(0, _state.chapterCount - 1);
+    if (clamped != _state.currentPosition.chapterIndex) {
+      _updateState(
+        _state.copyWith(
+          currentPosition: _state.currentPosition.copyWith(chapterIndex: clamped),
+        ),
+      );
+    }
+    _chapterLoadDebouncer.call(() {
+      if (_disposed) return;
+      unawaited(_ensureChaptersLoaded(clamped));
+      _evictDistantChapters(clamped);
+    });
+  }
+
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
     final generation = ++_chapterLoadGeneration;
     if (_loaded && !_state.isLoading) {
@@ -430,6 +463,17 @@ class ReaderController {
       _updatePositionFromScroll(boundedProgress);
       _progressDebouncer.call(saveProgress);
 
+      // Hide bars on fast scroll
+      final settings = _ref.read(readerSettingsProvider);
+      if (settings.hideBarsOnFastScroll && _state.uiVisible) {
+        final currentOffset = _scrollController!.offset;
+        final delta = (currentOffset - _lastScrollOffset).abs();
+        _lastScrollOffset = currentOffset;
+        if (delta > 30) {
+          _updateState(_state.copyWith(uiVisible: false));
+        }
+      }
+
       if (!_state.isLoading && _state.chapterCount > 0) {
         final total = _state.chapterCount;
         final chapterIndex = (boundedProgress * (total - 1)).round();
@@ -451,12 +495,15 @@ class ReaderController {
         (position.localOffset - _state.currentPosition.localOffset).abs() < 0.5) {
       return;
     }
+    final chapterChanged = position.chapterIndex != _state.currentPosition.chapterIndex;
     _updateState(_state.copyWith(currentPosition: position));
     _ref
         .read(readingProgressProvider.notifier)
         .updateProgress(
           ReadingProgress.fromPosition(position, totalPages: total),
         );
+    // Checkpoint: save immediately on chapter boundary crossing
+    if (chapterChanged) saveProgress();
   }
 
   ReaderPosition _positionFromProgress(double progress) {
@@ -522,7 +569,7 @@ class ReaderController {
 
   void _restoreSavedPosition(ReaderPosition position) {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) {
       _updateState(_state.copyWith(currentPosition: position));
       return;
     }
@@ -537,7 +584,7 @@ class ReaderController {
           if (maxScroll <= 0) return;
           unawaited(
             _scrollController!.animateTo(
-              (position.progressPercent * maxScroll).clamp(0.0, maxScroll),
+              _semanticAnchor(position).clamp(0.0, maxScroll) * maxScroll,
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
             ),
@@ -545,6 +592,29 @@ class ReaderController {
         });
       }),
     );
+  }
+
+  // CRT-22.1: use stable chapter/paragraph instead of visual progressPercent
+  double _semanticAnchor(ReaderPosition position) {
+    if (_state.chapterCount <= 1) {
+      final chapter = _state.chapterAt(0);
+      final count = chapter?.blocks.length ?? 1;
+      return (position.paragraphIndex / count).clamp(0.0, 1.0);
+    }
+    var totalBlocks = 0;
+    var blocksBeforeTarget = 0;
+    for (var ch = 0; ch < _state.chapterCount; ch++) {
+      final chapter = _state.chapterAt(ch);
+      final count = chapter?.blocks.length ?? 1;
+      if (ch < position.chapterIndex) {
+        blocksBeforeTarget += count;
+      } else if (ch == position.chapterIndex) {
+        blocksBeforeTarget += (position.paragraphIndex).clamp(0, count - 1);
+      }
+      totalBlocks += count;
+    }
+    if (totalBlocks <= 0) return 0.0;
+    return (blocksBeforeTarget / totalBlocks).clamp(0.0, 1.0);
   }
 
   void saveProgress() {
@@ -556,6 +626,53 @@ class ReaderController {
     _progress.saveProgress(_state.currentPosition, totalBlocks);
   }
 
+  void saveCheckpoint() {
+    final p = _state.scrollProgress;
+    final existing = _state.checkpoints;
+    // Deduplicate: remove checkpoint within 2% of current position
+    final filtered = existing.where((c) => (c - p).abs() > 0.02).toList()
+      ..add(p)
+      ..sort();
+    _updateState(_state.copyWith(checkpoints: filtered));
+  }
+
+  void navigateToCheckpoint(double progress) {
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    final maxScroll = _scrollController!.position.maxScrollExtent;
+    unawaited(
+      _scrollController!.animateTo(
+        progress.clamp(0.0, 1.0) * maxScroll,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      ),
+    );
+    // Remove the checkpoint after navigating to it (single-use)
+    final filtered = _state.checkpoints.where((c) => (c - progress).abs() > 0.02).toList();
+    _updateState(_state.copyWith(checkpoints: filtered));
+  }
+
+  bool get hasCheckpointAhead {
+    final p = _state.scrollProgress;
+    return _state.checkpoints.any((c) => c > p + 0.02);
+  }
+
+  bool get hasCheckpointBehind {
+    final p = _state.scrollProgress;
+    return _state.checkpoints.any((c) => c < p - 0.02);
+  }
+
+  void navigateToNearestCheckpoint({required bool forward}) {
+    final p = _state.scrollProgress;
+    final sorted = List<double>.from(_state.checkpoints)..sort();
+    if (forward) {
+      final next = sorted.where((c) => c > p + 0.02).firstOrNull;
+      if (next != null) navigateToCheckpoint(next);
+    } else {
+      final prev = sorted.where((c) => c < p - 0.02).lastOrNull;
+      if (prev != null) navigateToCheckpoint(prev);
+    }
+  }
+
   void reanchorAfterLayoutChange() {
     if (!_loaded || _scrollController == null || !_scrollController!.hasClients) return;
     final savedPosition = _state.currentPosition;
@@ -565,7 +682,7 @@ class ReaderController {
       if (maxScroll <= 0) return;
       unawaited(
         _scrollController!.animateTo(
-          (savedPosition.progressPercent * maxScroll).clamp(0.0, maxScroll),
+          _semanticAnchor(savedPosition).clamp(0.0, maxScroll) * maxScroll,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         ),
@@ -577,8 +694,9 @@ class ReaderController {
 
   void scrollToNext() {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
-      final step = mode == ReaderMode.twoPage ? 2 : 1;
+    if (mode == ReaderMode.paginated) {
+      final settings = _ref.read(readerSettingsProvider);
+      final step = settings.twoPageEnabled ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
         _state.chapterCount - 1,
@@ -592,6 +710,11 @@ class ReaderController {
       _evictDistantChapters(nextChapter);
       return;
     }
+    if (mode == ReaderMode.focus) {
+      _advanceFocusParagraph(direction: 1);
+      return;
+    }
+    if (mode == ReaderMode.rsvp) return; // RSVP handles its own play/pause
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     final currentScroll = _scrollController!.offset;
@@ -606,10 +729,50 @@ class ReaderController {
     );
   }
 
+  void _advanceFocusParagraph({required int direction}) {
+    final ch = _state.currentPosition.chapterIndex;
+    final para = _state.currentPosition.paragraphIndex;
+    var newCh = ch;
+    var newPara = para + direction;
+
+    // Check bounds within current chapter
+    final chapter = _state.loadedChapters[ch];
+    if (chapter != null) {
+      if (newPara < 0 && ch > 0) {
+        // Go to previous chapter's last paragraph
+        newCh = ch - 1;
+        final prev = _state.loadedChapters[newCh];
+        newPara = prev != null ? prev.blocks.length - 1 : 0;
+      } else if (newPara >= (chapter.blocks.length)) {
+        // Go to next chapter's first paragraph
+        if (ch + 1 < _state.chapterCount) {
+          newCh = ch + 1;
+          newPara = 0;
+        } else {
+          newPara = chapter.blocks.length - 1;
+        }
+      }
+    }
+
+    if (newCh != ch) {
+      unawaited(_ensureChaptersLoaded(newCh));
+      _evictDistantChapters(newCh);
+    }
+    _updateState(
+      _state.copyWith(
+        currentPosition: _state.currentPosition.copyWith(
+          chapterIndex: newCh,
+          paragraphIndex: newPara,
+        ),
+      ),
+    );
+  }
+
   void scrollToPrevious() {
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
-      final step = mode == ReaderMode.twoPage ? 2 : 1;
+    if (mode == ReaderMode.paginated) {
+      final settings = _ref.read(readerSettingsProvider);
+      final step = settings.twoPageEnabled ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
         _state.chapterCount - 1,
@@ -623,6 +786,11 @@ class ReaderController {
       _evictDistantChapters(previousChapter);
       return;
     }
+    if (mode == ReaderMode.focus) {
+      _advanceFocusParagraph(direction: -1);
+      return;
+    }
+    if (mode == ReaderMode.rsvp) return; // RSVP handles its own navigation
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final currentScroll = _scrollController!.offset;
     final viewportHeight = _scrollController!.position.viewportDimension;
@@ -641,7 +809,7 @@ class ReaderController {
     if (total == 0) return;
     final clamped = position.clamp(chapterCount: total);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) {
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) {
       _updateState(_state.copyWith(currentPosition: clamped));
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
@@ -661,6 +829,21 @@ class ReaderController {
     );
   }
 
+  bool get hasLinkBack => _linkBackStack.isNotEmpty;
+
+  void pushLinkPosition() {
+    _linkBackStack.add(_state.currentPosition);
+  }
+
+  bool popLinkPosition() {
+    if (_linkBackStack.isEmpty) return false;
+    final position = _linkBackStack.removeLast();
+    jumpToPosition(position);
+    return true;
+  }
+
+  void clearLinkBackStack() => _linkBackStack.clear();
+
   void jumpToProgress(double progress) {
     final bounded = progress.clamp(0.0, 1.0);
     final position = _positionFromProgress(bounded);
@@ -670,7 +853,7 @@ class ReaderController {
     unawaited(_ensureChaptersLoaded(position.chapterIndex));
     _evictDistantChapters(position.chapterIndex);
     final mode = effectiveMode;
-    if (mode == ReaderMode.paginated || mode == ReaderMode.twoPage) return;
+    if (mode == ReaderMode.paginated || mode == ReaderMode.focus) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
     unawaited(
@@ -704,16 +887,21 @@ class ReaderController {
   void handleTap(TapUpDetails details, double width) {
     final settings = _ref.read(readerSettingsProvider);
     final x = details.localPosition.dx;
-    final threshold1 = switch (settings.tapZoneLayout) {
-      TapZoneLayout.third => width / 3,
-      TapZoneLayout.quarter => width / 4,
-      TapZoneLayout.edge => width * 0.15,
-    };
-    final threshold2 = width - threshold1;
-    if (x < threshold1) {
-      scrollToPrevious();
-    } else if (x > threshold2) {
-      scrollToNext();
+    final zoneWidth = (width * settings.tapZoneWidth).clamp(
+      48.0,
+      double.infinity,
+    ); // MD-24.3: 48dp min
+    const snapMargin = 20.0; // ponytail: magnetic edge snapping
+
+    // LW-7.2: RTL swap — in manga RTL, left=next, right=prev
+    final isRtl = settings.textDirection == ReaderTextDirection.rtl;
+    final leftAction = isRtl ? scrollToNext : scrollToPrevious;
+    final rightAction = isRtl ? scrollToPrevious : scrollToNext;
+
+    if (x < zoneWidth + snapMargin) {
+      leftAction();
+    } else if (x > width - zoneWidth - snapMargin) {
+      rightAction();
     } else {
       toggleUi();
     }
@@ -728,12 +916,7 @@ class ReaderController {
       case DoubleTapAction.addBookmark:
         addBookmark();
         break;
-      case DoubleTapAction.toggleFullscreen:
-        final notifier = _ref.read(readerSettingsProvider.notifier);
-        final currentMode = effectiveMode;
-        notifier.updateMode(
-          currentMode == ReaderMode.fullscreen ? ReaderMode.continuous : ReaderMode.fullscreen,
-        );
+      case DoubleTapAction.translate:
         break;
       case DoubleTapAction.disabled:
         break;
@@ -803,10 +986,6 @@ class ReaderController {
     );
   }
 
-  void clearHighlight() {
-    _updateState(_state.copyWith(clearHighlight: true));
-  }
-
   // ── Theme / system ────────────────────────────────────
 
   Future<void> _applyPerBookSettings() async {
@@ -821,6 +1000,50 @@ class ReaderController {
     }
   }
 
+  // MD-11.4: auto dark theme for manga — check title/description for keywords
+  static final _mangaPattern = RegExp(
+    r'manga|манга|комикс|comic|manga\b',
+    caseSensitive: false,
+  );
+
+  void _autoMangaTheme(NormalizedBookMetadata meta) {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.autoThemeMode != AutoThemeMode.off) return;
+    final isCurrentDark =
+        settings.theme == ReaderTheme.dark ||
+        settings.theme == ReaderTheme.oled ||
+        settings.theme == ReaderTheme.bedtime;
+    if (isCurrentDark) return;
+    final combined = '${meta.title} ${meta.description ?? ''}';
+    if (_mangaPattern.hasMatch(combined)) {
+      _ref.read(readerSettingsProvider.notifier).updateTheme(ReaderTheme.dark);
+    }
+  }
+
+  // MD-11.3: auto font by genre — technical/non-fiction → Inter, fiction → Literata
+  static final _technicalGenrePattern = RegExp(
+    r'техничес|программирован|наук|учебн|справоч|计算机|компьютер|информатик|математик',
+    caseSensitive: false,
+  );
+
+  Future<void> _autoGenreFont(String bookId) async {
+    final settings = _ref.read(readerSettingsProvider);
+    if (settings.font != ReaderFont.literata) return; // user chose something else
+    try {
+      final db = _ref.read(databaseProvider);
+      final book = await db.bookDao.getBookById(bookId);
+      if (book == null) return;
+      final allGenres = await db.genreDao.getAllGenres();
+      final genreMap = {for (final g in allGenres) g.id: g.name};
+      final names = book.genreIds.map((id) => genreMap[id] ?? id).join(' ');
+      if (_technicalGenrePattern.hasMatch(names)) {
+        _ref.read(readerSettingsProvider.notifier).updateFont(ReaderFont.inter);
+      }
+    } on Object catch (e) {
+      AppLogger().warning('Auto genre font failed: $e');
+    }
+  }
+
   void _applyWakeLock() {
     final keepAwake = _ref.read(readerSettingsProvider).keepScreenAwake;
     if (keepAwake) {
@@ -828,18 +1051,6 @@ class ReaderController {
     } else {
       unawaited(WakelockPlus.disable());
     }
-  }
-
-  void enableFullscreen() {
-    if (_fullscreenEnabled) return;
-    _fullscreenEnabled = true;
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
-  }
-
-  void disableFullscreen() {
-    if (!_fullscreenEnabled) return;
-    _fullscreenEnabled = false;
-    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   }
 
   void _checkAutoTheme() {
@@ -969,6 +1180,45 @@ class ReaderController {
     final diagnostics = buildDiagnostics();
     unawaited(Clipboard.setData(ClipboardData(text: diagnostics)));
   }
+
+  // CRT-10.7: search highlights
+  Future<void> searchHighlights(BuildContext context) async {
+    if (!_loaded || _disposed) return;
+    final query = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _HighlightSearchDialog(bookId: _bookId),
+    );
+    if (query == null || query.trim().isEmpty || _disposed || !context.mounted) return;
+    final repo = _ref.read(highlightRepositoryProvider);
+    final results = await repo.searchHighlights(_bookId, query.trim());
+    if (_disposed || !context.mounted) return;
+    if (results.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выделений не найдено'), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+    // Jump to first result
+    final first = results.first;
+    jumpToPosition(
+      ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: first.chapterIndex,
+        paragraphIndex: first.blockIndex,
+        progressPercent: _state.chapterCount > 1
+            ? first.chapterIndex / (_state.chapterCount - 1)
+            : 0.0,
+        updatedAt: DateTime.now(),
+      ),
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Найдено ${results.length} выделений'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
 }
 
 final readerControllerProvider = Provider.autoDispose.family<ReaderController, String>((
@@ -980,3 +1230,47 @@ final readerControllerProvider = Provider.autoDispose.family<ReaderController, S
   ref.onDispose(controller.dispose);
   return controller;
 });
+
+class _HighlightSearchDialog extends StatefulWidget {
+  const _HighlightSearchDialog({required this.bookId});
+  final String bookId;
+
+  @override
+  State<_HighlightSearchDialog> createState() => _HighlightSearchDialogState();
+}
+
+class _HighlightSearchDialogState extends State<_HighlightSearchDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Поиск выделений'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Введите текст...',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: const Text('Найти'),
+        ),
+      ],
+    );
+  }
+}

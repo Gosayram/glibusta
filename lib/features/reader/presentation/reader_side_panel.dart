@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -7,6 +8,7 @@ import '../../notes/data/note_repository.dart';
 import '../../quotes/data/quote_repository.dart';
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
+import 'toc_hierarchy.dart';
 
 class ReaderSidePanel extends ConsumerStatefulWidget {
   const ReaderSidePanel({
@@ -16,6 +18,7 @@ class ReaderSidePanel extends ConsumerStatefulWidget {
     required this.scrollController,
     required this.width,
     this.onJumpToPosition,
+    this.bookTitle,
   });
 
   final NormalizedBookMetadata metadata;
@@ -23,6 +26,7 @@ class ReaderSidePanel extends ConsumerStatefulWidget {
   final ScrollController scrollController;
   final double width;
   final ValueChanged<ReaderPosition>? onJumpToPosition;
+  final String? bookTitle;
 
   @override
   ConsumerState<ReaderSidePanel> createState() => _ReaderSidePanelState();
@@ -32,6 +36,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   late final BookmarkRepository _bookmarks;
   late final NoteRepository _notes;
   late final QuoteRepository _quotes;
+  final Set<int> _collapsedGroups = {};
 
   @override
   void initState() {
@@ -77,27 +82,73 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
   }
 
   Widget _buildTableOfContents(BuildContext context) {
+    final chapters = _buildHierarchy();
+    final visibleChapters = chapters
+        .where((item) => item.isGroup || !_collapsedGroups.contains(item.groupId))
+        .toList();
     return ListView.builder(
-      itemCount: widget.metadata.chapterCount,
+      itemCount: visibleChapters.length,
       itemBuilder: (context, index) {
-        final title = index < widget.metadata.chapterTitles.length
-            ? widget.metadata.chapterTitles[index]
-            : '';
-        final isActive = index == widget.currentChapterIndex;
+        final item = visibleChapters[index];
+        final title = item.title.isNotEmpty ? item.title : 'Глава ${item.index + 1}';
+        final isActive = item.index == widget.currentChapterIndex;
+        final isGroup = item.isGroup;
+        final isCollapsed = _collapsedGroups.contains(item.groupId);
+
         return ListTile(
+          contentPadding: EdgeInsets.only(left: 12.0 + item.depth * 16.0),
+          leading: isGroup
+              ? GestureDetector(
+                  onTap: () => setState(() {
+                    if (isCollapsed) {
+                      _collapsedGroups.remove(item.groupId);
+                    } else {
+                      _collapsedGroups.add(item.groupId);
+                    }
+                  }),
+                  child: Icon(
+                    isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                )
+              : null,
           title: Text(
-            title.isNotEmpty ? title : 'Глава ${index + 1}',
+            title,
             style: TextStyle(
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isActive
+                  ? FontWeight.bold
+                  : isGroup
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+              fontSize: isGroup ? 14 : 13,
               color: isActive ? Theme.of(context).colorScheme.primary : null,
             ),
           ),
+          subtitle: isActive
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinearProgressIndicator(
+                    value: widget.metadata.chapterCount <= 1
+                        ? 0.0
+                        : (widget.currentChapterIndex / (widget.metadata.chapterCount - 1)).clamp(
+                            0.0,
+                            1.0,
+                          ),
+                    minHeight: 2,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                )
+              : null,
           dense: true,
-          onTap: () => _jumpToChapter(index),
+          onTap: () => _jumpToChapter(item.index),
         );
       },
     );
   }
+
+  // ponytail: shared with table_of_contents_sheet via toc_hierarchy.dart
+  List<TocEntry> _buildHierarchy() => buildTocHierarchy(widget.metadata.chapterTitles);
 
   Widget _buildBookmarks() {
     return StreamBuilder<List<Bookmark>>(
@@ -105,27 +156,55 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
       builder: (context, snapshot) {
         final bookmarks = snapshot.data ?? const <Bookmark>[];
         if (bookmarks.isEmpty) return const Center(child: Text('Нет закладок'));
-        return ListView.builder(
-          itemCount: bookmarks.length,
-          itemBuilder: (context, index) {
-            final bookmark = bookmarks[index];
-            return _buildPositionTile(
-              title: 'Закладка',
-              subtitle: bookmark.selectedText ?? _positionText(bookmark.chapterIndex),
-              position: _toReaderPosition(
-                bookmark.chapterIndex,
-                bookmark.paragraphIndex,
-                bookmark.localOffset,
+        return Column(
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: 'Копировать все закладки',
+                onPressed: () => _exportBookmarks(bookmarks),
               ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _bookmarks.deleteBookmark(bookmark.id),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: bookmarks.length,
+                itemBuilder: (context, index) {
+                  final bookmark = bookmarks[index];
+                  return _buildPositionTile(
+                    title: 'Закладка',
+                    subtitle: bookmark.selectedText ?? _positionText(bookmark.chapterIndex),
+                    position: _toReaderPosition(
+                      bookmark.chapterIndex,
+                      bookmark.paragraphIndex,
+                      bookmark.localOffset,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _bookmarks.deleteBookmark(bookmark.id),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
+  }
+
+  Future<void> _exportBookmarks(List<Bookmark> bookmarks) async {
+    final buf = StringBuffer();
+    for (final b in bookmarks) {
+      final text = b.selectedText ?? _positionText(b.chapterIndex);
+      buf.writeln('• $text');
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Закладки скопированы'), duration: Duration(seconds: 1)),
+      );
+    }
   }
 
   Widget _buildNotes() {
@@ -134,20 +213,54 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
       builder: (context, snapshot) {
         final notes = snapshot.data ?? const <Note>[];
         if (notes.isEmpty) return const Center(child: Text('Нет заметок'));
-        return ListView.builder(
-          itemCount: notes.length,
-          itemBuilder: (context, index) {
-            final note = notes[index];
-            return _buildPositionTile(
-              title: 'Заметка',
-              subtitle: note.content,
-              position: _toReaderPosition(note.chapterIndex, note.paragraphIndex, note.localOffset),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _notes.deleteNote(note.id),
+        return Column(
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                tooltip: 'Копировать все заметки',
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final buf = StringBuffer();
+                  for (final n in notes) {
+                    buf.writeln('Глава ${n.chapterIndex + 1}: ${n.content}');
+                    buf.writeln();
+                  }
+                  await Clipboard.setData(ClipboardData(text: buf.toString()));
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Заметки скопированы'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
+                },
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: notes.length,
+                itemBuilder: (context, index) {
+                  final note = notes[index];
+                  return _buildPositionTile(
+                    title: 'Заметка',
+                    subtitle: note.content,
+                    position: _toReaderPosition(
+                      note.chapterIndex,
+                      note.paragraphIndex,
+                      note.localOffset,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _notes.deleteNote(note.id),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
     );
@@ -172,15 +285,37 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
               title: 'Цитата',
               subtitle: subtitle,
               position: _toReaderPosition(quote.chapterIndex, quote.paragraphIndex, 0.0),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () => _quotes.deleteQuote(quote.id),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.copy, size: 20),
+                    tooltip: 'Копировать с атрибуцией',
+                    onPressed: () => _copyQuoteWithAttribution(quote),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: () => _quotes.deleteQuote(quote.id),
+                  ),
+                ],
               ),
             );
           },
         );
       },
     );
+  }
+
+  Future<void> _copyQuoteWithAttribution(Quote quote) async {
+    final title = widget.bookTitle ?? 'Книга';
+    final chapter = 'Глава ${quote.chapterIndex + 1}';
+    final text = '"${quote.selectedText}" — $title, $chapter';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Цитата скопирована'), duration: Duration(seconds: 1)),
+      );
+    }
   }
 
   Widget _buildPositionTile({

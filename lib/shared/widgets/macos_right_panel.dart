@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/models/book.dart';
-import '../../shared/widgets/book_cover_image.dart';
+import '../models/book.dart';
+import 'book_cover_image.dart';
 
 class SelectedBookNotifier extends Notifier<Book?> {
   @override

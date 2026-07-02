@@ -9,6 +9,7 @@ import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/book_details/presentation/book_details_screen.dart';
 import '../features/bookmarks/presentation/bookmarks_screen.dart';
 import '../features/catalog/presentation/author_detail_screen.dart';
+import '../features/catalog/presentation/catalog_screen.dart';
 import '../features/catalog/presentation/genre_books_screen.dart';
 import '../features/catalog/presentation/genre_list_screen.dart';
 import '../features/catalog/presentation/opds_catalog_screen.dart';
@@ -31,9 +32,9 @@ import '../features/settings/presentation/tag_management_screen.dart';
 import '../shared/widgets/adaptive_navigation.dart';
 import 'routes.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final rootNavigatorKey = GlobalKey<NavigatorState>();
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/library',
@@ -76,6 +77,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                   final category = state.uri.queryParameters['category'];
                   return SearchScreen(initialCategory: category);
                 },
+              ),
+            ],
+          ),
+          // ── Catalog ──
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/catalog',
+                name: 'catalog',
+                builder: (BuildContext context, GoRouterState state) => const CatalogScreen(),
               ),
             ],
           ),
@@ -197,9 +208,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CustomTransitionPage<void>(
             key: state.pageKey,
             child: ReaderEntryScreen(bookId: bookId),
+            // LW-2.3: cover animation — 3D book-opening effect
             transitionsBuilder: (_, animation, second, child) {
-              return FadeTransition(
-                opacity: animation,
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (_, c) {
+                  final t = Curves.easeOutCubic.transform(animation.value);
+                  final rotation = (1 - t) * 0.8;
+                  return Transform(
+                    alignment: Alignment.centerRight,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.001)
+                      ..rotateY(-rotation),
+                    child: Opacity(opacity: t.clamp(0.0, 1.0), child: c),
+                  );
+                },
                 child: child,
               );
             },

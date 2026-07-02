@@ -1,4 +1,6 @@
 import '../../features/reader/data/parsers/format_detector.dart';
+import '../utils/format_utils.dart';
+export '../utils/format_utils.dart' show formatBytes;
 
 const int _mb = 1024 * 1024;
 
@@ -24,14 +26,4 @@ String bookFileTooLargeMessage(BookFormat format, int sizeBytes) {
   final limit = maxReadableBookBytes(format);
   return 'Файл слишком большой для обработки: '
       '${formatBytes(sizeBytes)} из ${formatBytes(limit)} для ${format.name.toUpperCase()}';
-}
-
-String formatBytes(int bytes) {
-  if (bytes >= _mb) {
-    return '${(bytes / _mb).toStringAsFixed(1)} MB';
-  }
-  if (bytes >= 1024) {
-    return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  }
-  return '$bytes B';
 }

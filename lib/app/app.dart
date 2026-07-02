@@ -8,10 +8,14 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../core/notifications/download_notification_service.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
 import '../core/platform/share_handler.dart';
+import '../features/downloads/data/download_listener.dart';
 import '../features/library/data/book_import_service.dart';
+import '../features/library/data/library_scanner.dart';
+import '../features/library/presentation/library_screen.dart' show libraryBooksProvider;
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/command_palette.dart';
 import 'router.dart';
@@ -49,6 +53,10 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   late final LifecycleObserver _lifecycleObserver;
   final _shareHandler = ShareHandler();
   bool _shareHandlerInitialized = false;
+  bool _downloadListenerInitialized = false;
+  bool _notifPermRequested = false;
+  bool _libraryScanned = false;
+  StreamSubscription<String>? _notificationTapSub;
 
   @override
   void initState() {
@@ -66,10 +74,27 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       final importService = ref.read(bookImportServiceProvider);
       _shareHandler.init(context, importService);
     }
+    if (!_downloadListenerInitialized) {
+      _downloadListenerInitialized = true;
+      final listener = ref.read(downloadListenerProvider);
+      listener.startListening();
+    }
+    if (!_notifPermRequested && supportsPredictiveBack) {
+      _notifPermRequested = true;
+      unawaited(_requestNotificationPermission());
+    }
+    if (_notificationTapSub == null) {
+      final notifService = ref.read(downloadNotificationServiceProvider);
+      _notificationTapSub = notifService.onTapBookId.listen(_onNotificationTap);
+    }
+    if (!_libraryScanned) {
+      _libraryScanned = true;
+      unawaited(_scanLibrary());
+    }
   }
 
   void _initPlatform() {
-    if (ref.read(platformCapabilitiesProvider).supportsPredictiveBack) {
+    if (supportsPredictiveBack) {
       _initAndroidEdgeToEdge();
     }
   }
@@ -84,6 +109,43 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+  }
+
+  static const _platform = MethodChannel('com.gosayram.glibusta/storage_bridge');
+
+  void _onNotificationTap(String bookId) {
+    if (bookId.isEmpty) return;
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx != null) {
+      ctx.go('/reader/$bookId');
+    }
+  }
+
+  Future<void> _scanLibrary() async {
+    await _ensureStoragePermission();
+    final scanner = ref.read(libraryScannerProvider);
+    await scanner.scanLazy();
+    if (mounted) {
+      ref.invalidate(libraryBooksProvider);
+    }
+  }
+
+  Future<void> _ensureStoragePermission() async {
+    try {
+      final granted = await _platform.invokeMethod<bool>('checkStoragePermission');
+      if (granted == true) return;
+      await _platform.invokeMethod<bool>('requestStoragePermission');
+    } on MissingPluginException {
+      // Not on Android — ignore
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      await _platform.invokeMethod<bool>('requestNotificationPermission');
+    } on MissingPluginException {
+      // Not on Android — ignore
+    }
   }
 
   void _initLifecycle() {
@@ -102,6 +164,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
 
   @override
   void dispose() {
+    unawaited(_notificationTapSub?.cancel());
     _shareHandler.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

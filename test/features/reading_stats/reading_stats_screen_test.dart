@@ -24,6 +24,7 @@ void main() {
                   thisWeekMinutes: 0,
                   thisMonthMinutes: 0,
                   totalMinutes: 0,
+                  totalSessions: 0,
                   heatmapData: [],
                 ),
           ),

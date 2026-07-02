@@ -90,6 +90,22 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
         );
   }
 
+  /// Returns total seconds grouped by hour of day (0-23) for recent readings.
+  Future<Map<int, int>> getReadingHours(int days) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.isBiggerOrEqualValue(start))).get();
+
+    final hourlySeconds = <int, int>{};
+    for (final row in results) {
+      final hour = row.updatedAt.hour;
+      hourlySeconds[hour] = (hourlySeconds[hour] ?? 0) + row.readingTimeSeconds;
+    }
+    return hourlySeconds;
+  }
+
   Future<List<ReadingTimeRow>> getTopBooksByReadingTime({int limit = 10}) async {
     final query = readingTime.readingTimeSeconds;
     final results =

@@ -7,37 +7,11 @@ part of 'routes.dart';
 // **************************************************************************
 
 List<RouteBase> get $appRoutes => [
-  $catalogRoute,
   $collectionsRoute,
   $annotationsRoute,
   $statsRoute,
   $highlightsRoute,
 ];
-
-RouteBase get $catalogRoute => GoRouteData.$route(
-  path: '/catalog',
-  name: 'catalog',
-  factory: $CatalogRoute._fromState,
-);
-
-mixin $CatalogRoute on GoRouteData {
-  static CatalogRoute _fromState(GoRouterState state) => const CatalogRoute();
-
-  @override
-  String get location => GoRouteData.$location('/catalog');
-
-  @override
-  void go(BuildContext context) => context.go(location);
-
-  @override
-  Future<T?> push<T>(BuildContext context) => context.push<T>(location);
-
-  @override
-  void pushReplacement(BuildContext context) => context.pushReplacement(location);
-
-  @override
-  void replace(BuildContext context) => context.replace(location);
-}
 
 RouteBase get $collectionsRoute => GoRouteData.$route(
   path: '/collections',

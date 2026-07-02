@@ -23,8 +23,6 @@ class DeleteBookDialog extends StatefulWidget {
 }
 
 class _DeleteBookDialogState extends State<DeleteBookDialog> {
-  bool _deleteFile = false;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -39,21 +37,12 @@ class _DeleteBookDialogState extends State<DeleteBookDialog> {
             '«${widget.bookTitle}»',
             style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
-            'Книга будет удалена из списка библиотеки.',
+            'Выберите действие:',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
-          ),
-          const SizedBox(height: 12),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: _deleteFile,
-            onChanged: (value) => setState(() => _deleteFile = value ?? false),
-            title: const Text('Удалить файл с диска'),
-            subtitle: const Text('Файл книги будет удалён навсегда'),
           ),
         ],
       ),
@@ -62,14 +51,20 @@ class _DeleteBookDialogState extends State<DeleteBookDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Отмена'),
         ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const DeleteBookResult(),
+          ),
+          child: const Text('Из списка'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: theme.colorScheme.error,
           ),
           onPressed: () => Navigator.of(context).pop(
-            DeleteBookResult(deleteFile: _deleteFile),
+            const DeleteBookResult(deleteFile: true),
           ),
-          child: const Text('Удалить'),
+          child: const Text('С файлом'),
         ),
       ],
     );

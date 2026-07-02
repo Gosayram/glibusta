@@ -1,12 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reader.freezed.dart';
 
 enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
-enum ReaderMode { auto, paginated, continuous, twoPage, focus, fullscreen }
+enum ReaderMode { paginated, continuous, focus, rsvp }
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -30,17 +28,35 @@ enum AutoThemeMode {
 
 enum ReaderFont {
   literata('Literata'),
-  inter('Inter');
+  inter('Inter'),
+  serif('Serif'),
+  sans('Sans-Serif'),
+  mono('Monospace'),
+  system('Системный'),
+  custom('Свой');
 
   const ReaderFont(this.displayName);
   final String displayName;
+
+  static String? activeCustomFontFamily;
+
+  String get fontFamily => switch (this) {
+    ReaderFont.literata => 'Literata',
+    ReaderFont.inter => 'Inter',
+    ReaderFont.serif => 'serif',
+    ReaderFont.sans => 'sans-serif',
+    ReaderFont.mono => 'monospace',
+    ReaderFont.system => '',
+    ReaderFont.custom => activeCustomFontFamily ?? '',
+  };
 }
 
 enum ReaderTextAlign {
   left('По левому краю'),
   justify('По ширине'),
   center('По центру'),
-  right('По правому краю');
+  right('По правому краю'),
+  asInBook('Как в книге');
 
   const ReaderTextAlign(this.displayName);
   final String displayName;
@@ -50,28 +66,73 @@ enum ProgressBarPosition { top, bottom, hidden }
 
 enum BottomBarContent { percent, page, chapter, time, none }
 
-enum TapZoneLayout { third, quarter, edge }
-
-enum PageTurnAnimation { none, slide, fade, curl }
+enum PageTurnAnimation { none, slide, fade, curl, stack }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 
-enum DoubleTapAction { toggleUI, addBookmark, toggleFullscreen, disabled }
+enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
+
+enum HorizontalGesture { off, on, inverse }
+
+enum HorizontalGestureScroll { half, twoThirds, threeQuarters }
+
+enum OrientationLock { none, portrait, landscape }
+
+enum ImageAlignment { start, center, end }
+
+enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
+
+enum ParagraphIndentMode {
+  asInBook('Как в книге'),
+  firstLine('Первая строка'),
+  emptyLine('Пустая строка'),
+  custom('Свой отступ');
+
+  const ParagraphIndentMode(this.displayName);
+  final String displayName;
+}
+
+enum ScrollInertia {
+  none('Без инерции'),
+  light('Лёгкая'),
+  medium('Средняя'),
+  heavy('Тяжёлая');
+
+  const ScrollInertia(this.displayName);
+  final String displayName;
+}
+
+enum FullScreenMode {
+  immersive('Полный экран'),
+  keepPanels('С панелями'),
+  followSystem('Как в системе');
+
+  const FullScreenMode(this.displayName);
+  final String displayName;
+}
 
 @freezed
 abstract class ReaderSettings with _$ReaderSettings {
   const factory ReaderSettings({
     @Default(ReaderTheme.system) ReaderTheme theme,
-    @Default(ReaderMode.continuous) ReaderMode mode,
+    @Default(ReaderMode.paginated) ReaderMode mode,
+    @Default(false) bool twoPageEnabled,
     @Default(18.0) double fontSize,
-    @Default(1.55) double lineHeight,
+    @Default(1.6) double lineHeight,
     @Default(20.0) double margin,
+    @Default(20.0) double marginTop,
+    @Default(20.0) double marginBottom,
+    @Default(20.0) double marginLeft,
+    @Default(20.0) double marginRight,
+    @Default(false) bool separateMargins,
     @Default(ReaderFont.literata) ReaderFont font,
-    @Default(8.0) double paragraphSpacing,
+    @Default(20.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
-    @Default(ReaderTextAlign.left) ReaderTextAlign textAlign,
+    @Default(0.0) double wordSpacing,
+    @Default(0.0) double fontWeightDelta,
+    @Default(ReaderTextAlign.justify) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,
     @Default(7) int customDayHour,
     @Default(20) int customNightHour,
@@ -81,10 +142,11 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(3) int autoHideDelay,
     @Default(ProgressBarPosition.top) ProgressBarPosition progressBarPosition,
     @Default(BottomBarContent.percent) BottomBarContent bottomBarContent,
-    @Default(0.0) double paragraphFirstLineIndent,
+    @Default(16.0) double paragraphFirstLineIndent,
+    @Default(ParagraphIndentMode.firstLine) ParagraphIndentMode paragraphIndentMode,
     @Default(true) bool hyphenation,
-    @Default(TapZoneLayout.quarter) TapZoneLayout tapZoneLayout,
     @Default(PageTurnAnimation.slide) PageTurnAnimation pageTurnAnimation,
+    @Default(ScrollInertia.medium) ScrollInertia scrollInertia,
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
     @Default(true) bool verticalSwipeBrightness,
@@ -92,6 +154,32 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
     @Default(true) bool restoreLastPosition,
     String? forcedEncoding,
+    @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,
+    @Default(HorizontalGestureScroll.half) HorizontalGestureScroll horizontalGestureScroll,
+    @Default(0.33) double tapZoneWidth,
+    @Default(FullScreenMode.immersive) FullScreenMode fullScreenMode,
+    @Default('') String customCss,
+    @Default(false) bool perceptionExpander,
+    @Default(false) bool hideBarsOnFastScroll,
+    @Default(OrientationLock.none) OrientationLock orientationLock,
+    @Default(false) bool bionicReading,
+    @Default(false) bool horizontalLimiter,
+    @Default(0.5) double horizontalLimiterHeight,
+    @Default(0.5) double horizontalLimiterOffset,
+    @Default(0.15) double horizontalLimiterDimming,
+    @Default(true) bool horizontalLimiterLines,
+    @Default(true) bool scrollbarIndicator,
+    @Default(true) bool showImages,
+    @Default(0.0) double imageCornerRadius,
+    @Default(ImageAlignment.center) ImageAlignment imageAlignment,
+    @Default(1.0) double imageWidth,
+    @Default(ImageColorEffect.off) ImageColorEffect imageColorEffect,
+    @Default('blue_light') String activeColorPresetId,
+    @Default(false) bool oldStyleFigures,
+    @Default(false) bool smallCaps,
+    @Default(300) int rsvpWpm,
+    @Default(false) bool ignoreBookAlignment,
+    @Default(false) bool ignoreBookIndent,
   }) = _ReaderSettings;
 }
 
@@ -159,50 +247,4 @@ class ReadingProgress {
       lastRead: position.updatedAt,
     );
   }
-}
-
-class ReadingProfile {
-  final String name;
-  final ReaderSettings settings;
-
-  const ReadingProfile({required this.name, required this.settings});
-
-  static const defaults = <ReadingProfile>[
-    ReadingProfile(
-      name: 'Стандартный',
-      settings: ReaderSettings(),
-    ),
-    ReadingProfile(
-      name: 'Комфортный',
-      settings: ReaderSettings(
-        fontSize: 20.0,
-        lineHeight: 1.7,
-        margin: 24.0,
-        paragraphSpacing: 12.0,
-        theme: ReaderTheme.sepia,
-      ),
-    ),
-    ReadingProfile(
-      name: 'Компактный',
-      settings: ReaderSettings(
-        fontSize: 14.0,
-        lineHeight: 1.3,
-        margin: 8.0,
-        paragraphSpacing: 4.0,
-        letterSpacing: -0.3,
-      ),
-    ),
-    ReadingProfile(
-      name: 'Ночной',
-      settings: ReaderSettings(
-        paragraphSpacing: 10.0,
-      ),
-    ),
-  ];
-}
-
-abstract class BookParser {
-  Future<String> parseFb2(Uint8List bytes);
-  Future<String> parseEpub(Uint8List bytes);
-  Future<String> parseTxt(Uint8List bytes);
 }

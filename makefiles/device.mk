@@ -105,10 +105,18 @@ adb-logs-run: ## Launch the app fresh and capture startup/crash logs into .gl-lo
 adb-install: ## Install the latest built release APK onto a connected device
 	@$(call REQUIRE_TOOL,$(ADB))
 	@if ! $(ADB) get-state >/dev/null 2>&1; then $(PRINT_ERROR) "No adb device connected"; exit 1; fi
-	@$(PRINT_STEP) "Installing latest APK for $(ANDROID_PACKAGE)"
-	@APK="$$(ls -t $(DIST_DIR)/*.apk 2>/dev/null | head -1)"; \
+	@$(PRINT_STEP) "Detecting device architecture"
+	@DEVICE_ARCH="$$( $(ADB) shell getprop ro.product.cpu.abi | tr -d '\r' )"; \
+	printf "  Device arch: %s\n" "$$DEVICE_ARCH"; \
+	APK="$$(ls -t $(DIST_DIR)/*-$$DEVICE_ARCH.apk 2>/dev/null | head -1)"; \
 	if [ -z "$$APK" ]; then \
-		$(PRINT_ERROR) "No APK found in $(DIST_DIR). Run 'make build-android-apk' first."; \
+		APK="$$(ls -t $(DIST_DIR)/*.apk 2>/dev/null | head -1)"; \
+		if [ -n "$$APK" ]; then \
+			printf "$(C_YELLOW)  No APK for %s, falling back to: %s$(C_RESET)\n" "$$DEVICE_ARCH" "$$(basename "$$APK")"; \
+		fi; \
+	fi; \
+	if [ -z "$$APK" ]; then \
+		$(PRINT_ERROR) "No APK found in $(DIST_DIR). Run 'make build-android-apk-split' first."; \
 		exit 1; \
 	fi; \
 	printf "  Installing: %s\n" "$$APK"; \

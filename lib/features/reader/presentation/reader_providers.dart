@@ -52,6 +52,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(mode: mode);
   }
 
+  void updateTwoPageEnabled(bool enabled) {
+    state = state.copyWith(twoPageEnabled: enabled);
+  }
+
   void updateFont(ReaderFont font) {
     state = state.copyWith(font: font);
   }
@@ -64,12 +68,64 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(margin: margin);
   }
 
+  void updateSeparateMargins(bool enabled) {
+    state = state.copyWith(separateMargins: enabled);
+  }
+
+  void updateMarginTop(double value) {
+    state = state.copyWith(marginTop: value);
+  }
+
+  void updateMarginBottom(double value) {
+    state = state.copyWith(marginBottom: value);
+  }
+
+  void updateMarginLeft(double value) {
+    state = state.copyWith(marginLeft: value);
+  }
+
+  void updateMarginRight(double value) {
+    state = state.copyWith(marginRight: value);
+  }
+
   void updateParagraphSpacing(double spacing) {
     state = state.copyWith(paragraphSpacing: spacing);
   }
 
   void updateLetterSpacing(double spacing) {
     state = state.copyWith(letterSpacing: spacing);
+  }
+
+  void updateWordSpacing(double spacing) {
+    state = state.copyWith(wordSpacing: spacing);
+  }
+
+  void updateFontWeightDelta(double delta) {
+    state = state.copyWith(fontWeightDelta: delta);
+  }
+
+  void applyTypographyPreset({
+    required ReaderFont font,
+    required int fontSize,
+    required double lineHeight,
+    required double margin,
+    required double paragraphSpacing,
+    required double paragraphFirstLineIndent,
+    required ReaderTextAlign textAlign,
+    ReaderTheme? theme,
+  }) {
+    state = state.copyWith(
+      font: font,
+      fontSize: fontSize.toDouble(),
+      lineHeight: lineHeight,
+      margin: margin,
+      paragraphSpacing: paragraphSpacing,
+      paragraphFirstLineIndent: paragraphFirstLineIndent,
+      textAlign: textAlign,
+    );
+    if (theme != null) {
+      state = state.copyWith(theme: theme);
+    }
   }
 
   void updateTextAlign(ReaderTextAlign align) {
@@ -116,16 +172,32 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(paragraphFirstLineIndent: indent);
   }
 
+  void updateParagraphIndentMode(ParagraphIndentMode mode) {
+    state = state.copyWith(paragraphIndentMode: mode);
+  }
+
   void updateHyphenation(bool hyphenation) {
     state = state.copyWith(hyphenation: hyphenation);
   }
 
-  void updateTapZoneLayout(TapZoneLayout layout) {
-    state = state.copyWith(tapZoneLayout: layout);
+  void updateOldStyleFigures(bool value) {
+    state = state.copyWith(oldStyleFigures: value);
+  }
+
+  void updateSmallCaps(bool value) {
+    state = state.copyWith(smallCaps: value);
+  }
+
+  void updateRsvpWpm(int value) {
+    state = state.copyWith(rsvpWpm: value.clamp(100, 1000));
   }
 
   void updatePageTurnAnimation(PageTurnAnimation animation) {
     state = state.copyWith(pageTurnAnimation: animation);
+  }
+
+  void updateScrollInertia(ScrollInertia inertia) {
+    state = state.copyWith(scrollInertia: inertia);
   }
 
   void updateTextDirection(ReaderTextDirection direction) {
@@ -152,8 +224,100 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(restoreLastPosition: restore);
   }
 
+  void updateTapZoneWidth(double width) {
+    state = state.copyWith(tapZoneWidth: width.clamp(0.1, 0.5));
+  }
+
+  void updateFullScreenMode(FullScreenMode mode) {
+    state = state.copyWith(fullScreenMode: mode);
+  }
+
+  void updateCustomCss(String css) {
+    state = state.copyWith(customCss: css);
+  }
+
+  void updateIgnoreBookAlignment(bool value) {
+    state = state.copyWith(ignoreBookAlignment: value);
+  }
+
+  void updateIgnoreBookIndent(bool value) {
+    state = state.copyWith(ignoreBookIndent: value);
+  }
+
   void updateForcedEncoding(String? encoding) {
     state = state.copyWith(forcedEncoding: encoding);
+  }
+
+  void updateHorizontalGesture(HorizontalGesture gesture) {
+    state = state.copyWith(horizontalGesture: gesture);
+  }
+
+  void updateHorizontalGestureScroll(HorizontalGestureScroll scroll) {
+    state = state.copyWith(horizontalGestureScroll: scroll);
+  }
+
+  void updatePerceptionExpander(bool enabled) {
+    state = state.copyWith(perceptionExpander: enabled);
+  }
+
+  void updateHideBarsOnFastScroll(bool enabled) {
+    state = state.copyWith(hideBarsOnFastScroll: enabled);
+  }
+
+  void updateOrientationLock(OrientationLock lock) {
+    state = state.copyWith(orientationLock: lock);
+  }
+
+  void updateBionicReading(bool value) {
+    state = state.copyWith(bionicReading: value);
+  }
+
+  void updateHorizontalLimiter(bool value) {
+    state = state.copyWith(horizontalLimiter: value);
+  }
+
+  void updateHorizontalLimiterHeight(double value) {
+    state = state.copyWith(horizontalLimiterHeight: value);
+  }
+
+  void updateHorizontalLimiterOffset(double value) {
+    state = state.copyWith(horizontalLimiterOffset: value);
+  }
+
+  void updateHorizontalLimiterDimming(double value) {
+    state = state.copyWith(horizontalLimiterDimming: value);
+  }
+
+  void updateHorizontalLimiterLines(bool value) {
+    state = state.copyWith(horizontalLimiterLines: value);
+  }
+
+  void updateScrollbarIndicator(bool value) {
+    state = state.copyWith(scrollbarIndicator: value);
+  }
+
+  void updateShowImages(bool value) {
+    state = state.copyWith(showImages: value);
+  }
+
+  void updateImageCornerRadius(double value) {
+    state = state.copyWith(imageCornerRadius: value);
+  }
+
+  void updateImageAlignment(ImageAlignment value) {
+    state = state.copyWith(imageAlignment: value);
+  }
+
+  void updateImageWidth(double value) {
+    state = state.copyWith(imageWidth: value);
+  }
+
+  void updateImageColorEffect(ImageColorEffect value) {
+    state = state.copyWith(imageColorEffect: value);
+  }
+
+  void updateActiveColorPresetId(String value) {
+    state = state.copyWith(activeColorPresetId: value);
   }
 
   void applyProfile(ReaderSettings profile) {

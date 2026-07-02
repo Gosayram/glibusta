@@ -18,6 +18,7 @@ class ReadingStats {
   final int thisWeekMinutes;
   final int thisMonthMinutes;
   final int totalMinutes;
+  final int totalSessions;
   final List<DayReading> heatmapData;
 
   const ReadingStats({
@@ -27,8 +28,12 @@ class ReadingStats {
     required this.thisWeekMinutes,
     required this.thisMonthMinutes,
     required this.totalMinutes,
+    required this.totalSessions,
     required this.heatmapData,
   });
+
+  double get avgSessionMinutes =>
+      totalSessions > 0 ? (totalMinutes / totalSessions).roundToDouble() : 0;
 
   String get todayText {
     if (todayMinutes == 0) return 'Сегодня не читали';
@@ -132,6 +137,7 @@ Future<ReadingStats> readingStats(Ref ref) async {
     thisWeekMinutes: weekMinutes,
     thisMonthMinutes: monthMinutes,
     totalMinutes: totalMinutes,
+    totalSessions: allSessions.length,
     heatmapData: heatmapData,
   );
 }
