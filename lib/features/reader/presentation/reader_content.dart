@@ -221,32 +221,51 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
   );
 }
 
-/// LW-10.1: parse basic CSS properties from user's customCss text.
-/// ponytail: only extracts p { } rules, basic properties.
-Map<String, double> _parseCustomCss(String css) {
+/// LW-10.1/10.2: parse basic CSS properties from user's customCss text.
+/// Supports `/* chapter:N */` markers for per-chapter overrides.
+Map<String, double> _parseCustomCss(String css, {int? chapterIndex}) {
   if (css.isEmpty) return {};
+
+  // LW-10.2: split CSS into global + chapter-specific blocks
   final result = <String, double>{};
-  // Find `p { ... }` blocks
-  final pBlock = RegExp(r'p\s*\{([^}]*)\}').firstMatch(css);
-  if (pBlock == null) return result;
+  final chapterPattern = RegExp(r'/\*\s*chapter:(\d+)\s*\*/');
+  final sections = css.split(chapterPattern);
+
+  // First section (before any chapter marker) = global rules
+  _extractCssProperties(sections[0], result);
+
+  // Chapter-specific sections: pattern gives [_, chapterNum, cssText, chapterNum, cssText, ...]
+  if (chapterIndex != null) {
+    for (var i = 1; i < sections.length - 1; i += 2) {
+      final chNum = int.tryParse(sections[i]);
+      final chCss = sections[i + 1];
+      if (chNum == chapterIndex && chCss.isNotEmpty) {
+        _extractCssProperties(chCss, result);
+      }
+    }
+  }
+
+  return result;
+}
+
+void _extractCssProperties(String cssBlock, Map<String, double> result) {
+  final pBlock = RegExp(r'p\s*\{([^}]*)\}').firstMatch(cssBlock);
+  if (pBlock == null) return;
   final body = pBlock.group(1) ?? '';
   for (final prop in body.split(';')) {
     final colon = prop.indexOf(':');
     if (colon < 0) continue;
     final name = prop.substring(0, colon).trim();
     final value = prop.substring(colon + 1).trim();
-    // Extract numeric value
     final numMatch = RegExp(r'([\d.]+)').firstMatch(value);
     if (numMatch == null) continue;
     final num = double.tryParse(numMatch.group(1)!);
     if (num == null) continue;
-    // Normalize px units, pass through for unitless (em, rem already multiplied in Rust)
     if (name == 'font-size') result['font-size'] = num;
     if (name == 'line-height') result['line-height'] = num;
     if (name == 'letter-spacing') result['letter-spacing'] = num;
     if (name == 'word-spacing') result['word-spacing'] = num;
   }
-  return result;
 }
 
 bool _blockNeedsExtraGap(BlockType prev, BlockType next) {
