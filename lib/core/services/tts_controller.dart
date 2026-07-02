@@ -10,16 +10,16 @@ class TtsController {
   TtsController._();
   static final TtsController instance = TtsController._();
 
-  FlutterTts? _tts;
+  late FlutterTts _tts;
   bool _isPlaying = false;
-  String? _lastText;
-  String _lastLang = 'ru-RU';
-  double _lastRate = 0.5;
+  late String _lastLang;
+  late double _lastRate;
   StreamSubscription<dynamic>? _noisySub;
 
-  Future<FlutterTts> _ensureTts() async {
-    _tts ??= FlutterTts();
-    return _tts!;
+  void _ensureTts() {
+    _tts = FlutterTts();
+    _lastLang = 'ru-RU';
+    _lastRate = 0.5;
   }
 
   /// Start listening for headphone removal events.
@@ -40,27 +40,26 @@ class TtsController {
   }
 
   Future<void> speak(String text, {String? lang, double? rate}) async {
-    final tts = await _ensureTts();
-    _lastText = text;
+    _ensureTts();
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;
-    await tts.setLanguage(_lastLang);
-    await tts.setSpeechRate(_lastRate);
+    await _tts.setLanguage(_lastLang);
+    await _tts.setSpeechRate(_lastRate);
     _isPlaying = true;
-    await tts.speak(text);
+    await _tts.speak(text);
   }
 
   void stop() {
     _isPlaying = false;
-    _tts?.stop();
+    _tts.stop(); // ignore: discarded_futures
   }
 
   bool get isPlaying => _isPlaying;
 
   void dispose() {
-    _noisySub?.cancel();
+    _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
-    _tts?.stop();
+    _tts.stop(); // ignore: discarded_futures
     _isPlaying = false;
   }
 }

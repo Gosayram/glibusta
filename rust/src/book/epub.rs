@@ -731,7 +731,7 @@ fn parse_xhtml_to_blocks(
                 current_class = get_class_attr(e);
                 match tag.as_str() {
                     "body" => in_body = true,
-                    "p" if in_body => {
+                    "p" | "pre" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -994,7 +994,7 @@ fn parse_xhtml_to_blocks(
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = false,
-                    "p" if in_block && block_type == BlockType::Paragraph => {
+                    "p" | "pre" if in_block && block_type == BlockType::Paragraph => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
