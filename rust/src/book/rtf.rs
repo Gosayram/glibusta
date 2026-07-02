@@ -11,7 +11,6 @@ pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     } else {
         decode_with_encoding(bytes, encoding_name)
     };
-    let (_header_end, _codepage) = find_body_start(&decoded);
     let blocks = rtf_to_rich_blocks(&decoded);
 
     let chapters = if blocks.is_empty() {
@@ -90,68 +89,6 @@ fn decode_with_encoding(bytes: &[u8], encoding: &str) -> String {
         .unwrap_or(encoding_rs::WINDOWS_1252)
         .decode(bytes);
     decoded.into_owned()
-}
-
-fn find_body_start(text: &str) -> (usize, u16) {
-    let mut codepage: u16 = 1252;
-    let mut pos = 0;
-
-    while pos < text.len() && pos < 2000 {
-        if text[pos..].starts_with("\\ansicpg") {
-            let num_start = pos + 8;
-            let num_end = text[num_start..]
-                .find(|c: char| !c.is_ascii_digit())
-                .map(|e| num_start + e)
-                .unwrap_or(text.len());
-            if let Ok(cp) = text[num_start..num_end].parse::<u16>() {
-                codepage = cp;
-            }
-        }
-
-        if text[pos..].starts_with("\\rtf1") {
-            let mut brace_depth = 0i32;
-            let mut search_pos = pos;
-            while search_pos < text.len() && search_pos < 5000 {
-                match text.as_bytes()[search_pos] {
-                    b'{' => brace_depth += 1,
-                    b'}' => {
-                        brace_depth -= 1;
-                        if brace_depth < 0 {
-                            return (search_pos + 1, codepage);
-                        }
-                    }
-                    b'\\' => {
-                        search_pos += 1;
-                        if search_pos < text.len() {
-                            match text.as_bytes()[search_pos] {
-                                b'{' | b'}' | b'\\' => {}
-                                b'\n' | b'\r' => {}
-                                _ => {
-                                    while search_pos < text.len()
-                                        && text.as_bytes()[search_pos].is_ascii_alphanumeric()
-                                    {
-                                        search_pos += 1;
-                                    }
-                                    if search_pos < text.len()
-                                        && text.as_bytes()[search_pos] == b' '
-                                    {
-                                        search_pos += 1;
-                                    }
-                                    continue;
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                search_pos += 1;
-            }
-            break;
-        }
-        pos += 1;
-    }
-
-    (pos, codepage)
 }
 
 #[derive(Clone, Default)]

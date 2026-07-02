@@ -298,6 +298,13 @@ fn create_minimal_docx() -> Vec<u8> {
     )
     .unwrap();
 
+    // Minimal 1×1 transparent PNG
+    zip.start_file("word/media/image1.png", options).unwrap();
+    zip.write_all(&[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+    ])
+    .unwrap();
+
     zip.finish().unwrap();
     buf.into_inner()
 }
@@ -309,6 +316,19 @@ fn test_docx_basic_parse() {
     assert_eq!(book.title, "DOCX Title");
     assert_eq!(book.authors, vec!["Author Name"]);
     assert_eq!(book.book_format, BookFormat::Docx);
+}
+
+#[test]
+fn test_docx_embedded_images() {
+    let docx_bytes = create_minimal_docx();
+    let book = glibusta_core::book::docx::parse_docx(&docx_bytes, None).unwrap();
+    assert_eq!(book.images.len(), 1, "should extract 1 image");
+    assert_eq!(book.images[0].id, "image1.png");
+    assert_eq!(book.images[0].media_type, "image/png");
+    assert!(
+        book.cover_url.is_some(),
+        "first image should become cover_url"
+    );
 }
 
 #[test]
