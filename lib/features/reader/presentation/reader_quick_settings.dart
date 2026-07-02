@@ -886,7 +886,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             ],
           ),
         ),
-      ),
+      ).whenComplete(nameController.dispose),
     );
   }
 

@@ -665,10 +665,10 @@ class ReaderController {
     final p = _state.scrollProgress;
     final sorted = List<double>.from(_state.checkpoints)..sort();
     if (forward) {
-      final next = sorted.where((c) => c > p + 0.01).firstOrNull;
+      final next = sorted.where((c) => c > p + 0.02).firstOrNull;
       if (next != null) navigateToCheckpoint(next);
     } else {
-      final prev = sorted.where((c) => c < p - 0.01).lastOrNull;
+      final prev = sorted.where((c) => c < p - 0.02).lastOrNull;
       if (prev != null) navigateToCheckpoint(prev);
     }
   }

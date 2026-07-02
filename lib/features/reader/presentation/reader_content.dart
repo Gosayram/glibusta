@@ -1802,6 +1802,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.separator:
         return ps * 4;
       case BlockType.image:
+        if (!settings.showImages) return 0;
         final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
         final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
         if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {
