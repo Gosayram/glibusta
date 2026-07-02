@@ -5,6 +5,16 @@ ignore = [
     "RUSTSEC-2024-0388",
     # paste is unmaintained — pinned by flutter_rust_bridge_codegen, no fix available
     "RUSTSEC-2024-0436",
+    # ttf-parser is unmaintained — will switch to skrifa (fontations) in future
+    "RUSTSEC-2026-0192",
+    # archived crate — transitive dep of flutter_rust_bridge, no fix
+    "RUSTSEC-2023-0089",
+    # fxhash unmaintained — transitive dep of flutter_rust_bridge_codegen, no fix
+    "RUSTSEC-2025-0057",
+    # web-time unmaintained — transitive dep of flutter_rust_bridge, no fix
+    "RUSTSEC-2024-0384",
+    # instant archived — build-time dep via serial_test, no fix
+    "RUSTSEC-2023-0081",
 ]
 
 [bans]
@@ -14,13 +24,10 @@ wildcards = "allow"
 skip = [
     "ahash",
     "bitflags",
-    "block-buffer",
     "convert_case",
     "cpufeatures",
-    "crypto-common",
     "cssparser",
     "cssparser-macros",
-    "digest",
     "getrandom",
     "hashbrown",
     "heck",
@@ -40,6 +47,7 @@ version = 2
 allow = [
     "MIT",
     "Apache-2.0",
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",

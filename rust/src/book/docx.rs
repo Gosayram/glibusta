@@ -44,13 +44,13 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     });
 
     let images = extract_images(&mut zip);
-    let cover_url = images.first().and_then(|img| {
+    let cover_url = images.first().map(|img| {
         use base64::Engine;
-        Some(format!(
+        format!(
             "data:{};base64,{}",
             img.media_type,
             base64::engine::general_purpose::STANDARD.encode(&img.data)
-        ))
+        )
     });
 
     Ok(NormalizedBook {
