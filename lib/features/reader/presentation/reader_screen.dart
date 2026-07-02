@@ -844,6 +844,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     onBookmark: () => _ctrl.addBookmark(),
                     onMore: () => _showQuickSettings(context),
                     onBookInfo: () => _showBookStats(context, readerState),
+                    onKaraoke: () => _showKaraokeUnavailable(context),
                   ),
                 ),
               );
@@ -1273,6 +1274,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _ctrl.onBottomSheetClose();
         _gestureCoordinator.onBottomSheetClosed();
       }),
+    );
+  }
+
+  /// LW-6.1: placeholder for karaoke sync; wire KaraokeService when SMIL pipeline lands.
+  void _showKaraokeUnavailable(BuildContext context) {
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Аудиосинхронизация'),
+          content: const Text(
+            'Функция караоке будет доступна в книгах с аудиодорожкой.\n\n'
+            'Сейчас нет загруженных SMIL-данных для синхронизации.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

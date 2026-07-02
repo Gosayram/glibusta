@@ -2105,6 +2105,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             itemBuilder: useSwitcher
                 ? (context, index) {
                     final child = itemBuilder(context, index);
+                    // LW-2.1: 3D page curl with shadow gradient
                     if (anim == PageTurnAnimation.curl) {
                       return AnimatedSwitcher(
                         duration: Duration(milliseconds: switcherDuration),
@@ -2118,15 +2119,37 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                               final t = animation.value;
                               final rotation = (1 - t) * 0.4;
                               final opacity = t.clamp(0.0, 1.0);
-                              return Transform(
-                                alignment: Alignment.centerRight,
-                                transform: Matrix4.identity()
-                                  ..setEntry(3, 2, 0.002)
-                                  ..rotateY(-rotation),
-                                child: Opacity(
-                                  opacity: opacity,
-                                  child: child,
-                                ),
+                              // Shadow peaks mid-animation
+                              final shadowAlpha = (0.3 * (t * (1 - t)) * 4).clamp(0.0, 0.3);
+                              return Stack(
+                                children: [
+                                  Transform(
+                                    alignment: Alignment.centerRight,
+                                    transform: Matrix4.identity()
+                                      ..setEntry(3, 2, 0.002)
+                                      ..rotateY(-rotation),
+                                    child: Opacity(
+                                      opacity: opacity,
+                                      child: child,
+                                    ),
+                                  ),
+                                  // Shadow gradient on curling page leading edge
+                                  Positioned.fill(
+                                    child: IgnorePointer(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            end: Alignment.center,
+                                            colors: [
+                                              Colors.black.withValues(alpha: shadowAlpha),
+                                              Colors.transparent,
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           );

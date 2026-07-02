@@ -17,6 +17,7 @@ class ReaderTopBar extends StatelessWidget {
     this.isBookmarked = false,
     this.hasLinkBack = false,
     this.onBookInfo,
+    this.onKaraoke,
   });
 
   final ReaderSettings settings;
@@ -30,6 +31,7 @@ class ReaderTopBar extends StatelessWidget {
   final bool isBookmarked;
   final bool hasLinkBack;
   final VoidCallback? onBookInfo;
+  final VoidCallback? onKaraoke;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +136,18 @@ class ReaderTopBar extends StatelessWidget {
                   color: colors.text,
                   tooltip: 'О книге',
                   onPressed: onBookInfo,
+                ),
+              ),
+            // LW-6.1: karaoke audio sync button
+            if (onKaraoke != null)
+              Semantics(
+                button: true,
+                label: 'Аудиосинхронизация',
+                child: IconButton(
+                  icon: const Icon(Icons.music_note),
+                  color: colors.text,
+                  tooltip: 'Аудиосинхронизация',
+                  onPressed: onKaraoke,
                 ),
               ),
             Semantics(
