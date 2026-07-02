@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use anyhow::{Result, bail};
 use regex::Regex;
 
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock};
+use crate::api::models::{BlockType, BookFormat, NormalizedBook, ReaderBlock};
 
 mod chapters;
 mod cover;
@@ -469,5 +469,10 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         cover_url: None,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),
+        book_format: BookFormat::Mobi,
+        language: None,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc: Vec::new(),
     })
 }

@@ -1,4 +1,6 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, TocEntry,
+};
 use crate::book::normalize_whitespace;
 use anyhow::Result;
 use regex::Regex;
@@ -42,6 +44,14 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     let title = extract_title_from_first_line(&blocks);
 
     let chapters = split_into_chapters(blocks, &title);
+    let toc: Vec<TocEntry> = chapters
+        .iter()
+        .map(|ch| TocEntry {
+            title: ch.title.clone(),
+            chapter_index: ch.index,
+            children: Vec::new(),
+        })
+        .collect();
 
     Ok(NormalizedBook {
         id,
@@ -51,6 +61,11 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         cover_url: None,
         chapters,
         metadata: None,
+        book_format: BookFormat::Txt,
+        language: None,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc,
     })
 }
 
@@ -70,6 +85,28 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
 }
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
+    let chapter_re =
+        Regex::new(r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+")
+            .unwrap();
+    let short_re = Regex::new(r"^[\s\d]+$").unwrap();
+    // Skip very short lines, lines that look like chapter headings, or common non-title intros
+    for block in blocks {
+        let text = block.text.trim();
+        if text.len() < 3 {
+            continue;
+        }
+        if chapter_re.is_match(text) {
+            continue;
+        }
+        if short_re.is_match(text) {
+            continue;
+        }
+        // Skip if it's a single word of 5 or fewer chars (likely metadata)
+        if text.len() <= 5 && !text.contains(' ') {
+            continue;
+        }
+        return text.to_string();
+    }
     blocks.first().map(|b| b.text.clone()).unwrap_or_default()
 }
 
@@ -83,7 +120,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
     }
 
     let re = Regex::new(
-        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue)\s+[\dIVXLCDM]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s",
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
     )
     .unwrap();
 

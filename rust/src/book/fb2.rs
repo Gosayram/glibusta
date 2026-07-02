@@ -1,4 +1,6 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+};
 use crate::book::archive;
 use crate::book::encoding::get_xml_attr;
 use crate::book::flush_rich_span;
@@ -33,6 +35,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut authors: Vec<String> = Vec::new();
     let mut genres: Vec<String> = Vec::new();
     let mut description: Option<String> = None;
+    let mut language: Option<String> = None;
     let mut cover_data: Option<String> = None;
     let mut body_blocks: Vec<ReaderBlock> = Vec::new();
     let mut chapters_blocks: Vec<Vec<ReaderBlock>> = Vec::new();
@@ -62,6 +65,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_stanza = false;
     let mut in_cite = false;
     let mut in_pre = false;
+    let mut in_lang = false;
 
     // CRT-1.13: FB2 footnotes parsing
     let mut in_notes_body = false;
@@ -101,6 +105,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     "middle-name" if in_author => in_middle_name = true,
                     "last-name" if in_author => in_last_name = true,
                     "genre" if in_title_info => in_genre = true,
+                    "lang" if in_title_info => in_lang = true,
                     "coverpage" => in_coverpage = true,
                     "binary" => {
                         let binary_id = get_xml_attr(e, b"id").unwrap_or_default();
@@ -276,11 +281,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     current_author_parts.push(text.clone());
                 } else if in_genre {
                     genres.push(text.clone());
-                } else if in_annotation {
-                    description = Some(description.take().unwrap_or_default() + &text);
-                } else if in_binary {
-                    current_text.push_str(&text);
-                } else if in_p && in_body {
+                } else if in_lang {
+                    language = Some(text.clone());
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
                             last.text = text.clone();
@@ -305,6 +307,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     current_author_parts.push(text.to_string());
                 } else if in_genre {
                     genres.push(text.to_string());
+                } else if in_lang {
+                    language = Some(text.to_string());
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
@@ -347,6 +351,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         in_author = false;
                     }
                     "genre" => in_genre = false,
+                    "lang" => in_lang = false,
                     "coverpage" => in_coverpage = false,
                     "binary" => {
                         if in_binary && !current_text.is_empty() {
@@ -796,6 +801,11 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         cover_url,
         chapters,
         metadata,
+        book_format: BookFormat::Fb2,
+        language,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc: Vec::new(),
     })
 }
 

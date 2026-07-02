@@ -1,4 +1,6 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::decode_bytes;
 use anyhow::{Context, Result};
@@ -49,6 +51,11 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         cover_url: None,
         chapters,
         metadata: Some(metadata),
+        book_format: BookFormat::Docx,
+        language: None,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc: Vec::new(),
     })
 }
 

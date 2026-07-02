@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' show TextAlign;
 
@@ -52,7 +51,7 @@ class RustBookParser implements BookParser {
     }
 
     try {
-      final book = await rust_api.parseBook(
+      final book = await rust_api.parseBookLegacy(
         bytes: bytes,
         format: _formatName(format),
         forcedEncoding: forcedEncoding,
@@ -68,16 +67,12 @@ class RustBookParser implements BookParser {
     String filePath, {
     String? forcedEncoding,
   }) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw ParserFailure('File not found: $filePath');
+    try {
+      final book = await rust_api.parseBook(path: filePath);
+      return _toNormalizedBook(book);
+    } on Object catch (e) {
+      throw ParserFailure('Rust parser failed for $filePath: $e');
     }
-    final bytes = await file.readAsBytes();
-    if (bytes.isEmpty) {
-      throw ParserFailure('File is empty: $filePath');
-    }
-    final fileName = filePath.split(Platform.pathSeparator).last;
-    return parse(bytes, fileName: fileName, forcedEncoding: forcedEncoding);
   }
 
   Future<local.NormalizedBookMetadata?> parseMetadata(

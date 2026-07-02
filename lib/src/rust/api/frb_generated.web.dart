@@ -47,6 +47,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType dco_decode_block_type(dynamic raw);
 
   @protected
+  BookFormat dco_decode_book_format(dynamic raw);
+
+  @protected
   BookMeta dco_decode_book_meta(dynamic raw);
 
   @protected
@@ -74,6 +77,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_box_autoadd_usize(dynamic raw);
 
   @protected
+  EmbeddedImage dco_decode_embedded_image(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
 
   @protected
@@ -83,7 +89,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<EmbeddedImage> dco_decode_list_embedded_image(dynamic raw);
+
+  @protected
   List<List<String>> dco_decode_list_list_String(dynamic raw);
+
+  @protected
+  List<ParseWarning> dco_decode_list_parse_warning(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -99,6 +111,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<RichSpan> dco_decode_list_rich_span(dynamic raw);
+
+  @protected
+  List<TocEntry> dco_decode_list_toc_entry(dynamic raw);
 
   @protected
   NormalizedBook dco_decode_normalized_book(dynamic raw);
@@ -128,10 +143,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<List<String>>? dco_decode_opt_list_list_String(dynamic raw);
 
   @protected
+  Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
   List<ReaderBlock>? dco_decode_opt_list_reader_block(dynamic raw);
 
   @protected
   List<RichSpan>? dco_decode_opt_list_rich_span(dynamic raw);
+
+  @protected
+  ParseWarning dco_decode_parse_warning(dynamic raw);
 
   @protected
   ReaderBlock dco_decode_reader_block(dynamic raw);
@@ -141,6 +162,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RichSpan dco_decode_rich_span(dynamic raw);
+
+  @protected
+  TocEntry dco_decode_toc_entry(dynamic raw);
 
   @protected
   int dco_decode_u_16(dynamic raw);
@@ -174,6 +198,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType sse_decode_block_type(SseDeserializer deserializer);
 
   @protected
+  BookFormat sse_decode_book_format(SseDeserializer deserializer);
+
+  @protected
   BookMeta sse_decode_book_meta(SseDeserializer deserializer);
 
   @protected
@@ -203,6 +230,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer);
 
   @protected
+  EmbeddedImage sse_decode_embedded_image(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
@@ -212,7 +242,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<EmbeddedImage> sse_decode_list_embedded_image(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<List<String>> sse_decode_list_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<ParseWarning> sse_decode_list_parse_warning(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -230,6 +270,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<RichSpan> sse_decode_list_rich_span(SseDeserializer deserializer);
+
+  @protected
+  List<TocEntry> sse_decode_list_toc_entry(SseDeserializer deserializer);
 
   @protected
   NormalizedBook sse_decode_normalized_book(SseDeserializer deserializer);
@@ -261,12 +304,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
   List<ReaderBlock>? sse_decode_opt_list_reader_block(
     SseDeserializer deserializer,
   );
 
   @protected
   List<RichSpan>? sse_decode_opt_list_rich_span(SseDeserializer deserializer);
+
+  @protected
+  ParseWarning sse_decode_parse_warning(SseDeserializer deserializer);
 
   @protected
   ReaderBlock sse_decode_reader_block(SseDeserializer deserializer);
@@ -276,6 +325,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RichSpan sse_decode_rich_span(SseDeserializer deserializer);
+
+  @protected
+  TocEntry sse_decode_toc_entry(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_16(SseDeserializer deserializer);
@@ -314,6 +366,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_block_type(BlockType self, SseSerializer serializer);
 
   @protected
+  void sse_encode_book_format(BookFormat self, SseSerializer serializer);
+
+  @protected
   void sse_encode_book_meta(BookMeta self, SseSerializer serializer);
 
   @protected
@@ -345,6 +400,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer);
 
   @protected
+  void sse_encode_embedded_image(EmbeddedImage self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
@@ -354,8 +412,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_embedded_image(
+    List<EmbeddedImage> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_list_String(
     List<List<String>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_parse_warning(
+    List<ParseWarning> self,
     SseSerializer serializer,
   );
 
@@ -382,6 +452,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_rich_span(List<RichSpan> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_toc_entry(List<TocEntry> self, SseSerializer serializer);
 
   @protected
   void sse_encode_normalized_book(
@@ -418,6 +491,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_prim_u_8_strict(
+    Uint8List? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_list_reader_block(
     List<ReaderBlock>? self,
     SseSerializer serializer,
@@ -430,6 +509,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_parse_warning(ParseWarning self, SseSerializer serializer);
+
+  @protected
   void sse_encode_reader_block(ReaderBlock self, SseSerializer serializer);
 
   @protected
@@ -437,6 +519,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_rich_span(RichSpan self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_toc_entry(TocEntry self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_16(int self, SseSerializer serializer);

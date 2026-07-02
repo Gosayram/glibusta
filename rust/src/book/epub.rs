@@ -1,4 +1,6 @@
-use crate::api::models::{BlockType, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan};
+use crate::api::models::{
+    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+};
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{decode_bytes, get_xml_attr};
 use crate::book::flush_rich_span;
@@ -37,6 +39,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .filter(|s| !s.is_empty())
         .collect();
     let description = metadata.get("description").cloned();
+    let language = metadata.get("language").cloned();
 
     let cover_url = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, encoding_name);
 
@@ -165,6 +168,11 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         cover_url,
         chapters,
         metadata: meta,
+        book_format: BookFormat::Epub,
+        language,
+        warnings: Vec::new(),
+        images: Vec::new(),
+        toc: Vec::new(),
     })
 }
 
@@ -236,9 +244,30 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     "spine" => in_spine = true,
                     _ => {
                         // DC metadata tags: dc:title, dc:creator, etc.
-                        if in_metadata && tag.starts_with("dc:") {
+                        // local_name() strips namespace prefix, so check both forms
+                        let is_dc_tag = in_metadata
+                            && (tag.starts_with("dc:")
+                                || matches!(
+                                    tag.as_str(),
+                                    "title"
+                                        | "creator"
+                                        | "language"
+                                        | "description"
+                                        | "publisher"
+                                        | "date"
+                                        | "identifier"
+                                        | "subject"
+                                        | "contributor"
+                                        | "rights"
+                                        | "source"
+                                        | "type"
+                                        | "format"
+                                        | "coverage"
+                                        | "relation"
+                                ));
+                        if is_dc_tag {
                             in_dc_tag = true;
-                            current_dc_tag = tag[3..].to_string();
+                            current_dc_tag = tag.trim_start_matches("dc:").to_string();
                             current_text.clear();
                         }
                         if in_metadata && tag == "meta" {
@@ -326,6 +355,50 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                             in_dc_tag = false;
                             current_dc_tag.clear();
                             current_text.clear();
+                        }
+                    }
+                }
+            }
+            // Handle self-closing tags like <item ... /> and <itemref ... />
+            Ok(Event::Empty(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if in_manifest && tag == "item" {
+                    let id = get_xml_attr(e, b"id");
+                    let href = get_xml_attr(e, b"href");
+                    let media_type = get_xml_attr(e, b"media-type");
+                    let properties: Vec<String> = e
+                        .attributes()
+                        .filter_map(|a| a.ok())
+                        .filter(|attr| attr.key.as_ref() == b"properties")
+                        .flat_map(|attr| {
+                            String::from_utf8_lossy(&attr.value)
+                                .split_whitespace()
+                                .map(String::from)
+                                .collect::<Vec<_>>()
+                        })
+                        .collect();
+                    if let (Some(id), Some(href), Some(mt)) = (id, href, media_type) {
+                        manifest_items.insert(
+                            id.clone(),
+                            ManifestItem {
+                                href,
+                                media_type: mt,
+                                properties,
+                            },
+                        );
+                    }
+                }
+                if in_spine && tag == "itemref" {
+                    if let Some(idref) = get_xml_attr(e, b"idref") {
+                        spine_ids.push(idref);
+                    }
+                }
+                if in_metadata && tag == "meta" {
+                    let name = get_xml_attr(e, b"name");
+                    let content = get_xml_attr(e, b"content");
+                    if let (Some(n), Some(c)) = (name, content) {
+                        if n == "cover" {
+                            metadata.insert("cover-id".to_string(), c);
                         }
                     }
                 }

@@ -9,8 +9,29 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
+// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `dispatch_parse`, `ext_from_path`, `read_file_bytes`
+
+/// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
+Future<NormalizedBook> parseBook({required String path}) =>
+    RustLib.instance.api.crateApiApiParseBook(path: path);
+
+/// Extract metadata without full chapter parsing.
+Future<BookMeta> extractMetadata({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractMetadata(path: path);
+
+/// Extract cover image bytes. Returns None (empty Vec) if no cover.
+Future<Uint8List> extractCover({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractCover(path: path);
+
+/// Detect book format from file extension.
+Future<String> detectFormat({required String path}) =>
+    RustLib.instance.api.crateApiApiDetectFormat(path: path);
+
+/// Calculate SHA-256 hash of a file (first 64KB for speed).
+Future<String> calculateHash({required String path}) =>
+    RustLib.instance.api.crateApiApiCalculateHash(path: path);
+
 /// Extract blocks from HTML content using html5ever + scraper.
-/// Returns a JSON-serialized list of ReaderBlock for Dart consumption.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);
 
@@ -83,40 +104,17 @@ Future<String> sha256Hash({required List<int> bytes, BigInt? maxBytes}) =>
       maxBytes: maxBytes,
     );
 
-Future<NormalizedBook> parseBook({
+/// Legacy dispatcher — kept for backward compat.
+Future<NormalizedBook> parseBookLegacy({
   required List<int> bytes,
   required String format,
   String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseBook(
+}) => RustLib.instance.api.crateApiApiParseBookLegacy(
   bytes: bytes,
   format: format,
   forcedEncoding: forcedEncoding,
 );
 
-/// Extract metadata (title, authors, description) without full chapter parsing.
-/// Faster than parse_book when only metadata is needed.
-Future<BookMeta> extractMetadata({
-  required List<int> bytes,
-  required String format,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiExtractMetadata(
-  bytes: bytes,
-  format: format,
-  forcedEncoding: forcedEncoding,
-);
-
-/// Extract cover image bytes (if available). Returns empty Vec if no cover.
-Future<Uint8List> extractCover({
-  required List<int> bytes,
-  required String format,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiExtractCover(
-  bytes: bytes,
-  format: format,
-  forcedEncoding: forcedEncoding,
-);
-
-/// Stub when pdf feature is disabled.
 Future<Uint8List> renderPdfThumbnail({
   required String path,
   required int pageIndex,

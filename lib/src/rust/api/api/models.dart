@@ -8,7 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CoreError`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -34,21 +35,61 @@ enum BlockType {
       RustLib.instance.api.crateApiModelsBlockTypeFromStr(s: s);
 }
 
+/// Book format detected by extension or content sniffing.
+enum BookFormat {
+  fb2,
+  epub,
+  txt,
+  docx,
+  rtf,
+  mobi,
+  azw3,
+  prc,
+  pdf,
+  djvu,
+  unknown,
+  ;
+
+  Future<void> asStr() => RustLib.instance.api.crateApiModelsBookFormatAsStr(
+    that: this,
+  );
+
+  static Future<void> extensions() => RustLib.instance.api.crateApiModelsBookFormatExtensions();
+
+  static Future<BookFormat> fromExt({required String ext}) =>
+      RustLib.instance.api.crateApiModelsBookFormatFromExt(ext: ext);
+}
+
 /// Lightweight book metadata — no chapters, no blocks.
 /// Used by extract_metadata() for fast scanning.
 class BookMeta {
   final String title;
   final List<String> authors;
   final String? description;
+  final String? language;
+  final List<String> genres;
+  final Uint8List? coverData;
+  final List<TocEntry> toc;
 
   const BookMeta({
     required this.title,
     required this.authors,
     this.description,
+    this.language,
+    required this.genres,
+    this.coverData,
+    required this.toc,
   });
 
   @override
-  int get hashCode => title.hashCode ^ authors.hashCode ^ description.hashCode;
+  int get hashCode =>
+      title.hashCode ^
+      authors.hashCode ^
+      description.hashCode ^
+      language.hashCode ^
+      genres.hashCode ^
+      coverData.hashCode ^
+      toc.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -57,7 +98,41 @@ class BookMeta {
           runtimeType == other.runtimeType &&
           title == other.title &&
           authors == other.authors &&
-          description == other.description;
+          description == other.description &&
+          language == other.language &&
+          genres == other.genres &&
+          coverData == other.coverData &&
+          toc == other.toc;
+}
+
+/// An embedded image extracted from the book.
+class EmbeddedImage {
+  /// Identifier (filename or URL reference).
+  final String id;
+
+  /// MIME type (e.g. "image/jpeg").
+  final String mediaType;
+
+  /// Raw image bytes.
+  final Uint8List data;
+
+  const EmbeddedImage({
+    required this.id,
+    required this.mediaType,
+    required this.data,
+  });
+
+  @override
+  int get hashCode => id.hashCode ^ mediaType.hashCode ^ data.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EmbeddedImage &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          mediaType == other.mediaType &&
+          data == other.data;
 }
 
 class NormalizedBook {
@@ -69,6 +144,13 @@ class NormalizedBook {
   final List<ReaderChapter> chapters;
   final Value? metadata;
 
+  /// New fields
+  final BookFormat bookFormat;
+  final String? language;
+  final List<ParseWarning> warnings;
+  final List<EmbeddedImage> images;
+  final List<TocEntry> toc;
+
   const NormalizedBook({
     required this.id,
     required this.title,
@@ -77,6 +159,11 @@ class NormalizedBook {
     this.coverUrl,
     required this.chapters,
     this.metadata,
+    required this.bookFormat,
+    this.language,
+    required this.warnings,
+    required this.images,
+    required this.toc,
   });
 
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
@@ -94,7 +181,12 @@ class NormalizedBook {
       description.hashCode ^
       coverUrl.hashCode ^
       chapters.hashCode ^
-      metadata.hashCode;
+      metadata.hashCode ^
+      bookFormat.hashCode ^
+      language.hashCode ^
+      warnings.hashCode ^
+      images.hashCode ^
+      toc.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -107,7 +199,29 @@ class NormalizedBook {
           description == other.description &&
           coverUrl == other.coverUrl &&
           chapters == other.chapters &&
-          metadata == other.metadata;
+          metadata == other.metadata &&
+          bookFormat == other.bookFormat &&
+          language == other.language &&
+          warnings == other.warnings &&
+          images == other.images &&
+          toc == other.toc;
+}
+
+/// Non-fatal warning from parsing.
+class ParseWarning {
+  final String message;
+
+  const ParseWarning({
+    required this.message,
+  });
+
+  @override
+  int get hashCode => message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
 }
 
 class ReaderBlock {
@@ -242,4 +356,33 @@ class RichSpan {
           superscript == other.superscript &&
           href == other.href &&
           lineBreak == other.lineBreak;
+}
+
+/// TOC entry for navigation.
+class TocEntry {
+  final String title;
+
+  /// Chapter index (0-based) or -1 for non-chapter entries.
+  final int chapterIndex;
+
+  /// Nested sub-entries.
+  final List<TocEntry> children;
+
+  const TocEntry({
+    required this.title,
+    required this.chapterIndex,
+    required this.children,
+  });
+
+  @override
+  int get hashCode => title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TocEntry &&
+          runtimeType == other.runtimeType &&
+          title == other.title &&
+          chapterIndex == other.chapterIndex &&
+          children == other.children;
 }
