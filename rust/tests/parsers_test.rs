@@ -338,7 +338,13 @@ This is a second paragraph.\par
 }";
     let book = glibusta_core::book::rtf::parse_rtf(rtf_text, None).unwrap();
     assert_eq!(book.book_format, BookFormat::Rtf);
-    // Simple RTF may not produce blocks — just validate the format
+    assert!(!book.chapters.is_empty(), "should have chapters");
+    let blocks = &book.chapters[0].blocks;
+    assert!(!blocks.is_empty(), "should have blocks");
+    assert!(
+        blocks.iter().any(|b| b.text.contains("Hello")),
+        "should contain 'Hello' text"
+    );
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
 };
-use crate::book::{flush_rich_span, normalize_whitespace};
+use crate::book::normalize_whitespace;
 use anyhow::Result;
 
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
@@ -11,9 +11,8 @@ pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     } else {
         decode_with_encoding(bytes, encoding_name)
     };
-    let (header_end, _codepage) = find_body_start(&decoded);
-    let body = &decoded[header_end..];
-    let blocks = rtf_to_rich_blocks(body);
+    let (_header_end, _codepage) = find_body_start(&decoded);
+    let blocks = rtf_to_rich_blocks(&decoded);
 
     let chapters = if blocks.is_empty() {
         vec![]
@@ -182,11 +181,29 @@ impl RtfFmt {
     }
 }
 
+/// Flush accumulated span_text into rich_spans with current formatting.
+/// Always preserves text (even without formatting) so paragraphs aren't lost.
+fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfFmt) {
+    let text = span_text.trim().to_string();
+    if !text.is_empty() {
+        rich_spans.push(RichSpan {
+            text,
+            bold: fmt.bold,
+            italic: fmt.italic,
+            superscript: fmt.superscript,
+            href: None,
+            line_break: false,
+        });
+    }
+    span_text.clear();
+}
+
 fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
     let bytes = body.as_bytes();
     let mut i = 0;
     let mut brace_depth = 0i32;
     let mut skip_group = false;
+    let mut skip_depth = 0i32;
     let mut group_stack: Vec<RtfFmt> = Vec::new();
     let mut fmt = RtfFmt::default();
     let mut span_text = String::new();
@@ -198,8 +215,13 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
         match bytes[i] {
             b'{' => {
                 brace_depth += 1;
-                if bytes[i + 1..].starts_with(b"\\fonttbl") {
+                if bytes[i + 1..].starts_with(b"\\fonttbl")
+                    || bytes[i + 1..].starts_with(b"\\colortbl")
+                    || bytes[i + 1..].starts_with(b"\\stylesheet")
+                    || bytes[i + 1..].starts_with(b"\\*")
+                {
                     skip_group = true;
+                    skip_depth = brace_depth;
                 }
                 group_stack.push(fmt.clone());
                 i += 1;
@@ -208,7 +230,7 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                 if brace_depth > 0 {
                     brace_depth -= 1;
                 }
-                if skip_group && brace_depth == 0 {
+                if skip_group && brace_depth < skip_depth {
                     skip_group = false;
                 }
                 if let Some(prev) = group_stack.pop() {
@@ -250,71 +272,30 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                     "ansi" | "ansicpg" | "uc" | "deff" | "deflang" => {}
                     "fonttbl" | "colortbl" | "stylesheet" | "listtables" | "revtbl" => {
                         skip_group = true;
+                        skip_depth = brace_depth;
                     }
                     "b" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.bold = true;
                     }
                     "b0" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.bold = false;
                     }
                     "i" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.italic = true;
                     }
                     "i0" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.italic = false;
                     }
                     "super" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.superscript = true;
                     }
                     "sub" => {
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            fmt.bold,
-                            fmt.italic,
-                            fmt.superscript,
-                            &None,
-                        );
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.superscript = false;
                     }
                     "ul" | "ulnone" | "strike" | "scaps" | "highlight" => {}
@@ -426,14 +407,9 @@ fn push_rtf_paragraph(
     span_text: &mut String,
     fmt: &mut RtfFmt,
 ) {
-    flush_rich_span(
-        rich_spans,
-        span_text,
-        fmt.bold,
-        fmt.italic,
-        fmt.superscript,
-        &None,
-    );
+    // Flush any remaining span with formatting into rich_spans
+    flush_span(rich_spans, span_text, fmt);
+
     let text = if rich_spans.is_empty() {
         normalize_whitespace(span_text)
     } else {

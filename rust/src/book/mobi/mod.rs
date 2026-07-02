@@ -484,12 +484,15 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         } else {
             authors
         },
-        description: Some(description_for(&header)),
+        description: metadata
+            .description
+            .clone()
+            .or(Some(description_for(&header))),
         cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),
         book_format: BookFormat::Mobi,
-        language: None,
+        language: metadata.language.clone(),
         warnings: Vec::new(),
         images: Vec::new(),
         toc: Vec::new(),
