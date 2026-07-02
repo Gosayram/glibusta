@@ -250,6 +250,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     current_author_parts.push(text.clone());
                 } else if in_genre {
                     genres.push(text.clone());
+                } else if in_lang {
+                    language = Some(text.clone());
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
