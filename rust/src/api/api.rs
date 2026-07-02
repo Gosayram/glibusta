@@ -1,5 +1,12 @@
-use crate::api::models::{BookMeta, NormalizedBook};
+use crate::api::models::{BookMeta, NormalizedBook, ReaderBlock};
 use anyhow::{Context, Result};
+
+/// Extract blocks from HTML content using html5ever + scraper.
+/// Returns a JSON-serialized list of ReaderBlock for Dart consumption.
+pub fn parse_html_blocks(html: String) -> Result<Vec<ReaderBlock>> {
+    let (blocks, _) = crate::book::html_parser::html_to_blocks(&html, 0);
+    Ok(blocks)
+}
 
 pub fn parse_fb2(bytes: Vec<u8>, forced_encoding: Option<String>) -> Result<NormalizedBook> {
     crate::book::fb2::parse_fb2(&bytes, forced_encoding.as_deref()).context("Failed to parse FB2")

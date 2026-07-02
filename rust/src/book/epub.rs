@@ -74,9 +74,36 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         for (family, src) in extract_font_faces(&xhtml_text) {
             font_faces.entry(family).or_insert(src);
         }
-        let (blocks, next_block_index, page_breaks_in_file) =
+        let (mut blocks, next_block_index, page_breaks_in_file) =
             parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
         block_index = next_block_index;
+
+        // If quick-xml produced nothing, try html5ever for malformed HTML content.
+        // html5ever handles unclosed tags, bare &, and other real-world HTML soup.
+        if blocks.is_empty() && !xhtml_text.trim().is_empty() {
+            let (html5_blocks, html5_next) =
+                crate::book::html_parser::html_to_blocks(&xhtml_text, block_index);
+            if !html5_blocks.is_empty() {
+                blocks = html5_blocks;
+                block_index = html5_next;
+                // Apply CSS at tag level (no class info from simplified parser)
+                for b in &mut blocks {
+                    apply_css_props(
+                        b,
+                        match b.block_type {
+                            BlockType::Heading => "h1",
+                            BlockType::Quote => "blockquote",
+                            BlockType::List => "ul",
+                            BlockType::Image => "img",
+                            BlockType::Separator => "hr",
+                            _ => "p",
+                        },
+                        None,
+                        &css,
+                    );
+                }
+            }
+        }
 
         if blocks.is_empty() {
             continue;

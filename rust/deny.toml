@@ -20,7 +20,6 @@ skip = [
     "ahash",
     "bitflags",
     "block-buffer",
-    "console",
     "convert_case",
     "cpufeatures",
     "crypto-common",
@@ -30,19 +29,10 @@ skip = [
     "getrandom",
     "hashbrown",
     "heck",
-    "indicatif",
     "r-efi",
     "syn",
     "toml",
     "windows-sys",
-    "windows-targets",
-    "windows_aarch64_gnullvm",
-    "windows_aarch64_msvc",
-    "windows_i686_gnu",
-    "windows_i686_msvc",
-    "windows_x86_64_gnu",
-    "windows_x86_64_gnullvm",
-    "windows_x86_64_msvc",
 ]
 
 [licenses]
