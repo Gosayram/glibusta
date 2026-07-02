@@ -701,6 +701,7 @@ fn parse_xhtml_to_blocks(
     let mut current_text = String::new();
     let mut in_body = false;
     let mut in_block = false; // inside p, h1-h6, blockquote
+    let mut in_pre = false;
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
     let mut blockquote_depth: i32 = 0;
@@ -753,6 +754,7 @@ fn parse_xhtml_to_blocks(
                         rich_spans.clear();
                         span_text.clear();
                         in_block = true;
+                        in_pre = tag == "pre";
                         block_type = if blockquote_depth > 0 {
                             BlockType::Quote
                         } else {
@@ -1028,18 +1030,27 @@ fn parse_xhtml_to_blocks(
                                 table_rows: None,
                                 image_alt: None,
                                 text_indent: None,
-                                text_align: None,
+                                text_align: if in_pre {
+                                    Some("ws:pre".to_string())
+                                } else {
+                                    None
+                                },
                                 note_id: None,
                             });
                             if let Some(ref cls) = current_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "p", Some(cls), css);
+                                    apply_css_props(last, "pre", Some(cls), css);
                                 }
                                 // MD-1.4: track page-break-before
-                                if css_has_page_break(css, "p", Some(cls)) {
+                                if css_has_page_break(css, "p", Some(cls))
+                                    || css_has_page_break(css, "pre", Some(cls))
+                                {
                                     page_breaks.push(blocks.len());
                                 }
-                            } else if css_has_page_break(css, "p", None) {
+                            } else if css_has_page_break(css, "p", None)
+                                || css_has_page_break(css, "pre", None)
+                            {
                                 page_breaks.push(blocks.len());
                             }
                             block_index += 1;
@@ -1115,6 +1126,7 @@ fn parse_xhtml_to_blocks(
                                     rich_spans.clear();
                                     span_text.clear();
                                     in_block = false;
+                                    in_pre = false;
                                     bold = false;
                                     italic = false;
                                     superscript = false;
