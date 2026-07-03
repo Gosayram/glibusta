@@ -76,6 +76,8 @@ class BookCoverImage extends ConsumerWidget {
                 cachedFile,
                 width: width,
                 height: height,
+                cacheWidth: targetWidth,
+                cacheHeight: targetHeight,
                 fit: fit,
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
               )
