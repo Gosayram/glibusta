@@ -264,6 +264,41 @@ pub fn get_book_assets(path: String) -> anyhow::Result<Vec<BookAssetMeta>> {
     Ok(assets)
 }
 
+/// Lazy-load a single asset (image) from a book file by its asset_id (href).
+pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>> {
+    let format = detect_format_from_path(&path)?;
+    let bytes = read_file_bytes(&path)?;
+
+    match format {
+        BookFormat::Epub => {
+            let mut zip = crate::book::archive::decode_zip(&bytes)?;
+            let entry = zip.find_file(&asset_id).or_else(|| {
+                zip.entry_names()
+                    .iter()
+                    .find(|n| n.ends_with(&asset_id))
+                    .cloned()
+                    .and_then(|name| zip.find_file(&name))
+            });
+            Ok(entry.unwrap_or_default())
+        }
+        BookFormat::Docx => {
+            let mut zip = crate::book::archive::decode_zip(&bytes)?;
+            let entry = zip.find_file(&asset_id).or_else(|| {
+                zip.entry_names()
+                    .iter()
+                    .find(|n| n.ends_with(&asset_id))
+                    .cloned()
+                    .and_then(|name| zip.find_file(&name))
+            });
+            Ok(entry.unwrap_or_default())
+        }
+        _ => Err(anyhow::anyhow!(
+            "Asset extraction not supported for format: {:?}",
+            format
+        )),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Legacy byte-based API (still needed by some callers)
 // ---------------------------------------------------------------------------

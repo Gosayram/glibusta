@@ -431,3 +431,23 @@ fn test_normalized_book_json_roundtrip() {
     assert_eq!(restored.language, book.language);
     assert_eq!(restored.toc.len(), 1);
 }
+
+// ---------------------------------------------------------------------------
+// Golden tests — snapshot-based regression detection
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_fb2_golden_snapshot() {
+    let book = glibusta_core::book::fb2::parse_fb2(MINIMAL_FB2.as_bytes(), None).unwrap();
+    let snapshot = serde_json::json!({
+        "title": book.title,
+        "authors": book.authors,
+        "language": book.language,
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "chapter_titles": book.chapters.iter().map(|c| c.title.as_str()).collect::<Vec<_>>(),
+        "blocks_per_chapter": book.chapters.iter().map(|c| c.blocks.len()).collect::<Vec<_>>(),
+        "toc": book.toc.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
+    });
+    insta::assert_snapshot!("fb2_golden", snapshot.to_string());
+}

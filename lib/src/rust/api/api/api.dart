@@ -68,6 +68,12 @@ Future<BookValidationResult> validateBook({required String path}) =>
 Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
     RustLib.instance.api.crateApiApiGetBookAssets(path: path);
 
+/// Lazy-load a single asset (image) from a book file by its asset_id (href).
+Future<Uint8List> getAssetBytes({
+  required String path,
+  required String assetId,
+}) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);

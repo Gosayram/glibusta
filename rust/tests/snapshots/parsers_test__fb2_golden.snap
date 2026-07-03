@@ -1,0 +1,5 @@
+---
+source: tests/parsers_test.rs
+expression: snapshot.to_string()
+---
+{"authors":["Иван Ефремов"],"blocks_per_chapter":[3,2],"chapter_titles":["Туманность Андромеды","Туманность Андромеды"],"chapters":2,"format":"Fb2","language":"ru","title":"Туманность Андромеды","toc":[]}
