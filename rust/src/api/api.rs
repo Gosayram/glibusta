@@ -22,18 +22,18 @@ fn disk_cache_key(path: &str) -> std::path::PathBuf {
     use std::hash::{Hash, Hasher};
     let mut h = DefaultHasher::new();
     path.hash(&mut h);
-    std::env::temp_dir().join(format!("glibusta_cache_{:016x}.json", h.finish()))
+    // ARC-4.1: use .bin extension for binary cache
+    std::env::temp_dir().join(format!("glibusta_cache_{:016x}.bin", h.finish()))
 }
 
 fn disk_cache_lookup(key: &std::path::Path) -> Option<NormalizedBook> {
     let data = std::fs::read(key).ok()?;
-    let s = std::str::from_utf8(&data).ok()?;
-    NormalizedBook::from_json_str(s).ok()
+    postcard::from_bytes(&data).ok()
 }
 
 fn disk_cache_store(key: &std::path::Path, book: &NormalizedBook) {
-    if let Ok(json) = book.to_json_string() {
-        let _ = std::fs::write(key, json);
+    if let Ok(data) = postcard::to_allocvec(book) {
+        let _ = std::fs::write(key, data);
     }
 }
 
@@ -109,8 +109,10 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
 /// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
 pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
+    let _span = tracing::info_span!("parse_book", path = %path).entered();
     // L1: RAM cache
     if let Some(cached) = BOOK_CACHE.get(&path) {
+        tracing::info!("cache_hit_l1");
         return Ok(cached);
     }
     // L2: disk cache

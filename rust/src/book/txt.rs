@@ -4,6 +4,22 @@ use crate::api::models::{
 use crate::book::normalize_whitespace;
 use anyhow::Result;
 use regex::Regex;
+use std::sync::LazyLock;
+
+// ARC-10.2: Lazy-compiled regex patterns (avoid recompilation on every call)
+static CHAPTER_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+")
+        .unwrap()
+});
+
+static SHORT_LINE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\s\d]+$").unwrap());
+
+static CHAPTER_SPLIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
+    )
+    .unwrap()
+});
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let mut warnings = Vec::new();
@@ -89,20 +105,16 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
 }
 
 fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
-    let chapter_re =
-        Regex::new(r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+")
-            .unwrap();
-    let short_re = Regex::new(r"^[\s\d]+$").unwrap();
-    // Skip very short lines, lines that look like chapter headings, or common non-title intros
+    // ARC-10.2: use lazy-compiled regex statics
     for block in blocks {
         let text = block.text.trim();
         if text.len() < 3 {
             continue;
         }
-        if chapter_re.is_match(text) {
+        if CHAPTER_HEADING_RE.is_match(text) {
             continue;
         }
-        if short_re.is_match(text) {
+        if SHORT_LINE_RE.is_match(text) {
             continue;
         }
         // Skip if it's a single word of 5 or fewer chars (likely metadata)
@@ -123,14 +135,12 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
         return vec![];
     }
 
-    let re = Regex::new(
-        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
-    )
-    .unwrap();
+    // ARC-10.2: use lazy-compiled regex
+    let re = &*CHAPTER_SPLIT_RE;
 
     let mut chapter_indices: Vec<usize> = Vec::new();
     for (i, block) in blocks.iter().enumerate() {
-        if is_chapter_heading(&block.text, &re) {
+        if is_chapter_heading(&block.text, re) {
             chapter_indices.push(i);
         }
     }
