@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1658693479;
+  int get rustContentHash => -685989316;
 
   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
     stem: 'glibusta_core',
@@ -137,12 +137,37 @@ abstract class RustLibApi extends BaseApi {
     required String path,
   });
 
+  Future<String> crateApiModelsNormalizedBookAnnotationAnchorId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+    required BigInt charOffset,
+  });
+
+  Future<String> crateApiModelsNormalizedBookAssetId({required String url});
+
+  Future<String> crateApiModelsNormalizedBookBlockId({
+    required NormalizedBook that,
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+  });
+
   Future<List<(int, String)>> crateApiModelsNormalizedBookChapterHashes({
     required NormalizedBook that,
   });
 
+  Future<String> crateApiModelsNormalizedBookChapterId({
+    required NormalizedBook that,
+    required BigInt chapterIndex,
+  });
+
   Future<NormalizedBook> crateApiModelsNormalizedBookFromJsonStr({
     required String json,
+  });
+
+  Future<int> crateApiModelsNormalizedBookMigrateChapterIndex({
+    required String oldChapterId,
+    required NormalizedBook oldBook,
+    required NormalizedBook newBook,
   });
 
   Future<String> crateApiModelsNormalizedBookToJsonString({
@@ -160,6 +185,11 @@ abstract class RustLibApi extends BaseApi {
   Future<NormalizedBook> crateApiApiParseBookWithTimeout({
     required String path,
     required BigInt timeoutSecs,
+  });
+
+  Future<ReaderChapter> crateApiApiParseChapter({
+    required String path,
+    required int chapterIndex,
   });
 
   Future<NormalizedBook> crateApiApiParseDocx({
@@ -850,6 +880,108 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<String> crateApiModelsNormalizedBookAnnotationAnchorId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+    required BigInt charOffset,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_usize(chapterIndex, serializer);
+          sse_encode_usize(blockIndex, serializer);
+          sse_encode_usize(charOffset, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiModelsNormalizedBookAnnotationAnchorIdConstMeta,
+        argValues: [chapterIndex, blockIndex, charOffset],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiModelsNormalizedBookAnnotationAnchorIdConstMeta => const TaskConstMeta(
+    debugName: 'normalized_book_annotation_anchor_id',
+    argNames: ['chapterIndex', 'blockIndex', 'charOffset'],
+  );
+
+  @override
+  Future<String> crateApiModelsNormalizedBookAssetId({required String url}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(url, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiModelsNormalizedBookAssetIdConstMeta,
+        argValues: [url],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiModelsNormalizedBookAssetIdConstMeta => const TaskConstMeta(
+    debugName: 'normalized_book_asset_id',
+    argNames: ['url'],
+  );
+
+  @override
+  Future<String> crateApiModelsNormalizedBookBlockId({
+    required NormalizedBook that,
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_normalized_book(that, serializer);
+          sse_encode_usize(chapterIndex, serializer);
+          sse_encode_usize(blockIndex, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiModelsNormalizedBookBlockIdConstMeta,
+        argValues: [that, chapterIndex, blockIndex],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiModelsNormalizedBookBlockIdConstMeta => const TaskConstMeta(
+    debugName: 'normalized_book_block_id',
+    argNames: ['that', 'chapterIndex', 'blockIndex'],
+  );
+
+  @override
   Future<List<(int, String)>> crateApiModelsNormalizedBookChapterHashes({
     required NormalizedBook that,
   }) {
@@ -861,7 +993,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 24,
             port: port_,
           );
         },
@@ -882,6 +1014,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<String> crateApiModelsNormalizedBookChapterId({
+    required NormalizedBook that,
+    required BigInt chapterIndex,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_normalized_book(that, serializer);
+          sse_encode_usize(chapterIndex, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiModelsNormalizedBookChapterIdConstMeta,
+        argValues: [that, chapterIndex],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiModelsNormalizedBookChapterIdConstMeta => const TaskConstMeta(
+    debugName: 'normalized_book_chapter_id',
+    argNames: ['that', 'chapterIndex'],
+  );
+
+  @override
   Future<NormalizedBook> crateApiModelsNormalizedBookFromJsonStr({
     required String json,
   }) {
@@ -893,7 +1059,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 26,
             port: port_,
           );
         },
@@ -914,6 +1080,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<int> crateApiModelsNormalizedBookMigrateChapterIndex({
+    required String oldChapterId,
+    required NormalizedBook oldBook,
+    required NormalizedBook newBook,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(oldChapterId, serializer);
+          sse_encode_box_autoadd_normalized_book(oldBook, serializer);
+          sse_encode_box_autoadd_normalized_book(newBook, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_i_32,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiModelsNormalizedBookMigrateChapterIndexConstMeta,
+        argValues: [oldChapterId, oldBook, newBook],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiModelsNormalizedBookMigrateChapterIndexConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_migrate_chapter_index',
+        argNames: ['oldChapterId', 'oldBook', 'newBook'],
+      );
+
+  @override
   Future<String> crateApiModelsNormalizedBookToJsonString({
     required NormalizedBook that,
   }) {
@@ -925,7 +1128,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 28,
             port: port_,
           );
         },
@@ -955,7 +1158,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 29,
             port: port_,
           );
         },
@@ -991,7 +1194,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1025,7 +1228,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1046,6 +1249,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<ReaderChapter> crateApiApiParseChapter({
+    required String path,
+    required int chapterIndex,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          sse_encode_i_32(chapterIndex, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_reader_chapter,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiApiParseChapterConstMeta,
+        argValues: [path, chapterIndex],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiApiParseChapterConstMeta => const TaskConstMeta(
+    debugName: 'parse_chapter',
+    argNames: ['path', 'chapterIndex'],
+  );
+
+  @override
   Future<NormalizedBook> crateApiApiParseDocx({
     required List<int> bytes,
     String? forcedEncoding,
@@ -1059,7 +1296,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1093,7 +1330,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1127,7 +1364,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1157,7 +1394,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1191,7 +1428,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1225,7 +1462,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1255,7 +1492,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1289,7 +1526,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1325,7 +1562,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1355,7 +1592,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1385,7 +1622,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1419,7 +1656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1449,7 +1686,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 45,
             port: port_,
           );
         },

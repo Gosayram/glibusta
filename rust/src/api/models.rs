@@ -418,6 +418,119 @@ impl NormalizedBook {
             })
             .collect()
     }
+
+    /// RCE-15.2: Stable chapter ID from title + content.
+    pub fn chapter_id(&self, chapter_index: usize) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        if let Some(ch) = self.chapters.get(chapter_index) {
+            let mut h = DefaultHasher::new();
+            self.title.hash(&mut h);
+            ch.title.hash(&mut h);
+            ch.blocks.len().hash(&mut h);
+            format!("ch_{:016x}", h.finish())
+        } else {
+            format!("ch_missing_{}", chapter_index)
+        }
+    }
+
+    /// RCE-15.3: Stable block ID from chapter + block content.
+    pub fn block_id(&self, chapter_index: usize, block_index: usize) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        if let Some(ch) = self.chapters.get(chapter_index) {
+            if let Some(b) = ch.blocks.get(block_index) {
+                let mut h = DefaultHasher::new();
+                self.title.hash(&mut h);
+                ch.title.hash(&mut h);
+                b.text.hash(&mut h);
+                format!("blk_{:016x}", h.finish())
+            } else {
+                format!("blk_missing_{}_{}", chapter_index, block_index)
+            }
+        } else {
+            format!("blk_missing_{}_{}", chapter_index, block_index)
+        }
+    }
+
+    /// RCE-15.4: Stable asset ID from image URL.
+    pub fn asset_id(url: &str) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        url.hash(&mut h);
+        format!("asset_{:016x}", h.finish())
+    }
+
+    /// RCE-15.6: Stable annotation anchor from chapter + block + char offset.
+    pub fn annotation_anchor_id(
+        chapter_index: usize,
+        block_index: usize,
+        char_offset: usize,
+    ) -> String {
+        format!("ann_{}_{}_{}", chapter_index, block_index, char_offset)
+    }
+
+    /// RCE-17.1 + RCE-17.2: Migrate an old reading position to new book state
+    /// with fuzzy title matching when exact hash fails.
+    pub fn migrate_chapter_index(
+        old_chapter_id: &str,
+        old_book: &NormalizedBook,
+        new_book: &NormalizedBook,
+    ) -> i32 {
+        let old_hashes = old_book.chapter_hashes();
+        let new_hashes = new_book.chapter_hashes();
+        // Exact match by hash
+        if let Some((old_idx, _)) = old_hashes.iter().find(|(_, id)| id == old_chapter_id) {
+            if let Some((new_idx, _)) = new_hashes.get(*old_idx as usize) {
+                return *new_idx;
+            }
+            // Fuzzy: match by title similarity
+            if let Some(old_ch) = old_book.chapters.get(*old_idx as usize) {
+                for (new_idx, new_ch) in new_book.chapters.iter().enumerate() {
+                    if levenshtein_ratio(&old_ch.title, &new_ch.title) > 0.6 {
+                        return new_idx as i32;
+                    }
+                }
+            }
+        }
+        0
+    }
+}
+
+/// Simple Levenshtein distance for small strings.
+fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (a_len, b_len) = (a.len(), b.len());
+    let mut dp = vec![vec![0usize; b_len + 1]; a_len + 1];
+    for (i, row) in dp.iter_mut().enumerate() {
+        row[0] = i;
+    }
+    for (j, val) in dp[0].iter_mut().enumerate() {
+        *val = j;
+    }
+    for i in 1..=a_len {
+        for j in 1..=b_len {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+    dp[a_len][b_len]
+}
+
+/// Levenshtein similarity ratio (0.0 .. 1.0).
+fn levenshtein_ratio(a: &str, b: &str) -> f64 {
+    if a == b {
+        return 1.0;
+    }
+    let max_len = a.len().max(b.len());
+    if max_len == 0 {
+        return 1.0;
+    }
+    1.0 - (levenshtein_distance(a, b) as f64 / max_len as f64)
 }
 
 // ---------------------------------------------------------------------------

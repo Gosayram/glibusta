@@ -8,6 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
+// These functions are ignored because they are not marked as `pub`: `levenshtein_distance`, `levenshtein_ratio`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `ParserEvent`, `SearchMatch`, `TextNormalizationMode`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -380,14 +381,58 @@ class NormalizedBook {
     required this.toc,
   });
 
+  /// RCE-15.6: Stable annotation anchor from chapter + block + char offset.
+  static Future<String> annotationAnchorId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+    required BigInt charOffset,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookAnnotationAnchorId(
+    chapterIndex: chapterIndex,
+    blockIndex: blockIndex,
+    charOffset: charOffset,
+  );
+
+  /// RCE-15.4: Stable asset ID from image URL.
+  static Future<String> assetId({required String url}) =>
+      RustLib.instance.api.crateApiModelsNormalizedBookAssetId(url: url);
+
+  /// RCE-15.3: Stable block ID from chapter + block content.
+  Future<String> blockId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookBlockId(
+    that: this,
+    chapterIndex: chapterIndex,
+    blockIndex: blockIndex,
+  );
+
   /// Compute content_hash per chapter for stable anchors during reparse.
   Future<List<(int, String)>> chapterHashes() =>
       RustLib.instance.api.crateApiModelsNormalizedBookChapterHashes(
         that: this,
       );
 
+  /// RCE-15.2: Stable chapter ID from title + content.
+  Future<String> chapterId({required BigInt chapterIndex}) =>
+      RustLib.instance.api.crateApiModelsNormalizedBookChapterId(
+        that: this,
+        chapterIndex: chapterIndex,
+      );
+
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
+
+  /// RCE-17.1 + RCE-17.2: Migrate an old reading position to new book state
+  /// with fuzzy title matching when exact hash fails.
+  static Future<int> migrateChapterIndex({
+    required String oldChapterId,
+    required NormalizedBook oldBook,
+    required NormalizedBook newBook,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookMigrateChapterIndex(
+    oldChapterId: oldChapterId,
+    oldBook: oldBook,
+    newBook: newBook,
+  );
 
   Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
     that: this,

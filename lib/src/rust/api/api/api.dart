@@ -15,6 +15,15 @@ import 'models.dart';
 Future<NormalizedBook> parseBook({required String path}) =>
     RustLib.instance.api.crateApiApiParseBook(path: path);
 
+/// RCE-1.4: Extract a single chapter from a book file.
+Future<ReaderChapter> parseChapter({
+  required String path,
+  required int chapterIndex,
+}) => RustLib.instance.api.crateApiApiParseChapter(
+  path: path,
+  chapterIndex: chapterIndex,
+);
+
 /// Panic-safe wrapper for parse_book. Returns error instead of crashing.
 Future<NormalizedBook> safeParseBook({required String path}) =>
     RustLib.instance.api.crateApiApiSafeParseBook(path: path);

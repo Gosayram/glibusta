@@ -81,6 +81,18 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     Ok(book)
 }
 
+/// RCE-1.4: Extract a single chapter from a book file.
+pub fn parse_chapter(
+    path: String,
+    chapter_index: i32,
+) -> anyhow::Result<crate::api::models::ReaderChapter> {
+    let book = parse_book(path)?;
+    book.chapters
+        .into_iter()
+        .find(|c| c.index == chapter_index)
+        .ok_or_else(|| anyhow::anyhow!("Chapter {} not found", chapter_index))
+}
+
 /// Panic-safe wrapper for parse_book. Returns error instead of crashing.
 pub fn safe_parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let result = std::panic::catch_unwind(|| parse_book(path));
