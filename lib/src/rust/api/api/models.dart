@@ -9,7 +9,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `SearchMatch`, `TextNormalizationMode`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -203,6 +203,57 @@ class FormatCapabilities {
           images == other.images &&
           css == other.css &&
           footnotes == other.footnotes;
+}
+
+class ImportReport {
+  final BookFormat format;
+  final String parserUsed;
+  final BigInt chaptersCount;
+  final BigInt blocksCount;
+  final BigInt imagesCount;
+  final BigInt footnotesCount;
+  final List<ParseWarning> warnings;
+  final BigInt parseTimeMs;
+  final String fileHash;
+
+  const ImportReport({
+    required this.format,
+    required this.parserUsed,
+    required this.chaptersCount,
+    required this.blocksCount,
+    required this.imagesCount,
+    required this.footnotesCount,
+    required this.warnings,
+    required this.parseTimeMs,
+    required this.fileHash,
+  });
+
+  @override
+  int get hashCode =>
+      format.hashCode ^
+      parserUsed.hashCode ^
+      chaptersCount.hashCode ^
+      blocksCount.hashCode ^
+      imagesCount.hashCode ^
+      footnotesCount.hashCode ^
+      warnings.hashCode ^
+      parseTimeMs.hashCode ^
+      fileHash.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportReport &&
+          runtimeType == other.runtimeType &&
+          format == other.format &&
+          parserUsed == other.parserUsed &&
+          chaptersCount == other.chaptersCount &&
+          blocksCount == other.blocksCount &&
+          imagesCount == other.imagesCount &&
+          footnotesCount == other.footnotesCount &&
+          warnings == other.warnings &&
+          parseTimeMs == other.parseTimeMs &&
+          fileHash == other.fileHash;
 }
 
 class NormalizedBook {

@@ -449,3 +449,20 @@ pub struct ChapterLanguage {
     pub lang: String,
     pub confidence: f64,
 }
+
+// ---------------------------------------------------------------------------
+// RCE-22: Import report
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportReport {
+    pub format: BookFormat,
+    pub parser_used: String,
+    pub chapters_count: usize,
+    pub blocks_count: usize,
+    pub images_count: usize,
+    pub footnotes_count: usize,
+    pub warnings: Vec<ParseWarning>,
+    pub parse_time_ms: u64,
+    pub file_hash: String,
+}

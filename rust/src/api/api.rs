@@ -1,6 +1,6 @@
 use crate::api::models::{
-    BookFormat, BookMeta, ChapterLanguage, CoreError, FormatCapabilities, NormalizedBook,
-    ReaderBlock, TocEntry,
+    BookFormat, BookMeta, ChapterLanguage, CoreError, FormatCapabilities, ImportReport,
+    NormalizedBook, ReaderBlock, TocEntry,
 };
 use std::path::Path;
 
@@ -81,6 +81,42 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     Ok(book)
 }
 
+/// Panic-safe wrapper for parse_book. Returns error instead of crashing.
+pub fn safe_parse_book(path: String) -> anyhow::Result<NormalizedBook> {
+    let result = std::panic::catch_unwind(|| parse_book(path));
+    match result {
+        Ok(Ok(book)) => Ok(book),
+        Ok(Err(e)) => Err(e),
+        Err(panic) => {
+            let msg = if let Some(s) = panic.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic".to_string()
+            };
+            Err(anyhow::anyhow!("Parser panicked: {}", msg))
+        }
+    }
+}
+
+/// Parse with a timeout. Returns error if parsing takes longer than timeout_secs.
+pub fn parse_book_with_timeout(path: String, timeout_secs: u64) -> anyhow::Result<NormalizedBook> {
+    let handle = std::thread::spawn(move || parse_book(path));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+    loop {
+        if std::time::Instant::now() >= deadline {
+            return Err(anyhow::anyhow!("Parse timeout after {}s", timeout_secs));
+        }
+        if handle.is_finished() {
+            return handle
+                .join()
+                .map_err(|_| anyhow::anyhow!("Parser thread panicked"))?;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 /// Extract metadata without full chapter parsing.
 pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -151,6 +187,34 @@ pub fn detect_chapter_language(text: String) -> anyhow::Result<ChapterLanguage> 
     Ok(ChapterLanguage {
         lang: info.lang().code().to_string(),
         confidence: info.confidence(),
+    })
+}
+
+/// Generate import report: parse book and return structured statistics.
+pub fn generate_import_report(path: String) -> anyhow::Result<ImportReport> {
+    let format = detect_format_from_path(&path)?;
+    let bytes = read_file_bytes(&path)?;
+    let file_hash = crate::book::sha256_hex(&bytes);
+    let start = std::time::Instant::now();
+    let book = dispatch_parse(&bytes, format)?;
+    let parse_time_ms = start.elapsed().as_millis() as u64;
+    let blocks_count: usize = book.chapters.iter().map(|c| c.blocks.len()).sum();
+    let images_count = book
+        .chapters
+        .iter()
+        .flat_map(|c| &c.blocks)
+        .filter(|b| b.block_type == crate::api::models::BlockType::Image)
+        .count();
+    Ok(ImportReport {
+        format,
+        parser_used: format!("{}-native", format.as_str()),
+        chapters_count: book.chapters.len(),
+        blocks_count,
+        images_count,
+        footnotes_count: 0,
+        warnings: book.warnings,
+        parse_time_ms,
+        file_hash,
     })
 }
 

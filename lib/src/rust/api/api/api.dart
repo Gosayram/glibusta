@@ -15,6 +15,19 @@ import 'models.dart';
 Future<NormalizedBook> parseBook({required String path}) =>
     RustLib.instance.api.crateApiApiParseBook(path: path);
 
+/// Panic-safe wrapper for parse_book. Returns error instead of crashing.
+Future<NormalizedBook> safeParseBook({required String path}) =>
+    RustLib.instance.api.crateApiApiSafeParseBook(path: path);
+
+/// Parse with a timeout. Returns error if parsing takes longer than timeout_secs.
+Future<NormalizedBook> parseBookWithTimeout({
+  required String path,
+  required BigInt timeoutSecs,
+}) => RustLib.instance.api.crateApiApiParseBookWithTimeout(
+  path: path,
+  timeoutSecs: timeoutSecs,
+);
+
 /// Extract metadata without full chapter parsing.
 Future<BookMeta> extractMetadata({required String path}) =>
     RustLib.instance.api.crateApiApiExtractMetadata(path: path);
@@ -42,6 +55,10 @@ Future<FormatCapabilities> getFormatCapabilities({required String path}) =>
 /// Detect the language of a text snippet using whatlang.
 Future<ChapterLanguage> detectChapterLanguage({required String text}) =>
     RustLib.instance.api.crateApiApiDetectChapterLanguage(text: text);
+
+/// Generate import report: parse book and return structured statistics.
+Future<ImportReport> generateImportReport({required String path}) =>
+    RustLib.instance.api.crateApiApiGenerateImportReport(path: path);
 
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
