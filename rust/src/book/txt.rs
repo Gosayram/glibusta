@@ -1,15 +1,19 @@
 use crate::api::models::{
-    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, TocEntry,
+    BlockType, BookFormat, NormalizedBook, ParseWarning, ReaderBlock, ReaderChapter, TocEntry,
 };
 use crate::book::normalize_whitespace;
 use anyhow::Result;
 use regex::Regex;
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    let mut warnings = Vec::new();
     let text = if let Some(enc) = forced_encoding {
         decode_text(bytes, enc)?
     } else {
         let encoding = crate::book::encoding::detect_encoding(bytes);
+        warnings.push(ParseWarning {
+            message: format!("Encoding auto-detected: {}", encoding),
+        });
         decode_text(bytes, encoding)?
     };
 
@@ -63,7 +67,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         metadata: None,
         book_format: BookFormat::Txt,
         language: None,
-        warnings: Vec::new(),
+        warnings,
         images: Vec::new(),
         toc,
     })

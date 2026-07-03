@@ -163,6 +163,18 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     // ---- TOC extraction ----
     let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name);
 
+    let mut warnings = Vec::new();
+    if cover_url.is_none() {
+        warnings.push(crate::api::models::ParseWarning {
+            message: "Cover image not found".to_string(),
+        });
+    }
+    if chapters.is_empty() {
+        warnings.push(crate::api::models::ParseWarning {
+            message: "No content chapters found".to_string(),
+        });
+    }
+
     Ok(NormalizedBook {
         id,
         title,
@@ -173,7 +185,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         metadata: meta,
         book_format: BookFormat::Epub,
         language,
-        warnings: Vec::new(),
+        warnings,
         images: Vec::new(),
         toc,
     })
