@@ -545,3 +545,34 @@ fn test_fb2_parse_under_3s() {
         elapsed_ms
     );
 }
+
+#[test]
+fn test_parse_toc_under_500ms() {
+    let epub_bytes = create_minimal_epub();
+    let start = std::time::Instant::now();
+    for _ in 0..100 {
+        let _ = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
+    }
+    let elapsed_ms = start.elapsed().as_millis();
+    assert!(
+        elapsed_ms < 500,
+        "100 EPUB TOC parses took {}ms (>500ms budget)",
+        elapsed_ms
+    );
+}
+
+#[test]
+fn test_parse_chapter_under_200ms() {
+    let epub_bytes = create_minimal_epub();
+    let start = std::time::Instant::now();
+    for _ in 0..100 {
+        let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
+        let _ = book.chapters.first().unwrap();
+    }
+    let elapsed_ms = start.elapsed().as_millis();
+    assert!(
+        elapsed_ms < 200,
+        "100 chapter extractions took {}ms (>200ms budget)",
+        elapsed_ms
+    );
+}
