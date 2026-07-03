@@ -1,5 +1,6 @@
 use crate::api::models::{
-    BookFormat, BookMeta, CoreError, FormatCapabilities, NormalizedBook, ReaderBlock, TocEntry,
+    BookFormat, BookMeta, ChapterLanguage, CoreError, FormatCapabilities, NormalizedBook,
+    ReaderBlock, TocEntry,
 };
 use std::path::Path;
 
@@ -141,6 +142,16 @@ pub fn parse_toc(path: String) -> anyhow::Result<Vec<TocEntry>> {
 pub fn get_format_capabilities(path: String) -> anyhow::Result<FormatCapabilities> {
     let fmt = detect_format_from_path(&path)?;
     Ok(fmt.capabilities())
+}
+
+/// Detect the language of a text snippet using whatlang.
+pub fn detect_chapter_language(text: String) -> anyhow::Result<ChapterLanguage> {
+    let info =
+        whatlang::detect(&text).ok_or_else(|| anyhow::anyhow!("Could not detect language"))?;
+    Ok(ChapterLanguage {
+        lang: info.lang().code().to_string(),
+        confidence: info.confidence(),
+    })
 }
 
 // ---------------------------------------------------------------------------

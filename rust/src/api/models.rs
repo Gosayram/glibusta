@@ -396,3 +396,56 @@ impl NormalizedBook {
         Ok(serde_json::from_str(json)?)
     }
 }
+
+// ---------------------------------------------------------------------------
+// RCE-4.1: Cache manifest for rapid cache hit/miss
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookCacheManifest {
+    pub file_hash: String,
+    pub file_size: u64,
+    pub modified_at: u64,
+    pub schema_version: u32,
+    pub parser_version: String,
+    pub format: BookFormat,
+    #[serde(default)]
+    pub warnings: Vec<ParseWarning>,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-5.2: Search match result
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchMatch {
+    pub chapter_index: i32,
+    pub block_index: i32,
+    pub span_start: usize,
+    pub span_end: usize,
+    pub preview: String,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-20: Text normalization modes
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TextNormalizationMode {
+    /// Keep original formatting as-is
+    PreserveOriginal,
+    /// Normalize whitespace + typography (default)
+    ReaderFriendly,
+    /// Aggressively clean: remove page numbers, headers, OCR artifacts
+    AggressiveCleanup,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-18.2: Chapter language detection result
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChapterLanguage {
+    pub lang: String,
+    pub confidence: f64,
+}

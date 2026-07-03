@@ -75,6 +75,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt dco_decode_box_autoadd_usize(dynamic raw);
 
   @protected
+  ChapterLanguage dco_decode_chapter_language(dynamic raw);
+
+  @protected
   EmbeddedImage dco_decode_embedded_image(dynamic raw);
 
   @protected
@@ -229,6 +232,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer);
+
+  @protected
+  ChapterLanguage sse_decode_chapter_language(SseDeserializer deserializer);
 
   @protected
   EmbeddedImage sse_decode_embedded_image(SseDeserializer deserializer);
@@ -404,6 +410,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_chapter_language(
+    ChapterLanguage self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_embedded_image(EmbeddedImage self, SseSerializer serializer);

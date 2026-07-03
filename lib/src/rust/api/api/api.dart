@@ -39,6 +39,10 @@ Future<List<TocEntry>> parseToc({required String path}) =>
 Future<FormatCapabilities> getFormatCapabilities({required String path}) =>
     RustLib.instance.api.crateApiApiGetFormatCapabilities(path: path);
 
+/// Detect the language of a text snippet using whatlang.
+Future<ChapterLanguage> detectChapterLanguage({required String text}) =>
+    RustLib.instance.api.crateApiApiDetectChapterLanguage(text: text);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);
