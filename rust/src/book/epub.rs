@@ -174,6 +174,11 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             message: "No content chapters found".to_string(),
         });
     }
+    if toc.is_empty() && !chapters.is_empty() {
+        warnings.push(crate::api::models::ParseWarning {
+            message: "TOC not found, fallback to chapter titles".to_string(),
+        });
+    }
 
     Ok(NormalizedBook {
         id,

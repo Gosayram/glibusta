@@ -4,6 +4,11 @@ use std::fmt;
 /// Increment when NormalizedBook fields change. Flutter compares this to invalidate cache.
 pub const NORMALIZED_BOOK_SCHEMA_VERSION: u32 = 1;
 
+/// Safety limits for parsing.
+pub const MAX_FILE_SIZE: u64 = 500 * 1024 * 1024; // 500 MB
+pub const MAX_CHAPTER_SIZE: usize = 10 * 1024 * 1024; // 10 MB
+pub const MAX_IMAGE_SIZE: usize = 50 * 1024 * 1024; // 50 MB
+
 /// Book format detected by extension or content sniffing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BookFormat {
