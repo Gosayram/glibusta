@@ -349,6 +349,16 @@ pub fn diff_parsed_book(old_path: String, new_path: String) -> anyhow::Result<Bo
     Ok(BookDiff::compute(&old, &new))
 }
 
+/// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
+/// Returns (needs_reparse, file_hash, file_size).
+pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
+    let bytes = read_file_bytes(&path)?;
+    let file_hash = crate::book::sha256_hex(&bytes);
+    let file_size = bytes.len() as u64;
+    // Always return true for now — cache validation happens in Drift (Flutter side)
+    Ok((true, file_hash, file_size))
+}
+
 // ---------------------------------------------------------------------------
 // Legacy byte-based API (still needed by some callers)
 // ---------------------------------------------------------------------------

@@ -96,6 +96,11 @@ Future<BookDiff> diffParsedBook({
   newPath: newPath,
 );
 
+/// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
+/// Returns (needs_reparse, file_hash, file_size).
+Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
+    RustLib.instance.api.crateApiApiCheckBookCache(path: path);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);

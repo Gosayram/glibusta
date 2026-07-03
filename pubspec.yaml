@@ -144,6 +144,8 @@ dev_dependencies:
 
   # --- Test data ---
   faker: ^2.0.0
+  leak_tracker_flutter_testing: ^3.0.10
+  leak_tracker: ^11.0.2
 
 flutter:
   generate: true
