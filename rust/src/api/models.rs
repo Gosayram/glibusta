@@ -401,6 +401,23 @@ impl NormalizedBook {
     pub fn from_json_str(json: &str) -> anyhow::Result<Self> {
         Ok(serde_json::from_str(json)?)
     }
+
+    /// Compute content_hash per chapter for stable anchors during reparse.
+    pub fn chapter_hashes(&self) -> Vec<(i32, String)> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        self.chapters
+            .iter()
+            .map(|ch| {
+                let mut hasher = DefaultHasher::new();
+                ch.title.hash(&mut hasher);
+                for b in &ch.blocks {
+                    b.text.hash(&mut hasher);
+                }
+                (ch.index, format!("{:016x}", hasher.finish()))
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------

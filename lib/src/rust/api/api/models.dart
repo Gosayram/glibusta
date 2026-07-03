@@ -344,6 +344,12 @@ class NormalizedBook {
     required this.toc,
   });
 
+  /// Compute content_hash per chapter for stable anchors during reparse.
+  Future<List<(int, String)>> chapterHashes() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookChapterHashes(
+        that: this,
+      );
+
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 

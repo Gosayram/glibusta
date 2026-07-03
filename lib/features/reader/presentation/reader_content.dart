@@ -446,7 +446,20 @@ Widget _buildReaderBlock(
         }
         return imgWidget;
       }
-      return const SizedBox.shrink();
+      // RCE-7.4: broken image placeholder
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
+        child: Center(
+          child: Text(
+            '[ ${block.imageAlt ?? 'image'} ]',
+            style: style.copyWith(
+              fontSize: s.fontSize * 0.85,
+              fontStyle: FontStyle.italic,
+              color: (style.color ?? Colors.black).withValues(alpha: 0.4),
+            ),
+          ),
+        ),
+      );
     case BlockType.footnote:
       return Padding(
         padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing / 2),
@@ -1819,6 +1832,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         return ps * 4;
       case BlockType.image:
         if (!settings.showImages) return 0;
+        if (block.imageUrl == null || block.imageUrl!.isEmpty) {
+          return _measureTextHeight(
+                '[ image ]',
+                settings.fontSize * 0.85,
+                settings.lineHeight,
+                width,
+              ) +
+              ps;
+        }
         final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
         final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
         if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {

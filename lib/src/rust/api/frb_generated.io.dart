@@ -129,6 +129,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReaderChapter> dco_decode_list_reader_chapter(dynamic raw);
 
   @protected
+  List<(int, String)> dco_decode_list_record_i_32_string(dynamic raw);
+
+  @protected
   List<RichSpan> dco_decode_list_rich_span(dynamic raw);
 
   @protected
@@ -178,6 +181,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReaderChapter dco_decode_reader_chapter(dynamic raw);
+
+  @protected
+  (int, String) dco_decode_record_i_32_string(dynamic raw);
 
   @protected
   RichSpan dco_decode_rich_span(dynamic raw);
@@ -318,6 +324,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<(int, String)> sse_decode_list_record_i_32_string(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<RichSpan> sse_decode_list_rich_span(SseDeserializer deserializer);
 
   @protected
@@ -371,6 +382,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ReaderChapter sse_decode_reader_chapter(SseDeserializer deserializer);
+
+  @protected
+  (int, String) sse_decode_record_i_32_string(SseDeserializer deserializer);
 
   @protected
   RichSpan sse_decode_rich_span(SseDeserializer deserializer);
@@ -539,6 +553,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_record_i_32_string(
+    List<(int, String)> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_rich_span(List<RichSpan> self, SseSerializer serializer);
 
   @protected
@@ -604,6 +624,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_reader_chapter(ReaderChapter self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_record_i_32_string(
+    (int, String) self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_rich_span(RichSpan self, SseSerializer serializer);
