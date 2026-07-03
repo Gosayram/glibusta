@@ -5,6 +5,7 @@ use crate::api::models::{
 use std::path::Path;
 use std::sync::LazyLock;
 use std::time::Duration;
+use unicode_segmentation::UnicodeSegmentation;
 
 // ---------------------------------------------------------------------------
 // ARC-8.1 + ARC-8.2 + ARC-8.3: Two-level cache (RAM + Disk)
@@ -398,6 +399,27 @@ pub fn diff_parsed_book(old_path: String, new_path: String) -> anyhow::Result<Bo
     let old = parse_book(old_path)?;
     let new = parse_book(new_path)?;
     Ok(BookDiff::compute(&old, &new))
+}
+
+/// RCE-19.1: Find word break positions in a word for hyphenation.
+/// Returns Vec of byte offsets where breaks can occur (before each grapheme cluster).
+pub fn hyphenate_word(word: String) -> Vec<usize> {
+    let graphemes: Vec<&str> = word.graphemes(true).collect();
+    let len = graphemes.len();
+    if len < 3 {
+        return Vec::new();
+    }
+    // Break after each grapheme cluster except first and last
+    let mut positions = Vec::new();
+    let mut byte_offset = 0;
+    for (i, g) in graphemes.iter().enumerate() {
+        byte_offset += g.len();
+        // Allow breaks after positions 1..len-1 (min 2 chars on each side)
+        if i >= 1 && i < len - 1 {
+            positions.push(byte_offset);
+        }
+    }
+    positions
 }
 
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.

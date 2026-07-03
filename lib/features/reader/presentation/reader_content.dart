@@ -1604,6 +1604,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   // MD-2.3: per-chapter pagination cache — survives chapter eviction+reload
   final Map<String, List<_PageContent>> _chapterPageCache = {};
   static const int _maxCachedChapters = 30;
+  // ARC-11.2: block height cache — avoid recomputing _measureTextHeight
+  final Map<int, double> _heightCache = {};
 
   @override
   void initState() {
@@ -1696,17 +1698,24 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
     for (int i = 0; i < chapter.blocks.length; i++) {
       final block = chapter.blocks[i];
-      final blockHeight = _estimateBlockHeight(block, settings, style, contentWidth);
+      final cacheKey = Object.hash(block.text, block.type.index, settings.fontSize, contentWidth);
+      final blockHeight = _heightCache.putIfAbsent(cacheKey, () {
+        return _estimateBlockHeight(block, settings, style, contentWidth);
+      });
 
       if (currentHeight + blockHeight > availableHeight && i > pageStart) {
         final remainingBlocks = chapter.blocks.length - i;
         final remainingHeight = remainingBlocks > 0
-            ? chapter.blocks
-                  .skip(i)
-                  .fold<double>(
-                    0,
-                    (sum, b) => sum + _estimateBlockHeight(b, settings, style, contentWidth),
-                  )
+            ? chapter.blocks.skip(i).fold<double>(
+                0,
+                (sum, b) {
+                  final k = Object.hash(b.text, b.type.index, settings.fontSize, contentWidth);
+                  return sum +
+                      _heightCache.putIfAbsent(k, () {
+                        return _estimateBlockHeight(b, settings, style, contentWidth);
+                      });
+                },
+              )
             : 0.0;
         final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
         if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {

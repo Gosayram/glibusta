@@ -79,6 +79,11 @@ Future<Uint8List> getAssetBytes({required String path, required String assetId})
 Future<BookDiff> diffParsedBook({required String oldPath, required String newPath}) =>
     RustLib.instance.api.crateApiApiDiffParsedBook(oldPath: oldPath, newPath: newPath);
 
+/// RCE-19.1: Find word break positions in a word for hyphenation.
+/// Returns Vec of byte offsets where breaks can occur (before each grapheme cluster).
+Future<Uint64List> hyphenateWord({required String word}) =>
+    RustLib.instance.api.crateApiApiHyphenateWord(word: word);
+
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
