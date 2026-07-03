@@ -13,6 +13,33 @@ pub(crate) use hash::sha256_hex;
 
 use crate::api::models::RichSpan;
 
+// ---------------------------------------------------------------------------
+// ARC-2.3: Object Pool — reuse Vec<RichSpan> allocations across paragraphs
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    static SPAN_POOL: std::cell::RefCell<Vec<Vec<RichSpan>>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Get a pre-allocated Vec<RichSpan> from the pool (or create new).
+pub(crate) fn pool_get_spans() -> Vec<RichSpan> {
+    SPAN_POOL
+        .with(|pool| pool.borrow_mut().pop())
+        .unwrap_or_default()
+}
+
+/// Return a Vec<RichSpan> to the pool for reuse. Clears the vec.
+pub(crate) fn pool_return_spans(mut spans: Vec<RichSpan>) {
+    spans.clear();
+    SPAN_POOL.with(|pool| {
+        let p = pool.borrow();
+        if p.len() < 64 {
+            drop(p);
+            pool.borrow_mut().push(spans);
+        }
+    });
+}
+
 /// Strip dangerous schemes from href (javascript:, vbscript:, data:).
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     let trimmed = href.trim();

@@ -458,7 +458,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     if let Some(ref lang) = metadata.language {
         meta.insert(
             "mobiLanguage".to_string(),
-            serde_json::Value::String(lang.clone()),
+            serde_json::Value::String(lang.to_string()),
         );
     }
     meta.insert(
@@ -486,13 +486,13 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         },
         description: metadata
             .description
-            .clone()
+            .map(|s| s.to_string())
             .or(Some(description_for(&header))),
         cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),
         book_format: BookFormat::Mobi,
-        language: metadata.language.clone(),
+        language: metadata.language.map(|s| s.to_string()),
         warnings: Vec::new(),
         images: Vec::new(),
         toc: Vec::new(),

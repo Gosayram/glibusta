@@ -1,4 +1,5 @@
 use anyhow::Result;
+use compact_str::CompactString;
 use nom::IResult;
 use nom::bytes::streaming::{tag, take};
 use nom::multi::count;
@@ -6,11 +7,12 @@ use nom::number::streaming::be_u32;
 
 use super::MobiHeader;
 
+/// ARC-2.2: CompactString for stack-allocated metadata strings.
 pub(crate) struct MobiMetadata {
-    pub title: Option<String>,
-    pub author: Option<String>,
-    pub language: Option<String>,
-    pub description: Option<String>,
+    pub title: Option<CompactString>,
+    pub author: Option<CompactString>,
+    pub language: Option<CompactString>,
+    pub description: Option<CompactString>,
     pub cover_record_index: Option<u32>,
     pub has_exth: bool,
 }
@@ -118,10 +120,10 @@ impl ExthParser {
         }
 
         Ok(MobiMetadata {
-            title,
-            author,
-            language,
-            description,
+            title: title.map(CompactString::new),
+            author: author.map(CompactString::new),
+            language: language.map(CompactString::new),
+            description: description.map(CompactString::new),
             cover_record_index,
             has_exth: true,
         })
