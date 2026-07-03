@@ -1249,7 +1249,8 @@ fn parse_xhtml_to_blocks(
                             superscript,
                             &href,
                         );
-                        href = get_xml_attr(e, b"href");
+                        href =
+                            get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                     }
                     "br" if in_block => {
                         span_text.push('\n');

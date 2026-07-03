@@ -217,7 +217,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             current_span_superscript,
                             &current_span_href,
                         );
-                        current_span_href = get_xml_attr(e, b"href");
+                        current_span_href =
+                            get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                         // CRT-1.13: capture footnote reference
                         let a_type = get_xml_attr(e, b"type");
                         if a_type.as_deref() == Some("note") {

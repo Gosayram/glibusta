@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// Increment when NormalizedBook fields change. Flutter compares this to invalidate cache.
+pub const NORMALIZED_BOOK_SCHEMA_VERSION: u32 = 1;
+
 /// Book format detected by extension or content sniffing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BookFormat {

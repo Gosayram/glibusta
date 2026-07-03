@@ -262,7 +262,7 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     line_break: false,
                 }),
                 "a" => {
-                    let href = sub.attr("href").map(String::from);
+                    let href = sub.attr("href").and_then(crate::book::sanitize_href);
                     spans.push(RichSpan {
                         text: t,
                         bold: false,

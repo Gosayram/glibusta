@@ -13,6 +13,22 @@ pub(crate) use hash::sha256_hex;
 
 use crate::api::models::RichSpan;
 
+/// Strip dangerous schemes from href (javascript:, vbscript:, data:).
+pub(crate) fn sanitize_href(href: &str) -> Option<String> {
+    let trimmed = href.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("javascript:")
+        || lower.starts_with("vbscript:")
+        || lower.starts_with("data:")
+    {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
 /// Flush accumulated span_text into a RichSpan if formatting is active.
 pub(crate) fn flush_rich_span(
     spans: &mut Vec<RichSpan>,
