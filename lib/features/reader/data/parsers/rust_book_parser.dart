@@ -199,6 +199,8 @@ class RustBookParser implements BookParser {
       rust_models.BlockType.cite => local.BlockType.cite,
       rust_models.BlockType.textAuthor => local.BlockType.textAuthor,
       rust_models.BlockType.subtitle => local.BlockType.subtitle,
+      rust_models.BlockType.listItem => local.BlockType.listItem,
+      rust_models.BlockType.preformatted => local.BlockType.preformatted,
       rust_models.BlockType.paragraph => local.BlockType.paragraph,
     };
   }

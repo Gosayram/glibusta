@@ -272,6 +272,8 @@ pub enum BlockType {
     Cite,
     TextAuthor,
     Subtitle,
+    ListItem,
+    Preformatted,
 }
 
 impl BlockType {
@@ -290,6 +292,8 @@ impl BlockType {
             BlockType::Cite => "cite",
             BlockType::TextAuthor => "textAuthor",
             BlockType::Subtitle => "subtitle",
+            BlockType::ListItem => "listItem",
+            BlockType::Preformatted => "preformatted",
         }
     }
 
@@ -308,6 +312,8 @@ impl BlockType {
             "cite" => BlockType::Cite,
             "textAuthor" => BlockType::TextAuthor,
             "subtitle" => BlockType::Subtitle,
+            "listItem" => BlockType::ListItem,
+            "preformatted" => BlockType::Preformatted,
             _ => BlockType::Paragraph,
         }
     }
@@ -465,4 +471,27 @@ pub struct ImportReport {
     pub warnings: Vec<ParseWarning>,
     pub parse_time_ms: u64,
     pub file_hash: String,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-21: Reading order validator
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookValidationResult {
+    pub valid: bool,
+    pub empty_chapters: Vec<i32>,
+    pub duplicate_chapters: Vec<i32>,
+    pub spine_toc_mismatch: bool,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-10: Asset metadata
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookAssetMeta {
+    pub asset_id: String,
+    pub media_type: String,
+    pub size: usize,
 }

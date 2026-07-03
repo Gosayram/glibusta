@@ -461,6 +461,22 @@ Widget _buildReaderBlock(
       return _readerTableBlock(block, s, style);
     case BlockType.list:
       return _readerListBlock(ctx, block, textAlign);
+    case BlockType.listItem:
+      return Padding(
+        padding: EdgeInsets.only(left: s.margin, bottom: s.paragraphSpacing * 0.5),
+        child: _readerHighlightedText(ctx, '• ${block.text}', style, textAlign),
+      );
+    case BlockType.preformatted:
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
+        child: Text(
+          block.text,
+          style: style.copyWith(
+            fontFamily: 'monospace',
+            fontSize: s.fontSize * 0.9,
+          ),
+        ),
+      );
     case BlockType.paragraph:
       final indentValue = switch (s.paragraphIndentMode) {
         ParagraphIndentMode.asInBook when !s.ignoreBookIndent =>
@@ -1834,6 +1850,22 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               _measureTextHeight(item.text, settings.fontSize, settings.lineHeight, width - 32) + 4;
         }
         return totalHeight;
+      case BlockType.listItem:
+        return _measureTextHeight(
+              '• ${block.text}',
+              settings.fontSize,
+              settings.lineHeight,
+              width - 32,
+            ) +
+            ps * 0.5;
+      case BlockType.preformatted:
+        return _measureTextHeight(
+              block.text,
+              settings.fontSize * 0.9,
+              settings.lineHeight,
+              width,
+            ) +
+            ps;
       case BlockType.paragraph:
         final indent = switch (settings.paragraphIndentMode) {
           ParagraphIndentMode.asInBook when !settings.ignoreBookIndent => (block.textIndent ?? 0.0),

@@ -9,7 +9,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `SearchMatch`, `TextNormalizationMode`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -25,6 +25,8 @@ enum BlockType {
   cite,
   textAuthor,
   subtitle,
+  listItem,
+  preformatted,
   ;
 
   Future<void> asStr() => RustLib.instance.api.crateApiModelsBlockTypeAsStr(
@@ -33,6 +35,30 @@ enum BlockType {
 
   static Future<BlockType> fromStr({required String s}) =>
       RustLib.instance.api.crateApiModelsBlockTypeFromStr(s: s);
+}
+
+class BookAssetMeta {
+  final String assetId;
+  final String mediaType;
+  final BigInt size;
+
+  const BookAssetMeta({
+    required this.assetId,
+    required this.mediaType,
+    required this.size,
+  });
+
+  @override
+  int get hashCode => assetId.hashCode ^ mediaType.hashCode ^ size.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookAssetMeta &&
+          runtimeType == other.runtimeType &&
+          assetId == other.assetId &&
+          mediaType == other.mediaType &&
+          size == other.size;
 }
 
 /// Book format detected by extension or content sniffing.
@@ -108,6 +134,37 @@ class BookMeta {
           genres == other.genres &&
           coverData == other.coverData &&
           toc == other.toc;
+}
+
+class BookValidationResult {
+  final bool valid;
+  final Int32List emptyChapters;
+  final Int32List duplicateChapters;
+  final bool spineTocMismatch;
+
+  const BookValidationResult({
+    required this.valid,
+    required this.emptyChapters,
+    required this.duplicateChapters,
+    required this.spineTocMismatch,
+  });
+
+  @override
+  int get hashCode =>
+      valid.hashCode ^
+      emptyChapters.hashCode ^
+      duplicateChapters.hashCode ^
+      spineTocMismatch.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookValidationResult &&
+          runtimeType == other.runtimeType &&
+          valid == other.valid &&
+          emptyChapters == other.emptyChapters &&
+          duplicateChapters == other.duplicateChapters &&
+          spineTocMismatch == other.spineTocMismatch;
 }
 
 class ChapterLanguage {

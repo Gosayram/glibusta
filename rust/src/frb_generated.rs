@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 609822335;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 47183510;
 
 // Section: executor
 
@@ -564,6 +564,41 @@ fn wire__crate__api__api__generate_import_report_impl(
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
                         let output_ok = crate::api::api::generate_import_report(api_path)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__api__get_book_assets_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_book_assets",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::api::get_book_assets(api_path)?;
                         Ok(output_ok)
                     })(),
                 )
@@ -1192,6 +1227,41 @@ fn wire__crate__api__api__sha256_hash_impl(
         },
     )
 }
+fn wire__crate__api__api__validate_book_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "validate_book",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::api::validate_book(api_path)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 
 // Section: related_funcs
 
@@ -1253,7 +1323,23 @@ impl SseDecode for crate::api::models::BlockType {
             10 => crate::api::models::BlockType::Cite,
             11 => crate::api::models::BlockType::TextAuthor,
             12 => crate::api::models::BlockType::Subtitle,
+            13 => crate::api::models::BlockType::ListItem,
+            14 => crate::api::models::BlockType::Preformatted,
             _ => unreachable!("Invalid variant for BlockType: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::models::BookAssetMeta {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_assetId = <String>::sse_decode(deserializer);
+        let mut var_mediaType = <String>::sse_decode(deserializer);
+        let mut var_size = <usize>::sse_decode(deserializer);
+        return crate::api::models::BookAssetMeta {
+            asset_id: var_assetId,
+            media_type: var_mediaType,
+            size: var_size,
         };
     }
 }
@@ -1297,6 +1383,22 @@ impl SseDecode for crate::api::models::BookMeta {
             genres: var_genres,
             cover_data: var_coverData,
             toc: var_toc,
+        };
+    }
+}
+
+impl SseDecode for crate::api::models::BookValidationResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_valid = <bool>::sse_decode(deserializer);
+        let mut var_emptyChapters = <Vec<i32>>::sse_decode(deserializer);
+        let mut var_duplicateChapters = <Vec<i32>>::sse_decode(deserializer);
+        let mut var_spineTocMismatch = <bool>::sse_decode(deserializer);
+        return crate::api::models::BookValidationResult {
+            valid: var_valid,
+            empty_chapters: var_emptyChapters,
+            duplicate_chapters: var_duplicateChapters,
+            spine_toc_mismatch: var_spineTocMismatch,
         };
     }
 }
@@ -1408,6 +1510,20 @@ impl SseDecode for Vec<String> {
     }
 }
 
+impl SseDecode for Vec<crate::api::models::BookAssetMeta> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::models::BookAssetMeta>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::models::EmbeddedImage> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1441,6 +1557,18 @@ impl SseDecode for Vec<crate::api::models::ParseWarning> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::models::ParseWarning>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<i32>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -1814,37 +1942,39 @@ fn pde_ffi_dispatcher_primary_impl(
         13 => wire__crate__api__api__extract_metadata_impl(port, ptr, rust_vec_len, data_len),
         14 => wire__crate__api__api__extract_zip_entry_impl(port, ptr, rust_vec_len, data_len),
         15 => wire__crate__api__api__generate_import_report_impl(port, ptr, rust_vec_len, data_len),
-        16 => {
+        16 => wire__crate__api__api__get_book_assets_impl(port, ptr, rust_vec_len, data_len),
+        17 => {
             wire__crate__api__api__get_format_capabilities_impl(port, ptr, rust_vec_len, data_len)
         }
-        17 => wire__crate__api__models__normalized_book_from_json_str_impl(
+        18 => wire__crate__api__models__normalized_book_from_json_str_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        18 => wire__crate__api__models__normalized_book_to_json_string_impl(
+        19 => wire__crate__api__models__normalized_book_to_json_string_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        19 => wire__crate__api__api__parse_book_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__api__parse_book_legacy_impl(port, ptr, rust_vec_len, data_len),
-        21 => {
+        20 => wire__crate__api__api__parse_book_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__api__parse_book_legacy_impl(port, ptr, rust_vec_len, data_len),
+        22 => {
             wire__crate__api__api__parse_book_with_timeout_impl(port, ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__api__api__parse_docx_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__api__parse_epub_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__api__parse_fb2_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__api__parse_html_blocks_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__api__parse_mobi_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__api__parse_rtf_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__api__parse_toc_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__api__parse_txt_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__api__render_pdf_thumbnail_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__api__safe_parse_book_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__api__parse_docx_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__api__parse_epub_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__api__parse_fb2_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__api__parse_html_blocks_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__api__parse_mobi_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__api__parse_rtf_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__api__parse_toc_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__api__parse_txt_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__api__render_pdf_thumbnail_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__api__safe_parse_book_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__api__validate_book_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1895,6 +2025,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::BlockType {
             Self::Cite => 10.into_dart(),
             Self::TextAuthor => 11.into_dart(),
             Self::Subtitle => 12.into_dart(),
+            Self::ListItem => 13.into_dart(),
+            Self::Preformatted => 14.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -1904,6 +2036,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::BlockType>
     for crate::api::models::BlockType
 {
     fn into_into_dart(self) -> crate::api::models::BlockType {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::models::BookAssetMeta {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.asset_id.into_into_dart().into_dart(),
+            self.media_type.into_into_dart().into_dart(),
+            self.size.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::models::BookAssetMeta
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::models::BookAssetMeta>
+    for crate::api::models::BookAssetMeta
+{
+    fn into_into_dart(self) -> crate::api::models::BookAssetMeta {
         self
     }
 }
@@ -1957,6 +2111,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::BookMeta>
     for crate::api::models::BookMeta
 {
     fn into_into_dart(self) -> crate::api::models::BookMeta {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::models::BookValidationResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.valid.into_into_dart().into_dart(),
+            self.empty_chapters.into_into_dart().into_dart(),
+            self.duplicate_chapters.into_into_dart().into_dart(),
+            self.spine_toc_mismatch.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::models::BookValidationResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::models::BookValidationResult>
+    for crate::api::models::BookValidationResult
+{
+    fn into_into_dart(self) -> crate::api::models::BookValidationResult {
         self
     }
 }
@@ -2253,12 +2430,23 @@ impl SseEncode for crate::api::models::BlockType {
                 crate::api::models::BlockType::Cite => 10,
                 crate::api::models::BlockType::TextAuthor => 11,
                 crate::api::models::BlockType::Subtitle => 12,
+                crate::api::models::BlockType::ListItem => 13,
+                crate::api::models::BlockType::Preformatted => 14,
                 _ => {
                     unimplemented!("");
                 }
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::models::BookAssetMeta {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.asset_id, serializer);
+        <String>::sse_encode(self.media_type, serializer);
+        <usize>::sse_encode(self.size, serializer);
     }
 }
 
@@ -2297,6 +2485,16 @@ impl SseEncode for crate::api::models::BookMeta {
         <Vec<String>>::sse_encode(self.genres, serializer);
         <Option<Vec<u8>>>::sse_encode(self.cover_data, serializer);
         <Vec<crate::api::models::TocEntry>>::sse_encode(self.toc, serializer);
+    }
+}
+
+impl SseEncode for crate::api::models::BookValidationResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.valid, serializer);
+        <Vec<i32>>::sse_encode(self.empty_chapters, serializer);
+        <Vec<i32>>::sse_encode(self.duplicate_chapters, serializer);
+        <bool>::sse_encode(self.spine_toc_mismatch, serializer);
     }
 }
 
@@ -2376,6 +2574,16 @@ impl SseEncode for Vec<String> {
     }
 }
 
+impl SseEncode for Vec<crate::api::models::BookAssetMeta> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::models::BookAssetMeta>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::models::EmbeddedImage> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2402,6 +2610,16 @@ impl SseEncode for Vec<crate::api::models::ParseWarning> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::models::ParseWarning>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <i32>::sse_encode(item, serializer);
         }
     }
 }

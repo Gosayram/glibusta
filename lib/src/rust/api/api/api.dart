@@ -60,6 +60,14 @@ Future<ChapterLanguage> detectChapterLanguage({required String text}) =>
 Future<ImportReport> generateImportReport({required String path}) =>
     RustLib.instance.api.crateApiApiGenerateImportReport(path: path);
 
+/// Validate reading order: empty chapters, duplicates, spine/TOC mismatch.
+Future<BookValidationResult> validateBook({required String path}) =>
+    RustLib.instance.api.crateApiApiValidateBook(path: path);
+
+/// Get asset metadata (IDs, types, sizes) without downloading bytes.
+Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
+    RustLib.instance.api.crateApiApiGetBookAssets(path: path);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);

@@ -45,10 +45,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType dco_decode_block_type(dynamic raw);
 
   @protected
+  BookAssetMeta dco_decode_book_asset_meta(dynamic raw);
+
+  @protected
   BookFormat dco_decode_book_format(dynamic raw);
 
   @protected
   BookMeta dco_decode_book_meta(dynamic raw);
+
+  @protected
+  BookValidationResult dco_decode_book_validation_result(dynamic raw);
 
   @protected
   bool dco_decode_bool(dynamic raw);
@@ -96,6 +102,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
+  List<BookAssetMeta> dco_decode_list_book_asset_meta(dynamic raw);
+
+  @protected
   List<EmbeddedImage> dco_decode_list_embedded_image(dynamic raw);
 
   @protected
@@ -103,6 +112,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ParseWarning> dco_decode_list_parse_warning(dynamic raw);
+
+  @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -208,10 +220,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType sse_decode_block_type(SseDeserializer deserializer);
 
   @protected
+  BookAssetMeta sse_decode_book_asset_meta(SseDeserializer deserializer);
+
+  @protected
   BookFormat sse_decode_book_format(SseDeserializer deserializer);
 
   @protected
   BookMeta sse_decode_book_meta(SseDeserializer deserializer);
+
+  @protected
+  BookValidationResult sse_decode_book_validation_result(
+    SseDeserializer deserializer,
+  );
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -263,6 +283,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
+  List<BookAssetMeta> sse_decode_list_book_asset_meta(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<EmbeddedImage> sse_decode_list_embedded_image(
     SseDeserializer deserializer,
   );
@@ -274,6 +299,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ParseWarning> sse_decode_list_parse_warning(
     SseDeserializer deserializer,
   );
+
+  @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -390,10 +418,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_block_type(BlockType self, SseSerializer serializer);
 
   @protected
+  void sse_encode_book_asset_meta(BookAssetMeta self, SseSerializer serializer);
+
+  @protected
   void sse_encode_book_format(BookFormat self, SseSerializer serializer);
 
   @protected
   void sse_encode_book_meta(BookMeta self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_book_validation_result(
+    BookValidationResult self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -451,6 +488,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_book_asset_meta(
+    List<BookAssetMeta> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_embedded_image(
     List<EmbeddedImage> self,
     SseSerializer serializer,
@@ -465,6 +508,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_parse_warning(
     List<ParseWarning> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
     SseSerializer serializer,
   );
 

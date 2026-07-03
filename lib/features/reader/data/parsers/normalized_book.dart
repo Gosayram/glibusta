@@ -504,4 +504,6 @@ enum BlockType {
   cite,
   textAuthor,
   subtitle,
+  listItem,
+  preformatted,
 }

@@ -1,6 +1,6 @@
 use crate::api::models::{
-    BookFormat, BookMeta, ChapterLanguage, CoreError, FormatCapabilities, ImportReport,
-    NormalizedBook, ReaderBlock, TocEntry,
+    BookAssetMeta, BookFormat, BookMeta, BookValidationResult, ChapterLanguage, CoreError,
+    FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, TocEntry,
 };
 use std::path::Path;
 
@@ -216,6 +216,52 @@ pub fn generate_import_report(path: String) -> anyhow::Result<ImportReport> {
         parse_time_ms,
         file_hash,
     })
+}
+
+/// Validate reading order: empty chapters, duplicates, spine/TOC mismatch.
+pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
+    let book = parse_book(path)?;
+    let mut empty_chapters = Vec::new();
+    let mut titles_seen = std::collections::HashSet::new();
+    let mut duplicate_chapters = Vec::new();
+    for ch in &book.chapters {
+        if ch.blocks.is_empty() || (ch.blocks.len() == 1 && ch.blocks[0].text.trim().is_empty()) {
+            empty_chapters.push(ch.index);
+        }
+        if !titles_seen.insert(ch.title.clone()) {
+            duplicate_chapters.push(ch.index);
+        }
+    }
+    let spine_toc_mismatch = !book.toc.is_empty()
+        && book.toc.len() != book.chapters.len()
+        && book
+            .toc
+            .iter()
+            .any(|t| t.chapter_index >= book.chapters.len() as i32);
+    Ok(BookValidationResult {
+        valid: empty_chapters.is_empty() && duplicate_chapters.is_empty() && !spine_toc_mismatch,
+        empty_chapters,
+        duplicate_chapters,
+        spine_toc_mismatch,
+    })
+}
+
+/// Get asset metadata (IDs, types, sizes) without downloading bytes.
+pub fn get_book_assets(path: String) -> anyhow::Result<Vec<BookAssetMeta>> {
+    let book = parse_book(path)?;
+    let mut assets = Vec::new();
+    for ch in &book.chapters {
+        for b in &ch.blocks {
+            if let Some(url) = &b.image_url {
+                assets.push(BookAssetMeta {
+                    asset_id: url.clone(),
+                    media_type: "image".to_string(),
+                    size: 0,
+                });
+            }
+        }
+    }
+    Ok(assets)
 }
 
 // ---------------------------------------------------------------------------
