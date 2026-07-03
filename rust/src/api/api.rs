@@ -3,6 +3,19 @@ use crate::api::models::{
     CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, TocEntry,
 };
 use std::path::Path;
+use std::sync::LazyLock;
+use std::time::Duration;
+
+// ---------------------------------------------------------------------------
+// ARC-8.1: RAM cache for parsed books (TTL 10 min, max 32 books)
+// ---------------------------------------------------------------------------
+
+static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLock::new(|| {
+    moka::sync::Cache::builder()
+        .max_capacity(32)
+        .time_to_idle(Duration::from_secs(600))
+        .build()
+});
 
 // ---------------------------------------------------------------------------
 // Internal helpers (not FRB-visible)
@@ -27,8 +40,10 @@ fn detect_format_from_path(path: &str) -> Result<BookFormat, CoreError> {
     Ok(fmt)
 }
 
-fn read_file_bytes(path: &str) -> Result<Vec<u8>, CoreError> {
-    std::fs::read(path).map_err(|e| CoreError::IoError(e.to_string()))
+/// ARC-3.1: Memory-map a file for zero-copy reading.
+fn map_file(path: &str) -> Result<memmap2::Mmap, CoreError> {
+    let file = std::fs::File::open(path).map_err(|e| CoreError::IoError(e.to_string()))?;
+    unsafe { memmap2::Mmap::map(&file).map_err(|e| CoreError::IoError(e.to_string())) }
 }
 
 fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, CoreError> {
@@ -72,12 +87,19 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
 // ---------------------------------------------------------------------------
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
+/// Uses moka cache (ARC-8.1): if already parsed recently, returns cached result.
 pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
+    // ARC-8.1: check cache first
+    if let Some(cached) = BOOK_CACHE.get(&path) {
+        return Ok(cached);
+    }
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
-    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
-    let mut book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mmap = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     // Set format on the output
     book.book_format = format;
+    // ARC-8.1: store in cache
+    BOOK_CACHE.insert(path, book.clone());
     Ok(book)
 }
 
@@ -132,7 +154,7 @@ pub fn parse_book_with_timeout(path: String, timeout_secs: u64) -> anyhow::Resul
 /// Extract metadata without full chapter parsing.
 pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
-    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
 
@@ -150,7 +172,7 @@ pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
 /// Extract cover image bytes. Returns None (empty Vec) if no cover.
 pub fn extract_cover(path: String) -> anyhow::Result<Vec<u8>> {
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
-    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
 
@@ -173,7 +195,7 @@ pub fn detect_format(path: String) -> anyhow::Result<String> {
 
 /// Calculate SHA-256 hash of a file (first 64KB for speed).
 pub fn calculate_hash(path: String) -> anyhow::Result<String> {
-    let bytes = read_file_bytes(&path)?;
+    let bytes = map_file(&path)?;
     let limit = 65536.min(bytes.len());
     Ok(crate::book::sha256_hex(&bytes[..limit]))
 }
@@ -181,7 +203,7 @@ pub fn calculate_hash(path: String) -> anyhow::Result<String> {
 /// Extract table of contents without full chapter parsing.
 pub fn parse_toc(path: String) -> anyhow::Result<Vec<TocEntry>> {
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
-    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
     let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     Ok(book.toc)
 }
@@ -205,7 +227,7 @@ pub fn detect_chapter_language(text: String) -> anyhow::Result<ChapterLanguage> 
 /// Generate import report: parse book and return structured statistics.
 pub fn generate_import_report(path: String) -> anyhow::Result<ImportReport> {
     let format = detect_format_from_path(&path)?;
-    let bytes = read_file_bytes(&path)?;
+    let bytes = map_file(&path)?;
     let file_hash = crate::book::sha256_hex(&bytes);
     let start = std::time::Instant::now();
     let book = dispatch_parse(&bytes, format)?;
@@ -310,7 +332,7 @@ pub fn get_book_assets(path: String) -> anyhow::Result<Vec<BookAssetMeta>> {
 /// Lazy-load a single asset (image) from a book file by its asset_id (href).
 pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>> {
     let format = detect_format_from_path(&path)?;
-    let bytes = read_file_bytes(&path)?;
+    let bytes = map_file(&path)?;
 
     match format {
         BookFormat::Epub => {
@@ -352,7 +374,7 @@ pub fn diff_parsed_book(old_path: String, new_path: String) -> anyhow::Result<Bo
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
-    let bytes = read_file_bytes(&path)?;
+    let bytes = map_file(&path)?;
     let file_hash = crate::book::sha256_hex(&bytes);
     let file_size = bytes.len() as u64;
     // Always return true for now — cache validation happens in Drift (Flutter side)

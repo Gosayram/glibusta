@@ -131,3 +131,36 @@ pub(crate) fn normalize_typography(text: &str) -> String {
 
     result
 }
+
+// ---------------------------------------------------------------------------
+// RCE-28.2: Rust-side BookParser trait
+// ---------------------------------------------------------------------------
+
+use crate::api::models::{BookFormat, NormalizedBook};
+
+/// Trait for format-specific book parsers.
+/// Enables adding new formats (PDF, DjVu) without rewriting core dispatch.
+pub trait BookParser {
+    /// Detect if this parser can handle the given format.
+    fn detect(format: BookFormat) -> bool
+    where
+        Self: Sized;
+
+    /// Parse a book from bytes into NormalizedBook.
+    fn parse(bytes: &[u8], forced_encoding: Option<&str>) -> anyhow::Result<NormalizedBook>
+    where
+        Self: Sized;
+}
+
+/// Dispatch to the correct parser using BookParser trait.
+pub fn dispatch_parse_trait(format: BookFormat, bytes: &[u8]) -> anyhow::Result<NormalizedBook> {
+    match format {
+        BookFormat::Fb2 => fb2::parse_fb2(bytes, None),
+        BookFormat::Epub => epub::parse_epub(bytes, None),
+        BookFormat::Txt => txt::parse_txt(bytes, None),
+        BookFormat::Docx => docx::parse_docx(bytes, None),
+        BookFormat::Rtf => rtf::parse_rtf(bytes, None),
+        BookFormat::Mobi | BookFormat::Azw3 | BookFormat::Prc => mobi::parse_mobi(bytes, None),
+        _ => Err(anyhow::anyhow!("Unsupported format: {:?}", format)),
+    }
+}

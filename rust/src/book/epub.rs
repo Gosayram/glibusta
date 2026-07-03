@@ -1073,6 +1073,28 @@ fn parse_xhtml_to_blocks(
                 current_class = get_class_attr(e);
                 match tag.as_str() {
                     "body" => in_body = true,
+                    "aside" if in_body => {
+                        // RCE-9.2: detect epub:type="footnote"
+                        let epub_type =
+                            get_xml_attr(e, b"epub:type").or_else(|| get_xml_attr(e, b"type"));
+                        if epub_type.as_deref() == Some("footnote") {
+                            flush_block(
+                                &mut blocks,
+                                &mut current_text,
+                                &mut rich_spans,
+                                &mut block_index,
+                                BlockType::Footnote,
+                                None,
+                                None,
+                            );
+                            current_text.clear();
+                            rich_spans.clear();
+                            span_text.clear();
+                            in_block = true;
+                            block_type = BlockType::Footnote;
+                            href = None;
+                        }
+                    }
                     "p" | "pre" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
@@ -1338,6 +1360,22 @@ fn parse_xhtml_to_blocks(
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = false,
+                    "aside" if in_block && block_type == BlockType::Footnote => {
+                        flush_block(
+                            &mut blocks,
+                            &mut current_text,
+                            &mut rich_spans,
+                            &mut block_index,
+                            BlockType::Footnote,
+                            None,
+                            None,
+                        );
+                        current_text.clear();
+                        rich_spans.clear();
+                        span_text.clear();
+                        in_block = false;
+                        block_type = BlockType::Paragraph;
+                    }
                     "p" | "pre" if in_block && block_type == BlockType::Paragraph => {
                         flush_rich_span(
                             &mut rich_spans,

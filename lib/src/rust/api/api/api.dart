@@ -8,9 +8,10 @@ import '../lib.dart';
 import 'models.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `dispatch_parse`, `ext_from_path`, `read_file_bytes`
+// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `dispatch_parse`, `ext_from_path`, `map_file`
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
+/// Uses moka cache (ARC-8.1): if already parsed recently, returns cached result.
 Future<NormalizedBook> parseBook({required String path}) =>
     RustLib.instance.api.crateApiApiParseBook(path: path);
 
