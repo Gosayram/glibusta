@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -85,6 +86,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
     unawaited(_fetchBatteryLevel());
     unawaited(CustomFontHelper.loadSaved());
+    // FDEP-1.3: request 120Hz on Android flagships
+    unawaited(FlutterDisplayMode.setHighRefreshRate().catchError((_) {}));
     // LW-11.1: init TTS headphone auto-pause listener
     unawaited(TtsController.instance.init());
     _enterImmersiveMode();

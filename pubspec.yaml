@@ -120,6 +120,7 @@ dependencies:
   in_app_review: ^2.0.12
   upgrader: ^13.5.0
   in_app_update: ^4.2.5
+  flutter_displaymode: ^0.7.0
 
 dev_dependencies:
   flutter_test:
@@ -146,6 +147,7 @@ dev_dependencies:
   faker: ^2.0.0
   leak_tracker_flutter_testing: ^3.0.10
   leak_tracker: ^11.0.2
+  accessibility_tools: ^2.8.0
 
 flutter:
   generate: true
