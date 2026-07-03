@@ -631,7 +631,6 @@ pub struct BookAssetMeta {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[flutter_rust_bridge::frb(unignore)]
 pub enum ParserEvent {
     ParserStarted {
         format: String,

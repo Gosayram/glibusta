@@ -44,6 +44,7 @@ rust-build-release: require-rust ## Build Rust native library in release mode
 rust-build-android: require-rust ## Build Rust native libraries for Android (arm64-v8a + armeabi-v7a)
 	@$(PRINT_STEP) "Building Rust libraries for Android"
 	@export ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)"; \
+	export PATH="$${HOME}/.cargo/bin:$${HOME}/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$${PATH}"; \
 	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a; \
 	cd rust && $(CARGO_NDK) -t arm64-v8a build --release && \
 	$(CARGO_NDK) -t armeabi-v7a build --release

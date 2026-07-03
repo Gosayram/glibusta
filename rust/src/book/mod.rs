@@ -22,6 +22,7 @@ thread_local! {
 }
 
 /// Get a pre-allocated Vec<RichSpan> from the pool (or create new).
+#[allow(dead_code)]
 pub(crate) fn pool_get_spans() -> Vec<RichSpan> {
     SPAN_POOL
         .with(|pool| pool.borrow_mut().pop())
@@ -29,6 +30,7 @@ pub(crate) fn pool_get_spans() -> Vec<RichSpan> {
 }
 
 /// Return a Vec<RichSpan> to the pool for reuse. Clears the vec.
+#[allow(dead_code)]
 pub(crate) fn pool_return_spans(mut spans: Vec<RichSpan>) {
     spans.clear();
     SPAN_POOL.with(|pool| {
