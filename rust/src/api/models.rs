@@ -541,3 +541,50 @@ pub enum ParserEvent {
         elapsed_ms: u64,
     },
 }
+
+// ---------------------------------------------------------------------------
+// RCE-9.3: Footnote model
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Footnote {
+    pub id: String,
+    pub number: usize,
+    pub content_blocks: Vec<ReaderBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub back_ref: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// RCE-16: Book diff after reparse
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookDiff {
+    pub chapters_changed: bool,
+    pub text_changed: bool,
+    pub metadata_only: bool,
+    pub needs_anchor_migration: bool,
+}
+
+impl BookDiff {
+    pub fn compute(old: &NormalizedBook, new: &NormalizedBook) -> Self {
+        let chapters_changed = old.chapters.len() != new.chapters.len()
+            || old.chapters.iter().zip(new.chapters.iter()).any(|(a, b)| {
+                a.blocks.len() != b.blocks.len()
+                    || a.blocks
+                        .iter()
+                        .zip(b.blocks.iter())
+                        .any(|(x, y)| x.text != y.text)
+            });
+        let text_changed = chapters_changed;
+        let metadata_only = !text_changed && (old.title != new.title || old.authors != new.authors);
+        let needs_anchor_migration = chapters_changed;
+        Self {
+            chapters_changed,
+            text_changed,
+            metadata_only,
+            needs_anchor_migration,
+        }
+    }
+}

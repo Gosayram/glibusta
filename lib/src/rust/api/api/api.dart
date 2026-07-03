@@ -78,6 +78,15 @@ Future<Uint8List> getAssetBytes({
   required String assetId,
 }) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
 
+/// Compare two books parsed from the same file at different times.
+Future<BookDiff> diffParsedBook({
+  required String oldPath,
+  required String newPath,
+}) => RustLib.instance.api.crateApiApiDiffParsedBook(
+  oldPath: oldPath,
+  newPath: newPath,
+);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);

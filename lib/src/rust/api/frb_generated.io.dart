@@ -48,6 +48,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BookAssetMeta dco_decode_book_asset_meta(dynamic raw);
 
   @protected
+  BookDiff dco_decode_book_diff(dynamic raw);
+
+  @protected
   BookFormat dco_decode_book_format(dynamic raw);
 
   @protected
@@ -227,6 +230,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BookAssetMeta sse_decode_book_asset_meta(SseDeserializer deserializer);
+
+  @protected
+  BookDiff sse_decode_book_diff(SseDeserializer deserializer);
 
   @protected
   BookFormat sse_decode_book_format(SseDeserializer deserializer);
@@ -433,6 +439,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_book_asset_meta(BookAssetMeta self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_book_diff(BookDiff self, SseSerializer serializer);
 
   @protected
   void sse_encode_book_format(BookFormat self, SseSerializer serializer);

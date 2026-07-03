@@ -8,8 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `ParserEvent`, `SearchMatch`, `TextNormalizationMode`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `ParserEvent`, `SearchMatch`, `TextNormalizationMode`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -59,6 +59,42 @@ class BookAssetMeta {
           assetId == other.assetId &&
           mediaType == other.mediaType &&
           size == other.size;
+}
+
+class BookDiff {
+  final bool chaptersChanged;
+  final bool textChanged;
+  final bool metadataOnly;
+  final bool needsAnchorMigration;
+
+  const BookDiff({
+    required this.chaptersChanged,
+    required this.textChanged,
+    required this.metadataOnly,
+    required this.needsAnchorMigration,
+  });
+
+  static Future<BookDiff> compute({
+    required NormalizedBook old,
+    required NormalizedBook new_,
+  }) => RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
+
+  @override
+  int get hashCode =>
+      chaptersChanged.hashCode ^
+      textChanged.hashCode ^
+      metadataOnly.hashCode ^
+      needsAnchorMigration.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookDiff &&
+          runtimeType == other.runtimeType &&
+          chaptersChanged == other.chaptersChanged &&
+          textChanged == other.textChanged &&
+          metadataOnly == other.metadataOnly &&
+          needsAnchorMigration == other.needsAnchorMigration;
 }
 
 /// Book format detected by extension or content sniffing.

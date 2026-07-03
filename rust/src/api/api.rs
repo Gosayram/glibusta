@@ -1,6 +1,6 @@
 use crate::api::models::{
-    BookAssetMeta, BookFormat, BookMeta, BookValidationResult, ChapterLanguage, CoreError,
-    FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, TocEntry,
+    BookAssetMeta, BookDiff, BookFormat, BookMeta, BookValidationResult, ChapterLanguage,
+    CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, TocEntry,
 };
 use std::path::Path;
 
@@ -328,6 +328,13 @@ pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>
             format
         )),
     }
+}
+
+/// Compare two books parsed from the same file at different times.
+pub fn diff_parsed_book(old_path: String, new_path: String) -> anyhow::Result<BookDiff> {
+    let old = parse_book(old_path)?;
+    let new = parse_book(new_path)?;
+    Ok(BookDiff::compute(&old, &new))
 }
 
 // ---------------------------------------------------------------------------
