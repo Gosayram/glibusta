@@ -14,6 +14,17 @@ use std::collections::HashMap;
 
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let mut zip = archive::decode_zip(bytes).context("Failed to open EPUB archive")?;
+
+    // RCE-12.6: zip bomb guard — reject archives with too many entries
+    let entry_count = zip.entry_names().len();
+    if entry_count > crate::api::models::MAX_EXTRACTED_FILES {
+        bail!(
+            "Archive too large: {} entries (max {})",
+            entry_count,
+            crate::api::models::MAX_EXTRACTED_FILES
+        );
+    }
+
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
     let container_xml = zip
@@ -46,6 +57,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     let mut chapter_index = 0i32;
     let mut block_index = 0i32;
+    let mut warnings: Vec<crate::api::models::ParseWarning> = Vec::new();
     // CRT-1.14: collect @font-face declarations across all XHTML files
     let mut font_faces: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
@@ -153,6 +165,17 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
     let id = crate::book::sha256_hex(bytes);
 
+    // RCE-11.3: warn about broken images (img blocks with no src)
+    for ch in &chapters {
+        for b in &ch.blocks {
+            if b.block_type == crate::api::models::BlockType::Image && b.image_url.is_none() {
+                warnings.push(crate::api::models::ParseWarning {
+                    message: format!("Broken image in chapter {}: missing src", ch.index),
+                });
+            }
+        }
+    }
+
     // CRT-1.14: include font-face declarations in metadata
     let meta = if font_faces.is_empty() {
         None
@@ -163,7 +186,6 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     // ---- TOC extraction ----
     let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name);
 
-    let mut warnings = Vec::new();
     if cover_url.is_none() {
         warnings.push(crate::api::models::ParseWarning {
             message: "Cover image not found".to_string(),

@@ -31,6 +31,14 @@ Future<String> detectFormat({required String path}) =>
 Future<String> calculateHash({required String path}) =>
     RustLib.instance.api.crateApiApiCalculateHash(path: path);
 
+/// Extract table of contents without full chapter parsing.
+Future<List<TocEntry>> parseToc({required String path}) =>
+    RustLib.instance.api.crateApiApiParseToc(path: path);
+
+/// Get format capabilities (what features a book format supports).
+Future<FormatCapabilities> getFormatCapabilities({required String path}) =>
+    RustLib.instance.api.crateApiApiGetFormatCapabilities(path: path);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);

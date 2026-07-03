@@ -10,6 +10,16 @@ use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let mut zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
+
+    let entry_count = zip.entry_names().len();
+    if entry_count > crate::api::models::MAX_EXTRACTED_FILES {
+        anyhow::bail!(
+            "Archive too large: {} entries (max {})",
+            entry_count,
+            crate::api::models::MAX_EXTRACTED_FILES
+        );
+    }
+
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
     let (title, authors, created_date) = parse_core_properties(&mut zip, encoding_name)?;

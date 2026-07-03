@@ -8,6 +8,109 @@ pub const NORMALIZED_BOOK_SCHEMA_VERSION: u32 = 1;
 pub const MAX_FILE_SIZE: u64 = 500 * 1024 * 1024; // 500 MB
 pub const MAX_CHAPTER_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 pub const MAX_IMAGE_SIZE: usize = 50 * 1024 * 1024; // 50 MB
+pub const MAX_EXTRACTED_FILES: usize = 5000; // max files in a ZIP archive
+/// Zip bomb threshold: ratio of uncompressed/compressed size
+pub const MAX_COMPRESSION_RATIO: u64 = 100;
+
+/// Capabilities that each format supports.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FormatCapabilities {
+    pub metadata: bool,
+    pub cover: bool,
+    pub toc: bool,
+    pub text: bool,
+    pub images: bool,
+    pub css: bool,
+    pub footnotes: bool,
+}
+
+impl BookFormat {
+    pub fn capabilities(&self) -> FormatCapabilities {
+        match self {
+            BookFormat::Fb2 => FormatCapabilities {
+                metadata: true,
+                cover: true,
+                toc: true,
+                text: true,
+                images: true,
+                css: false,
+                footnotes: true,
+            },
+            BookFormat::Epub => FormatCapabilities {
+                metadata: true,
+                cover: true,
+                toc: true,
+                text: true,
+                images: true,
+                css: true,
+                footnotes: true,
+            },
+            BookFormat::Txt => FormatCapabilities {
+                metadata: false,
+                cover: false,
+                toc: true,
+                text: true,
+                images: false,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Docx => FormatCapabilities {
+                metadata: true,
+                cover: false,
+                toc: false,
+                text: true,
+                images: true,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Rtf => FormatCapabilities {
+                metadata: false,
+                cover: false,
+                toc: false,
+                text: true,
+                images: false,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Mobi | BookFormat::Azw3 | BookFormat::Prc => FormatCapabilities {
+                metadata: true,
+                cover: true,
+                toc: true,
+                text: true,
+                images: false,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Pdf => FormatCapabilities {
+                metadata: false,
+                cover: true,
+                toc: false,
+                text: false,
+                images: true,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Djvu => FormatCapabilities {
+                metadata: false,
+                cover: false,
+                toc: false,
+                text: false,
+                images: true,
+                css: false,
+                footnotes: false,
+            },
+            BookFormat::Unknown => FormatCapabilities {
+                metadata: false,
+                cover: false,
+                toc: false,
+                text: false,
+                images: false,
+                css: false,
+                footnotes: false,
+            },
+        }
+    }
+}
 
 /// Book format detected by extension or content sniffing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

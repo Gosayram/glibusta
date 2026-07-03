@@ -9,7 +9,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CoreError`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -54,7 +54,13 @@ enum BookFormat {
     that: this,
   );
 
-  static Future<void> extensions() => RustLib.instance.api.crateApiModelsBookFormatExtensions();
+  Future<FormatCapabilities> capabilities() =>
+      RustLib.instance.api.crateApiModelsBookFormatCapabilities(
+        that: this,
+      );
+
+  static Future<void> extensions() =>
+      RustLib.instance.api.crateApiModelsBookFormatExtensions();
 
   static Future<BookFormat> fromExt({required String ext}) =>
       RustLib.instance.api.crateApiModelsBookFormatFromExt(ext: ext);
@@ -135,6 +141,50 @@ class EmbeddedImage {
           data == other.data;
 }
 
+/// Capabilities that each format supports.
+class FormatCapabilities {
+  final bool metadata;
+  final bool cover;
+  final bool toc;
+  final bool text;
+  final bool images;
+  final bool css;
+  final bool footnotes;
+
+  const FormatCapabilities({
+    required this.metadata,
+    required this.cover,
+    required this.toc,
+    required this.text,
+    required this.images,
+    required this.css,
+    required this.footnotes,
+  });
+
+  @override
+  int get hashCode =>
+      metadata.hashCode ^
+      cover.hashCode ^
+      toc.hashCode ^
+      text.hashCode ^
+      images.hashCode ^
+      css.hashCode ^
+      footnotes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FormatCapabilities &&
+          runtimeType == other.runtimeType &&
+          metadata == other.metadata &&
+          cover == other.cover &&
+          toc == other.toc &&
+          text == other.text &&
+          images == other.images &&
+          css == other.css &&
+          footnotes == other.footnotes;
+}
+
 class NormalizedBook {
   final String id;
   final String title;
@@ -169,9 +219,10 @@ class NormalizedBook {
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 
-  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-    that: this,
-  );
+  Future<String> toJsonString() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+        that: this,
+      );
 
   @override
   int get hashCode =>
@@ -221,7 +272,9 @@ class ParseWarning {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
+      other is ParseWarning &&
+          runtimeType == other.runtimeType &&
+          message == other.message;
 }
 
 class ReaderBlock {
@@ -375,7 +428,8 @@ class TocEntry {
   });
 
   @override
-  int get hashCode => title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
+  int get hashCode =>
+      title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
 
   @override
   bool operator ==(Object other) =>

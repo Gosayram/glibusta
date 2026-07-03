@@ -1,4 +1,6 @@
-use crate::api::models::{BookFormat, BookMeta, CoreError, NormalizedBook, ReaderBlock};
+use crate::api::models::{
+    BookFormat, BookMeta, CoreError, FormatCapabilities, NormalizedBook, ReaderBlock, TocEntry,
+};
 use std::path::Path;
 
 // ---------------------------------------------------------------------------
@@ -125,6 +127,20 @@ pub fn calculate_hash(path: String) -> anyhow::Result<String> {
     let bytes = read_file_bytes(&path)?;
     let limit = 65536.min(bytes.len());
     Ok(crate::book::sha256_hex(&bytes[..limit]))
+}
+
+/// Extract table of contents without full chapter parsing.
+pub fn parse_toc(path: String) -> anyhow::Result<Vec<TocEntry>> {
+    let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let bytes = read_file_bytes(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
+    Ok(book.toc)
+}
+
+/// Get format capabilities (what features a book format supports).
+pub fn get_format_capabilities(path: String) -> anyhow::Result<FormatCapabilities> {
+    let fmt = detect_format_from_path(&path)?;
+    Ok(fmt.capabilities())
 }
 
 // ---------------------------------------------------------------------------
