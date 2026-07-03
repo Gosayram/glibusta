@@ -89,6 +89,10 @@ Future<Uint64List> hyphenateWord({required String word}) =>
 Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
     RustLib.instance.api.crateApiApiCheckBookCache(path: path);
 
+/// ARC-1.1: Open book and return opaque handle.
+Future<ArcBookEngine> openBookEngine({required String path}) =>
+    RustLib.instance.api.crateApiApiOpenBookEngine(path: path);
+
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);
@@ -144,3 +148,21 @@ Future<Uint8List> renderPdfThumbnail({
   pageIndex: pageIndex,
   width: width,
 );
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Arc < BookEngine >>>
+abstract class ArcBookEngine implements RustOpaqueInterface {}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BookEngine>>
+abstract class BookEngine implements RustOpaqueInterface {
+  Future<BigInt> chapterCount();
+
+  Future<void> dropEngine();
+
+  Future<ReaderChapter?> getChapter({required BigInt index});
+
+  // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
+  static Future<BookEngine> newInstance({required NormalizedBook book}) =>
+      RustLib.instance.api.crateApiApiBookEngineNew(book: book);
+
+  Future<String> title();
+}

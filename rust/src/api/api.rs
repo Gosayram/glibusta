@@ -1,9 +1,10 @@
 use crate::api::models::{
     BookAssetMeta, BookDiff, BookFormat, BookMeta, BookValidationResult, ChapterLanguage,
-    CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, TocEntry,
+    CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, ReaderChapter,
+    TocEntry,
 };
 use std::path::Path;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -430,6 +431,62 @@ pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
     let file_size = bytes.len() as u64;
     // Always return true for now — cache validation happens in Drift (Flutter side)
     Ok((true, file_hash, file_size))
+}
+
+// ---------------------------------------------------------------------------
+// ARC-1.1: Opaque BookEngine — data stays in Rust heap
+// ---------------------------------------------------------------------------
+
+/// Opaque handle to a parsed book. Data lives in Rust-heap,
+/// Dart gets only the handle (pointer). Chapters/blocks copied on demand.
+pub struct BookEngine {
+    inner: Mutex<Option<NormalizedBook>>,
+}
+
+impl BookEngine {
+    pub fn new(book: NormalizedBook) -> Self {
+        Self {
+            inner: Mutex::new(Some(book)),
+        }
+    }
+
+    pub fn get_chapter(&self, index: usize) -> Option<ReaderChapter> {
+        self.inner
+            .lock()
+            .ok()?
+            .as_ref()?
+            .chapters
+            .get(index)
+            .cloned()
+    }
+
+    pub fn chapter_count(&self) -> usize {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|b| b.as_ref().map(|b| b.chapters.len()))
+            .unwrap_or(0)
+    }
+
+    pub fn title(&self) -> String {
+        self.inner
+            .lock()
+            .ok()
+            .and_then(|b| b.as_ref().map(|b| b.title.clone()))
+            .unwrap_or_default()
+    }
+
+    pub fn drop_engine(&self) {
+        if let Ok(mut guard) = self.inner.lock() {
+            *guard = None;
+        }
+    }
+}
+
+/// ARC-1.1: Open book and return opaque handle.
+pub fn open_book_engine(path: String) -> anyhow::Result<Arc<BookEngine>> {
+    let book = parse_book(path)?;
+    Ok(Arc::new(BookEngine::new(book)))
 }
 
 // ---------------------------------------------------------------------------
