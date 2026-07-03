@@ -2266,6 +2266,56 @@ impl SseDecode for crate::api::models::ParseWarning {
     }
 }
 
+impl SseDecode for crate::api::models::ParserEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                let mut var_format = <String>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::ParserStarted { format: var_format };
+            }
+            1 => {
+                let mut var_encoding = <String>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::EncodingDetected {
+                    encoding: var_encoding,
+                };
+            }
+            2 => {
+                let mut var_found = <bool>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::CoverExtracted { found: var_found };
+            }
+            3 => {
+                let mut var_index = <i32>::sse_decode(deserializer);
+                let mut var_blocks = <usize>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::ChapterParsed {
+                    index: var_index,
+                    blocks: var_blocks,
+                };
+            }
+            4 => {
+                let mut var_message = <String>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::WarningAdded {
+                    message: var_message,
+                };
+            }
+            5 => {
+                let mut var_totalChapters = <usize>::sse_decode(deserializer);
+                let mut var_totalBlocks = <usize>::sse_decode(deserializer);
+                let mut var_elapsedMs = <u64>::sse_decode(deserializer);
+                return crate::api::models::ParserEvent::ParserFinished {
+                    total_chapters: var_totalChapters,
+                    total_blocks: var_totalBlocks,
+                    elapsed_ms: var_elapsedMs,
+                };
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
 impl SseDecode for crate::api::models::ReaderBlock {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2840,6 +2890,56 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::ParseWarning>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::models::ParserEvent {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::models::ParserEvent::ParserStarted { format } => {
+                [0.into_dart(), format.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::models::ParserEvent::EncodingDetected { encoding } => {
+                [1.into_dart(), encoding.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::models::ParserEvent::CoverExtracted { found } => {
+                [2.into_dart(), found.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::models::ParserEvent::ChapterParsed { index, blocks } => [
+                3.into_dart(),
+                index.into_into_dart().into_dart(),
+                blocks.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            crate::api::models::ParserEvent::WarningAdded { message } => {
+                [4.into_dart(), message.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::models::ParserEvent::ParserFinished {
+                total_chapters,
+                total_blocks,
+                elapsed_ms,
+            } => [
+                5.into_dart(),
+                total_chapters.into_into_dart().into_dart(),
+                total_blocks.into_into_dart().into_dart(),
+                elapsed_ms.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::models::ParserEvent
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::models::ParserEvent>
+    for crate::api::models::ParserEvent
+{
+    fn into_into_dart(self) -> crate::api::models::ParserEvent {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::models::ReaderBlock {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -3373,6 +3473,48 @@ impl SseEncode for crate::api::models::ParseWarning {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.message, serializer);
+    }
+}
+
+impl SseEncode for crate::api::models::ParserEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::models::ParserEvent::ParserStarted { format } => {
+                <i32>::sse_encode(0, serializer);
+                <String>::sse_encode(format, serializer);
+            }
+            crate::api::models::ParserEvent::EncodingDetected { encoding } => {
+                <i32>::sse_encode(1, serializer);
+                <String>::sse_encode(encoding, serializer);
+            }
+            crate::api::models::ParserEvent::CoverExtracted { found } => {
+                <i32>::sse_encode(2, serializer);
+                <bool>::sse_encode(found, serializer);
+            }
+            crate::api::models::ParserEvent::ChapterParsed { index, blocks } => {
+                <i32>::sse_encode(3, serializer);
+                <i32>::sse_encode(index, serializer);
+                <usize>::sse_encode(blocks, serializer);
+            }
+            crate::api::models::ParserEvent::WarningAdded { message } => {
+                <i32>::sse_encode(4, serializer);
+                <String>::sse_encode(message, serializer);
+            }
+            crate::api::models::ParserEvent::ParserFinished {
+                total_chapters,
+                total_blocks,
+                elapsed_ms,
+            } => {
+                <i32>::sse_encode(5, serializer);
+                <usize>::sse_encode(total_chapters, serializer);
+                <usize>::sse_encode(total_blocks, serializer);
+                <u64>::sse_encode(elapsed_ms, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
     }
 }
 

@@ -3,11 +3,10 @@
 
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
-import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-
 import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `dispatch_parse`, `ext_from_path`, `read_file_bytes`
 
@@ -16,26 +15,16 @@ Future<NormalizedBook> parseBook({required String path}) =>
     RustLib.instance.api.crateApiApiParseBook(path: path);
 
 /// RCE-1.4: Extract a single chapter from a book file.
-Future<ReaderChapter> parseChapter({
-  required String path,
-  required int chapterIndex,
-}) => RustLib.instance.api.crateApiApiParseChapter(
-  path: path,
-  chapterIndex: chapterIndex,
-);
+Future<ReaderChapter> parseChapter({required String path, required int chapterIndex}) =>
+    RustLib.instance.api.crateApiApiParseChapter(path: path, chapterIndex: chapterIndex);
 
 /// Panic-safe wrapper for parse_book. Returns error instead of crashing.
 Future<NormalizedBook> safeParseBook({required String path}) =>
     RustLib.instance.api.crateApiApiSafeParseBook(path: path);
 
 /// Parse with a timeout. Returns error if parsing takes longer than timeout_secs.
-Future<NormalizedBook> parseBookWithTimeout({
-  required String path,
-  required BigInt timeoutSecs,
-}) => RustLib.instance.api.crateApiApiParseBookWithTimeout(
-  path: path,
-  timeoutSecs: timeoutSecs,
-);
+Future<NormalizedBook> parseBookWithTimeout({required String path, required BigInt timeoutSecs}) =>
+    RustLib.instance.api.crateApiApiParseBookWithTimeout(path: path, timeoutSecs: timeoutSecs);
 
 /// Extract metadata without full chapter parsing.
 Future<BookMeta> extractMetadata({required String path}) =>
@@ -82,19 +71,12 @@ Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
     RustLib.instance.api.crateApiApiGetBookAssets(path: path);
 
 /// Lazy-load a single asset (image) from a book file by its asset_id (href).
-Future<Uint8List> getAssetBytes({
-  required String path,
-  required String assetId,
-}) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+Future<Uint8List> getAssetBytes({required String path, required String assetId}) =>
+    RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
 
 /// Compare two books parsed from the same file at different times.
-Future<BookDiff> diffParsedBook({
-  required String oldPath,
-  required String newPath,
-}) => RustLib.instance.api.crateApiApiDiffParsedBook(
-  oldPath: oldPath,
-  newPath: newPath,
-);
+Future<BookDiff> diffParsedBook({required String oldPath, required String newPath}) =>
+    RustLib.instance.api.crateApiApiDiffParsedBook(oldPath: oldPath, newPath: newPath);
 
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
@@ -105,74 +87,36 @@ Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
     RustLib.instance.api.crateApiApiParseHtmlBlocks(html: html);
 
-Future<NormalizedBook> parseFb2({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseFb2(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseFb2({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseFb2(bytes: bytes, forcedEncoding: forcedEncoding);
 
-Future<NormalizedBook> parseEpub({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseEpub(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseEpub({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseEpub(bytes: bytes, forcedEncoding: forcedEncoding);
 
-Future<NormalizedBook> parseTxt({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseTxt(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseTxt({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseTxt(bytes: bytes, forcedEncoding: forcedEncoding);
 
-Future<NormalizedBook> parseDocx({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseDocx(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseDocx({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseDocx(bytes: bytes, forcedEncoding: forcedEncoding);
 
-Future<NormalizedBook> parseRtf({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseRtf(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseRtf({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseRtf(bytes: bytes, forcedEncoding: forcedEncoding);
 
-Future<NormalizedBook> parseMobi({
-  required List<int> bytes,
-  String? forcedEncoding,
-}) => RustLib.instance.api.crateApiApiParseMobi(
-  bytes: bytes,
-  forcedEncoding: forcedEncoding,
-);
+Future<NormalizedBook> parseMobi({required List<int> bytes, String? forcedEncoding}) =>
+    RustLib.instance.api.crateApiApiParseMobi(bytes: bytes, forcedEncoding: forcedEncoding);
 
 Future<List<String>> decodeZipEntries({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDecodeZipEntries(bytes: bytes);
 
-Future<Uint8List> extractZipEntry({
-  required List<int> bytes,
-  required String entryName,
-}) => RustLib.instance.api.crateApiApiExtractZipEntry(
-  bytes: bytes,
-  entryName: entryName,
-);
+Future<Uint8List> extractZipEntry({required List<int> bytes, required String entryName}) =>
+    RustLib.instance.api.crateApiApiExtractZipEntry(bytes: bytes, entryName: entryName);
 
 Future<String> detectEncoding({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDetectEncoding(bytes: bytes);
 
 /// Compute SHA-256 hash of bytes (first `max_bytes` only for efficiency).
 Future<String> sha256Hash({required List<int> bytes, BigInt? maxBytes}) =>
-    RustLib.instance.api.crateApiApiSha256Hash(
-      bytes: bytes,
-      maxBytes: maxBytes,
-    );
+    RustLib.instance.api.crateApiApiSha256Hash(bytes: bytes, maxBytes: maxBytes);
 
 /// Legacy dispatcher — kept for backward compat.
 Future<NormalizedBook> parseBookLegacy({

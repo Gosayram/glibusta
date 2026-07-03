@@ -6,15 +6,13 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
-
 import 'api/api.dart';
 import 'api/models.dart';
+import 'dart:async';
+import 'dart:convert';
 import 'frb_generated.dart';
 import 'lib.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustLibApiImplPlatform({
@@ -36,9 +34,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  Value dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
-    dynamic raw,
-  );
+  Value dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(dynamic raw);
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -182,6 +178,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ParseWarning dco_decode_parse_warning(dynamic raw);
 
   @protected
+  ParserEvent dco_decode_parser_event(dynamic raw);
+
+  @protected
   ReaderBlock dco_decode_reader_block(dynamic raw);
 
   @protected
@@ -246,9 +245,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BookMeta sse_decode_book_meta(SseDeserializer deserializer);
 
   @protected
-  BookValidationResult sse_decode_book_validation_result(
-    SseDeserializer deserializer,
-  );
+  BookValidationResult sse_decode_book_validation_result(SseDeserializer deserializer);
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -269,9 +266,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
-  NormalizedBook sse_decode_box_autoadd_normalized_book(
-    SseDeserializer deserializer,
-  );
+  NormalizedBook sse_decode_box_autoadd_normalized_book(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer);
@@ -286,9 +281,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
-  FormatCapabilities sse_decode_format_capabilities(
-    SseDeserializer deserializer,
-  );
+  FormatCapabilities sse_decode_format_capabilities(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -300,22 +293,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
-  List<BookAssetMeta> sse_decode_list_book_asset_meta(
-    SseDeserializer deserializer,
-  );
+  List<BookAssetMeta> sse_decode_list_book_asset_meta(SseDeserializer deserializer);
 
   @protected
-  List<EmbeddedImage> sse_decode_list_embedded_image(
-    SseDeserializer deserializer,
-  );
+  List<EmbeddedImage> sse_decode_list_embedded_image(SseDeserializer deserializer);
 
   @protected
   List<List<String>> sse_decode_list_list_String(SseDeserializer deserializer);
 
   @protected
-  List<ParseWarning> sse_decode_list_parse_warning(
-    SseDeserializer deserializer,
-  );
+  List<ParseWarning> sse_decode_list_parse_warning(SseDeserializer deserializer);
 
   @protected
   Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
@@ -330,14 +317,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReaderBlock> sse_decode_list_reader_block(SseDeserializer deserializer);
 
   @protected
-  List<ReaderChapter> sse_decode_list_reader_chapter(
-    SseDeserializer deserializer,
-  );
+  List<ReaderChapter> sse_decode_list_reader_chapter(SseDeserializer deserializer);
 
   @protected
-  List<(int, String)> sse_decode_list_record_i_32_string(
-    SseDeserializer deserializer,
-  );
+  List<(int, String)> sse_decode_list_record_i_32_string(SseDeserializer deserializer);
 
   @protected
   List<RichSpan> sse_decode_list_rich_span(SseDeserializer deserializer);
@@ -370,17 +353,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt? sse_decode_opt_box_autoadd_usize(SseDeserializer deserializer);
 
   @protected
-  List<List<String>>? sse_decode_opt_list_list_String(
-    SseDeserializer deserializer,
-  );
+  List<List<String>>? sse_decode_opt_list_list_String(SseDeserializer deserializer);
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
-  List<ReaderBlock>? sse_decode_opt_list_reader_block(
-    SseDeserializer deserializer,
-  );
+  List<ReaderBlock>? sse_decode_opt_list_reader_block(SseDeserializer deserializer);
 
   @protected
   List<RichSpan>? sse_decode_opt_list_rich_span(SseDeserializer deserializer);
@@ -389,15 +368,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ParseWarning sse_decode_parse_warning(SseDeserializer deserializer);
 
   @protected
+  ParserEvent sse_decode_parser_event(SseDeserializer deserializer);
+
+  @protected
   ReaderBlock sse_decode_reader_block(SseDeserializer deserializer);
 
   @protected
   ReaderChapter sse_decode_reader_chapter(SseDeserializer deserializer);
 
   @protected
-  (bool, String, BigInt) sse_decode_record_bool_string_u_64(
-    SseDeserializer deserializer,
-  );
+  (bool, String, BigInt) sse_decode_record_bool_string_u_64(SseDeserializer deserializer);
 
   @protected
   (int, String) sse_decode_record_i_32_string(SseDeserializer deserializer);
@@ -424,10 +404,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
-  void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  );
+  void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
 
   @protected
   void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
@@ -460,10 +437,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_book_meta(BookMeta self, SseSerializer serializer);
 
   @protected
-  void sse_encode_book_validation_result(
-    BookValidationResult self,
-    SseSerializer serializer,
-  );
+  void sse_encode_book_validation_result(BookValidationResult self, SseSerializer serializer);
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -485,19 +459,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_normalized_book(
-    NormalizedBook self,
-    SseSerializer serializer,
-  );
+  void sse_encode_box_autoadd_normalized_book(NormalizedBook self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer);
 
   @protected
-  void sse_encode_chapter_language(
-    ChapterLanguage self,
-    SseSerializer serializer,
-  );
+  void sse_encode_chapter_language(ChapterLanguage self, SseSerializer serializer);
 
   @protected
   void sse_encode_embedded_image(EmbeddedImage self, SseSerializer serializer);
@@ -506,10 +474,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
-  void sse_encode_format_capabilities(
-    FormatCapabilities self,
-    SseSerializer serializer,
-  );
+  void sse_encode_format_capabilities(FormatCapabilities self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -521,61 +486,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_book_asset_meta(
-    List<BookAssetMeta> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_book_asset_meta(List<BookAssetMeta> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_embedded_image(
-    List<EmbeddedImage> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_embedded_image(List<EmbeddedImage> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_list_String(
-    List<List<String>> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_list_String(List<List<String>> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_parse_warning(
-    List<ParseWarning> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_parse_warning(List<ParseWarning> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_prim_i_32_strict(
-    Int32List self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_prim_i_32_strict(Int32List self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_prim_u_8_strict(
-    Uint8List self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_reader_block(
-    List<ReaderBlock> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_reader_block(List<ReaderBlock> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_reader_chapter(
-    List<ReaderChapter> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_reader_chapter(List<ReaderChapter> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_record_i_32_string(
-    List<(int, String)> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_record_i_32_string(List<(int, String)> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_rich_span(List<RichSpan> self, SseSerializer serializer);
@@ -584,10 +522,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_toc_entry(List<TocEntry> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_normalized_book(
-    NormalizedBook self,
-    SseSerializer serializer,
-  );
+  void sse_encode_normalized_book(NormalizedBook self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
@@ -612,31 +547,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_usize(BigInt? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_list_list_String(
-    List<List<String>>? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_list_list_String(List<List<String>>? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_list_prim_u_8_strict(
-    Uint8List? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_list_prim_u_8_strict(Uint8List? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_list_reader_block(
-    List<ReaderBlock>? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_list_reader_block(List<ReaderBlock>? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_list_rich_span(
-    List<RichSpan>? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_list_rich_span(List<RichSpan>? self, SseSerializer serializer);
 
   @protected
   void sse_encode_parse_warning(ParseWarning self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_parser_event(ParserEvent self, SseSerializer serializer);
 
   @protected
   void sse_encode_reader_block(ReaderBlock self, SseSerializer serializer);
@@ -645,16 +571,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_reader_chapter(ReaderChapter self, SseSerializer serializer);
 
   @protected
-  void sse_encode_record_bool_string_u_64(
-    (bool, String, BigInt) self,
-    SseSerializer serializer,
-  );
+  void sse_encode_record_bool_string_u_64((bool, String, BigInt) self, SseSerializer serializer);
 
   @protected
-  void sse_encode_record_i_32_string(
-    (int, String) self,
-    SseSerializer serializer,
-  );
+  void sse_encode_record_i_32_string((int, String) self, SseSerializer serializer);
 
   @protected
   void sse_encode_rich_span(RichSpan self, SseSerializer serializer);
@@ -681,7 +601,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 // Section: wire_class
 
 class RustLibWire implements BaseWire {
-  RustLibWire.fromExternalLibrary();
+  RustLibWire.fromExternalLibrary(ExternalLibrary lib);
 
   void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
