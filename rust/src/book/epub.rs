@@ -925,8 +925,16 @@ fn apply_css_props(
     }
 }
 
-/// ponytail: text-indent, text-align, white-space, margin-left, line-height, font-weight, font-style, color.
+/// RCE-7.3: Inline CSS normalization — apply CSS properties to a ReaderBlock.
+/// ponytail: text-indent, text-align, white-space, margin-left, line-height, font-weight, font-style, color, display.
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
+    // RCE-7.3: display:none → empty text to hide block
+    if let Some(display) = props.get("display") {
+        if display.trim() == "none" {
+            block.text.clear();
+            return;
+        }
+    }
     if let Some(indent) = props.get("text-indent") {
         if let Some(v) = parse_css_length(indent) {
             block.text_indent = Some(v);
@@ -963,6 +971,9 @@ fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
         ("line-height", "lh"),
         ("font-weight", "fw"),
         ("font-style", "fs"),
+        ("text-decoration", "td"),
+        ("padding-left", "pl"),
+        ("opacity", "op"),
     ];
     for &(css_prop, prefix) in extra {
         if let Some(val) = props.get(css_prop) {

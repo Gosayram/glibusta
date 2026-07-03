@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 // ---------------------------------------------------------------------------
-// ARC-8.1: RAM cache for parsed books (TTL 10 min, max 32 books)
+// ARC-8.1 + ARC-8.2 + ARC-8.3: Two-level cache (RAM + Disk)
 // ---------------------------------------------------------------------------
 
 static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLock::new(|| {
@@ -16,6 +16,26 @@ static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLoc
         .time_to_idle(Duration::from_secs(600))
         .build()
 });
+
+fn disk_cache_key(path: &str) -> std::path::PathBuf {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    path.hash(&mut h);
+    std::env::temp_dir().join(format!("glibusta_cache_{:016x}.json", h.finish()))
+}
+
+fn disk_cache_lookup(key: &std::path::Path) -> Option<NormalizedBook> {
+    let data = std::fs::read(key).ok()?;
+    let s = std::str::from_utf8(&data).ok()?;
+    NormalizedBook::from_json_str(s).ok()
+}
+
+fn disk_cache_store(key: &std::path::Path, book: &NormalizedBook) {
+    if let Ok(json) = book.to_json_string() {
+        let _ = std::fs::write(key, json);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers (not FRB-visible)
@@ -87,19 +107,26 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
 // ---------------------------------------------------------------------------
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
-/// Uses moka cache (ARC-8.1): if already parsed recently, returns cached result.
+/// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
 pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
-    // ARC-8.1: check cache first
+    // L1: RAM cache
     if let Some(cached) = BOOK_CACHE.get(&path) {
         return Ok(cached);
     }
+    // L2: disk cache
+    let cache_key = disk_cache_key(&path);
+    if let Some(cached) = disk_cache_lookup(&cache_key) {
+        BOOK_CACHE.insert(path.clone(), cached.clone());
+        return Ok(cached);
+    }
+    // Cache miss: parse from file
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
     let mmap = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
     let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
-    // Set format on the output
     book.book_format = format;
-    // ARC-8.1: store in cache
-    BOOK_CACHE.insert(path, book.clone());
+    // Store in both caches
+    BOOK_CACHE.insert(path.clone(), book.clone());
+    disk_cache_store(&cache_key, &book);
     Ok(book)
 }
 

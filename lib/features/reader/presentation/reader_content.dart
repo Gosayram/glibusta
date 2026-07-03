@@ -461,12 +461,18 @@ Widget _buildReaderBlock(
         ),
       );
     case BlockType.footnote:
+      // RCE-9.4: footnote with tappable style — context unavailable here,
+      // bottom sheet requires plumbing BuildContext through _buildReaderBlock.
       return Padding(
         padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing / 2),
         child: _readerHighlightedText(
           ctx,
           block.text,
-          style.copyWith(fontSize: s.fontSize * 0.85, color: ctx.colors.footnote),
+          style.copyWith(
+            fontSize: s.fontSize * 0.85,
+            color: ctx.colors.footnote,
+            decoration: TextDecoration.underline,
+          ),
           textAlign,
         ),
       );
