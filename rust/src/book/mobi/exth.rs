@@ -1,6 +1,10 @@
 use anyhow::Result;
+use nom::IResult;
+use nom::bytes::streaming::{tag, take};
+use nom::multi::count;
+use nom::number::streaming::be_u32;
 
-use super::{BinaryReader, MobiHeader};
+use super::MobiHeader;
 
 pub(crate) struct MobiMetadata {
     pub title: Option<String>,
@@ -24,6 +28,28 @@ impl MobiMetadata {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DEP-1.1: nom combinators for EXTH parsing
+// ---------------------------------------------------------------------------
+
+/// Parse EXTH header: "EXTH" + length(u32) + record_count(u32)
+fn exth_header(input: &[u8]) -> IResult<&[u8], (u32, u32)> {
+    let (input, _) = tag("EXTH".as_bytes())(input)?;
+    let (input, length) = be_u32(input)?;
+    let (input, count) = be_u32(input)?;
+    Ok((input, (length, count)))
+}
+
+/// Parse a single EXTH record: type(u32) + size(u32) + data
+fn exth_record(input: &[u8]) -> IResult<&[u8], (u32, Vec<u8>)> {
+    let (input, rec_type) = be_u32(input)?;
+    let (input, size) = be_u32(input)?;
+    // size includes the 8-byte header (type + size)
+    let data_len = (size as usize).saturating_sub(8);
+    let (input, data) = take(data_len)(input)?;
+    Ok((input, (rec_type, data.to_vec())))
+}
+
 pub(crate) struct ExthParser;
 
 impl ExthParser {
@@ -37,37 +63,39 @@ impl ExthParser {
             None => return Ok(MobiMetadata::default()),
         };
 
-        let reader = BinaryReader::new(record0);
-        let length = reader.u32be(exth_offset + 4)? as usize;
-        let count = reader.u32be(exth_offset + 8)? as usize;
-        let exth_end = exth_offset + length;
+        let exth_data = &record0[exth_offset..];
 
-        if length < 12 || exth_end > record0.len() {
+        let (_remaining, (length, rec_count)) = match exth_header(exth_data) {
+            Ok(r) => r,
+            Err(_) => {
+                return Ok(MobiMetadata {
+                    has_exth: true,
+                    ..MobiMetadata::default()
+                });
+            }
+        };
+
+        if length < 12 || (exth_offset + length as usize) > record0.len() {
             return Ok(MobiMetadata {
                 has_exth: true,
                 ..MobiMetadata::default()
             });
         }
 
+        // Parse records after the 12-byte header (EXTH + length + count)
+        let records_data = &record0[exth_offset + 12..exth_offset + length as usize];
+        use nom::Parser;
+        let (_, records) = count(exth_record, rec_count as usize)
+            .parse(records_data)
+            .unwrap_or_default();
+
         let mut title: Option<String> = None;
         let mut author: Option<String> = None;
         let mut language: Option<String> = None;
         let mut description: Option<String> = None;
         let mut cover_record_index: Option<u32> = None;
-        let mut pos = exth_offset + 12;
 
-        for _ in 0..count {
-            if pos + 8 > exth_end {
-                break;
-            }
-            let r = BinaryReader::new(record0);
-            let rec_type = r.u32be(pos)?;
-            let size = r.u32be(pos + 4)? as usize;
-            if size < 8 || pos + size > exth_end {
-                break;
-            }
-
-            let data = &record0[pos + 8..pos + size];
+        for (rec_type, data) in &records {
             match rec_type {
                 100 => {
                     author = Some(String::from_utf8_lossy(data).trim().to_string());
@@ -82,12 +110,11 @@ impl ExthParser {
                     description = Some(String::from_utf8_lossy(data).trim().to_string());
                 }
                 201 if data.len() >= 4 => {
-                    let cr = BinaryReader::new(data);
-                    cover_record_index = Some(cr.u32be(0)?);
+                    cover_record_index =
+                        Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
                 }
                 _ => {}
             }
-            pos += size;
         }
 
         Ok(MobiMetadata {

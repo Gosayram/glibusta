@@ -576,3 +576,76 @@ fn test_parse_chapter_under_200ms() {
         elapsed_ms
     );
 }
+
+// ---------------------------------------------------------------------------
+// RCE-13: Corpus — edge case tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_txt_empty_file() {
+    let book = glibusta_core::book::txt::parse_txt(b"", None).unwrap();
+    assert_eq!(book.title, "");
+    assert!(book.chapters.is_empty() || book.chapters[0].blocks.is_empty());
+}
+
+#[test]
+fn test_txt_single_line() {
+    let book = glibusta_core::book::txt::parse_txt(b"Hello, world!", None).unwrap();
+    assert!(!book.chapters.is_empty());
+    assert!(!book.chapters[0].blocks.is_empty());
+}
+
+#[test]
+fn test_fb2_malformed_xml() {
+    let bad_fb2 = b"<?xml version=\"1.0\"?><FictionBook><title>Test</title></FictionBook>";
+    let result = glibusta_core::book::fb2::parse_fb2(bad_fb2, None);
+    assert!(result.is_ok(), "Should handle malformed FB2 gracefully");
+}
+
+#[test]
+fn test_txt_cp1251_encoding() {
+    // "Привет" in Windows-1251
+    let text = b"\xcf\xf0\xe8\xe2\xe5\xf2";
+    let book = glibusta_core::book::txt::parse_txt(text, Some("windows-1251")).unwrap();
+    assert!(!book.chapters.is_empty());
+    assert!(!book.chapters[0].blocks.is_empty());
+    assert!(book.chapters[0].blocks[0].text.contains("Привет"));
+}
+
+#[test]
+fn test_docx_empty() {
+    let mut buf = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buf);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("[Content_Types].xml", options).unwrap();
+    zip.write_all(b"<?xml version=\"1.0\"?>\n<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>").unwrap();
+    zip.start_file("word/document.xml", options).unwrap();
+    zip.write_all(b"<?xml version=\"1.0\"?>\n<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body/></w:document>").unwrap();
+    zip.start_file("docProps/core.xml", options).unwrap();
+    zip.write_all(b"<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\"/>").unwrap();
+    zip.finish().unwrap();
+    let bytes = buf.into_inner();
+    let book = glibusta_core::book::docx::parse_docx(&bytes, None).unwrap();
+    assert_eq!(book.title, "");
+    assert!(book.chapters.is_empty() || book.chapters[0].blocks.is_empty());
+}
+
+#[test]
+fn test_rtf_empty() {
+    let book = glibusta_core::book::rtf::parse_rtf(b"", None).unwrap();
+    assert_eq!(book.book_format, BookFormat::Rtf);
+}
+
+#[test]
+fn test_fb2_empty_body() {
+    let fb2 = br#"<?xml version="1.0" encoding="utf-8"?>
+<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0">
+  <description>
+    <title-info><book-title>Empty</book-title><lang>en</lang></title-info>
+  </description>
+  <body><section/></body>
+</FictionBook>"#;
+    let book = glibusta_core::book::fb2::parse_fb2(fb2, None).unwrap();
+    assert_eq!(book.title, "Empty");
+}
