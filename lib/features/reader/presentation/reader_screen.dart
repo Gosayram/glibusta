@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
@@ -435,6 +436,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_finishedDialogShown) return;
     if (readerState.scrollProgress < 0.99) return;
     _finishedDialogShown = true;
+    // STR-6.1: request review after finishing a book
+    final inAppReview = InAppReview.instance;
+    unawaited(
+      inAppReview.isAvailable().then((available) {
+        if (available) unawaited(inAppReview.requestReview());
+      }),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_showNextBookDialog());

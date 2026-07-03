@@ -117,6 +117,8 @@ dependencies:
 
   # --- Deep linking ---
   app_links: ^6.0.0
+  in_app_review: ^2.0.12
+  upgrader: ^13.5.0
 
 dev_dependencies:
   flutter_test:
