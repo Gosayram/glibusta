@@ -138,6 +138,12 @@ rust-bloat: ## Analyze Rust binary size breakdown
 	@$(PRINT_STEP) "Analyzing Rust binary size"
 	cd rust && cargo bloat --release -n 30
 
+.PHONY: drift-schema-check
+drift-schema-check: require-flutter ## Regenerate Drift schema and verify no diff
+	@$(PRINT_STEP) "Checking Drift schema consistency"
+	$(FLUTTER) run drift_dev schema dump lib/core/database/app_database.dart schema/
+	@cd schema && git diff --quiet drift_schema_v14.json || (echo "Schema drift detected! Run: dart run drift_dev schema dump" && exit 1)
+
 .PHONY: rust-size
 rust-size: ## Show Rust binary sizes
 	@$(PRINT_STEP) "Rust binary sizes:"

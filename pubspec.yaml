@@ -119,6 +119,7 @@ dependencies:
   app_links: ^6.0.0
   in_app_review: ^2.0.12
   upgrader: ^13.5.0
+  in_app_update: ^4.2.5
 
 dev_dependencies:
   flutter_test:

@@ -512,3 +512,36 @@ fn test_docx_golden_snapshot() {
     });
     insta::assert_snapshot!("docx_golden", snapshot.to_string());
 }
+
+// ---------------------------------------------------------------------------
+// RCE-26: Parse performance benchmarks
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_parse_metadata_under_300ms() {
+    let epub_bytes = create_minimal_epub();
+    let start = std::time::Instant::now();
+    for _ in 0..100 {
+        let _ = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
+    }
+    let elapsed_ms = start.elapsed().as_millis();
+    assert!(
+        elapsed_ms < 300,
+        "100 EPUB parses took {}ms (>300ms budget)",
+        elapsed_ms
+    );
+}
+
+#[test]
+fn test_fb2_parse_under_3s() {
+    let start = std::time::Instant::now();
+    for _ in 0..10 {
+        let _ = glibusta_core::book::fb2::parse_fb2(MINIMAL_FB2.as_bytes(), None).unwrap();
+    }
+    let elapsed_ms = start.elapsed().as_millis();
+    assert!(
+        elapsed_ms < 3000,
+        "10 FB2 parses took {}ms (>3s budget)",
+        elapsed_ms
+    );
+}
