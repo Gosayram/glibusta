@@ -495,3 +495,32 @@ pub struct BookAssetMeta {
     pub media_type: String,
     pub size: usize,
 }
+
+// ---------------------------------------------------------------------------
+// RCE-27: Parser events (structured logging)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ParserEvent {
+    ParserStarted {
+        format: String,
+    },
+    EncodingDetected {
+        encoding: String,
+    },
+    CoverExtracted {
+        found: bool,
+    },
+    ChapterParsed {
+        index: i32,
+        blocks: usize,
+    },
+    WarningAdded {
+        message: String,
+    },
+    ParserFinished {
+        total_chapters: usize,
+        total_blocks: usize,
+        elapsed_ms: u64,
+    },
+}

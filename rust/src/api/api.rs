@@ -246,6 +246,37 @@ pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
     })
 }
 
+/// Repair a book: remove empty chapters, deduplicate, fix TOC/chapter index mapping.
+pub fn repair_book(path: String) -> anyhow::Result<NormalizedBook> {
+    let mut book = parse_book(path)?;
+    // Remove empty chapters and re-index
+    let mut new_chapters = Vec::new();
+    let mut old_to_new: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
+    for ch in &book.chapters {
+        let has_content = ch.blocks.iter().any(|b| !b.text.trim().is_empty());
+        if has_content {
+            let new_idx = new_chapters.len() as i32;
+            old_to_new.insert(ch.index, new_idx);
+            let mut fixed = ch.clone();
+            fixed.index = new_idx;
+            new_chapters.push(fixed);
+        }
+    }
+    book.chapters = new_chapters;
+    // Fix TOC chapter_index mapping
+    for toc in &mut book.toc {
+        if let Some(&new_idx) = old_to_new.get(&toc.chapter_index) {
+            toc.chapter_index = new_idx;
+        } else {
+            toc.chapter_index = 0;
+        }
+    }
+    // Deduplicate TOC by chapter_index
+    let mut seen = std::collections::HashSet::new();
+    book.toc.retain(|t| seen.insert(t.chapter_index));
+    Ok(book)
+}
+
 /// Get asset metadata (IDs, types, sizes) without downloading bytes.
 pub fn get_book_assets(path: String) -> anyhow::Result<Vec<BookAssetMeta>> {
     let book = parse_book(path)?;

@@ -64,6 +64,10 @@ Future<ImportReport> generateImportReport({required String path}) =>
 Future<BookValidationResult> validateBook({required String path}) =>
     RustLib.instance.api.crateApiApiValidateBook(path: path);
 
+/// Repair a book: remove empty chapters, deduplicate, fix TOC/chapter index mapping.
+Future<NormalizedBook> repairBook({required String path}) =>
+    RustLib.instance.api.crateApiApiRepairBook(path: path);
+
 /// Get asset metadata (IDs, types, sizes) without downloading bytes.
 Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
     RustLib.instance.api.crateApiApiGetBookAssets(path: path);

@@ -69,7 +69,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -942280480;
+  int get rustContentHash => -463732240;
 
   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
     stem: 'glibusta_core',
@@ -187,6 +187,8 @@ abstract class RustLibApi extends BaseApi {
     required int pageIndex,
     required int width,
   });
+
+  Future<NormalizedBook> crateApiApiRepairBook({required String path});
 
   Future<NormalizedBook> crateApiApiSafeParseBook({required String path});
 
@@ -1230,7 +1232,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<NormalizedBook> crateApiApiSafeParseBook({required String path}) {
+  Future<NormalizedBook> crateApiApiRepairBook({required String path}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -1240,6 +1242,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 33,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_normalized_book,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiApiRepairBookConstMeta,
+        argValues: [path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiApiRepairBookConstMeta => const TaskConstMeta(
+    debugName: 'repair_book',
+    argNames: ['path'],
+  );
+
+  @override
+  Future<NormalizedBook> crateApiApiSafeParseBook({required String path}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1273,7 +1305,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1303,7 +1335,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 36,
             port: port_,
           );
         },

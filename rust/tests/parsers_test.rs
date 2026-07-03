@@ -451,3 +451,64 @@ fn test_fb2_golden_snapshot() {
     });
     insta::assert_snapshot!("fb2_golden", snapshot.to_string());
 }
+
+#[test]
+fn test_txt_golden_snapshot() {
+    let txt = "Первая строка\n\nВторая строка\n\nТретий абзац текста.";
+    let book = glibusta_core::book::txt::parse_txt(txt.as_bytes(), None).unwrap();
+    let snapshot = serde_json::json!({
+        "title": book.title,
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "blocks": book.chapters.iter().map(|c| c.blocks.len()).sum::<usize>(),
+        "toc": book.toc.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
+    });
+    insta::assert_snapshot!("txt_golden", snapshot.to_string());
+}
+
+#[test]
+fn test_rtf_golden_snapshot() {
+    let rtf = br"{\rtf1\ansi\deff0
+{\fonttbl {\f0 Times New Roman;}}
+\f0\fs24{\b Chapter 1}\par
+Hello, world!\par
+}";
+    let book = glibusta_core::book::rtf::parse_rtf(rtf, None).unwrap();
+    let snapshot = serde_json::json!({
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "blocks": book.chapters.iter().map(|c| c.blocks.len()).sum::<usize>(),
+    });
+    insta::assert_snapshot!("rtf_golden", snapshot.to_string());
+}
+
+#[test]
+fn test_epub_golden_snapshot() {
+    let epub_bytes = create_minimal_epub();
+    let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
+    let snapshot = serde_json::json!({
+        "title": book.title,
+        "authors": book.authors,
+        "language": book.language,
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "chapter_titles": book.chapters.iter().map(|c| c.title.as_str()).collect::<Vec<_>>(),
+        "toc": book.toc.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
+        "warnings": book.warnings.iter().map(|w| w.message.as_str()).collect::<Vec<_>>(),
+    });
+    insta::assert_snapshot!("epub_golden", snapshot.to_string());
+}
+
+#[test]
+fn test_docx_golden_snapshot() {
+    let docx_bytes = create_minimal_docx();
+    let book = glibusta_core::book::docx::parse_docx(&docx_bytes, None).unwrap();
+    let snapshot = serde_json::json!({
+        "title": book.title,
+        "authors": book.authors,
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "images": book.images.len(),
+    });
+    insta::assert_snapshot!("docx_golden", snapshot.to_string());
+}
