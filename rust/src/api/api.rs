@@ -423,6 +423,47 @@ pub fn hyphenate_word(word: String) -> Vec<usize> {
     positions
 }
 
+/// RCE-5.1: Search for a query across all chapters of a book.
+/// Returns SearchMatch results with chapter/block positions and preview text.
+pub fn search_in_book(
+    path: String,
+    query: String,
+    limit: usize,
+) -> anyhow::Result<Vec<crate::api::models::SearchMatch>> {
+    use crate::api::models::SearchMatch;
+    let book = parse_book(path)?;
+    let ac = aho_corasick::AhoCorasick::new([&query])
+        .map_err(|e| anyhow::anyhow!("Search error: {}", e))?;
+    let mut results = Vec::new();
+    let max_results = if limit == 0 { 100 } else { limit };
+    'outer: for chapter in &book.chapters {
+        for block in &chapter.blocks {
+            for mat in ac.find_iter(&block.text) {
+                let start = mat.start();
+                let end = mat.end();
+                let preview_len = 40usize;
+                let preview_start = start.saturating_sub(preview_len);
+                let preview_end = (end + preview_len).min(block.text.len());
+                let preview = format!(
+                    "...{}...",
+                    block.text[preview_start..preview_end].replace('\n', " ")
+                );
+                results.push(SearchMatch {
+                    chapter_index: chapter.index,
+                    block_index: block.index,
+                    span_start: start,
+                    span_end: end,
+                    preview,
+                });
+                if results.len() >= max_results {
+                    break 'outer;
+                }
+            }
+        }
+    }
+    Ok(results)
+}
+
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {

@@ -3,14 +3,13 @@
 
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+
 import '../frb_generated.dart';
 import '../lib.dart';
-import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
-part 'models.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `levenshtein_distance`, `levenshtein_ratio`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `SearchMatch`, `TextNormalizationMode`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `ParserEvent`, `TextNormalizationMode`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
@@ -76,8 +75,10 @@ class BookDiff {
     required this.needsAnchorMigration,
   });
 
-  static Future<BookDiff> compute({required NormalizedBook old, required NormalizedBook new_}) =>
-      RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
+  static Future<BookDiff> compute({
+    required NormalizedBook old,
+    required NormalizedBook new_,
+  }) => RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
 
   @override
   int get hashCode =>
@@ -396,12 +397,14 @@ class NormalizedBook {
       RustLib.instance.api.crateApiModelsNormalizedBookAssetId(url: url);
 
   /// RCE-15.3: Stable block ID from chapter + block content.
-  Future<String> blockId({required BigInt chapterIndex, required BigInt blockIndex}) =>
-      RustLib.instance.api.crateApiModelsNormalizedBookBlockId(
-        that: this,
-        chapterIndex: chapterIndex,
-        blockIndex: blockIndex,
-      );
+  Future<String> blockId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookBlockId(
+    that: this,
+    chapterIndex: chapterIndex,
+    blockIndex: blockIndex,
+  );
 
   /// Compute content_hash per chapter for stable anchors during reparse.
   Future<List<(int, String)>> chapterHashes() =>
@@ -410,8 +413,11 @@ class NormalizedBook {
       );
 
   /// RCE-15.2: Stable chapter ID from title + content.
-  Future<String> chapterId({required BigInt chapterIndex}) => RustLib.instance.api
-      .crateApiModelsNormalizedBookChapterId(that: this, chapterIndex: chapterIndex);
+  Future<String> chapterId({required BigInt chapterIndex}) =>
+      RustLib.instance.api.crateApiModelsNormalizedBookChapterId(
+        that: this,
+        chapterIndex: chapterIndex,
+      );
 
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
@@ -481,33 +487,6 @@ class ParseWarning {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
-}
-
-@freezed
-sealed class ParserEvent with _$ParserEvent {
-  const ParserEvent._();
-
-  const factory ParserEvent.parserStarted({
-    required String format,
-  }) = ParserEvent_ParserStarted;
-  const factory ParserEvent.encodingDetected({
-    required String encoding,
-  }) = ParserEvent_EncodingDetected;
-  const factory ParserEvent.coverExtracted({
-    required bool found,
-  }) = ParserEvent_CoverExtracted;
-  const factory ParserEvent.chapterParsed({
-    required int index,
-    required BigInt blocks,
-  }) = ParserEvent_ChapterParsed;
-  const factory ParserEvent.warningAdded({
-    required String message,
-  }) = ParserEvent_WarningAdded;
-  const factory ParserEvent.parserFinished({
-    required BigInt totalChapters,
-    required BigInt totalBlocks,
-    required BigInt elapsedMs,
-  }) = ParserEvent_ParserFinished;
 }
 
 class ReaderBlock {
@@ -642,6 +621,41 @@ class RichSpan {
           superscript == other.superscript &&
           href == other.href &&
           lineBreak == other.lineBreak;
+}
+
+class SearchMatch {
+  final int chapterIndex;
+  final int blockIndex;
+  final BigInt spanStart;
+  final BigInt spanEnd;
+  final String preview;
+
+  const SearchMatch({
+    required this.chapterIndex,
+    required this.blockIndex,
+    required this.spanStart,
+    required this.spanEnd,
+    required this.preview,
+  });
+
+  @override
+  int get hashCode =>
+      chapterIndex.hashCode ^
+      blockIndex.hashCode ^
+      spanStart.hashCode ^
+      spanEnd.hashCode ^
+      preview.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SearchMatch &&
+          runtimeType == other.runtimeType &&
+          chapterIndex == other.chapterIndex &&
+          blockIndex == other.blockIndex &&
+          spanStart == other.spanStart &&
+          spanEnd == other.spanEnd &&
+          preview == other.preview;
 }
 
 /// TOC entry for navigation.

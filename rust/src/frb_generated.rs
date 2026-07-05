@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -441353377;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1583697736;
 
 // Section: executor
 
@@ -1945,6 +1945,44 @@ fn wire__crate__api__api__safe_parse_book_impl(
         },
     )
 }
+fn wire__crate__api__api__search_in_book_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "search_in_book",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_query = <String>::sse_decode(&mut deserializer);
+            let api_limit = <usize>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::api::search_in_book(api_path, api_query, api_limit)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__api__sha256_hash_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2464,6 +2502,18 @@ impl SseDecode for Vec<crate::api::models::RichSpan> {
     }
 }
 
+impl SseDecode for Vec<crate::api::models::SearchMatch> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::models::SearchMatch>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::models::TocEntry> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2645,56 +2695,6 @@ impl SseDecode for crate::api::models::ParseWarning {
     }
 }
 
-impl SseDecode for crate::api::models::ParserEvent {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut tag_ = <i32>::sse_decode(deserializer);
-        match tag_ {
-            0 => {
-                let mut var_format = <String>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::ParserStarted { format: var_format };
-            }
-            1 => {
-                let mut var_encoding = <String>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::EncodingDetected {
-                    encoding: var_encoding,
-                };
-            }
-            2 => {
-                let mut var_found = <bool>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::CoverExtracted { found: var_found };
-            }
-            3 => {
-                let mut var_index = <i32>::sse_decode(deserializer);
-                let mut var_blocks = <usize>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::ChapterParsed {
-                    index: var_index,
-                    blocks: var_blocks,
-                };
-            }
-            4 => {
-                let mut var_message = <String>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::WarningAdded {
-                    message: var_message,
-                };
-            }
-            5 => {
-                let mut var_totalChapters = <usize>::sse_decode(deserializer);
-                let mut var_totalBlocks = <usize>::sse_decode(deserializer);
-                let mut var_elapsedMs = <u64>::sse_decode(deserializer);
-                return crate::api::models::ParserEvent::ParserFinished {
-                    total_chapters: var_totalChapters,
-                    total_blocks: var_totalBlocks,
-                    elapsed_ms: var_elapsedMs,
-                };
-            }
-            _ => {
-                unimplemented!("");
-            }
-        }
-    }
-}
-
 impl SseDecode for crate::api::models::ReaderBlock {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2782,6 +2782,24 @@ impl SseDecode for crate::api::models::RichSpan {
             superscript: var_superscript,
             href: var_href,
             line_break: var_lineBreak,
+        };
+    }
+}
+
+impl SseDecode for crate::api::models::SearchMatch {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_chapterIndex = <i32>::sse_decode(deserializer);
+        let mut var_blockIndex = <i32>::sse_decode(deserializer);
+        let mut var_spanStart = <usize>::sse_decode(deserializer);
+        let mut var_spanEnd = <usize>::sse_decode(deserializer);
+        let mut var_preview = <String>::sse_decode(deserializer);
+        return crate::api::models::SearchMatch {
+            chapter_index: var_chapterIndex,
+            block_index: var_blockIndex,
+            span_start: var_spanStart,
+            span_end: var_spanEnd,
+            preview: var_preview,
         };
     }
 }
@@ -2950,8 +2968,9 @@ fn pde_ffi_dispatcher_primary_impl(
         49 => wire__crate__api__api__render_pdf_thumbnail_impl(port, ptr, rust_vec_len, data_len),
         50 => wire__crate__api__api__repair_book_impl(port, ptr, rust_vec_len, data_len),
         51 => wire__crate__api__api__safe_parse_book_impl(port, ptr, rust_vec_len, data_len),
-        52 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__api__validate_book_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__api__search_in_book_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__api__validate_book_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3310,56 +3329,6 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::ParseWarning>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::models::ParserEvent {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        match self {
-            crate::api::models::ParserEvent::ParserStarted { format } => {
-                [0.into_dart(), format.into_into_dart().into_dart()].into_dart()
-            }
-            crate::api::models::ParserEvent::EncodingDetected { encoding } => {
-                [1.into_dart(), encoding.into_into_dart().into_dart()].into_dart()
-            }
-            crate::api::models::ParserEvent::CoverExtracted { found } => {
-                [2.into_dart(), found.into_into_dart().into_dart()].into_dart()
-            }
-            crate::api::models::ParserEvent::ChapterParsed { index, blocks } => [
-                3.into_dart(),
-                index.into_into_dart().into_dart(),
-                blocks.into_into_dart().into_dart(),
-            ]
-            .into_dart(),
-            crate::api::models::ParserEvent::WarningAdded { message } => {
-                [4.into_dart(), message.into_into_dart().into_dart()].into_dart()
-            }
-            crate::api::models::ParserEvent::ParserFinished {
-                total_chapters,
-                total_blocks,
-                elapsed_ms,
-            } => [
-                5.into_dart(),
-                total_chapters.into_into_dart().into_dart(),
-                total_blocks.into_into_dart().into_dart(),
-                elapsed_ms.into_into_dart().into_dart(),
-            ]
-            .into_dart(),
-            _ => {
-                unimplemented!("");
-            }
-        }
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::models::ParserEvent
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::models::ParserEvent>
-    for crate::api::models::ParserEvent
-{
-    fn into_into_dart(self) -> crate::api::models::ParserEvent {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::models::ReaderBlock {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -3433,6 +3402,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::models::RichSpan>
     for crate::api::models::RichSpan
 {
     fn into_into_dart(self) -> crate::api::models::RichSpan {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::models::SearchMatch {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.chapter_index.into_into_dart().into_dart(),
+            self.block_index.into_into_dart().into_dart(),
+            self.span_start.into_into_dart().into_dart(),
+            self.span_end.into_into_dart().into_dart(),
+            self.preview.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::models::SearchMatch
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::models::SearchMatch>
+    for crate::api::models::SearchMatch
+{
+    fn into_into_dart(self) -> crate::api::models::SearchMatch {
         self
     }
 }
@@ -3807,6 +3800,16 @@ impl SseEncode for Vec<crate::api::models::RichSpan> {
     }
 }
 
+impl SseEncode for Vec<crate::api::models::SearchMatch> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::models::SearchMatch>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::models::TocEntry> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3952,48 +3955,6 @@ impl SseEncode for crate::api::models::ParseWarning {
     }
 }
 
-impl SseEncode for crate::api::models::ParserEvent {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        match self {
-            crate::api::models::ParserEvent::ParserStarted { format } => {
-                <i32>::sse_encode(0, serializer);
-                <String>::sse_encode(format, serializer);
-            }
-            crate::api::models::ParserEvent::EncodingDetected { encoding } => {
-                <i32>::sse_encode(1, serializer);
-                <String>::sse_encode(encoding, serializer);
-            }
-            crate::api::models::ParserEvent::CoverExtracted { found } => {
-                <i32>::sse_encode(2, serializer);
-                <bool>::sse_encode(found, serializer);
-            }
-            crate::api::models::ParserEvent::ChapterParsed { index, blocks } => {
-                <i32>::sse_encode(3, serializer);
-                <i32>::sse_encode(index, serializer);
-                <usize>::sse_encode(blocks, serializer);
-            }
-            crate::api::models::ParserEvent::WarningAdded { message } => {
-                <i32>::sse_encode(4, serializer);
-                <String>::sse_encode(message, serializer);
-            }
-            crate::api::models::ParserEvent::ParserFinished {
-                total_chapters,
-                total_blocks,
-                elapsed_ms,
-            } => {
-                <i32>::sse_encode(5, serializer);
-                <usize>::sse_encode(total_chapters, serializer);
-                <usize>::sse_encode(total_blocks, serializer);
-                <u64>::sse_encode(elapsed_ms, serializer);
-            }
-            _ => {
-                unimplemented!("");
-            }
-        }
-    }
-}
-
 impl SseEncode for crate::api::models::ReaderBlock {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -4049,6 +4010,17 @@ impl SseEncode for crate::api::models::RichSpan {
         <bool>::sse_encode(self.superscript, serializer);
         <Option<String>>::sse_encode(self.href, serializer);
         <bool>::sse_encode(self.line_break, serializer);
+    }
+}
+
+impl SseEncode for crate::api::models::SearchMatch {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.chapter_index, serializer);
+        <i32>::sse_encode(self.block_index, serializer);
+        <usize>::sse_encode(self.span_start, serializer);
+        <usize>::sse_encode(self.span_end, serializer);
+        <String>::sse_encode(self.preview, serializer);
     }
 }
 
