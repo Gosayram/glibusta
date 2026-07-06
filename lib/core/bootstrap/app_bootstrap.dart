@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../src/rust/api/frb_generated.dart';
 import '../logging/app_logger.dart';
+import '../services/sync_service.dart';
 
 class AppBootstrap {
   AppBootstrap._();
@@ -23,6 +24,8 @@ class AppBootstrap {
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();
+    // STR-4.2: initialize background sync (non-blocking, failure-safe)
+    unawaited(SyncService.initialize().catchError((_) {}));
   }
 
   static void _configureErrorHandlers() {
