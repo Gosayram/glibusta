@@ -54,13 +54,15 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     });
 
     let images = extract_images(&mut zip);
-    let cover_url = images.first().map(|img| {
+    let cover_url = images.first().and_then(|img| {
+        let entry_name = format!("word/media/{}", img.id);
+        let data = zip.find_file(&entry_name)?;
         use base64::Engine;
-        format!(
+        Some(format!(
             "data:{};base64,{}",
             img.media_type,
-            base64::engine::general_purpose::STANDARD.encode(&img.data)
-        )
+            base64::engine::general_purpose::STANDARD.encode(&data)
+        ))
     });
 
     Ok(NormalizedBook {
@@ -113,26 +115,20 @@ fn parse_core_properties(
     Ok((title, authors, created))
 }
 
-/// Extract images from word/media/ directory.
+/// Extract image metadata from word/media/ without loading bytes.
+/// Use `get_asset_bytes()` (RCE-10.2) for lazy data loading.
 fn extract_images(zip: &mut ZipFile) -> Vec<EmbeddedImage> {
-    let media_entries: Vec<String> = zip
-        .entry_names()
+    zip.entry_names()
         .iter()
         .filter(|name| name.starts_with("word/media/"))
-        .cloned()
-        .collect();
-
-    media_entries
-        .into_iter()
-        .filter_map(|name| {
-            let data = zip.find_file(&name)?;
-            let media_type = mime_from_name(&name);
-            let id = name.rsplit('/').next().unwrap_or(&name).to_string();
-            Some(EmbeddedImage {
+        .map(|name| {
+            let media_type = mime_from_name(name);
+            let id = name.rsplit('/').next().unwrap_or(name).to_string();
+            EmbeddedImage {
                 id,
                 media_type,
-                data,
-            })
+                data: Vec::new(),
+            }
         })
         .collect()
 }

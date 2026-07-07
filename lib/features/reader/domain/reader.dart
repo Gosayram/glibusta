@@ -193,6 +193,7 @@ abstract class ReaderPosition with _$ReaderPosition {
     @Default(0.0) double progressPercent,
     @Default('') String chapterId,
     @Default(0) int textOffset,
+    @Default('') String contentHash,
     required DateTime updatedAt,
   }) = _ReaderPosition;
   const ReaderPosition._();
@@ -212,6 +213,7 @@ abstract class ReaderPosition with _$ReaderPosition {
         bookId: bookId,
         chapterIndex: 0,
         paragraphIndex: 0,
+        contentHash: contentHash,
         updatedAt: updatedAt,
       );
     }
@@ -224,6 +226,7 @@ abstract class ReaderPosition with _$ReaderPosition {
       progressPercent: progressPercent.clamp(0.0, 1.0),
       chapterId: chapterId,
       textOffset: textOffset,
+      contentHash: contentHash,
       updatedAt: updatedAt,
     );
   }

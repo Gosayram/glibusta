@@ -29,6 +29,9 @@ class ReaderProgressHelper {
       final progressPercent = row.progressPercent <= 0 && chapterCount > 0
           ? row.chapterIndex / (chapterCount > 1 ? chapterCount - 1 : 1)
           : row.progressPercent;
+      final savedBook = await (_database.select(
+        _database.savedBooks,
+      )..where((t) => t.id.equals(_bookId))).getSingleOrNull();
       return ReaderPosition(
         bookId: _bookId,
         chapterIndex: row.chapterIndex,
@@ -37,6 +40,7 @@ class ReaderProgressHelper {
         progressPercent: progressPercent.clamp(0.0, 1.0),
         chapterId: row.chapterId,
         textOffset: row.textOffset,
+        contentHash: savedBook?.contentHash ?? '',
         updatedAt: row.updatedAt,
       ).clamp(chapterCount: chapterCount);
     } on Object catch (e) {

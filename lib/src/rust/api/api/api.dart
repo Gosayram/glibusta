@@ -9,7 +9,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
-// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `map_file`
+// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `load_dictionary`, `map_file`
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
 /// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
@@ -97,8 +97,9 @@ Future<BookDiff> diffParsedBook({
   newPath: newPath,
 );
 
-/// RCE-19.1: Find word break positions in a word for hyphenation.
-/// Returns Vec of byte offsets where breaks can occur (before each grapheme cluster).
+/// RCE-19.2: Hyphenate a word using Knuth-Liang TeX patterns.
+/// Returns byte positions where hyphenation is allowed.
+/// Falls back to every-grapheme approach when the dictionary is unavailable.
 Future<Uint64List> hyphenateWord({required String word}) =>
     RustLib.instance.api.crateApiApiHyphenateWord(word: word);
 

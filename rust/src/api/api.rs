@@ -3,6 +3,8 @@ use crate::api::models::{
     CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, ReaderChapter,
     TocEntry,
 };
+use hyphenation::{Hyphenator, Language, Load, Standard};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -403,23 +405,63 @@ pub fn diff_parsed_book(old_path: String, new_path: String) -> anyhow::Result<Bo
 
 /// RCE-19.1: Find word break positions in a word for hyphenation.
 /// Returns Vec of byte offsets where breaks can occur (before each grapheme cluster).
+static HYPHENATORS: LazyLock<Mutex<HashMap<Language, Standard>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// RCE-19.2: Hyphenate a word using Knuth-Liang TeX patterns.
+/// Returns byte positions where hyphenation is allowed.
+/// Falls back to every-grapheme approach when the dictionary is unavailable.
 pub fn hyphenate_word(word: String) -> Vec<usize> {
     let graphemes: Vec<&str> = word.graphemes(true).collect();
     let len = graphemes.len();
     if len < 3 {
         return Vec::new();
     }
-    // Break after each grapheme cluster except first and last
+
+    // Map language to Language enum for dictionary lookup
+    let lang = detect_hyphen_lang(&word);
+
+    if let Some(dict) = load_dictionary(lang) {
+        let h = dict.hyphenate(&word);
+        return h.breaks;
+    }
+
+    // Fallback: every grapheme break except first and last
     let mut positions = Vec::new();
     let mut byte_offset = 0;
     for (i, g) in graphemes.iter().enumerate() {
         byte_offset += g.len();
-        // Allow breaks after positions 1..len-1 (min 2 chars on each side)
         if i >= 1 && i < len - 1 {
             positions.push(byte_offset);
         }
     }
     positions
+}
+
+fn load_dictionary(lang: Language) -> Option<Standard> {
+    let mut map = HYPHENATORS.lock().ok()?;
+    if let Some(dict) = map.get(&lang) {
+        return Some(dict.clone());
+    }
+    match Standard::from_embedded(lang) {
+        Ok(dict) => {
+            map.insert(lang, dict.clone());
+            Some(dict)
+        }
+        Err(_) => None,
+    }
+}
+
+fn detect_hyphen_lang(word: &str) -> Language {
+    // Simple heuristic: check for Cyrillic characters → Russian, else English
+    if word
+        .chars()
+        .any(|c| ('\u{0400}'..='\u{04FF}').contains(&c) || c == 'ё' || c == 'Ё')
+    {
+        Language::Russian
+    } else {
+        Language::EnglishUS
+    }
 }
 
 /// RCE-5.1: Search for a query across all chapters of a book.

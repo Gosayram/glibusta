@@ -527,6 +527,7 @@ class ReaderController {
       paragraphIndex: paragraphIndex,
       localOffset: progress * 100.0,
       progressPercent: progress,
+      contentHash: _state.currentPosition.contentHash,
       updatedAt: DateTime.now(),
     );
   }

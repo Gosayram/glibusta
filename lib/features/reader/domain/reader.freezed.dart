@@ -460,7 +460,7 @@ as bool,
 /// @nodoc
 mixin _$ReaderPosition {
 
- String get bookId; int get chapterIndex; int get paragraphIndex; double get localOffset; double get progressPercent; String get chapterId; int get textOffset; DateTime get updatedAt;
+ String get bookId; int get chapterIndex; int get paragraphIndex; double get localOffset; double get progressPercent; String get chapterId; int get textOffset; String get contentHash; DateTime get updatedAt;
 /// Create a copy of ReaderPosition
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -471,16 +471,16 @@ $ReaderPositionCopyWith<ReaderPosition> get copyWith => _$ReaderPositionCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.chapterId, chapterId) || other.chapterId == chapterId)&&(identical(other.textOffset, textOffset) || other.textOffset == textOffset)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.chapterId, chapterId) || other.chapterId == chapterId)&&(identical(other.textOffset, textOffset) || other.textOffset == textOffset)&&(identical(other.contentHash, contentHash) || other.contentHash == contentHash)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,chapterId,textOffset,updatedAt);
+int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,chapterId,textOffset,contentHash,updatedAt);
 
 @override
 String toString() {
-  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, chapterId: $chapterId, textOffset: $textOffset, updatedAt: $updatedAt)';
+  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, chapterId: $chapterId, textOffset: $textOffset, contentHash: $contentHash, updatedAt: $updatedAt)';
 }
 
 
@@ -491,7 +491,7 @@ abstract mixin class $ReaderPositionCopyWith<$Res>  {
   factory $ReaderPositionCopyWith(ReaderPosition value, $Res Function(ReaderPosition) _then) = _$ReaderPositionCopyWithImpl;
 @useResult
 $Res call({
- String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, String chapterId, int textOffset, DateTime updatedAt
+ String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, String chapterId, int textOffset, String contentHash, DateTime updatedAt
 });
 
 
@@ -508,7 +508,7 @@ class _$ReaderPositionCopyWithImpl<$Res>
 
 /// Create a copy of ReaderPosition
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? chapterId = null,Object? textOffset = null,Object? updatedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? chapterId = null,Object? textOffset = null,Object? contentHash = null,Object? updatedAt = null,}) {
   return _then(_self.copyWith(
 bookId: null == bookId ? _self.bookId : bookId // ignore: cast_nullable_to_non_nullable
 as String,chapterIndex: null == chapterIndex ? _self.chapterIndex : chapterIndex // ignore: cast_nullable_to_non_nullable
@@ -517,7 +517,8 @@ as int,localOffset: null == localOffset ? _self.localOffset : localOffset // ign
 as double,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
 as double,chapterId: null == chapterId ? _self.chapterId : chapterId // ignore: cast_nullable_to_non_nullable
 as String,textOffset: null == textOffset ? _self.textOffset : textOffset // ignore: cast_nullable_to_non_nullable
-as int,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
+as int,contentHash: null == contentHash ? _self.contentHash : contentHash // ignore: cast_nullable_to_non_nullable
+as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }
@@ -603,10 +604,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  String contentHash,  DateTime updatedAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ReaderPosition() when $default != null:
-return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.updatedAt);case _:
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.contentHash,_that.updatedAt);case _:
   return orElse();
 
 }
@@ -624,10 +625,10 @@ return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.local
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  DateTime updatedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  String contentHash,  DateTime updatedAt)  $default,) {final _that = this;
 switch (_that) {
 case _ReaderPosition():
-return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.updatedAt);case _:
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.contentHash,_that.updatedAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -644,10 +645,10 @@ return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.local
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  DateTime updatedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String bookId,  int chapterIndex,  int paragraphIndex,  double localOffset,  double progressPercent,  String chapterId,  int textOffset,  String contentHash,  DateTime updatedAt)?  $default,) {final _that = this;
 switch (_that) {
 case _ReaderPosition() when $default != null:
-return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.updatedAt);case _:
+return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.localOffset,_that.progressPercent,_that.chapterId,_that.textOffset,_that.contentHash,_that.updatedAt);case _:
   return null;
 
 }
@@ -659,7 +660,7 @@ return $default(_that.bookId,_that.chapterIndex,_that.paragraphIndex,_that.local
 
 
 class _ReaderPosition extends ReaderPosition {
-  const _ReaderPosition({required this.bookId, required this.chapterIndex, required this.paragraphIndex, this.localOffset = 0.0, this.progressPercent = 0.0, this.chapterId = '', this.textOffset = 0, required this.updatedAt}): super._();
+  const _ReaderPosition({required this.bookId, required this.chapterIndex, required this.paragraphIndex, this.localOffset = 0.0, this.progressPercent = 0.0, this.chapterId = '', this.textOffset = 0, this.contentHash = '', required this.updatedAt}): super._();
   
 
 @override final  String bookId;
@@ -669,6 +670,7 @@ class _ReaderPosition extends ReaderPosition {
 @override@JsonKey() final  double progressPercent;
 @override@JsonKey() final  String chapterId;
 @override@JsonKey() final  int textOffset;
+@override@JsonKey() final  String contentHash;
 @override final  DateTime updatedAt;
 
 /// Create a copy of ReaderPosition
@@ -681,16 +683,16 @@ _$ReaderPositionCopyWith<_ReaderPosition> get copyWith => __$ReaderPositionCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.chapterId, chapterId) || other.chapterId == chapterId)&&(identical(other.textOffset, textOffset) || other.textOffset == textOffset)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ReaderPosition&&(identical(other.bookId, bookId) || other.bookId == bookId)&&(identical(other.chapterIndex, chapterIndex) || other.chapterIndex == chapterIndex)&&(identical(other.paragraphIndex, paragraphIndex) || other.paragraphIndex == paragraphIndex)&&(identical(other.localOffset, localOffset) || other.localOffset == localOffset)&&(identical(other.progressPercent, progressPercent) || other.progressPercent == progressPercent)&&(identical(other.chapterId, chapterId) || other.chapterId == chapterId)&&(identical(other.textOffset, textOffset) || other.textOffset == textOffset)&&(identical(other.contentHash, contentHash) || other.contentHash == contentHash)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,chapterId,textOffset,updatedAt);
+int get hashCode => Object.hash(runtimeType,bookId,chapterIndex,paragraphIndex,localOffset,progressPercent,chapterId,textOffset,contentHash,updatedAt);
 
 @override
 String toString() {
-  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, chapterId: $chapterId, textOffset: $textOffset, updatedAt: $updatedAt)';
+  return 'ReaderPosition(bookId: $bookId, chapterIndex: $chapterIndex, paragraphIndex: $paragraphIndex, localOffset: $localOffset, progressPercent: $progressPercent, chapterId: $chapterId, textOffset: $textOffset, contentHash: $contentHash, updatedAt: $updatedAt)';
 }
 
 
@@ -701,7 +703,7 @@ abstract mixin class _$ReaderPositionCopyWith<$Res> implements $ReaderPositionCo
   factory _$ReaderPositionCopyWith(_ReaderPosition value, $Res Function(_ReaderPosition) _then) = __$ReaderPositionCopyWithImpl;
 @override @useResult
 $Res call({
- String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, String chapterId, int textOffset, DateTime updatedAt
+ String bookId, int chapterIndex, int paragraphIndex, double localOffset, double progressPercent, String chapterId, int textOffset, String contentHash, DateTime updatedAt
 });
 
 
@@ -718,7 +720,7 @@ class __$ReaderPositionCopyWithImpl<$Res>
 
 /// Create a copy of ReaderPosition
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? chapterId = null,Object? textOffset = null,Object? updatedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? bookId = null,Object? chapterIndex = null,Object? paragraphIndex = null,Object? localOffset = null,Object? progressPercent = null,Object? chapterId = null,Object? textOffset = null,Object? contentHash = null,Object? updatedAt = null,}) {
   return _then(_ReaderPosition(
 bookId: null == bookId ? _self.bookId : bookId // ignore: cast_nullable_to_non_nullable
 as String,chapterIndex: null == chapterIndex ? _self.chapterIndex : chapterIndex // ignore: cast_nullable_to_non_nullable
@@ -727,7 +729,8 @@ as int,localOffset: null == localOffset ? _self.localOffset : localOffset // ign
 as double,progressPercent: null == progressPercent ? _self.progressPercent : progressPercent // ignore: cast_nullable_to_non_nullable
 as double,chapterId: null == chapterId ? _self.chapterId : chapterId // ignore: cast_nullable_to_non_nullable
 as String,textOffset: null == textOffset ? _self.textOffset : textOffset // ignore: cast_nullable_to_non_nullable
-as int,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
+as int,contentHash: null == contentHash ? _self.contentHash : contentHash // ignore: cast_nullable_to_non_nullable
+as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }
