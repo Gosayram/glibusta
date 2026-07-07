@@ -5,6 +5,7 @@ pub mod epub;
 pub mod fb2;
 pub mod hash;
 pub(crate) mod html_parser;
+pub mod layout;
 pub mod mobi;
 pub mod rtf;
 pub mod txt;

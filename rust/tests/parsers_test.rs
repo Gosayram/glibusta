@@ -737,3 +737,23 @@ fn test_mobi_golden_snapshot() {
     });
     insta::assert_snapshot!("mobi_golden", snapshot.to_string());
 }
+
+#[test]
+fn test_taffy_layout() {
+    let rects =
+        glibusta_core::book::layout::compute_vertical_layout(400.0, &[100.0, 50.0, 200.0], 10.0);
+    assert_eq!(rects.len(), 3);
+    // Blocks should stack vertically
+    assert!(
+        rects[1].y > rects[0].y,
+        "second block should be below first"
+    );
+    assert!(
+        rects[2].y > rects[1].y,
+        "third block should be below second"
+    );
+    // Widths should match container
+    for r in &rects {
+        assert!((r.width - 400.0).abs() < 1.0, "width should be ~400");
+    }
+}
