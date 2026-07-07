@@ -649,3 +649,91 @@ fn test_fb2_empty_body() {
     let book = glibusta_core::book::fb2::parse_fb2(fb2, None).unwrap();
     assert_eq!(book.title, "Empty");
 }
+
+// ---------------------------------------------------------------------------
+// MOBI — minimal in-memory fixture + golden test
+// ---------------------------------------------------------------------------
+
+fn create_minimal_mobi() -> Vec<u8> {
+    let text = b"<html><body><p>Hello MOBI</p><p>Second paragraph.</p></body></html>";
+    let text_len = text.len() as u32;
+
+    let record0_offset = 94u32; // 78 header + 16 record table
+    let record0_size = 248u32; // 16 PalmDOC + 232 MOBI header
+    let record1_offset = record0_offset + record0_size;
+
+    let mut buf = Vec::with_capacity(record1_offset as usize + text.len());
+
+    // PalmDB header (78 bytes)
+    buf.extend_from_slice(b"Test MOBI");
+    buf.resize(32, 0); // name = 32 bytes
+    buf.extend_from_slice(&[0; 2]); // attributes
+    buf.extend_from_slice(&[0; 2]); // version
+    buf.extend_from_slice(&[0; 4]); // creation time
+    buf.extend_from_slice(&[0; 4]); // modification time
+    buf.extend_from_slice(&[0; 4]); // backup time
+    buf.extend_from_slice(&[0; 4]); // modification number
+    buf.extend_from_slice(&[0; 4]); // app info area
+    buf.extend_from_slice(&[0; 4]); // sort info area
+    buf.extend_from_slice(b"BOOK"); // type
+    buf.extend_from_slice(b"MOBI"); // creator
+    buf.extend_from_slice(&[0; 4]); // unique ID seed
+    buf.extend_from_slice(&[0; 4]); // next record list ID
+    assert_eq!(buf.len(), 76);
+    buf.extend_from_slice(&2u16.to_be_bytes()); // num_records = 2
+    assert_eq!(buf.len(), 78);
+
+    // Record table (2 entries × 8 bytes = 16 bytes, starts at offset 78)
+    buf.extend_from_slice(&record0_offset.to_be_bytes()); // record 0 offset
+    buf.extend_from_slice(&[0, 0, 0, 0]); // attr + unique_id
+    buf.extend_from_slice(&record1_offset.to_be_bytes()); // record 1 offset
+    buf.extend_from_slice(&[0, 0, 0, 1]); // attr + unique_id
+    assert_eq!(buf.len(), 94);
+
+    // Record 0: PalmDOC header (16 bytes)
+    let r0 = buf.len();
+    buf.extend_from_slice(&1u16.to_be_bytes()); // compression = 1 (none)
+    buf.extend_from_slice(&0u16.to_be_bytes()); // unused
+    buf.extend_from_slice(&text_len.to_be_bytes()); // text_length
+    buf.extend_from_slice(&1u16.to_be_bytes()); // text_record_count = 1
+    buf.extend_from_slice(&4096u16.to_be_bytes()); // record_size
+    buf.extend_from_slice(&0u16.to_be_bytes()); // encryption = 0
+    buf.extend_from_slice(&0u16.to_be_bytes()); // unused
+    assert_eq!(buf.len(), r0 + 16);
+
+    // Record 0: MOBI header (232 bytes)
+    let mobi = r0 + 16;
+    buf.extend_from_slice(b"MOBI");
+    buf.extend_from_slice(&232u32.to_be_bytes()); // header_length
+    buf.resize(mobi + 232, 0); // zero-fill rest of MOBI header
+    // Set text_encoding = 1252 at mobi+12
+    buf[mobi + 12..mobi + 14].copy_from_slice(&1252u16.to_be_bytes());
+
+    // Record 1: HTML text
+    assert_eq!(buf.len(), record1_offset as usize);
+    buf.extend_from_slice(text);
+
+    buf
+}
+
+#[test]
+fn test_mobi_basic_parse() {
+    let mobi_bytes = create_minimal_mobi();
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi_bytes, None).unwrap();
+    assert!(!book.chapters.is_empty(), "should have chapters");
+    assert!(!book.chapters[0].blocks.is_empty(), "should have blocks");
+    assert_eq!(book.book_format, BookFormat::Mobi);
+}
+
+#[test]
+fn test_mobi_golden_snapshot() {
+    let mobi_bytes = create_minimal_mobi();
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi_bytes, None).unwrap();
+    let snapshot = serde_json::json!({
+        "format": format!("{:?}", book.book_format),
+        "chapters": book.chapters.len(),
+        "blocks": book.chapters.iter().map(|c| c.blocks.len()).sum::<usize>(),
+        "language": book.language,
+    });
+    insta::assert_snapshot!("mobi_golden", snapshot.to_string());
+}

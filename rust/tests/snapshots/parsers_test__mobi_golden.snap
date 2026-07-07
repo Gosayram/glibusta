@@ -1,0 +1,5 @@
+---
+source: tests/parsers_test.rs
+expression: snapshot.to_string()
+---
+{"blocks":2,"chapters":1,"format":"Mobi","language":null}
