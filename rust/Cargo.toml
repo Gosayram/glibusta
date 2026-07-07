@@ -109,7 +109,7 @@ sha2 = "0.10"
 simdutf8 = "0.1"
 similar = "2"
 slotmap = { version = "1", features = ["serde"] }
-smallvec = "1"
+smallvec = { version = "1", features = ["serde"] }
 
 # ─── Enum / Builder / Errors ───────────────────────────────────────────
 strum = { version = "0.26", features = ["derive"] }
