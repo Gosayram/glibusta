@@ -2,7 +2,7 @@ use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan, TocEntry,
 };
 use crate::book::archive::{self, ZipFile};
-use crate::book::encoding::{decode_bytes, get_xml_attr};
+use crate::book::encoding::{attr_eq, decode_bytes, get_xml_attr};
 use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
@@ -1085,10 +1085,8 @@ fn parse_xhtml_to_blocks(
                 match tag.as_str() {
                     "body" => in_body = true,
                     "aside" if in_body => {
-                        // RCE-9.2: detect epub:type="footnote"
-                        let epub_type =
-                            get_xml_attr(e, b"epub:type").or_else(|| get_xml_attr(e, b"type"));
-                        if epub_type.as_deref() == Some("footnote") {
+                        if attr_eq(e, b"epub:type", b"footnote") || attr_eq(e, b"type", b"footnote")
+                        {
                             flush_block(
                                 &mut blocks,
                                 &mut current_text,

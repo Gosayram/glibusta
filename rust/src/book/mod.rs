@@ -110,30 +110,40 @@ pub(crate) fn normalize_whitespace(text: &str) -> String {
     normalize_typography(result.trim())
 }
 
-/// Normalize Russian/English typography:
-/// - " - " → " — " (em dash for isolated hyphens)
-/// - "--" → "—"
+/// Normalize Russian/English typography (single-pass):
+/// - " - " → " — " and "--" → "—"
 /// - "..." → "…"
 /// - Straight quotes "..." → «...» (Russian guillemets)
 pub(crate) fn normalize_typography(text: &str) -> String {
-    let mut s = text.to_string();
-
-    // Double hyphen → em dash
-    s = s.replace("--", "\u{2014}");
-
-    // Isolated hyphen surrounded by spaces → em dash
-    s = s.replace(" - ", " \u{2014} ");
-
-    // Three dots → ellipsis
-    s = s.replace("...", "\u{2026}");
-
-    // Straight double quotes → Russian guillemets «...»
-    let bytes = s.as_bytes();
-    let mut result = String::with_capacity(s.len());
+    let bytes = text.as_bytes();
+    let mut result = String::with_capacity(bytes.len());
     let mut open_quote = true;
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'"' {
+        // Pattern matching — scan for known sequences
+        if bytes[i] == b'-' {
+            if i + 1 < bytes.len() && bytes[i + 1] == b'-' {
+                // "--" → em dash
+                result.push('\u{2014}');
+                i += 2;
+            } else if i > 0 && bytes[i - 1] == b' ' && i + 1 < bytes.len() && bytes[i + 1] == b' ' {
+                // " - " → " — " (leading space already copied, push just "\u{2014} ")
+                result.push_str("\u{2014} ");
+                i += 2; // skip past the trailing space
+            } else {
+                let (ch, adv) = copy_char(bytes, i);
+                result.push_str(ch);
+                i = adv;
+            }
+        } else if i + 2 < bytes.len()
+            && bytes[i] == b'.'
+            && bytes[i + 1] == b'.'
+            && bytes[i + 2] == b'.'
+        {
+            // "..." → "…"
+            result.push('\u{2026}');
+            i += 3;
+        } else if bytes[i] == b'"' {
             if open_quote {
                 result.push('\u{00AB}');
             } else {
@@ -142,27 +152,32 @@ pub(crate) fn normalize_typography(text: &str) -> String {
             open_quote = !open_quote;
             i += 1;
         } else {
-            // Copy UTF-8 char safely
-            let ch_start = i;
-            let first = bytes[i];
-            let len = if first < 0x80 {
-                1
-            } else if first & 0xE0 == 0xC0 {
-                2
-            } else if first & 0xF0 == 0xE0 {
-                3
-            } else {
-                4
-            };
-            let end = (i + len).min(bytes.len());
-            if let Ok(slice) = std::str::from_utf8(&bytes[ch_start..end]) {
-                result.push_str(slice);
-            }
-            i = end;
+            let (ch, adv) = copy_char(bytes, i);
+            result.push_str(ch);
+            i = adv;
         }
     }
-
     result
+}
+
+/// Copy a single UTF-8 character from bytes at position i. Returns (&str, next_i).
+fn copy_char(bytes: &[u8], i: usize) -> (&str, usize) {
+    let first = bytes[i];
+    let len = if first < 0x80 {
+        1
+    } else if first & 0xE0 == 0xC0 {
+        2
+    } else if first & 0xF0 == 0xE0 {
+        3
+    } else {
+        4
+    };
+    let end = (i + len).min(bytes.len());
+    // SAFETY: input text is valid UTF-8, slice is within bounds
+    (
+        unsafe { std::str::from_utf8_unchecked(&bytes[i..end]) },
+        end,
+    )
 }
 
 // ---------------------------------------------------------------------------

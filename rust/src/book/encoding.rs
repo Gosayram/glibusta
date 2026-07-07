@@ -6,6 +6,14 @@ pub(crate) fn get_xml_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     Some(String::from_utf8_lossy(&attr.value).into_owned())
 }
 
+/// Check if an attribute equals a byte-string value (no allocation).
+pub(crate) fn attr_eq(e: &BytesStart<'_>, name: &[u8], expected: &[u8]) -> bool {
+    e.try_get_attribute(name)
+        .ok()
+        .flatten()
+        .is_some_and(|attr| attr.value.as_ref() == expected)
+}
+
 pub(crate) fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
     let encoding = if encoding_name.eq_ignore_ascii_case("utf-8") {
         encoding_rs::UTF_8

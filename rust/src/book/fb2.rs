@@ -2,7 +2,7 @@ use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
 };
 use crate::book::archive;
-use crate::book::encoding::get_xml_attr;
+use crate::book::encoding::{attr_eq, get_xml_attr};
 use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use quick_xml::Reader;
@@ -119,9 +119,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         current_text.clear();
                     }
                     b"body" => {
-                        let body_name = get_xml_attr(e, b"name");
                         in_body = true;
-                        in_notes_body = body_name.as_deref() == Some("notes");
+                        in_notes_body = attr_eq(e, b"name", b"notes");
                     }
                     b"section" if in_body => {
                         if in_notes_body {
@@ -211,8 +210,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         );
                         current_span_href =
                             get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
-                        let a_type = get_xml_attr(e, b"type");
-                        if a_type.as_deref() == Some("note") {
+                        if attr_eq(e, b"type", b"note") {
                             if let Some(ref href) = current_span_href {
                                 current_note_ref = Some(href.trim_start_matches('#').to_string());
                             }
