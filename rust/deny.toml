@@ -70,6 +70,7 @@ skip = [
     "windows_x86_64_gnullvm",
     "windows_x86_64_msvc",
     "dashmap",
+    "zip",
 ]
 
 [licenses]
@@ -86,6 +87,7 @@ allow = [
     "0BSD",
     "MPL-2.0",
     "CC0-1.0",
+    "IJG",
 ]
 
 [sources]

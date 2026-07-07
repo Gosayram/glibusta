@@ -97,9 +97,8 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
                 "PDF support disabled, rebuild with --features pdf".into(),
             ))
         }
-        BookFormat::Djvu => Err(CoreError::FeatureDisabled(
-            "DJVU support not yet implemented".into(),
-        )),
+        BookFormat::Djvu => crate::book::djvu::DjvuEngine::parse_djvu(bytes)
+            .map_err(|e| CoreError::ParserFailed(e.to_string())),
         BookFormat::Unknown => Err(CoreError::UnsupportedFormat("unknown".into())),
     }
 }
@@ -513,6 +512,32 @@ pub fn extract_pdf_text(_path: String) -> anyhow::Result<String> {
 #[cfg(not(feature = "pdf"))]
 pub fn pdf_page_count(_path: String) -> anyhow::Result<i32> {
     anyhow::bail!("PDF support disabled. Rebuild with --features pdf")
+}
+
+// ---------------------------------------------------------------------------
+// CRT-20.4/20.5: DjVu rendering and text extraction via djvu-rs (pure Rust)
+// ---------------------------------------------------------------------------
+
+/// CRT-20.4: Render DjVu page to PNG thumbnail.
+pub fn render_djvu_thumbnail(
+    path: String,
+    page_index: usize,
+    max_width: usize,
+) -> anyhow::Result<Vec<u8>> {
+    let bytes = map_file(&path)?;
+    crate::book::djvu::DjvuEngine::render_page_to_png(&bytes, page_index, max_width as u16)
+}
+
+/// CRT-20.5: Extract text from DjVu document (from all pages' OCR/embedded text layers).
+pub fn extract_djvu_text(path: String) -> anyhow::Result<String> {
+    let bytes = map_file(&path)?;
+    crate::book::djvu::DjvuEngine::extract_text(&bytes)
+}
+
+/// Get DjVu page count.
+pub fn djvu_page_count(path: String) -> anyhow::Result<i32> {
+    let bytes = map_file(&path)?;
+    crate::book::djvu::DjvuEngine::page_count(&bytes)
 }
 
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.

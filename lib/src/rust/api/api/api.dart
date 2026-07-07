@@ -133,6 +133,25 @@ Future<String> extractPdfText({required String path}) =>
 Future<int> pdfPageCount({required String path}) =>
     RustLib.instance.api.crateApiApiPdfPageCount(path: path);
 
+/// CRT-20.4: Render DjVu page to PNG thumbnail.
+Future<Uint8List> renderDjvuThumbnail({
+  required String path,
+  required BigInt pageIndex,
+  required BigInt maxWidth,
+}) => RustLib.instance.api.crateApiApiRenderDjvuThumbnail(
+  path: path,
+  pageIndex: pageIndex,
+  maxWidth: maxWidth,
+);
+
+/// CRT-20.5: Extract text from DjVu document (from all pages' OCR/embedded text layers).
+Future<String> extractDjvuText({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractDjvuText(path: path);
+
+/// Get DjVu page count.
+Future<int> djvuPageCount({required String path}) =>
+    RustLib.instance.api.crateApiApiDjvuPageCount(path: path);
+
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
