@@ -7,6 +7,8 @@ pub mod hash;
 pub(crate) mod html_parser;
 pub mod layout;
 pub mod mobi;
+#[cfg(feature = "pdf")]
+pub mod pdf;
 pub mod rtf;
 pub mod txt;
 

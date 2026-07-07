@@ -58,6 +58,11 @@ rust-build-check: require-rust ## Verify Rust code compiles
 	$(CARGO_CHECK)
 	@$(PRINT_OK) "Rust compilation verified"
 
+.PHONY: pdfium
+pdfium: ## Download and verify PDFium binaries (v152.0.7934.0) from GitHub release with Sigstore attestation
+	@$(PRINT_STEP) "Downloading PDFium binaries"
+	@$(SCRIPTS_DIR)/download-pdfium.sh
+
 .PHONY: rust-sync-version
 rust-sync-version: ## Sync Rust crate version with pubspec.yaml
 	@$(PRINT_STEP) "Syncing Rust version from pubspec.yaml"

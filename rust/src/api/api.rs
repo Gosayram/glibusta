@@ -464,6 +464,57 @@ pub fn search_in_book(
     Ok(results)
 }
 
+/// CRT-20.2: Render PDF page to PNG thumbnail.
+/// Requires `pdf` feature flag and PDFium binary.
+#[cfg(feature = "pdf")]
+pub fn render_pdf_thumbnail(
+    path: String,
+    page_index: usize,
+    max_width: usize,
+) -> anyhow::Result<Vec<u8>> {
+    let bytes = map_file(&path)?;
+    let engine = crate::book::pdf::PdfEngine::new()?;
+    engine.render_page_to_png(&bytes, page_index, max_width as u16)
+}
+
+/// CRT-20.3: Extract text from PDF for search.
+#[cfg(feature = "pdf")]
+pub fn extract_pdf_text(path: String) -> anyhow::Result<String> {
+    let bytes = map_file(&path)?;
+    let engine = crate::book::pdf::PdfEngine::new()?;
+    engine.extract_text(&bytes)
+}
+
+/// Get PDF page count.
+#[cfg(feature = "pdf")]
+pub fn pdf_page_count(path: String) -> anyhow::Result<i32> {
+    let bytes = map_file(&path)?;
+    let engine = crate::book::pdf::PdfEngine::new()?;
+    engine.page_count(&bytes)
+}
+
+/// Stub: PDF thumbnail not available without pdf feature.
+#[cfg(not(feature = "pdf"))]
+pub fn render_pdf_thumbnail(
+    _path: String,
+    _page_index: usize,
+    _max_width: usize,
+) -> anyhow::Result<Vec<u8>> {
+    anyhow::bail!("PDF support disabled. Rebuild with --features pdf")
+}
+
+/// Stub: PDF text extraction not available without pdf feature.
+#[cfg(not(feature = "pdf"))]
+pub fn extract_pdf_text(_path: String) -> anyhow::Result<String> {
+    anyhow::bail!("PDF support disabled. Rebuild with --features pdf")
+}
+
+/// Stub: PDF page count not available without pdf feature.
+#[cfg(not(feature = "pdf"))]
+pub fn pdf_page_count(_path: String) -> anyhow::Result<i32> {
+    anyhow::bail!("PDF support disabled. Rebuild with --features pdf")
+}
+
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
@@ -627,53 +678,4 @@ pub fn parse_book_legacy(
         "mobi" | "azw3" | "prc" => parse_mobi(bytes, forced_encoding),
         _ => anyhow::bail!("Unsupported format: {}", format),
     }
-}
-
-/// Render a PDF page as a PNG thumbnail.
-#[cfg(feature = "pdf")]
-pub fn render_pdf_thumbnail(path: String, page_index: u16, width: u16) -> anyhow::Result<Vec<u8>> {
-    use pdfium_render::prelude::*;
-
-    let bindings = Pdfium::bind_to_system_library()
-        .map_err(|e| anyhow::anyhow!("Failed to bind PDFium: {}", e))?;
-    let pdfium = Pdfium::new(bindings);
-
-    let document = pdfium
-        .load_pdf_from_file(&path, None)
-        .map_err(|e| anyhow::anyhow!("Failed to load PDF: {}", e))?;
-
-    let page = document
-        .pages()
-        .get(page_index as i32)
-        .map_err(|e| anyhow::anyhow!("Failed to get page {}: {}", page_index, e))?;
-
-    let config = PdfRenderConfig::new()
-        .set_target_width(width as i32)
-        .render_form_data(true);
-
-    let bitmap = page
-        .render_with_config(&config)
-        .map_err(|e| anyhow::anyhow!("Failed to render page: {}", e))?;
-
-    let img = bitmap
-        .as_image()
-        .map_err(|e| anyhow::anyhow!("Failed to convert bitmap to image: {}", e))?;
-
-    let mut bytes = Vec::new();
-    img.write_to(
-        &mut std::io::Cursor::new(&mut bytes),
-        image::ImageFormat::Png,
-    )
-    .map_err(|e| anyhow::anyhow!("Failed to encode PNG: {}", e))?;
-
-    Ok(bytes)
-}
-
-#[cfg(not(feature = "pdf"))]
-pub fn render_pdf_thumbnail(
-    _path: String,
-    _page_index: u16,
-    _width: u16,
-) -> anyhow::Result<Vec<u8>> {
-    anyhow::bail!("PDF support is not enabled. Rebuild with --features pdf")
 }

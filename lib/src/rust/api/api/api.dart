@@ -114,6 +114,25 @@ Future<List<SearchMatch>> searchInBook({
   limit: limit,
 );
 
+/// Stub: PDF thumbnail not available without pdf feature.
+Future<Uint8List> renderPdfThumbnail({
+  required String path,
+  required BigInt pageIndex,
+  required BigInt maxWidth,
+}) => RustLib.instance.api.crateApiApiRenderPdfThumbnail(
+  path: path,
+  pageIndex: pageIndex,
+  maxWidth: maxWidth,
+);
+
+/// Stub: PDF text extraction not available without pdf feature.
+Future<String> extractPdfText({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractPdfText(path: path);
+
+/// Stub: PDF page count not available without pdf feature.
+Future<int> pdfPageCount({required String path}) =>
+    RustLib.instance.api.crateApiApiPdfPageCount(path: path);
+
 /// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
 /// Returns (needs_reparse, file_hash, file_size).
 Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
@@ -205,16 +224,6 @@ Future<NormalizedBook> parseBookLegacy({
   bytes: bytes,
   format: format,
   forcedEncoding: forcedEncoding,
-);
-
-Future<Uint8List> renderPdfThumbnail({
-  required String path,
-  required int pageIndex,
-  required int width,
-}) => RustLib.instance.api.crateApiApiRenderPdfThumbnail(
-  path: path,
-  pageIndex: pageIndex,
-  width: width,
 );
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Arc < BookEngine >>>
