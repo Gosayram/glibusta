@@ -738,6 +738,73 @@ fn test_mobi_golden_snapshot() {
     insta::assert_snapshot!("mobi_golden", snapshot.to_string());
 }
 
+// ---------------------------------------------------------------------------
+// DjVu tests — parse from embedded binary
+// ---------------------------------------------------------------------------
+
+/// Minimal 4×4 DjVu with no text layer (49 bytes)
+const MINIMAL_DJVU: &[u8] = &[
+    0x41, 0x54, 0x26, 0x54, 0x46, 0x4f, 0x52, 0x4d, 0x00, 0x00, 0x00, 0x20, 0x44, 0x4a, 0x56, 0x55,
+    0x49, 0x4e, 0x46, 0x4f, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x02, 0x00, 0x02, 0x18, 0x00, 0x2c, 0x01,
+    0x16, 0x01, 0x53, 0x6a, 0x62, 0x7a, 0x00, 0x00, 0x00, 0x02, 0xab, 0x7f,
+];
+
+/// 4×4 DjVu with "Hello World" text layer (88 bytes)
+const DJVU_WITH_TEXT: &[u8] = &[
+    0x41, 0x54, 0x26, 0x54, 0x46, 0x4f, 0x52, 0x4d, 0x00, 0x00, 0x00, 0x4c, 0x44, 0x4a, 0x56, 0x55,
+    0x49, 0x4e, 0x46, 0x4f, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x04, 0x00, 0x04, 0x18, 0x00, 0x2c, 0x01,
+    0x16, 0x01, 0x53, 0x6a, 0x62, 0x7a, 0x00, 0x00, 0x00, 0x07, 0x9b, 0x69, 0xe7, 0xba, 0xed, 0x93,
+    0x17, 0x00, 0x54, 0x58, 0x54, 0x7a, 0x00, 0x00, 0x00, 0x1e, 0xff, 0xff, 0xde, 0x88, 0xce, 0x6e,
+    0xd5, 0x2c, 0x80, 0x35, 0xfb, 0x4e, 0x14, 0xf9, 0xd7, 0x47, 0x14, 0x6e, 0x25, 0xf0, 0xfb, 0x3a,
+    0x67, 0xfa, 0x55, 0xde, 0xb2, 0x8e, 0xed, 0xbf,
+];
+
+#[test]
+fn test_djvu_page_count() {
+    assert_eq!(
+        glibusta_core::book::djvu::DjvuEngine::page_count(MINIMAL_DJVU).unwrap(),
+        1
+    );
+}
+
+#[test]
+fn test_djvu_extract_text_empty() {
+    let text = glibusta_core::book::djvu::DjvuEngine::extract_text(MINIMAL_DJVU).unwrap();
+    assert!(text.is_empty(), "DjVu without TXTz should produce no text");
+}
+
+#[test]
+fn test_djvu_extract_text() {
+    let text = glibusta_core::book::djvu::DjvuEngine::extract_text(DJVU_WITH_TEXT).unwrap();
+    assert_eq!(text.trim(), "Hello World");
+}
+
+#[test]
+fn test_djvu_render_page() {
+    let png =
+        glibusta_core::book::djvu::DjvuEngine::render_page_to_png(MINIMAL_DJVU, 0, 100).unwrap();
+    assert!(!png.is_empty(), "PNG output should not be empty");
+    assert_eq!(&png[..8], b"\x89PNG\r\n\x1a\n", "should be valid PNG");
+}
+
+#[test]
+fn test_djvu_parse_book() {
+    let book = glibusta_core::book::djvu::DjvuEngine::parse_djvu(MINIMAL_DJVU).unwrap();
+    assert_eq!(book.chapters.len(), 1, "should have 1 chapter");
+    assert_eq!(book.book_format, BookFormat::Djvu);
+}
+
+#[test]
+fn test_djvu_parse_book_with_text() {
+    let book = glibusta_core::book::djvu::DjvuEngine::parse_djvu(DJVU_WITH_TEXT).unwrap();
+    assert_eq!(book.chapters.len(), 1);
+    if let Some(block) = book.chapters[0].blocks.first() {
+        assert!(block.text.contains("Hello"), "text should contain 'Hello'");
+    } else {
+        panic!("expected at least one block");
+    }
+}
+
 #[test]
 fn test_taffy_layout() {
     let rects =
