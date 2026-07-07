@@ -91,7 +91,9 @@ pub(crate) fn flush_rich_span(
 /// Collapse whitespace + normalize typography (dashes, quotes, ellipsis).
 pub(crate) fn normalize_whitespace(text: &str) -> String {
     let mut result = String::with_capacity(text.len());
-    let mut prev_was_space = false;
+    let mut prev_was_space = true; // true → skip leading whitespace
+    let mut has_typo_chars = false;
+
     for ch in text.chars() {
         match ch {
             '\r' => continue,
@@ -102,12 +104,28 @@ pub(crate) fn normalize_whitespace(text: &str) -> String {
                 prev_was_space = true;
             }
             _ => {
-                result.push(ch);
                 prev_was_space = false;
+                if ch == '-' || ch == '.' || ch == '"' {
+                    has_typo_chars = true;
+                }
+                result.push(ch);
             }
         }
     }
-    normalize_typography(result.trim())
+
+    if result.is_empty() {
+        return result;
+    }
+
+    // Trim trailing whitespace
+    let trimmed_len = result.trim_end().len();
+    result.truncate(trimmed_len);
+
+    if has_typo_chars {
+        normalize_typography(&result)
+    } else {
+        result
+    }
 }
 
 /// Normalize Russian/English typography (single-pass):

@@ -350,13 +350,18 @@ fn push_rtf_paragraph(
     let text = if rich_spans.is_empty() {
         normalize_whitespace(span_text)
     } else {
-        normalize_whitespace(
-            &rich_spans
-                .iter()
-                .map(|s| s.text.as_str())
-                .collect::<Vec<_>>()
-                .join(""),
-        )
+        // rich_spans text is already normalized — concatenate directly
+        let cap: usize = rich_spans.iter().map(|s| s.text.len()).sum();
+        let mut combined = String::with_capacity(cap);
+        for s in rich_spans.iter() {
+            combined.push_str(&s.text);
+        }
+        let trimmed = combined.trim().to_string();
+        if trimmed.len() < combined.len() {
+            trimmed
+        } else {
+            combined
+        }
     };
     if !text.is_empty() || !rich_spans.is_empty() {
         blocks.push(ReaderBlock {

@@ -69,15 +69,12 @@ fn walk_children(
                     } else {
                         BlockType::Paragraph
                     };
-                    emit_block(
-                        blocks,
-                        index,
-                        text,
-                        bt,
-                        None,
-                        if rich.is_empty() { None } else { Some(rich) },
-                        None,
-                    );
+                    let rich = if rich.is_empty() || (rich.len() == 1 && rich[0].text == text) {
+                        None
+                    } else {
+                        Some(rich)
+                    };
+                    emit_block(blocks, index, text, bt, None, rich, None);
                 }
             }
             h_tag if is_heading(h_tag) && !in_list => {
@@ -231,11 +228,10 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
             }
         } else if let Some(sub) = ElementRef::wrap(child) {
             let tag = sub.value().name();
-            let text = collect_text(sub);
-            if text.is_empty() {
+            let t = collect_text(sub);
+            if t.is_empty() {
                 continue;
             }
-            let t = crate::book::normalize_typography(&text);
             match tag {
                 "b" | "strong" => spans.push(RichSpan {
                     text: t,
