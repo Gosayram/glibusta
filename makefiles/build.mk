@@ -100,6 +100,16 @@ bump-build: require-python ## Bump build number only: 0.1.5+3 → 0.1.5+4
 	echo "  $$NEW_VER"
 	@$(MAKE) rust-sync-version
 
+.PHONY: subset-fonts
+subset-fonts: ## Subset font files to reduce APK size (Cyrillic + Latin + punctuation only)
+	@$(PRINT_STEP) "Subsetting fonts (fonttools)"
+	@$(PYTHON_TOOLS_VENV)/bin/python $(SCRIPTS_DIR)/subset_fonts.py
+
+.PHONY: restore-fonts
+restore-fonts: ## Restore original fonts from git
+	@$(PRINT_STEP) "Restoring original fonts"
+	@git checkout assets/fonts/
+
 .PHONY: clean-artifacts
 clean-artifacts: ## Remove generated release artifacts
 	@$(PRINT_STEP) "Cleaning release artifacts"
@@ -153,7 +163,7 @@ macos-available: ## Verify macOS platform files exist
 	@test -d macos || { $(PRINT_ERROR) "macOS platform directory is missing"; exit 1; }
 
 .PHONY: build-android-apk
-build-android-apk: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
+build-android-apk: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release APK
 	@$(PRINT_STEP) "Building signed Android APK $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK)
 	@test -f "$(ANDROID_APK_SOURCE)" || { $(PRINT_ERROR) "APK not found: $(ANDROID_APK_SOURCE)"; exit 1; }
@@ -161,7 +171,7 @@ build-android-apk: clean-build rust-build-android bump-build require-flutter and
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
 .PHONY: build-android-apk-split
-build-android-apk-split: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
+build-android-apk-split: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
 	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK_SPLIT) || true
 	@for abi in arm64-v8a armeabi-v7a; do \
@@ -173,7 +183,7 @@ build-android-apk-split: clean-build rust-build-android bump-build require-flutt
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab
-build-android-aab: clean-build rust-build-android bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
+build-android-aab: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
 	@$(PRINT_STEP) "Building signed Android App Bundle $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_AAB)
 	@test -f "$(ANDROID_AAB_SOURCE)" || { $(PRINT_ERROR) "AAB not found: $(ANDROID_AAB_SOURCE)"; exit 1; }
@@ -193,7 +203,7 @@ sign-macos: macos-available ## Sign macOS app bundle with MACOS_CODESIGN_IDENTIT
 	@$(PRINT_OK) "macOS app signed"
 
 .PHONY: build-macos
-build-macos: clean-build bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS release zip
+build-macos: clean-build subset-fonts bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS release zip
 	@$(call REQUIRE_TOOL,$(DITTO))
 	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_MACOS)
