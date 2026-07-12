@@ -22,7 +22,7 @@ dependencies:
   dio: ^5.10.0
 
   # Background downloads
-  background_downloader: ^9.5.5
+  background_downloader: ^9.5.6
 
   # HTML parsing
   html: ^0.15.1
@@ -33,8 +33,8 @@ dependencies:
   intl: ^0.20.2
 
   # Local database
-  drift: ^2.34.0
-  drift_flutter: ^0.3.0
+  drift: ^2.34.1
+  drift_flutter: ^0.3.1
 
   # Models / serialization
   freezed_annotation: ^3.1.0
@@ -47,7 +47,7 @@ dependencies:
   receive_sharing_intent: ^1.9.0
 
   # Reader formats
-  pdfrx: ^2.4.4
+  pdfrx: ^2.4.7
   xml: ^7.0.1
   archive: ^4.0.0
 
@@ -116,15 +116,16 @@ dependencies:
   talker: ^5.1.17
 
   # --- Deep linking ---
-  app_links: ^7.2.0
+  app_links: ^7.2.1
   in_app_review: ^2.0.12
   upgrader: ^13.5.0
-  in_app_update: ^4.2.5
+  in_app_update: ^5.0.0
   flutter_displaymode: ^0.7.0
   super_clipboard: ^0.1.7+6
   powersync: ^2.3.1
 
   http: any
+  talker_flutter: ^5.1.17
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -132,7 +133,7 @@ dev_dependencies:
   riverpod_generator: ^4.0.4-dev.1
   freezed: ^3.2.5
   json_serializable: ^6.14.0
-  build_runner: ^2.15.0
+  build_runner: ^2.15.1
   drift_dev: ^2.34.0
   mocktail: ^1.0.4
   go_router_builder: ^4.3.0
