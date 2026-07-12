@@ -184,11 +184,31 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         }
     }
 
-    // CRT-1.14: include font-face declarations in metadata
-    let meta = if font_faces.is_empty() {
+    // LW-8.1: fixed-layout info + CRT-1.14: font-face declarations
+    let rendition_layout = metadata.get("rendition:layout");
+    let rendition_viewport = metadata.get("rendition:viewport");
+    let rendition_orientation = metadata.get("rendition:orientation");
+    let has_rendition = rendition_layout
+        .or(rendition_viewport)
+        .or(rendition_orientation)
+        .is_some();
+    let meta = if font_faces.is_empty() && !has_rendition {
         None
     } else {
-        Some(serde_json::json!({ "fonts": font_faces }))
+        let mut obj = serde_json::json!({});
+        if !font_faces.is_empty() {
+            obj["fonts"] = serde_json::json!(font_faces);
+        }
+        if let Some(layout) = rendition_layout {
+            obj["rendition:layout"] = serde_json::json!(layout);
+        }
+        if let Some(vp) = rendition_viewport {
+            obj["rendition:viewport"] = serde_json::json!(vp);
+        }
+        if let Some(orient) = rendition_orientation {
+            obj["rendition:orientation"] = serde_json::json!(orient);
+        }
+        Some(obj)
     };
 
     // ---- TOC extraction ----
@@ -352,6 +372,9 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     let mut in_dc_tag = false;
     let mut current_dc_tag = String::new();
     let mut current_text = String::new();
+    // LW-8.1: track rendition property name for <meta property="rendition:*">text</meta>
+    let mut in_rendition_meta = false;
+    let mut current_rendition_prop = String::new();
 
     loop {
         match reader.read_event() {
@@ -399,9 +422,25 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                             // Handle <meta name="cover" content="cover-id"/>
                             let name = get_xml_attr(e, b"name");
                             let content = get_xml_attr(e, b"content");
-                            if let (Some(n), Some(c)) = (name, content) {
+                            if let Some(ref n) = name {
                                 if n == "cover" {
-                                    metadata.insert("cover-id".to_string(), c);
+                                    if let Some(c) = &content {
+                                        metadata.insert("cover-id".to_string(), c.clone());
+                                    }
+                                }
+                            }
+                            // LW-8.1: EPUB3 rendition properties (<meta property="rendition:*">)
+                            let property = get_xml_attr(e, b"property");
+                            if let Some(ref prop) = property {
+                                if prop.starts_with("rendition:") {
+                                    if let Some(c) = content {
+                                        metadata.insert(prop.clone(), c);
+                                    } else {
+                                        // text content follows — track for End event
+                                        in_rendition_meta = true;
+                                        current_rendition_prop = prop.clone();
+                                        current_text.clear();
+                                    }
                                 }
                             }
                         }
@@ -441,8 +480,12 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                 }
             }
             Ok(Event::Text(ref e)) => {
+                let t = e.xml10_content().unwrap_or_default();
                 if in_dc_tag {
-                    current_text.push_str(&e.xml10_content().unwrap_or_default());
+                    current_text.push_str(&t);
+                }
+                if in_rendition_meta {
+                    current_text.push_str(&t);
                 }
             }
             Ok(Event::CData(ref e)) => {
@@ -450,10 +493,16 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                 if in_dc_tag {
                     current_text.push_str(&text);
                 }
+                if in_rendition_meta {
+                    current_text.push_str(&text);
+                }
             }
             Ok(Event::GeneralRef(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default();
                 if in_dc_tag {
+                    current_text.push_str(&text);
+                }
+                if in_rendition_meta {
                     current_text.push_str(&text);
                 }
             }
@@ -479,6 +528,16 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                             }
                             in_dc_tag = false;
                             current_dc_tag.clear();
+                            current_text.clear();
+                        }
+                        // LW-8.1: close rendition meta (text content collected)
+                        if in_rendition_meta && tag == "meta" {
+                            let val = current_text.trim().to_string();
+                            if !val.is_empty() {
+                                metadata.insert(current_rendition_prop.clone(), val);
+                            }
+                            in_rendition_meta = false;
+                            current_rendition_prop.clear();
                             current_text.clear();
                         }
                     }
@@ -524,6 +583,14 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                     if let (Some(n), Some(c)) = (name, content) {
                         if n == "cover" {
                             metadata.insert("cover-id".to_string(), c);
+                        }
+                    }
+                    // LW-8.1: self-closing rendition property
+                    let property = get_xml_attr(e, b"property");
+                    let value = get_xml_attr(e, b"content");
+                    if let (Some(ref prop), Some(c)) = (property, value) {
+                        if prop.starts_with("rendition:") {
+                            metadata.insert(prop.clone(), c);
                         }
                     }
                 }

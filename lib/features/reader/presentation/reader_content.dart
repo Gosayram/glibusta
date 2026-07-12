@@ -1147,6 +1147,12 @@ class ReaderContentBody extends StatefulWidget {
 class _ReaderContentBodyState extends State<ReaderContentBody> {
   bool _didScrollToProgress = false;
 
+  bool _isFixedLayout() {
+    final meta = widget.metadata.metadata;
+    if (meta == null) return false;
+    return meta['isFixedLayout'] == true || meta['rendition:layout'] == 'pre-paginated';
+  }
+
   @override
   void didUpdateWidget(covariant ReaderContentBody oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -1158,6 +1164,16 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   @override
   Widget build(BuildContext context) {
     final settings = widget.settings;
+    // LW-8.1: fixed-layout override — each spine item is a full page
+    if (_isFixedLayout()) {
+      return _FixedLayoutBody(
+        loadedChapters: widget.loadedChapters,
+        settings: settings,
+        initialPage: widget.initialPage,
+        onTap: widget.onTap,
+        onPageChanged: widget.onPageChanged,
+      );
+    }
     if (settings.mode == ReaderMode.paginated) {
       return _PaginatedContentBody(
         metadata: widget.metadata,
@@ -2313,6 +2329,117 @@ class _SmoothScrollBehavior extends ScrollBehavior {
       TargetPlatform.linux => const ClampingScrollPhysics(),
       TargetPlatform.iOS => const BouncingScrollPhysics(),
     };
+  }
+}
+
+/// LW-8.1: Fixed-layout EPUB — each spine item is a full-screen page.
+/// ponytail: image pages full-screen, text pages centered. No absolute
+/// positioning, no SVG — add when test corpus includes those features.
+class _FixedLayoutBody extends StatelessWidget {
+  const _FixedLayoutBody({
+    required this.loadedChapters,
+    required this.settings,
+    required this.initialPage,
+    this.onTap,
+    this.onPageChanged,
+  });
+
+  final Map<int, ReaderChapter> loadedChapters;
+  final ReaderSettings settings;
+  final int initialPage;
+  final void Function(TapUpDetails)? onTap;
+  final void Function(int page)? onPageChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return PageView.builder(
+      onPageChanged: onPageChanged,
+      itemCount: loadedChapters.length,
+      itemBuilder: (_, index) {
+        final chapter = loadedChapters[index];
+        if (chapter == null) return const SizedBox.shrink();
+
+        final imgBlocks = chapter.blocks
+            .where((b) => b.type == BlockType.image && b.imageUrl != null)
+            .toList();
+        if (imgBlocks.isNotEmpty) {
+          return _imagePage(imgBlocks.first.imageUrl!, context);
+        }
+        return _textPage(chapter, theme, context);
+      },
+    );
+  }
+
+  Widget _imagePage(String url, BuildContext context) {
+    return GestureDetector(
+      onTapUp: onTap,
+      child: InteractiveViewer(
+        child: Center(
+          child: _loadImage(url, BoxFit.contain),
+        ),
+      ),
+    );
+  }
+
+  Widget _textPage(ReaderChapter chapter, ThemeData theme, BuildContext context) {
+    final textColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black;
+    return GestureDetector(
+      onTapUp: onTap,
+      child: ColoredBox(
+        color: theme.scaffoldBackgroundColor,
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (chapter.title.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      chapter.title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                ...chapter.blocks.where((b) => b.text.isNotEmpty).map((b) {
+                  final style = b.type == BlockType.heading
+                      ? TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        )
+                      : TextStyle(fontSize: 14, color: textColor);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(b.text, style: style),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _loadImage(String url, BoxFit fit) {
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.scheme == 'data') {
+      final parts = url.split(',');
+      if (parts.length == 2) {
+        return Image.memory(base64Decode(parts.last), fit: fit);
+      }
+    }
+    if (uri != null && uri.scheme == 'file') {
+      return Image.file(File(uri.path), fit: fit);
+    }
+    if (uri == null || !uri.isAbsolute) return Image.file(File(url), fit: fit);
+    return const Icon(Icons.broken_image, size: 64, color: Colors.white);
   }
 }
 
