@@ -1080,11 +1080,12 @@ fn parse_xhtml_to_blocks(
         match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                let local_name = e.local_name();
+                let name = local_name.as_ref();
                 current_class = get_class_attr(e);
-                match tag.as_str() {
-                    "body" => in_body = true,
-                    "aside" if in_body => {
+                match name {
+                    b"body" => in_body = true,
+                    b"aside" if in_body => {
                         if attr_eq(e, b"epub:type", b"footnote") || attr_eq(e, b"type", b"footnote")
                         {
                             flush_block(
@@ -1104,7 +1105,7 @@ fn parse_xhtml_to_blocks(
                             href = None;
                         }
                     }
-                    "p" | "pre" if in_body => {
+                    b"p" | b"pre" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1126,7 +1127,7 @@ fn parse_xhtml_to_blocks(
                         rich_spans.clear();
                         span_text.clear();
                         in_block = true;
-                        in_pre = tag == "pre";
+                        in_pre = name == b"pre";
                         block_type = if blockquote_depth > 0 {
                             BlockType::Quote
                         } else {
@@ -1134,36 +1135,35 @@ fn parse_xhtml_to_blocks(
                         };
                         heading_level = None;
                     }
-                    t if t.starts_with('h') && t.len() == 2 && in_body => {
-                        if let Some(d) = t.as_bytes().get(1) {
-                            if d.is_ascii_digit() {
-                                flush_rich_span(
-                                    &mut rich_spans,
-                                    &mut span_text,
-                                    bold,
-                                    italic,
-                                    superscript,
-                                    &href,
-                                );
-                                flush_block(
-                                    &mut blocks,
-                                    &mut current_text,
-                                    &mut rich_spans,
-                                    &mut block_index,
-                                    block_type.clone(),
-                                    heading_level,
-                                    None,
-                                );
-                                current_text.clear();
-                                rich_spans.clear();
-                                span_text.clear();
-                                in_block = true;
-                                block_type = BlockType::Heading;
-                                heading_level = Some(*d as i32 - '0' as i32);
-                            }
+                    b if b.starts_with(b"h") && b.len() == 2 && in_body => {
+                        let digit = b[1];
+                        if digit.is_ascii_digit() {
+                            flush_rich_span(
+                                &mut rich_spans,
+                                &mut span_text,
+                                bold,
+                                italic,
+                                superscript,
+                                &href,
+                            );
+                            flush_block(
+                                &mut blocks,
+                                &mut current_text,
+                                &mut rich_spans,
+                                &mut block_index,
+                                block_type.clone(),
+                                heading_level,
+                                None,
+                            );
+                            current_text.clear();
+                            rich_spans.clear();
+                            span_text.clear();
+                            in_block = true;
+                            block_type = BlockType::Heading;
+                            heading_level = Some(digit as i32 - b'0' as i32);
                         }
                     }
-                    "blockquote" if in_body => {
+                    b"blockquote" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1189,7 +1189,7 @@ fn parse_xhtml_to_blocks(
                         heading_level = None;
                         blockquote_depth += 1;
                     }
-                    "table" if in_body => {
+                    b"table" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1213,14 +1213,14 @@ fn parse_xhtml_to_blocks(
                         in_table = true;
                         table_rows.clear();
                     }
-                    "tr" if in_table => {
+                    b"tr" if in_table => {
                         current_row.clear();
                     }
-                    "td" | "th" if in_table => {
+                    b"td" | b"th" if in_table => {
                         span_text.clear();
                         rich_spans.clear();
                     }
-                    "ul" if in_body => {
+                    b"ul" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1244,7 +1244,7 @@ fn parse_xhtml_to_blocks(
                         in_list = true;
                         list_items.clear();
                     }
-                    "ol" if in_body => {
+                    b"ol" if in_body => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1268,12 +1268,12 @@ fn parse_xhtml_to_blocks(
                         in_list = true;
                         list_items.clear();
                     }
-                    "li" if in_list => {
+                    b"li" if in_list => {
                         span_text.clear();
                         rich_spans.clear();
                     }
                     // Inline formatting tags
-                    "strong" | "b" if in_block => {
+                    b"strong" | b"b" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1284,7 +1284,7 @@ fn parse_xhtml_to_blocks(
                         );
                         bold = true;
                     }
-                    "em" | "i" if in_block => {
+                    b"em" | b"i" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1295,7 +1295,7 @@ fn parse_xhtml_to_blocks(
                         );
                         italic = true;
                     }
-                    "sup" if in_block => {
+                    b"sup" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1306,7 +1306,7 @@ fn parse_xhtml_to_blocks(
                         );
                         superscript = true;
                     }
-                    "a" if in_block => {
+                    b"a" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1318,7 +1318,7 @@ fn parse_xhtml_to_blocks(
                         href =
                             get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                     }
-                    "br" if in_block => {
+                    b"br" if in_block => {
                         span_text.push('\n');
                         current_text.push('\n');
                     }
@@ -1366,10 +1366,11 @@ fn parse_xhtml_to_blocks(
                 }
             }
             Ok(Event::End(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                match tag.as_str() {
-                    "body" => in_body = false,
-                    "aside" if in_block && block_type == BlockType::Footnote => {
+                let local_name = e.local_name();
+                let name = local_name.as_ref();
+                match name {
+                    b"body" => in_body = false,
+                    b"aside" if in_block && block_type == BlockType::Footnote => {
                         flush_block(
                             &mut blocks,
                             &mut current_text,
@@ -1385,7 +1386,7 @@ fn parse_xhtml_to_blocks(
                         in_block = false;
                         block_type = BlockType::Paragraph;
                     }
-                    "p" | "pre" if in_block && block_type == BlockType::Paragraph => {
+                    b"p" | b"pre" if in_block && block_type == BlockType::Paragraph => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1453,79 +1454,77 @@ fn parse_xhtml_to_blocks(
                         superscript = false;
                         href = None;
                     }
-                    t if t.starts_with('h')
-                        && t.len() == 2
+                    b if b.starts_with(b"h")
+                        && b.len() == 2
                         && in_block
                         && block_type == BlockType::Heading =>
                     {
-                        if let Some(d) = t.as_bytes().get(1) {
-                            if d.is_ascii_digit() {
-                                let expected_level = *d as i32 - '0' as i32;
-                                if heading_level == Some(expected_level) {
-                                    flush_rich_span(
-                                        &mut rich_spans,
-                                        &mut span_text,
-                                        bold,
-                                        italic,
-                                        superscript,
-                                        &href,
-                                    );
-                                    let t_text = current_text.trim().to_string();
-                                    if !t_text.is_empty() {
-                                        blocks.push(ReaderBlock {
-                                            index: block_index,
-                                            text: t_text,
-                                            block_type: BlockType::Heading,
-                                            image_url: None,
-                                            note_ref: None,
-                                            rich_spans: if rich_spans.is_empty() {
-                                                None
-                                            } else {
-                                                Some(rich_spans.clone())
-                                            },
-                                            heading_level,
-                                            ordered: None,
-                                            list_items: None,
-                                            table_rows: None,
-                                            image_alt: None,
-                                            text_indent: None,
-                                            text_align: None,
-                                            note_id: None,
-                                        });
-                                        if let Some(ref cls) = current_class {
-                                            if let Some(last) = blocks.last_mut() {
-                                                let htag =
-                                                    format!("h{}", heading_level.unwrap_or(1));
-                                                apply_css_props(last, &htag, Some(cls), css);
-                                            }
-                                            // MD-1.4: track page-break-before on headings
-                                            let htag = format!("h{}", heading_level.unwrap_or(1));
-                                            if css_has_page_break(css, &htag, Some(cls)) {
-                                                page_breaks.push(blocks.len());
-                                            }
+                        let digit = b[1];
+                        if digit.is_ascii_digit() {
+                            let expected_level = digit as i32 - b'0' as i32;
+                            if heading_level == Some(expected_level) {
+                                flush_rich_span(
+                                    &mut rich_spans,
+                                    &mut span_text,
+                                    bold,
+                                    italic,
+                                    superscript,
+                                    &href,
+                                );
+                                let t_text = current_text.trim().to_string();
+                                if !t_text.is_empty() {
+                                    blocks.push(ReaderBlock {
+                                        index: block_index,
+                                        text: t_text,
+                                        block_type: BlockType::Heading,
+                                        image_url: None,
+                                        note_ref: None,
+                                        rich_spans: if rich_spans.is_empty() {
+                                            None
                                         } else {
+                                            Some(rich_spans.clone())
+                                        },
+                                        heading_level,
+                                        ordered: None,
+                                        list_items: None,
+                                        table_rows: None,
+                                        image_alt: None,
+                                        text_indent: None,
+                                        text_align: None,
+                                        note_id: None,
+                                    });
+                                    if let Some(ref cls) = current_class {
+                                        if let Some(last) = blocks.last_mut() {
                                             let htag = format!("h{}", heading_level.unwrap_or(1));
-                                            if css_has_page_break(css, &htag, None) {
-                                                page_breaks.push(blocks.len());
-                                            }
+                                            apply_css_props(last, &htag, Some(cls), css);
                                         }
-                                        block_index += 1;
+                                        // MD-1.4: track page-break-before on headings
+                                        let htag = format!("h{}", heading_level.unwrap_or(1));
+                                        if css_has_page_break(css, &htag, Some(cls)) {
+                                            page_breaks.push(blocks.len());
+                                        }
+                                    } else {
+                                        let htag = format!("h{}", heading_level.unwrap_or(1));
+                                        if css_has_page_break(css, &htag, None) {
+                                            page_breaks.push(blocks.len());
+                                        }
                                     }
-                                    current_text.clear();
-                                    rich_spans.clear();
-                                    span_text.clear();
-                                    in_block = false;
-                                    in_pre = false;
-                                    bold = false;
-                                    italic = false;
-                                    superscript = false;
-                                    href = None;
-                                    blockquote_depth = (blockquote_depth - 1).max(0);
+                                    block_index += 1;
                                 }
+                                current_text.clear();
+                                rich_spans.clear();
+                                span_text.clear();
+                                in_block = false;
+                                in_pre = false;
+                                bold = false;
+                                italic = false;
+                                superscript = false;
+                                href = None;
+                                blockquote_depth = (blockquote_depth - 1).max(0);
                             }
                         }
                     }
-                    "blockquote" if in_block && block_type == BlockType::Quote => {
+                    b"blockquote" if in_block && block_type == BlockType::Quote => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1572,18 +1571,18 @@ fn parse_xhtml_to_blocks(
                         superscript = false;
                         href = None;
                     }
-                    "td" | "th" if in_table => {
+                    b"td" | b"th" if in_table => {
                         let t = span_text.trim().to_string();
                         current_row.push(t);
                         span_text.clear();
                     }
-                    "tr" if in_table => {
+                    b"tr" if in_table => {
                         if !current_row.is_empty() {
                             table_rows.push(current_row.clone());
                             current_row.clear();
                         }
                     }
-                    "table" if in_table => {
+                    b"table" if in_table => {
                         in_table = false;
                         if !table_rows.is_empty() {
                             let text = table_rows
@@ -1611,14 +1610,14 @@ fn parse_xhtml_to_blocks(
                             table_rows.clear();
                         }
                     }
-                    "li" if in_list => {
+                    b"li" if in_list => {
                         let t = span_text.trim().to_string();
                         if !t.is_empty() {
                             list_items.push(t);
                         }
                         span_text.clear();
                     }
-                    "ul" if in_list => {
+                    b"ul" if in_list => {
                         in_list = false;
                         if !list_items.is_empty() {
                             let text = list_items.join("\n");
@@ -1662,7 +1661,7 @@ fn parse_xhtml_to_blocks(
                             list_items.clear();
                         }
                     }
-                    "ol" if in_list => {
+                    b"ol" if in_list => {
                         in_list = false;
                         if !list_items.is_empty() {
                             let text = list_items.join("\n");
@@ -1707,7 +1706,7 @@ fn parse_xhtml_to_blocks(
                         }
                     }
                     // Inline formatting end tags
-                    "strong" | "b" if in_block => {
+                    b"strong" | b"b" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1718,7 +1717,7 @@ fn parse_xhtml_to_blocks(
                         );
                         bold = false;
                     }
-                    "em" | "i" if in_block => {
+                    b"em" | b"i" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1729,7 +1728,7 @@ fn parse_xhtml_to_blocks(
                         );
                         italic = false;
                     }
-                    "sup" if in_block => {
+                    b"sup" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1740,7 +1739,7 @@ fn parse_xhtml_to_blocks(
                         );
                         superscript = false;
                     }
-                    "a" if in_block => {
+                    b"a" if in_block => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -1755,8 +1754,9 @@ fn parse_xhtml_to_blocks(
                 }
             }
             Ok(Event::Empty(ref e)) => {
-                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "hr" && in_body {
+                let local_name = e.local_name();
+                let name = local_name.as_ref();
+                if name == b"hr" && in_body {
                     blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
@@ -1774,7 +1774,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                     });
                     block_index += 1;
-                } else if tag == "img" && in_body {
+                } else if name == b"img" && in_body {
                     let src = get_xml_attr(e, b"src");
                     let alt = get_xml_attr(e, b"alt");
                     blocks.push(ReaderBlock {
@@ -1794,7 +1794,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                     });
                     block_index += 1;
-                } else if tag == "image" && in_body {
+                } else if name == b"image" && in_body {
                     // CRT-1.15: SVG <image> tags — extract raster fallback from xlink:href or href
                     let src = get_xml_attr(e, b"xlink:href").or_else(|| get_xml_attr(e, b"href"));
                     if let Some(image_src) = src {
@@ -1816,13 +1816,13 @@ fn parse_xhtml_to_blocks(
                         });
                         block_index += 1;
                     }
-                } else if tag == "br" && in_body {
+                } else if name == b"br" && in_body {
                     if in_block {
                         span_text.push('\n');
                     } else {
                         current_text.push('\n');
                     }
-                } else if tag == "img" && in_block {
+                } else if name == b"img" && in_block {
                     // Inline image inside paragraph - treat as text placeholder
                     let src = get_xml_attr(e, b"src").unwrap_or_default();
                     span_text.push_str(&format!("[img:{}]", src));
