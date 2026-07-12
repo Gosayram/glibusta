@@ -218,6 +218,29 @@ miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires ni
 		$(PRINT_WARN) "Skipping Miri — install with: make miri-setup"; \
 	fi
 
+# ── Benchmark ──────────────────────────────────────────────────────────────────
+
+.PHONY: trace-startup
+trace-startup: require-flutter ## Build profile APK with --trace-startup and launch
+	@$(PRINT_STEP) "Building profile APK with startup tracing"
+	@$(FLUTTER) build apk --profile --target lib/main.dart --trace-startup 2>&1 | tee build/startup_trace.log
+	@if grep -q '"timeToFirstFrameMicros"' build/startup_trace.log 2>/dev/null; then \
+		$(PRINT_OK) "Startup trace logged in build/startup_trace.log"; \
+	else \
+		$(PRINT_WARN) "Install build/app/outputs/flutter-apk/app-profile.apk and launch manually"; \
+	fi
+
+.PHONY: benchmark
+benchmark: require-flutter ## Run integration benchmark on connected device
+	@$(PRINT_STEP) "Running benchmark trace"
+	@if [ -z "$$(adb devices 2>/dev/null | grep -v List | grep -v '^$$' | head -1)" ]; then \
+		$(PRINT_WARN) "No device connected — run with a device attached"; exit 1; \
+	fi
+	@$(FLUTTER) test integration_test/benchmark_test.dart --profile \
+		&& $(PRINT_OK) "Benchmark complete — trace in build/benchmark/"
+
+# ── Fix / Check ────────────────────────────────────────────────────────────────
+
 .PHONY: fix-all
 fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix miri-check ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
