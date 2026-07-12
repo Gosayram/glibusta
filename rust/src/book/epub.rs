@@ -2,13 +2,14 @@ use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan, TocEntry,
 };
 use crate::book::archive::{self, ZipFile};
-use crate::book::encoding::{attr_eq, decode_bytes, get_xml_attr};
+use crate::book::encoding::{attr_eq, decode_bytes, get_class_attr_arena, get_xml_attr};
 use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use bumpalo::Bump;
 use quick_xml::Reader;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::Event;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -1068,20 +1069,27 @@ fn css_has_page_break(
     tag: &str,
     class: Option<&str>,
 ) -> bool {
-    for props in css
-        .get(tag)
-        .into_iter()
-        .chain(css.get(&format!(".{}", class.unwrap_or(""))))
-    {
-        if let Some(val) = props
-            .get("page-break-before")
-            .or_else(|| props.get("break-before"))
-        {
-            let v = val.trim();
-            if v == "always" || v == "page" {
-                return true;
-            }
+    if let Some(props) = css.get(tag) {
+        if has_page_break_prop(props) {
+            return true;
         }
+    }
+    if let Some(cls) = class {
+        let class_sel = format!(".{}", cls);
+        if css.get(&class_sel).is_some_and(has_page_break_prop) {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_page_break_prop(props: &HashMap<String, String>) -> bool {
+    if let Some(val) = props
+        .get("page-break-before")
+        .or_else(|| props.get("break-before"))
+    {
+        let v = val.trim();
+        return v == "always" || v == "page";
     }
     false
 }
@@ -1105,21 +1113,12 @@ fn parse_css_length(value: &str) -> Option<f64> {
     }
 }
 
-/// Extract class attribute value from a quick-xml element.
-fn get_class_attr(e: &BytesStart<'_>) -> Option<String> {
-    for attr in e.attributes().flatten() {
-        if attr.key.local_name().as_ref() == b"class" {
-            return Some(String::from_utf8_lossy(&attr.value).to_string());
-        }
-    }
-    None
-}
-
 fn parse_xhtml_to_blocks(
     text: &str,
     mut block_index: i32,
     css: &HashMap<String, HashMap<String, String>>,
 ) -> (Vec<ReaderBlock>, i32, Vec<usize>) {
+    let arena = Bump::new();
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     reader.config_mut().allow_dangling_amp = true;
@@ -1132,7 +1131,7 @@ fn parse_xhtml_to_blocks(
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
     let mut blockquote_depth: i32 = 0;
-    let mut current_class: Option<String> = None;
+    let mut current_class: Option<&str> = None;
 
     // Rich span tracking
     let mut rich_spans: Vec<RichSpan> = Vec::new();
@@ -1151,13 +1150,16 @@ fn parse_xhtml_to_blocks(
     let mut in_list = false;
     let mut list_items: Vec<String> = Vec::new();
 
+    // Pre-computed heading tag names (avoid format!("h{}", level) on every heading)
+    const H_TAGS: [&str; 6] = ["h1", "h2", "h3", "h4", "h5", "h6"];
+
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
                 let local_name = e.local_name();
                 let name = local_name.as_ref();
-                current_class = get_class_attr(e);
+                current_class = get_class_attr_arena(e, &arena);
                 match name {
                     b"body" => in_body = true,
                     b"aside" if in_body => {
@@ -1502,7 +1504,7 @@ fn parse_xhtml_to_blocks(
                                 },
                                 note_id: None,
                             });
-                            if let Some(ref cls) = current_class {
+                            if let Some(cls) = current_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "p", Some(cls), css);
                                     apply_css_props(last, "pre", Some(cls), css);
@@ -1568,21 +1570,20 @@ fn parse_xhtml_to_blocks(
                                         text_align: None,
                                         note_id: None,
                                     });
-                                    if let Some(ref cls) = current_class {
+                                    let htag = match heading_level {
+                                        Some(lv @ 1..=6) => H_TAGS[(lv - 1) as usize],
+                                        _ => "h1",
+                                    };
+                                    if let Some(cls) = current_class {
                                         if let Some(last) = blocks.last_mut() {
-                                            let htag = format!("h{}", heading_level.unwrap_or(1));
-                                            apply_css_props(last, &htag, Some(cls), css);
+                                            apply_css_props(last, htag, Some(cls), css);
                                         }
                                         // MD-1.4: track page-break-before on headings
-                                        let htag = format!("h{}", heading_level.unwrap_or(1));
-                                        if css_has_page_break(css, &htag, Some(cls)) {
+                                        if css_has_page_break(css, htag, Some(cls)) {
                                             page_breaks.push(blocks.len());
                                         }
-                                    } else {
-                                        let htag = format!("h{}", heading_level.unwrap_or(1));
-                                        if css_has_page_break(css, &htag, None) {
-                                            page_breaks.push(blocks.len());
-                                        }
+                                    } else if css_has_page_break(css, htag, None) {
+                                        page_breaks.push(blocks.len());
                                     }
                                     block_index += 1;
                                 }
@@ -1630,7 +1631,7 @@ fn parse_xhtml_to_blocks(
                                 text_align: None,
                                 note_id: None,
                             });
-                            if let Some(ref cls) = current_class {
+                            if let Some(cls) = current_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "blockquote", Some(cls), css);
                                 }

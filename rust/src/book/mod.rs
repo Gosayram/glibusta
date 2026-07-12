@@ -47,15 +47,16 @@ pub(crate) fn pool_return_spans(mut spans: Vec<RichSpan>) {
 }
 
 /// Strip dangerous schemes from href (javascript:, vbscript:, data:).
+/// Single-pass: trim + case-insensitive scheme check, no intermediate alloc.
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     let trimmed = href.trim();
     if trimmed.is_empty() {
         return None;
     }
-    let lower = trimmed.to_ascii_lowercase();
-    if lower.starts_with("javascript:")
-        || lower.starts_with("vbscript:")
-        || lower.starts_with("data:")
+    let bytes = trimmed.as_bytes();
+    if (bytes.len() >= 11 && bytes[..11].eq_ignore_ascii_case(b"javascript:"))
+        || (bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"vbscript:"))
+        || (bytes.len() >= 5 && bytes[..5].eq_ignore_ascii_case(b"data:"))
     {
         return None;
     }
@@ -133,6 +134,10 @@ pub(crate) fn normalize_whitespace(text: &str) -> String {
 /// - "..." → "…"
 /// - Straight quotes "..." → «...» (Russian guillemets)
 pub(crate) fn normalize_typography(text: &str) -> String {
+    // Fast-path: no typographic characters → return as-is
+    if !text.bytes().any(|b| b == b'-' || b == b'.' || b == b'"') {
+        return text.to_string();
+    }
     let bytes = text.as_bytes();
     let mut result = String::with_capacity(bytes.len());
     let mut open_quote = true;
