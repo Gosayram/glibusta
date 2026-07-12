@@ -13,7 +13,7 @@ class GlibustaSyncConnector extends PowerSyncBackendConnector {
   final String? _token;
   final String? _userId;
 
-  const GlibustaSyncConnector({
+  GlibustaSyncConnector({
     String? endpoint,
     String? token,
     String? userId,

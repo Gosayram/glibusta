@@ -8,10 +8,10 @@ import '../sync/powersync_adapter.dart';
 import '../sync/powersync_connector.dart';
 import '../sync/sync_bridge.dart';
 
-/// STR-4: Orchestrates sync between Drift ↔ PowerSync ↔ Cloud.
+/// STR-4: Orchestrates sync between Drift, PowerSync, and Cloud.
 ///
-/// [initialize] sets up the background workmanager task.
-/// Connect via [provider] to enable PowerSync live sync.
+/// The static [initialize] sets up the background workmanager task.
+/// Connect via [connect] to enable PowerSync live sync.
 class SyncService {
   static const String _taskName = 'glibusta-sync';
   static bool _initialized = false;
@@ -75,7 +75,7 @@ class SyncService {
   // ---------------------------------------------------------------------------
 
   Stream<SyncStatus> get statusStream => _adapter.statusStream;
-  SyncStatus get currentStatus => _adapter.currentStatus;
+  SyncStatus? get currentStatus => _adapter.currentStatus;
   bool get isConnected => _adapter.isConnected;
 
   // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ class SyncService {
   Future<void> syncNow() async {
     AppLogger().info('Manual sync triggered', name: 'Sync');
     if (!_connector.isConfigured) {
-      AppLogger().warn(
+      AppLogger().warning(
         'SyncService: connector not configured, skipping sync.',
         name: 'Sync',
       );

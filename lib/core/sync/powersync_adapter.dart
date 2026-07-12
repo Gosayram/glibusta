@@ -22,7 +22,6 @@ class PowerSyncAdapter {
 
     final dir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(dir.path, 'glibusta', 'glibusta_sync.db');
-
     _db = PowerSyncDatabase(
       schema: PowerSyncSchemas.schema,
       path: dbPath,
@@ -73,13 +72,13 @@ class PowerSyncAdapter {
   }
 
   Stream<SyncStatus> get statusStream => _db?.statusStream ?? const Stream.empty();
-  SyncStatus get currentStatus => _db?.currentStatus ?? const SyncStatus(hasSynced: false);
+  SyncStatus? get currentStatus => _db?.currentStatus;
 
   Future<String?> _resolveEndpoint(PowerSyncBackendConnector connector) async {
     try {
       final creds = await connector.fetchCredentials();
       return creds?.endpoint;
-    } catch (_) {
+    } on Object catch (_) {
       return null;
     }
   }

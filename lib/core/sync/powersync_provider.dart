@@ -15,7 +15,7 @@ final powersyncAdapterProvider = Provider<PowerSyncAdapter>((ref) {
 /// Configurable backend connector — override via provider override in tests
 /// or to supply production credentials.
 final powersyncConnectorProvider = Provider<GlibustaSyncConnector>(
-  (ref) => const GlibustaSyncConnector(),
+  (ref) => GlibustaSyncConnector(),
 );
 
 /// Bridge that mirrors Drift writes into PowerSync.
