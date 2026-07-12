@@ -1694,7 +1694,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (cached != null) return cached;
 
     final settings = widget.settings;
-    final style = _getReaderStyle(settings);
     final chapter = widget.loadedChapters[chIdx];
     final pages = <_PageContent>[];
 
@@ -1716,7 +1715,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       final block = chapter.blocks[i];
       final cacheKey = Object.hash(block.text, block.type.index, settings.fontSize, contentWidth);
       final blockHeight = _heightCache.putIfAbsent(cacheKey, () {
-        return _estimateBlockHeight(block, settings, style, contentWidth);
+        return _estimateBlockHeight(block, settings, contentWidth);
       });
 
       if (currentHeight + blockHeight > availableHeight && i > pageStart) {
@@ -1728,7 +1727,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                   final k = Object.hash(b.text, b.type.index, settings.fontSize, contentWidth);
                   return sum +
                       _heightCache.putIfAbsent(k, () {
-                        return _estimateBlockHeight(b, settings, style, contentWidth);
+                        return _estimateBlockHeight(b, settings, contentWidth);
                       });
                 },
               )
@@ -1814,111 +1813,67 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     return pages;
   }
 
-  double _estimateBlockHeight(
-    ReaderBlock block,
-    ReaderSettings settings,
-    TextStyle style,
-    double width,
-  ) {
+  /// MD-2.1: Estimate block height using layout-engine measurement.
+  /// Now delegates to [_measureBlockHeight] for accurate rich-text + hyphenation.
+  double _estimateBlockHeight(ReaderBlock block, ReaderSettings settings, double width) {
     final ps = settings.paragraphSpacing;
+    final colors =
+        widget.customColors ??
+        ReaderColors.forThemeWithContext(
+          settings.theme,
+          MediaQuery.platformBrightnessOf(context),
+        );
+
     switch (block.type) {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
-        final scale = _headingScale(level);
         final spacing = _headingSpacing(ps, level);
-        return _measureTextHeight(
-              block.text,
-              settings.fontSize * scale,
-              settings.lineHeight,
-              width,
-            ) +
-            spacing +
-            ps;
+        final h = _measureBlockHeight(block, settings, colors, width);
+        return h + spacing + ps;
       case BlockType.subtitle:
-        return _measureTextHeight(block.text, settings.fontSize * 1.1, settings.lineHeight, width) +
-            ps * 3;
+        return _measureBlockHeight(block, settings, colors, width) + ps * 3;
       case BlockType.epigraph:
-        return _measureTextHeight(
-              block.text,
-              settings.fontSize * 0.95,
-              settings.lineHeight,
-              width - settings.margin,
-            ) +
-            ps * 2 +
-            24;
+        return _measureBlockHeight(block, settings, colors, width - settings.margin) + ps * 2 + 24;
       case BlockType.poem:
-        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 48) +
-            ps * 4;
+        return _measureBlockHeight(block, settings, colors, width - 48) + ps * 4;
       case BlockType.cite:
-        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 40) +
-            ps +
-            16;
+        return _measureBlockHeight(block, settings, colors, width - 40) + ps + 16;
       case BlockType.textAuthor:
-        return settings.fontSize * 0.9 * settings.lineHeight + ps;
+        return _measureBlockHeight(block, settings, colors, width) + ps;
       case BlockType.quote:
-        return _measureTextHeight(block.text, settings.fontSize, settings.lineHeight, width - 32) +
-            ps +
-            16;
+        return _measureBlockHeight(block, settings, colors, width - 32) + ps + 16;
       case BlockType.separator:
         return ps * 4;
       case BlockType.image:
         if (!settings.showImages) return 0;
         if (block.imageUrl == null || block.imageUrl!.isEmpty) {
-          return _measureTextHeight(
-                '[ image ]',
-                settings.fontSize * 0.85,
-                settings.lineHeight,
-                width,
-              ) +
-              ps;
+          return _measureBlockHeight(block, settings, colors, width) + ps;
         }
         final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
         final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
         if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {
-          return imgHeight +
-              _measureTextHeight(
-                block.imageCaption!,
-                settings.fontSize * 0.8,
-                settings.lineHeight,
-                width,
-              ) +
-              ps;
+          final capBlock = ReaderBlock(
+            text: block.imageCaption!,
+            index: block.index,
+          );
+          return imgHeight + _measureBlockHeight(capBlock, settings, colors, width) + ps;
         }
         return imgHeight;
       case BlockType.footnote:
-        return _measureTextHeight(
-              block.text,
-              settings.fontSize * 0.85,
-              settings.lineHeight,
-              width,
-            ) +
-            ps;
+        return _measureBlockHeight(block, settings, colors, width) + ps;
       case BlockType.table:
         final rows = block.tableRows?.length ?? 0;
         return (rows * settings.fontSize * settings.lineHeight * 1.3) + ps * 2 + 16;
       case BlockType.list:
         var totalHeight = ps + 8.0;
         for (final item in block.listItems ?? <ReaderBlock>[]) {
-          totalHeight +=
-              _measureTextHeight(item.text, settings.fontSize, settings.lineHeight, width - 32) + 4;
+          totalHeight += _measureBlockHeight(item, settings, colors, width - 32) + 4;
         }
         return totalHeight;
       case BlockType.listItem:
-        return _measureTextHeight(
-              '• ${block.text}',
-              settings.fontSize,
-              settings.lineHeight,
-              width - 32,
-            ) +
-            ps * 0.5;
+        return _measureBlockHeight(block, settings, colors, width - 32) + ps * 0.5;
       case BlockType.preformatted:
-        return _measureTextHeight(
-              block.text,
-              settings.fontSize * 0.9,
-              settings.lineHeight,
-              width,
-            ) +
-            ps;
+        return _measureBlockHeight(block, settings, colors, width) + ps;
       case BlockType.paragraph:
         final indent = switch (settings.paragraphIndentMode) {
           ParagraphIndentMode.asInBook when !settings.ignoreBookIndent => (block.textIndent ?? 0.0),
@@ -1930,33 +1885,96 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final bottomPad = settings.paragraphIndentMode == ParagraphIndentMode.emptyLine
             ? ps * 2
             : ps;
-        return _measureTextHeight(
-              block.text,
-              settings.fontSize,
-              settings.lineHeight,
+        return _measureBlockHeight(
+              block,
+              settings,
+              colors,
               width - indent,
+              firstLineIndent: indent,
             ) +
             bottomPad;
     }
   }
 
-  double _measureTextHeight(String text, double fontSize, double lineHeight, double maxWidth) {
-    if (text.isEmpty) return fontSize * lineHeight;
-    final s = widget.settings;
-    final colors =
-        widget.customColors ??
-        ReaderColors.forThemeWithContext(s.theme, MediaQuery.platformBrightnessOf(context));
+  /// MD-2.1: Measure block height matching actual render output.
+  /// Uses richSpans, locale (hyphenation), and text direction so pagination
+  /// matches what the Text widget produces.
+  double _measureBlockHeight(
+    ReaderBlock block,
+    ReaderSettings s,
+    ReaderColors colors,
+    double maxWidth, {
+    double firstLineIndent = 0,
+  }) {
+    final locale = s.hyphenation ? const Locale('ru') : null;
+    final dir = switch (s.textDirection) {
+      ReaderTextDirection.rtl => TextDirection.rtl,
+      _ => TextDirection.ltr,
+    };
+    TextSpan textSpan;
+
+    if (block.richSpans != null && block.richSpans!.isNotEmpty) {
+      final baseStyle = _readerTextStyle(s, colors);
+      final spans = _readerRichTextSpans(
+        block.richSpans!,
+        baseStyle,
+        colors.link,
+      );
+      if (firstLineIndent > 0) {
+        spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
+      }
+      textSpan = TextSpan(children: spans);
+    } else {
+      final fontSize = s.fontSize * _blockFontScale(block);
+      final textStyle = _readerTextStyle(s, colors).copyWith(
+        fontSize: fontSize,
+        height: s.lineHeight,
+      );
+      if (firstLineIndent > 0) {
+        textSpan = TextSpan(
+          children: [
+            WidgetSpan(child: SizedBox(width: firstLineIndent)),
+            TextSpan(text: block.text, style: textStyle),
+          ],
+        );
+      } else {
+        textSpan = TextSpan(text: block.text, style: textStyle);
+      }
+    }
+
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: _readerTextStyle(s, colors).copyWith(fontSize: fontSize, height: lineHeight),
-      ),
-      textDirection: TextDirection.ltr,
+      text: textSpan,
+      textDirection: dir,
+      locale: locale,
     );
     painter.layout(maxWidth: maxWidth);
     final height = painter.height;
     painter.dispose();
     return height;
+  }
+
+  double _blockFontScale(ReaderBlock block) {
+    if (block.type == BlockType.heading) {
+      final level = block.headingLevel ?? 2;
+      return switch (level) {
+        1 => 1.3,
+        2 => 1.2,
+        3 => 1.1,
+        _ => 1.0,
+      };
+    }
+    if (block.type == BlockType.subtitle) {
+      return 1.1;
+    }
+    if (block.type == BlockType.epigraph ||
+        block.type == BlockType.cite ||
+        block.type == BlockType.footnote) {
+      return 0.95;
+    }
+    if (block.type == BlockType.preformatted) {
+      return 0.9;
+    }
+    return 1.0;
   }
 
   Widget _buildPaginatedPage(int index, BuildContext context) {
