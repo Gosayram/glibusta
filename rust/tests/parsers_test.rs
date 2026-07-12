@@ -437,6 +437,7 @@ fn test_normalized_book_json_roundtrip() {
 // ---------------------------------------------------------------------------
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_fb2_golden_snapshot() {
     let book = glibusta_core::book::fb2::parse_fb2(MINIMAL_FB2.as_bytes(), None).unwrap();
     let snapshot = serde_json::json!({
@@ -453,6 +454,7 @@ fn test_fb2_golden_snapshot() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_txt_golden_snapshot() {
     let txt = "Первая строка\n\nВторая строка\n\nТретий абзац текста.";
     let book = glibusta_core::book::txt::parse_txt(txt.as_bytes(), None).unwrap();
@@ -467,6 +469,7 @@ fn test_txt_golden_snapshot() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_rtf_golden_snapshot() {
     let rtf = br"{\rtf1\ansi\deff0
 {\fonttbl {\f0 Times New Roman;}}
@@ -483,6 +486,7 @@ Hello, world!\par
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_epub_golden_snapshot() {
     let epub_bytes = create_minimal_epub();
     let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
@@ -500,6 +504,7 @@ fn test_epub_golden_snapshot() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_docx_golden_snapshot() {
     let docx_bytes = create_minimal_docx();
     let book = glibusta_core::book::docx::parse_docx(&docx_bytes, None).unwrap();
@@ -518,6 +523,7 @@ fn test_docx_golden_snapshot() {
 // ---------------------------------------------------------------------------
 
 #[test]
+#[cfg_attr(miri, ignore)] // timing tests are meaningless under Miri
 fn test_parse_metadata_under_300ms() {
     let epub_bytes = create_minimal_epub();
     let start = std::time::Instant::now();
@@ -533,6 +539,7 @@ fn test_parse_metadata_under_300ms() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // timing tests are meaningless under Miri
 fn test_fb2_parse_under_3s() {
     let start = std::time::Instant::now();
     for _ in 0..10 {
@@ -547,6 +554,7 @@ fn test_fb2_parse_under_3s() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // timing tests are meaningless under Miri
 fn test_parse_toc_under_500ms() {
     let epub_bytes = create_minimal_epub();
     let start = std::time::Instant::now();
@@ -562,6 +570,7 @@ fn test_parse_toc_under_500ms() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // timing tests are meaningless under Miri
 fn test_parse_chapter_under_200ms() {
     let epub_bytes = create_minimal_epub();
     let start = std::time::Instant::now();
@@ -726,6 +735,7 @@ fn test_mobi_basic_parse() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // insta uses fork() which Miri doesn't support
 fn test_mobi_golden_snapshot() {
     let mobi_bytes = create_minimal_mobi();
     let book = glibusta_core::book::mobi::parse_mobi(&mobi_bytes, None).unwrap();
@@ -780,6 +790,7 @@ fn test_djvu_extract_text() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // zlib-rs flate2 dealloc UB in dependency
 fn test_djvu_render_page() {
     let png =
         glibusta_core::book::djvu::DjvuEngine::render_page_to_png(MINIMAL_DJVU, 0, 100).unwrap();

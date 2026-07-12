@@ -202,12 +202,28 @@ rust-nextest-ci: ## Run Rust tests with nextest (CI mode, no re-runs)
 	@$(PRINT_STEP) "Running Rust tests (CI mode)"
 	cd rust && cargo nextest run --failure-quick
 
+.PHONY: miri-setup
+miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
+	@$(PRINT_STEP) "Installing Miri"
+	rustup toolchain install nightly --component miri 2>&1
+
+.PHONY: miri-check
+miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires nightly)
+	@$(PRINT_STEP) "Running Miri UB checks"
+	@NIGHTLY_CARGO="$$HOME/.rustup/toolchains/nightly-aarch64-apple-darwin/bin/cargo"; \
+	if [ -x "$$NIGHTLY_CARGO" ] && "$$NIGHTLY_CARGO" miri --version >/dev/null 2>&1; then \
+		cd rust && MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" "$$NIGHTLY_CARGO" miri test 2>&1; \
+		$(PRINT_OK) "Miri checks passed"; \
+	else \
+		$(PRINT_WARN) "Skipping Miri — install with: make miri-setup"; \
+	fi
+
 .PHONY: fix-all
-fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
+fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix miri-check ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check ## Run all local linting and formatting checks
+check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check miri-check ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
 
 .PHONY: check

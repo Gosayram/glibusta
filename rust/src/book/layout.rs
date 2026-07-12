@@ -34,8 +34,8 @@ pub fn compute_vertical_layout(
                 margin: Rect {
                     top: length(gaps),
                     bottom: length(gaps),
-                    left: length(0.0),
-                    right: length(0.0),
+                    left: length(0.0_f32),
+                    right: length(0.0_f32),
                 },
                 ..Default::default()
             })

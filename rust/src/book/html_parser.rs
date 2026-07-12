@@ -1,5 +1,6 @@
 use crate::api::models::{BlockType, ReaderBlock, RichSpan};
 use scraper::{ElementRef, Html, Selector};
+use smallvec::SmallVec;
 
 /// Parse HTML content into ReaderBlocks using html5ever + scraper.
 ///
@@ -72,7 +73,7 @@ fn walk_children(
                     let rich = if rich.is_empty() || (rich.len() == 1 && rich[0].text == text) {
                         None
                     } else {
-                        Some(rich)
+                        Some(rich.into_vec())
                     };
                     emit_block(blocks, index, text, bt, None, rich, None);
                 }
@@ -211,8 +212,9 @@ fn collect_text(el: ElementRef<'_>) -> String {
 }
 
 /// Collect inline formatting (b, i, sup, a) from direct children only.
-fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
-    let mut spans = Vec::new();
+/// ponytail: SmallVec avoids heap allocation for common 1-2 span case.
+fn collect_rich_spans(el: ElementRef<'_>) -> SmallVec<[RichSpan; 4]> {
+    let mut spans = SmallVec::new();
     for child in el.children() {
         if let Some(t) = child.value().as_text() {
             let text = t.trim();

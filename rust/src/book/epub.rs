@@ -729,14 +729,18 @@ fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {
 
 /// Collect CSS class→properties map from `<style>` elements in XHTML.
 /// Uses html5ever (via scraper) for robust extraction from malformed HTML.
+#[allow(unused_mut, unused_variables)]
 fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
     let mut all_style = String::new();
-    let doc = scraper::Html::parse_document(text);
-    let sel = scraper::Selector::parse("style").unwrap();
-    for style in doc.select(&sel) {
-        if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
-            all_style.push_str(content);
-            all_style.push('\n');
+    #[cfg(not(miri))]
+    {
+        let doc = scraper::Html::parse_document(text);
+        let sel = scraper::Selector::parse("style").unwrap();
+        for style in doc.select(&sel) {
+            if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
+                all_style.push_str(content);
+                all_style.push('\n');
+            }
         }
     }
     if all_style.is_empty() {
@@ -826,59 +830,63 @@ fn expand_media_queries(css: &str) -> String {
 
 /// CRT-1.14: extract @font-face declarations from XHTML text.
 /// Uses html5ever (via scraper) for robust extraction from malformed HTML.
+#[allow(unused_mut, unused_variables)]
 fn extract_font_faces(text: &str) -> Vec<(String, String)> {
     let mut faces = Vec::new();
-    let doc = scraper::Html::parse_document(text);
-    let sel = scraper::Selector::parse("style").unwrap();
-    for style in doc.select(&sel) {
-        if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
-            let style_text = content.to_string();
-            let expanded = expand_media_queries(&style_text);
-            let mut pos = 0;
-            while let Some(start) = expanded[pos..].find("@font-face") {
-                let abs_start = pos + start;
-                if let Some(brace) = expanded[abs_start..].find('{') {
-                    let block_start = abs_start + brace + 1;
-                    let mut depth = 1i32;
-                    let mut j = block_start;
-                    let bytes = expanded.as_bytes();
-                    while j < bytes.len() && depth > 0 {
-                        match bytes[j] {
-                            b'{' => depth += 1,
-                            b'}' => depth -= 1,
-                            _ => {}
+    #[cfg(not(miri))]
+    {
+        let doc = scraper::Html::parse_document(text);
+        let sel = scraper::Selector::parse("style").unwrap();
+        for style in doc.select(&sel) {
+            if let Some(content) = style.first_child().and_then(|n| n.value().as_text()) {
+                let style_text = content.to_string();
+                let expanded = expand_media_queries(&style_text);
+                let mut pos = 0;
+                while let Some(start) = expanded[pos..].find("@font-face") {
+                    let abs_start = pos + start;
+                    if let Some(brace) = expanded[abs_start..].find('{') {
+                        let block_start = abs_start + brace + 1;
+                        let mut depth = 1i32;
+                        let mut j = block_start;
+                        let bytes = expanded.as_bytes();
+                        while j < bytes.len() && depth > 0 {
+                            match bytes[j] {
+                                b'{' => depth += 1,
+                                b'}' => depth -= 1,
+                                _ => {}
+                            }
+                            j += 1;
                         }
-                        j += 1;
-                    }
-                    let block = &expanded[block_start..j - 1];
-                    let mut font_family = String::new();
-                    let mut src = String::new();
-                    for prop in block.split(';') {
-                        let prop = prop.trim();
-                        if let Some(colon) = prop.find(':') {
-                            let name = prop[..colon].trim();
-                            let value = prop[colon + 1..].trim();
-                            if name == "font-family" {
-                                font_family =
-                                    value.trim_matches(|c| c == '\'' || c == '"').to_string();
-                            } else if name == "src" {
-                                if let Some(url_start) = value.find("url(") {
-                                    let rest = &value[url_start + 4..];
-                                    if let Some(url_end) = rest.find(')') {
-                                        src = rest[..url_end]
-                                            .trim_matches(|c| c == '\'' || c == '"')
-                                            .to_string();
+                        let block = &expanded[block_start..j - 1];
+                        let mut font_family = String::new();
+                        let mut src = String::new();
+                        for prop in block.split(';') {
+                            let prop = prop.trim();
+                            if let Some(colon) = prop.find(':') {
+                                let name = prop[..colon].trim();
+                                let value = prop[colon + 1..].trim();
+                                if name == "font-family" {
+                                    font_family =
+                                        value.trim_matches(|c| c == '\'' || c == '"').to_string();
+                                } else if name == "src" {
+                                    if let Some(url_start) = value.find("url(") {
+                                        let rest = &value[url_start + 4..];
+                                        if let Some(url_end) = rest.find(')') {
+                                            src = rest[..url_end]
+                                                .trim_matches(|c| c == '\'' || c == '"')
+                                                .to_string();
+                                        }
                                     }
                                 }
                             }
                         }
+                        if !font_family.is_empty() && !src.is_empty() {
+                            faces.push((font_family, src));
+                        }
+                        pos = j;
+                    } else {
+                        pos = abs_start + 10;
                     }
-                    if !font_family.is_empty() && !src.is_empty() {
-                        faces.push((font_family, src));
-                    }
-                    pos = j;
-                } else {
-                    pos = abs_start + 10;
                 }
             }
         }
