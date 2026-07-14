@@ -23,11 +23,7 @@ class StorageBridgeImpl implements StorageBridge {
 
   @override
   Future<int> countBooks(String folderUri) async {
-    try {
-      return await _channel.invokeMethod<int>('countBooks', {'uri': folderUri}) ?? 0;
-    } on PlatformException {
-      return 0;
-    }
+    return await _channel.invokeMethod<int>('countBooks', {'uri': folderUri}) ?? 0;
   }
 
   @override

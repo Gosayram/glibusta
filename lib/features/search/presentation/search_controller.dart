@@ -121,7 +121,16 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: bookError != null && bookResult.books.isEmpty ? bookError.toString() : null,
       );
       if (bookResult.books.isNotEmpty || authorResult.authors.isNotEmpty) {
-        await _rememberSearch(normalized);
+        try {
+          await _rememberSearch(normalized);
+        } on Object catch (e, st) {
+          _logger.warning(
+            'Failed to save search history: $e',
+            name: 'Search',
+            error: e,
+            st: st,
+          );
+        }
       }
     } on Object catch (e, st) {
       if (!_isCurrentRequest(generation)) return;

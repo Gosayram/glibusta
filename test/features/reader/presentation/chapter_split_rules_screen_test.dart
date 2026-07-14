@@ -36,4 +36,24 @@ void main() {
     );
     expect(find.text('Saved custom rule'), findsOneWidget);
   });
+
+  testWidgets('rejects an invalid custom regular expression', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(home: ChapterSplitRulesScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).at(1), 'Invalid rule');
+    await tester.enterText(find.byType(TextField).at(2), '[');
+    await tester.tap(find.text('Add'));
+    await tester.pump();
+
+    expect(find.text('Add Custom Rule'), findsOneWidget);
+    expect(find.text('Pattern is not a valid regular expression'), findsOneWidget);
+  });
 }

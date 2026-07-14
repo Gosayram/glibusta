@@ -57,6 +57,25 @@ void main() {
 
     expect(container.read(searchControllerProvider).history, ['repeated', 'other']);
   });
+
+  test('keeps successful results when saving search history fails', () async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    await database.close();
+    final container = ProviderContainer(
+      overrides: [
+        bookSourceProvider.overrideWithValue(_SuccessfulBookSource()),
+        databaseProvider.overrideWithValue(database),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(searchControllerProvider.notifier).search('query');
+
+    final state = container.read(searchControllerProvider);
+    expect(state.books, isNotEmpty);
+    expect(state.error, isNull);
+    expect(state.isLoading, isFalse);
+  });
 }
 
 class _DelayedFailingBookSource extends BookSource {

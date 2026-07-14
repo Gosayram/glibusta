@@ -177,15 +177,22 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
             FilledButton(
               onPressed: () {
                 if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                  _service.addRule(
-                    ChapterSplitRule(
-                      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-                      name: nameController.text,
-                      pattern: patternController.text,
-                    ),
-                  );
-                  Navigator.pop(ctx);
-                  setState(() {});
+                  try {
+                    RegExp(patternController.text);
+                    _service.addRule(
+                      ChapterSplitRule(
+                        id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                        name: nameController.text,
+                        pattern: patternController.text,
+                      ),
+                    );
+                    Navigator.pop(ctx);
+                    setState(() {});
+                  } on FormatException {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Pattern is not a valid regular expression')),
+                    );
+                  }
                 }
               },
               child: const Text('Add'),
@@ -232,16 +239,23 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
             FilledButton(
               onPressed: () {
                 if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                  _service.updateRule(
-                    ChapterSplitRule(
-                      id: rule.id,
-                      name: nameController.text,
-                      pattern: patternController.text,
-                      isPreset: rule.isPreset,
-                    ),
-                  );
-                  Navigator.pop(ctx);
-                  setState(() {});
+                  try {
+                    RegExp(patternController.text);
+                    _service.updateRule(
+                      ChapterSplitRule(
+                        id: rule.id,
+                        name: nameController.text,
+                        pattern: patternController.text,
+                        isPreset: rule.isPreset,
+                      ),
+                    );
+                    Navigator.pop(ctx);
+                    setState(() {});
+                  } on FormatException {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Pattern is not a valid regular expression')),
+                    );
+                  }
                 }
               },
               child: const Text('Save'),

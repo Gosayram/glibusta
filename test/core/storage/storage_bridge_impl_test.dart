@@ -23,4 +23,20 @@ void main() {
 
     expect(count, 42);
   });
+
+  test('countBooks surfaces native failures to the folder settings flow', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async => throw PlatformException(code: 'SCAN_ERROR'),
+    );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+
+    await expectLater(
+      StorageBridgeImpl().countBooks('content://tree/library'),
+      throwsA(isA<PlatformException>()),
+    );
+  });
 }

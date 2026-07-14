@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -274,35 +274,52 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private fun copyToCache(fileUri: Uri, result: MethodChannel.Result) {
-        var tempFile: java.io.File? = null
-        try {
-            tempFile = java.io.File.createTempFile("saf_", ".tmp", cacheDir)
-            val input = contentResolver.openInputStream(fileUri)
-                ?: run {
-                    tempFile.delete()
-                    result.error("READ_ERROR", "Cannot open file", null)
-                    return
-                }
-            input.use { ins ->
-                tempFile.outputStream().use { out ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var copiedBytes = 0L
-                    while (true) {
-                        val read = ins.read(buffer)
-                        if (read < 0) break
-                        copiedBytes += read
-                        if (copiedBytes > maxImportFileBytes) {
-                            throw IllegalArgumentException("File exceeds the 500 MiB import limit")
+        lifecycleScope.launch(Dispatchers.IO) {
+            var tempFile: java.io.File? = null
+            try {
+                tempFile = java.io.File.createTempFile("saf_", cacheFileSuffix(fileUri), cacheDir)
+                val input = contentResolver.openInputStream(fileUri)
+                    ?: throw IllegalStateException("Cannot open file")
+                input.use { ins ->
+                    tempFile.outputStream().use { out ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var copiedBytes = 0L
+                        while (true) {
+                            val read = ins.read(buffer)
+                            if (read < 0) break
+                            copiedBytes += read
+                            if (copiedBytes > maxImportFileBytes) {
+                                throw IllegalArgumentException("File exceeds the 500 MiB import limit")
+                            }
+                            out.write(buffer, 0, read)
                         }
-                        out.write(buffer, 0, read)
                     }
                 }
+                withContext(Dispatchers.Main) {
+                    result.success(tempFile.absolutePath)
+                }
+            } catch (e: Exception) {
+                tempFile?.delete()
+                withContext(Dispatchers.Main) {
+                    result.error("READ_ERROR", e.message, null)
+                }
             }
-            result.success(tempFile.absolutePath)
-        } catch (e: Exception) {
-            tempFile?.delete()
-            result.error("READ_ERROR", e.message, null)
         }
+    }
+
+    private fun cacheFileSuffix(fileUri: Uri): String {
+        val displayName = contentResolver.query(
+            fileUri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
+        }
+        val extension = displayName?.substringAfterLast('.', "").orEmpty()
+        return extension.takeIf(String::isNotBlank)?.let { ".${it}" } ?: ".tmp"
     }
 
     private fun hasStoragePermission(): Boolean {
