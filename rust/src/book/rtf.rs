@@ -60,7 +60,23 @@ fn detect_rtf_encoding(bytes: &[u8]) -> &str {
             }
         }
     }
+    if has_rtf_control_word(head, b"\\mac") {
+        return "macintosh";
+    }
     "windows-1252"
+}
+
+fn has_rtf_control_word(bytes: &[u8], control_word: &[u8]) -> bool {
+    bytes
+        .windows(control_word.len())
+        .enumerate()
+        .any(|(index, word)| {
+            word == control_word
+                && match bytes.get(index + control_word.len()) {
+                    Some(next) => !next.is_ascii_alphabetic(),
+                    None => true,
+                }
+        })
 }
 
 fn codepage_to_encoding(cp: u16) -> &'static str {
@@ -483,6 +499,13 @@ mod tests {
             .expect("parse Windows-1251 RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Привет");
+    }
+
+    #[test]
+    fn decodes_mac_roman_documents() {
+        let book = parse_rtf(b"{\\rtf1\\mac Caf\x8e}", None).expect("parse MacRoman RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Café");
     }
 
     #[test]

@@ -33,7 +33,11 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         decode_text(bytes, encoding)?
     };
 
-    let paragraphs = split_paragraphs(&text);
+    // `decode_without_bom_handling` intentionally preserves a BOM. It is an
+    // encoding marker, not book content, so never expose it in the title or
+    // first reader block.
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let paragraphs = split_paragraphs(text);
 
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     for (i, paragraph) in paragraphs.into_iter().enumerate() {
@@ -269,5 +273,20 @@ mod tests {
 
         assert_eq!(book.chapters.len(), 2);
         assert_eq!(book.chapters[1].title, "Chapter 1");
+    }
+
+    #[test]
+    fn strips_utf8_bom_from_the_first_paragraph() {
+        let book = parse_txt(b"\xEF\xBB\xBFBOM title\n\nBody", None).expect("parse BOM TXT");
+
+        assert_eq!(book.title, "BOM title");
+        assert!(!book.chapters[0].blocks[0].text.starts_with('\u{feff}'));
+    }
+
+    #[test]
+    fn auto_detects_cp866_text() {
+        let book = parse_txt(b"\x8f\xe0\xa8\xa2\xa5\xe2", None).expect("parse CP866 TXT");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет");
     }
 }

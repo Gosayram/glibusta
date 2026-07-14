@@ -7,7 +7,7 @@ use crate::book::encoding::{attr_eq, get_xml_attr};
 use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > MAX_FILE_SIZE {
@@ -65,6 +65,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_subtitle = false;
     let mut in_epigraph = false;
     let mut in_image = false;
+    let mut current_image_ref: Option<String> = None;
     let mut in_empty_line = false;
     let mut in_coverpage = false;
     let mut in_binary = false;
@@ -92,9 +93,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut current_span_href: Option<String> = None;
     let mut section_depth = 0i32;
     let mut current_binary_id: Option<String> = None;
+    let mut current_binary_media_type: Option<String> = None;
+    let mut cover_media_type: Option<String> = None;
 
     // Collect all binary data for inline images
     let mut binaries: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut binary_media_types: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     loop {
         match reader.read_event() {
@@ -116,6 +121,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     b"coverpage" => in_coverpage = true,
                     b"binary" => {
                         let binary_id = get_xml_attr(e, b"id").unwrap_or_default();
+                        current_binary_media_type = get_xml_attr(e, b"content-type");
                         if binary_id.starts_with("cover") && cover_data.is_none() {
                             in_binary = true;
                             current_binary_id = Some(binary_id);
@@ -153,7 +159,10 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     b"subtitle" if in_body => in_subtitle = true,
                     b"epigraph" if in_body => in_epigraph = true,
                     b"empty-line" if in_body => in_empty_line = true,
-                    b"image" if in_body && !in_coverpage => in_image = true,
+                    b"image" if in_body && !in_coverpage => {
+                        in_image = true;
+                        current_image_ref = get_fb2_href(e);
+                    }
                     b"text-author" if in_body => in_text_author = true,
                     b"poem" if in_body => in_poem = true,
                     b"stanza" if in_body && in_poem => {
@@ -356,12 +365,17 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         if let Some(ref id) = current_binary_id {
                             if id.starts_with("cover") && cover_data.is_none() {
                                 cover_data = Some(current_text.trim().to_string());
+                                cover_media_type = current_binary_media_type.clone();
                             }
                             binaries.insert(id.clone(), current_text.trim().to_string());
+                            if let Some(media_type) = current_binary_media_type.clone() {
+                                binary_media_types.insert(id.clone(), media_type);
+                            }
                         }
                     }
                     in_binary = false;
                     current_binary_id = None;
+                    current_binary_media_type = None;
                     current_text.clear();
                 }
                 b"body" => {
@@ -609,17 +623,16 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     in_empty_line = false;
                 }
                 b"image" if in_body && !in_coverpage => {
-                    let image_ref = current_text.trim().to_string();
+                    let image_ref = current_image_ref
+                        .take()
+                        .unwrap_or_else(|| current_text.trim().to_string());
                     current_text.clear();
                     let key = image_ref.trim_start_matches('#').to_string();
-                    let image_url = binaries
-                        .get(&key)
-                        .map(|d| format!("data:image/jpeg;base64,{}", d));
                     body_blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
                         block_type: BlockType::Image,
-                        image_url,
+                        image_url: fb2_binary_reference(&key),
                         note_ref: None,
                         rich_spans: None,
                         heading_level: None,
@@ -701,18 +714,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     block_index += 1;
                 }
                 b"image" if in_body && !in_coverpage => {
-                    let href = get_xml_attr(e, b"l:href")
-                        .or_else(|| get_xml_attr(e, b"href"))
-                        .unwrap_or_default();
+                    let href = get_fb2_href(e).unwrap_or_default();
                     let key = href.trim_start_matches('#').to_string();
-                    let image_url = binaries
-                        .get(&key)
-                        .map(|d| format!("data:image/jpeg;base64,{}", d));
                     body_blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
                         block_type: BlockType::Image,
-                        image_url,
+                        image_url: fb2_binary_reference(&key),
                         note_ref: None,
                         rich_spans: None,
                         heading_level: None,
@@ -735,9 +743,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         }
     }
 
-    let cover_url = cover_data.map(|d| format!("data:image/jpeg;base64,{}", d));
+    let cover_url = cover_data.map(|data| binary_data_uri(&data, cover_media_type.as_ref()));
 
-    let chapters = if !chapters_blocks.is_empty() {
+    let mut chapters = if !chapters_blocks.is_empty() {
         // Sections were found — build chapters from them
         if !body_blocks.is_empty() {
             // Preamble before first section
@@ -773,6 +781,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             blocks: body_blocks,
         }]
     };
+    resolve_fb2_binary_references(&mut chapters, &binaries, &binary_media_types);
 
     let id = crate::book::sha256_hex(bytes);
 
@@ -796,6 +805,54 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+fn binary_data_uri(data: &str, declared_media_type: Option<&String>) -> String {
+    let media_type = declared_media_type
+        .map(|value| value.trim().to_ascii_lowercase())
+        .and_then(|value| match value.as_str() {
+            "image/jpeg" | "image/png" | "image/gif" | "image/webp" | "image/bmp"
+            | "image/tiff" => Some(value),
+            _ => None,
+        })
+        .unwrap_or_else(|| "image/jpeg".to_string());
+    format!("data:{media_type};base64,{data}")
+}
+
+const FB2_BINARY_REFERENCE_PREFIX: &str = "fb2-binary:";
+
+fn fb2_binary_reference(key: &str) -> Option<String> {
+    (!key.is_empty()).then(|| format!("{FB2_BINARY_REFERENCE_PREFIX}{key}"))
+}
+
+/// Binary nodes are valid after the body in FB2, so image references are
+/// resolved only once the complete XML document has been read.
+fn resolve_fb2_binary_references(
+    chapters: &mut [ReaderChapter],
+    binaries: &std::collections::HashMap<String, String>,
+    binary_media_types: &std::collections::HashMap<String, String>,
+) {
+    for block in chapters.iter_mut().flat_map(|chapter| &mut chapter.blocks) {
+        let Some(reference) = block.image_url.as_deref() else {
+            continue;
+        };
+        let Some(key) = reference.strip_prefix(FB2_BINARY_REFERENCE_PREFIX) else {
+            continue;
+        };
+        block.image_url = binaries
+            .get(key)
+            .map(|data| binary_data_uri(data, binary_media_types.get(key)));
+    }
+}
+
+/// XML namespace prefixes are document-local, so accept any prefix whose local
+/// attribute name is `href` (`l:href`, `xlink:href`, or an unprefixed href).
+fn get_fb2_href(element: &BytesStart<'_>) -> Option<String> {
+    element
+        .attributes()
+        .flatten()
+        .find(|attribute| attribute.key.local_name().as_ref() == b"href")
+        .map(|attribute| String::from_utf8_lossy(&attribute.value).into_owned())
 }
 
 fn max_base64_image_size() -> usize {
@@ -948,5 +1005,35 @@ mod tests {
             .expect_err("CDATA image above the size limit must be rejected");
 
         assert!(error.to_string().contains("FB2 image exceeds maximum size"));
+    }
+
+    #[test]
+    fn preserves_declared_mime_type_for_binary_cover() {
+        let book = parse_fb2(
+            br#"<FictionBook><description><title-info><book-title>PNG cover</book-title></title-info></description><binary id="cover.png" content-type="image/png">iVBORw0KGgo=</binary></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with PNG cover");
+
+        assert!(
+            book.cover_url
+                .is_some_and(|url| url.starts_with("data:image/png;base64,"))
+        );
+    }
+
+    #[test]
+    fn preserves_declared_mime_type_for_inline_binary_images() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><image l:href="#illustration.webp"/></section></body><binary id="illustration.webp" content-type="image/webp">UklGRg==</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with WebP illustration");
+
+        assert!(
+            book.chapters[0].blocks[0]
+                .image_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("data:image/webp;base64,"))
+        );
     }
 }

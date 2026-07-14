@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -45,6 +46,34 @@ void main() {
       parser.parse(bytes, fileName: 'empty.cbz'),
       throwsA(isA<ParserFailure>()),
     );
+  });
+
+  test('uses ComicInfo.xml metadata when present', () async {
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile(
+          'ComicInfo.xml',
+          146,
+          utf8.encode('''
+            <ComicInfo>
+              <Title>Город героев</Title>
+              <Writer>Автор</Writer>
+              <Series>Серия</Series>
+              <Number>7</Number>
+            </ComicInfo>
+          '''),
+        ),
+      )
+      ..addFile(ArchiveFile('001.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'fallback.cbz',
+    );
+
+    expect(book.title, 'Город героев');
+    expect(book.authors, ['Автор']);
+    expect(book.metadata, {'series': 'Серия', 'number': '7'});
   });
 
   test('routes CBR files to the path-based native RAR parser', () async {
