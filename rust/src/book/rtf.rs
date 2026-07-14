@@ -11,7 +11,7 @@ pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     } else {
         decode_with_encoding(bytes, encoding_name)
     };
-    let blocks = rtf_to_rich_blocks(&decoded);
+    let blocks = rtf_to_rich_blocks(&decoded, encoding_name);
 
     let chapters = if blocks.is_empty() {
         vec![]
@@ -134,7 +134,7 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
     }
 }
 
-fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
+fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let bytes = body.as_bytes();
     let mut i = 0;
     let mut brace_depth = 0i32;
@@ -179,10 +179,26 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                 if i >= bytes.len() {
                     break;
                 }
+                if bytes[i] == b'\'' {
+                    let hex_start = i + 1;
+                    let hex_end = hex_start.saturating_add(2);
+                    if hex_end <= bytes.len() {
+                        if let Ok(byte_val) = u8::from_str_radix(
+                            std::str::from_utf8(&bytes[hex_start..hex_end]).unwrap_or("00"),
+                            16,
+                        ) {
+                            if byte_val >= 0x20 {
+                                append_encoded_byte(&mut span_text, byte_val, encoding_name);
+                            }
+                        }
+                        i = hex_end;
+                    } else {
+                        i = bytes.len();
+                    }
+                    continue;
+                }
                 let cmd_start = i;
-                while i < bytes.len()
-                    && (bytes[i].is_ascii_alphabetic() || bytes[i] == b'*' || bytes[i] == b'\'')
-                {
+                while i < bytes.len() && (bytes[i].is_ascii_alphabetic() || bytes[i] == b'*') {
                     i += 1;
                 }
                 let cmd = std::str::from_utf8(&bytes[cmd_start..i]).unwrap_or("");
@@ -284,20 +300,7 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                         }
                         continue;
                     }
-                    _ => {
-                        if cmd.starts_with('\'') && i + 2 <= bytes.len() {
-                            let hex = &bytes[i..i + 2];
-                            if let Ok(byte_val) =
-                                u8::from_str_radix(std::str::from_utf8(hex).unwrap_or("00"), 16)
-                            {
-                                if byte_val >= 0x20 {
-                                    span_text.push(byte_val as char);
-                                }
-                            }
-                            i += 2;
-                            continue;
-                        }
-                    }
+                    _ => {}
                 }
 
                 while i < bytes.len() && bytes[i].is_ascii_digit() {
@@ -307,9 +310,15 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                     i += 1;
                 }
             }
-            c if !skip_group && brace_depth > 0 => {
-                span_text.push(c as char);
-                i += 1;
+            _ if !skip_group && brace_depth > 0 => {
+                // `body` is already decoded. Advance by a Unicode scalar rather
+                // than treating each UTF-8 byte as a separate Latin-1 character.
+                if let Some(ch) = body[i..].chars().next() {
+                    span_text.push(ch);
+                    i += ch.len_utf8();
+                } else {
+                    break;
+                }
             }
             _ => {
                 i += 1;
@@ -326,6 +335,15 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
     );
 
     blocks
+}
+
+/// Decode an RTF `\\'hh` escape with the document's declared ANSI code page.
+fn append_encoded_byte(output: &mut String, byte: u8, encoding_name: &str) {
+    let encoding = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
+        .unwrap_or(encoding_rs::WINDOWS_1252);
+    let encoded = [byte];
+    let (decoded, _, _) = encoding.decode(&encoded);
+    output.push_str(&decoded);
 }
 
 fn push_rtf_paragraph(
@@ -410,5 +428,29 @@ mod tests {
                 ("normal", false, false),
             ],
         );
+    }
+
+    #[test]
+    fn preserves_utf8_literal_text() {
+        let book = parse_rtf(r"{\rtf1\ansi Привет, мир!}".as_bytes(), Some("utf-8"))
+            .expect("parse UTF-8 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет, мир!");
+    }
+
+    #[test]
+    fn decodes_escaped_bytes_using_the_declared_code_page() {
+        let book = parse_rtf(br"{\rtf1\ansi\ansicpg1251\'cf\'f0\'e8\'e2\'e5\'f2}", None)
+            .expect("parse Windows-1251 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет");
+    }
+
+    #[test]
+    fn skips_unicode_fallback_characters() {
+        let book = parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8"))
+            .expect("parse Unicode escape");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "П");
     }
 }

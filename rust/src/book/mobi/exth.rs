@@ -77,7 +77,13 @@ impl ExthParser {
             }
         };
 
-        if length < 12 || (exth_offset + length as usize) > record0.len() {
+        let Some(exth_end) = exth_offset.checked_add(length as usize) else {
+            return Ok(MobiMetadata {
+                has_exth: true,
+                ..MobiMetadata::default()
+            });
+        };
+        if length < 12 || exth_end > record0.len() {
             return Ok(MobiMetadata {
                 has_exth: true,
                 ..MobiMetadata::default()
@@ -85,7 +91,7 @@ impl ExthParser {
         }
 
         // Parse records after the 12-byte header (EXTH + length + count)
-        let records_data = &record0[exth_offset + 12..exth_offset + length as usize];
+        let records_data = &record0[exth_offset + 12..exth_end];
         let max_record_count = records_data.len() / 8;
         if rec_count as usize > max_record_count {
             return Ok(MobiMetadata {

@@ -731,13 +731,7 @@ impl BookDiff {
                         .zip(b.blocks.iter())
                         .any(|(x, y)| x.index != y.index || x.block_type != y.block_type)
             });
-        let text_changed = old.chapters.iter().zip(new.chapters.iter()).any(|(a, b)| {
-            a.title != b.title
-                || a.blocks
-                    .iter()
-                    .zip(b.blocks.iter())
-                    .any(|(x, y)| x.text != y.text)
-        });
+        let text_changed = text_fragments(old) != text_fragments(new);
         let block_content_changed = old
             .chapters
             .iter()
@@ -763,6 +757,20 @@ impl BookDiff {
             needs_anchor_migration,
         }
     }
+}
+
+/// Keep the textual signal independent from structural changes.  Comparing the
+/// complete ordered stream also catches text in added/removed chapters, which
+/// a pairwise `zip()` comparison silently ignored.
+fn text_fragments(book: &NormalizedBook) -> Vec<&str> {
+    book.chapters
+        .iter()
+        .flat_map(|chapter| {
+            std::iter::once(chapter.title.as_str())
+                .chain(chapter.blocks.iter().map(|block| block.text.as_str()))
+        })
+        .filter(|text| !text.trim().is_empty())
+        .collect()
 }
 
 #[cfg(test)]
@@ -820,6 +828,23 @@ mod book_diff_tests {
     }
 
     #[test]
+    fn added_textual_chapter_is_reported_as_a_text_change() {
+        let old = test_book();
+        let mut new = old.clone();
+        let mut added = new.chapters[0].clone();
+        added.index = 1;
+        added.title = "Added chapter".to_string();
+        added.blocks[0].text = "Added text".to_string();
+        new.chapters.push(added);
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(diff.chapters_changed);
+        assert!(diff.text_changed);
+        assert!(diff.needs_anchor_migration);
+    }
+
+    #[test]
     fn metadata_change_is_reported_without_content_change() {
         let old = test_book();
         let mut new = old.clone();
@@ -860,7 +885,7 @@ mod book_diff_tests {
         let diff = BookDiff::compute(&old, &new);
 
         assert!(diff.chapters_changed);
-        assert!(!diff.text_changed);
+        assert!(diff.text_changed);
         assert!(!diff.metadata_only);
         assert!(diff.needs_anchor_migration);
     }

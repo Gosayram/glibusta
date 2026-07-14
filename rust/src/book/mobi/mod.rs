@@ -41,8 +41,15 @@ impl<'a> BinaryReader<'a> {
         Self { bytes }
     }
 
-    fn check(&self, offset: usize, length: usize) -> Result<()> {
-        if offset + length > self.bytes.len() {
+    fn check(&self, offset: usize, length: usize) -> Result<usize> {
+        let Some(end) = offset.checked_add(length) else {
+            bail!(
+                "BinaryReader: offset {} + length {} overflows usize",
+                offset,
+                length
+            );
+        };
+        if end > self.bytes.len() {
             bail!(
                 "BinaryReader: offset {} + length {} out of range (len {})",
                 offset,
@@ -50,7 +57,7 @@ impl<'a> BinaryReader<'a> {
                 self.bytes.len()
             );
         }
-        Ok(())
+        Ok(end)
     }
 
     pub fn u16be(&self, offset: usize) -> Result<u16> {
@@ -67,11 +74,8 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn ascii(&self, offset: usize, length: usize) -> Result<String> {
-        self.check(offset, length)?;
-        Ok(self.bytes[offset..offset + length]
-            .iter()
-            .map(|&b| b as char)
-            .collect())
+        let end = self.check(offset, length)?;
+        Ok(self.bytes[offset..end].iter().map(|&b| b as char).collect())
     }
 
     #[allow(dead_code)]
@@ -308,11 +312,12 @@ fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
     if header.full_name_length == 0 {
         return None;
     }
-    let end = header.full_name_offset as usize + header.full_name_length as usize;
-    if header.full_name_offset as usize >= record0.len() || end > record0.len() {
+    let start = header.full_name_offset as usize;
+    let end = start.checked_add(header.full_name_length as usize)?;
+    if start >= record0.len() || end > record0.len() {
         return None;
     }
-    let name = String::from_utf8_lossy(&record0[header.full_name_offset as usize..end])
+    let name = String::from_utf8_lossy(&record0[start..end])
         .trim()
         .to_string();
     if name.is_empty() { None } else { Some(name) }
@@ -503,4 +508,16 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BinaryReader;
+
+    #[test]
+    fn binary_reader_rejects_overflowing_ranges() {
+        let reader = BinaryReader::new(&[]);
+
+        assert!(reader.u16be(usize::MAX).is_err());
+    }
 }
