@@ -39,7 +39,8 @@ class FormatCapabilityService {
     BookFormat.azw3 => FormatCapability.partial,
     BookFormat.prc => FormatCapability.legacy,
     BookFormat.pdf || BookFormat.djvu => FormatCapability.documentOnly,
-    BookFormat.cbr => FormatCapability.readable,
+    // CbzParser reads ZIP archives only; CBR requires a RAR decoder.
+    BookFormat.cbr => FormatCapability.unsupported,
     BookFormat.unknown => FormatCapability.unsupported,
   };
 

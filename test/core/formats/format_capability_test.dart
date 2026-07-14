@@ -61,6 +61,12 @@ void main() {
       expect(service.hasReaderRoute(BookFormat.djvu), isTrue);
     });
 
+    test('cbr is unsupported without a RAR decoder', () {
+      expect(service.capabilityOf(BookFormat.cbr), FormatCapability.unsupported);
+      expect(service.canReadInApp(BookFormat.cbr), isFalse);
+      expect(service.canImport(BookFormat.cbr), isFalse);
+    });
+
     test('unknown is unsupported', () {
       expect(service.capabilityOf(BookFormat.unknown), FormatCapability.unsupported);
       expect(service.canReadInApp(BookFormat.unknown), isFalse);

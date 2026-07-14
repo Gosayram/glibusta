@@ -13,7 +13,7 @@ import 'normalized_book.dart';
 
 final class CbzParser implements BookParser {
   @override
-  bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
+  bool supports(BookFormat format) => format == BookFormat.cbz;
 
   @override
   Future<NormalizedBook> parse(
