@@ -70,10 +70,12 @@ impl ZipFile {
         })
     }
 
-    pub fn find_file(&mut self, name: &str) -> Option<Vec<u8>> {
+    /// Read a text-like entry using the default chapter-size limit.
+    ///
+    /// A missing entry is represented by `Ok(None)`; extraction and safety
+    /// failures remain errors so callers cannot mistake them for absence.
+    pub fn find_file(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
         self.read_file_limited(name, MAX_CHAPTER_SIZE)
-            .ok()
-            .flatten()
     }
 
     /// Read an archive entry after enforcing its caller-specific size limit.
@@ -99,19 +101,24 @@ impl ZipFile {
         Ok(Some(content))
     }
 
-    pub fn find_file_case_insensitive(&mut self, name: &str) -> Option<Vec<u8>> {
+    pub fn find_file_case_insensitive(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
         let lower = name.to_lowercase();
-        let entry = self
+        let Some(entry) = self
             .entry_names
             .iter()
-            .find(|n| n.to_lowercase() == lower)?
-            .clone();
+            .find(|n| n.to_lowercase() == lower)
+            .cloned()
+        else {
+            return Ok(None);
+        };
         self.find_file(&entry)
     }
 
-    pub fn find_file_flexible(&mut self, name: &str) -> Option<Vec<u8>> {
-        self.find_file(name)
-            .or_else(|| self.find_file_case_insensitive(name))
+    pub fn find_file_flexible(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
+        if let Some(content) = self.find_file(name)? {
+            return Ok(Some(content));
+        }
+        self.find_file_case_insensitive(name)
     }
 
     pub fn has_entry(&self, name: &str) -> bool {

@@ -11,7 +11,7 @@ use quick_xml::events::Event;
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let raw_bytes = if looks_like_zip(bytes) {
         let mut zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
-        find_fb2_in_zip(&mut zip).context("No .fb2 file found in archive")?
+        find_fb2_in_zip(&mut zip)?.context("No .fb2 file found in archive")?
     } else {
         bytes.to_vec()
     };
@@ -794,12 +794,15 @@ fn looks_like_zip(bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
 }
 
-fn find_fb2_in_zip(zip: &mut archive::ZipFile) -> Option<Vec<u8>> {
-    let name = zip
+fn find_fb2_in_zip(zip: &mut archive::ZipFile) -> Result<Option<Vec<u8>>> {
+    let Some(name) = zip
         .entry_names()
         .iter()
         .find(|name| name.ends_with(".fb2") && !name.ends_with(".fb2.zip"))
-        .cloned()?;
+        .cloned()
+    else {
+        return Ok(None);
+    };
     zip.find_file(&name)
 }
 

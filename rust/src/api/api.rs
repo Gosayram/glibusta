@@ -751,6 +751,7 @@ pub fn extract_zip_entry(bytes: Vec<u8>, entry_name: String) -> anyhow::Result<V
     let mut zip = crate::book::archive::decode_zip(&bytes)
         .map_err(|e| anyhow::anyhow!("Failed to decode ZIP: {}", e))?;
     zip.find_file(&entry_name)
+        .map_err(|e| anyhow::anyhow!("Failed to extract ZIP entry: {}", e))?
         .ok_or_else(|| anyhow::anyhow!("Entry '{}' not found in ZIP", entry_name))
 }
 
