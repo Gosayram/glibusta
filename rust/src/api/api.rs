@@ -682,6 +682,9 @@ pub fn search_in_book(
     limit: usize,
 ) -> anyhow::Result<Vec<crate::api::models::SearchMatch>> {
     use crate::api::models::SearchMatch;
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
     let book = parse_book(path)?;
     let ac = aho_corasick::AhoCorasick::new([&query])
         .map_err(|e| anyhow::anyhow!("Search error: {}", e))?;
@@ -1023,7 +1026,9 @@ mod cover_data_uri_tests {
 
 #[cfg(test)]
 mod parse_api_tests {
-    use super::{MAX_FILE_SIZE, parse_book, parse_book_legacy, repair_normalized_book};
+    use super::{
+        MAX_FILE_SIZE, parse_book, parse_book_legacy, repair_normalized_book, search_in_book,
+    };
     use crate::api::models::{BlockType, TocEntry};
 
     #[test]
@@ -1109,5 +1114,23 @@ mod parse_api_tests {
         let repaired = repair_normalized_book(book);
 
         assert!(repaired.toc[0].children.is_empty());
+    }
+
+    #[test]
+    fn search_with_empty_query_returns_no_zero_length_matches() {
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-empty-search-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, b"A searchable title\n\nSome searchable text.")
+            .expect("write temporary TXT file");
+
+        let result = search_in_book(path.to_string_lossy().into_owned(), String::new(), 100);
+        let _ = std::fs::remove_file(&path);
+
+        assert!(
+            result.expect("search temporary TXT file").is_empty(),
+            "empty queries must not produce zero-length matches"
+        );
     }
 }
