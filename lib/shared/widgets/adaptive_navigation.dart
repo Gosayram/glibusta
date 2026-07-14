@@ -69,16 +69,29 @@ class AdaptiveNavigation extends StatelessWidget {
       );
     }
 
-    return NavigationRail(
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onDestinationSelected,
-      extended: context.isExpanded,
-      labelType: context.isExpanded ? NavigationRailLabelType.none : NavigationRailLabelType.all,
-      leading: const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Icon(Icons.menu_book, size: 28),
-      ),
-      destinations: expandedDestinations,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useCompactRail = constraints.maxHeight < 400;
+        final rail = NavigationRail(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onDestinationSelected,
+          extended: context.isExpanded,
+          labelType: context.isExpanded || useCompactRail
+              ? NavigationRailLabelType.none
+              : NavigationRailLabelType.all,
+          leading: useCompactRail
+              ? null
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Icon(Icons.menu_book, size: 28),
+                ),
+          destinations: expandedDestinations,
+        );
+
+        // A wide foldable in landscape can select the rail while providing
+        // less vertical space than its five destinations and heading require.
+        return rail;
+      },
     );
   }
 }

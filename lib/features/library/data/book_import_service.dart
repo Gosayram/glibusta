@@ -39,7 +39,7 @@ class BookImportService {
   BookImportService(this._database, this._storage, this._coverService);
 
   final _registry = BookParserRegistry.defaultInstance;
-  final Map<String, Completer<void>> _importLocks = {};
+  final Map<String, Future<ImportResult>> _importLocks = {};
 
   static String generateAuthorId(String name) {
     final normalized = name.trim().toLowerCase();
@@ -71,22 +71,12 @@ class BookImportService {
       );
     }
 
-    final normalizedPath = inspection.path.replaceAll(r'\', '/');
-    final existingLock = _importLocks[normalizedPath];
-    if (existingLock != null) {
-      await existingLock.future;
-    }
-    final lock = Completer<void>();
-    _importLocks[normalizedPath] = lock;
-    try {
+    return _coalesceImport(inspection.path, () async {
       if (inspection.decision == ImportDecision.importAsDocument) {
         return _doDocumentImport(inspection);
       }
       return _doImport(inspection.path, forcedEncoding: inspection.encoding);
-    } finally {
-      lock.complete();
-      _importLocks.remove(normalizedPath);
-    }
+    });
   }
 
   /// Import a file by path (runs full inspection + import).
@@ -107,14 +97,7 @@ class BookImportService {
     if (isBookFileTooLarge(format, size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
-    final normalizedPath = filePath.replaceAll(r'\', '/');
-    final existingLock = _importLocks[normalizedPath];
-    if (existingLock != null) {
-      await existingLock.future;
-    }
-    final lock = Completer<void>();
-    _importLocks[normalizedPath] = lock;
-    try {
+    return _coalesceImport(filePath, () async {
       if (const FormatCapabilityService().isDocumentOnly(format)) {
         return _doDocumentImport(
           BookFileInspectionResult(
@@ -127,10 +110,33 @@ class BookImportService {
         );
       }
       return _doImport(filePath);
-    } finally {
-      lock.complete();
-      _importLocks.remove(normalizedPath);
-    }
+    });
+  }
+
+  /// Shares one in-flight import result among requests for the same local file.
+  ///
+  /// A wait-then-retry lock still runs a second import after the first finishes,
+  /// which can turn a simultaneous import into a spurious "duplicate" result.
+  Future<ImportResult> _coalesceImport(
+    String filePath,
+    Future<ImportResult> Function() import,
+  ) {
+    final normalizedPath = filePath.replaceAll(r'\', '/');
+    final activeImport = _importLocks[normalizedPath];
+    if (activeImport != null) return activeImport;
+
+    late final Future<ImportResult> result;
+    result = Future.sync(import).whenComplete(() {
+      if (identical(_importLocks[normalizedPath], result)) {
+        final removedImport = _importLocks.remove(normalizedPath);
+        assert(
+          identical(removedImport, result),
+          'An import lock must only remove its own in-flight result.',
+        );
+      }
+    });
+    _importLocks[normalizedPath] = result;
+    return result;
   }
 
   Future<ImportResult> _doImport(String filePath, {String? forcedEncoding}) async {

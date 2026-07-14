@@ -7,9 +7,12 @@ import 'package:glibusta/features/reader/data/parsers/rust_book_parser.dart';
 import 'package:glibusta/features/reader/epub/epub_archive.dart';
 import 'package:glibusta/features/reader/epub/epub_image_store.dart';
 import 'package:glibusta/features/reader/epub/epub_parser.dart' as new_epub;
+import 'package:glibusta/src/rust/api/frb_generated.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
+  setUpAll(RustLib.init);
+
   final testDir = p.join(Directory.current.path, 'test_results');
 
   group('EPUB Parser (new engine)', () {

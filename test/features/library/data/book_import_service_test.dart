@@ -6,6 +6,8 @@ import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
 import 'package:glibusta/features/library/data/cover_extraction_service.dart';
+import 'package:glibusta/features/library/data/inspectors/book_inspection_result.dart';
+import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
 import 'package:glibusta/shared/models/book.dart';
 
 void main() {
@@ -15,9 +17,9 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    final storage = AppFileStorageImpl();
-    service = BookImportService(db, storage, CoverExtractionService(storage));
     tempDir = await Directory.systemTemp.createTemp('import_test_');
+    final storage = _TestAppFileStorage(tempDir);
+    service = BookImportService(db, storage, CoverExtractionService(storage));
   });
 
   tearDown(() async {
@@ -46,6 +48,30 @@ void main() {
       final result = await service.importFile(file.path);
       expect(result.isSuccess, isFalse);
       expect(result.error, contains('слишком мал'));
+    });
+  });
+
+  group('concurrent imports', () {
+    test('shares the first result for simultaneous imports of one file', () async {
+      final file = File('${tempDir.path}/document.pdf');
+      await file.writeAsBytes(List<int>.filled(200, 1));
+      const hash = 'same-document-hash';
+      final inspection = BookFileInspectionResult(
+        path: file.path,
+        format: BookFormat.pdf,
+        decision: ImportDecision.importAsDocument,
+        hash: hash,
+        title: 'Document',
+      );
+
+      final results = await Future.wait([
+        service.importFromInspection(inspection),
+        service.importFromInspection(inspection),
+      ]);
+
+      expect(results, everyElement(isA<ImportResult>()));
+      expect(results.map((result) => result.isSuccess), everyElement(isTrue));
+      expect(results.first.title, results.last.title);
     });
   });
 
@@ -99,4 +125,46 @@ void main() {
       expect(batch.failureCount, 1);
     });
   });
+}
+
+final class _TestAppFileStorage implements AppFileStorage {
+  const _TestAppFileStorage(this.root);
+
+  final Directory root;
+
+  Future<Directory> _directory(String name) async {
+    final directory = Directory('${root.path}/$name');
+    await directory.create(recursive: true);
+    return directory;
+  }
+
+  @override
+  Future<File> bookFile(String bookId, BookFormat format) async {
+    final directory = await booksDir();
+    return File('${directory.path}/$bookId.${format.name}');
+  }
+
+  @override
+  Future<Directory> booksDir() => _directory('books');
+
+  @override
+  Future<Directory> cacheDir() => _directory('cache');
+
+  @override
+  Future<Directory> catalogCoversDir() => _directory('catalog_covers');
+
+  @override
+  Future<File> coverFile(String bookId) async {
+    final directory = await coversDir();
+    return File('${directory.path}/$bookId.jpg');
+  }
+
+  @override
+  Future<Directory> coversDir() => _directory('covers');
+
+  @override
+  Future<Directory> dbDir() => _directory('db');
+
+  @override
+  Future<Directory> tempDir() => _directory('temp');
 }

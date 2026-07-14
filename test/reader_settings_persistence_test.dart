@@ -76,6 +76,7 @@ void main() {
         expect(settings.theme, ReaderTheme.paper);
         expect(settings.fontSize, 18.0); // default
         expect(settings.lineHeight, 1.6); // default
+        expect(settings.scrollbarIndicator, isTrue); // default
       });
 
       test('handles unknown theme name gracefully', () async {
@@ -160,6 +161,27 @@ void main() {
         expect(loaded.autoThemeMode, AutoThemeMode.custom);
         expect(loaded.customDayHour, 6);
         expect(loaded.customNightHour, 22);
+      });
+
+      test('round-trips every reader setting', () async {
+        const settings = ReaderSettings(
+          marginTop: 1,
+          marginBottom: 2,
+          marginLeft: 3,
+          marginRight: 4,
+          separateMargins: true,
+          paragraphIndentMode: ParagraphIndentMode.emptyLine,
+          scrollInertia: ScrollInertia.heavy,
+          forcedEncoding: 'windows-1251',
+          tapZoneWidth: 0.4,
+          fullScreenMode: FullScreenMode.keepPanels,
+          customCss: 'p { color: red; }',
+          scrollbarIndicator: false,
+        );
+
+        await ReaderSettingsPersistence.save(settings);
+
+        expect(await ReaderSettingsPersistence.load(), settings);
       });
     });
   });
