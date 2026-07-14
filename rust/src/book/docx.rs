@@ -168,6 +168,9 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut in_table = false;
     let mut in_table_row = false;
     let mut in_table_cell = false;
+    let mut paragraph_is_numbered = false;
+    let mut paragraph_numbering_id: Option<String> = None;
+    let mut pending_list_numbering_id: Option<String> = None;
     let mut pstyle_val = String::new();
 
     let mut current_text = String::new();
@@ -178,6 +181,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
     let mut current_table_cell = String::new();
+    let mut pending_list_items: Vec<ReaderBlock> = Vec::new();
     let mut element_depth = 0usize;
 
     loop {
@@ -194,6 +198,8 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                 match tag.as_str() {
                     "w:body" => in_body = true,
                     "w:tbl" if in_body && !in_table => {
+                        flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
+                        pending_list_numbering_id = None;
                         in_table = true;
                         table_rows.clear();
                     }
@@ -213,6 +219,12 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                         current_span_bold = false;
                         current_span_italic = false;
                         pstyle_val.clear();
+                        paragraph_is_numbered = false;
+                        paragraph_numbering_id = None;
+                    }
+                    "w:numPr" if in_paragraph => paragraph_is_numbered = true,
+                    "w:numId" if in_paragraph && paragraph_is_numbered => {
+                        paragraph_numbering_id = word_value_attribute(e);
                     }
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
@@ -269,7 +281,11 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                     .ok_or_else(|| anyhow::anyhow!("DOCX XML parse error: unexpected end tag"))?;
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
-                    "w:body" => in_body = false,
+                    "w:body" => {
+                        flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
+                        pending_list_numbering_id = None;
+                        in_body = false;
+                    }
                     "w:pStyle" => in_pstyle = false,
                     "w:r" if in_paragraph => {
                         if !current_span_text.is_empty() {
@@ -317,8 +333,8 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                                 .iter()
                                 .any(|s| s.bold || s.italic || s.superscript || s.href.is_some());
 
-                            blocks.push(ReaderBlock {
-                                index: block_index,
+                            let mut paragraph = ReaderBlock {
+                                index: block_index + pending_list_items.len() as i32,
                                 text: trimmed,
                                 block_type,
                                 image_url: None,
@@ -336,8 +352,31 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
-                            });
-                            block_index += 1;
+                            };
+                            if paragraph_is_numbered {
+                                if pending_list_numbering_id != paragraph_numbering_id {
+                                    flush_docx_list(
+                                        &mut blocks,
+                                        &mut pending_list_items,
+                                        &mut block_index,
+                                    );
+                                    pending_list_numbering_id = paragraph_numbering_id.clone();
+                                }
+                                pending_list_items.push(paragraph);
+                            } else {
+                                flush_docx_list(
+                                    &mut blocks,
+                                    &mut pending_list_items,
+                                    &mut block_index,
+                                );
+                                pending_list_numbering_id = None;
+                                paragraph.index = block_index;
+                                blocks.push(paragraph);
+                                block_index += 1;
+                            }
+                        } else if !in_table_cell {
+                            flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
+                            pending_list_numbering_id = None;
                         }
 
                         in_paragraph = false;
@@ -395,6 +434,10 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                             }
                         }
                     }
+                    "w:numPr" if in_paragraph => paragraph_is_numbered = true,
+                    "w:numId" if in_paragraph && paragraph_is_numbered => {
+                        paragraph_numbering_id = word_value_attribute(e);
+                    }
                     "w:b" if in_run => current_span_bold = word_bool_value(e),
                     "w:i" if in_run => current_span_italic = word_bool_value(e),
                     "w:tab" if in_run => current_span_text.push('\t'),
@@ -428,6 +471,47 @@ fn word_bool_value(element: &BytesStart<'_>) -> bool {
 
 fn is_word_value_attribute(key: &[u8]) -> bool {
     key == b"val" || key.ends_with(b":val")
+}
+
+fn word_value_attribute(element: &BytesStart<'_>) -> Option<String> {
+    element
+        .attributes()
+        .filter_map(|attribute| attribute.ok())
+        .find(|attribute| is_word_value_attribute(attribute.key.as_ref()))
+        .map(|attribute| String::from_utf8_lossy(&attribute.value).into_owned())
+}
+
+fn flush_docx_list(
+    blocks: &mut Vec<ReaderBlock>,
+    pending_items: &mut Vec<ReaderBlock>,
+    block_index: &mut i32,
+) {
+    if pending_items.is_empty() {
+        return;
+    }
+    let items = std::mem::take(pending_items);
+    let text = items
+        .iter()
+        .map(|item| item.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    blocks.push(ReaderBlock {
+        index: *block_index,
+        text,
+        block_type: BlockType::List,
+        image_url: None,
+        note_ref: None,
+        rich_spans: None,
+        heading_level: None,
+        ordered: Some(true),
+        list_items: Some(items),
+        table_rows: None,
+        image_alt: None,
+        text_indent: None,
+        text_align: None,
+        note_id: None,
+    });
+    *block_index += 1;
 }
 
 #[cfg(test)]
@@ -540,5 +624,37 @@ mod tests {
                 vec!["Author".into(), "Ursula".into()],
             ])
         );
+    }
+
+    #[test]
+    fn groups_consecutive_numbered_paragraphs_into_an_ordered_list() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body>
+                    <w:p><w:pPr><w:numPr><w:numId w:val="42"/></w:numPr></w:pPr>
+                      <w:r><w:t>First</w:t></w:r></w:p>
+                    <w:p><w:pPr><w:numPr><w:numId w:val="42"/></w:numPr></w:pPr>
+                      <w:r><w:t>Second</w:t></w:r></w:p>
+                    <w:p><w:r><w:t>After the list</w:t></w:r></w:p>
+                </w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX list");
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::List);
+        assert_eq!(blocks[0].ordered, Some(true));
+        assert_eq!(
+            blocks[0]
+                .list_items
+                .as_ref()
+                .expect("list items")
+                .iter()
+                .map(|item| item.text.as_str())
+                .collect::<Vec<_>>(),
+            ["First", "Second"]
+        );
+        assert_eq!(blocks[1].text, "After the list");
     }
 }
