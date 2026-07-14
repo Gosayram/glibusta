@@ -20,43 +20,39 @@ pub fn compute_vertical_layout(
     container_width: f32,
     block_heights: &[f32],
     gaps: f32,
-) -> Vec<LayoutRect> {
+) -> anyhow::Result<Vec<LayoutRect>> {
     let mut tree: TaffyTree = TaffyTree::new();
 
     let mut children = Vec::new();
     for &h in block_heights {
-        let node = tree
-            .new_leaf(Style {
-                size: Size {
-                    width: length(container_width),
-                    height: length(h),
-                },
-                margin: Rect {
-                    top: length(gaps),
-                    bottom: length(gaps),
-                    left: length(0.0_f32),
-                    right: length(0.0_f32),
-                },
-                ..Default::default()
-            })
-            .unwrap();
+        let node = tree.new_leaf(Style {
+            size: Size {
+                width: length(container_width),
+                height: length(h),
+            },
+            margin: Rect {
+                top: length(0.0_f32),
+                bottom: length(gaps),
+                left: length(0.0_f32),
+                right: length(0.0_f32),
+            },
+            ..Default::default()
+        })?;
         children.push(node);
     }
 
-    let root = tree
-        .new_with_children(
-            Style {
-                display: Display::Flex,
-                flex_direction: FlexDirection::Column,
-                size: Size {
-                    width: length(container_width),
-                    height: auto(),
-                },
-                ..Default::default()
+    let root = tree.new_with_children(
+        Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            size: Size {
+                width: length(container_width),
+                height: auto(),
             },
-            &children,
-        )
-        .unwrap();
+            ..Default::default()
+        },
+        &children,
+    )?;
 
     tree.compute_layout(
         root,
@@ -64,19 +60,18 @@ pub fn compute_vertical_layout(
             width: AvailableSpace::Definite(container_width),
             height: AvailableSpace::MaxContent,
         },
-    )
-    .ok();
+    )?;
 
     children
         .iter()
         .map(|&node| {
-            let layout = tree.layout(node).unwrap();
-            LayoutRect {
+            let layout = tree.layout(node)?;
+            Ok(LayoutRect {
                 x: layout.location.x,
                 y: layout.location.y,
                 width: layout.size.width,
                 height: layout.size.height,
-            }
+            })
         })
         .collect()
 }

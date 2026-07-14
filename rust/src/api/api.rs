@@ -5,6 +5,8 @@ use crate::api::models::{
 };
 use hyphenation::{Hyphenator, Language, Load, Standard};
 use std::collections::HashMap;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -20,6 +22,10 @@ static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLoc
         .time_to_idle(Duration::from_secs(600))
         .build()
 });
+
+const DISK_CACHE_DIR_NAME: &str = "glibusta-book-cache";
+const DISK_CACHE_MAX_ENTRIES: usize = 64;
+const DISK_CACHE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Identifies a source file for caches that must never survive its replacement.
 ///
@@ -39,22 +45,83 @@ fn cache_fingerprint(path: &str) -> Result<String, CoreError> {
 }
 
 fn disk_cache_key(fingerprint: &str) -> std::path::PathBuf {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut h = DefaultHasher::new();
-    fingerprint.hash(&mut h);
-    // ARC-4.1: use .bin extension for binary cache
-    std::env::temp_dir().join(format!("glibusta_cache_{:016x}.bin", h.finish()))
+    // Keep cached books out of the temp root and use a stable cryptographic
+    // digest rather than a process-dependent hash for the filename.
+    std::env::temp_dir().join(DISK_CACHE_DIR_NAME).join(format!(
+        "{}.bin",
+        crate::book::sha256_hex(fingerprint.as_bytes())
+    ))
 }
 
 fn disk_cache_lookup(key: &std::path::Path) -> Option<NormalizedBook> {
-    let data = std::fs::read(key).ok()?;
+    let metadata = fs::symlink_metadata(key).ok()?;
+    if metadata.file_type().is_symlink() || metadata.len() > MAX_FILE_SIZE {
+        return None;
+    }
+    let data = fs::read(key).ok()?;
     postcard::from_bytes(&data).ok()
 }
 
 fn disk_cache_store(key: &std::path::Path, book: &NormalizedBook) {
-    if let Ok(data) = postcard::to_allocvec(book) {
-        let _ = std::fs::write(key, data);
+    let Ok(data) = postcard::to_allocvec(book) else {
+        return;
+    };
+    if data.len() as u64 > MAX_FILE_SIZE {
+        return;
+    }
+    let Some(parent) = key.parent() else {
+        return;
+    };
+    if fs::create_dir_all(parent).is_err() {
+        return;
+    }
+    cleanup_disk_cache(parent);
+
+    let temporary = parent.join(format!(".{}.tmp", uuid::Uuid::new_v4()));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(&data)?;
+        file.sync_all()?;
+        fs::rename(&temporary, key)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+}
+
+fn cleanup_disk_cache(directory: &Path) {
+    let now = std::time::SystemTime::now();
+    let mut entries = fs::read_dir(directory)
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path).ok()?;
+            if !metadata.is_file() || metadata.len() > MAX_FILE_SIZE {
+                return None;
+            }
+            let modified = metadata.modified().ok()?;
+            if now
+                .duration_since(modified)
+                .is_ok_and(|age| age > DISK_CACHE_TTL)
+            {
+                let _ = fs::remove_file(path);
+                return None;
+            }
+            Some((modified, path))
+        })
+        .collect::<Vec<_>>();
+    entries.sort_unstable_by_key(|(modified, _)| *modified);
+    let excess = entries
+        .len()
+        .saturating_sub(DISK_CACHE_MAX_ENTRIES.saturating_sub(1));
+    for (_, path) in entries.into_iter().take(excess) {
+        let _ = fs::remove_file(path);
     }
 }
 

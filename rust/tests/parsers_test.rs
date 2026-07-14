@@ -855,7 +855,8 @@ fn test_djvu_parse_book_with_text() {
 #[test]
 fn test_taffy_layout() {
     let rects =
-        glibusta_core::book::layout::compute_vertical_layout(400.0, &[100.0, 50.0, 200.0], 10.0);
+        glibusta_core::book::layout::compute_vertical_layout(400.0, &[100.0, 50.0, 200.0], 10.0)
+            .unwrap();
     assert_eq!(rects.len(), 3);
     // Blocks should stack vertically
     assert!(
@@ -866,6 +867,9 @@ fn test_taffy_layout() {
         rects[2].y > rects[1].y,
         "third block should be below second"
     );
+    assert!((rects[0].y - 0.0).abs() < f32::EPSILON);
+    assert!((rects[1].y - 110.0).abs() < f32::EPSILON);
+    assert!((rects[2].y - 170.0).abs() < f32::EPSILON);
     // Widths should match container
     for r in &rects {
         assert!((r.width - 400.0).abs() < 1.0, "width should be ~400");

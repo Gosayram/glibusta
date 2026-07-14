@@ -1836,8 +1836,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         '${settings.fontSize}_${settings.lineHeight}_${settings.margin}_'
         '${settings.paragraphSpacing}_${settings.letterSpacing}_${settings.paragraphFirstLineIndent}_'
         '${settings.font}_${settings.hyphenation}_${settings.textAlign.name}_'
-        '${settings.paragraphIndentMode.name}_${availableHeight.toStringAsFixed(1)}_'
-        '${settings.showImages}_${settings.imageWidth}_${contentWidth.toStringAsFixed(1)}';
+        '${settings.paragraphIndentMode.name}_${settings.ignoreBookIndent}_'
+        '${settings.wordSpacing}_${settings.fontWeightDelta}_${settings.textDirection.name}_'
+        '${settings.customCss}_${settings.showImages}_${settings.imageWidth}_'
+        '${availableHeight.toStringAsFixed(1)}_${contentWidth.toStringAsFixed(1)}';
 
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
     if (hasCover) {
@@ -1892,7 +1894,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.cite:
         return _measureBlockHeight(block, settings, colors, width - 40) + ps + 16;
       case BlockType.textAuthor:
-        return _measureBlockHeight(block, settings, colors, width) + ps;
+        return _measureBlockHeight(block, settings, colors, width, fontScale: 0.9) + ps;
       case BlockType.quote:
         return _measureBlockHeight(block, settings, colors, width - 32) + ps + 16;
       case BlockType.separator:
@@ -1900,7 +1902,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.image:
         if (!settings.showImages) return 0;
         if (block.imageUrl == null || block.imageUrl!.isEmpty) {
-          return _measureBlockHeight(block, settings, colors, width) + ps;
+          return _measureBlockHeight(block, settings, colors, width, fontScale: 0.85) + ps;
         }
         final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
         final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
@@ -1909,7 +1911,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             text: block.imageCaption!,
             index: block.index,
           );
-          return imgHeight + _measureBlockHeight(capBlock, settings, colors, width) + ps;
+          return imgHeight +
+              _measureBlockHeight(
+                capBlock,
+                settings,
+                colors,
+                width - settings.margin,
+                fontScale: 0.8,
+              ) +
+              ps;
         }
         return imgHeight;
       case BlockType.footnote:
@@ -1958,6 +1968,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     ReaderColors colors,
     double maxWidth, {
     double firstLineIndent = 0,
+    double? fontScale,
   }) {
     final locale = s.hyphenation ? const Locale('ru') : null;
     final dir = switch (s.textDirection) {
@@ -1966,8 +1977,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     };
     TextSpan textSpan;
 
+    final effectiveFontScale = fontScale ?? _blockFontScale(block);
     if (block.richSpans != null && block.richSpans!.isNotEmpty) {
-      final baseStyle = _readerTextStyle(s, colors);
+      final baseStyle = _readerTextStyle(s, colors).copyWith(
+        fontSize: s.fontSize * effectiveFontScale,
+        height: s.lineHeight,
+      );
       final spans = _readerRichTextSpans(
         block.richSpans!,
         baseStyle,
@@ -1976,7 +1991,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       );
       textSpan = TextSpan(children: spans);
     } else {
-      final fontSize = s.fontSize * _blockFontScale(block);
+      final fontSize = s.fontSize * effectiveFontScale;
       final textStyle = _readerTextStyle(s, colors).copyWith(
         fontSize: fontSize,
         height: s.lineHeight,
@@ -2005,12 +2020,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   double _blockFontScale(ReaderBlock block) {
     if (block.type == BlockType.heading) {
       final level = block.headingLevel ?? 2;
-      return switch (level) {
-        1 => 1.3,
-        2 => 1.2,
-        3 => 1.1,
-        _ => 1.0,
-      };
+      return _headingScale(level);
     }
     if (block.type == BlockType.subtitle) {
       return 1.1;
@@ -2019,6 +2029,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       return 0.95;
     }
     if (block.type == BlockType.footnote) return 0.85;
+    if (block.type == BlockType.textAuthor) return 0.9;
     if (block.type == BlockType.preformatted) {
       return 0.9;
     }
