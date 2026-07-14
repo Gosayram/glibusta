@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:xml/xml.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/formats/archive_safety.dart';
@@ -13,6 +14,8 @@ import 'normalized_book.dart';
 import 'rust_book_parser.dart';
 
 final class CbzParser implements BookParser {
+  static const int _maxComicInfoBytes = 1024 * 1024;
+
   @override
   bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
 
@@ -28,6 +31,7 @@ final class CbzParser implements BookParser {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       ArchiveSafety.validateZip(archive);
+      final comicInfo = _readComicInfo(archive);
       final images = _sortedImageFiles(archive);
       if (images.isEmpty) {
         throw const ParserFailure('В архиве нет изображений');
@@ -48,11 +52,15 @@ final class CbzParser implements BookParser {
           ),
         );
       }
-      final title = _titleFromFileName(fileName);
+      final metadata = <String, dynamic>{
+        if (comicInfo?.series case final String series) 'series': series,
+        if (comicInfo?.number case final String number) 'number': number,
+      };
       return NormalizedBook(
         id: fileName ?? 'unknown.cbz',
-        title: title,
-        authors: const [],
+        title: comicInfo?.title ?? _titleFromFileName(fileName),
+        authors: comicInfo?.authors ?? const [],
+        metadata: metadata.isEmpty ? null : metadata,
         chapters: [
           ReaderChapter(index: 0, title: 'Страницы', blocks: blocks),
         ],
@@ -164,4 +172,47 @@ final class CbzParser implements BookParser {
     if (fileName == null || fileName.isEmpty) return 'Без названия';
     return fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
   }
+
+  _ComicInfo? _readComicInfo(Archive archive) {
+    ArchiveFile? file;
+    for (final entry in archive.files) {
+      final name = entry.name.split('/').last.toLowerCase();
+      if (entry.isFile && name == 'comicinfo.xml') {
+        file = entry;
+        break;
+      }
+    }
+    if (file == null || file.size > _maxComicInfoBytes) return null;
+
+    try {
+      final document = XmlDocument.parse(
+        utf8.decode(file.content as List<int>, allowMalformed: true),
+      );
+      String? value(String name) {
+        final elements = document.findAllElements(name);
+        if (elements.isEmpty) return null;
+        final text = elements.first.innerText.trim();
+        return text.isEmpty ? null : text;
+      }
+
+      final writer = value('Writer');
+      return _ComicInfo(
+        title: value('Title'),
+        authors: writer?.split(RegExp(r'\s*[,;]\s*')).where((author) => author.isNotEmpty).toList(),
+        series: value('Series'),
+        number: value('Number'),
+      );
+    } on XmlException {
+      return null;
+    }
+  }
+}
+
+final class _ComicInfo {
+  const _ComicInfo({this.title, this.authors, this.series, this.number});
+
+  final String? title;
+  final List<String>? authors;
+  final String? series;
+  final String? number;
 }
