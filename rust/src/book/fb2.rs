@@ -934,6 +934,10 @@ mod tests {
     use super::{max_base64_image_size, parse_fb2};
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "large CDATA limit test is prohibitively slow under Miri"
+    )]
     fn rejects_oversized_image_in_cdata() {
         let base64 = "A".repeat(max_base64_image_size() + 1);
         let fb2 = format!(

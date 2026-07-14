@@ -76,6 +76,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "8 MiB decompression-limit test is prohibitively slow under Miri"
+    )]
     fn rejects_output_that_exceeds_record_limit() {
         let input = vec![b'a'; MAX_DECOMPRESSED_RECORD_BYTES + 1];
         let error = PalmDocDecompressor
