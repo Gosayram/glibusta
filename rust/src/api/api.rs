@@ -472,10 +472,7 @@ pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
     }
     let spine_toc_mismatch = !book.toc.is_empty()
         && (book.toc.len() != book.chapters.len()
-            || book
-                .toc
-                .iter()
-                .any(|t| t.chapter_index >= book.chapters.len() as i32));
+            || toc_has_invalid_chapter(&book.toc, book.chapters.len() as i32));
     Ok(BookValidationResult {
         valid: empty_chapters.is_empty() && duplicate_chapters.is_empty() && !spine_toc_mismatch,
         empty_chapters,
@@ -496,6 +493,13 @@ fn chapter_has_renderable_content(chapter: &ReaderChapter) -> bool {
                     | crate::api::models::BlockType::List
                     | crate::api::models::BlockType::Table
             )
+    })
+}
+
+fn toc_has_invalid_chapter(entries: &[TocEntry], chapter_count: i32) -> bool {
+    entries.iter().any(|entry| {
+        entry.chapter_index >= chapter_count
+            || toc_has_invalid_chapter(&entry.children, chapter_count)
     })
 }
 
@@ -521,12 +525,7 @@ fn repair_normalized_book(mut book: NormalizedBook) -> NormalizedBook {
     // Keep only TOC entries that still point to a retained chapter before
     // deduplication. Reassigning invalid entries to zero could discard the
     // legitimate first chapter entry.
-    book.toc
-        .retain(|toc| old_to_new.contains_key(&toc.chapter_index));
-    for toc in &mut book.toc {
-        // Safe after retain above.
-        toc.chapter_index = old_to_new[&toc.chapter_index];
-    }
+    repair_toc_entries(&mut book.toc, &old_to_new);
     // Deduplicate TOC by chapter_index
     let mut seen = std::collections::HashSet::new();
     book.toc.retain(|t| {
@@ -535,6 +534,17 @@ fn repair_normalized_book(mut book: NormalizedBook) -> NormalizedBook {
             && seen.insert(t.chapter_index)
     });
     book
+}
+
+fn repair_toc_entries(
+    entries: &mut Vec<TocEntry>,
+    old_to_new: &std::collections::HashMap<i32, i32>,
+) {
+    entries.retain(|entry| old_to_new.contains_key(&entry.chapter_index));
+    for entry in entries {
+        entry.chapter_index = old_to_new[&entry.chapter_index];
+        repair_toc_entries(&mut entry.children, old_to_new);
+    }
 }
 
 /// Get asset metadata (IDs, types, sizes) without downloading bytes.
@@ -1080,5 +1090,24 @@ mod parse_api_tests {
         assert_eq!(repaired.chapters.len(), 1);
         assert_eq!(repaired.chapters[0].index, 0);
         assert_eq!(repaired.toc[0].chapter_index, 0);
+    }
+
+    #[test]
+    fn repair_removes_invalid_nested_toc_entries() {
+        let mut book = parse_book_legacy(b"Book title".to_vec(), "txt".to_owned(), None)
+            .expect("parse fixture book");
+        book.toc = vec![TocEntry {
+            title: "Chapter".to_string(),
+            chapter_index: 0,
+            children: vec![TocEntry {
+                title: "Missing section".to_string(),
+                chapter_index: 99,
+                children: Vec::new(),
+            }],
+        }];
+
+        let repaired = repair_normalized_book(book);
+
+        assert!(repaired.toc[0].children.is_empty());
     }
 }
