@@ -56,6 +56,7 @@ void main() {
         speedBytesPerSec: any(named: 'speedBytesPerSec'),
       ),
     ).thenAnswer((_) async {});
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => const []);
   });
 
   group('DownloadQueue.enqueue', () {
@@ -199,4 +200,29 @@ void main() {
     },
     timeout: const Timeout(Duration(seconds: 2)),
   );
+
+  test('loads persisted downloads for a new queue instance', () async {
+    const persistedTask = DownloadTask(
+      id: 'persisted-task',
+      bookId: 'book-1',
+      format: BookFormat.epub,
+      sourceUrl: 'https://example.com/b/book-1/epub',
+      targetPath: '/tmp/book-1.epub',
+      status: DownloadStatus.paused,
+      downloadedBytes: 25,
+      totalBytes: 100,
+    );
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [persistedTask]);
+    final queue = DownloadQueue(
+      mockRepo,
+      mockBgDownload,
+      mockNotificationService,
+      mockBookImport,
+    );
+    addTearDown(queue.dispose);
+
+    final initialTasks = await queue.onDownloadsChanged.first;
+
+    expect(initialTasks, [persistedTask]);
+  });
 }

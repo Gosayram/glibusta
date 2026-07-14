@@ -57,6 +57,7 @@ void main() {
     when(() => mockRepo.removeDownload(any())).thenAnswer((_) async {});
     when(() => mockRepo.cancelDownload(any())).thenAnswer((_) async {});
     when(() => mockRepo.updateStatus(any(), any())).thenAnswer((_) async {});
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => const []);
   });
 
   group('pause', () {

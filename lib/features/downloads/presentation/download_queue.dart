@@ -53,6 +53,12 @@ class DownloadQueue {
   bool _disposed = false;
 
   Stream<List<DownloadTask>> get onDownloadsChanged async* {
+    final persistedTasks = await _repository.getAllDownloads();
+    if (_disposed) return;
+    for (final task in persistedTasks) {
+      _tasks.putIfAbsent(task.id, () => task);
+    }
+    _latestTasks = _tasks.values.toList();
     yield _latestTasks;
     yield* _downloadsController.stream;
   }
