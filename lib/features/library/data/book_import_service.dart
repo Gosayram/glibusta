@@ -446,8 +446,6 @@ class BookImportService {
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
-      final bytes = await cacheFile.readAsBytes();
-
       if (const FormatCapabilityService().isDocumentOnly(format)) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
         final documentBookId = contentHash;
@@ -499,10 +497,7 @@ class BookImportService {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }
 
-      final book = await parser.parse(
-        bytes,
-        fileName: external.name,
-      );
+      final book = await parser.parseFile(cachedPath);
 
       Uint8List? extCoverBytes;
       if (book.metadata != null) {

@@ -668,13 +668,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
 
-      final scanned = await bridge.scanBooks(uri);
+      final bookCount = await bridge.countBooks(uri);
       final name = uri.split('/').last;
 
       await ref.read(externalFolderProvider.notifier).updateFolder(uri: uri, name: name);
 
       if (context.mounted) {
-        unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
+        unawaited(SmartDialog.showToast('Найдено книг: $bookCount'));
       }
     } on Object catch (e) {
       if (context.mounted) {

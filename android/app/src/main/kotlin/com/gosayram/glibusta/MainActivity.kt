@@ -90,6 +90,25 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
             }
+            "countBooks" -> {
+                val folderUri = call.argument<String>("uri")
+                if (folderUri == null) {
+                    result.error("INVALID_ARG", "URI is required", null)
+                    return
+                }
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val count = countBooks(Uri.parse(folderUri))
+                        withContext(Dispatchers.Main) {
+                            result.success(count)
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            result.error("SCAN_ERROR", e.message, null)
+                        }
+                    }
+                }
+            }
             "readFile" -> {
                 val fileUri = call.argument<String>("uri")
                 if (fileUri == null) {
@@ -198,34 +217,57 @@ class MainActivity : FlutterFragmentActivity() {
         return books
     }
 
+    private fun countBooks(treeUri: Uri): Int {
+        val root = DocumentFile.fromTreeUri(this, treeUri)
+            ?: throw IllegalStateException("Cannot access folder")
+        val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
+        val directories = ArrayDeque<DocumentFile>().apply { add(root) }
+        var count = 0
+        while (directories.isNotEmpty()) {
+            for (file in directories.removeFirst().listFiles()) {
+                if (file.isDirectory) {
+                    directories.addLast(file)
+                    continue
+                }
+                val name = file.name ?: continue
+                val extension = name.substringAfterLast('.', "").lowercase()
+                if (file.isFile && !isHiddenOrTemporary(name) && extension in supportedExtensions) {
+                    count++
+                }
+            }
+        }
+        return count
+    }
+
     private fun collectBooks(
         directory: DocumentFile,
         supportedExtensions: Set<String>,
         books: MutableList<Map<String, Any>>,
     ) {
-        for (file in directory.listFiles()) {
-            if (file.isDirectory) {
-                collectBooks(file, supportedExtensions, books)
-                continue
+        val directories = ArrayDeque<DocumentFile>().apply { add(directory) }
+        while (directories.isNotEmpty()) {
+            for (file in directories.removeFirst().listFiles()) {
+                if (file.isDirectory) {
+                    directories.addLast(file)
+                    continue
+                }
+                if (!file.isFile) continue
+
+                val name = file.name ?: continue
+                if (isHiddenOrTemporary(name)) continue
+
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (ext !in supportedExtensions) continue
+
+                books.add(mapOf(
+                    "uri" to file.uri.toString(),
+                    "name" to name,
+                    "size" to file.length(),
+                    "extension" to ext,
+                    "mimeType" to (file.type ?: ""),
+                    "lastModified" to file.lastModified(),
+                ))
             }
-            if (!file.isFile) continue
-
-            val name = file.name ?: continue
-            if (isHiddenOrTemporary(name)) continue
-
-            val ext = name.substringAfterLast('.', "").lowercase()
-            if (ext !in supportedExtensions) continue
-
-            val size = file.length()
-
-            books.add(mapOf(
-                "uri" to file.uri.toString(),
-                "name" to name,
-                "size" to size,
-                "extension" to ext,
-                "mimeType" to (file.type ?: ""),
-                "lastModified" to file.lastModified(),
-            ))
         }
     }
 
