@@ -1,8 +1,12 @@
 import 'dart:math';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../domain/reader.dart';
 
-class AutoThemeService {
+final autoThemeServiceProvider = Provider<AutoThemeService>((ref) => AutoThemeService());
+
+final class AutoThemeService {
   ReaderTheme resolveTheme(AutoThemeMode mode, ReaderTheme manualTheme, {DateTime? now}) {
     if (mode == AutoThemeMode.off) return manualTheme;
     final dt = now ?? DateTime.now();

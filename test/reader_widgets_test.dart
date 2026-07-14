@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/logging/app_logger.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/domain/book_file_repository.dart';
 import 'package:glibusta/features/reader/data/book_open_service.dart';
@@ -15,7 +16,11 @@ import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 
 class _FakeBookOpenService extends BookOpenService {
   _FakeBookOpenService(AppDatabase database)
-    : super(AppFileStorageImpl(), BookFileRepositoryImpl(database));
+    : super(
+        AppFileStorageImpl(),
+        BookFileRepositoryImpl(database),
+        logger: AppLogger(),
+      );
 
   static const _chapter = ReaderChapter(
     index: 0,

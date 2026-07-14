@@ -22,19 +22,21 @@ final class CacheSourceFingerprint {
 
 typedef CacheFingerprintProvider = Future<CacheSourceFingerprint?> Function(String bookId);
 
-class ReaderCacheService {
+final class ReaderCacheService {
   ReaderCacheService({
     required CacheFingerprintProvider fingerprintProvider,
     required AppFileStorage storage,
+    required AppLogger logger,
     FullTextSearchService? ftsService,
   }) : _fingerprintProvider = fingerprintProvider,
        _storage = storage,
+       _logger = logger,
        _ftsService = ftsService;
 
   final CacheFingerprintProvider _fingerprintProvider;
   final AppFileStorage _storage;
   final FullTextSearchService? _ftsService;
-  final _logger = AppLogger();
+  final AppLogger _logger;
 
   static const int _splitCacheVersion = 1;
   static const int _parserCacheVersion = 1;

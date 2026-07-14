@@ -142,13 +142,16 @@ class ReaderState {
   }
 }
 
-class ReaderController {
-  ReaderController(this._bookId, this._ref);
+final class ReaderController {
+  ReaderController(this._bookId, this._ref)
+    : _autoThemeService = _ref.read(autoThemeServiceProvider),
+      _logger = _ref.read(appLoggerProvider);
 
   final String _bookId;
   final Ref _ref;
 
-  final _autoThemeService = AutoThemeService();
+  final AutoThemeService _autoThemeService;
+  final AppLogger _logger;
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   final _sessionStopwatch = Stopwatch();
@@ -253,8 +256,8 @@ class ReaderController {
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);
-    _content = ReaderContentHelper(service, _bookId);
-    _progress = ReaderProgressHelper(db, _bookId);
+    _content = ReaderContentHelper(service, _bookId, _logger);
+    _progress = ReaderProgressHelper(db, _bookId, _logger);
 
     try {
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
@@ -379,7 +382,7 @@ class ReaderController {
         }
       }
     } on Object catch (e) {
-      AppLogger().warning(
+      _logger.warning(
         'Download lookup failed during error recovery: $e',
         name: 'Reader',
         error: e,
@@ -997,7 +1000,7 @@ class ReaderController {
         _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
       }
     } on Object catch (e) {
-      AppLogger().warning('Failed to apply per-book settings: $e');
+      _logger.warning('Failed to apply per-book settings: $e', name: 'Reader', error: e);
     }
   }
 
@@ -1041,7 +1044,7 @@ class ReaderController {
         _ref.read(readerSettingsProvider.notifier).updateFont(ReaderFont.inter);
       }
     } on Object catch (e) {
-      AppLogger().warning('Auto genre font failed: $e');
+      _logger.warning('Auto genre font failed: $e', name: 'Reader', error: e);
     }
   }
 
@@ -1110,7 +1113,7 @@ class ReaderController {
     final filePath = _state.errorFilePath;
     if (filePath == null || filePath.isEmpty) return;
     if (!_isAppOwnedPath(filePath)) {
-      AppLogger().warning(
+      _logger.warning(
         'Refusing to delete non-app path: $filePath',
         name: 'Reader',
       );
@@ -1126,7 +1129,7 @@ class ReaderController {
         await _progress.deleteProgress();
       }
     } on Object catch (e) {
-      AppLogger().warning('Error during file deletion: $e', name: 'Reader', error: e);
+      _logger.warning('Error during file deletion: $e', name: 'Reader', error: e);
     }
     _updateState(_state.copyWith(errorMessage: 'Файл удалён'));
   }

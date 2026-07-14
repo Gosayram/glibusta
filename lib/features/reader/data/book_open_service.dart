@@ -22,22 +22,25 @@ final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final storage = ref.watch(appFileStorageProvider);
   final fileRepo = ref.watch(bookFileRepositoryProvider);
   final ftsService = ref.watch(fullTextSearchProvider);
-  return BookOpenService(storage, fileRepo, ftsService);
+  final logger = ref.watch(appLoggerProvider);
+  return BookOpenService(storage, fileRepo, logger: logger, ftsService: ftsService);
 });
 
 class BookOpenService {
   final BookFileRepository _fileRepo;
-  final _logger = AppLogger();
+  final AppLogger _logger;
   late final ReaderCacheService cache;
 
   BookOpenService(
     AppFileStorage storage,
-    this._fileRepo, [
+    this._fileRepo, {
+    required AppLogger logger,
     FullTextSearchService? ftsService,
-  ]) {
+  }) : _logger = logger {
     cache = ReaderCacheService(
       fingerprintProvider: _computeCacheFingerprint,
       storage: storage,
+      logger: logger,
       ftsService: ftsService,
     );
   }

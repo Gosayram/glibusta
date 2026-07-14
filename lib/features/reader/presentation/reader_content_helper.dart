@@ -6,12 +6,12 @@ const int chapterWindowSize = 2;
 // MD-2.3: max loaded chapters before eviction kicks in
 const int maxLoadedChapters = 20;
 
-class ReaderContentHelper {
-  ReaderContentHelper(this._service, this._bookId);
+final class ReaderContentHelper {
+  ReaderContentHelper(this._service, this._bookId, this._logger);
 
   final BookOpenService _service;
   final String _bookId;
-  final _logger = AppLogger();
+  final AppLogger _logger;
 
   Future<NormalizedBookMetadata> loadMetadata({void Function(String)? onCacheMode}) async {
     final cached = await _service.getCachedMetadata(_bookId);

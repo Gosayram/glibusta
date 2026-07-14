@@ -66,9 +66,37 @@ class AppLogger {
   final _controller = StreamController<LogEntry>.broadcast();
   final List<void Function(LogEntry)> _listeners = [];
 
+  static StreamSubscription<LogRecord>? _rootLogSubscription;
+
   Stream<LogEntry> get stream => _controller.stream;
   List<LogEntry> get entries => _ringBuffer.toList();
   LogEntry? get lastEntry => _ringBuffer.last;
+
+  /// Routes package:logging records into the application-wide buffer once.
+  ///
+  /// [AppLogger] is process-wide, while a ProviderScope can be short-lived.
+  /// Registering per scope duplicates every record and disposing per scope closes
+  /// a logger that other scopes still use.
+  void ensureRootLogListener() {
+    if (_rootLogSubscription != null) return;
+    Logger.root.level = Level.ALL;
+    // ignore: cancel_subscriptions - process-lifetime singleton; see disposeRootLogListener.
+    _rootLogSubscription = Logger.root.onRecord.listen((record) {
+      log(
+        record.level.name,
+        record.message,
+        loggerName: record.loggerName,
+        error: record.error,
+        stackTrace: record.stackTrace,
+      );
+    });
+  }
+
+  /// Releases the process-wide logging subscription during an explicit shutdown.
+  static Future<void> disposeRootLogListener() async {
+    await _rootLogSubscription?.cancel();
+    _rootLogSubscription = null;
+  }
 
   void log(
     String level,
@@ -303,21 +331,6 @@ class _RingBuffer<T> {
 
 final appLoggerProvider = Provider<AppLogger>((ref) {
   final logger = AppLogger();
-
-  Logger.root.level = Level.ALL;
-  final rootLogSubscription = Logger.root.onRecord.listen((record) {
-    logger.log(
-      record.level.name,
-      record.message,
-      loggerName: record.loggerName,
-      error: record.error,
-      stackTrace: record.stackTrace,
-    );
-  });
-
-  ref.onDispose(() {
-    unawaited(rootLogSubscription.cancel());
-    logger.dispose();
-  });
+  logger.ensureRootLogListener();
   return logger;
 });

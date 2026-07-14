@@ -6,12 +6,12 @@ import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../domain/reader.dart';
 
-class ReaderProgressHelper {
-  ReaderProgressHelper(this._database, this._bookId);
+final class ReaderProgressHelper {
+  ReaderProgressHelper(this._database, this._bookId, this._logger);
 
   final AppDatabase _database;
   final String _bookId;
-  final _logger = AppLogger();
+  final AppLogger _logger;
 
   Future<ReaderPosition> loadSavedPosition(int chapterCount) async {
     try {
