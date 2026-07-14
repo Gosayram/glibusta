@@ -533,56 +533,20 @@ final class ReaderController {
         updatedAt: DateTime.now(),
       );
     }
-    final lastChapter = total - 1;
-    final chapterIndex = _estimateChapterIndex(progress, lastChapter);
-    final chapter = _state.chapterAt(chapterIndex);
-    final lastParagraph = (chapter?.blocks.isEmpty ?? true) ? 0 : chapter!.blocks.length - 1;
-    final paragraphIndex = (progress * lastParagraph).round().clamp(0, lastParagraph);
+    final estimate = ReaderContentHelper.estimatePositionFromProgress(
+      progress: progress,
+      chapterCount: total,
+      loadedChapters: _state.loadedChapters,
+    );
     return ReaderPosition(
       bookId: _bookId,
-      chapterIndex: chapterIndex,
-      paragraphIndex: paragraphIndex,
+      chapterIndex: estimate.chapterIndex,
+      paragraphIndex: estimate.paragraphIndex,
       localOffset: progress * 100.0,
       progressPercent: progress,
       contentHash: _state.currentPosition.contentHash,
       updatedAt: DateTime.now(),
     );
-  }
-
-  int _estimateChapterIndex(double progress, int lastChapter) {
-    if (_state.loadedChapters.isEmpty) {
-      return (progress * lastChapter).round().clamp(0, lastChapter);
-    }
-
-    var avgBlocks = 0.0;
-    for (final ch in _state.loadedChapters.values) {
-      avgBlocks += ch.blocks.length;
-    }
-    avgBlocks /= _state.loadedChapters.length;
-    if (avgBlocks < 1) avgBlocks = 1;
-
-    final weights = List<double>.filled(lastChapter + 1, avgBlocks);
-    for (final entry in _state.loadedChapters.entries) {
-      if (entry.key >= 0 && entry.key <= lastChapter) {
-        final w = entry.value.blocks.length.toDouble();
-        weights[entry.key] = w > 0 ? w : 1;
-      }
-    }
-
-    var totalWeight = 0.0;
-    for (final w in weights) {
-      totalWeight += w;
-    }
-
-    final targetWeight = progress * totalWeight;
-    var cumulative = 0.0;
-    for (var i = 0; i < weights.length; i++) {
-      cumulative += weights[i];
-      if (cumulative >= targetWeight) {
-        return i;
-      }
-    }
-    return lastChapter;
   }
 
   void _restoreSavedPosition(ReaderPosition position) {

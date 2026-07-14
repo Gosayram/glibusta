@@ -120,6 +120,52 @@ final class ReaderContentHelper {
 
   int computeTotalWords(Map<int, ReaderChapter> chapters) => countWords(chapters.values);
 
+  /// Estimates a semantic location from reader progress.
+  ///
+  /// Loaded chapters use their real block counts. Unloaded chapters receive the
+  /// average loaded weight so progress remains stable while the window fills.
+  static ({int chapterIndex, int paragraphIndex}) estimatePositionFromProgress({
+    required double progress,
+    required int chapterCount,
+    required Map<int, ReaderChapter> loadedChapters,
+  }) {
+    if (chapterCount <= 0) return (chapterIndex: 0, paragraphIndex: 0);
+
+    var averageBlocks = 1.0;
+    if (loadedChapters.isNotEmpty) {
+      averageBlocks =
+          loadedChapters.values
+              .map((chapter) => chapter.blocks.isEmpty ? 1.0 : chapter.blocks.length.toDouble())
+              .fold<double>(0, (sum, count) => sum + count) /
+          loadedChapters.length;
+    }
+
+    final weights = List<double>.generate(chapterCount, (index) {
+      final blockCount = loadedChapters[index]?.blocks.length;
+      return blockCount == null || blockCount <= 0 ? averageBlocks : blockCount.toDouble();
+    });
+    final totalWeight = weights.fold<double>(0, (sum, weight) => sum + weight);
+    final targetWeight = progress.clamp(0.0, 1.0) * totalWeight;
+
+    var precedingWeight = 0.0;
+    for (var index = 0; index < weights.length; index++) {
+      final chapterWeight = weights[index];
+      final cumulativeWeight = precedingWeight + chapterWeight;
+      if (targetWeight <= cumulativeWeight || index == weights.length - 1) {
+        final blockCount = loadedChapters[index]?.blocks.length ?? 0;
+        final lastParagraph = blockCount > 0 ? blockCount - 1 : 0;
+        final localProgress = ((targetWeight - precedingWeight) / chapterWeight).clamp(0.0, 1.0);
+        return (
+          chapterIndex: index,
+          paragraphIndex: (localProgress * lastParagraph).round(),
+        );
+      }
+      precedingWeight = cumulativeWeight;
+    }
+
+    return (chapterIndex: chapterCount - 1, paragraphIndex: 0);
+  }
+
   NormalizedBook buildBookForSearch(
     NormalizedBookMetadata meta,
     Map<int, ReaderChapter> loadedChapters,

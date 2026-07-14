@@ -158,6 +158,39 @@ void main() {
 
       expect(ReaderContentHelper.countWords(chapters), 2);
     });
+
+    test('position estimate uses progress within the selected chapter', () {
+      final chapters = <int, ReaderChapter>{
+        0: const ReaderChapter(
+          index: 0,
+          title: 'Short',
+          blocks: [
+            ReaderBlock(index: 0, text: 'One'),
+            ReaderBlock(index: 1, text: 'Two'),
+          ],
+        ),
+        1: const ReaderChapter(
+          index: 1,
+          title: 'Long',
+          blocks: [
+            ReaderBlock(index: 0, text: '1'),
+            ReaderBlock(index: 1, text: '2'),
+            ReaderBlock(index: 2, text: '3'),
+            ReaderBlock(index: 3, text: '4'),
+            ReaderBlock(index: 4, text: '5'),
+            ReaderBlock(index: 5, text: '6'),
+          ],
+        ),
+      };
+
+      final position = ReaderContentHelper.estimatePositionFromProgress(
+        progress: 0.5,
+        chapterCount: 2,
+        loadedChapters: chapters,
+      );
+
+      expect(position, (chapterIndex: 1, paragraphIndex: 2));
+    });
   });
 
   group('ReaderController', () {
