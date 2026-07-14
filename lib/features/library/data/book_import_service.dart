@@ -454,7 +454,7 @@ class BookImportService {
         bookId = documentBookId;
         final targetFile = await _storage.bookFile(documentBookId, format);
         await targetFile.parent.create(recursive: true);
-        await cacheFile.rename(targetFile.path);
+        await _moveCacheFileToStorage(cacheFile, targetFile);
 
         await _database.transaction(() async {
           await _database
@@ -467,7 +467,7 @@ class BookImportService {
                   description: Value(_documentDescription(format)),
                   sourceUrl: Value(external.uri),
                   contentHash: Value(contentHash),
-                  fileSize: Value(external.size),
+                  fileSize: Value(fileSize),
                   filePath: Value(targetFile.path),
                   storageMode: const Value('external'),
                   externalUri: Value(external.uri),
@@ -514,12 +514,7 @@ class BookImportService {
         format,
       );
       await targetFile.parent.create(recursive: true);
-      try {
-        await cacheFile.rename(targetFile.path);
-      } on Object catch (_) {
-        await cacheFile.copy(targetFile.path);
-        await _tryDelete(cacheFile.path);
-      }
+      await _moveCacheFileToStorage(cacheFile, targetFile);
 
       final extAuthorIds = <String>[];
       final extAuthorCompanions = <AuthorsCompanion>[];
@@ -544,7 +539,7 @@ class BookImportService {
                 coverUrl: Value(book.coverUrl),
                 sourceUrl: Value(external.uri),
                 contentHash: Value(contentHash),
-                fileSize: Value(external.size),
+                fileSize: Value(fileSize),
                 filePath: Value(targetFile.path),
                 storageMode: const Value('external'),
                 externalUri: Value(external.uri),
@@ -601,6 +596,17 @@ class BookImportService {
         );
       }
       return ImportResult.failure(_friendlyImportError(e));
+    }
+  }
+
+  /// Moves an SAF cache file into the app directory, copying across volumes
+  /// when the platform rejects an atomic rename.
+  Future<void> _moveCacheFileToStorage(File cacheFile, File targetFile) async {
+    try {
+      await cacheFile.rename(targetFile.path);
+    } on FileSystemException {
+      await cacheFile.copy(targetFile.path);
+      await _tryDelete(cacheFile.path);
     }
   }
 
