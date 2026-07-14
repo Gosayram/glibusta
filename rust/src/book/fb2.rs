@@ -1,5 +1,6 @@
 use crate::api::models::{
-    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+    BlockType, BookFormat, MAX_FILE_SIZE, MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock,
+    ReaderChapter, RichSpan,
 };
 use crate::book::archive;
 use crate::book::encoding::{attr_eq, get_xml_attr};
@@ -9,6 +10,13 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    if bytes.len() as u64 > MAX_FILE_SIZE {
+        bail!(
+            "FB2 file exceeds maximum size of {} MiB",
+            MAX_FILE_SIZE / 1024 / 1024
+        );
+    }
+
     let raw_bytes = if looks_like_zip(bytes) {
         let mut zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
         find_fb2_in_zip(&mut zip)?.context("No .fb2 file found in archive")?
@@ -245,6 +253,12 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
+                    if current_text.len().saturating_add(text.len()) > max_base64_image_size() {
+                        bail!(
+                            "FB2 image exceeds maximum size of {} MiB",
+                            MAX_IMAGE_SIZE / 1024 / 1024
+                        );
+                    }
                     current_text.push_str(&text);
                 } else if in_p && in_body {
                     if let Some(last) = current_rich_spans.last_mut() {
@@ -788,6 +802,14 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+fn max_base64_image_size() -> usize {
+    MAX_IMAGE_SIZE
+        .checked_add(2)
+        .and_then(|size| size.checked_div(3))
+        .and_then(|groups| groups.checked_mul(4))
+        .unwrap_or(usize::MAX)
 }
 
 fn looks_like_zip(bytes: &[u8]) -> bool {

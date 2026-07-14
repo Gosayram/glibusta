@@ -197,39 +197,22 @@ class BookOpenService {
     final sw = Stopwatch()..start();
     final cachedMeta = await cache.getMetadata(bookId);
     if (cachedMeta != null) {
-      _logger.info(
-        'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
-        name: 'Reader',
-        cid: cid,
-      );
       final isComplete = await cache.isCacheValid(bookId, cachedMeta);
-      if (!loadChapters) {
-        return NormalizedBook(
-          id: cachedMeta.id,
-          title: cachedMeta.title,
-          authors: cachedMeta.authors,
-          description: cachedMeta.description,
-          coverUrl: cachedMeta.coverUrl,
-          chapters: [
-            for (var i = 0; i < cachedMeta.chapterCount; i++)
-              ReaderChapter(
-                index: i,
-                title: i < cachedMeta.chapterTitles.length
-                    ? cachedMeta.chapterTitles[i]
-                    : 'Глава ${i + 1}',
-                blocks: const [],
-              ),
-          ],
-          metadata: cachedMeta.metadata,
-        );
-      }
-
       if (!isComplete) {
         _logger.warning(
-          'Split cache is incomplete for $bookId',
+          'Split cache is stale or incomplete for $bookId; reparsing source',
           name: 'Reader',
         );
+        await cache.invalidate(bookId, preserveImages: true);
       } else {
+        _logger.info(
+          'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
+          name: 'Reader',
+          cid: cid,
+        );
+        if (!loadChapters) {
+          return _bookFromMetadata(cachedMeta);
+        }
         final chapters = <ReaderChapter>[];
         for (var i = 0; i < cachedMeta.chapterCount; i++) {
           final chapter = await cache.getChapter(bookId, i);
@@ -248,26 +231,12 @@ class BookOpenService {
             metadata: cachedMeta.metadata,
           );
         }
+        _logger.warning(
+          'Split cache lost chapters while loading $bookId; reparsing source',
+          name: 'Reader',
+        );
+        await cache.invalidate(bookId, preserveImages: true);
       }
-
-      return NormalizedBook(
-        id: cachedMeta.id,
-        title: cachedMeta.title,
-        authors: cachedMeta.authors,
-        description: cachedMeta.description,
-        coverUrl: cachedMeta.coverUrl,
-        chapters: [
-          for (var i = 0; i < cachedMeta.chapterCount; i++)
-            ReaderChapter(
-              index: i,
-              title: i < cachedMeta.chapterTitles.length
-                  ? cachedMeta.chapterTitles[i]
-                  : 'Глава ${i + 1}',
-              blocks: const [],
-            ),
-        ],
-        metadata: cachedMeta.metadata,
-      );
     }
 
     final cached = await cache.getCachedBook(bookId);
@@ -294,5 +263,24 @@ class BookOpenService {
       await cache.invalidate(bookId, preserveImages: true);
       rethrow;
     }
+  }
+
+  NormalizedBook _bookFromMetadata(NormalizedBookMetadata metadata) {
+    return NormalizedBook(
+      id: metadata.id,
+      title: metadata.title,
+      authors: metadata.authors,
+      description: metadata.description,
+      coverUrl: metadata.coverUrl,
+      chapters: [
+        for (var i = 0; i < metadata.chapterCount; i++)
+          ReaderChapter(
+            index: i,
+            title: i < metadata.chapterTitles.length ? metadata.chapterTitles[i] : 'Глава ${i + 1}',
+            blocks: const [],
+          ),
+      ],
+      metadata: metadata.metadata,
+    );
   }
 }

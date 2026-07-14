@@ -368,14 +368,44 @@ pub fn extract_cover(path: String) -> anyhow::Result<Vec<u8>> {
     let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
 
     if let Some(cover_b64) = &book.cover_url {
-        use base64::Engine;
-        let engine = base64::engine::general_purpose::STANDARD;
-        let decoded = engine
-            .decode(cover_b64)
-            .map_err(|e| anyhow::anyhow!("Failed to decode cover base64: {}", e))?;
-        return Ok(decoded);
+        return decode_cover_data_uri(cover_b64, MAX_IMAGE_SIZE);
     }
     Ok(Vec::new())
+}
+
+fn decode_cover_data_uri(cover_url: &str, max_size: usize) -> anyhow::Result<Vec<u8>> {
+    let encoded = if let Some(data_uri) = cover_url.strip_prefix("data:") {
+        let (metadata, payload) = data_uri
+            .split_once(',')
+            .ok_or_else(|| anyhow::anyhow!("Cover data URI is missing its payload"))?;
+        if !metadata.ends_with(";base64") {
+            anyhow::bail!("Cover data URI is not base64-encoded");
+        }
+        payload
+    } else {
+        // Preserve compatibility with cached books created before cover URLs
+        // were consistently emitted as data URIs.
+        cover_url
+    };
+
+    let max_encoded_size = max_size
+        .checked_add(2)
+        .and_then(|size| size.checked_div(3))
+        .and_then(|groups| groups.checked_mul(4))
+        .unwrap_or(usize::MAX);
+    if encoded.len() > max_encoded_size {
+        anyhow::bail!("Encoded cover exceeds maximum size of {max_size} bytes");
+    }
+
+    use base64::Engine;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|error| anyhow::anyhow!("Failed to decode cover base64: {error}"))?;
+    if decoded.len() > max_size {
+        anyhow::bail!("Cover exceeds maximum size of {max_size} bytes");
+    }
+
+    Ok(decoded)
 }
 
 /// Detect book format from file extension.
@@ -931,5 +961,24 @@ pub fn parse_book_legacy(
         "rtf" => parse_rtf(bytes, forced_encoding),
         "mobi" | "azw3" | "prc" => parse_mobi(bytes, forced_encoding),
         _ => anyhow::bail!("Unsupported format: {}", format),
+    }
+}
+
+#[cfg(test)]
+mod cover_data_uri_tests {
+    use super::decode_cover_data_uri;
+
+    #[test]
+    fn decodes_base64_data_uri() {
+        let decoded = decode_cover_data_uri("data:image/png;base64,Y292ZXI=", 5).unwrap();
+
+        assert_eq!(decoded, b"cover");
+    }
+
+    #[test]
+    fn rejects_oversized_encoded_cover_before_decoding() {
+        let error = decode_cover_data_uri("data:image/png;base64,Y292ZXI=", 3).unwrap_err();
+
+        assert!(error.to_string().contains("Encoded cover exceeds"));
     }
 }

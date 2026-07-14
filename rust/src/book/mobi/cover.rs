@@ -1,3 +1,5 @@
+use crate::api::models::MAX_IMAGE_SIZE;
+
 use super::{MobiHeader, MobiMetadata, PalmDb};
 
 pub(crate) struct MobiCoverExtractor;
@@ -61,6 +63,9 @@ impl MobiCoverExtractor {
     }
 
     fn validate_image_bytes(&self, bytes: &[u8]) -> Option<Vec<u8>> {
+        if bytes.len() > MAX_IMAGE_SIZE {
+            return None;
+        }
         if self.is_jpeg(bytes) || self.is_png(bytes) || self.is_gif(bytes) {
             Some(bytes.to_vec())
         } else {

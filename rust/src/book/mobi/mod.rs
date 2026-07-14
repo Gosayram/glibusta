@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use anyhow::{Result, bail};
 use regex::Regex;
 
-use crate::api::models::{BlockType, BookFormat, NormalizedBook, ReaderBlock};
+use crate::api::models::{BlockType, BookFormat, MAX_FILE_SIZE, NormalizedBook, ReaderBlock};
 
 mod chapters;
 mod cover;
@@ -407,6 +407,12 @@ fn encode_cover_data_uri(bytes: &[u8]) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    if bytes.len() as u64 > MAX_FILE_SIZE {
+        bail!(
+            "MOBI file exceeds maximum size of {} MiB",
+            MAX_FILE_SIZE / 1024 / 1024
+        );
+    }
     if bytes.len() < 86 {
         bail!("File is too small for PalmDB/MOBI");
     }

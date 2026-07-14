@@ -147,9 +147,9 @@ final class ReaderCacheService {
       if (preserveImages) {
         final imagesDir = Directory('${bookDir.path}/epub_images');
         final hasImages = await imagesDir.exists();
-        final imagesBackup = hasImages
-            ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
-            : null;
+        final backupPath =
+            '${bookDir.path}.epub_images_bak_${DateTime.now().microsecondsSinceEpoch}';
+        final imagesBackup = hasImages ? await imagesDir.rename(backupPath) : null;
 
         try {
           await bookDir.delete(recursive: true);
@@ -161,6 +161,7 @@ final class ReaderCacheService {
         }
 
         if (imagesBackup != null) {
+          await bookDir.create(recursive: true);
           await imagesBackup.rename('${bookDir.path}/epub_images');
         }
       } else {
