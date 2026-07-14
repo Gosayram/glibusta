@@ -319,7 +319,7 @@ impl BlockType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RichSpan {
     pub text: String,
     pub bold: bool,
@@ -331,7 +331,7 @@ pub struct RichSpan {
     pub line_break: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReaderBlock {
     pub index: i32,
     pub text: String,
@@ -698,7 +698,12 @@ impl BookDiff {
                     .zip(b.blocks.iter())
                     .any(|(x, y)| x.text != y.text)
         });
-        let chapters_changed = structure_changed || text_changed;
+        let block_content_changed = old
+            .chapters
+            .iter()
+            .zip(new.chapters.iter())
+            .any(|(a, b)| a.blocks.iter().zip(b.blocks.iter()).any(|(x, y)| x != y));
+        let chapters_changed = structure_changed || text_changed || block_content_changed;
         let metadata_changed = old.title != new.title
             || old.authors != new.authors
             || old.description != new.description
@@ -832,5 +837,18 @@ mod book_diff_tests {
         assert!(!diff.text_changed);
         assert!(!diff.metadata_only);
         assert!(diff.needs_anchor_migration);
+    }
+
+    #[test]
+    fn non_text_block_content_change_does_not_require_anchor_migration() {
+        let old = test_book();
+        let mut new = old.clone();
+        new.chapters[0].blocks[0].image_url = Some("cover.png".to_string());
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(diff.chapters_changed);
+        assert!(!diff.text_changed);
+        assert!(!diff.needs_anchor_migration);
     }
 }

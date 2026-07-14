@@ -104,13 +104,25 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         let (mut blocks, next_block_index, page_breaks_in_file) =
             parse_xhtml_to_blocks(&xhtml_text, block_index, &css);
         // RCE-7.5: collapse empty div/span — remove blocks with no visible content
-        blocks.retain(|b| {
+        let is_renderable = |b: &ReaderBlock| {
             !b.text.trim().is_empty()
                 || b.image_url.is_some()
                 || b.block_type == BlockType::Separator
                 || b.table_rows.is_some()
                 || b.list_items.is_some()
-        });
+        };
+        let page_breaks_in_file: Vec<usize> = page_breaks_in_file
+            .into_iter()
+            .filter_map(|break_index| {
+                let remapped_index = blocks
+                    .iter()
+                    .take(break_index)
+                    .filter(|block| is_renderable(block))
+                    .count();
+                (remapped_index > 0).then_some(remapped_index)
+            })
+            .collect();
+        blocks.retain(is_renderable);
         block_index = next_block_index;
 
         // If quick-xml produced nothing, try html5ever for malformed HTML content.

@@ -488,12 +488,14 @@ Widget _buildReaderBlock(
     case BlockType.preformatted:
       return Padding(
         padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
-        child: Text(
+        child: _readerHighlightedText(
+          ctx,
           block.text,
-          style: style.copyWith(
+          style.copyWith(
             fontFamily: 'monospace',
             fontSize: s.fontSize * 0.9,
           ),
+          textAlign,
         ),
       );
     case BlockType.paragraph:

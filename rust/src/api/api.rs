@@ -518,17 +518,22 @@ pub fn repair_book(path: String) -> anyhow::Result<NormalizedBook> {
         }
     }
     book.chapters = new_chapters;
-    // Fix TOC chapter_index mapping
+    // Keep only TOC entries that still point to a retained chapter before
+    // deduplication. Reassigning invalid entries to zero could discard the
+    // legitimate first chapter entry.
+    book.toc
+        .retain(|toc| old_to_new.contains_key(&toc.chapter_index));
     for toc in &mut book.toc {
-        if let Some(&new_idx) = old_to_new.get(&toc.chapter_index) {
-            toc.chapter_index = new_idx;
-        } else {
-            toc.chapter_index = 0;
-        }
+        // Safe after retain above.
+        toc.chapter_index = old_to_new[&toc.chapter_index];
     }
     // Deduplicate TOC by chapter_index
     let mut seen = std::collections::HashSet::new();
-    book.toc.retain(|t| seen.insert(t.chapter_index));
+    book.toc.retain(|t| {
+        t.chapter_index >= 0
+            && (t.chapter_index as usize) < book.chapters.len()
+            && seen.insert(t.chapter_index)
+    });
     Ok(book)
 }
 

@@ -18,18 +18,21 @@ pub(crate) use hash::sha256_hex;
 use crate::api::models::RichSpan;
 
 /// Strip dangerous schemes from href (javascript:, vbscript:, data:).
-/// Single-pass: trim + case-insensitive scheme check, no intermediate alloc.
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     let trimmed = href.trim();
     if trimmed.is_empty() {
         return None;
     }
-    let bytes = trimmed.as_bytes();
-    if (bytes.len() >= 11 && bytes[..11].eq_ignore_ascii_case(b"javascript:"))
-        || (bytes.len() >= 9 && bytes[..9].eq_ignore_ascii_case(b"vbscript:"))
-        || (bytes.len() >= 5 && bytes[..5].eq_ignore_ascii_case(b"data:"))
-    {
-        return None;
+    if let Some(colon) = trimmed.find(':') {
+        let scheme: Vec<u8> = trimmed.as_bytes()[..colon]
+            .iter()
+            .copied()
+            .filter(|byte| !byte.is_ascii_whitespace() && !byte.is_ascii_control())
+            .map(|byte| byte.to_ascii_lowercase())
+            .collect();
+        if matches!(scheme.as_slice(), b"javascript" | b"vbscript" | b"data") {
+            return None;
+        }
     }
     Some(trimmed.to_string())
 }

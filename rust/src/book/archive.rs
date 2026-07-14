@@ -1,6 +1,4 @@
-use crate::api::models::{
-    MAX_CHAPTER_SIZE, MAX_COMPRESSION_RATIO, MAX_EXTRACTED_FILES, MAX_FILE_SIZE,
-};
+use crate::api::models::{MAX_COMPRESSION_RATIO, MAX_EXTRACTED_FILES, MAX_FILE_SIZE};
 use anyhow::{Context, Result};
 use std::io::Cursor;
 use std::io::Read;
@@ -70,12 +68,12 @@ impl<'a> ZipFile<'a> {
         })
     }
 
-    /// Read a text-like entry using the default chapter-size limit.
+    /// Read a general archive entry up to the archive file-size limit.
     ///
     /// A missing entry is represented by `Ok(None)`; extraction and safety
     /// failures remain errors so callers cannot mistake them for absence.
     pub fn find_file(&mut self, name: &str) -> Result<Option<Vec<u8>>> {
-        self.read_file_limited(name, MAX_CHAPTER_SIZE)
+        self.read_file_limited(name, MAX_FILE_SIZE as usize)
     }
 
     /// Read an archive entry after enforcing its caller-specific size limit.

@@ -440,16 +440,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (readerState.scrollProgress < 0.99) return;
     _finishedDialogShown = true;
     // STR-6.1: request review after finishing a book
-    final inAppReview = InAppReview.instance;
-    unawaited(
-      inAppReview.isAvailable().then((available) {
-        if (available) unawaited(inAppReview.requestReview());
-      }),
-    );
+    unawaited(_requestReview());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_showNextBookDialog());
     });
+  }
+
+  Future<void> _requestReview() async {
+    final inAppReview = InAppReview.instance;
+    try {
+      if (await inAppReview.isAvailable()) {
+        await inAppReview.requestReview();
+      }
+    } on PlatformException catch (e) {
+      debugPrint('In-app review is unavailable: ${e.message ?? e.code}');
+    } on Object catch (e) {
+      debugPrint('In-app review request failed: $e');
+    }
   }
 
   Future<void> _showNextBookDialog() async {

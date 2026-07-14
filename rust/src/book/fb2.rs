@@ -825,7 +825,7 @@ fn find_fb2_in_zip(zip: &mut archive::ZipFile<'_>) -> Result<Option<Vec<u8>>> {
     else {
         return Ok(None);
     };
-    zip.find_file(&name)
+    zip.read_file_limited(&name, crate::api::models::MAX_FILE_SIZE as usize)
 }
 
 fn detect_fb2_encoding(bytes: &[u8]) -> String {
