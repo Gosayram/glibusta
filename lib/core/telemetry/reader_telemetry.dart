@@ -174,9 +174,14 @@ class ReaderTelemetry {
   Future<List<String>> getFrequentErrors({int limit = 10}) async {
     final errors = _prefs.getStringList(_errorsKey) ?? [];
     final counts = <String, int>{};
-    for (final e in errors) {
-      final msg = e.split('|').first;
-      counts[msg] = (counts[msg] ?? 0) + 1;
+    for (final entry in errors) {
+      final firstSeparator = entry.indexOf('|');
+      final lastSeparator = entry.lastIndexOf('|');
+      if (firstSeparator < 0 || firstSeparator == lastSeparator) continue;
+
+      final message = entry.substring(firstSeparator + 1, lastSeparator);
+      if (message.isEmpty) continue;
+      counts[message] = (counts[message] ?? 0) + 1;
     }
     final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return sorted.take(limit).map((e) => e.key).toList();
