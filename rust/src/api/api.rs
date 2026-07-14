@@ -1,7 +1,7 @@
 use crate::api::models::{
     BookAssetMeta, BookDiff, BookFormat, BookMeta, BookValidationResult, ChapterLanguage,
-    CoreError, FormatCapabilities, ImportReport, NormalizedBook, ReaderBlock, ReaderChapter,
-    TocEntry,
+    CoreError, FormatCapabilities, ImportReport, MAX_FILE_SIZE, MAX_IMAGE_SIZE, NormalizedBook,
+    ReaderBlock, ReaderChapter, TocEntry,
 };
 use hyphenation::{Hyphenator, Language, Load, Standard};
 use std::collections::HashMap;
@@ -82,6 +82,16 @@ fn detect_format_from_path(path: &str) -> Result<BookFormat, CoreError> {
 /// ARC-3.1: Memory-map a file for zero-copy reading.
 fn map_file(path: &str) -> Result<memmap2::Mmap, CoreError> {
     let file = std::fs::File::open(path).map_err(|e| CoreError::IoError(e.to_string()))?;
+    let size = file
+        .metadata()
+        .map_err(|e| CoreError::IoError(e.to_string()))?
+        .len();
+    if size > MAX_FILE_SIZE {
+        return Err(CoreError::IoError(format!(
+            "File exceeds maximum supported size: {} bytes (max {} bytes)",
+            size, MAX_FILE_SIZE
+        )));
+    }
     unsafe { memmap2::Mmap::map(&file).map_err(|e| CoreError::IoError(e.to_string())) }
 }
 
@@ -315,11 +325,11 @@ pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
         }
     }
     let spine_toc_mismatch = !book.toc.is_empty()
-        && book.toc.len() != book.chapters.len()
-        && book
-            .toc
-            .iter()
-            .any(|t| t.chapter_index >= book.chapters.len() as i32);
+        && (book.toc.len() != book.chapters.len()
+            || book
+                .toc
+                .iter()
+                .any(|t| t.chapter_index >= book.chapters.len() as i32));
     Ok(BookValidationResult {
         valid: empty_chapters.is_empty() && duplicate_chapters.is_empty() && !spine_toc_mismatch,
         empty_chapters,
@@ -385,30 +395,36 @@ pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>
     match format {
         BookFormat::Epub => {
             let mut zip = crate::book::archive::decode_zip(&bytes)?;
-            let entry = zip.find_file(&asset_id).or_else(|| {
-                zip.entry_names()
-                    .iter()
-                    .find(|n| n.ends_with(&asset_id))
-                    .cloned()
-                    .and_then(|name| zip.find_file(&name))
-            });
-            Ok(entry.unwrap_or_default())
+            read_archive_asset(&mut zip, &asset_id)
         }
         BookFormat::Docx => {
             let mut zip = crate::book::archive::decode_zip(&bytes)?;
-            let entry = zip.find_file(&asset_id).or_else(|| {
-                zip.entry_names()
-                    .iter()
-                    .find(|n| n.ends_with(&asset_id))
-                    .cloned()
-                    .and_then(|name| zip.find_file(&name))
-            });
-            Ok(entry.unwrap_or_default())
+            read_archive_asset(&mut zip, &asset_id)
         }
         _ => Err(anyhow::anyhow!(
             "Asset extraction not supported for format: {:?}",
             format
         )),
+    }
+}
+
+fn read_archive_asset(
+    zip: &mut crate::book::archive::ZipFile,
+    asset_id: &str,
+) -> anyhow::Result<Vec<u8>> {
+    if let Some(entry) = zip.read_file_limited(asset_id, MAX_IMAGE_SIZE)? {
+        return Ok(entry);
+    }
+    let matching_name = zip
+        .entry_names()
+        .iter()
+        .find(|name| name.ends_with(asset_id))
+        .cloned();
+    match matching_name {
+        Some(name) => Ok(zip
+            .read_file_limited(&name, MAX_IMAGE_SIZE)?
+            .unwrap_or_default()),
+        None => Ok(Vec::new()),
     }
 }
 

@@ -9,6 +9,9 @@ use quick_xml::events::Event;
 use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    if bytes.len() as u64 > crate::api::models::MAX_FILE_SIZE {
+        anyhow::bail!("DOCX exceeds maximum file size");
+    }
     let mut zip = archive::decode_zip(bytes).context("Failed to open DOCX archive")?;
 
     let entry_count = zip.entry_names().len();
@@ -25,7 +28,7 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let (title, authors, created_date) = parse_core_properties(&mut zip, encoding_name)?;
 
     let document_xml = zip
-        .find_file("word/document.xml")
+        .read_file_limited("word/document.xml", crate::api::models::MAX_CHAPTER_SIZE)?
         .context("DOCX missing word/document.xml")?;
     let doc_text = decode_bytes(&document_xml, encoding_name);
 
@@ -54,16 +57,20 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     });
 
     let images = extract_images(&mut zip);
-    let cover_url = images.first().and_then(|img| {
+    let cover_url = if let Some(img) = images.first() {
         let entry_name = format!("word/media/{}", img.id);
-        let data = zip.find_file(&entry_name)?;
+        let data = zip.read_file_limited(&entry_name, crate::api::models::MAX_IMAGE_SIZE)?;
         use base64::Engine;
-        Some(format!(
-            "data:{};base64,{}",
-            img.media_type,
-            base64::engine::general_purpose::STANDARD.encode(&data)
-        ))
-    });
+        data.map(|data| {
+            format!(
+                "data:{};base64,{}",
+                img.media_type,
+                base64::engine::general_purpose::STANDARD.encode(&data)
+            )
+        })
+    } else {
+        None
+    };
 
     Ok(NormalizedBook {
         id,
@@ -96,7 +103,7 @@ fn parse_core_properties(
     encoding_name: &str,
 ) -> Result<(String, Vec<String>, String)> {
     let props_bytes = zip
-        .find_file("docProps/core.xml")
+        .read_file_limited("docProps/core.xml", crate::api::models::MAX_CHAPTER_SIZE)?
         .context("DOCX missing docProps/core.xml")?;
     let props_text = decode_bytes(&props_bytes, encoding_name);
 

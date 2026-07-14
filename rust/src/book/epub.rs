@@ -14,6 +14,9 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    if bytes.len() as u64 > crate::api::models::MAX_FILE_SIZE {
+        bail!("EPUB exceeds maximum file size");
+    }
     let mut zip = archive::decode_zip(bytes).context("Failed to open EPUB archive")?;
 
     // RCE-12.6: zip bomb guard — reject archives with too many entries
@@ -29,13 +32,16 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
     let container_xml = zip
-        .find_file("META-INF/container.xml")
+        .read_file_limited(
+            "META-INF/container.xml",
+            crate::api::models::MAX_CHAPTER_SIZE,
+        )?
         .context("EPUB missing META-INF/container.xml")?;
     let container_text = decode_bytes(&container_xml, encoding_name);
     let opf_path = parse_container_xml(&container_text)?;
 
     let opf_bytes = zip
-        .find_file(&opf_path)
+        .read_file_limited(&opf_path, crate::api::models::MAX_CHAPTER_SIZE)?
         .with_context(|| format!("OPF file not found: {}", opf_path))?;
     let opf_text = decode_bytes(&opf_bytes, encoding_name);
 
@@ -53,7 +59,8 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let description = metadata.get("description").cloned();
     let language = metadata.get("language").cloned();
 
-    let cover_url = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, encoding_name);
+    let cover_url =
+        extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, encoding_name)?;
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     let mut chapter_index = 0i32;
@@ -73,14 +80,18 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             format!("{}/{}", opf_dir, item.href)
         };
 
-        let Some(xhtml_bytes) = zip.find_file(&item_href).or_else(|| {
-            let name = zip
-                .entry_names()
-                .iter()
-                .find(|n| n.eq_ignore_ascii_case(&item_href))
-                .cloned()?;
-            zip.find_file(&name)
-        }) else {
+        let matching_name = zip
+            .entry_names()
+            .iter()
+            .find(|name| name.eq_ignore_ascii_case(&item_href))
+            .cloned();
+        let xhtml_bytes = zip
+            .read_file_limited(&item_href, crate::api::models::MAX_CHAPTER_SIZE)?
+            .or(match matching_name {
+                Some(name) => zip.read_file_limited(&name, crate::api::models::MAX_CHAPTER_SIZE)?,
+                None => None,
+            });
+        let Some(xhtml_bytes) = xhtml_bytes else {
             continue;
         };
 
@@ -213,7 +224,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     };
 
     // ---- TOC extraction ----
-    let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name);
+    let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name)?;
 
     if cover_url.is_none() {
         warnings.push(crate::api::models::ParseWarning {
@@ -254,20 +265,20 @@ fn extract_epub_toc(
     ncx_id: &Option<String>,
     opf_dir: &str,
     encoding_name: &str,
-) -> Vec<TocEntry> {
+) -> Result<Vec<TocEntry>> {
     // Try EPUB 3 nav.xhtml first (preferred)
-    if let Some(toc) = try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name) {
+    if let Some(toc) = try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name)? {
         if !toc.is_empty() {
-            return toc;
+            return Ok(toc);
         }
     }
 
     // Fall back to EPUB 2 NCX
-    if let Some(toc) = try_parse_ncx(zip, manifest, ncx_id, opf_dir, encoding_name) {
-        return toc;
+    if let Some(toc) = try_parse_ncx(zip, manifest, ncx_id, opf_dir, encoding_name)? {
+        return Ok(toc);
     }
 
-    Vec::new()
+    Ok(Vec::new())
 }
 
 fn try_parse_nav_xhtml(
@@ -275,18 +286,23 @@ fn try_parse_nav_xhtml(
     manifest: &HashMap<String, ManifestItem>,
     opf_dir: &str,
     encoding_name: &str,
-) -> Option<Vec<TocEntry>> {
-    let nav_item = manifest.values().find(|item| {
+) -> Result<Option<Vec<TocEntry>>> {
+    let Some(nav_item) = manifest.values().find(|item| {
         item.properties.iter().any(|p| p == "nav") && item.media_type == "application/xhtml+xml"
-    })?;
+    }) else {
+        return Ok(None);
+    };
     let nav_path = if opf_dir.is_empty() {
         nav_item.href.clone()
     } else {
         format!("{}/{}", opf_dir, nav_item.href)
     };
-    let bytes = zip.find_file(&nav_path)?;
+    let Some(bytes) = zip.read_file_limited(&nav_path, crate::api::models::MAX_CHAPTER_SIZE)?
+    else {
+        return Ok(None);
+    };
     let text = decode_bytes(&bytes, encoding_name);
-    Some(parse_nav_xhtml(&text))
+    Ok(Some(parse_nav_xhtml(&text)))
 }
 
 fn try_parse_ncx(
@@ -295,7 +311,7 @@ fn try_parse_ncx(
     ncx_id: &Option<String>,
     opf_dir: &str,
     encoding_name: &str,
-) -> Option<Vec<TocEntry>> {
+) -> Result<Option<Vec<TocEntry>>> {
     // Find NCX: either by spine toc attribute or by media-type
     let ncx_item = ncx_id
         .as_ref()
@@ -304,15 +320,21 @@ fn try_parse_ncx(
             manifest
                 .values()
                 .find(|item| item.media_type == "application/x-dtbncx+xml")
-        })?;
+        });
+    let Some(ncx_item) = ncx_item else {
+        return Ok(None);
+    };
     let ncx_path = if opf_dir.is_empty() {
         ncx_item.href.clone()
     } else {
         format!("{}/{}", opf_dir, ncx_item.href)
     };
-    let bytes = zip.find_file(&ncx_path)?;
+    let Some(bytes) = zip.read_file_limited(&ncx_path, crate::api::models::MAX_CHAPTER_SIZE)?
+    else {
+        return Ok(None);
+    };
     let text = decode_bytes(&bytes, encoding_name);
-    Some(parse_ncx(&text))
+    Ok(Some(parse_ncx(&text)))
 }
 
 struct ManifestItem {
@@ -745,7 +767,7 @@ fn extract_cover_url(
     metadata: &HashMap<String, String>,
     opf_dir: &str,
     _encoding_name: &str,
-) -> Option<String> {
+) -> Result<Option<String>> {
     // Try cover-id from <meta name="cover" content="..."/>
     if let Some(cover_id) = metadata.get("cover-id") {
         if let Some(item) = manifest.get(cover_id.as_str()) {
@@ -754,8 +776,8 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, &bytes));
+            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(cover));
             }
         }
     }
@@ -768,8 +790,8 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, &bytes));
+            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(cover));
             }
         }
     }
@@ -782,13 +804,18 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(bytes) = zip.find_file(&href) {
-                return Some(encode_data_uri(&item.media_type, &bytes));
+            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(cover));
             }
         }
     }
 
-    None
+    Ok(None)
+}
+
+fn read_cover_image(zip: &mut ZipFile, href: &str, media_type: &str) -> Result<Option<String>> {
+    let bytes = zip.read_file_limited(href, crate::api::models::MAX_IMAGE_SIZE)?;
+    Ok(bytes.map(|data| encode_data_uri(media_type, &data)))
 }
 
 fn encode_data_uri(mime: &str, bytes: &[u8]) -> String {

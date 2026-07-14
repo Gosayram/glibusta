@@ -1914,7 +1914,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
         return totalHeight;
       case BlockType.listItem:
-        return _measureBlockHeight(block, settings, colors, width - 32) + ps * 0.5;
+        return _measureBlockHeight(block, settings, colors, width - settings.margin) + ps * 0.5;
       case BlockType.preformatted:
         return _measureBlockHeight(block, settings, colors, width) + ps;
       case BlockType.paragraph:
