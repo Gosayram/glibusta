@@ -431,7 +431,39 @@ void main() {
       await tester.pumpAndSettle();
     });
   });
+
+  testWidgets('RSVP skip controls work when the loaded chapter has no text', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'book-1',
+            title: 'Тестовая книга',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Глава 1'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(index: 0, title: 'Глава 1', blocks: []),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.rsvp),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.skip_next));
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('300 сл/мин  ·  0/0'), findsOneWidget);
+  });
 }
+
+void _ignoreTap(TapUpDetails _) {}
 
 class _TestReaderSettingsNotifier extends ReaderSettingsNotifier {
   _TestReaderSettingsNotifier(this._initial);

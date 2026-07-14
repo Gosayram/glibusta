@@ -2602,6 +2602,7 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
   }
 
   void _togglePlay() {
+    if (_words.isEmpty) return;
     if (_playing) {
       _timer?.cancel();
       _timer = null;
@@ -2628,6 +2629,7 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
   }
 
   void _skip(int delta) {
+    if (_words.isEmpty) return;
     _timer?.cancel();
     setState(() {
       _wordIndex = (_wordIndex + delta).clamp(0, _words.length - 1);
@@ -2649,6 +2651,7 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
         ReaderColors.forThemeWithContext(s.theme, MediaQuery.platformBrightnessOf(context));
     final word = _words.isEmpty ? '' : _words[_wordIndex];
     final progress = _words.isEmpty ? 0.0 : (_wordIndex + 1) / _words.length;
+    final displayedWordIndex = _words.isEmpty ? 0 : _wordIndex + 1;
 
     return ColoredBox(
       color: colors.scaffold,
@@ -2721,7 +2724,7 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                '${s.rsvpWpm} сл/мин  ·  ${_wordIndex + 1}/${_words.length}',
+                '${s.rsvpWpm} сл/мин  ·  $displayedWordIndex/${_words.length}',
                 style: TextStyle(
                   color: colors.text.withValues(alpha: 0.4),
                   fontSize: 12,
