@@ -868,6 +868,16 @@ pub fn open_book_engine(path: String) -> anyhow::Result<Arc<BookEngine>> {
 // Legacy byte-based API (still needed by some callers)
 // ---------------------------------------------------------------------------
 
+fn validate_legacy_input_size(bytes: &[u8], max_size: u64) -> anyhow::Result<()> {
+    if bytes.len() as u64 > max_size {
+        anyhow::bail!(
+            "Book data exceeds maximum size of {} MiB",
+            max_size / 1024 / 1024
+        );
+    }
+    Ok(())
+}
+
 /// Extract blocks from HTML content using html5ever + scraper.
 pub fn parse_html_blocks(html: String) -> anyhow::Result<Vec<ReaderBlock>> {
     let (blocks, _) = crate::book::html_parser::html_to_blocks(&html, 0);
@@ -878,6 +888,7 @@ pub fn parse_fb2(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::fb2::parse_fb2(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -886,6 +897,7 @@ pub fn parse_epub(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::epub::parse_epub(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -894,6 +906,7 @@ pub fn parse_txt(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::txt::parse_txt(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -902,6 +915,7 @@ pub fn parse_docx(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::docx::parse_docx(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -910,6 +924,7 @@ pub fn parse_rtf(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::rtf::parse_rtf(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -918,6 +933,7 @@ pub fn parse_mobi(
     bytes: Vec<u8>,
     forced_encoding: Option<String>,
 ) -> anyhow::Result<NormalizedBook> {
+    validate_legacy_input_size(&bytes, MAX_FILE_SIZE)?;
     crate::book::mobi::parse_mobi(&bytes, forced_encoding.as_deref())
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
@@ -966,7 +982,7 @@ pub fn parse_book_legacy(
 
 #[cfg(test)]
 mod cover_data_uri_tests {
-    use super::decode_cover_data_uri;
+    use super::{decode_cover_data_uri, validate_legacy_input_size};
 
     #[test]
     fn decodes_base64_data_uri() {
@@ -980,5 +996,12 @@ mod cover_data_uri_tests {
         let error = decode_cover_data_uri("data:image/png;base64,Y292ZXI=", 3).unwrap_err();
 
         assert!(error.to_string().contains("Encoded cover exceeds"));
+    }
+
+    #[test]
+    fn rejects_oversized_legacy_input_before_parsing() {
+        let error = validate_legacy_input_size(&[0, 1], 1).unwrap_err();
+
+        assert!(error.to_string().contains("Book data exceeds"));
     }
 }
