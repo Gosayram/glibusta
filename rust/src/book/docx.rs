@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > crate::api::models::MAX_FILE_SIZE {
@@ -32,7 +33,9 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .context("DOCX missing word/document.xml")?;
     let doc_text = decode_bytes(&document_xml, encoding_name);
 
-    let (blocks, chapter_title) = parse_document_xml(&doc_text)?;
+    let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
+    let (blocks, chapter_title) =
+        parse_document_xml_with_hyperlinks(&doc_text, &hyperlink_targets)?;
 
     let id = crate::book::sha256_hex(bytes);
 
@@ -122,6 +125,46 @@ fn parse_core_properties(
     Ok((title, authors, created))
 }
 
+fn parse_hyperlink_relationships(
+    zip: &mut ZipFile<'_>,
+    encoding_name: &str,
+) -> Result<HashMap<String, String>> {
+    let Some(bytes) = zip.read_file_limited(
+        "word/_rels/document.xml.rels",
+        crate::api::models::MAX_CHAPTER_SIZE,
+    )?
+    else {
+        return Ok(HashMap::new());
+    };
+    let text = decode_bytes(&bytes, encoding_name);
+    let mut reader = Reader::from_str(&text);
+    let mut targets = HashMap::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Empty(ref element)) | Ok(Event::Start(ref element))
+                if element.local_name().as_ref() == b"Relationship" =>
+            {
+                let id = xml_attribute(element, b"Id");
+                let target = xml_attribute(element, b"Target");
+                let mode = xml_attribute(element, b"TargetMode");
+                if mode.as_deref() == Some("External") {
+                    if let (Some(id), Some(target)) = (id, target) {
+                        if let Some(safe_target) = crate::book::sanitize_href(&target) {
+                            targets.insert(id, safe_target);
+                        }
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(_) => return Ok(HashMap::new()),
+        }
+    }
+
+    Ok(targets)
+}
+
 /// Extract image metadata from word/media/ without loading bytes.
 /// Use `get_asset_bytes()` (RCE-10.2) for lazy data loading.
 fn extract_images(zip: &mut ZipFile<'_>) -> Vec<EmbeddedImage> {
@@ -154,9 +197,19 @@ fn mime_from_name(name: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
+    parse_document_xml_with_hyperlinks(text, &HashMap::new())
+}
+
+fn parse_document_xml_with_hyperlinks(
+    text: &str,
+    hyperlink_targets: &HashMap<String, String>,
+) -> Result<(Vec<ReaderBlock>, String)> {
     let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
+    // Whitespace between XML elements is ignored outside runs; preserve spaces
+    // inside `<w:t>` so adjacent runs don't collapse words together.
+    reader.config_mut().trim_text(false);
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
     let mut chapter_title = String::new();
@@ -178,6 +231,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
     let mut current_span_italic = false;
+    let mut current_span_href: Option<String> = None;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
     let mut current_table_cell = String::new();
@@ -218,6 +272,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                         current_span_text.clear();
                         current_span_bold = false;
                         current_span_italic = false;
+                        current_span_href = None;
                         pstyle_val.clear();
                         paragraph_is_numbered = false;
                         paragraph_numbering_id = None;
@@ -225,6 +280,15 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                     "w:numPr" if in_paragraph => paragraph_is_numbered = true,
                     "w:numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
+                    }
+                    "w:hyperlink" if in_paragraph => {
+                        current_span_href = word_attribute(e, b"anchor")
+                            .map(|anchor| format!("#{anchor}"))
+                            .or_else(|| {
+                                word_attribute(e, b"id")
+                                    .and_then(|id| hyperlink_targets.get(&id).cloned())
+                            })
+                            .and_then(|href| crate::book::sanitize_href(&href));
                     }
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
@@ -294,7 +358,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                                 bold: current_span_bold,
                                 italic: current_span_italic,
                                 superscript: false,
-                                href: None,
+                                href: current_span_href.clone(),
                                 line_break: false,
                             });
                         }
@@ -382,7 +446,9 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                         in_paragraph = false;
                         rich_spans.clear();
                         current_span_text.clear();
+                        current_span_href = None;
                     }
+                    "w:hyperlink" if in_paragraph => current_span_href = None,
                     "w:tc" if in_table_cell => {
                         current_table_row.push(current_table_cell.trim().to_string());
                         current_table_cell.clear();
@@ -474,11 +540,19 @@ fn is_word_value_attribute(key: &[u8]) -> bool {
 }
 
 fn word_value_attribute(element: &BytesStart<'_>) -> Option<String> {
+    word_attribute(element, b"val")
+}
+
+fn word_attribute(element: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     element
         .attributes()
         .filter_map(|attribute| attribute.ok())
-        .find(|attribute| is_word_value_attribute(attribute.key.as_ref()))
+        .find(|attribute| attribute.key.local_name().as_ref() == name)
         .map(|attribute| String::from_utf8_lossy(&attribute.value).into_owned())
+}
+
+fn xml_attribute(element: &BytesStart<'_>, name: &[u8]) -> Option<String> {
+    word_attribute(element, name)
 }
 
 fn flush_docx_list(
@@ -516,7 +590,8 @@ fn flush_docx_list(
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_document_xml, parse_docx};
+    use super::{parse_document_xml, parse_document_xml_with_hyperlinks, parse_docx};
+    use std::collections::HashMap;
     use std::io::{Cursor, Write};
 
     fn malformed_docx() -> Vec<u8> {
@@ -656,5 +731,65 @@ mod tests {
             ["First", "Second"]
         );
         assert_eq!(blocks[1].text, "After the list");
+    }
+
+    #[test]
+    fn preserves_external_and_bookmark_hyperlinks() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                <w:body><w:p>
+                    <w:r><w:t>See </w:t></w:r>
+                    <w:hyperlink r:id="rId7"><w:r><w:t>website</w:t></w:r></w:hyperlink>
+                    <w:r><w:t> and </w:t></w:r>
+                    <w:hyperlink w:anchor="chapter-2"><w:r><w:t>chapter</w:t></w:r></w:hyperlink>
+                </w:p></w:body>
+            </w:document>
+        "#;
+        let hyperlinks =
+            HashMap::from([(String::from("rId7"), String::from("https://example.com"))]);
+
+        let (blocks, _) =
+            parse_document_xml_with_hyperlinks(xml, &hyperlinks).expect("parse DOCX links");
+        let spans = blocks[0].rich_spans.as_ref().expect("rich spans");
+
+        assert_eq!(blocks[0].text, "See website and chapter");
+        assert_eq!(spans[1].href.as_deref(), Some("https://example.com"));
+        assert_eq!(spans[3].href.as_deref(), Some("#chapter-2"));
+    }
+
+    #[test]
+    fn resolves_external_hyperlinks_from_document_relationships() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:hyperlink r:id="rId1"><w:r><w:t>Website</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/_rels/document.xml.rels", options)
+            .expect("start relationships XML");
+        zip.write_all(
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/></Relationships>"#,
+        )
+        .expect("write relationships XML");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse DOCX with hyperlink");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(spans[0].href.as_deref(), Some("https://example.com"));
     }
 }
