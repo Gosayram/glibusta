@@ -99,6 +99,7 @@ class ReaderState {
 
   ReaderState copyWith({
     NormalizedBookMetadata? metadata,
+    bool clearMetadata = false,
     Map<int, ReaderChapter>? loadedChapters,
     ReaderLoadingStage? loadingStage,
     bool clearLoadingStage = false,
@@ -122,7 +123,7 @@ class ReaderState {
     int? wpm,
   }) {
     return ReaderState(
-      metadata: metadata ?? this.metadata,
+      metadata: clearMetadata ? null : (metadata ?? this.metadata),
       loadedChapters: loadedChapters ?? this.loadedChapters,
       loadingStage: clearLoadingStage ? null : (loadingStage ?? this.loadingStage),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -247,14 +248,31 @@ final class ReaderController {
 
   Future<void> loadBook() async {
     final loadGeneration = ++_loadGeneration;
+    _chapterLoadGeneration++;
     _loaded = false;
+    _sessionWordsRead = 0;
+    _cacheMode = 'unknown';
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _autoThemeTimer = null;
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _scrollController = null;
-    _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.openingFile));
+    _updateState(
+      _state.copyWith(
+        clearMetadata: true,
+        loadedChapters: const {},
+        loadingStage: ReaderLoadingStage.openingFile,
+        clearError: true,
+        currentPosition: ReaderPosition.initial,
+        scrollProgress: 0,
+        estimatedMinutesLeft: 0,
+        clearHighlight: true,
+        isDynamicallyLoading: false,
+        checkpoints: const [],
+        wpm: 200,
+      ),
+    );
 
     final service = _ref.read(bookOpenServiceProvider);
     final db = _ref.read(databaseProvider);

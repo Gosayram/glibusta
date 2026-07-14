@@ -115,6 +115,32 @@ void main() {
       expect(updated.errorFileSize, 512000);
     });
 
+    test('copyWith can clear stale book data for a reload', () {
+      final state = ReaderState(
+        metadata: const NormalizedBookMetadata(
+          id: 'old-book',
+          title: 'Old title',
+          authors: [],
+          chapterCount: 1,
+          chapterTitles: ['Old chapter'],
+        ),
+        loadedChapters: const {
+          0: ReaderChapter(index: 0, title: 'Old chapter', blocks: []),
+        },
+        errorMessage: 'Old error',
+      );
+
+      final reloading = state.copyWith(
+        clearMetadata: true,
+        loadedChapters: const {},
+        clearError: true,
+      );
+
+      expect(reloading.metadata, isNull);
+      expect(reloading.loadedChapters, isEmpty);
+      expect(reloading.errorMessage, isNull);
+    });
+
     test('ReaderState copyWith chain produces expected state', () {
       final state = ReaderState();
       final updated = state
