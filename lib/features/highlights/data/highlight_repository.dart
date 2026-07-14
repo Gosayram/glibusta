@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/daos/highlight_dao.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class HighlightRepository {
   HighlightRepository(this._db);
@@ -29,7 +30,7 @@ class HighlightRepository {
     required String color,
     String? noteText,
   }) async {
-    final id = '$bookId-${DateTime.now().millisecondsSinceEpoch}';
+    final id = '$bookId-${newMonotonicId()}';
     return _dao.insertHighlight(
       TextHighlightsCompanion.insert(
         id: id,

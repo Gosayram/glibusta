@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class BookmarkRepository {
   final AppDatabase _db;
@@ -30,7 +31,7 @@ class BookmarkRepository {
         .into(_db.bookmarks)
         .insert(
           BookmarksCompanion.insert(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            id: newMonotonicId(),
             bookId: bookId,
             chapterIndex: chapterIndex,
             paragraphIndex: paragraphIndex,

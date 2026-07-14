@@ -12,6 +12,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
+import '../../../core/utils/monotonic_id.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
@@ -1083,7 +1084,7 @@ final class ReaderController {
     if (total == 0) return;
     final position = _state.currentPosition.copyWith(bookId: _bookId, updatedAt: DateTime.now());
     final database = _ref.read(databaseProvider);
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final id = newMonotonicId();
     unawaited(
       database
           .into(database.bookmarks)

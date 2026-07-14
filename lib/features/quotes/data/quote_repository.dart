@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class QuoteRepository {
   final AppDatabase _db;
@@ -31,7 +32,7 @@ class QuoteRepository {
         .into(_db.quotes)
         .insert(
           QuotesCompanion.insert(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            id: newMonotonicId(),
             bookId: bookId,
             chapterIndex: chapterIndex,
             paragraphIndex: paragraphIndex,

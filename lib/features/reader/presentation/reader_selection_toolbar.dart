@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/tts_controller.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -222,7 +223,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
         .into(db.bookmarks)
         .insert(
           BookmarksCompanion.insert(
-            id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+            id: '${widget.bookId}-${newMonotonicId()}',
             bookId: widget.bookId,
             chapterIndex: widget.chapterIndex,
             paragraphIndex: widget.paragraphIndex,
@@ -293,7 +294,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
           .into(db.notes)
           .insert(
             NotesCompanion.insert(
-              id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+              id: '${widget.bookId}-${newMonotonicId()}',
               bookId: widget.bookId,
               chapterIndex: widget.chapterIndex,
               paragraphIndex: widget.paragraphIndex,
@@ -367,7 +368,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
           .into(db.quotes)
           .insert(
             QuotesCompanion.insert(
-              id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+              id: '${widget.bookId}-${newMonotonicId()}',
               bookId: widget.bookId,
               chapterIndex: widget.chapterIndex,
               paragraphIndex: widget.paragraphIndex,
@@ -392,7 +393,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
         .into(db.textHighlights)
         .insert(
           TextHighlightsCompanion.insert(
-            id: '${widget.bookId}-${DateTime.now().millisecondsSinceEpoch}',
+            id: '${widget.bookId}-${newMonotonicId()}',
             bookId: widget.bookId,
             chapterId: widget.chapterIndex.toString(),
             chapterIndex: widget.chapterIndex,
