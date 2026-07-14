@@ -590,13 +590,20 @@ fn read_archive_asset(
     zip: &mut crate::book::archive::ZipFile<'_>,
     asset_id: &str,
 ) -> anyhow::Result<Vec<u8>> {
+    let requested_name = Path::new(asset_id)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("Asset ID must include a file name"))?;
     if let Some(entry) = zip.read_file_limited(asset_id, MAX_IMAGE_SIZE)? {
         return Ok(entry);
     }
     let matching_name = zip
         .entry_names()
         .iter()
-        .find(|name| name.ends_with(asset_id))
+        .find(|name| {
+            Path::new(name).file_name().and_then(|name| name.to_str()) == Some(requested_name)
+        })
         .cloned();
     match matching_name {
         Some(name) => Ok(zip
@@ -1027,9 +1034,11 @@ mod cover_data_uri_tests {
 #[cfg(test)]
 mod parse_api_tests {
     use super::{
-        MAX_FILE_SIZE, parse_book, parse_book_legacy, repair_normalized_book, search_in_book,
+        MAX_FILE_SIZE, parse_book, parse_book_legacy, read_archive_asset, repair_normalized_book,
+        search_in_book,
     };
     use crate::api::models::{BlockType, TocEntry};
+    use std::io::{Cursor, Write};
 
     #[test]
     fn path_and_legacy_txt_parsers_return_the_same_book() {
@@ -1131,6 +1140,31 @@ mod parse_api_tests {
         assert!(
             result.expect("search temporary TXT file").is_empty(),
             "empty queries must not produce zero-length matches"
+        );
+    }
+
+    #[test]
+    fn asset_lookup_matches_the_entry_basename_not_an_arbitrary_suffix() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer
+            .start_file("word/media/notimage1.png", options)
+            .expect("start colliding asset");
+        writer.write_all(b"wrong").expect("write colliding asset");
+        writer
+            .start_file("word/media/image1.png", options)
+            .expect("start requested asset");
+        writer.write_all(b"correct").expect("write requested asset");
+        writer.finish().expect("finish archive");
+
+        let archive_bytes = bytes.into_inner();
+        let mut archive = crate::book::archive::decode_zip(&archive_bytes).expect("open archive");
+
+        assert_eq!(
+            read_archive_asset(&mut archive, "image1.png").expect("load requested asset"),
+            b"correct",
         );
     }
 }
