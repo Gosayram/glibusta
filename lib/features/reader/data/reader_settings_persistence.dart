@@ -69,7 +69,7 @@ class ReaderSettingsPersistence {
         hyphenation: map['hyphenation'] as bool? ?? true,
         oldStyleFigures: map['oldStyleFigures'] as bool? ?? false,
         smallCaps: map['smallCaps'] as bool? ?? false,
-        rsvpWpm: (map['rsvpWpm'] as num?)?.toInt() ?? 300,
+        rsvpWpm: ((map['rsvpWpm'] as num?)?.toInt() ?? 300).clamp(100, 1000),
         ignoreBookAlignment: map['ignoreBookAlignment'] as bool? ?? false,
         ignoreBookIndent: map['ignoreBookIndent'] as bool? ?? false,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(

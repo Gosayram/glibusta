@@ -100,6 +100,18 @@ void main() {
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.font, ReaderFont.literata); // fallback
       });
+
+      test('clamps persisted RSVP speed to a safe timer range', () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'reader_settings',
+          jsonEncode({'rsvpWpm': 0}),
+        );
+
+        final settings = await ReaderSettingsPersistence.load();
+
+        expect(settings.rsvpWpm, 100);
+      });
     });
 
     group('save', () {

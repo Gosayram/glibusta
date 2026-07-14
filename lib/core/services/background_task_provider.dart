@@ -38,11 +38,13 @@ class BackgroundTask {
 }
 
 class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
+  var _nextId = 0;
+
   @override
   List<BackgroundTask> build() => [];
 
   String start(BackgroundTaskType type, String message) {
-    final id = '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
+    final id = '${type.name}_${DateTime.now().microsecondsSinceEpoch}_${_nextId++}';
     final task = BackgroundTask(
       id: id,
       type: type,
