@@ -11,13 +11,24 @@ const _pinnedKey = 'pinned_book_ids';
 
 @riverpod
 class PinnedBooks extends _$PinnedBooks {
+  Future<void> _toggleQueue = Future.value();
+
   @override
   Future<List<String>> build() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_pinnedKey) ?? [];
   }
 
-  Future<void> toggle(String bookId) async {
+  Future<void> toggle(String bookId) {
+    final next = _toggleQueue.then<void>(
+      (_) => _toggle(bookId),
+      onError: (Object _, StackTrace _) => _toggle(bookId),
+    );
+    _toggleQueue = next;
+    return next;
+  }
+
+  Future<void> _toggle(String bookId) async {
     final current = await future;
     final prefs = await SharedPreferences.getInstance();
     List<String> updated;
