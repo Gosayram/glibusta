@@ -36,6 +36,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   bool _isSearching = false;
   bool _searchCurrentChapter = false;
   bool _matchCase = false;
+  var _searchRequestId = 0;
 
   @override
   void initState() {
@@ -65,6 +66,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   }
 
   Future<void> _performSearch(String query) async {
+    final requestId = ++_searchRequestId;
     if (query.trim().isEmpty) {
       widget.searchService.cancelPending();
       setState(() {
@@ -84,7 +86,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       chapterIndex: _searchCurrentChapter ? widget.currentChapterIndex : null,
       matchCase: _matchCase,
     );
-    if (!mounted) return;
+    if (!mounted || requestId != _searchRequestId) return;
     setState(() {
       _results = results;
       _isSearching = false;
