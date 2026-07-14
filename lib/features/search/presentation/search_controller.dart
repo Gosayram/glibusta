@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show OrderingTerm;
+import 'package:drift/drift.dart' show Expression, OrderingTerm;
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -121,7 +121,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: bookError != null && bookResult.books.isEmpty ? bookError.toString() : null,
       );
       if (bookResult.books.isNotEmpty || authorResult.authors.isNotEmpty) {
-        unawaited(_rememberSearch(normalized));
+        await _rememberSearch(normalized);
       }
     } on Object catch (e, st) {
       if (!_isCurrentRequest(generation)) return;
@@ -187,7 +187,10 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     final db = ref.read(databaseProvider);
     final rows =
         await (db.select(db.searchHistory)
-              ..orderBy([(table) => OrderingTerm.desc(table.searchedAt)])
+              ..orderBy([
+                (table) => OrderingTerm.desc(table.searchedAt),
+                (table) => OrderingTerm.desc(table.id),
+              ])
               ..limit(8))
             .get();
     if (!ref.mounted) return;
@@ -205,17 +208,26 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     if (normalized.isEmpty) return;
 
     final db = ref.read(databaseProvider);
-    await db
-        .into(db.searchHistory)
-        .insert(
-          SearchHistoryCompanion.insert(
-            query: normalized,
-            type: 'online',
-          ),
-        );
+    await db.transaction(() async {
+      await (db.delete(db.searchHistory)..where(
+            (table) => Expression.and([
+              table.query.equals(normalized),
+              table.type.equals('online'),
+            ]),
+          ))
+          .go();
+      await db
+          .into(db.searchHistory)
+          .insert(
+            SearchHistoryCompanion.insert(
+              query: normalized,
+              type: 'online',
+            ),
+          );
+    });
 
     if (!ref.mounted) return;
-    unawaited(loadHistory());
+    await loadHistory();
   }
 
   Future<void> clearHistory() async {
