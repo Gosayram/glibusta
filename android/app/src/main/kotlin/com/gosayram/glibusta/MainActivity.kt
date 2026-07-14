@@ -24,6 +24,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private val DJVU_CHANNEL = "glibusta/djvu"
+    private val maxImportFileBytes = 500L * 1024 * 1024
     private var pendingResult: MethodChannel.Result? = null
     private var pendingPermResult: MethodChannel.Result? = null
 
@@ -63,6 +64,10 @@ class MainActivity : FlutterFragmentActivity() {
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pickFolder" -> {
+                if (pendingResult != null) {
+                    result.error("PICKER_IN_PROGRESS", "Folder picker is already open", null)
+                    return
+                }
                 pendingResult = result
                 openTreeLauncher.launch(null)
             }
@@ -235,21 +240,33 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private fun copyToCache(fileUri: Uri, result: MethodChannel.Result) {
+        var tempFile: java.io.File? = null
         try {
+            tempFile = java.io.File.createTempFile("saf_", ".tmp", cacheDir)
             val input = contentResolver.openInputStream(fileUri)
                 ?: run {
+                    tempFile.delete()
                     result.error("READ_ERROR", "Cannot open file", null)
                     return
                 }
-            val cacheDir = cacheDir
-            val tempFile = java.io.File(cacheDir, "saf_${System.currentTimeMillis()}.tmp")
             input.use { ins ->
                 tempFile.outputStream().use { out ->
-                    ins.copyTo(out, bufferSize = 8192)
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var copiedBytes = 0L
+                    while (true) {
+                        val read = ins.read(buffer)
+                        if (read < 0) break
+                        copiedBytes += read
+                        if (copiedBytes > maxImportFileBytes) {
+                            throw IllegalArgumentException("File exceeds the 500 MiB import limit")
+                        }
+                        out.write(buffer, 0, read)
+                    }
                 }
             }
             result.success(tempFile.absolutePath)
         } catch (e: Exception) {
+            tempFile?.delete()
             result.error("READ_ERROR", e.message, null)
         }
     }
