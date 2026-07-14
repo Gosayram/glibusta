@@ -212,19 +212,11 @@ fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {
                     }
                     "b" => {
                         flush_span(&mut rich_spans, &mut span_text, &fmt);
-                        fmt.bold = true;
-                    }
-                    "b0" => {
-                        flush_span(&mut rich_spans, &mut span_text, &fmt);
-                        fmt.bold = false;
+                        fmt.bold = bytes.get(i) != Some(&b'0');
                     }
                     "i" => {
                         flush_span(&mut rich_spans, &mut span_text, &fmt);
-                        fmt.italic = true;
-                    }
-                    "i0" => {
-                        flush_span(&mut rich_spans, &mut span_text, &fmt);
-                        fmt.italic = false;
+                        fmt.italic = bytes.get(i) != Some(&b'0');
                     }
                     "super" => {
                         flush_span(&mut rich_spans, &mut span_text, &fmt);
@@ -388,4 +380,35 @@ fn push_rtf_paragraph(
     rich_spans.clear();
     span_text.clear();
     *fmt = RtfFmt::default();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_rtf;
+
+    #[test]
+    fn reset_controls_disable_inline_formatting() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi\b Bold\b0 plain\i italic\i0 normal}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(
+            spans
+                .iter()
+                .map(|span| (span.text.trim(), span.bold, span.italic))
+                .collect::<Vec<_>>(),
+            vec![
+                ("Bold", true, false),
+                ("plain", false, false),
+                ("italic", false, true),
+                ("normal", false, false),
+            ],
+        );
+    }
 }

@@ -480,18 +480,46 @@ impl NormalizedBook {
     ) -> i32 {
         let old_hashes = old_book.chapter_hashes();
         let new_hashes = new_book.chapter_hashes();
-        // Exact match by hash
-        if let Some((old_idx, _)) = old_hashes.iter().find(|(_, id)| id == old_chapter_id) {
-            if let Some((new_idx, _)) = new_hashes.get(*old_idx as usize) {
-                return *new_idx;
-            }
-            // Fuzzy: match by title similarity
-            if let Some(old_ch) = old_book.chapters.get(*old_idx as usize) {
-                for (new_idx, new_ch) in new_book.chapters.iter().enumerate() {
-                    if levenshtein_ratio(&old_ch.title, &new_ch.title) > 0.6 {
-                        return new_idx as i32;
-                    }
-                }
+        let old_position = old_hashes
+            .iter()
+            .position(|(_, hash)| hash == old_chapter_id)
+            .or_else(|| {
+                old_book
+                    .chapters
+                    .iter()
+                    .enumerate()
+                    .find_map(|(position, _)| {
+                        (old_book.chapter_id(position) == old_chapter_id).then_some(position)
+                    })
+            });
+        let Some(old_position) = old_position else {
+            return 0;
+        };
+
+        let old_hash = &old_hashes[old_position].1;
+        if let Some((position, _)) = new_hashes
+            .iter()
+            .enumerate()
+            .find(|(_, (_, hash))| hash == old_hash)
+        {
+            return new_book.chapters[position].index;
+        }
+
+        let old_stable_id = old_book.chapter_id(old_position);
+        if let Some((position, _)) = new_book
+            .chapters
+            .iter()
+            .enumerate()
+            .find(|(position, _)| new_book.chapter_id(*position) == old_stable_id)
+        {
+            return new_book.chapters[position].index;
+        }
+
+        // Fuzzy: match by title similarity when text changed during reparse.
+        let old_ch = &old_book.chapters[old_position];
+        for new_ch in &new_book.chapters {
+            if levenshtein_ratio(&old_ch.title, &new_ch.title) > 0.6 {
+                return new_ch.index;
             }
         }
         0
@@ -850,5 +878,26 @@ mod book_diff_tests {
         assert!(diff.chapters_changed);
         assert!(!diff.text_changed);
         assert!(!diff.needs_anchor_migration);
+    }
+
+    #[test]
+    fn chapter_id_migration_finds_a_reordered_chapter() {
+        let mut old = test_book();
+        old.chapters[0].index = 10;
+        old.chapters[0].title = "First".to_string();
+        let mut second = old.chapters[0].clone();
+        second.index = 20;
+        second.title = "Second".to_string();
+        second.blocks[0].text = "Second chapter".to_string();
+        old.chapters.push(second);
+
+        let old_id = old.chapter_id(1);
+        let mut new = old.clone();
+        new.chapters.swap(0, 1);
+
+        assert_eq!(
+            NormalizedBook::migrate_chapter_index(&old_id, &old, &new),
+            20
+        );
     }
 }

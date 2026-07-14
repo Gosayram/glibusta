@@ -253,13 +253,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
-                    if current_text.len().saturating_add(text.len()) > max_base64_image_size() {
-                        bail!(
-                            "FB2 image exceeds maximum size of {} MiB",
-                            MAX_IMAGE_SIZE / 1024 / 1024
-                        );
-                    }
-                    current_text.push_str(&text);
+                    append_binary_data(&mut current_text, &text)?;
                 } else if in_p && in_body {
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
@@ -319,7 +313,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
-                    current_text.push_str(&text);
+                    append_binary_data(&mut current_text, &text)?;
                 } else if in_p && in_body {
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
@@ -812,6 +806,17 @@ fn max_base64_image_size() -> usize {
         .unwrap_or(usize::MAX)
 }
 
+fn append_binary_data(buffer: &mut String, data: &str) -> Result<()> {
+    if buffer.len().saturating_add(data.len()) > max_base64_image_size() {
+        bail!(
+            "FB2 image exceeds maximum size of {} MiB",
+            MAX_IMAGE_SIZE / 1024 / 1024
+        );
+    }
+    buffer.push_str(data);
+    Ok(())
+}
+
 fn looks_like_zip(bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
 }
@@ -919,4 +924,22 @@ fn flush_fb2_block(
     current_text.clear();
     current_rich_spans.clear();
     current_span_text.clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{max_base64_image_size, parse_fb2};
+
+    #[test]
+    fn rejects_oversized_image_in_cdata() {
+        let base64 = "A".repeat(max_base64_image_size() + 1);
+        let fb2 = format!(
+            "<FictionBook><binary id=\"illustration\"><![CDATA[{base64}]]></binary></FictionBook>"
+        );
+
+        let error = parse_fb2(fb2.as_bytes(), Some("utf-8"))
+            .expect_err("CDATA image above the size limit must be rejected");
+
+        assert!(error.to_string().contains("FB2 image exceeds maximum size"));
+    }
 }
