@@ -212,7 +212,7 @@ impl From<std::io::Error> for CoreError {
 }
 
 /// TOC entry for navigation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TocEntry {
     pub title: String,
     /// Chapter index (0-based) or -1 for non-chapter entries.
@@ -223,7 +223,7 @@ pub struct TocEntry {
 }
 
 /// An embedded image extracted from the book.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EmbeddedImage {
     /// Identifier (filename or URL reference).
     pub id: String,
@@ -234,7 +234,7 @@ pub struct EmbeddedImage {
 }
 
 /// Non-fatal warning from parsing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ParseWarning {
     pub message: String,
 }
@@ -682,22 +682,141 @@ pub struct BookDiff {
 
 impl BookDiff {
     pub fn compute(old: &NormalizedBook, new: &NormalizedBook) -> Self {
-        let chapters_changed = old.chapters.len() != new.chapters.len()
+        let structure_changed = old.chapters.len() != new.chapters.len()
             || old.chapters.iter().zip(new.chapters.iter()).any(|(a, b)| {
-                a.blocks.len() != b.blocks.len()
+                a.index != b.index
+                    || a.blocks.len() != b.blocks.len()
                     || a.blocks
                         .iter()
                         .zip(b.blocks.iter())
-                        .any(|(x, y)| x.text != y.text)
+                        .any(|(x, y)| x.index != y.index)
             });
-        let text_changed = chapters_changed;
-        let metadata_only = !text_changed && (old.title != new.title || old.authors != new.authors);
-        let needs_anchor_migration = chapters_changed;
+        let text_changed = old.chapters.iter().zip(new.chapters.iter()).any(|(a, b)| {
+            a.title != b.title
+                || a.blocks
+                    .iter()
+                    .zip(b.blocks.iter())
+                    .any(|(x, y)| x.text != y.text)
+        });
+        let chapters_changed = structure_changed || text_changed;
+        let metadata_changed = old.title != new.title
+            || old.authors != new.authors
+            || old.description != new.description
+            || old.cover_url != new.cover_url
+            || old.metadata != new.metadata
+            || old.book_format != new.book_format
+            || old.language != new.language
+            || old.warnings != new.warnings
+            || old.images != new.images
+            || old.toc != new.toc;
+        let metadata_only = !chapters_changed && metadata_changed;
+        let needs_anchor_migration = structure_changed;
         Self {
             chapters_changed,
             text_changed,
             metadata_only,
             needs_anchor_migration,
         }
+    }
+}
+
+#[cfg(test)]
+mod book_diff_tests {
+    use super::{BlockType, BookDiff, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter};
+
+    fn test_book() -> NormalizedBook {
+        NormalizedBook {
+            id: "book".to_string(),
+            title: "Title".to_string(),
+            authors: vec!["Author".to_string()],
+            description: None,
+            cover_url: None,
+            chapters: vec![ReaderChapter {
+                index: 0,
+                title: "Chapter".to_string(),
+                blocks: vec![ReaderBlock {
+                    index: 0,
+                    text: "Original text".to_string(),
+                    block_type: BlockType::Paragraph,
+                    image_url: None,
+                    note_ref: None,
+                    rich_spans: None,
+                    heading_level: None,
+                    ordered: None,
+                    list_items: None,
+                    table_rows: None,
+                    image_alt: None,
+                    text_indent: None,
+                    text_align: None,
+                    note_id: None,
+                }],
+            }],
+            metadata: None,
+            book_format: BookFormat::Txt,
+            language: None,
+            warnings: Vec::new(),
+            images: Vec::new(),
+            toc: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn text_change_does_not_require_anchor_migration() {
+        let old = test_book();
+        let mut new = old.clone();
+        new.chapters[0].blocks[0].text = "Updated text".to_string();
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(diff.chapters_changed);
+        assert!(diff.text_changed);
+        assert!(!diff.needs_anchor_migration);
+        assert!(!diff.metadata_only);
+    }
+
+    #[test]
+    fn metadata_change_is_reported_without_content_change() {
+        let old = test_book();
+        let mut new = old.clone();
+        new.description = Some("Updated description".to_string());
+        new.language = Some("ru".to_string());
+        new.cover_url = Some("data:image/png;base64,AA==".to_string());
+        new.book_format = BookFormat::Epub;
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(!diff.chapters_changed);
+        assert!(!diff.text_changed);
+        assert!(diff.metadata_only);
+        assert!(!diff.needs_anchor_migration);
+    }
+
+    #[test]
+    fn block_structure_change_requires_anchor_migration() {
+        let old = test_book();
+        let mut new = old.clone();
+        new.chapters[0].blocks.push(ReaderBlock {
+            index: 1,
+            text: "Inserted block".to_string(),
+            block_type: BlockType::Paragraph,
+            image_url: None,
+            note_ref: None,
+            rich_spans: None,
+            heading_level: None,
+            ordered: None,
+            list_items: None,
+            table_rows: None,
+            image_alt: None,
+            text_indent: None,
+            text_align: None,
+            note_id: None,
+        });
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(diff.chapters_changed);
+        assert!(!diff.text_changed);
+        assert!(!diff.metadata_only);
+        assert!(diff.needs_anchor_migration);
     }
 }
