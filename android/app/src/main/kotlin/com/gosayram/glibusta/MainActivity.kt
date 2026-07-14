@@ -109,14 +109,6 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
             }
-            "readFile" -> {
-                val fileUri = call.argument<String>("uri")
-                if (fileUri == null) {
-                    result.error("INVALID_ARG", "URI is required", null)
-                    return
-                }
-                readFile(Uri.parse(fileUri), result)
-            }
             "copyToCache" -> {
                 val fileUri = call.argument<String>("uri")
                 if (fileUri == null) {
@@ -309,17 +301,6 @@ class MainActivity : FlutterFragmentActivity() {
             result.success(tempFile.absolutePath)
         } catch (e: Exception) {
             tempFile?.delete()
-            result.error("READ_ERROR", e.message, null)
-        }
-    }
-
-    private fun readFile(fileUri: Uri, result: MethodChannel.Result) {
-        try {
-            contentResolver.openInputStream(fileUri)?.use { input ->
-                val bytes = input.readBytes()
-                result.success(bytes)
-            } ?: result.error("READ_ERROR", "Cannot open file", null)
-        } catch (e: Exception) {
             result.error("READ_ERROR", e.message, null)
         }
     }

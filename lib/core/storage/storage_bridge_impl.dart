@@ -55,19 +55,6 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
-  Future<Uint8List> readFile(String fileUri) async {
-    try {
-      final bytes = await _channel.invokeMethod<Uint8List>(
-        'readFile',
-        {'uri': fileUri},
-      );
-      return bytes ?? Uint8List(0);
-    } on PlatformException {
-      return Uint8List(0);
-    }
-  }
-
-  @override
   Future<String?> copyToCache(String fileUri) async {
     try {
       final path = await _channel.invokeMethod<String>(
