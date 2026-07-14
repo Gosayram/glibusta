@@ -7,6 +7,7 @@ use hyphenation::{Hyphenator, Language, Load, Standard};
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::ops::Deref;
 use std::path::Path;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
@@ -16,12 +17,42 @@ use unicode_segmentation::UnicodeSegmentation;
 // ARC-8.1 + ARC-8.2 + ARC-8.3: Two-level cache (RAM + Disk)
 // ---------------------------------------------------------------------------
 
+#[cfg(not(miri))]
 static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLock::new(|| {
     moka::sync::Cache::builder()
         .max_capacity(32)
         .time_to_idle(Duration::from_secs(600))
         .build()
 });
+
+/// Miri cannot model Moka's lock-free internals. A small mutex-protected cache
+/// preserves the L1 cache contract while Miri validates our cache logic.
+#[cfg(miri)]
+static MIRI_BOOK_CACHE: LazyLock<Mutex<HashMap<String, NormalizedBook>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn memory_cache_get(fingerprint: &str) -> Option<NormalizedBook> {
+    #[cfg(not(miri))]
+    {
+        BOOK_CACHE.get(fingerprint)
+    }
+    #[cfg(miri)]
+    {
+        MIRI_BOOK_CACHE
+            .lock()
+            .ok()
+            .and_then(|cache| cache.get(fingerprint).cloned())
+    }
+}
+
+fn memory_cache_store(fingerprint: String, book: NormalizedBook) {
+    #[cfg(not(miri))]
+    BOOK_CACHE.insert(fingerprint, book);
+    #[cfg(miri)]
+    if let Ok(mut cache) = MIRI_BOOK_CACHE.lock() {
+        cache.insert(fingerprint, book);
+    }
+}
 
 const DISK_CACHE_DIR_NAME: &str = "glibusta-book-cache";
 const DISK_CACHE_MAX_ENTRIES: usize = 64;
@@ -148,8 +179,29 @@ fn detect_format_from_path(path: &str) -> Result<BookFormat, CoreError> {
     Ok(fmt)
 }
 
-/// ARC-3.1: Memory-map a file for zero-copy reading.
-fn map_file(path: &str) -> Result<memmap2::Mmap, CoreError> {
+enum BookBytes {
+    #[cfg(not(miri))]
+    Mapped(memmap2::Mmap),
+    #[cfg(miri)]
+    Owned(Vec<u8>),
+}
+
+impl Deref for BookBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        match self {
+            #[cfg(not(miri))]
+            Self::Mapped(bytes) => bytes,
+            #[cfg(miri)]
+            Self::Owned(bytes) => bytes,
+        }
+    }
+}
+
+/// Maps a file in production and uses an owned buffer under Miri, which does
+/// not implement either file-backed or anonymous memory mappings.
+fn map_file(path: &str) -> Result<BookBytes, CoreError> {
     let file = std::fs::File::open(path).map_err(|e| CoreError::IoError(e.to_string()))?;
     let size = file
         .metadata()
@@ -161,7 +213,19 @@ fn map_file(path: &str) -> Result<memmap2::Mmap, CoreError> {
             size, MAX_FILE_SIZE
         )));
     }
-    unsafe { memmap2::Mmap::map(&file).map_err(|e| CoreError::IoError(e.to_string())) }
+    #[cfg(miri)]
+    {
+        return fs::read(path)
+            .map(BookBytes::Owned)
+            .map_err(|e| CoreError::IoError(e.to_string()));
+    }
+
+    #[cfg(not(miri))]
+    unsafe {
+        memmap2::Mmap::map(&file)
+            .map(BookBytes::Mapped)
+            .map_err(|e| CoreError::IoError(e.to_string()))
+    }
 }
 
 fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, CoreError> {
@@ -208,15 +272,15 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
 pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let _span = tracing::info_span!("parse_book", path = %path).entered();
     let fingerprint = cache_fingerprint(&path).map_err(|e| anyhow::anyhow!("{e}"))?;
-    // L1: RAM cache
-    if let Some(cached) = BOOK_CACHE.get(&fingerprint) {
+    // L1: RAM cache. Miri uses a mutex-protected equivalent of Moka.
+    if let Some(cached) = memory_cache_get(&fingerprint) {
         tracing::info!("cache_hit_l1");
         return Ok(cached);
     }
     // L2: disk cache
     let cache_key = disk_cache_key(&fingerprint);
     if let Some(cached) = disk_cache_lookup(&cache_key) {
-        BOOK_CACHE.insert(fingerprint, cached.clone());
+        memory_cache_store(fingerprint, cached.clone());
         return Ok(cached);
     }
     // Cache miss: parse from file
@@ -225,7 +289,7 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     book.book_format = format;
     // Store in both caches
-    BOOK_CACHE.insert(fingerprint, book.clone());
+    memory_cache_store(fingerprint, book.clone());
     disk_cache_store(&cache_key, &book);
     Ok(book)
 }
@@ -710,7 +774,7 @@ pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
     let fingerprint = cache_fingerprint(&path).map_err(|e| anyhow::anyhow!("{e}"))?;
     let cache_key = disk_cache_key(&fingerprint);
     let has_cached_book =
-        BOOK_CACHE.get(&fingerprint).is_some() || disk_cache_lookup(&cache_key).is_some();
+        memory_cache_get(&fingerprint).is_some() || disk_cache_lookup(&cache_key).is_some();
     Ok((!has_cached_book, file_hash, file_size))
 }
 

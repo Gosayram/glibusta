@@ -210,8 +210,9 @@ miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
 .PHONY: miri-check
 miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires nightly)
 	@$(PRINT_STEP) "Running Miri UB checks"
-	@if rustup run nightly cargo miri --version >/dev/null 2>&1; then \
-		cd rust && MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" rustup run nightly cargo miri test; \
+	@NIGHTLY_BIN="$$(dirname "$$(rustup which --toolchain nightly cargo 2>/dev/null)")"; \
+	if [ -n "$$NIGHTLY_BIN" ] && PATH="$$NIGHTLY_BIN:$$PATH" rustup run nightly cargo miri --version >/dev/null 2>&1; then \
+		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" rustup run nightly cargo miri test && \
 		$(PRINT_OK) "Miri checks passed"; \
 	else \
 		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \

@@ -427,14 +427,26 @@ final class ReaderController {
     if (_loaded && !_state.isLoading) {
       _updateState(_state.copyWith(isDynamicallyLoading: true));
     }
-    final updated = await _content.ensureChaptersLoaded(
-      centerIndex,
-      _state.loadedChapters,
-      chapterCount: _state.chapterCount,
-    );
-    // Discard stale results if a newer chapter load superseded this one.
-    if (_disposed || generation != _chapterLoadGeneration) return;
-    _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
+    try {
+      final updated = await _content.ensureChaptersLoaded(
+        centerIndex,
+        _state.loadedChapters,
+        chapterCount: _state.chapterCount,
+      );
+      // Discard stale results if a newer chapter load superseded this one.
+      if (_disposed || generation != _chapterLoadGeneration) return;
+      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
+    } on Object catch (error, stackTrace) {
+      if (_disposed || generation != _chapterLoadGeneration) return;
+      if (!_loaded) rethrow;
+      _logger.warning(
+        'Failed to load chapter window around $centerIndex',
+        name: 'Reader',
+        error: error,
+        st: stackTrace,
+      );
+      _updateState(_state.copyWith(isDynamicallyLoading: false));
+    }
   }
 
   void _evictDistantChapters(int centerIndex) {

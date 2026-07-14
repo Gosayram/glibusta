@@ -143,12 +143,79 @@ mod tests {
     use super::ZipFile;
     use std::io::{Cursor, Write};
 
+    fn write_u16(bytes: &mut Vec<u8>, value: u16) {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn write_u32(bytes: &mut Vec<u8>, value: u32) {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    /// A minimal deflated ZIP entry whose central-directory metadata declares
+    /// a high compression ratio. `ZipFile::open` rejects it before attempting
+    /// decompression, so the payload need not be a valid DEFLATE stream.
+    fn highly_compressed_zip_fixture() -> Vec<u8> {
+        const NAME: &[u8] = b"chapter.xhtml";
+        const UNCOMPRESSED_SIZE: u32 = 32 * 1024;
+        let mut bytes = Vec::new();
+
+        // Local file header + one-byte placeholder payload.
+        write_u32(&mut bytes, 0x0403_4b50);
+        write_u16(&mut bytes, 20);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 8);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, 1);
+        write_u32(&mut bytes, UNCOMPRESSED_SIZE);
+        write_u16(&mut bytes, NAME.len() as u16);
+        write_u16(&mut bytes, 0);
+        bytes.extend_from_slice(NAME);
+        bytes.push(0);
+
+        let central_directory_offset = bytes.len() as u32;
+        write_u32(&mut bytes, 0x0201_4b50);
+        write_u16(&mut bytes, 20);
+        write_u16(&mut bytes, 20);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 8);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, 1);
+        write_u32(&mut bytes, UNCOMPRESSED_SIZE);
+        write_u16(&mut bytes, NAME.len() as u16);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, 0);
+        bytes.extend_from_slice(NAME);
+
+        let central_directory_size = bytes.len() as u32 - central_directory_offset;
+        write_u32(&mut bytes, 0x0605_4b50);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 0);
+        write_u16(&mut bytes, 1);
+        write_u16(&mut bytes, 1);
+        write_u32(&mut bytes, central_directory_size);
+        write_u32(&mut bytes, central_directory_offset);
+        write_u16(&mut bytes, 0);
+        bytes
+    }
+
     #[test]
     fn rejects_entry_above_requested_read_limit() {
         let mut bytes = Cursor::new(Vec::new());
         let mut writer = zip::ZipWriter::new(&mut bytes);
         writer
-            .start_file("chapter.xhtml", zip::write::FileOptions::<()>::default())
+            .start_file(
+                "chapter.xhtml",
+                zip::write::FileOptions::<()>::default()
+                    .compression_method(zip::CompressionMethod::Stored),
+            )
             .expect("start archive entry");
         writer.write_all(b"too large").expect("write archive entry");
         writer.finish().expect("finish archive");
@@ -162,19 +229,7 @@ mod tests {
 
     #[test]
     fn rejects_highly_compressed_entry_before_extraction() {
-        let mut bytes = Cursor::new(Vec::new());
-        let mut writer = zip::ZipWriter::new(&mut bytes);
-        let options = zip::write::FileOptions::<()>::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        writer
-            .start_file("chapter.xhtml", options)
-            .expect("start archive entry");
-        writer
-            .write_all(&vec![0; 32 * 1024])
-            .expect("write compressible archive entry");
-        writer.finish().expect("finish archive");
-
-        let error = match ZipFile::open(&bytes.into_inner()) {
+        let error = match ZipFile::open(&highly_compressed_zip_fixture()) {
             Ok(_) => panic!("archive must exceed ratio"),
             Err(error) => error,
         };
