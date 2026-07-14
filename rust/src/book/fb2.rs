@@ -825,7 +825,10 @@ fn find_fb2_in_zip(zip: &mut archive::ZipFile<'_>) -> Result<Option<Vec<u8>>> {
     let Some(name) = zip
         .entry_names()
         .iter()
-        .find(|name| name.ends_with(".fb2") && !name.ends_with(".fb2.zip"))
+        .find(|name| {
+            name.rsplit_once('.')
+                .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("fb2"))
+        })
         .cloned()
     else {
         return Ok(None);

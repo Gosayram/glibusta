@@ -127,6 +127,24 @@ fn test_fb2_default_title_on_empty() {
     assert!(!book.chapters.is_empty());
 }
 
+#[test]
+fn test_fb2_zip_finds_case_insensitive_entry_name() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("BOOK.FB2", options)
+        .expect("create FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write FB2 fixture");
+    zip.finish().expect("finish FB2.ZIP fixture");
+
+    let book = glibusta_core::book::fb2::parse_fb2(&buffer.into_inner(), None)
+        .expect("parse FB2.ZIP with uppercase extension");
+
+    assert_eq!(book.title, "Туманность Андромеды");
+}
+
 // ---------------------------------------------------------------------------
 // TXT tests — encoding detection + chapter splitting
 // ---------------------------------------------------------------------------
@@ -285,6 +303,14 @@ fn test_epub_toc_ncx() {
     let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
     assert!(!book.toc.is_empty(), "TOC should have entries");
     assert_eq!(book.toc[0].title, "Chapter 1");
+}
+
+#[test]
+fn test_epub_corrupted_archive_is_rejected() {
+    let error = glibusta_core::book::epub::parse_epub(b"not an EPUB archive", None)
+        .expect_err("corrupted EPUB must not be parsed");
+
+    assert!(error.to_string().contains("Failed to open EPUB archive"));
 }
 
 // ---------------------------------------------------------------------------
