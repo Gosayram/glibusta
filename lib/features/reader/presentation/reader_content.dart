@@ -1656,9 +1656,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         widget.settings.marginLeft != oldWidget.settings.marginLeft ||
         widget.settings.marginRight != oldWidget.settings.marginRight ||
         widget.settings.font != oldWidget.settings.font ||
+        widget.settings.paragraphSpacing != oldWidget.settings.paragraphSpacing ||
         widget.settings.hyphenation != oldWidget.settings.hyphenation ||
+        widget.settings.textAlign != oldWidget.settings.textAlign ||
         widget.settings.paragraphIndentMode != oldWidget.settings.paragraphIndentMode ||
         widget.settings.paragraphFirstLineIndent != oldWidget.settings.paragraphFirstLineIndent ||
+        widget.settings.ignoreBookIndent != oldWidget.settings.ignoreBookIndent ||
         widget.settings.letterSpacing != oldWidget.settings.letterSpacing ||
         widget.settings.wordSpacing != oldWidget.settings.wordSpacing ||
         widget.settings.fontWeightDelta != oldWidget.settings.fontWeightDelta ||
@@ -1684,13 +1687,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             break;
           }
         }
-        // For two-page layout, snap to even index
-        if (widget.settings.twoPageEnabled && targetPage.isOdd) {
+        final useTwoPageLayout = widget.settings.twoPageEnabled && context.canUseTwoPageMode;
+        // For two-page layout, snap to the first page in its spread.
+        if (useTwoPageLayout && targetPage.isOdd) {
           targetPage = (targetPage - 1).clamp(0, pageCount - 1);
         }
         unawaited(
           _pageController.animateToPage(
-            targetPage,
+            useTwoPageLayout ? targetPage ~/ 2 : targetPage,
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
           ),
@@ -2196,17 +2200,25 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final safeContentWidth = contentWidth > 1.0 ? contentWidth : 1.0;
         // HG-6.1: check layout cache
         final s = widget.settings;
+        final useTwoPageLayout = s.twoPageEnabled && context.canUseTwoPageMode;
+        // Each spread page is rendered in half the available width, after the
+        // divider is reserved, so paginate using that actual child width.
+        final pageContentWidth = useTwoPageLayout
+            ? ((safeContentWidth - 1) / 2).clamp(1.0, safeContentWidth)
+            : safeContentWidth;
         final key =
             '${s.fontSize}_${s.lineHeight}_${layoutMargin.top}_${layoutMargin.bottom}_'
             '${layoutMargin.left}_${layoutMargin.right}_${s.paragraphSpacing}_'
             '${s.letterSpacing}_${s.paragraphFirstLineIndent}_${s.font}_'
             '${s.hyphenation}_${s.textAlign.name}_${s.paragraphIndentMode.name}_'
-            '${safeAvailableHeight.toStringAsFixed(1)}_${safeContentWidth.toStringAsFixed(1)}_'
+            '${s.ignoreBookIndent}_${s.wordSpacing}_${s.fontWeightDelta}_${s.textDirection.name}_'
+            '${s.customCss}_${s.showImages}_${s.imageWidth}_${useTwoPageLayout}_'
+            '${safeAvailableHeight.toStringAsFixed(1)}_${pageContentWidth.toStringAsFixed(1)}_'
             '${widget.loadedChapters.length}';
         if (key == _cacheKey && _cachedPages.isNotEmpty) {
           _pages = _cachedPages;
         } else {
-          _pages = _paginateContent(safeAvailableHeight, safeContentWidth);
+          _pages = _paginateContent(safeAvailableHeight, pageContentWidth);
           _cacheKey = key;
           _cachedPages = _pages;
         }
@@ -2215,7 +2227,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           return const SizedBox.shrink();
         }
 
-        final useTwoPageLayout = context.canUseTwoPageMode;
         final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
         if (!_didRestoreInitialPage && widget.initialPage > 0) {
@@ -2267,8 +2278,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             padEnds: false,
             itemCount: effectivePageCount,
             onPageChanged: (index) {
-              if (_pages.isNotEmpty && index < _pages.length) {
-                widget.onPageChanged?.call(_pages[index].chapterIndex);
+              final pageIndex = useTwoPageLayout ? index * 2 : index;
+              if (_pages.isNotEmpty && pageIndex < _pages.length) {
+                widget.onPageChanged?.call(_pages[pageIndex].chapterIndex);
               }
             },
             itemBuilder: useSwitcher
