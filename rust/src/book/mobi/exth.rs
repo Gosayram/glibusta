@@ -86,6 +86,13 @@ impl ExthParser {
 
         // Parse records after the 12-byte header (EXTH + length + count)
         let records_data = &record0[exth_offset + 12..exth_offset + length as usize];
+        let max_record_count = records_data.len() / 8;
+        if rec_count as usize > max_record_count {
+            return Ok(MobiMetadata {
+                has_exth: true,
+                ..MobiMetadata::default()
+            });
+        }
         use nom::Parser;
         let (_, records) = count(exth_record, rec_count as usize)
             .parse(records_data)

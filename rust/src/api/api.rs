@@ -28,11 +28,13 @@ static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLoc
 /// read before parsing and invalidate both in-memory Moka and disk caches.
 fn cache_fingerprint(path: &str) -> Result<String, CoreError> {
     let metadata = std::fs::metadata(path).map_err(|e| CoreError::IoError(e.to_string()))?;
-    let modified_nanos = metadata
+    let modified = metadata
         .modified()
-        .ok()
-        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-        .map_or(0, |duration| duration.as_nanos());
+        .map_err(|e| CoreError::IoError(e.to_string()))?;
+    let modified_nanos = modified
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| CoreError::IoError(e.to_string()))?
+        .as_nanos();
     Ok(format!("{path}:{}:{modified_nanos}", metadata.len()))
 }
 
@@ -424,7 +426,7 @@ fn read_archive_asset(
         Some(name) => Ok(zip
             .read_file_limited(&name, MAX_IMAGE_SIZE)?
             .unwrap_or_default()),
-        None => Ok(Vec::new()),
+        None => Err(anyhow::anyhow!("Asset '{asset_id}' not found in archive")),
     }
 }
 
@@ -515,8 +517,10 @@ pub fn search_in_book(
                 let start = mat.start();
                 let end = mat.end();
                 let preview_len = 40usize;
-                let preview_start = start.saturating_sub(preview_len);
-                let preview_end = (end + preview_len).min(block.text.len());
+                let preview_start =
+                    floor_char_boundary(&block.text, start.saturating_sub(preview_len));
+                let preview_end =
+                    ceil_char_boundary(&block.text, (end + preview_len).min(block.text.len()));
                 let preview = format!(
                     "...{}...",
                     block.text[preview_start..preview_end].replace('\n', " ")
@@ -535,6 +539,22 @@ pub fn search_in_book(
         }
     }
     Ok(results)
+}
+
+fn floor_char_boundary(text: &str, mut index: usize) -> usize {
+    index = index.min(text.len());
+    while index > 0 && !text.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
+fn ceil_char_boundary(text: &str, mut index: usize) -> usize {
+    index = index.min(text.len());
+    while index < text.len() && !text.is_char_boundary(index) {
+        index += 1;
+    }
+    index
 }
 
 /// CRT-20.2: Render PDF page to PNG thumbnail.

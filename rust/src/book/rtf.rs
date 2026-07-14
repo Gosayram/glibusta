@@ -121,8 +121,8 @@ impl RtfFmt {
 /// Flush accumulated span_text into rich_spans with current formatting.
 /// Always preserves text (even without formatting) so paragraphs aren't lost.
 fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfFmt) {
-    let text = span_text.trim().to_string();
-    if !text.is_empty() {
+    let text = std::mem::take(span_text);
+    if !text.trim().is_empty() {
         rich_spans.push(RichSpan {
             text,
             bold: fmt.bold,
@@ -132,7 +132,6 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
             line_break: false,
         });
     }
-    span_text.clear();
 }
 
 fn rtf_to_rich_blocks(body: &str) -> Vec<ReaderBlock> {

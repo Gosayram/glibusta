@@ -210,12 +210,12 @@ miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
 .PHONY: miri-check
 miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires nightly)
 	@$(PRINT_STEP) "Running Miri UB checks"
-	@NIGHTLY_CARGO="$$HOME/.rustup/toolchains/nightly-aarch64-apple-darwin/bin/cargo"; \
-	if [ -x "$$NIGHTLY_CARGO" ] && "$$NIGHTLY_CARGO" miri --version >/dev/null 2>&1; then \
-		cd rust && MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" "$$NIGHTLY_CARGO" miri test 2>&1; \
+	@if rustup run nightly cargo miri --version >/dev/null 2>&1; then \
+		cd rust && MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" rustup run nightly cargo miri test; \
 		$(PRINT_OK) "Miri checks passed"; \
 	else \
-		$(PRINT_WARN) "Skipping Miri — install with: make miri-setup"; \
+		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \
+		exit 1; \
 	fi
 
 # ── Benchmark ──────────────────────────────────────────────────────────────────
@@ -223,7 +223,7 @@ miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires ni
 .PHONY: trace-startup
 trace-startup: require-flutter ## Build profile APK with --trace-startup and launch
 	@$(PRINT_STEP) "Building profile APK with startup tracing"
-	@$(FLUTTER) build apk --profile --target lib/main.dart --trace-startup 2>&1 | tee build/startup_trace.log
+	@set -o pipefail; $(FLUTTER) build apk --profile --target lib/main.dart --trace-startup 2>&1 | tee build/startup_trace.log
 	@if grep -q '"timeToFirstFrameMicros"' build/startup_trace.log 2>/dev/null; then \
 		$(PRINT_OK) "Startup trace logged in build/startup_trace.log"; \
 	else \

@@ -24,8 +24,17 @@ class AppBootstrap {
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();
-    // STR-4.2: initialize background sync (non-blocking, failure-safe)
-    unawaited(SyncService.initialize().catchError((_) {}));
+    // STR-4.2: initialize background sync without delaying app startup.
+    unawaited(
+      SyncService.initialize().catchError((Object error, StackTrace stackTrace) {
+        AppLogger().warning(
+          'Background sync initialization failed',
+          name: 'Bootstrap',
+          error: error,
+          st: stackTrace,
+        );
+      }),
+    );
   }
 
   static void _configureErrorHandlers() {

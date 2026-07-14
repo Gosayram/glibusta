@@ -34,7 +34,6 @@ class SyncService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
-    _initialized = true;
 
     await Workmanager().initialize(
       callbackDispatcher,
@@ -47,6 +46,7 @@ class SyncService {
         networkType: NetworkType.connected,
       ),
     );
+    _initialized = true;
     AppLogger().info('SyncService workmanager initialized', name: 'Sync');
   }
 

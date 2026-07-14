@@ -76,7 +76,7 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
 
   void _goToPage(int page) {
     if (page < 1 || page > _totalPages) return;
-    _currentPage = page;
+    setState(() => _currentPage = page);
     unawaited(_renderPage(page));
   }
 

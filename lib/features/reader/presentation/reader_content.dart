@@ -1663,6 +1663,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         widget.settings.wordSpacing != oldWidget.settings.wordSpacing ||
         widget.settings.fontWeightDelta != oldWidget.settings.fontWeightDelta ||
         widget.settings.textDirection != oldWidget.settings.textDirection ||
+        widget.settings.showImages != oldWidget.settings.showImages ||
+        widget.settings.imageWidth != oldWidget.settings.imageWidth ||
         widget.settings.customCss != oldWidget.settings.customCss) {
       _chapterPageCache.clear();
       _cacheKey = null;
@@ -1811,6 +1813,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       settings.paragraphFirstLineIndent,
       settings.ignoreBookIndent,
       settings.customCss,
+      settings.paragraphSpacing,
+      settings.showImages,
+      settings.imageWidth,
       contentWidth,
     ]);
   }
@@ -1832,7 +1837,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         '${settings.paragraphSpacing}_${settings.letterSpacing}_${settings.paragraphFirstLineIndent}_'
         '${settings.font}_${settings.hyphenation}_${settings.textAlign.name}_'
         '${settings.paragraphIndentMode.name}_${availableHeight.toStringAsFixed(1)}_'
-        '${contentWidth.toStringAsFixed(1)}';
+        '${settings.showImages}_${settings.imageWidth}_${contentWidth.toStringAsFixed(1)}';
 
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
     if (hasCover) {
@@ -2010,11 +2015,10 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (block.type == BlockType.subtitle) {
       return 1.1;
     }
-    if (block.type == BlockType.epigraph ||
-        block.type == BlockType.cite ||
-        block.type == BlockType.footnote) {
+    if (block.type == BlockType.epigraph) {
       return 0.95;
     }
+    if (block.type == BlockType.footnote) return 0.85;
     if (block.type == BlockType.preformatted) {
       return 0.9;
     }
@@ -2498,9 +2502,13 @@ class _FixedLayoutBody extends StatelessWidget {
   Widget _loadImage(String url, BoxFit fit) {
     final uri = Uri.tryParse(url);
     if (uri != null && uri.scheme == 'data') {
-      final parts = url.split(',');
-      if (parts.length == 2) {
-        return Image.memory(base64Decode(parts.last), fit: fit);
+      final separator = url.indexOf(',');
+      if (separator > 0 && url.substring(0, separator).toLowerCase().contains(';base64')) {
+        try {
+          return Image.memory(base64Decode(url.substring(separator + 1)), fit: fit);
+        } on FormatException {
+          return const Icon(Icons.broken_image, size: 64, color: Colors.white);
+        }
       }
     }
     if (uri != null && uri.scheme == 'file') {

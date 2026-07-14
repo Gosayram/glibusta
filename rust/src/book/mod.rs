@@ -17,35 +17,6 @@ pub(crate) use hash::sha256_hex;
 
 use crate::api::models::RichSpan;
 
-// ---------------------------------------------------------------------------
-// ARC-2.3: Object Pool — reuse Vec<RichSpan> allocations across paragraphs
-// ---------------------------------------------------------------------------
-
-thread_local! {
-    static SPAN_POOL: std::cell::RefCell<Vec<Vec<RichSpan>>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// Get a pre-allocated Vec<RichSpan> from the pool (or create new).
-#[allow(dead_code)]
-pub(crate) fn pool_get_spans() -> Vec<RichSpan> {
-    SPAN_POOL
-        .with(|pool| pool.borrow_mut().pop())
-        .unwrap_or_default()
-}
-
-/// Return a Vec<RichSpan> to the pool for reuse. Clears the vec.
-#[allow(dead_code)]
-pub(crate) fn pool_return_spans(mut spans: Vec<RichSpan>) {
-    spans.clear();
-    SPAN_POOL.with(|pool| {
-        let p = pool.borrow();
-        if p.len() < 64 {
-            drop(p);
-            pool.borrow_mut().push(spans);
-        }
-    });
-}
-
 /// Strip dangerous schemes from href (javascript:, vbscript:, data:).
 /// Single-pass: trim + case-insensitive scheme check, no intermediate alloc.
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
@@ -55,7 +26,7 @@ pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     }
     let bytes = trimmed.as_bytes();
     if (bytes.len() >= 11 && bytes[..11].eq_ignore_ascii_case(b"javascript:"))
-        || (bytes.len() >= 8 && bytes[..8].eq_ignore_ascii_case(b"vbscript:"))
+        || (bytes.len() >= 9 && bytes[..9].eq_ignore_ascii_case(b"vbscript:"))
         || (bytes.len() >= 5 && bytes[..5].eq_ignore_ascii_case(b"data:"))
     {
         return None;
@@ -154,7 +125,7 @@ pub(crate) fn normalize_typography(text: &str) -> String {
                 result.push_str("\u{2014} ");
                 i += 2; // skip past the trailing space
             } else {
-                let (ch, adv) = copy_char(bytes, i);
+                let (ch, adv) = copy_char(text, i);
                 result.push_str(ch);
                 i = adv;
             }
@@ -175,7 +146,7 @@ pub(crate) fn normalize_typography(text: &str) -> String {
             open_quote = !open_quote;
             i += 1;
         } else {
-            let (ch, adv) = copy_char(bytes, i);
+            let (ch, adv) = copy_char(text, i);
             result.push_str(ch);
             i = adv;
         }
@@ -183,24 +154,11 @@ pub(crate) fn normalize_typography(text: &str) -> String {
     result
 }
 
-/// Copy a single UTF-8 character from bytes at position i. Returns (&str, next_i).
-fn copy_char(bytes: &[u8], i: usize) -> (&str, usize) {
-    let first = bytes[i];
-    let len = if first < 0x80 {
-        1
-    } else if first & 0xE0 == 0xC0 {
-        2
-    } else if first & 0xF0 == 0xE0 {
-        3
-    } else {
-        4
-    };
-    let end = (i + len).min(bytes.len());
-    // SAFETY: input text is valid UTF-8, slice is within bounds
-    (
-        unsafe { std::str::from_utf8_unchecked(&bytes[i..end]) },
-        end,
-    )
+/// Copy a single UTF-8 character at position `i`. Returns (character, next_i).
+fn copy_char(text: &str, i: usize) -> (&str, usize) {
+    let ch = text[i..].chars().next().expect("index is within text");
+    let end = i + ch.len_utf8();
+    (&text[i..end], end)
 }
 
 // ---------------------------------------------------------------------------

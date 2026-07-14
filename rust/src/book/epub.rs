@@ -1031,10 +1031,16 @@ fn apply_css_props(
 /// RCE-7.3: Inline CSS normalization — apply CSS properties to a ReaderBlock.
 /// ponytail: text-indent, text-align, white-space, margin-left, line-height, font-weight, font-style, color, display.
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
-    // RCE-7.3: display:none → empty text to hide block
+    // RCE-7.3: display:none removes every renderable payload from the block.
     if let Some(display) = props.get("display") {
         if display.trim() == "none" {
             block.text.clear();
+            block.block_type = BlockType::Paragraph;
+            block.image_url = None;
+            block.image_alt = None;
+            block.rich_spans = None;
+            block.list_items = None;
+            block.table_rows = None;
             return;
         }
     }

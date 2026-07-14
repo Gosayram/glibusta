@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:powersync/powersync.dart';
@@ -21,7 +23,9 @@ class PowerSyncAdapter {
     if (_db != null) return _db!;
 
     final dir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(dir.path, 'glibusta', 'glibusta_sync.db');
+    final databaseDir = Directory(p.join(dir.path, 'glibusta'));
+    await databaseDir.create(recursive: true);
+    final dbPath = p.join(databaseDir.path, 'glibusta_sync.db');
     _db = PowerSyncDatabase(
       schema: PowerSyncSchemas.schema,
       path: dbPath,
