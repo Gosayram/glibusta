@@ -131,7 +131,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             blocks,
         }],
         metadata: None,
-        book_format: BookFormat::Unknown,
+        book_format: BookFormat::Cbr,
         language: None,
         warnings: Vec::new(),
         images: Vec::new(),

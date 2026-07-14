@@ -2392,7 +2392,8 @@ impl SseDecode for crate::api::models::BookFormat {
             7 => crate::api::models::BookFormat::Prc,
             8 => crate::api::models::BookFormat::Pdf,
             9 => crate::api::models::BookFormat::Djvu,
-            10 => crate::api::models::BookFormat::Unknown,
+            10 => crate::api::models::BookFormat::Cbr,
+            11 => crate::api::models::BookFormat::Unknown,
             _ => unreachable!("Invalid variant for BookFormat: {}", inner),
         };
     }
@@ -3296,7 +3297,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::BookFormat {
             Self::Prc => 7.into_dart(),
             Self::Pdf => 8.into_dart(),
             Self::Djvu => 9.into_dart(),
-            Self::Unknown => 10.into_dart(),
+            Self::Cbr => 10.into_dart(),
+            Self::Unknown => 11.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -3756,7 +3758,8 @@ impl SseEncode for crate::api::models::BookFormat {
                 crate::api::models::BookFormat::Prc => 7,
                 crate::api::models::BookFormat::Pdf => 8,
                 crate::api::models::BookFormat::Djvu => 9,
-                crate::api::models::BookFormat::Unknown => 10,
+                crate::api::models::BookFormat::Cbr => 10,
+                crate::api::models::BookFormat::Unknown => 11,
                 _ => {
                     unimplemented!("");
                 }

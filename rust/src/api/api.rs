@@ -259,6 +259,9 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
         }
         BookFormat::Djvu => crate::book::djvu::DjvuEngine::parse_djvu(bytes)
             .map_err(|e| CoreError::ParserFailed(e.to_string())),
+        BookFormat::Cbr => Err(CoreError::FeatureDisabled(
+            "CBR parsing requires a filesystem path".into(),
+        )),
         BookFormat::Unknown => Err(CoreError::UnsupportedFormat("unknown".into())),
     }
 }

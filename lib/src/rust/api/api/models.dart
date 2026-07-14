@@ -111,6 +111,7 @@ enum BookFormat {
   prc,
   pdf,
   djvu,
+  cbr,
   unknown,
   ;
 

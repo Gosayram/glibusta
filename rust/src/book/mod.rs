@@ -194,6 +194,7 @@ pub fn dispatch_parse_trait(format: BookFormat, bytes: &[u8]) -> anyhow::Result<
         BookFormat::Docx => docx::parse_docx(bytes, None),
         BookFormat::Rtf => rtf::parse_rtf(bytes, None),
         BookFormat::Mobi | BookFormat::Azw3 | BookFormat::Prc => mobi::parse_mobi(bytes, None),
+        BookFormat::Cbr => Err(anyhow::anyhow!("CBR parsing requires a filesystem path")),
         _ => Err(anyhow::anyhow!("Unsupported format: {:?}", format)),
     }
 }
