@@ -52,6 +52,9 @@ class HttpClient {
       final result = await _encodingDetector.detect(bytes);
       return result.text;
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw HttpException(message: 'Cancelled', url: url);
+      }
       _logger.warning('Dio failed for $url: ${e.type}', name: 'Http');
       throw _dioExceptionToHttpException(e, url);
     }
@@ -60,19 +63,34 @@ class HttpClient {
   Future<String> getUriWithFallback(Uri uri, {CancelToken? cancelToken}) async {
     try {
       return await getUri(uri, cancelToken: cancelToken);
-    } on HttpException catch (_) {
-      return _rawGet(uri);
+    } on HttpException catch (e) {
+      if (e.message == 'Cancelled') rethrow;
+      return _rawGet(uri, cancelToken: cancelToken);
     }
   }
 
-  Future<String> _rawGet(Uri uri) async {
+  /// Awaits an I/O operation while allowing Dio callers to cancel its fallback.
+  ///
+  /// Closing the native client in the caller's `finally` aborts the underlying
+  /// socket after the cancellation future wins the race.
+  Future<T> _awaitWithCancellation<T>(Future<T> operation, CancelToken? cancelToken) {
+    if (cancelToken == null) return operation;
+    return Future.any<T>([
+      operation,
+      cancelToken.whenCancel.then<T>(
+        (_) => throw const HttpException(message: 'Cancelled'),
+      ),
+    ]);
+  }
+
+  Future<String> _rawGet(Uri uri, {CancelToken? cancelToken}) async {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpIdle
       ..maxConnectionsPerHost = 1;
 
     try {
-      final request = await client.getUrl(uri);
+      final request = await _awaitWithCancellation(client.getUrl(uri), cancelToken);
       request.headers
         ..set(
           io.HttpHeaders.acceptHeader,
@@ -87,7 +105,10 @@ class HttpClient {
         request.headers.set(io.HttpHeaders.userAgentHeader, ua);
       }
 
-      final response = await request.close().timeout(AppDuration.httpReceive);
+      final response = await _awaitWithCancellation(
+        request.close().timeout(AppDuration.httpReceive),
+        cancelToken,
+      );
 
       final completer = Completer<Uint8List>();
       final bytes = <int>[];
@@ -96,7 +117,7 @@ class HttpClient {
         onDone: () => completer.complete(Uint8List.fromList(bytes)),
         onError: completer.completeError,
       );
-      final rawBytes = await completer.future;
+      final rawBytes = await _awaitWithCancellation(completer.future, cancelToken);
 
       if (rawBytes.isEmpty) return '';
       final detected = await _encodingDetector.detect(rawBytes);
