@@ -19,6 +19,7 @@ part 'search_controller.freezed.dart';
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
   CancelToken? _authorToken;
+  var _requestGeneration = 0;
   AppLogger get _logger => ref.read(appLoggerProvider);
 
   @override
@@ -34,6 +35,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
   BookSource get _source => ref.read(bookSourceProvider);
 
+  bool _isCurrentRequest(int generation) => ref.mounted && generation == _requestGeneration;
+
   Future<void> search(String query) async {
     final normalized = query.trim();
     if (normalized.isEmpty) {
@@ -45,6 +48,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
     _currentToken?.cancel();
     _authorToken?.cancel();
+    final generation = ++_requestGeneration;
     _currentToken = CancelToken();
     _authorToken = CancelToken();
     final localAuthorToken = _authorToken;
@@ -82,7 +86,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         );
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
 
       try {
         authorResult = await _source.searchAuthors(searchQuery, cancelToken: localAuthorToken);
@@ -91,7 +95,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         authorResult = const SearchAuthorsResultPage(authors: []);
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
 
       if (bookResult.books.isEmpty && authorResult.authors.isEmpty && bookError != null) {
         state = state.copyWith(
@@ -103,7 +107,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         return;
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.info(
         'Search returned ${bookResult.books.length} books, ${authorResult.authors.length} authors',
         name: 'Search',
@@ -120,7 +124,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         unawaited(_rememberSearch(normalized));
       }
     } on Object catch (e, st) {
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -140,11 +144,13 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       filters: state.filters,
     );
     _currentToken?.cancel();
+    _authorToken?.cancel();
     _currentToken = CancelToken();
+    final generation = ++_requestGeneration;
 
     try {
       final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.info('Load more returned ${result.books.length} results', name: 'Search');
       state = state.copyWith(
         books: [...state.books, ...result.books],
@@ -154,7 +160,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: null,
       );
     } on Object catch (e, st) {
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.severe('Load more failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -220,6 +226,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
   }
 
   void clearResults() {
+    _requestGeneration++;
     _currentToken?.cancel();
     _currentToken = null;
     _authorToken?.cancel();
