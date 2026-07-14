@@ -15,6 +15,18 @@ void main() {
 
   final testDir = p.join(Directory.current.path, 'test_results');
 
+  test('ReaderBlock JSON round trip preserves source text exactly', () {
+    const block = ReaderBlock(
+      index: 0,
+      text: 'А. С. Пушкин\nи  1 000 строк',
+      type: BlockType.preformatted,
+    );
+
+    final restored = ReaderBlock.fromJson(block.toJson());
+
+    expect(restored.text, block.text);
+  });
+
   group('EPUB → NormalizedBook → serialization roundtrip', () {
     final epubFiles = Directory(
       testDir,
