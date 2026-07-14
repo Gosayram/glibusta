@@ -7,8 +7,8 @@ use base64::engine::general_purpose::STANDARD;
 use unrar_ng::Archive;
 
 use crate::api::models::{
-    BlockType, BookFormat, MAX_EXTRACTED_FILES, MAX_FILE_SIZE, MAX_IMAGE_SIZE, NormalizedBook,
-    ReaderBlock, ReaderChapter,
+    BlockType, BookFormat, MAX_COMPRESSION_RATIO, MAX_EXTRACTED_FILES, MAX_FILE_SIZE,
+    MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock, ReaderChapter,
 };
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"];
@@ -56,6 +56,12 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             bail!(
                 "CBR exceeds maximum decompressed size of {} MiB",
                 MAX_FILE_SIZE / 1024 / 1024
+            );
+        }
+        if total_uncompressed_size > metadata.len().saturating_mul(MAX_COMPRESSION_RATIO) {
+            bail!(
+                "CBR exceeds maximum compression ratio of {}:1",
+                MAX_COMPRESSION_RATIO
             );
         }
 
@@ -140,18 +146,19 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
 }
 
 fn image_media_type(path: &str) -> Option<&'static str> {
-    let extension = path.rsplit_once('.')?.1;
-    IMAGE_EXTENSIONS
-        .contains(&extension.to_ascii_lowercase().as_str())
-        .then(|| match extension.to_ascii_lowercase().as_str() {
-            "jpg" | "jpeg" => "image/jpeg",
-            "png" => "image/png",
-            "gif" => "image/gif",
-            "webp" => "image/webp",
-            "bmp" => "image/bmp",
-            "tiff" => "image/tiff",
-            _ => unreachable!("extension was checked against IMAGE_EXTENSIONS"),
-        })
+    let extension = path.rsplit_once('.')?.1.to_ascii_lowercase();
+    if !IMAGE_EXTENSIONS.contains(&extension.as_str()) {
+        return None;
+    }
+    Some(match extension.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "tiff" => "image/tiff",
+        _ => unreachable!("extension was checked against IMAGE_EXTENSIONS"),
+    })
 }
 
 fn natural_cmp(left: &str, right: &str) -> Ordering {
@@ -235,5 +242,29 @@ mod tests {
         let _ = std::fs::remove_file(path);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn reads_a_rar4_archive_before_rejecting_non_image_contents() {
+        // Minimal valid RAR4 archive from UnRAR's own test corpus. It contains
+        // a VERSION file, so the CBR parser must scan it and then reject it for
+        // having no image pages rather than treating RAR4 as an invalid format.
+        const RAR4_ARCHIVE: &[u8] = &[
+            0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00, 0xcf, 0x90, 0x73, 0x00, 0x00, 0x0d, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x0c, 0x74, 0x20, 0x80, 0x27, 0x00, 0x15,
+            0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x03, 0x45, 0xf3, 0x7d, 0xc6, 0xa4, 0x8a,
+            0x07, 0x47, 0x1d, 0x33, 0x07, 0x00, 0xa4, 0x81, 0x00, 0x00, 0x56, 0x45, 0x52, 0x53,
+            0x49, 0x4f, 0x4e, 0x0c, 0x00, 0x8f, 0xec, 0x8a, 0x45, 0xcc, 0x23, 0xc8, 0x48, 0x08,
+            0x83, 0x62, 0xfe, 0x5f, 0xdd, 0x5c, 0x53, 0x88, 0xf0, 0x72, 0xc4, 0x3d, 0x7b, 0x00,
+            0x40, 0x07, 0x00,
+        ];
+        let path =
+            std::env::temp_dir().join(format!("glibusta-rar4-cbr-{}.cbr", uuid::Uuid::new_v4()));
+        std::fs::write(&path, RAR4_ARCHIVE).expect("write RAR4 fixture");
+
+        let result = parse_cbr_path(&path);
+        let _ = std::fs::remove_file(path);
+
+        assert!(matches!(result, Err(error) if error.to_string().contains("no supported images")));
     }
 }

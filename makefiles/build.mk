@@ -30,6 +30,9 @@ CARGO_CHECK := cd rust && cargo check
 ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
 CARGO_NDK := cargo ndk
 JNILIBS_DIR := android/app/src/main/jniLibs
+# Android's bionic libc has no `lutimes`.  UnRAR only reaches this call while
+# restoring a symlink's metadata; CBR pages are read into memory instead.
+UNRAR_NG_ANDROID_CXXFLAGS := -Dlutimes=utimes
 
 ##@ Build
 
@@ -44,6 +47,7 @@ rust-build-release: require-rust ## Build Rust native library in release mode
 rust-build-android: require-rust ## Build Rust native libraries for Android (arm64-v8a + armeabi-v7a)
 	@$(PRINT_STEP) "Building Rust libraries for Android"
 	@export ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)"; \
+	export CXXFLAGS="$${CXXFLAGS:+$${CXXFLAGS} }$(UNRAR_NG_ANDROID_CXXFLAGS)"; \
 	export PATH="$${HOME}/.cargo/bin:$${HOME}/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$${PATH}"; \
 	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a; \
 	cd rust && $(CARGO_NDK) -t arm64-v8a build --release && \
