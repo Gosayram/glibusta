@@ -1650,6 +1650,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (widget.settings.fontSize != oldWidget.settings.fontSize ||
         widget.settings.lineHeight != oldWidget.settings.lineHeight ||
         widget.settings.margin != oldWidget.settings.margin ||
+        widget.settings.separateMargins != oldWidget.settings.separateMargins ||
+        widget.settings.marginTop != oldWidget.settings.marginTop ||
+        widget.settings.marginBottom != oldWidget.settings.marginBottom ||
+        widget.settings.marginLeft != oldWidget.settings.marginLeft ||
+        widget.settings.marginRight != oldWidget.settings.marginRight ||
         widget.settings.font != oldWidget.settings.font ||
         widget.settings.hyphenation != oldWidget.settings.hyphenation ||
         widget.settings.paragraphIndentMode != oldWidget.settings.paragraphIndentMode ||
@@ -2167,20 +2172,26 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableHeight = constraints.maxHeight;
-        final contentWidth = constraints.maxWidth - widget.settings.margin * 2;
+        final layoutMargin = _effectiveMargin(widget.settings, widget.settings.mode);
+        // The page body applies this Padding at render time, so pagination
+        // must measure the child constraints after the same inset.
+        final availableHeight = constraints.maxHeight - layoutMargin.vertical;
+        final contentWidth = constraints.maxWidth - layoutMargin.horizontal;
+        final safeAvailableHeight = availableHeight > 1.0 ? availableHeight : 1.0;
+        final safeContentWidth = contentWidth > 1.0 ? contentWidth : 1.0;
         // HG-6.1: check layout cache
         final s = widget.settings;
         final key =
-            '${s.fontSize}_${s.lineHeight}_${s.margin}_${s.paragraphSpacing}_'
+            '${s.fontSize}_${s.lineHeight}_${layoutMargin.top}_${layoutMargin.bottom}_'
+            '${layoutMargin.left}_${layoutMargin.right}_${s.paragraphSpacing}_'
             '${s.letterSpacing}_${s.paragraphFirstLineIndent}_${s.font}_'
             '${s.hyphenation}_${s.textAlign.name}_${s.paragraphIndentMode.name}_'
-            '${availableHeight.toStringAsFixed(1)}_${contentWidth.toStringAsFixed(1)}_'
+            '${safeAvailableHeight.toStringAsFixed(1)}_${safeContentWidth.toStringAsFixed(1)}_'
             '${widget.loadedChapters.length}';
         if (key == _cacheKey && _cachedPages.isNotEmpty) {
           _pages = _cachedPages;
         } else {
-          _pages = _paginateContent(availableHeight, contentWidth);
+          _pages = _paginateContent(safeAvailableHeight, safeContentWidth);
           _cacheKey = key;
           _cachedPages = _pages;
         }

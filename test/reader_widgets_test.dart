@@ -400,6 +400,17 @@ void main() {
           overrides: [
             databaseProvider.overrideWithValue(db),
             bookOpenServiceProvider.overrideWithValue(_FakeBookOpenService(db)),
+            readerSettingsProvider.overrideWith(
+              () => _TestReaderSettingsNotifier(
+                const ReaderSettings(
+                  separateMargins: true,
+                  marginTop: 12,
+                  marginBottom: 28,
+                  marginLeft: 16,
+                  marginRight: 36,
+                ),
+              ),
+            ),
           ],
           child: const MaterialApp(
             home: ReaderScreen(bookId: 'book-1'),
