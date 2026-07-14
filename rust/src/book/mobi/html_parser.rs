@@ -477,7 +477,9 @@ impl MobiHtmlParser {
                         superscript = true;
                     } else if name == "a" {
                         if let Some(m) = HREF_RE.captures(&lower) {
-                            href = m.get(1).map(|v| v.as_str().to_string());
+                            href = m
+                                .get(1)
+                                .and_then(|value| crate::book::sanitize_href(value.as_str()));
                         }
                     }
                     i = tag_end + 1;
@@ -635,5 +637,20 @@ impl MobiHtmlParser {
         }
 
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MobiHtmlParser;
+
+    #[test]
+    fn strips_dangerous_link_schemes_from_rich_spans() {
+        let blocks =
+            MobiHtmlParser::new().parse(r#"<p><a href="javascript:alert(1)">Read</a></p>"#);
+
+        let span = &blocks[0].rich_spans.as_ref().expect("rich span")[0];
+        assert_eq!(span.text, "Read");
+        assert!(span.href.is_none());
     }
 }
