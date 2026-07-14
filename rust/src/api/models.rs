@@ -689,7 +689,7 @@ impl BookDiff {
                     || a.blocks
                         .iter()
                         .zip(b.blocks.iter())
-                        .any(|(x, y)| x.index != y.index)
+                        .any(|(x, y)| x.index != y.index || x.block_type != y.block_type)
             });
         let text_changed = old.chapters.iter().zip(new.chapters.iter()).any(|(a, b)| {
             a.title != b.title
@@ -811,6 +811,20 @@ mod book_diff_tests {
             text_align: None,
             note_id: None,
         });
+
+        let diff = BookDiff::compute(&old, &new);
+
+        assert!(diff.chapters_changed);
+        assert!(!diff.text_changed);
+        assert!(!diff.metadata_only);
+        assert!(diff.needs_anchor_migration);
+    }
+
+    #[test]
+    fn block_type_change_requires_anchor_migration() {
+        let old = test_book();
+        let mut new = old.clone();
+        new.chapters[0].blocks[0].block_type = BlockType::Heading;
 
         let diff = BookDiff::compute(&old, &new);
 

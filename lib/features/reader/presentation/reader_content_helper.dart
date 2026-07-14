@@ -166,7 +166,8 @@ final class ReaderContentHelper {
     return (chapterIndex: chapterCount - 1, paragraphIndex: 0);
   }
 
-  NormalizedBook buildBookForSearch(
+  /// Builds a complete chapter list while tolerating incomplete cached titles.
+  static List<ReaderChapter> buildSearchChapters(
     NormalizedBookMetadata meta,
     Map<int, ReaderChapter> loadedChapters,
   ) {
@@ -174,9 +175,21 @@ final class ReaderContentHelper {
     for (var i = 0; i < meta.chapterCount; i++) {
       chapters.add(
         loadedChapters[i] ??
-            ReaderChapter(index: i, title: meta.chapterTitles[i], blocks: const []),
+            ReaderChapter(
+              index: i,
+              title: i < meta.chapterTitles.length ? meta.chapterTitles[i] : 'Глава ${i + 1}',
+              blocks: const [],
+            ),
       );
     }
+    return chapters;
+  }
+
+  NormalizedBook buildBookForSearch(
+    NormalizedBookMetadata meta,
+    Map<int, ReaderChapter> loadedChapters,
+  ) {
+    final chapters = buildSearchChapters(meta, loadedChapters);
     return NormalizedBook(
       id: meta.id,
       title: meta.title,

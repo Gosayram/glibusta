@@ -693,6 +693,7 @@ final class ReaderController {
   // ── Navigation ────────────────────────────────────────
 
   void scrollToNext() {
+    if (_disposed || _state.chapterCount == 0) return;
     final mode = effectiveMode;
     if (mode == ReaderMode.paginated) {
       final settings = _ref.read(readerSettingsProvider);
@@ -769,6 +770,7 @@ final class ReaderController {
   }
 
   void scrollToPrevious() {
+    if (_disposed || _state.chapterCount == 0) return;
     final mode = effectiveMode;
     if (mode == ReaderMode.paginated) {
       final settings = _ref.read(readerSettingsProvider);

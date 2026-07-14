@@ -217,6 +217,20 @@ void main() {
 
       expect(position, (chapterIndex: 1, paragraphIndex: 2));
     });
+
+    test('search chapters fall back when cached titles are incomplete', () {
+      const metadata = NormalizedBookMetadata(
+        id: 'book',
+        title: 'Book',
+        authors: [],
+        chapterCount: 2,
+        chapterTitles: ['Available title'],
+      );
+
+      final chapters = ReaderContentHelper.buildSearchChapters(metadata, const {});
+
+      expect(chapters.map((chapter) => chapter.title), ['Available title', 'Глава 2']);
+    });
   });
 
   group('ReaderController', () {
@@ -263,6 +277,16 @@ void main() {
       expect(ctrl.state.uiVisible, isTrue);
       ctrl.dispose();
       await tester.pump(const Duration(seconds: 60));
+    });
+
+    testWidgets('chapter navigation ignores an unloaded book', (tester) async {
+      final ctrl = await createController(tester, 'book1');
+
+      expect(ctrl.scrollToNext, returnsNormally);
+      expect(ctrl.scrollToPrevious, returnsNormally);
+      expect(ctrl.state.currentPosition, ReaderPosition.initial);
+
+      ctrl.dispose();
     });
 
     testWidgets('onBottomSheetOpen/close toggles isBottomSheetOpen', (tester) async {
