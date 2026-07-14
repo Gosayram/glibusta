@@ -496,6 +496,7 @@ Widget _buildReaderBlock(
             fontSize: s.fontSize * 0.9,
           ),
           textAlign,
+          richSpans: block.richSpans,
         ),
       );
     case BlockType.paragraph:
