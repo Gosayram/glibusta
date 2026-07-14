@@ -7,10 +7,15 @@ import 'package:flutter_tts/flutter_tts.dart';
 /// LW-11.1/11.2: TTS controller with headphone auto-pause/resume.
 /// ponytail: singleton — single TTS instance shared across app.
 class TtsController {
-  TtsController._();
+  TtsController._({FlutterTts Function()? ttsFactory}) : _ttsFactory = ttsFactory ?? FlutterTts.new;
   static final TtsController instance = TtsController._();
 
+  @visibleForTesting
+  TtsController.forTesting(FlutterTts Function() ttsFactory) : _ttsFactory = ttsFactory;
+
+  final FlutterTts Function() _ttsFactory;
   late FlutterTts _tts;
+  var _isTtsInitialized = false;
   bool _isPlaying = false;
   late String _lastLang;
   late double _lastRate;
@@ -18,9 +23,12 @@ class TtsController {
   StreamSubscription<dynamic>? _noisySub;
 
   void _ensureTts() {
-    _tts = FlutterTts();
+    if (_isTtsInitialized) return;
+
+    _tts = _ttsFactory();
     _lastLang = 'ru-RU';
     _lastRate = 0.5;
+    _isTtsInitialized = true;
   }
 
   /// Start listening for headphone removal events.
@@ -60,7 +68,9 @@ class TtsController {
 
   void stop() {
     _isPlaying = false;
-    _tts.stop(); // ignore: discarded_futures
+    if (_isTtsInitialized) {
+      _tts.stop(); // ignore: discarded_futures
+    }
   }
 
   bool get isPlaying => _isPlaying;
@@ -71,7 +81,9 @@ class TtsController {
     _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
     _lastText = null;
-    _tts.stop(); // ignore: discarded_futures
+    if (_isTtsInitialized) {
+      _tts.stop(); // ignore: discarded_futures
+    }
     _isPlaying = false;
   }
 }
