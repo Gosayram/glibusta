@@ -60,6 +60,137 @@ void main() {
   });
 
   group('DownloadQueue.enqueue', () {
+    test('reuses a persisted active download before the downloads stream is opened', () async {
+      const persistedTask = DownloadTask(
+        id: 'persisted-task',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      const duplicateTask = DownloadTask(
+        id: 'duplicate-task',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [persistedTask]);
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) async => duplicateTask);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => duplicateTask.id);
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+      );
+      addTearDown(queue.dispose);
+
+      final taskId = await queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+
+      expect(taskId, persistedTask.id);
+      verifyNever(
+        () => mockRepo.startDownload(
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      );
+    });
+
+    test('coalesces simultaneous requests for the same book and format', () async {
+      const task = DownloadTask(
+        id: 'task-1',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      final startDownload = Completer<DownloadTask>();
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) => startDownload.future);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => task.id);
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+      );
+      addTearDown(queue.dispose);
+
+      final first = queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+      final second = queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      verify(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).called(1);
+
+      startDownload.complete(task);
+
+      expect(await first, task.id);
+      expect(await second, task.id);
+    });
+
     test('calls repo.startDownload with correct params', () async {
       const task = DownloadTask(
         id: 'task-1',

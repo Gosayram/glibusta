@@ -49,16 +49,14 @@ class DownloadQueue {
   final _progressController = StreamController<DownloadTask>.broadcast();
 
   final Map<String, DownloadTask> _tasks = {};
+  final Map<(String, BookFormat), Future<String>> _pendingEnqueues = {};
   List<DownloadTask> _latestTasks = [];
+  Future<void>? _tasksHydration;
   bool _disposed = false;
 
   Stream<List<DownloadTask>> get onDownloadsChanged async* {
-    final persistedTasks = await _repository.getAllDownloads();
+    await _hydrateTasks();
     if (_disposed) return;
-    for (final task in persistedTasks) {
-      _tasks.putIfAbsent(task.id, () => task);
-    }
-    _latestTasks = _tasks.values.toList();
     yield _latestTasks;
     yield* _downloadsController.stream;
   }
@@ -75,13 +73,36 @@ class DownloadQueue {
     required String bookTitle,
     required BookFormat format,
     required String sourceUrl,
+  }) {
+    final key = (bookId, format);
+    final pending = _pendingEnqueues[key];
+    if (pending != null) return pending;
+
+    late final Future<String> enqueue;
+    enqueue =
+        _enqueue(
+          bookId: bookId,
+          bookTitle: bookTitle,
+          format: format,
+          sourceUrl: sourceUrl,
+        ).whenComplete(() {
+          _pendingEnqueues.remove(key)?.ignore();
+        });
+    _pendingEnqueues[key] = enqueue;
+    return enqueue;
+  }
+
+  Future<String> _enqueue({
+    required String bookId,
+    required String bookTitle,
+    required BookFormat format,
+    required String sourceUrl,
   }) async {
+    await _hydrateTasks();
+
     // Deduplicate: skip if same bookId+format is already active.
     for (final existing in _tasks.values) {
-      if (existing.bookId == bookId &&
-          existing.format == format &&
-          existing.status != DownloadStatus.canceled &&
-          existing.status != DownloadStatus.failed) {
+      if (existing.bookId == bookId && existing.format == format && _isActive(existing.status)) {
         return existing.id;
       }
     }
@@ -129,6 +150,36 @@ class DownloadQueue {
     }
 
     return task.id;
+  }
+
+  static bool _isActive(DownloadStatus status) =>
+      status == DownloadStatus.queued ||
+      status == DownloadStatus.running ||
+      status == DownloadStatus.paused;
+
+  Future<void> _hydrateTasks() async {
+    final hydration = _tasksHydration;
+    if (hydration != null) return hydration;
+
+    final load = _loadPersistedTasks();
+    _tasksHydration = load;
+    try {
+      await load;
+    } on Object {
+      if (identical(_tasksHydration, load)) {
+        _tasksHydration = null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _loadPersistedTasks() async {
+    final persistedTasks = await _repository.getAllDownloads();
+    if (_disposed) return;
+    for (final task in persistedTasks) {
+      _tasks.putIfAbsent(task.id, () => task);
+    }
+    _latestTasks = _tasks.values.toList();
   }
 
   Future<void> pause(String taskId) async {
