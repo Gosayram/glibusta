@@ -16,11 +16,22 @@ class _FakeAppFileStorage implements AppFileStorage {
       File(p.join(baseDir, 'books', '$bookId.${format.toString().split('.').last}'));
 
   @override
+  Future<File> downloadFile(String bookId, dynamic format) async =>
+      File(p.join(baseDir, 'downloads', '$bookId.${format.toString().split('.').last}'));
+
+  @override
   Future<File> coverFile(String bookId) async => File(p.join(baseDir, 'covers', '$bookId.jpg'));
 
   @override
   Future<Directory> booksDir() async {
     final dir = Directory(p.join(baseDir, 'books'));
+    await dir.create(recursive: true);
+    return dir;
+  }
+
+  @override
+  Future<Directory> downloadsDir() async {
+    final dir = Directory(p.join(baseDir, 'downloads'));
     await dir.create(recursive: true);
     return dir;
   }

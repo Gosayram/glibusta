@@ -10,11 +10,15 @@ final appFileStorageProvider = Provider<AppFileStorage>((ref) {
   return AppFileStorageImpl();
 });
 
+const downloadsStorageDirectory = 'glibusta/downloads';
+
 abstract interface class AppFileStorage {
   Future<File> bookFile(String bookId, BookFormat format);
+  Future<File> downloadFile(String bookId, BookFormat format);
   Future<File> coverFile(String bookId);
   Future<Directory> tempDir();
   Future<Directory> booksDir();
+  Future<Directory> downloadsDir();
   Future<Directory> coversDir();
   Future<Directory> cacheDir();
   Future<Directory> catalogCoversDir();
@@ -52,6 +56,20 @@ class AppFileStorageImpl implements AppFileStorage {
   @override
   Future<File> bookFile(String bookId, BookFormat format) async {
     final dir = await booksDir();
+    return File(p.join(dir.path, '${sanitizeId(bookId)}.${format.name}'));
+  }
+
+  @override
+  Future<Directory> downloadsDir() async {
+    final dir = await getApplicationSupportDirectory();
+    final downloadsDir = Directory(p.join(dir.path, downloadsStorageDirectory));
+    await downloadsDir.create(recursive: true);
+    return downloadsDir;
+  }
+
+  @override
+  Future<File> downloadFile(String bookId, BookFormat format) async {
+    final dir = await downloadsDir();
     return File(p.join(dir.path, '${sanitizeId(bookId)}.${format.name}'));
   }
 

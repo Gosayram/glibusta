@@ -145,7 +145,16 @@ final class _TestAppFileStorage implements AppFileStorage {
   }
 
   @override
+  Future<File> downloadFile(String bookId, BookFormat format) async {
+    final directory = await downloadsDir();
+    return File('${directory.path}/$bookId.${format.name}');
+  }
+
+  @override
   Future<Directory> booksDir() => _directory('books');
+
+  @override
+  Future<Directory> downloadsDir() => _directory('downloads');
 
   @override
   Future<Directory> cacheDir() => _directory('cache');

@@ -5,6 +5,7 @@ import 'package:background_downloader/background_downloader.dart' as bd;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/logging/app_logger.dart';
+import '../../../core/platform/app_file_storage.dart';
 import '../../../shared/models/book.dart';
 import '../domain/download_repository.dart';
 import 'download_repository.dart';
@@ -53,8 +54,8 @@ class BackgroundDownloadService {
     final bdTask = bd.DownloadTask(
       url: sourceUrl,
       filename: fileName,
-      baseDirectory: bd.BaseDirectory.root,
-      directory: '/storage/emulated/0/Download/Glibusta',
+      baseDirectory: bd.BaseDirectory.applicationSupport,
+      directory: downloadsStorageDirectory,
       updates: bd.Updates.statusAndProgress,
       allowPause: true,
       retries: 3,

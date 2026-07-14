@@ -16,7 +16,14 @@ final class _TestStorage implements AppFileStorage {
   Future<File> bookFile(String bookId, BookFormat format) async => File('${root.path}/$bookId');
 
   @override
+  Future<File> downloadFile(String bookId, BookFormat format) async =>
+      File('${root.path}/downloads/$bookId.${format.name}');
+
+  @override
   Future<Directory> booksDir() async => root;
+
+  @override
+  Future<Directory> downloadsDir() async => Directory('${root.path}/downloads');
 
   @override
   Future<Directory> cacheDir() async {
