@@ -692,12 +692,9 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
     // Look for <nav epub:type="toc"> <ol> <li> <a href="...">text</a> ...
     let mut reader = Reader::from_str(text);
     let mut entries: Vec<TocEntry> = Vec::new();
-    let mut stack: Vec<Vec<TocEntry>> = Vec::new();
+    let mut pending_entries: Vec<TocEntry> = Vec::new();
     let mut in_toc_nav = false;
-    let mut in_li = false;
     let mut in_a = false;
-    let mut current_title = String::new();
-    let mut current_href = String::new();
 
     loop {
         match reader.read_event() {
@@ -717,54 +714,41 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
                             }
                         }
                     }
-                } else if tag == "ol" {
-                    stack.push(Vec::new());
                 } else if tag == "li" {
-                    in_li = true;
-                    current_title.clear();
-                    current_href.clear();
-                } else if in_li && tag == "a" {
+                    pending_entries.push(TocEntry {
+                        title: String::new(),
+                        chapter_index: -1,
+                        children: Vec::new(),
+                    });
+                } else if !pending_entries.is_empty() && tag == "a" {
                     in_a = true;
-                    if let Some(href) = get_xml_attr(e, b"href") {
-                        current_href = href;
-                    }
                 }
             }
             Ok(Event::Text(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default().to_string();
                 if in_a {
-                    current_title.push_str(&text);
+                    if let Some(entry) = pending_entries.last_mut() {
+                        entry.title.push_str(&text);
+                    }
                 }
             }
             Ok(Event::End(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
-                if tag == "ol" && !stack.is_empty() {
-                    let children = stack.pop().unwrap_or_default();
-                    if let Some(parent) = stack.last_mut() {
-                        // Add the children to the last entry of the parent
-                        if let Some(last) = parent.last_mut() {
-                            last.children = children;
-                        }
-                    } else {
-                        // Top-level list
-                        entries = children;
-                    }
-                } else if tag == "li" {
-                    in_li = false;
-                    let entry = TocEntry {
-                        title: current_title.trim().to_string(),
-                        chapter_index: -1,
-                        children: Vec::new(),
-                    };
-                    if !current_title.trim().is_empty() {
-                        if let Some(top) = stack.last_mut() {
-                            top.push(entry);
+                if tag == "li" {
+                    if let Some(mut entry) = pending_entries.pop() {
+                        entry.title = entry.title.trim().to_string();
+                        if !entry.title.is_empty() {
+                            if let Some(parent) = pending_entries.last_mut() {
+                                parent.children.push(entry);
+                            } else {
+                                entries.push(entry);
+                            }
                         }
                     }
-                    current_title.clear();
-                    current_href.clear();
                 } else if tag == "a" {
                     in_a = false;
+                } else if tag == "nav" {
+                    in_toc_nav = false;
                 }
             }
             _ => {}
@@ -2161,4 +2145,28 @@ fn extract_chapter_title(text: &str) -> String {
         title
     };
     result.trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_nav_xhtml;
+
+    #[test]
+    fn parses_epub3_nav_toc_with_nested_entries() {
+        let toc = parse_nav_xhtml(
+            r#"<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+                <nav epub:type="toc"><ol>
+                  <li><a href="chapter-1.xhtml">Chapter 1</a><ol>
+                    <li><a href="chapter-1.xhtml#part-1">Part 1</a></li>
+                  </ol></li>
+                  <li><a href="chapter-2.xhtml">Chapter 2</a></li>
+                </ol></nav>
+            </body></html>"#,
+        );
+
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].title, "Chapter 1");
+        assert_eq!(toc[0].children[0].title, "Part 1");
+        assert_eq!(toc[1].title, "Chapter 2");
+    }
 }

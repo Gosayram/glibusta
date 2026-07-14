@@ -165,6 +165,9 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut in_paragraph = false;
     let mut in_run = false;
     let mut in_pstyle = false;
+    let mut in_table = false;
+    let mut in_table_row = false;
+    let mut in_table_cell = false;
     let mut pstyle_val = String::new();
 
     let mut current_text = String::new();
@@ -172,6 +175,9 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
     let mut current_span_italic = false;
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    let mut current_table_row: Vec<String> = Vec::new();
+    let mut current_table_cell = String::new();
     let mut element_depth = 0usize;
 
     loop {
@@ -187,6 +193,18 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
                     "w:body" => in_body = true,
+                    "w:tbl" if in_body && !in_table => {
+                        in_table = true;
+                        table_rows.clear();
+                    }
+                    "w:tr" if in_table => {
+                        in_table_row = true;
+                        current_table_row.clear();
+                    }
+                    "w:tc" if in_table_row => {
+                        in_table_cell = true;
+                        current_table_cell.clear();
+                    }
                     "w:p" if in_body => {
                         in_paragraph = true;
                         current_text.clear();
@@ -273,7 +291,14 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                             rich_spans.iter().map(|s| s.text.as_str()).collect();
                         let trimmed = full_text.trim().to_string();
 
-                        if !trimmed.is_empty() {
+                        if in_table_cell {
+                            if !trimmed.is_empty() {
+                                if !current_table_cell.is_empty() {
+                                    current_table_cell.push('\n');
+                                }
+                                current_table_cell.push_str(&trimmed);
+                            }
+                        } else if !trimmed.is_empty() {
                             let is_heading = pstyle_val.starts_with("Heading")
                                 || pstyle_val.starts_with("Title")
                                 || pstyle_val.starts_with("Subtitle");
@@ -318,6 +343,44 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                         in_paragraph = false;
                         rich_spans.clear();
                         current_span_text.clear();
+                    }
+                    "w:tc" if in_table_cell => {
+                        current_table_row.push(current_table_cell.trim().to_string());
+                        current_table_cell.clear();
+                        in_table_cell = false;
+                    }
+                    "w:tr" if in_table_row => {
+                        if !current_table_row.is_empty() {
+                            table_rows.push(std::mem::take(&mut current_table_row));
+                        }
+                        in_table_row = false;
+                    }
+                    "w:tbl" if in_table => {
+                        if !table_rows.is_empty() {
+                            let table_text = table_rows
+                                .iter()
+                                .map(|row| row.join(" | "))
+                                .collect::<Vec<_>>()
+                                .join("\n");
+                            blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: table_text,
+                                block_type: BlockType::Table,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: Some(std::mem::take(&mut table_rows)),
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        in_table = false;
                     }
                     _ => {}
                 }
@@ -451,5 +514,31 @@ mod tests {
         let (blocks, _) = parse_document_xml(xml).expect("parse DOCX XML");
 
         assert_eq!(blocks[0].text, "Before\tAfter");
+    }
+
+    #[test]
+    fn preserves_docx_tables_as_table_blocks() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:tbl>
+                    <w:tr><w:tc><w:p><w:r><w:t>Name</w:t></w:r></w:p></w:tc>
+                          <w:tc><w:p><w:r><w:t>Value</w:t></w:r></w:p></w:tc></w:tr>
+                    <w:tr><w:tc><w:p><w:r><w:t>Author</w:t></w:r></w:p></w:tc>
+                          <w:tc><w:p><w:r><w:t>Ursula</w:t></w:r></w:p></w:tc></w:tr>
+                </w:tbl></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX table");
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Table);
+        assert_eq!(
+            blocks[0].table_rows,
+            Some(vec![
+                vec!["Name".into(), "Value".into()],
+                vec!["Author".into(), "Ursula".into()],
+            ])
+        );
     }
 }
