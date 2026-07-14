@@ -668,6 +668,7 @@ List<InlineSpan> _readerRichTextSpans(
   TextStyle baseStyle,
   Color linkColor, {
   ValueChanged<String>? onLinkTap,
+  bool forMeasurement = false,
 }) {
   final spans = <InlineSpan>[];
   for (final span in richSpans) {
@@ -688,6 +689,13 @@ List<InlineSpan> _readerRichTextSpans(
     if (span.superscript) {
       final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
       final supStyle = spanStyle.copyWith(fontSize: supFontSize);
+      // TextPainter cannot lay out WidgetSpan without placeholder dimensions.
+      // Pagination only needs the text metrics, so retain the smaller glyphs
+      // while omitting the visual baseline translation used by the renderer.
+      if (forMeasurement) {
+        spans.add(TextSpan(text: span.text, style: supStyle));
+        continue;
+      }
       if (span.href != null && onLinkTap != null) {
         final href = span.href!;
         spans.add(
@@ -1635,6 +1643,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (widget.loadedChapters != oldWidget.loadedChapters) {
       _cacheKey = null;
       _cachedPages = const [];
+      _chapterPageCache.clear();
+      _heightCache.clear();
     }
     // MD-2.3: clear per-chapter cache when settings affect layout
     if (widget.settings.fontSize != oldWidget.settings.fontSize ||
@@ -1642,9 +1652,16 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         widget.settings.margin != oldWidget.settings.margin ||
         widget.settings.font != oldWidget.settings.font ||
         widget.settings.hyphenation != oldWidget.settings.hyphenation ||
-        widget.settings.paragraphIndentMode != oldWidget.settings.paragraphIndentMode) {
+        widget.settings.paragraphIndentMode != oldWidget.settings.paragraphIndentMode ||
+        widget.settings.paragraphFirstLineIndent != oldWidget.settings.paragraphFirstLineIndent ||
+        widget.settings.letterSpacing != oldWidget.settings.letterSpacing ||
+        widget.settings.wordSpacing != oldWidget.settings.wordSpacing ||
+        widget.settings.fontWeightDelta != oldWidget.settings.fontWeightDelta ||
+        widget.settings.textDirection != oldWidget.settings.textDirection ||
+        widget.settings.customCss != oldWidget.settings.customCss) {
       _chapterPageCache.clear();
       _cacheKey = null;
+      _heightCache.clear();
     }
     if (widget.initialPage != oldWidget.initialPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1713,7 +1730,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
     for (int i = 0; i < chapter.blocks.length; i++) {
       final block = chapter.blocks[i];
-      final cacheKey = Object.hash(block.text, block.type.index, settings.fontSize, contentWidth);
+      final cacheKey = _blockHeightCacheKey(block, settings, contentWidth);
       final blockHeight = _heightCache.putIfAbsent(cacheKey, () {
         return _estimateBlockHeight(block, settings, contentWidth);
       });
@@ -1724,7 +1741,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ? chapter.blocks.skip(i).fold<double>(
                 0,
                 (sum, b) {
-                  final k = Object.hash(b.text, b.type.index, settings.fontSize, contentWidth);
+                  final k = _blockHeightCacheKey(b, settings, contentWidth);
                   return sum +
                       _heightCache.putIfAbsent(k, () {
                         return _estimateBlockHeight(b, settings, contentWidth);
@@ -1765,6 +1782,32 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     _chapterPageCache[cacheKey] = pages;
     _trimChapterCache();
     return pages;
+  }
+
+  int _blockHeightCacheKey(ReaderBlock block, ReaderSettings settings, double contentWidth) {
+    return Object.hashAll([
+      block.text,
+      block.type,
+      block.headingLevel,
+      block.textIndent,
+      block.richSpans,
+      block.listItems,
+      block.tableRows,
+      block.imageCaption,
+      settings.fontSize,
+      settings.lineHeight,
+      settings.font,
+      settings.fontWeightDelta,
+      settings.letterSpacing,
+      settings.wordSpacing,
+      settings.textDirection,
+      settings.hyphenation,
+      settings.paragraphIndentMode,
+      settings.paragraphFirstLineIndent,
+      settings.ignoreBookIndent,
+      settings.customCss,
+      contentWidth,
+    ]);
   }
 
   /// Evict oldest entries when cache exceeds limit.
@@ -1889,7 +1932,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               block,
               settings,
               colors,
-              width - indent,
+              width,
               firstLineIndent: indent,
             ) +
             bottomPad;
@@ -1919,10 +1962,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         block.richSpans!,
         baseStyle,
         colors.link,
+        forMeasurement: true,
       );
-      if (firstLineIndent > 0) {
-        spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
-      }
       textSpan = TextSpan(children: spans);
     } else {
       final fontSize = s.fontSize * _blockFontScale(block);
@@ -1930,16 +1971,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         fontSize: fontSize,
         height: s.lineHeight,
       );
-      if (firstLineIndent > 0) {
-        textSpan = TextSpan(
-          children: [
-            WidgetSpan(child: SizedBox(width: firstLineIndent)),
-            TextSpan(text: block.text, style: textStyle),
-          ],
-        );
-      } else {
-        textSpan = TextSpan(text: block.text, style: textStyle);
-      }
+      textSpan = TextSpan(text: block.text, style: textStyle);
     }
 
     final painter = TextPainter(
@@ -1947,7 +1979,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       textDirection: dir,
       locale: locale,
     );
-    painter.layout(maxWidth: maxWidth);
+    // A WidgetSpan gives the first rendered line its indentation, but it
+    // cannot be used in a standalone TextPainter. Measuring against the
+    // first-line content width is conservative: it may put a page break a
+    // little earlier, but never lets text overflow a page.
+    final measurementWidth = firstLineIndent > 0
+        ? (maxWidth - firstLineIndent).clamp(1.0, maxWidth)
+        : maxWidth;
+    painter.layout(maxWidth: measurementWidth);
     final height = painter.height;
     painter.dispose();
     return height;

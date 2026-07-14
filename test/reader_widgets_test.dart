@@ -10,6 +10,7 @@ import 'package:glibusta/features/reader/data/book_open_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
+import 'package:glibusta/features/reader/presentation/reader_content.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
@@ -77,8 +78,20 @@ void main() {
     );
   }
 
+  Future<void> openSettingsPage(WidgetTester tester, String pageLabel) async {
+    await tester.tap(find.text(pageLabel));
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> scrollSettingsUntilVisible(WidgetTester tester, Finder target) async {
+    final scrollable = find.byWidgetPredicate(
+      (widget) => widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    await tester.scrollUntilVisible(target, 200, scrollable: scrollable.first);
+  }
+
   group('ReaderQuickSettingsSheet', () {
-    testWidgets('renders all section labels', (tester) async {
+    testWidgets('renders display page sections', (tester) async {
       await tester.pumpWidget(
         wrapInApp(const ReaderQuickSettingsSheet()),
       );
@@ -86,11 +99,8 @@ void main() {
 
       expect(find.text('Тема'), findsOneWidget);
       expect(find.text('Шрифт'), findsOneWidget);
-      expect(find.text('Размер шрифта'), findsOneWidget);
-      expect(find.text('Межстрочный'), findsOneWidget);
-      expect(find.text('Отступы'), findsOneWidget);
-      expect(find.text('Авто-тема'), findsOneWidget);
-      expect(find.text('Режим'), findsOneWidget);
+      expect(find.text('Внешний вид'), findsOneWidget);
+      expect(find.text('Пресеты'), findsOneWidget);
     });
 
     testWidgets('renders all 7 theme swatches', (tester) async {
@@ -118,11 +128,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await openSettingsPage(tester, 'Режим');
+
       expect(find.text('Прокрутка'), findsOneWidget);
       expect(find.text('Страницы'), findsOneWidget);
-      expect(find.text('2 колонки'), findsOneWidget);
       expect(find.text('Фокус'), findsOneWidget);
-      expect(find.text('Полный'), findsOneWidget);
+      expect(find.text('RSVP'), findsOneWidget);
     });
 
     testWidgets('default font size shows 18', (tester) async {
@@ -130,6 +141,8 @@ void main() {
         wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
+
+      await scrollSettingsUntilVisible(tester, find.text('Размер шрифта'));
 
       expect(find.text('18'), findsOneWidget);
     });
@@ -139,6 +152,8 @@ void main() {
         wrapInApp(const ReaderQuickSettingsSheet()),
       );
       await tester.pumpAndSettle();
+
+      await scrollSettingsUntilVisible(tester, find.text('Размер шрифта'));
 
       final minusButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.remove),
@@ -150,9 +165,12 @@ void main() {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderQuickSettingsSheet(),
+          initialSettings: const ReaderSettings(fontSize: 10),
         ),
       );
       await tester.pumpAndSettle();
+
+      await scrollSettingsUntilVisible(tester, find.text('Размер шрифта'));
 
       final minusButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.remove),
@@ -164,9 +182,12 @@ void main() {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderQuickSettingsSheet(),
+          initialSettings: const ReaderSettings(fontSize: 40),
         ),
       );
       await tester.pumpAndSettle();
+
+      await scrollSettingsUntilVisible(tester, find.text('Размер шрифта'));
 
       final plusButton = tester.widget<IconButton>(
         find.widgetWithIcon(IconButton, Icons.add),
@@ -178,9 +199,13 @@ void main() {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderQuickSettingsSheet(),
+          initialSettings: const ReaderSettings(autoThemeMode: AutoThemeMode.custom),
         ),
       );
       await tester.pumpAndSettle();
+
+      await openSettingsPage(tester, 'Режим');
+      await scrollSettingsUntilVisible(tester, find.text('День с: '));
 
       expect(find.text('День с: '), findsOneWidget);
       expect(find.text('Ночь с: '), findsOneWidget);
@@ -194,6 +219,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      await openSettingsPage(tester, 'Режим');
+      await scrollSettingsUntilVisible(tester, find.text('Авто-тема'));
 
       expect(find.byType(DropdownButton<int>), findsNothing);
     });
@@ -230,7 +258,7 @@ void main() {
       expect(find.byIcon(Icons.arrow_back), findsOneWidget);
     });
 
-    testWidgets('displays settings tune icon', (tester) async {
+    testWidgets('displays settings icon', (tester) async {
       await tester.pumpWidget(
         wrapInApp(
           const ReaderTopBar(
@@ -242,7 +270,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.tune), findsOneWidget);
+      expect(find.byIcon(Icons.settings), findsOneWidget);
     });
   });
 
@@ -300,7 +328,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('1 / 5'), findsOneWidget);
-      expect(find.text('0%'), findsOneWidget);
+      expect(find.text('~150 мин'), findsOneWidget);
     });
 
     testWidgets('shows only minutes when less than hour', (tester) async {
@@ -318,7 +346,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('%'), findsWidgets);
+      expect(find.text('~10 мин'), findsOneWidget);
     });
   });
 
@@ -384,7 +412,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text('Текст книги успешно загружен.'), findsOneWidget);
+      expect(find.byType(ReaderContentBody), findsOneWidget);
+
+      // Dispose the ProviderScope before closing the in-memory database so
+      // Drift can cancel its query stream inside the test clock.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     });
   });
 }
