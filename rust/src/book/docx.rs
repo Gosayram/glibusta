@@ -198,7 +198,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                     }
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"val" {
+                            if is_word_value_attribute(attr.key.as_ref()) {
                                 pstyle_val = String::from_utf8_lossy(&attr.value).into_owned();
                             }
                         }
@@ -325,6 +325,13 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
             Ok(Event::Empty(ref e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
+                    "w:pStyle" if in_paragraph => {
+                        for attr in e.attributes().filter_map(|attr| attr.ok()) {
+                            if is_word_value_attribute(attr.key.as_ref()) {
+                                pstyle_val = String::from_utf8_lossy(&attr.value).into_owned();
+                            }
+                        }
+                    }
                     "w:b" if in_run => current_span_bold = word_bool_value(e),
                     "w:i" if in_run => current_span_italic = word_bool_value(e),
                     "w:br" if in_run => current_span_text.push('\n'),
@@ -343,7 +350,7 @@ fn word_bool_value(element: &BytesStart<'_>) -> bool {
     match element
         .attributes()
         .filter_map(|attribute| attribute.ok())
-        .find(|attribute| attribute.key.as_ref() == b"val")
+        .find(|attribute| is_word_value_attribute(attribute.key.as_ref()))
     {
         Some(attribute) => !matches!(
             String::from_utf8_lossy(&attribute.value)
@@ -353,6 +360,10 @@ fn word_bool_value(element: &BytesStart<'_>) -> bool {
         ),
         None => true,
     }
+}
+
+fn is_word_value_attribute(key: &[u8]) -> bool {
+    key == b"val" || key.ends_with(b":val")
 }
 
 #[cfg(test)]
@@ -407,5 +418,24 @@ mod tests {
         assert!(!spans[0].italic);
         assert!(!spans[1].bold);
         assert!(spans[1].italic);
+    }
+
+    #[test]
+    fn reads_namespaced_word_value_attributes() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:p>
+                    <w:pPr><w:pStyle w:val="Heading1"/></w:pPr>
+                    <w:r><w:rPr><w:b/><w:i w:val="0"/></w:rPr><w:t>Heading</w:t></w:r>
+                </w:p></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX XML");
+        let span = &blocks[0].rich_spans.as_ref().expect("formatted span")[0];
+
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Heading);
+        assert!(span.bold);
+        assert!(!span.italic);
     }
 }
