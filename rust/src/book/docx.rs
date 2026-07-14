@@ -99,7 +99,7 @@ struct CoreProps {
 }
 
 fn parse_core_properties(
-    zip: &mut ZipFile,
+    zip: &mut ZipFile<'_>,
     encoding_name: &str,
 ) -> Result<(String, Vec<String>, String)> {
     let props_bytes = zip
@@ -124,7 +124,7 @@ fn parse_core_properties(
 
 /// Extract image metadata from word/media/ without loading bytes.
 /// Use `get_asset_bytes()` (RCE-10.2) for lazy data loading.
-fn extract_images(zip: &mut ZipFile) -> Vec<EmbeddedImage> {
+fn extract_images(zip: &mut ZipFile<'_>) -> Vec<EmbeddedImage> {
     zip.entry_names()
         .iter()
         .filter(|name| name.starts_with("word/media/"))

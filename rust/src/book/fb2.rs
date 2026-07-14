@@ -794,7 +794,7 @@ fn looks_like_zip(bytes: &[u8]) -> bool {
     bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
 }
 
-fn find_fb2_in_zip(zip: &mut archive::ZipFile) -> Result<Option<Vec<u8>>> {
+fn find_fb2_in_zip(zip: &mut archive::ZipFile<'_>) -> Result<Option<Vec<u8>>> {
     let Some(name) = zip
         .entry_names()
         .iter()

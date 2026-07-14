@@ -542,7 +542,7 @@ pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>
 }
 
 fn read_archive_asset(
-    zip: &mut crate::book::archive::ZipFile,
+    zip: &mut crate::book::archive::ZipFile<'_>,
     asset_id: &str,
 ) -> anyhow::Result<Vec<u8>> {
     if let Some(entry) = zip.read_file_limited(asset_id, MAX_IMAGE_SIZE)? {

@@ -260,7 +260,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
 /// Find and parse EPUB table of contents (NCX for EPUB 2, nav.xhtml for EPUB 3).
 fn extract_epub_toc(
-    zip: &mut ZipFile,
+    zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     ncx_id: &Option<String>,
     opf_dir: &str,
@@ -282,7 +282,7 @@ fn extract_epub_toc(
 }
 
 fn try_parse_nav_xhtml(
-    zip: &mut ZipFile,
+    zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     opf_dir: &str,
     encoding_name: &str,
@@ -306,7 +306,7 @@ fn try_parse_nav_xhtml(
 }
 
 fn try_parse_ncx(
-    zip: &mut ZipFile,
+    zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     ncx_id: &Option<String>,
     opf_dir: &str,
@@ -762,7 +762,7 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
 }
 
 fn extract_cover_url(
-    zip: &mut ZipFile,
+    zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     metadata: &HashMap<String, String>,
     opf_dir: &str,
@@ -813,7 +813,7 @@ fn extract_cover_url(
     Ok(None)
 }
 
-fn read_cover_image(zip: &mut ZipFile, href: &str, media_type: &str) -> Result<Option<String>> {
+fn read_cover_image(zip: &mut ZipFile<'_>, href: &str, media_type: &str) -> Result<Option<String>> {
     let bytes = zip.read_file_limited(href, crate::api::models::MAX_IMAGE_SIZE)?;
     Ok(bytes.map(|data| encode_data_uri(media_type, &data)))
 }

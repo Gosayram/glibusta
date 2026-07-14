@@ -8,20 +8,20 @@ use zip::ZipArchive;
 
 const MAX_DECOMPRESSED_SIZE: u128 = 100 * 1024 * 1024; // 100MB
 
-pub struct ZipFile {
-    archive: ZipArchive<Cursor<Vec<u8>>>,
+pub struct ZipFile<'a> {
+    archive: ZipArchive<Cursor<&'a [u8]>>,
     entry_names: Vec<String>,
 }
 
-impl ZipFile {
-    pub fn open(bytes: &[u8]) -> Result<Self> {
+impl<'a> ZipFile<'a> {
+    pub fn open(bytes: &'a [u8]) -> Result<Self> {
         if bytes.len() as u64 > MAX_FILE_SIZE {
             anyhow::bail!(
                 "ZIP archive exceeds maximum file size ({}MB)",
                 MAX_FILE_SIZE / 1024 / 1024
             );
         }
-        let cursor = Cursor::new(bytes.to_vec());
+        let cursor = Cursor::new(bytes);
         let mut archive = ZipArchive::new(cursor).context("Failed to open ZIP archive")?;
 
         // Reject zip bombs with overlapping file entries
@@ -96,8 +96,21 @@ impl ZipFile {
             );
         }
         let mut content = Vec::with_capacity(size);
-        file.read_to_end(&mut content)
+        let read_limit = match u64::try_from(max_size) {
+            Ok(limit) => limit.saturating_add(1),
+            Err(_) => u64::MAX,
+        };
+        file.by_ref()
+            .take(read_limit)
+            .read_to_end(&mut content)
             .context("Failed to extract ZIP entry")?;
+        if content.len() > max_size {
+            anyhow::bail!(
+                "ZIP entry '{}' exceeds maximum size after extraction (max {} bytes)",
+                name,
+                max_size
+            );
+        }
         Ok(Some(content))
     }
 
@@ -134,7 +147,7 @@ impl ZipFile {
     }
 }
 
-pub fn decode_zip(bytes: &[u8]) -> Result<ZipFile> {
+pub fn decode_zip(bytes: &[u8]) -> Result<ZipFile<'_>> {
     ZipFile::open(bytes)
 }
 
@@ -151,48 +164,49 @@ mod tests {
         bytes.extend_from_slice(&value.to_le_bytes());
     }
 
-    /// A minimal deflated ZIP entry whose central-directory metadata declares
-    /// a high compression ratio. `ZipFile::open` rejects it before attempting
-    /// decompression, so the payload need not be a valid DEFLATE stream.
-    fn highly_compressed_zip_fixture() -> Vec<u8> {
-        const NAME: &[u8] = b"chapter.xhtml";
-        const UNCOMPRESSED_SIZE: u32 = 32 * 1024;
+    fn single_entry_zip_fixture(
+        name: &[u8],
+        compression_method: u16,
+        payload: &[u8],
+        compressed_size: u32,
+        uncompressed_size: u32,
+    ) -> Vec<u8> {
         let mut bytes = Vec::new();
 
-        // Local file header + one-byte placeholder payload.
+        // Local file header.
         write_u32(&mut bytes, 0x0403_4b50);
         write_u16(&mut bytes, 20);
         write_u16(&mut bytes, 0);
-        write_u16(&mut bytes, 8);
+        write_u16(&mut bytes, compression_method);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
         write_u32(&mut bytes, 0);
-        write_u32(&mut bytes, 1);
-        write_u32(&mut bytes, UNCOMPRESSED_SIZE);
-        write_u16(&mut bytes, NAME.len() as u16);
+        write_u32(&mut bytes, compressed_size);
+        write_u32(&mut bytes, uncompressed_size);
+        write_u16(&mut bytes, name.len() as u16);
         write_u16(&mut bytes, 0);
-        bytes.extend_from_slice(NAME);
-        bytes.push(0);
+        bytes.extend_from_slice(name);
+        bytes.extend_from_slice(payload);
 
         let central_directory_offset = bytes.len() as u32;
         write_u32(&mut bytes, 0x0201_4b50);
         write_u16(&mut bytes, 20);
         write_u16(&mut bytes, 20);
         write_u16(&mut bytes, 0);
-        write_u16(&mut bytes, 8);
+        write_u16(&mut bytes, compression_method);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
         write_u32(&mut bytes, 0);
-        write_u32(&mut bytes, 1);
-        write_u32(&mut bytes, UNCOMPRESSED_SIZE);
-        write_u16(&mut bytes, NAME.len() as u16);
+        write_u32(&mut bytes, compressed_size);
+        write_u32(&mut bytes, uncompressed_size);
+        write_u16(&mut bytes, name.len() as u16);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
         write_u32(&mut bytes, 0);
         write_u32(&mut bytes, 0);
-        bytes.extend_from_slice(NAME);
+        bytes.extend_from_slice(name);
 
         let central_directory_size = bytes.len() as u32 - central_directory_offset;
         write_u32(&mut bytes, 0x0605_4b50);
@@ -204,6 +218,13 @@ mod tests {
         write_u32(&mut bytes, central_directory_offset);
         write_u16(&mut bytes, 0);
         bytes
+    }
+
+    /// A minimal deflated ZIP entry whose central-directory metadata declares
+    /// a high compression ratio. `ZipFile::open` rejects it before attempting
+    /// decompression, so the payload need not be a valid DEFLATE stream.
+    fn highly_compressed_zip_fixture() -> Vec<u8> {
+        single_entry_zip_fixture(b"chapter.xhtml", 8, &[0], 1, 32 * 1024)
     }
 
     #[test]
@@ -220,7 +241,8 @@ mod tests {
         writer.write_all(b"too large").expect("write archive entry");
         writer.finish().expect("finish archive");
 
-        let mut zip = ZipFile::open(&bytes.into_inner()).expect("open archive");
+        let archive_bytes = bytes.into_inner();
+        let mut zip = ZipFile::open(&archive_bytes).expect("open archive");
         let error = zip
             .read_file_limited("chapter.xhtml", 1)
             .expect_err("entry must exceed the caller's limit");
@@ -234,5 +256,17 @@ mod tests {
             Err(error) => error,
         };
         assert!(error.to_string().contains("compression ratio"));
+    }
+
+    #[test]
+    fn rejects_entry_that_exceeds_limit_during_extraction() {
+        let bytes = single_entry_zip_fixture(b"chapter.xhtml", 0, b"ab", 2, 1);
+        let mut zip = ZipFile::open(&bytes).expect("open archive");
+
+        let error = zip
+            .read_file_limited("chapter.xhtml", 1)
+            .expect_err("extracted bytes must respect the caller limit");
+
+        assert!(error.to_string().contains("after extraction"));
     }
 }
