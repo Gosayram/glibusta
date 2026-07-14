@@ -22,7 +22,12 @@ class _QueuedTask<T> {
 }
 
 class TaskQueueService {
-  TaskQueueService(this._notifier, {int? maxConcurrent}) : maxConcurrent = maxConcurrent ?? 3;
+  TaskQueueService(this._notifier, {int? maxConcurrent})
+    : maxConcurrent = maxConcurrent == null
+          ? 3
+          : maxConcurrent < 1
+          ? 1
+          : maxConcurrent;
 
   final BackgroundTaskNotifier _notifier;
   final int maxConcurrent;
