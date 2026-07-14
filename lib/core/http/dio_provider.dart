@@ -16,6 +16,7 @@ part 'dio_provider.g.dart';
 @riverpod
 Dio dio(Ref ref) {
   final settings = ref.watch(appSettingsControllerProvider);
+  final logger = ref.watch(appLoggerProvider);
   final dio = Dio(
     BaseOptions(
       baseUrl: settings.baseUrl,
@@ -40,7 +41,7 @@ Dio dio(Ref ref) {
     SessionRefreshInterceptor(ref),
     LoggingInterceptor(),
     ErrorMappingInterceptor(),
-    _RetryInterceptor(dio: dio, maxRetries: 3),
+    _RetryInterceptor(dio: dio, logger: logger, maxRetries: 3),
   ]);
   return dio;
 }
@@ -75,9 +76,14 @@ class _UserAgentInterceptor extends Interceptor {
 class _RetryInterceptor extends Interceptor {
   final int maxRetries;
   final Dio _dio;
-  final _logger = AppLogger();
+  final AppLogger _logger;
 
-  _RetryInterceptor({required this.maxRetries, required Dio dio}) : _dio = dio;
+  _RetryInterceptor({
+    required this.maxRetries,
+    required Dio dio,
+    required AppLogger logger,
+  }) : _dio = dio,
+       _logger = logger;
 
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
@@ -105,23 +111,18 @@ class _RetryInterceptor extends Interceptor {
     final delay = Duration(
       milliseconds: (1 << retryCount) * 1000 + Random().nextInt(1000),
     );
-    await Future<void>.delayed(delay);
+    final cancelled = await _waitForRetryDelay(delay, err.requestOptions.cancelToken);
+    if (cancelled != null) {
+      handler.next(cancelled);
+      return;
+    }
 
-    final options = Options(
-      method: err.requestOptions.method,
-      headers: err.requestOptions.headers,
+    final options = err.requestOptions.copyWith(
       extra: {...err.requestOptions.extra, 'retryCount': retryCount + 1},
     );
 
     try {
-      final requestOptions = err.requestOptions;
-      final uri = requestOptions.uri;
-      final response = await _dio.request<dynamic>(
-        uri.toString(),
-        data: requestOptions.data,
-        queryParameters: requestOptions.queryParameters,
-        options: options,
-      );
+      final response = await _dio.fetch<dynamic>(options);
       _logger.info(
         'Retry succeeded for ${err.requestOptions.path}',
         name: 'Http',
@@ -134,6 +135,18 @@ class _RetryInterceptor extends Interceptor {
       );
       handler.next(e);
     }
+  }
+
+  /// Returns the cancellation error when the retry must not be started.
+  Future<DioException?> _waitForRetryDelay(Duration delay, CancelToken? token) async {
+    if (token == null) {
+      await Future<void>.delayed(delay);
+      return null;
+    }
+    return Future.any<DioException?>([
+      Future<DioException?>.delayed(delay, () => null),
+      token.whenCancel,
+    ]);
   }
 
   bool _shouldNotRetry(DioException err) {

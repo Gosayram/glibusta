@@ -1,6 +1,42 @@
+use std::fs;
 use std::io::Write;
 
 use glibusta_core::{BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, TocEntry};
+
+#[test]
+fn test_path_cache_invalidates_when_source_file_is_replaced() {
+    let path = std::env::temp_dir().join(format!(
+        "glibusta_cache_fingerprint_{}_{}.txt",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    let path_text = path.to_string_lossy().into_owned();
+
+    fs::write(&path, "Original title\n\nOriginal text.").expect("write first fixture");
+    let first =
+        glibusta_core::api::api::parse_book(path_text.clone()).expect("parse first fixture");
+    assert_eq!(first.title, "Original title");
+    assert!(
+        !glibusta_core::api::api::check_book_cache(path_text.clone())
+            .expect("check first cache")
+            .0
+    );
+
+    // A different size makes the assertion independent of filesystem mtime precision.
+    fs::write(
+        &path,
+        "Replacement title\n\nReplacement text with a different length.",
+    )
+    .expect("replace fixture");
+    let replacement =
+        glibusta_core::api::api::parse_book(path_text.clone()).expect("parse replacement fixture");
+    assert_eq!(replacement.title, "Replacement title");
+
+    fs::remove_file(path).expect("remove cache fixture");
+}
 
 // ---------------------------------------------------------------------------
 // FB2 tests — parse from XML string

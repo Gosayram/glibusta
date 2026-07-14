@@ -21,11 +21,26 @@ static BOOK_CACHE: LazyLock<moka::sync::Cache<String, NormalizedBook>> = LazyLoc
         .build()
 });
 
-fn disk_cache_key(path: &str) -> std::path::PathBuf {
+/// Identifies a source file for caches that must never survive its replacement.
+///
+/// A path alone is not enough: imports and downloads may overwrite a file while
+/// retaining its name. File size plus the modification timestamp are cheap to
+/// read before parsing and invalidate both in-memory Moka and disk caches.
+fn cache_fingerprint(path: &str) -> Result<String, CoreError> {
+    let metadata = std::fs::metadata(path).map_err(|e| CoreError::IoError(e.to_string()))?;
+    let modified_nanos = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |duration| duration.as_nanos());
+    Ok(format!("{path}:{}:{modified_nanos}", metadata.len()))
+}
+
+fn disk_cache_key(fingerprint: &str) -> std::path::PathBuf {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
     let mut h = DefaultHasher::new();
-    path.hash(&mut h);
+    fingerprint.hash(&mut h);
     // ARC-4.1: use .bin extension for binary cache
     std::env::temp_dir().join(format!("glibusta_cache_{:016x}.bin", h.finish()))
 }
@@ -113,15 +128,16 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
 /// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
 pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let _span = tracing::info_span!("parse_book", path = %path).entered();
+    let fingerprint = cache_fingerprint(&path).map_err(|e| anyhow::anyhow!("{e}"))?;
     // L1: RAM cache
-    if let Some(cached) = BOOK_CACHE.get(&path) {
+    if let Some(cached) = BOOK_CACHE.get(&fingerprint) {
         tracing::info!("cache_hit_l1");
         return Ok(cached);
     }
     // L2: disk cache
-    let cache_key = disk_cache_key(&path);
+    let cache_key = disk_cache_key(&fingerprint);
     if let Some(cached) = disk_cache_lookup(&cache_key) {
-        BOOK_CACHE.insert(path.clone(), cached.clone());
+        BOOK_CACHE.insert(fingerprint, cached.clone());
         return Ok(cached);
     }
     // Cache miss: parse from file
@@ -130,7 +146,7 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     book.book_format = format;
     // Store in both caches
-    BOOK_CACHE.insert(path.clone(), book.clone());
+    BOOK_CACHE.insert(fingerprint, book.clone());
     disk_cache_store(&cache_key, &book);
     Ok(book)
 }
@@ -588,8 +604,11 @@ pub fn check_book_cache(path: String) -> anyhow::Result<(bool, String, u64)> {
     let bytes = map_file(&path)?;
     let file_hash = crate::book::sha256_hex(&bytes);
     let file_size = bytes.len() as u64;
-    // Always return true for now — cache validation happens in Drift (Flutter side)
-    Ok((true, file_hash, file_size))
+    let fingerprint = cache_fingerprint(&path).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let cache_key = disk_cache_key(&fingerprint);
+    let has_cached_book =
+        BOOK_CACHE.get(&fingerprint).is_some() || disk_cache_lookup(&cache_key).is_some();
+    Ok((!has_cached_book, file_hash, file_size))
 }
 
 // ---------------------------------------------------------------------------
