@@ -12,26 +12,30 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
 
   Future<void> addReadingTime(String bookId, DateTime date, int seconds) async {
     final day = DateTime(date.year, date.month, date.day);
-    final existing = await (select(
-      readingTime,
-    )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).getSingleOrNull();
+    await transaction(() async {
+      final existing = await (select(
+        readingTime,
+      )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).getSingleOrNull();
 
-    if (existing != null) {
-      await (update(readingTime)..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).write(
-        ReadingTimeCompanion(
-          readingTimeSeconds: Value(existing.readingTimeSeconds + seconds),
-          updatedAt: Value(DateTime.now()),
-        ),
-      );
-    } else {
-      await into(readingTime).insert(
-        ReadingTimeCompanion.insert(
-          bookId: bookId,
-          date: day,
-          readingTimeSeconds: Value(seconds),
-        ),
-      );
-    }
+      if (existing != null) {
+        await (update(
+          readingTime,
+        )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).write(
+          ReadingTimeCompanion(
+            readingTimeSeconds: Value(existing.readingTimeSeconds + seconds),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      } else {
+        await into(readingTime).insert(
+          ReadingTimeCompanion.insert(
+            bookId: bookId,
+            date: day,
+            readingTimeSeconds: Value(seconds),
+          ),
+        );
+      }
+    });
   }
 
   Future<int> getTotalReadingSeconds(String bookId) async {
