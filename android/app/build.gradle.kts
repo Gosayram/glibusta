@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.gosayram.glibusta"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -58,15 +58,6 @@ android {
         }
     }
 
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
-        }
-    }
-
     packaging {
         resources {
             excludes += listOf(
@@ -88,4 +79,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// AGP 9 rejects the duplicate `org.chromium.net` namespace published by
+// cronet-api and its transitive cronet-shared artifact. Play Services supplies
+// the Cronet implementation, so only the public API artifact is needed here.
+configurations.configureEach {
+    exclude(group = "org.chromium.net", module = "cronet-shared")
 }
