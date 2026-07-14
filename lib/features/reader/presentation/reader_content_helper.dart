@@ -5,6 +5,7 @@ import '../data/parsers/normalized_book.dart';
 const int chapterWindowSize = 2;
 // MD-2.3: max loaded chapters before eviction kicks in
 const int maxLoadedChapters = 20;
+final _wordTokenPattern = RegExp(r'\S+');
 
 final class ReaderContentHelper {
   ReaderContentHelper(this._service, this._bookId, this._logger);
@@ -106,15 +107,18 @@ final class ReaderContentHelper {
     return updated;
   }
 
-  int computeTotalWords(Map<int, ReaderChapter> chapters) {
+  /// Counts visible text tokens without allocating a list for every block.
+  static int countWords(Iterable<ReaderChapter> chapters) {
     var total = 0;
-    for (final chapter in chapters.values) {
+    for (final chapter in chapters) {
       for (final block in chapter.blocks) {
-        total += block.text.split(RegExp(r'\s+')).length;
+        total += _wordTokenPattern.allMatches(block.text).length;
       }
     }
     return total;
   }
+
+  int computeTotalWords(Map<int, ReaderChapter> chapters) => countWords(chapters.values);
 
   NormalizedBook buildBookForSearch(
     NormalizedBookMetadata meta,

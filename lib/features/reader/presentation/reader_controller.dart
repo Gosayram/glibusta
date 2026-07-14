@@ -60,7 +60,7 @@ class ReaderState {
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
     this.metadata,
-    this.loadedChapters = const {},
+    Map<int, ReaderChapter> loadedChapters = const {},
     this.loadingStage = ReaderLoadingStage.openingFile,
     this.errorMessage,
     this.errorKind,
@@ -75,9 +75,11 @@ class ReaderState {
     this.isSearchOpen = false,
     this.highlightedQuery,
     this.isDynamicallyLoading = false,
-    this.checkpoints = const [],
+    List<double> checkpoints = const [],
     this.wpm = 200,
-  }) : currentPosition = currentPosition ?? ReaderPosition.initial;
+  }) : loadedChapters = Map.unmodifiable(loadedChapters),
+       checkpoints = List.unmodifiable(checkpoints),
+       currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;
 

@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
+import 'package:glibusta/features/reader/presentation/reader_content_helper.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
 
 void main() {
@@ -128,6 +130,33 @@ void main() {
       final a = ReaderState(loadingStage: null);
       final b = ReaderState(isSearchOpen: true);
       expect(a.isSearchOpen, isNot(equals(b.isSearchOpen)));
+    });
+
+    test('collection state cannot be mutated after publication', () {
+      final checkpoints = <double>[0.25];
+      final state = ReaderState(checkpoints: checkpoints);
+
+      checkpoints.add(0.75);
+
+      expect(state.checkpoints, <double>[0.25]);
+      expect(state.loadedChapters.clear, throwsUnsupportedError);
+      expect(() => state.checkpoints.add(0.5), throwsUnsupportedError);
+    });
+
+    test('word count ignores empty and whitespace-only blocks', () {
+      final chapters = <ReaderChapter>[
+        const ReaderChapter(
+          index: 0,
+          title: 'Chapter',
+          blocks: [
+            ReaderBlock(index: 0, text: '  two\twords  '),
+            ReaderBlock(index: 1, text: ''),
+            ReaderBlock(index: 2, text: '\n  '),
+          ],
+        ),
+      ];
+
+      expect(ReaderContentHelper.countWords(chapters), 2);
     });
   });
 
