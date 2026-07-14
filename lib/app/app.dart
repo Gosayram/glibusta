@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../core/logging/app_logger.dart';
 import '../core/notifications/download_notification_service.dart';
 import '../core/platform/app_platform.dart';
 import '../core/platform/lifecycle_service.dart';
@@ -122,11 +123,20 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
   }
 
   Future<void> _scanLibrary() async {
-    await _ensureStoragePermission();
-    final scanner = ref.read(libraryScannerProvider);
-    await scanner.scanLazy();
-    if (mounted) {
-      ref.invalidate(libraryBooksProvider);
+    try {
+      await _ensureStoragePermission();
+      final scanner = ref.read(libraryScannerProvider);
+      await scanner.scanLazy();
+      if (mounted) {
+        ref.invalidate(libraryBooksProvider);
+      }
+    } on Object catch (error, stackTrace) {
+      AppLogger().warning(
+        'Initial library scan failed: $error',
+        name: 'App',
+        error: error,
+        st: stackTrace,
+      );
     }
   }
 
@@ -136,7 +146,14 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
       if (granted == true) return;
       await _platform.invokeMethod<bool>('requestStoragePermission');
     } on MissingPluginException {
-      // Not on Android — ignore
+      // Not on Android — ignore.
+    } on PlatformException catch (error, stackTrace) {
+      AppLogger().warning(
+        'Storage permission channel failed: ${error.message}',
+        name: 'App',
+        error: error,
+        st: stackTrace,
+      );
     }
   }
 
@@ -144,7 +161,14 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     try {
       await _platform.invokeMethod<bool>('requestNotificationPermission');
     } on MissingPluginException {
-      // Not on Android — ignore
+      // Not on Android — ignore.
+    } on PlatformException catch (error, stackTrace) {
+      AppLogger().warning(
+        'Notification permission channel failed: ${error.message}',
+        name: 'App',
+        error: error,
+        st: stackTrace,
+      );
     }
   }
 
