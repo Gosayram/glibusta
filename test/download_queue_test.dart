@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/notifications/download_notification_service.dart';
 import 'package:glibusta/features/downloads/data/background_download_service.dart';
@@ -133,4 +135,68 @@ void main() {
       queue.dispose();
     });
   });
+
+  test(
+    'emits updated download data when progress changes',
+    () async {
+      const task = DownloadTask(
+        id: 'task-progress',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.running,
+        downloadedBytes: 0,
+        totalBytes: 100,
+      );
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) async => task);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => task.id);
+
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+      );
+      final progressUpdate = Completer<List<DownloadTask>>();
+      final updates = queue.onDownloadsChanged.listen((tasks) {
+        if (tasks.length == 1 &&
+            tasks.single.downloadedBytes == 50 &&
+            !progressUpdate.isCompleted) {
+          progressUpdate.complete(tasks);
+        }
+      });
+      addTearDown(() async {
+        await updates.cancel();
+        queue.dispose();
+      });
+
+      await Future<void>.delayed(Duration.zero);
+      await queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+      queue.onProgressChanged(task.id, 50, 100);
+
+      expect(await progressUpdate.future, hasLength(1));
+    },
+    timeout: const Timeout(Duration(seconds: 2)),
+  );
 }

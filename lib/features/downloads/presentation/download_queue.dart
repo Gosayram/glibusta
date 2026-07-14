@@ -248,6 +248,7 @@ class DownloadQueue {
     );
     _tasks[taskId] = updated;
     _progressController.add(updated);
+    _emitUpdate();
   }
 
   void _emitUpdate() {
