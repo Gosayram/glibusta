@@ -81,8 +81,12 @@ void main() {
           );
           expect(file.exists(), completion(isFalse));
         },
-        createHttpClient: (context) => io.HttpClient(context: context),
+        createHttpClient: (context) => _RealHttpClientFactory().create(context),
       );
     });
   });
+}
+
+class _RealHttpClientFactory extends io.HttpOverrides {
+  io.HttpClient create(io.SecurityContext? context) => super.createHttpClient(context);
 }

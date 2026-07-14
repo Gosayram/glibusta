@@ -10,7 +10,7 @@ const _kExternalFolderName = 'external_folder_name';
 const _kDirectReadMode = 'direct_read_mode';
 
 class StorageSettingsPersistence {
-  StorageSettingsPersistence(this._prefs);
+  StorageSettingsPersistence(SharedPreferences prefs) : _prefs = prefs;
 
   final SharedPreferences _prefs;
 
