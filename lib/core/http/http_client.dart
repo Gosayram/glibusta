@@ -83,6 +83,21 @@ class HttpClient {
     ]);
   }
 
+  /// Stops waiting for the next download chunk as soon as cancellation completes.
+  ///
+  /// `HttpClientResponse` is a stream, so checking cancellation only inside an
+  /// `await for` body leaves a download blocked until the server sends another
+  /// chunk. Racing each `moveNext` call makes cancellation prompt even for a
+  /// stalled response. Errors from the cancellation notifier are intentionally
+  /// ignored to preserve the previous best-effort cancellation contract.
+  Future<T> _awaitDownloadOperation<T>(Future<T> operation, Future<void>? cancellation) {
+    if (cancellation == null) return operation;
+    return Future.any<T>([
+      operation,
+      cancellation.then<T>((_) => throw const HttpException(message: 'Cancelled')),
+    ]);
+  }
+
   Future<String> _rawGet(Uri uri, {CancelToken? cancelToken}) async {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
@@ -219,34 +234,25 @@ class HttpClient {
 
       final file = io.File(savePath);
       final sink = file.openWrite(mode: startBytes > 0 ? io.FileMode.append : io.FileMode.write);
-      var cancelled = false;
-      if (onCancel != null) {
-        unawaited(
-          onCancel
-              .then((_) {
-                cancelled = true;
-              })
-              .catchError((_) {}),
-        );
-      }
+      final cancellation = onCancel?.catchError((Object _) {});
       try {
         int received = 0;
         final total = response.contentLength;
 
-        await for (final chunk in response) {
-          if (cancelled) break;
-
-          sink.add(chunk);
-          received += chunk.length;
-          if (onProgress != null) {
-            onProgress(received, total);
+        final iterator = StreamIterator<List<int>>(response);
+        try {
+          while (await _awaitDownloadOperation(iterator.moveNext(), cancellation)) {
+            final chunk = iterator.current;
+            sink.add(chunk);
+            received += chunk.length;
+            if (onProgress != null) {
+              onProgress(received, total);
+            }
           }
+        } finally {
+          await iterator.cancel();
         }
         await sink.close();
-
-        if (cancelled) {
-          throw HttpException(message: 'Cancelled', url: url);
-        }
 
         if (received == 0) {
           throw HttpException(message: 'Empty download', url: url);
