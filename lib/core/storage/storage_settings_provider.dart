@@ -18,6 +18,8 @@ Future<StorageSettingsPersistence> storageSettingsPersistence(
 
 @Riverpod(keepAlive: true)
 class StorageModeNotifier extends _$StorageModeNotifier {
+  var _version = 0;
+
   @override
   StorageMode build() {
     unawaited(_load());
@@ -25,19 +27,25 @@ class StorageModeNotifier extends _$StorageModeNotifier {
   }
 
   Future<void> _load() async {
+    final version = _version;
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    if (!ref.mounted || version != _version) return;
     state = persistence.storageMode;
   }
 
   Future<void> updateMode(StorageMode mode) async {
+    final version = ++_version;
     state = mode;
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
-    persistence.storageMode = mode;
+    if (!ref.mounted || version != _version) return;
+    await persistence.saveStorageMode(mode);
   }
 }
 
 @Riverpod(keepAlive: true)
 class ExternalFolderNotifier extends _$ExternalFolderNotifier {
+  var _version = 0;
+
   @override
   ({String? uri, String? name}) build() {
     unawaited(_load());
@@ -45,27 +53,35 @@ class ExternalFolderNotifier extends _$ExternalFolderNotifier {
   }
 
   Future<void> _load() async {
+    final version = _version;
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    if (!ref.mounted || version != _version) return;
     state = (uri: persistence.externalFolderUri, name: persistence.externalFolderName);
   }
 
   Future<void> updateFolder({required String uri, required String name}) async {
+    final version = ++_version;
     state = (uri: uri, name: name);
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
-    persistence.externalFolderUri = uri;
-    persistence.externalFolderName = name;
+    if (!ref.mounted || version != _version) return;
+    await persistence.saveExternalFolderUri(uri);
+    await persistence.saveExternalFolderName(name);
   }
 
   Future<void> clearFolder() async {
+    final version = ++_version;
     state = (uri: null, name: null);
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
-    persistence.externalFolderUri = null;
-    persistence.externalFolderName = null;
+    if (!ref.mounted || version != _version) return;
+    await persistence.saveExternalFolderUri(null);
+    await persistence.saveExternalFolderName(null);
   }
 }
 
 @Riverpod(keepAlive: true)
 class DirectReadNotifier extends _$DirectReadNotifier {
+  var _version = 0;
+
   @override
   bool build() {
     unawaited(_load());
@@ -73,13 +89,17 @@ class DirectReadNotifier extends _$DirectReadNotifier {
   }
 
   Future<void> _load() async {
+    final version = _version;
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    if (!ref.mounted || version != _version) return;
     state = persistence.directReadMode;
   }
 
   Future<void> update(bool value) async {
+    final version = ++_version;
     state = value;
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
-    persistence.directReadMode = value;
+    if (!ref.mounted || version != _version) return;
+    await persistence.saveDirectReadMode(value);
   }
 }

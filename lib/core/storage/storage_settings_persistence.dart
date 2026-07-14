@@ -19,34 +19,34 @@ class StorageSettingsPersistence {
     return StorageMode.values[index.clamp(0, StorageMode.values.length - 1)];
   }
 
-  set storageMode(StorageMode mode) {
-    unawaited(_prefs.setInt(_kStorageMode, mode.index));
+  Future<void> saveStorageMode(StorageMode mode) async {
+    await _prefs.setInt(_kStorageMode, mode.index);
   }
 
   String? get externalFolderUri => _prefs.getString(_kExternalFolderUri);
 
-  set externalFolderUri(String? uri) {
+  Future<void> saveExternalFolderUri(String? uri) async {
     if (uri != null) {
-      unawaited(_prefs.setString(_kExternalFolderUri, uri));
+      await _prefs.setString(_kExternalFolderUri, uri);
     } else {
-      unawaited(_prefs.remove(_kExternalFolderUri));
+      await _prefs.remove(_kExternalFolderUri);
     }
   }
 
   String? get externalFolderName => _prefs.getString(_kExternalFolderName);
 
-  set externalFolderName(String? name) {
+  Future<void> saveExternalFolderName(String? name) async {
     if (name != null) {
-      unawaited(_prefs.setString(_kExternalFolderName, name));
+      await _prefs.setString(_kExternalFolderName, name);
     } else {
-      unawaited(_prefs.remove(_kExternalFolderName));
+      await _prefs.remove(_kExternalFolderName);
     }
   }
 
   bool get directReadMode => _prefs.getBool(_kDirectReadMode) ?? false;
 
-  set directReadMode(bool value) {
-    unawaited(_prefs.setBool(_kDirectReadMode, value));
+  Future<void> saveDirectReadMode(bool value) async {
+    await _prefs.setBool(_kDirectReadMode, value);
   }
 
   Future<void> reset() async {
