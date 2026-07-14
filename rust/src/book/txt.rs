@@ -33,11 +33,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         decode_text(bytes, encoding)?
     };
 
-    let paragraphs: Vec<String> = text
-        .split("\n\n")
-        .map(normalize_whitespace)
-        .filter(|p| !p.is_empty())
-        .collect();
+    let paragraphs = split_paragraphs(&text);
 
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     for (i, paragraph) in paragraphs.into_iter().enumerate() {
@@ -87,6 +83,32 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         images: Vec::new(),
         toc,
     })
+}
+
+fn split_paragraphs(text: &str) -> Vec<String> {
+    let mut paragraphs = Vec::new();
+    let mut current = String::new();
+
+    for line in text.split(['\n', '\r']) {
+        if line.trim().is_empty() {
+            let paragraph = normalize_whitespace(&current);
+            if !paragraph.is_empty() {
+                paragraphs.push(paragraph);
+            }
+            current.clear();
+        } else {
+            if !current.is_empty() {
+                current.push('\n');
+            }
+            current.push_str(line);
+        }
+    }
+
+    let paragraph = normalize_whitespace(&current);
+    if !paragraph.is_empty() {
+        paragraphs.push(paragraph);
+    }
+    paragraphs
 }
 
 fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
@@ -231,4 +253,21 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
     }
 
     chapters
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_txt;
+
+    #[test]
+    fn detects_chapters_separated_by_windows_line_endings() {
+        let book = parse_txt(
+            b"A Windows Book\r\n\r\nChapter 1\r\n\r\nThe first chapter.",
+            Some("utf-8"),
+        )
+        .expect("parse TXT");
+
+        assert_eq!(book.chapters.len(), 2);
+        assert_eq!(book.chapters[1].title, "Chapter 1");
+    }
 }

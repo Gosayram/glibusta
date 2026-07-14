@@ -498,7 +498,8 @@ fn chapter_has_renderable_content(chapter: &ReaderChapter) -> bool {
 
 fn toc_has_invalid_chapter(entries: &[TocEntry], chapter_count: i32) -> bool {
     entries.iter().any(|entry| {
-        entry.chapter_index >= chapter_count
+        entry.chapter_index < 0
+            || entry.chapter_index >= chapter_count
             || toc_has_invalid_chapter(&entry.children, chapter_count)
     })
 }
@@ -1035,7 +1036,7 @@ mod cover_data_uri_tests {
 mod parse_api_tests {
     use super::{
         MAX_FILE_SIZE, parse_book, parse_book_legacy, read_archive_asset, repair_normalized_book,
-        search_in_book,
+        search_in_book, toc_has_invalid_chapter,
     };
     use crate::api::models::{BlockType, TocEntry};
     use std::io::{Cursor, Write};
@@ -1123,6 +1124,17 @@ mod parse_api_tests {
         let repaired = repair_normalized_book(book);
 
         assert!(repaired.toc[0].children.is_empty());
+    }
+
+    #[test]
+    fn toc_validation_rejects_negative_chapter_indices() {
+        let toc = [TocEntry {
+            title: "Missing chapter".to_string(),
+            chapter_index: -1,
+            children: Vec::new(),
+        }];
+
+        assert!(toc_has_invalid_chapter(&toc, 1));
     }
 
     #[test]
