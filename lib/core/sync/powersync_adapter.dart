@@ -13,6 +13,7 @@ import 'powersync_schema.dart';
 /// connect/disconnect/status helpers.
 class PowerSyncAdapter {
   PowerSyncDatabase? _db;
+  Future<PowerSyncDatabase>? _initializing;
   bool _connected = false;
 
   PowerSyncDatabase? get database => _db;
@@ -20,20 +21,37 @@ class PowerSyncAdapter {
 
   /// Initialize the PowerSync database file.
   Future<PowerSyncDatabase> init() async {
-    if (_db != null) return _db!;
+    final database = _db;
+    if (database != null) return database;
 
+    final initializing = _initializing;
+    if (initializing != null) return initializing;
+
+    final future = _createDatabase();
+    _initializing = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_initializing, future)) {
+        _initializing = null;
+      }
+    }
+  }
+
+  Future<PowerSyncDatabase> _createDatabase() async {
     final dir = await getApplicationDocumentsDirectory();
     final databaseDir = Directory(p.join(dir.path, 'glibusta'));
     await databaseDir.create(recursive: true);
     final dbPath = p.join(databaseDir.path, 'glibusta_sync.db');
-    _db = PowerSyncDatabase(
+    final database = PowerSyncDatabase(
       schema: PowerSyncSchemas.schema,
       path: dbPath,
     );
 
-    await _db!.initialize();
+    await database.initialize();
+    _db = database;
     AppLogger().info('PowerSync database initialized', name: 'PowerSync');
-    return _db!;
+    return database;
   }
 
   /// Connect to the PowerSync service using the given connector.
@@ -67,6 +85,10 @@ class PowerSyncAdapter {
 
   /// Close the database entirely.
   Future<void> close() async {
+    final initializing = _initializing;
+    if (initializing != null) {
+      await initializing;
+    }
     await disconnect();
     if (_db != null) {
       await _db!.close();
