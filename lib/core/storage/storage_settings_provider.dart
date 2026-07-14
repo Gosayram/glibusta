@@ -65,6 +65,7 @@ class ExternalFolderNotifier extends _$ExternalFolderNotifier {
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
     if (!ref.mounted || version != _version) return;
     await persistence.saveExternalFolderUri(uri);
+    if (!ref.mounted || version != _version) return;
     await persistence.saveExternalFolderName(name);
   }
 
@@ -74,6 +75,7 @@ class ExternalFolderNotifier extends _$ExternalFolderNotifier {
     final persistence = await ref.read(storageSettingsPersistenceProvider.future);
     if (!ref.mounted || version != _version) return;
     await persistence.saveExternalFolderUri(null);
+    if (!ref.mounted || version != _version) return;
     await persistence.saveExternalFolderName(null);
   }
 }
