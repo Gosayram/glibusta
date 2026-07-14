@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/formats/archive_safety.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
@@ -22,6 +23,7 @@ final class CbzParser implements BookParser {
   }) async {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      ArchiveSafety.validateZip(archive);
       final images = _sortedImageFiles(archive);
       if (images.isEmpty) {
         throw const ParserFailure('В архиве нет изображений');
