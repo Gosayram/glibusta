@@ -11,7 +11,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'api/api.dart';
 import 'api/models.dart';
 import 'frb_generated.dart';
-import 'frb_generated.io.dart' if (dart.library.js_interop) 'frb_generated.web.dart';
+import 'frb_generated.io.dart'
+    if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'lib.dart';
 
 /// Main entrypoint of the Rust API
@@ -53,10 +54,12 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   static void dispose() => instance.disposeImpl();
 
   @override
-  ApiImplConstructor<RustLibApiImpl, RustLibWire> get apiImplConstructor => RustLibApiImpl.new;
+  ApiImplConstructor<RustLibApiImpl, RustLibWire> get apiImplConstructor =>
+      RustLibApiImpl.new;
 
   @override
-  WireConstructor<RustLibWire> get wireConstructor => RustLibWire.fromExternalLibrary;
+  WireConstructor<RustLibWire> get wireConstructor =>
+      RustLibWire.fromExternalLibrary;
 
   @override
   Future<void> executeRustInitializers() async {}
@@ -69,13 +72,14 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -932497718;
+  int get rustContentHash => 191331172;
 
-  static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
-    stem: 'glibusta_core',
-    ioDirectory: 'rust/target/release/',
-    webPrefix: 'pkg/',
-  );
+  static const kDefaultExternalLibraryLoaderConfig =
+      ExternalLibraryLoaderConfig(
+        stem: 'glibusta_core',
+        ioDirectory: 'rust/target/release/',
+        webPrefix: 'pkg/',
+      );
 }
 
 abstract class RustLibApi extends BaseApi {
@@ -209,11 +213,6 @@ abstract class RustLibApi extends BaseApi {
     String? forcedEncoding,
   });
 
-  Future<NormalizedBook> crateApiApiParseBookWithTimeout({
-    required String path,
-    required BigInt timeoutSecs,
-  });
-
   Future<ReaderChapter> crateApiApiParseChapter({
     required String path,
     required int chapterIndex,
@@ -284,15 +283,20 @@ abstract class RustLibApi extends BaseApi {
 
   Future<BookValidationResult> crateApiApiValidateBook({required String path});
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_ArcBookEngine;
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_ArcBookEngine;
 
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_ArcBookEngine;
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_ArcBookEngine;
 
-  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ArcBookEnginePtr;
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_ArcBookEnginePtr;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_BookEngine;
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_BookEngine;
 
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_BookEngine;
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_BookEngine;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_BookEnginePtr;
 
@@ -339,10 +343,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiBookEngineChapterCountConstMeta => const TaskConstMeta(
-    debugName: 'BookEngine_chapter_count',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiApiBookEngineChapterCountConstMeta =>
+      const TaskConstMeta(
+        debugName: 'BookEngine_chapter_count',
+        argNames: ['that'],
+      );
 
   @override
   Future<void> crateApiApiBookEngineDropEngine({required BookEngine that}) {
@@ -372,10 +377,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiBookEngineDropEngineConstMeta => const TaskConstMeta(
-    debugName: 'BookEngine_drop_engine',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiApiBookEngineDropEngineConstMeta =>
+      const TaskConstMeta(
+        debugName: 'BookEngine_drop_engine',
+        argNames: ['that'],
+      );
 
   @override
   Future<ReaderChapter?> crateApiApiBookEngineGetChapter({
@@ -409,10 +415,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiBookEngineGetChapterConstMeta => const TaskConstMeta(
-    debugName: 'BookEngine_get_chapter',
-    argNames: ['that', 'index'],
-  );
+  TaskConstMeta get kCrateApiApiBookEngineGetChapterConstMeta =>
+      const TaskConstMeta(
+        debugName: 'BookEngine_get_chapter',
+        argNames: ['that', 'index'],
+      );
 
   @override
   Future<BookEngine> crateApiApiBookEngineNew({required NormalizedBook book}) {
@@ -503,10 +510,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBlockTypeAsStrConstMeta => const TaskConstMeta(
-    debugName: 'block_type_as_str',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiModelsBlockTypeAsStrConstMeta =>
+      const TaskConstMeta(
+        debugName: 'block_type_as_str',
+        argNames: ['that'],
+      );
 
   @override
   Future<BlockType> crateApiModelsBlockTypeFromStr({required String s}) {
@@ -533,10 +541,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBlockTypeFromStrConstMeta => const TaskConstMeta(
-    debugName: 'block_type_from_str',
-    argNames: ['s'],
-  );
+  TaskConstMeta get kCrateApiModelsBlockTypeFromStrConstMeta =>
+      const TaskConstMeta(
+        debugName: 'block_type_from_str',
+        argNames: ['s'],
+      );
 
   @override
   Future<BookDiff> crateApiModelsBookDiffCompute({
@@ -567,10 +576,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBookDiffComputeConstMeta => const TaskConstMeta(
-    debugName: 'book_diff_compute',
-    argNames: ['old', 'new_'],
-  );
+  TaskConstMeta get kCrateApiModelsBookDiffComputeConstMeta =>
+      const TaskConstMeta(
+        debugName: 'book_diff_compute',
+        argNames: ['old', 'new_'],
+      );
 
   @override
   Future<void> crateApiModelsBookFormatAsStr({required BookFormat that}) {
@@ -597,10 +607,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBookFormatAsStrConstMeta => const TaskConstMeta(
-    debugName: 'book_format_as_str',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiModelsBookFormatAsStrConstMeta =>
+      const TaskConstMeta(
+        debugName: 'book_format_as_str',
+        argNames: ['that'],
+      );
 
   @override
   Future<FormatCapabilities> crateApiModelsBookFormatCapabilities({
@@ -629,10 +640,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBookFormatCapabilitiesConstMeta => const TaskConstMeta(
-    debugName: 'book_format_capabilities',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiModelsBookFormatCapabilitiesConstMeta =>
+      const TaskConstMeta(
+        debugName: 'book_format_capabilities',
+        argNames: ['that'],
+      );
 
   @override
   Future<void> crateApiModelsBookFormatExtensions() {
@@ -658,10 +670,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBookFormatExtensionsConstMeta => const TaskConstMeta(
-    debugName: 'book_format_extensions',
-    argNames: [],
-  );
+  TaskConstMeta get kCrateApiModelsBookFormatExtensionsConstMeta =>
+      const TaskConstMeta(
+        debugName: 'book_format_extensions',
+        argNames: [],
+      );
 
   @override
   Future<BookFormat> crateApiModelsBookFormatFromExt({required String ext}) {
@@ -688,10 +701,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsBookFormatFromExtConstMeta => const TaskConstMeta(
-    debugName: 'book_format_from_ext',
-    argNames: ['ext'],
-  );
+  TaskConstMeta get kCrateApiModelsBookFormatFromExtConstMeta =>
+      const TaskConstMeta(
+        debugName: 'book_format_from_ext',
+        argNames: ['ext'],
+      );
 
   @override
   Future<String> crateApiApiCalculateHash({required String path}) {
@@ -780,10 +794,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiDecodeZipEntriesConstMeta => const TaskConstMeta(
-    debugName: 'decode_zip_entries',
-    argNames: ['bytes'],
-  );
+  TaskConstMeta get kCrateApiApiDecodeZipEntriesConstMeta =>
+      const TaskConstMeta(
+        debugName: 'decode_zip_entries',
+        argNames: ['bytes'],
+      );
 
   @override
   Future<ChapterLanguage> crateApiApiDetectChapterLanguage({
@@ -812,10 +827,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiDetectChapterLanguageConstMeta => const TaskConstMeta(
-    debugName: 'detect_chapter_language',
-    argNames: ['text'],
-  );
+  TaskConstMeta get kCrateApiApiDetectChapterLanguageConstMeta =>
+      const TaskConstMeta(
+        debugName: 'detect_chapter_language',
+        argNames: ['text'],
+      );
 
   @override
   Future<String> crateApiApiDetectEncoding({required List<int> bytes}) {
@@ -1120,10 +1136,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiGenerateImportReportConstMeta => const TaskConstMeta(
-    debugName: 'generate_import_report',
-    argNames: ['path'],
-  );
+  TaskConstMeta get kCrateApiApiGenerateImportReportConstMeta =>
+      const TaskConstMeta(
+        debugName: 'generate_import_report',
+        argNames: ['path'],
+      );
 
   @override
   Future<Uint8List> crateApiApiGetAssetBytes({
@@ -1216,10 +1233,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiGetFormatCapabilitiesConstMeta => const TaskConstMeta(
-    debugName: 'get_format_capabilities',
-    argNames: ['path'],
-  );
+  TaskConstMeta get kCrateApiApiGetFormatCapabilitiesConstMeta =>
+      const TaskConstMeta(
+        debugName: 'get_format_capabilities',
+        argNames: ['path'],
+      );
 
   @override
   Future<Uint64List> crateApiApiHyphenateWord({required String word}) {
@@ -1282,10 +1300,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookAnnotationAnchorIdConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_annotation_anchor_id',
-    argNames: ['chapterIndex', 'blockIndex', 'charOffset'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookAnnotationAnchorIdConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_annotation_anchor_id',
+        argNames: ['chapterIndex', 'blockIndex', 'charOffset'],
+      );
 
   @override
   Future<String> crateApiModelsNormalizedBookAssetId({required String url}) {
@@ -1312,10 +1331,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookAssetIdConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_asset_id',
-    argNames: ['url'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookAssetIdConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_asset_id',
+        argNames: ['url'],
+      );
 
   @override
   Future<String> crateApiModelsNormalizedBookBlockId({
@@ -1348,10 +1368,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookBlockIdConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_block_id',
-    argNames: ['that', 'chapterIndex', 'blockIndex'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookBlockIdConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_block_id',
+        argNames: ['that', 'chapterIndex', 'blockIndex'],
+      );
 
   @override
   Future<List<(int, String)>> crateApiModelsNormalizedBookChapterHashes({
@@ -1380,10 +1401,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookChapterHashesConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_chapter_hashes',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookChapterHashesConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_chapter_hashes',
+        argNames: ['that'],
+      );
 
   @override
   Future<String> crateApiModelsNormalizedBookChapterId({
@@ -1414,10 +1436,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookChapterIdConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_chapter_id',
-    argNames: ['that', 'chapterIndex'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookChapterIdConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_chapter_id',
+        argNames: ['that', 'chapterIndex'],
+      );
 
   @override
   Future<NormalizedBook> crateApiModelsNormalizedBookFromJsonStr({
@@ -1446,10 +1469,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookFromJsonStrConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_from_json_str',
-    argNames: ['json'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookFromJsonStrConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_from_json_str',
+        argNames: ['json'],
+      );
 
   @override
   Future<int> crateApiModelsNormalizedBookMigrateChapterIndex({
@@ -1515,10 +1539,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiModelsNormalizedBookToJsonStringConstMeta => const TaskConstMeta(
-    debugName: 'normalized_book_to_json_string',
-    argNames: ['that'],
-  );
+  TaskConstMeta get kCrateApiModelsNormalizedBookToJsonStringConstMeta =>
+      const TaskConstMeta(
+        debugName: 'normalized_book_to_json_string',
+        argNames: ['that'],
+      );
 
   @override
   Future<ArcBookEngine> crateApiApiOpenBookEngine({required String path}) {
@@ -1618,40 +1643,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
-  Future<NormalizedBook> crateApiApiParseBookWithTimeout({
-    required String path,
-    required BigInt timeoutSecs,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(path, serializer);
-          sse_encode_u_64(timeoutSecs, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 42,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_normalized_book,
-          decodeErrorData: sse_decode_AnyhowException,
-        ),
-        constMeta: kCrateApiApiParseBookWithTimeoutConstMeta,
-        argValues: [path, timeoutSecs],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiApiParseBookWithTimeoutConstMeta => const TaskConstMeta(
-    debugName: 'parse_book_with_timeout',
-    argNames: ['path', 'timeoutSecs'],
-  );
-
-  @override
   Future<ReaderChapter> crateApiApiParseChapter({
     required String path,
     required int chapterIndex,
@@ -1665,7 +1656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1699,7 +1690,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1733,7 +1724,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1767,7 +1758,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1797,7 +1788,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1831,7 +1822,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 48,
+            funcId: 47,
             port: port_,
           );
         },
@@ -1865,7 +1856,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 49,
+            funcId: 48,
             port: port_,
           );
         },
@@ -1895,7 +1886,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 50,
+            funcId: 49,
             port: port_,
           );
         },
@@ -1929,7 +1920,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 51,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1959,7 +1950,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 52,
+            funcId: 51,
             port: port_,
           );
         },
@@ -1995,7 +1986,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 53,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2010,10 +2001,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiRenderDjvuThumbnailConstMeta => const TaskConstMeta(
-    debugName: 'render_djvu_thumbnail',
-    argNames: ['path', 'pageIndex', 'maxWidth'],
-  );
+  TaskConstMeta get kCrateApiApiRenderDjvuThumbnailConstMeta =>
+      const TaskConstMeta(
+        debugName: 'render_djvu_thumbnail',
+        argNames: ['path', 'pageIndex', 'maxWidth'],
+      );
 
   @override
   Future<Uint8List> crateApiApiRenderPdfThumbnail({
@@ -2031,7 +2023,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 54,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2046,10 +2038,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiApiRenderPdfThumbnailConstMeta => const TaskConstMeta(
-    debugName: 'render_pdf_thumbnail',
-    argNames: ['path', 'pageIndex', 'maxWidth'],
-  );
+  TaskConstMeta get kCrateApiApiRenderPdfThumbnailConstMeta =>
+      const TaskConstMeta(
+        debugName: 'render_pdf_thumbnail',
+        argNames: ['path', 'pageIndex', 'maxWidth'],
+      );
 
   @override
   Future<NormalizedBook> crateApiApiRepairBook({required String path}) {
@@ -2061,7 +2054,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 55,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2091,7 +2084,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 56,
+            funcId: 55,
             port: port_,
           );
         },
@@ -2127,7 +2120,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 57,
+            funcId: 56,
             port: port_,
           );
         },
@@ -2161,7 +2154,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 58,
+            funcId: 57,
             port: port_,
           );
         },
@@ -2191,7 +2184,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 59,
+            funcId: 58,
             port: port_,
           );
         },
@@ -2211,22 +2204,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     argNames: ['path'],
   );
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_ArcBookEngine => wire
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_ArcBookEngine => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine;
 
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_ArcBookEngine => wire
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_ArcBookEngine => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_BookEngine => wire
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_BookEngine => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine;
 
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_BookEngine => wire
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_BookEngine => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine;
 
-  RustArcIncrementStrongCountFnType get rust_arc_increment_strong_count_Value => wire
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_Value => wire
       .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue;
 
-  RustArcDecrementStrongCountFnType get rust_arc_decrement_strong_count_Value => wire
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_Value => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue;
 
   @protected
@@ -2254,7 +2253,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Value dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -2280,7 +2280,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  BookEngine dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+  BookEngine
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -2288,7 +2289,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Value dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -2311,7 +2313,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BookAssetMeta dco_decode_book_asset_meta(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return BookAssetMeta(
       assetId: dco_decode_String(arr[0]),
       mediaType: dco_decode_String(arr[1]),
@@ -2323,7 +2326,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BookDiff dco_decode_book_diff(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return BookDiff(
       chaptersChanged: dco_decode_bool(arr[0]),
       textChanged: dco_decode_bool(arr[1]),
@@ -2342,7 +2346,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BookMeta dco_decode_book_meta(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7) throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return BookMeta(
       title: dco_decode_String(arr[0]),
       authors: dco_decode_list_String(arr[1]),
@@ -2358,7 +2363,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BookValidationResult dco_decode_book_validation_result(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return BookValidationResult(
       valid: dco_decode_bool(arr[0]),
       emptyChapters: dco_decode_list_prim_i_32_strict(arr[1]),
@@ -2424,7 +2430,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ChapterLanguage dco_decode_chapter_language(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return ChapterLanguage(
       lang: dco_decode_String(arr[0]),
       confidence: dco_decode_f_64(arr[1]),
@@ -2435,7 +2442,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EmbeddedImage dco_decode_embedded_image(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return EmbeddedImage(
       id: dco_decode_String(arr[0]),
       mediaType: dco_decode_String(arr[1]),
@@ -2453,7 +2461,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   FormatCapabilities dco_decode_format_capabilities(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7) throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return FormatCapabilities(
       metadata: dco_decode_bool(arr[0]),
       cover: dco_decode_bool(arr[1]),
@@ -2475,7 +2484,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ImportReport dco_decode_import_report(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9) throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return ImportReport(
       format: dco_decode_book_format(arr[0]),
       parserUsed: dco_decode_String(arr[1]),
@@ -2583,7 +2593,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   NormalizedBook dco_decode_normalized_book(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12) throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return NormalizedBook(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
@@ -2680,7 +2691,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ParseWarning dco_decode_parse_warning(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 1) throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
+    if (arr.length != 1)
+      throw Exception('unexpected arr length: expect 1 but see ${arr.length}');
     return ParseWarning(
       message: dco_decode_String(arr[0]),
     );
@@ -2690,7 +2702,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReaderBlock dco_decode_reader_block(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14) throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return ReaderBlock(
       index: dco_decode_i_32(arr[0]),
       text: dco_decode_String(arr[1]),
@@ -2713,7 +2726,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReaderChapter dco_decode_reader_chapter(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ReaderChapter(
       index: dco_decode_i_32(arr[0]),
       title: dco_decode_String(arr[1]),
@@ -2752,7 +2766,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RichSpan dco_decode_rich_span(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return RichSpan(
       text: dco_decode_String(arr[0]),
       bold: dco_decode_bool(arr[1]),
@@ -2767,7 +2782,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SearchMatch dco_decode_search_match(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return SearchMatch(
       chapterIndex: dco_decode_i_32(arr[0]),
       blockIndex: dco_decode_i_32(arr[1]),
@@ -2781,7 +2797,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TocEntry dco_decode_toc_entry(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return TocEntry(
       title: dco_decode_String(arr[0]),
       chapterIndex: dco_decode_i_32(arr[1]),
@@ -2845,7 +2862,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Value sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2880,7 +2898,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  BookEngine sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+  BookEngine
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2891,7 +2910,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Value sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  Value
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -3642,7 +3662,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   ) {
@@ -3654,7 +3675,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
     BookEngine self,
     SseSerializer serializer,
   ) {
@@ -3666,7 +3688,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
     ArcBookEngine self,
     SseSerializer serializer,
   ) {
@@ -3678,7 +3701,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
     BookEngine self,
     SseSerializer serializer,
   ) {
@@ -3690,7 +3714,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   ) {
@@ -4327,8 +4352,10 @@ class ArcBookEngineImpl extends RustOpaque implements ArcBookEngine {
     : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
 
   static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_ArcBookEngine,
-    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_ArcBookEngine,
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_ArcBookEngine,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_ArcBookEngine,
     rustArcDecrementStrongCountPtr:
         RustLib.instance.api.rust_arc_decrement_strong_count_ArcBookEnginePtr,
   );
@@ -4345,22 +4372,28 @@ class BookEngineImpl extends RustOpaque implements BookEngine {
     : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
 
   static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_BookEngine,
-    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_BookEngine,
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_BookEngine,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_BookEngine,
     rustArcDecrementStrongCountPtr:
         RustLib.instance.api.rust_arc_decrement_strong_count_BookEnginePtr,
   );
 
-  Future<BigInt> chapterCount() => RustLib.instance.api.crateApiApiBookEngineChapterCount(
-    that: this,
-  );
+  Future<BigInt> chapterCount() =>
+      RustLib.instance.api.crateApiApiBookEngineChapterCount(
+        that: this,
+      );
 
-  Future<void> dropEngine() => RustLib.instance.api.crateApiApiBookEngineDropEngine(
-    that: this,
-  );
+  Future<void> dropEngine() =>
+      RustLib.instance.api.crateApiApiBookEngineDropEngine(
+        that: this,
+      );
 
-  Future<ReaderChapter?> getChapter({required BigInt index}) =>
-      RustLib.instance.api.crateApiApiBookEngineGetChapter(that: this, index: index);
+  Future<ReaderChapter?> getChapter({required BigInt index}) => RustLib
+      .instance
+      .api
+      .crateApiApiBookEngineGetChapter(that: this, index: index);
 
   Future<String> title() => RustLib.instance.api.crateApiApiBookEngineTitle(
     that: this,
@@ -4378,8 +4411,11 @@ class ValueImpl extends RustOpaque implements Value {
     : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
 
   static final _kStaticData = RustArcStaticData(
-    rustArcIncrementStrongCount: RustLib.instance.api.rust_arc_increment_strong_count_Value,
-    rustArcDecrementStrongCount: RustLib.instance.api.rust_arc_decrement_strong_count_Value,
-    rustArcDecrementStrongCountPtr: RustLib.instance.api.rust_arc_decrement_strong_count_ValuePtr,
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_Value,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_Value,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_ValuePtr,
   );
 }

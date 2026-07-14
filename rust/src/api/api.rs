@@ -325,23 +325,6 @@ pub fn safe_parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     }
 }
 
-/// Parse with a timeout. Returns error if parsing takes longer than timeout_secs.
-pub fn parse_book_with_timeout(path: String, timeout_secs: u64) -> anyhow::Result<NormalizedBook> {
-    let handle = std::thread::spawn(move || parse_book(path));
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
-    loop {
-        if std::time::Instant::now() >= deadline {
-            return Err(anyhow::anyhow!("Parse timeout after {}s", timeout_secs));
-        }
-        if handle.is_finished() {
-            return handle
-                .join()
-                .map_err(|_| anyhow::anyhow!("Parser thread panicked"))?;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-}
-
 /// Extract metadata without full chapter parsing.
 pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -1008,5 +991,54 @@ mod cover_data_uri_tests {
         let error = validate_legacy_input_size(&[0, 1], 1).unwrap_err();
 
         assert!(error.to_string().contains("Book data exceeds"));
+    }
+}
+
+#[cfg(test)]
+mod parse_api_tests {
+    use super::{MAX_FILE_SIZE, parse_book, parse_book_legacy};
+
+    #[test]
+    fn path_and_legacy_txt_parsers_return_the_same_book() {
+        let bytes = b"A test book\n\nChapter 1\n\nText of the chapter.".to_vec();
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-parser-parity-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, &bytes).expect("write temporary TXT file");
+
+        let result = (|| {
+            let path_book = parse_book(path.to_string_lossy().into_owned())?;
+            let legacy_book = parse_book_legacy(bytes, "txt".to_owned(), None)?;
+            anyhow::Result::<_>::Ok((path_book, legacy_book))
+        })();
+        let _ = std::fs::remove_file(&path);
+
+        let (path_book, legacy_book) = result.expect("parse temporary TXT file");
+        assert_eq!(
+            serde_json::to_value(path_book).expect("serialize path book"),
+            serde_json::to_value(legacy_book).expect("serialize legacy book"),
+        );
+    }
+
+    #[test]
+    fn path_parser_rejects_oversized_file_before_mapping() {
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-parser-oversize-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::File::create(&path)
+            .and_then(|file| file.set_len(MAX_FILE_SIZE + 1))
+            .expect("create oversized sparse TXT file");
+
+        let error = parse_book(path.to_string_lossy().into_owned())
+            .expect_err("oversized file must be rejected before mapping");
+        let _ = std::fs::remove_file(&path);
+
+        assert!(
+            error
+                .to_string()
+                .contains("File exceeds maximum supported size")
+        );
     }
 }

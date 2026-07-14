@@ -9,7 +9,9 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
-// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `load_dictionary`, `map_file`
+// These functions are ignored because they are not marked as `pub`: `cache_fingerprint`, `ceil_char_boundary`, `cleanup_disk_cache`, `decode_cover_data_uri`, `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `floor_char_boundary`, `load_dictionary`, `map_file`, `memory_cache_get`, `memory_cache_store`, `read_archive_asset`, `validate_legacy_input_size`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookBytes`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
 /// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
@@ -28,15 +30,6 @@ Future<ReaderChapter> parseChapter({
 /// Panic-safe wrapper for parse_book. Returns error instead of crashing.
 Future<NormalizedBook> safeParseBook({required String path}) =>
     RustLib.instance.api.crateApiApiSafeParseBook(path: path);
-
-/// Parse with a timeout. Returns error if parsing takes longer than timeout_secs.
-Future<NormalizedBook> parseBookWithTimeout({
-  required String path,
-  required BigInt timeoutSecs,
-}) => RustLib.instance.api.crateApiApiParseBookWithTimeout(
-  path: path,
-  timeoutSecs: timeoutSecs,
-);
 
 /// Extract metadata without full chapter parsing.
 Future<BookMeta> extractMetadata({required String path}) =>
@@ -86,7 +79,8 @@ Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
 Future<Uint8List> getAssetBytes({
   required String path,
   required String assetId,
-}) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+}) =>
+    RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
 
 /// Compare two books parsed from the same file at different times.
 Future<BookDiff> diffParsedBook({
