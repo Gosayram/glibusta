@@ -172,5 +172,56 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 200));
       queue.dispose();
     });
+
+    test('marks the task failed when the native downloader rejects it', () async {
+      const task = DownloadTask(
+        id: 'task-1',
+        bookId: 'b1',
+        bookTitle: 'Book 1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b1.epub',
+        targetPath: '/tmp/b1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'b1',
+          bookTitle: 'Book 1',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b1.epub',
+        ),
+      ).thenAnswer((_) async => task);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenThrow(StateError('native scheduler unavailable'));
+
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+      );
+
+      await expectLater(
+        queue.enqueue(
+          bookId: 'b1',
+          bookTitle: 'Book 1',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b1.epub',
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      verify(() => mockRepo.updateStatus('task-1', DownloadStatus.failed)).called(1);
+      queue.dispose();
+    });
   });
 }

@@ -91,13 +91,36 @@ class DownloadQueue {
     _emitUpdate();
 
     // Enqueue in background_downloader.
-    await _bgDownload.enqueue(
-      taskId: task.id,
-      bookId: bookId,
-      bookTitle: bookTitle,
-      format: format,
-      sourceUrl: sourceUrl,
-    );
+    try {
+      await _bgDownload.enqueue(
+        taskId: task.id,
+        bookId: bookId,
+        bookTitle: bookTitle,
+        format: format,
+        sourceUrl: sourceUrl,
+      );
+    } on Object catch (error, stackTrace) {
+      final failedTask = task.copyWith(status: DownloadStatus.failed);
+      _tasks[task.id] = failedTask;
+      _emitUpdate();
+      try {
+        await _repository.updateStatus(task.id, DownloadStatus.failed);
+      } on Object catch (persistenceError, persistenceStackTrace) {
+        _logger.warning(
+          'Could not persist failed download ${task.id}: $persistenceError',
+          name: 'DownloadQueue',
+          error: persistenceError,
+          st: persistenceStackTrace,
+        );
+      }
+      _logger.warning(
+        'Could not enqueue download ${task.id}: $error',
+        name: 'DownloadQueue',
+        error: error,
+        st: stackTrace,
+      );
+      rethrow;
+    }
 
     return task.id;
   }
