@@ -463,7 +463,7 @@ pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
     let mut titles_seen = std::collections::HashSet::new();
     let mut duplicate_chapters = Vec::new();
     for ch in &book.chapters {
-        if ch.blocks.is_empty() || (ch.blocks.len() == 1 && ch.blocks[0].text.trim().is_empty()) {
+        if !chapter_has_renderable_content(ch) {
             empty_chapters.push(ch.index);
         }
         if !titles_seen.insert(ch.title.clone()) {
@@ -484,15 +484,32 @@ pub fn validate_book(path: String) -> anyhow::Result<BookValidationResult> {
     })
 }
 
+fn chapter_has_renderable_content(chapter: &ReaderChapter) -> bool {
+    chapter.blocks.iter().any(|block| {
+        !block.text.trim().is_empty()
+            || block.image_url.is_some()
+            || block.list_items.is_some()
+            || block.table_rows.is_some()
+            || matches!(
+                block.block_type,
+                crate::api::models::BlockType::Image
+                    | crate::api::models::BlockType::List
+                    | crate::api::models::BlockType::Table
+            )
+    })
+}
+
 /// Repair a book: remove empty chapters, deduplicate, fix TOC/chapter index mapping.
 pub fn repair_book(path: String) -> anyhow::Result<NormalizedBook> {
-    let mut book = parse_book(path)?;
+    Ok(repair_normalized_book(parse_book(path)?))
+}
+
+fn repair_normalized_book(mut book: NormalizedBook) -> NormalizedBook {
     // Remove empty chapters and re-index
     let mut new_chapters = Vec::new();
     let mut old_to_new: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();
     for ch in &book.chapters {
-        let has_content = ch.blocks.iter().any(|b| !b.text.trim().is_empty());
-        if has_content {
+        if chapter_has_renderable_content(ch) {
             let new_idx = new_chapters.len() as i32;
             old_to_new.insert(ch.index, new_idx);
             let mut fixed = ch.clone();
@@ -517,7 +534,7 @@ pub fn repair_book(path: String) -> anyhow::Result<NormalizedBook> {
             && (t.chapter_index as usize) < book.chapters.len()
             && seen.insert(t.chapter_index)
     });
-    Ok(book)
+    book
 }
 
 /// Get asset metadata (IDs, types, sizes) without downloading bytes.
@@ -996,7 +1013,8 @@ mod cover_data_uri_tests {
 
 #[cfg(test)]
 mod parse_api_tests {
-    use super::{MAX_FILE_SIZE, parse_book, parse_book_legacy};
+    use super::{MAX_FILE_SIZE, parse_book, parse_book_legacy, repair_normalized_book};
+    use crate::api::models::{BlockType, TocEntry};
 
     #[test]
     fn path_and_legacy_txt_parsers_return_the_same_book() {
@@ -1040,5 +1058,27 @@ mod parse_api_tests {
                 .to_string()
                 .contains("File exceeds maximum supported size")
         );
+    }
+
+    #[test]
+    fn repair_keeps_chapter_with_renderable_image_only() {
+        let mut book = parse_book_legacy(b"Book title".to_vec(), "txt".to_owned(), None)
+            .expect("parse fixture book");
+        let chapter = &mut book.chapters[0];
+        chapter.index = 7;
+        chapter.blocks[0].text.clear();
+        chapter.blocks[0].block_type = BlockType::Image;
+        chapter.blocks[0].image_url = Some("images/cover.jpg".to_string());
+        book.toc = vec![TocEntry {
+            title: "Illustration".to_string(),
+            chapter_index: 7,
+            children: Vec::new(),
+        }];
+
+        let repaired = repair_normalized_book(book);
+
+        assert_eq!(repaired.chapters.len(), 1);
+        assert_eq!(repaired.chapters[0].index, 0);
+        assert_eq!(repaired.toc[0].chapter_index, 0);
     }
 }
