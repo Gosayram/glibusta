@@ -146,6 +146,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut rich_spans: Vec<RichSpan> = Vec::new();
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
+    let mut unicode_fallback_count = 1usize;
 
     while i < bytes.len() {
         match bytes[i] {
@@ -221,7 +222,23 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                     "emdash" | "em" => span_text.push('\u{2014}'),
                     "endash" | "en" => span_text.push('\u{2013}'),
                     "bullet" => span_text.push('\u{2022}'),
-                    "ansi" | "ansicpg" | "uc" | "deff" | "deflang" => {}
+                    "ansi" | "ansicpg" | "deff" | "deflang" => {}
+                    "uc" => {
+                        let count_start = i;
+                        while i < bytes.len() && bytes[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        if let Ok(count) = std::str::from_utf8(&bytes[count_start..i])
+                            .unwrap_or("1")
+                            .parse::<usize>()
+                        {
+                            unicode_fallback_count = count;
+                        }
+                        if i < bytes.len() && bytes[i] == b' ' {
+                            i += 1;
+                        }
+                        continue;
+                    }
                     "fonttbl" | "colortbl" | "stylesheet" | "listtables" | "revtbl" => {
                         skip_group = true;
                         skip_depth = brace_depth;
@@ -285,6 +302,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                         if i < bytes.len() && bytes[i] == b';' {
                             i += 1;
                         }
+                        i = skip_unicode_fallback(body, i, unicode_fallback_count);
                         continue;
                     }
                     "bin" => {
@@ -335,6 +353,27 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     );
 
     blocks
+}
+
+/// Skip the fallback representation following an RTF `\\uN` escape.
+fn skip_unicode_fallback(body: &str, mut index: usize, count: usize) -> usize {
+    let bytes = body.as_bytes();
+    for _ in 0..count {
+        if index >= bytes.len() {
+            break;
+        }
+        if bytes[index] == b'\\'
+            && bytes.get(index + 1) == Some(&b'\'')
+            && index.saturating_add(4) <= bytes.len()
+        {
+            index += 4;
+        } else if let Some(ch) = body[index..].chars().next() {
+            index += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    index
 }
 
 /// Decode an RTF `\\'hh` escape with the document's declared ANSI code page.
@@ -448,8 +487,8 @@ mod tests {
 
     #[test]
     fn skips_unicode_fallback_characters() {
-        let book = parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8"))
-            .expect("parse Unicode escape");
+        let book =
+            parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8")).expect("parse Unicode escape");
 
         assert_eq!(book.chapters[0].blocks[0].text, "П");
     }

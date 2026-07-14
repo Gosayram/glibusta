@@ -233,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UnRAR is a native C++ dependency that Miri cannot execute")]
     fn rejects_a_non_rar_file_without_crashing_the_native_parser() {
         let path =
             std::env::temp_dir().join(format!("glibusta-invalid-cbr-{}.cbr", uuid::Uuid::new_v4()));
@@ -245,6 +246,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "UnRAR is a native C++ dependency that Miri cannot execute")]
     fn reads_a_rar4_archive_before_rejecting_non_image_contents() {
         // Minimal valid RAR4 archive from UnRAR's own test corpus. It contains
         // a VERSION file, so the CBR parser must scan it and then reject it for
