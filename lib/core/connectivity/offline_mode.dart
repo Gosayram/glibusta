@@ -47,10 +47,14 @@ class DownloadPolicyPersistence {
   final SharedPreferences _prefs;
 
   bool get allowMobileDownloads => _prefs.getBool(_kAllowMobileDownloads) ?? false;
-  set allowMobileDownloads(bool v) => unawaited(_prefs.setBool(_kAllowMobileDownloads, v));
+  Future<void> saveAllowMobileDownloads(bool value) async {
+    await _prefs.setBool(_kAllowMobileDownloads, value);
+  }
 
   bool get autoResumeOnWifi => _prefs.getBool(_kAutoResumeOnWifi) ?? true;
-  set autoResumeOnWifi(bool v) => unawaited(_prefs.setBool(_kAutoResumeOnWifi, v));
+  Future<void> saveAutoResumeOnWifi(bool value) async {
+    await _prefs.setBool(_kAutoResumeOnWifi, value);
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -61,6 +65,8 @@ Future<DownloadPolicyPersistence> downloadPolicyPersistence(Ref ref) async {
 
 @Riverpod(keepAlive: true)
 class AllowMobileDownloadsNotifier extends _$AllowMobileDownloadsNotifier {
+  var _version = 0;
+
   @override
   bool build() {
     unawaited(_load());
@@ -68,19 +74,25 @@ class AllowMobileDownloadsNotifier extends _$AllowMobileDownloadsNotifier {
   }
 
   Future<void> _load() async {
+    final version = _version;
     final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    if (!ref.mounted || version != _version) return;
     state = p.allowMobileDownloads;
   }
 
   Future<void> update(bool value) async {
+    final version = ++_version;
     state = value;
     final p = await ref.read(downloadPolicyPersistenceProvider.future);
-    p.allowMobileDownloads = value;
+    if (!ref.mounted || version != _version) return;
+    await p.saveAllowMobileDownloads(value);
   }
 }
 
 @Riverpod(keepAlive: true)
 class AutoResumeOnWifiNotifier extends _$AutoResumeOnWifiNotifier {
+  var _version = 0;
+
   @override
   bool build() {
     unawaited(_load());
@@ -88,14 +100,18 @@ class AutoResumeOnWifiNotifier extends _$AutoResumeOnWifiNotifier {
   }
 
   Future<void> _load() async {
+    final version = _version;
     final p = await ref.read(downloadPolicyPersistenceProvider.future);
+    if (!ref.mounted || version != _version) return;
     state = p.autoResumeOnWifi;
   }
 
   Future<void> update(bool value) async {
+    final version = ++_version;
     state = value;
     final p = await ref.read(downloadPolicyPersistenceProvider.future);
-    p.autoResumeOnWifi = value;
+    if (!ref.mounted || version != _version) return;
+    await p.saveAutoResumeOnWifi(value);
   }
 }
 
