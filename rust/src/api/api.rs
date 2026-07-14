@@ -964,6 +964,14 @@ pub fn parse_mobi(
         .map_err(|e| anyhow::anyhow!("{}", e))
 }
 
+/// Parse a CBR/RAR comic from a filesystem path.
+///
+/// The native UnRAR API is path-based, so unlike the legacy parsers this
+/// entry point deliberately does not accept an in-memory byte buffer.
+pub fn parse_cbr(path: String) -> anyhow::Result<NormalizedBook> {
+    crate::book::cbr::parse_cbr_path(Path::new(&path)).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
 pub fn decode_zip_entries(bytes: Vec<u8>) -> anyhow::Result<Vec<String>> {
     let zip = crate::book::archive::decode_zip(&bytes)
         .map_err(|e| anyhow::anyhow!("Failed to decode ZIP: {}", e))?;

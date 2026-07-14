@@ -9,7 +9,7 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
-// These functions are ignored because they are not marked as `pub`: `cache_fingerprint`, `ceil_char_boundary`, `cleanup_disk_cache`, `decode_cover_data_uri`, `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `floor_char_boundary`, `load_dictionary`, `map_file`, `memory_cache_get`, `memory_cache_store`, `read_archive_asset`, `validate_legacy_input_size`
+// These functions are ignored because they are not marked as `pub`: `cache_fingerprint`, `ceil_char_boundary`, `chapter_has_renderable_content`, `cleanup_disk_cache`, `decode_cover_data_uri`, `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `floor_char_boundary`, `load_dictionary`, `map_file`, `memory_cache_get`, `memory_cache_store`, `read_archive_asset`, `repair_normalized_book`, `repair_toc_entries`, `toc_has_invalid_chapter`, `validate_legacy_input_size`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookBytes`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`
 
@@ -207,6 +207,13 @@ Future<NormalizedBook> parseMobi({
   bytes: bytes,
   forcedEncoding: forcedEncoding,
 );
+
+/// Parse a CBR/RAR comic from a filesystem path.
+///
+/// The native UnRAR API is path-based, so unlike the legacy parsers this
+/// entry point deliberately does not accept an in-memory byte buffer.
+Future<NormalizedBook> parseCbr({required String path}) =>
+    RustLib.instance.api.crateApiApiParseCbr(path: path);
 
 Future<List<String>> decodeZipEntries({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDecodeZipEntries(bytes: bytes);

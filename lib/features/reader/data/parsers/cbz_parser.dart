@@ -10,10 +10,11 @@ import '../../../../core/formats/archive_safety.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
+import 'rust_book_parser.dart';
 
 final class CbzParser implements BookParser {
   @override
-  bool supports(BookFormat format) => format == BookFormat.cbz;
+  bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
 
   @override
   Future<NormalizedBook> parse(
@@ -21,6 +22,9 @@ final class CbzParser implements BookParser {
     String? fileName,
     String? forcedEncoding,
   }) async {
+    if (fileName != null && detectBookFormat(fileName) == BookFormat.cbr) {
+      throw const ParserFailure('CBR needs a file path and cannot be parsed from memory');
+    }
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       ArchiveSafety.validateZip(archive);
@@ -65,6 +69,9 @@ final class CbzParser implements BookParser {
     String filePath, {
     String? forcedEncoding,
   }) async {
+    if (detectBookFormat(filePath) == BookFormat.cbr) {
+      return RustBookParser().parseCbrFile(filePath);
+    }
     try {
       final file = File(filePath);
       if (!await file.exists()) {

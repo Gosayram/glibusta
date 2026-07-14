@@ -75,6 +75,16 @@ class RustBookParser implements BookParser {
     }
   }
 
+  /// Parses a CBR archive through the path-based native UnRAR API.
+  Future<local.NormalizedBook> parseCbrFile(String filePath) async {
+    try {
+      final book = await rust_api.parseCbr(path: filePath);
+      return _toNormalizedBook(book);
+    } on Object catch (e) {
+      throw ParserFailure('Rust CBR parser failed for $filePath: $e');
+    }
+  }
+
   Future<local.NormalizedBookMetadata?> parseMetadata(
     Uint8List bytes, {
     String? fileName,

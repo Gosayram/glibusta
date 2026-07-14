@@ -47,8 +47,12 @@ void main() {
     );
   });
 
-  test('does not claim CBR support without a RAR decoder', () {
+  test('routes CBR files to the path-based native RAR parser', () async {
     expect(parser.supports(BookFormat.cbz), isTrue);
-    expect(parser.supports(BookFormat.cbr), isFalse);
+    expect(parser.supports(BookFormat.cbr), isTrue);
+    await expectLater(
+      parser.parse(Uint8List(0), fileName: 'comic.cbr'),
+      throwsA(isA<ParserFailure>()),
+    );
   });
 }

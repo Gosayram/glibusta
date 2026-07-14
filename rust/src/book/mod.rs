@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod cbr;
 pub mod djvu;
 pub mod docx;
 pub mod encoding;
