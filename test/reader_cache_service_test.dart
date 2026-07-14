@@ -56,13 +56,17 @@ void main() {
       logger: AppLogger(),
     );
     const book = NormalizedBook(
-      id: 'book',
+      id: 'content-hash',
       title: 'Book',
       authors: [],
       chapters: [ReaderChapter(index: 0, title: 'Chapter', blocks: [])],
     );
 
     await service.putBook('book', book);
+    final metadata = await service.getMetadata('book');
+    expect(metadata, isNotNull);
+    expect(await service.isCacheValid('book', metadata!), isTrue);
+
     final bookDir = await service.getBookDir('book');
     final image = File('${bookDir.path}/epub_images/cover.jpg');
     await image.parent.create(recursive: true);

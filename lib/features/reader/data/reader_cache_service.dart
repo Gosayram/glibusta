@@ -106,7 +106,7 @@ final class ReaderCacheService {
   ) async {
     final bookDir = await _getExistingBookDir(bookId);
     if (!await bookDir.exists()) return false;
-    return _isSplitCacheValid(bookDir, meta);
+    return _isSplitCacheValid(bookId, bookDir, meta);
   }
 
   Future<ReaderChapter?> getChapter(String bookId, int index) async {
@@ -240,6 +240,7 @@ final class ReaderCacheService {
   }
 
   Future<bool> _isSplitCacheValid(
+    String bookId,
     Directory bookDir,
     NormalizedBookMetadata meta,
   ) async {
@@ -256,7 +257,7 @@ final class ReaderCacheService {
         final cachedContentHash = manifest['contentHash'] as String?;
         final chapterCount = manifest['chapterCount'] as int?;
         final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
-        final source = await _fingerprintProvider(meta.id);
+        final source = await _fingerprintProvider(bookId);
         if (source == null) {
           return false;
         }

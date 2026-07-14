@@ -45,7 +45,7 @@ class NormalizedBook {
   factory NormalizedBook.fromJson(Map<String, dynamic> json) => NormalizedBook(
     id: json['id'] as String,
     title: json['title'] as String,
-    authors: (json['authors'] as List<String>?) ?? [],
+    authors: (json['authors'] as List<dynamic>?)?.cast<String>() ?? const [],
     description: json['description'] as String?,
     coverUrl: json['coverUrl'] as String?,
     chapters:
@@ -104,7 +104,7 @@ class NormalizedBookMetadata {
   factory NormalizedBookMetadata.fromJson(Map<String, dynamic> json) => NormalizedBookMetadata(
     id: json['id'] as String,
     title: json['title'] as String,
-    authors: (json['authors'] as List<String>?) ?? [],
+    authors: (json['authors'] as List<dynamic>?)?.cast<String>() ?? const [],
     description: json['description'] as String?,
     coverUrl: json['coverUrl'] as String?,
     chapterCount: json['chapterCount'] as int,
