@@ -334,6 +334,7 @@ fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
                     }
                     "w:b" if in_run => current_span_bold = word_bool_value(e),
                     "w:i" if in_run => current_span_italic = word_bool_value(e),
+                    "w:tab" if in_run => current_span_text.push('\t'),
                     "w:br" if in_run => current_span_text.push('\n'),
                     _ => {}
                 }
@@ -437,5 +438,18 @@ mod tests {
         assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Heading);
         assert!(span.bold);
         assert!(!span.italic);
+    }
+
+    #[test]
+    fn preserves_self_closing_tabs_in_runs() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:p><w:r><w:t>Before</w:t><w:tab/><w:t>After</w:t></w:r></w:p></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX XML");
+
+        assert_eq!(blocks[0].text, "Before\tAfter");
     }
 }

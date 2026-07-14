@@ -11,7 +11,9 @@ static TAG_NAME_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^<?/?([a-zA-Z][a-zA-Z0-9]*)").unwrap());
 static STRIP_OUTER_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)^<(p|div|blockquote|pre|section|article)[^>]*>").unwrap());
-static HREF_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"href="([^"]*)""#).unwrap());
+static HREF_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\bhref\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+))"#).unwrap()
+});
 
 pub(crate) struct MobiHtmlParser {
     block_elements: HashSet<&'static str>,
@@ -476,9 +478,9 @@ impl MobiHtmlParser {
                     } else if name == "sup" {
                         superscript = true;
                     } else if name == "a" {
-                        if let Some(m) = HREF_RE.captures(&lower) {
-                            href = m
-                                .get(1)
+                        if let Some(captures) = HREF_RE.captures(&tag) {
+                            href = (1..=3)
+                                .find_map(|index| captures.get(index))
                                 .and_then(|value| crate::book::sanitize_href(value.as_str()));
                         }
                     }
@@ -652,5 +654,13 @@ mod tests {
         let span = &blocks[0].rich_spans.as_ref().expect("rich span")[0];
         assert_eq!(span.text, "Read");
         assert!(span.href.is_none());
+    }
+
+    #[test]
+    fn preserves_single_quoted_link_targets() {
+        let blocks = MobiHtmlParser::new().parse("<p><a href='chapter-2.html'>Next</a></p>");
+
+        let span = &blocks[0].rich_spans.as_ref().expect("rich span")[0];
+        assert_eq!(span.href.as_deref(), Some("chapter-2.html"));
     }
 }
