@@ -196,21 +196,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _nameController.text.trim(),
             _passwordController.text,
             _persistent,
-          )
-          .then((_) {
-            if (_persistent && mounted) {
-              final authState = ref.read(authStateProvider);
-              if (authState.hasValue && authState.value!.isAuthenticated) {
-                final secureStorage = ref.read(flutterSecureStorageProvider);
-                unawaited(
-                  secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
-                );
-                unawaited(
-                  secureStorage.write(key: 'auth_password', value: _passwordController.text),
-                );
-              }
-            }
-          }),
+          ),
     );
   }
 }

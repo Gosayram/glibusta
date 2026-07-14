@@ -247,6 +247,11 @@ class AuthStateNotifier extends _$AuthStateNotifier {
             persistent: persistent,
           );
       await _saveSession(session);
+      await _updateRememberedCredentials(
+        name: name,
+        password: password,
+        persistent: persistent,
+      );
       return AuthStateData(
         isAuthenticated: true,
         session: session,
@@ -323,6 +328,24 @@ class AuthStateNotifier extends _$AuthStateNotifier {
         .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
         .join('&');
     await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
+  }
+
+  Future<void> _updateRememberedCredentials({
+    required String name,
+    required String password,
+    required bool persistent,
+  }) async {
+    final secureStorage = ref.read(flutterSecureStorageProvider);
+    if (persistent) {
+      await secureStorage.write(key: 'auth_username', value: name);
+      await secureStorage.write(key: 'auth_password', value: password);
+      return;
+    }
+
+    await (
+      secureStorage.delete(key: 'auth_username'),
+      secureStorage.delete(key: 'auth_password'),
+    ).wait;
   }
 }
 
