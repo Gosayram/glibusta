@@ -142,7 +142,6 @@ class RustBookParser implements BookParser {
             ),
           )
           .toList(),
-      metadata: r.metadata != null ? Map<String, dynamic>.from(r.metadata! as Map) : null,
     );
   }
 
