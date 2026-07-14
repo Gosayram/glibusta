@@ -5,7 +5,7 @@ use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::decode_bytes;
 use anyhow::{Context, Result};
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
 use serde::Deserialize;
 
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
@@ -32,7 +32,7 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .context("DOCX missing word/document.xml")?;
     let doc_text = decode_bytes(&document_xml, encoding_name);
 
-    let (blocks, chapter_title) = parse_document_xml(&doc_text);
+    let (blocks, chapter_title) = parse_document_xml(&doc_text)?;
 
     let id = crate::book::sha256_hex(bytes);
 
@@ -154,7 +154,7 @@ fn mime_from_name(name: &str) -> String {
     }
 }
 
-fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
+fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
     let mut blocks: Vec<ReaderBlock> = Vec::new();
@@ -172,11 +172,18 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
     let mut current_span_italic = false;
+    let mut element_depth = 0usize;
 
     loop {
         match reader.read_event() {
-            Ok(Event::Eof) => break,
+            Ok(Event::Eof) => {
+                if element_depth != 0 {
+                    anyhow::bail!("DOCX XML parse error: unclosed elements");
+                }
+                break;
+            }
             Ok(Event::Start(ref e)) => {
+                element_depth += 1;
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
                     "w:body" => in_body = true,
@@ -203,26 +210,8 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                         current_span_bold = false;
                         current_span_italic = false;
                     }
-                    "w:b" if in_run => {
-                        for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"val" {
-                                let val = String::from_utf8_lossy(&attr.value).to_lowercase();
-                                current_span_bold = val != "0" && val != "false";
-                            } else {
-                                current_span_bold = true;
-                            }
-                        }
-                    }
-                    "w:i" if in_run => {
-                        for attr in e.attributes().filter_map(|a| a.ok()) {
-                            if attr.key.as_ref() == b"val" {
-                                let val = String::from_utf8_lossy(&attr.value).to_lowercase();
-                                current_span_italic = val != "0" && val != "false";
-                            } else {
-                                current_span_italic = true;
-                            }
-                        }
-                    }
+                    "w:b" if in_run => current_span_bold = word_bool_value(e),
+                    "w:i" if in_run => current_span_italic = word_bool_value(e),
                     "w:tab" if in_run => {
                         current_span_text.push('\t');
                     }
@@ -257,6 +246,9 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
                 }
             }
             Ok(Event::End(ref e)) => {
+                element_depth = element_depth
+                    .checked_sub(1)
+                    .ok_or_else(|| anyhow::anyhow!("DOCX XML parse error: unexpected end tag"))?;
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
                 match tag.as_str() {
                     "w:body" => in_body = false,
@@ -332,14 +324,88 @@ fn parse_document_xml(text: &str) -> (Vec<ReaderBlock>, String) {
             }
             Ok(Event::Empty(ref e)) => {
                 let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
-                if tag == "w:br" && in_run {
-                    current_span_text.push('\n');
+                match tag.as_str() {
+                    "w:b" if in_run => current_span_bold = word_bool_value(e),
+                    "w:i" if in_run => current_span_italic = word_bool_value(e),
+                    "w:br" if in_run => current_span_text.push('\n'),
+                    _ => {}
                 }
             }
-            Err(_) => break,
+            Err(error) => anyhow::bail!("DOCX XML parse error: {error}"),
             _ => {}
         }
     }
 
-    (blocks, chapter_title)
+    Ok((blocks, chapter_title))
+}
+
+fn word_bool_value(element: &BytesStart<'_>) -> bool {
+    match element
+        .attributes()
+        .filter_map(|attribute| attribute.ok())
+        .find(|attribute| attribute.key.as_ref() == b"val")
+    {
+        Some(attribute) => !matches!(
+            String::from_utf8_lossy(&attribute.value)
+                .to_lowercase()
+                .as_str(),
+            "0" | "false" | "off"
+        ),
+        None => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_document_xml, parse_docx};
+    use std::io::{Cursor, Write};
+
+    fn malformed_docx() -> Vec<u8> {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>unterminated"#,
+        )
+        .expect("write malformed document XML");
+        zip.finish().expect("finish DOCX archive");
+        bytes.into_inner()
+    }
+
+    #[test]
+    fn rejects_malformed_document_xml() {
+        let error = parse_docx(&malformed_docx(), None)
+            .expect_err("malformed document XML must not produce a partial book");
+
+        assert!(error.to_string().contains("DOCX XML parse error"));
+    }
+
+    #[test]
+    fn preserves_formatting_from_empty_run_property_tags() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:p>
+                    <w:r><w:rPr><w:b/></w:rPr><w:t>Bold</w:t></w:r>
+                    <w:r><w:rPr><w:i/></w:rPr><w:t>Italic</w:t></w:r>
+                </w:p></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX XML");
+        let spans = blocks[0].rich_spans.as_ref().expect("formatted spans");
+
+        assert!(spans[0].bold);
+        assert!(!spans[0].italic);
+        assert!(!spans[1].bold);
+        assert!(spans[1].italic);
+    }
 }
