@@ -4,7 +4,6 @@ use crate::api::models::{
 };
 use crate::book::archive;
 use crate::book::encoding::{attr_eq, get_xml_attr};
-use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -226,7 +225,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             &current_span_href,
                         );
                         current_span_href =
-                            get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
+                            get_fb2_href(e).and_then(|h| crate::book::sanitize_href(&h));
                         if attr_eq(e, b"type", b"note") {
                             if let Some(ref href) = current_span_href {
                                 current_note_ref = Some(href.trim_start_matches('#').to_string());
@@ -405,12 +404,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     }
                 }
                 b"p" if in_body => {
-                    if !current_span_text.trim().is_empty()
-                        && (current_span_bold
-                            || current_span_italic
-                            || current_span_superscript
-                            || current_span_href.is_some())
-                    {
+                    if !current_span_text.trim().is_empty() {
                         flush_rich_span(
                             &mut current_rich_spans,
                             &mut current_span_text,
@@ -940,6 +934,31 @@ fn default_block() -> ReaderBlock {
     }
 }
 
+/// FB2 paragraphs are reconstructed from spans, so keep unformatted segments
+/// as spans too. The shared helper intentionally drops them for parsers that
+/// retain plain text separately.
+fn flush_rich_span(
+    spans: &mut Vec<RichSpan>,
+    span_text: &mut String,
+    bold: bool,
+    italic: bool,
+    superscript: bool,
+    href: &Option<String>,
+) {
+    let text = std::mem::take(span_text);
+    if text.trim().is_empty() && href.is_none() {
+        return;
+    }
+    spans.push(RichSpan {
+        text,
+        bold,
+        italic,
+        superscript,
+        href: href.clone(),
+        line_break: false,
+    });
+}
+
 fn flush_fb2_block(
     blocks: &mut Vec<ReaderBlock>,
     current_text: &mut String,
@@ -1034,6 +1053,28 @@ mod tests {
                 .image_url
                 .as_deref()
                 .is_some_and(|url| url.starts_with("data:image/webp;base64,"))
+        );
+    }
+
+    #[test]
+    fn links_namespaced_footnote_references_to_notes() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
+                <body><section><p>Text<a l:href="#n1" type="note">1</a></p></section></body>
+                <body name="notes"><section id="n1"><p>Footnote text</p></section></body>
+            </FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with namespaced footnote");
+
+        assert_eq!(book.chapters.len(), 1, "{book:#?}");
+        assert_eq!(book.chapters[0].blocks[0].text, "Text1");
+        assert_eq!(book.chapters[0].blocks[0].note_ref.as_deref(), Some("n1"));
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
+            Some("Footnote text")
         );
     }
 }
