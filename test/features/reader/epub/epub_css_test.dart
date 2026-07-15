@@ -361,6 +361,45 @@ void main() {
     }
   });
 
+  test('assigns unique block indices after flattening section content', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_section_index_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><body>
+            <p>Before</p><div><p>Inside one</p><p>Inside two</p></div><p>After</p>
+          </body></html>
+        ''',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+
+      expect(normalized.chapters.single.blocks.map((block) => block.index), [0, 1, 2, 3]);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('preserves an EPUB RTL direction in normalized metadata', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_rtl_test_');
     try {

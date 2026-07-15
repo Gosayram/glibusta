@@ -57,17 +57,19 @@ class EpubBookAdapter {
     }
 
     final blocks = <ReaderBlock>[];
-    for (var i = 0; i < chapter.blocks.length; i++) {
-      final block = chapter.blocks[i];
+    void appendBlock(epub.ReaderBlock block) {
       if (block is epub.SectionBlock) {
-        for (var j = 0; j < block.children.length; j++) {
-          final child = applyCss(block.children[j], j);
-          if (child.text.isNotEmpty || child.imageUrl != null) blocks.add(child);
+        for (final child in block.children) {
+          appendBlock(child);
         }
-      } else {
-        final mapped = applyCss(block, i);
-        if (mapped.text.isNotEmpty || mapped.imageUrl != null) blocks.add(mapped);
+        return;
       }
+      final mapped = applyCss(block, blocks.length);
+      if (mapped.text.isNotEmpty || mapped.imageUrl != null) blocks.add(mapped);
+    }
+
+    for (final block in chapter.blocks) {
+      appendBlock(block);
     }
     return ReaderChapter(
       index: index,
