@@ -302,4 +302,11 @@ mod tests {
 
         assert_eq!(book.chapters[0].blocks[0].text, "Привет");
     }
+
+    #[test]
+    fn preserves_utf8_western_diacritics() {
+        let book = parse_txt("äöå café Görünen".as_bytes(), None).expect("parse UTF-8 TXT");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "äöå café Görünen");
+    }
 }

@@ -1059,19 +1059,32 @@ fn detect_fb2_encoding(bytes: &[u8]) -> String {
         return "utf-16be".to_string();
     }
     let snippet = &bytes[..bytes.len().min(200)];
-    if let Some(pos) = snippet.windows(15).position(|w| w == b"encoding=") {
-        let after = &snippet[pos + 10..];
+    if let Some(pos) = snippet
+        .windows(b"encoding=".len())
+        .position(|window| window == b"encoding=")
+    {
+        let after = &snippet[pos + b"encoding=".len()..];
         if let Some(q) = after.first() {
             if *q == b'"' || *q == b'\'' {
                 let quote = *q;
                 if let Some(end) = after[1..].iter().position(|&b| b == quote) {
                     let label = std::str::from_utf8(&after[1..1 + end]).unwrap_or("utf-8");
                     if encoding_rs::Encoding::for_label_no_replacement(label.as_bytes()).is_some() {
+                        if label.eq_ignore_ascii_case("utf-8")
+                            && std::str::from_utf8(bytes).is_err()
+                        {
+                            // Invalid UTF-8 declarations in legacy FB2 files are overwhelmingly
+                            // Windows-1251; decoding as UTF-8 would replace every Cyrillic byte.
+                            return "windows-1251".to_string();
+                        }
                         return label.to_lowercase();
                     }
                 }
             }
         }
+    }
+    if std::str::from_utf8(bytes).is_err() {
+        return crate::book::encoding::detect_encoding(bytes).to_string();
     }
     "utf-8".to_string()
 }
@@ -1200,6 +1213,47 @@ mod tests {
             book.cover_url
                 .is_some_and(|url| url.starts_with("data:image/png;base64,"))
         );
+    }
+
+    #[test]
+    fn recovers_from_a_false_utf8_declaration_for_windows_1251_bytes() {
+        let mut bytes = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><FictionBook><description><title-info><book-title>".to_vec();
+        for _ in 0..32 {
+            bytes.extend_from_slice(&[0xcf, 0xf0, 0xe8, 0xe2, 0xe5, 0xf2, b' ']);
+        }
+        bytes.extend_from_slice(b"</book-title></title-info></description><body><section><p>Text</p></section></body></FictionBook>");
+
+        let book = parse_fb2(&bytes, None).expect("parse CP1251 FB2 with false UTF-8 declaration");
+
+        assert!(book.title.starts_with("Привет"), "{}", book.title);
+    }
+
+    #[test]
+    fn detects_cp866_without_an_xml_declaration() {
+        let (encoded, _, _) = encoding_rs::IBM866.encode("Привет ");
+        let mut bytes = b"<FictionBook><description><title-info><book-title>".to_vec();
+        for _ in 0..32 {
+            bytes.extend_from_slice(&encoded);
+        }
+        bytes.extend_from_slice(b"</book-title></title-info></description><body><section><p>Text</p></section></body></FictionBook>");
+
+        let book = parse_fb2(&bytes, None).expect("parse CP866 FB2 without declaration");
+
+        assert!(book.title.starts_with("Привет"), "{}", book.title);
+    }
+
+    #[test]
+    fn detects_koi8_r_without_an_xml_declaration() {
+        let (encoded, _, _) = encoding_rs::KOI8_R.encode("Привет ");
+        let mut bytes = b"<FictionBook><description><title-info><book-title>".to_vec();
+        for _ in 0..32 {
+            bytes.extend_from_slice(&encoded);
+        }
+        bytes.extend_from_slice(b"</book-title></title-info></description><body><section><p>Text</p></section></body></FictionBook>");
+
+        let book = parse_fb2(&bytes, None).expect("parse KOI8-R FB2 without declaration");
+
+        assert!(book.title.starts_with("Привет"), "{}", book.title);
     }
 
     #[test]
