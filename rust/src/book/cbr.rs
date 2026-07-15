@@ -4,6 +4,8 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use quick_xml::Reader;
+use quick_xml::events::Event;
 use unrar_ng::Archive;
 
 use crate::api::models::{
@@ -12,6 +14,7 @@ use crate::api::models::{
 };
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"];
+const MAX_COMIC_INFO_BYTES: u64 = 1024 * 1024;
 
 /// Parse a CBR archive from its path. UnRAR can only operate on filesystem paths.
 pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
@@ -30,6 +33,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
     let mut entry_count = 0usize;
     let mut total_uncompressed_size = 0u64;
     let mut images = Vec::new();
+    let mut comic_info = None;
 
     loop {
         let Some(entry) = archive
@@ -63,6 +67,24 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
                 "CBR exceeds maximum compression ratio of {}:1",
                 MAX_COMPRESSION_RATIO
             );
+        }
+        if entry_name
+            .rsplit(['/', '\\'])
+            .next()
+            .is_some_and(|name| name.eq_ignore_ascii_case("ComicInfo.xml"))
+            && entry.entry().is_file()
+        {
+            if entry_size <= MAX_COMIC_INFO_BYTES {
+                let (bytes, next_archive) =
+                    entry.read().context("Failed to extract ComicInfo.xml")?;
+                comic_info = parse_comic_info(&bytes);
+                archive = next_archive;
+            } else {
+                archive = entry
+                    .skip()
+                    .context("Failed to skip oversized ComicInfo.xml")?;
+            }
+            continue;
         }
 
         let Some(media_type) = image_media_type(&entry_name).filter(|_| entry.entry().is_file())
@@ -118,17 +140,25 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         })
         .collect();
 
-    let title = path
+    let fallback_title = path
         .file_stem()
         .and_then(|name| name.to_str())
         .filter(|name| !name.trim().is_empty())
-        .unwrap_or("CBR")
-        .to_owned();
+        .unwrap_or("CBR");
+    let title = comic_info
+        .as_ref()
+        .and_then(|info| info.title.clone())
+        .unwrap_or_else(|| fallback_title.to_owned());
+    let authors = comic_info
+        .as_ref()
+        .and_then(|info| info.authors.clone())
+        .unwrap_or_default();
+    let comic_metadata = comic_info.as_ref().and_then(ComicInfo::metadata);
 
     Ok(NormalizedBook {
         id: crate::book::sha256_hex(path.as_os_str().as_encoded_bytes()),
         title,
-        authors: Vec::new(),
+        authors,
         description: None,
         cover_url: None,
         chapters: vec![ReaderChapter {
@@ -136,13 +166,91 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             title: "Pages".to_owned(),
             blocks,
         }],
-        metadata: None,
+        metadata: comic_metadata,
         book_format: BookFormat::Cbr,
         language: None,
         warnings: Vec::new(),
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+#[derive(Default)]
+struct ComicInfo {
+    title: Option<String>,
+    authors: Option<Vec<String>>,
+    series: Option<String>,
+    number: Option<String>,
+}
+
+impl ComicInfo {
+    fn metadata(&self) -> Option<serde_json::Value> {
+        let mut metadata = serde_json::Map::new();
+        if let Some(series) = &self.series {
+            metadata.insert(
+                "series".to_owned(),
+                serde_json::Value::String(series.clone()),
+            );
+        }
+        if let Some(number) = &self.number {
+            metadata.insert(
+                "number".to_owned(),
+                serde_json::Value::String(number.clone()),
+            );
+        }
+        (!metadata.is_empty()).then_some(serde_json::Value::Object(metadata))
+    }
+}
+
+fn parse_comic_info(bytes: &[u8]) -> Option<ComicInfo> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut reader = Reader::from_str(text);
+    reader.config_mut().trim_text(true);
+    let mut info = ComicInfo::default();
+    let mut field = None;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(element)) => {
+                field = match element.local_name().as_ref() {
+                    b"Title" => Some("title"),
+                    b"Writer" => Some("writer"),
+                    b"Series" => Some("series"),
+                    b"Number" => Some("number"),
+                    _ => None,
+                };
+            }
+            Ok(Event::Text(value)) => {
+                let value = value.xml10_content().ok()?.trim().to_owned();
+                if value.is_empty() {
+                    continue;
+                }
+                match field {
+                    Some("title") => info.title = Some(value),
+                    Some("writer") => {
+                        let authors = value
+                            .split([',', ';'])
+                            .map(str::trim)
+                            .filter(|author| !author.is_empty())
+                            .map(str::to_owned)
+                            .collect::<Vec<_>>();
+                        if !authors.is_empty() {
+                            info.authors = Some(authors);
+                        }
+                    }
+                    Some("series") => info.series = Some(value),
+                    Some("number") => info.number = Some(value),
+                    _ => {}
+                }
+            }
+            Ok(Event::End(_)) => field = None,
+            Err(_) => return None,
+            _ => {}
+        }
+    }
+
+    Some(info)
 }
 
 fn image_media_type(path: &str) -> Option<&'static str> {
@@ -213,7 +321,7 @@ fn trim_leading_zeroes(number: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{image_media_type, natural_cmp, parse_cbr_path};
+    use super::{image_media_type, natural_cmp, parse_cbr_path, parse_comic_info};
     use std::cmp::Ordering;
 
     #[test]
@@ -229,6 +337,24 @@ mod tests {
         assert_eq!(
             natural_cmp("pages/001.jpg", "pages/1.jpg"),
             Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn parses_comic_info_metadata() {
+        let info = parse_comic_info(
+            br#"<ComicInfo><Title>Comic</Title><Writer>A; B</Writer><Series>Series</Series><Number>7</Number></ComicInfo>"#,
+        )
+        .expect("parse ComicInfo.xml");
+
+        assert_eq!(info.title.as_deref(), Some("Comic"));
+        assert_eq!(
+            info.authors.as_deref(),
+            Some(["A".to_string(), "B".to_string()].as_slice())
+        );
+        assert_eq!(
+            info.metadata(),
+            Some(serde_json::json!({"series": "Series", "number": "7"}))
         );
     }
 
