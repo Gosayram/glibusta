@@ -203,8 +203,8 @@ impl ComicInfo {
 }
 
 fn parse_comic_info(bytes: &[u8]) -> Option<ComicInfo> {
-    let text = std::str::from_utf8(bytes).ok()?;
-    let mut reader = Reader::from_str(text);
+    let text = decode_comic_info(bytes)?;
+    let mut reader = Reader::from_str(&text);
     reader.config_mut().trim_text(true);
     let mut info = ComicInfo::default();
     let mut field = None;
@@ -251,6 +251,28 @@ fn parse_comic_info(bytes: &[u8]) -> Option<ComicInfo> {
     }
 
     Some(info)
+}
+
+fn decode_comic_info(bytes: &[u8]) -> Option<String> {
+    let (bytes, big_endian) = match bytes {
+        [0xFF, 0xFE, rest @ ..] => (rest, false),
+        [0xFE, 0xFF, rest @ ..] => (rest, true),
+        _ => return std::str::from_utf8(bytes).ok().map(str::to_owned),
+    };
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let code_units = bytes
+        .chunks_exact(2)
+        .map(|pair| {
+            if big_endian {
+                u16::from_be_bytes([pair[0], pair[1]])
+            } else {
+                u16::from_le_bytes([pair[0], pair[1]])
+            }
+        })
+        .collect::<Vec<_>>();
+    String::from_utf16(&code_units).ok()
 }
 
 fn image_media_type(path: &str) -> Option<&'static str> {
@@ -356,6 +378,32 @@ mod tests {
             info.metadata(),
             Some(serde_json::json!({"series": "Series", "number": "7"}))
         );
+    }
+
+    #[test]
+    fn parses_utf16le_comic_info_metadata() {
+        let xml = "<ComicInfo><Title>Комикс</Title><Writer>Автор</Writer></ComicInfo>";
+        let mut bytes = vec![0xFF, 0xFE];
+        bytes.extend(xml.encode_utf16().flat_map(u16::to_le_bytes));
+
+        let info = parse_comic_info(&bytes).expect("parse UTF-16 ComicInfo.xml");
+
+        assert_eq!(info.title.as_deref(), Some("Комикс"));
+        assert_eq!(
+            info.authors.as_deref(),
+            Some([String::from("Автор")].as_slice())
+        );
+    }
+
+    #[test]
+    fn parses_utf16be_comic_info_metadata() {
+        let xml = "<ComicInfo><Title>Comic</Title></ComicInfo>";
+        let mut bytes = vec![0xFE, 0xFF];
+        bytes.extend(xml.encode_utf16().flat_map(u16::to_be_bytes));
+
+        let info = parse_comic_info(&bytes).expect("parse UTF-16 ComicInfo.xml");
+
+        assert_eq!(info.title.as_deref(), Some("Comic"));
     }
 
     #[test]
