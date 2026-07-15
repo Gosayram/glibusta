@@ -105,6 +105,9 @@ fn parse_fb2_xml(
     let mut current_span_bold = false;
     let mut current_span_italic = false;
     let mut current_span_superscript = false;
+    let mut current_span_bold_depth = 0u32;
+    let mut current_span_italic_depth = 0u32;
+    let mut current_span_superscript_depth = 0u32;
     let mut current_span_href: Option<String> = None;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
@@ -238,6 +241,7 @@ fn parse_fb2_xml(
                             current_span_superscript,
                             &current_span_href,
                         );
+                        current_span_bold_depth = current_span_bold_depth.saturating_add(1);
                         current_span_bold = true;
                     }
                     b"emphasis" if in_p || in_subtitle => {
@@ -249,6 +253,7 @@ fn parse_fb2_xml(
                             current_span_superscript,
                             &current_span_href,
                         );
+                        current_span_italic_depth = current_span_italic_depth.saturating_add(1);
                         current_span_italic = true;
                     }
                     b"a" if in_p => {
@@ -277,6 +282,8 @@ fn parse_fb2_xml(
                             current_span_superscript,
                             &current_span_href,
                         );
+                        current_span_superscript_depth =
+                            current_span_superscript_depth.saturating_add(1);
                         current_span_superscript = true;
                     }
                     _ => {}
@@ -544,6 +551,9 @@ fn parse_fb2_xml(
                     current_span_bold = false;
                     current_span_italic = false;
                     current_span_superscript = false;
+                    current_span_bold_depth = 0;
+                    current_span_italic_depth = 0;
+                    current_span_superscript_depth = 0;
                     current_span_href = None;
                     in_p = false;
                 }
@@ -750,7 +760,8 @@ fn parse_fb2_xml(
                         current_span_superscript,
                         &current_span_href,
                     );
-                    current_span_bold = false;
+                    current_span_bold_depth = current_span_bold_depth.saturating_sub(1);
+                    current_span_bold = current_span_bold_depth > 0;
                 }
                 b"emphasis" if in_p => {
                     flush_rich_span(
@@ -761,7 +772,8 @@ fn parse_fb2_xml(
                         current_span_superscript,
                         &current_span_href,
                     );
-                    current_span_italic = false;
+                    current_span_italic_depth = current_span_italic_depth.saturating_sub(1);
+                    current_span_italic = current_span_italic_depth > 0;
                 }
                 b"a" if in_p => {
                     flush_rich_span(
@@ -783,7 +795,9 @@ fn parse_fb2_xml(
                         current_span_superscript,
                         &current_span_href,
                     );
-                    current_span_superscript = false;
+                    current_span_superscript_depth =
+                        current_span_superscript_depth.saturating_sub(1);
+                    current_span_superscript = current_span_superscript_depth > 0;
                 }
                 _ => {}
             },
@@ -1359,5 +1373,21 @@ mod tests {
                 vec!["Cell A".to_string(), "Cell B".to_string()],
             ]),
         );
+    }
+
+    #[test]
+    fn preserves_outer_inline_formatting_after_nested_equivalent_tags() {
+        let book = parse_fb2(
+            br#"<FictionBook><body><section><p><strong>Outer <strong>inner</strong> tail</strong></p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with nested formatting");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(spans[2].text, "tail");
+        assert!(spans[2].bold);
     }
 }
