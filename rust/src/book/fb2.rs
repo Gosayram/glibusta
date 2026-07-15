@@ -73,6 +73,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut in_stanza = false;
     let mut in_cite = false;
     let mut in_pre = false;
+    let mut in_table = false;
+    let mut in_table_row = false;
+    let mut in_table_cell = false;
     let mut in_lang = false;
 
     // CRT-1.13: FB2 footnotes parsing
@@ -90,6 +93,9 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut current_span_italic = false;
     let mut current_span_superscript = false;
     let mut current_span_href: Option<String> = None;
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    let mut current_table_row: Vec<String> = Vec::new();
+    let mut current_table_cell = String::new();
     let mut section_depth = 0i32;
     let mut current_binary_id: Option<String> = None;
     let mut current_binary_media_type: Option<String> = None;
@@ -152,8 +158,26 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             }
                         }
                     }
+                    b"table" if in_body && !in_notes_body => {
+                        in_table = true;
+                        table_rows.clear();
+                    }
+                    b"tr" if in_table => {
+                        in_table_row = true;
+                        current_table_row.clear();
+                    }
+                    b"td" if in_table_row => {
+                        in_table_cell = true;
+                        current_table_cell.clear();
+                    }
                     b"p" if in_body => {
-                        in_p = true;
+                        if in_table_cell {
+                            if !current_table_cell.is_empty() {
+                                current_table_cell.push('\n');
+                            }
+                        } else {
+                            in_p = true;
+                        }
                     }
                     b"subtitle" if in_body => in_subtitle = true,
                     b"epigraph" if in_body => in_epigraph = true,
@@ -262,6 +286,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
                     append_binary_data(&mut current_text, &text)?;
+                } else if in_table_cell {
+                    current_table_cell.push_str(&text);
                 } else if in_p && in_body {
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
@@ -273,7 +299,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         current_span_text.push_str(&text);
                     }
                 } else if in_body
-                    && ((in_subtitle || in_epigraph || in_text_author)
+                    && ((in_subtitle || in_epigraph || in_text_author || in_poem)
                         || (!in_section && !in_image && !in_empty_line))
                 {
                     current_text.push_str(&text);
@@ -301,8 +327,10 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     } else {
                         current_span_text.push_str(&owned);
                     }
+                } else if in_table_cell {
+                    current_table_cell.push_str(&text);
                 } else if in_body
-                    && ((in_subtitle || in_epigraph || in_text_author)
+                    && ((in_subtitle || in_epigraph || in_text_author || in_poem)
                         || (!in_section && !in_image && !in_empty_line))
                 {
                     current_text.push_str(&text);
@@ -322,6 +350,8 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
                     append_binary_data(&mut current_text, &text)?;
+                } else if in_table_cell {
+                    current_table_cell.push_str(&text);
                 } else if in_p && in_body {
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
@@ -333,7 +363,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                         current_span_text.push_str(&text);
                     }
                 } else if in_body
-                    && ((in_subtitle || in_epigraph || in_text_author)
+                    && ((in_subtitle || in_epigraph || in_text_author || in_poem)
                         || (!in_section && !in_image && !in_empty_line))
                 {
                     current_text.push_str(&text);
@@ -380,6 +410,48 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                 b"body" => {
                     in_body = false;
                     in_notes_body = false;
+                }
+                b"td" if in_table_cell => {
+                    current_table_row.push(
+                        current_table_cell
+                            .split_whitespace()
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    );
+                    current_table_cell.clear();
+                    in_table_cell = false;
+                }
+                b"tr" if in_table_row => {
+                    table_rows.push(std::mem::take(&mut current_table_row));
+                    in_table_row = false;
+                }
+                b"table" if in_table => {
+                    if in_table_row {
+                        table_rows.push(std::mem::take(&mut current_table_row));
+                        in_table_row = false;
+                    }
+                    if !table_rows.is_empty() {
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Table,
+                            image_url: None,
+                            note_ref: None,
+                            rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: Some(std::mem::take(&mut table_rows)),
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        block_index += 1;
+                    }
+                    in_table = false;
+                    in_table_cell = false;
+                    current_table_cell.clear();
                 }
                 b"section" => {
                     if in_notes_body {
@@ -1008,6 +1080,7 @@ fn flush_fb2_block(
 #[cfg(test)]
 mod tests {
     use super::{max_base64_image_size, parse_fb2};
+    use crate::api::models::BlockType;
 
     #[test]
     #[cfg_attr(
@@ -1075,6 +1148,54 @@ mod tests {
                 .as_ref()
                 .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
             Some("Footnote text")
+        );
+    }
+
+    #[test]
+    fn preserves_epigraph_and_stanza_boundaries() {
+        let book = parse_fb2(
+            br#"<FictionBook><body><section>
+                <epigraph>Opening quote</epigraph>
+                <poem><stanza><v>First line</v><v>Second line</v></stanza></poem>
+            </section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with epigraph and poem");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks[0].block_type, BlockType::Epigraph);
+        assert_eq!(blocks[0].text, "Opening quote");
+        assert_eq!(blocks[1].block_type, BlockType::Poem);
+        assert_eq!(blocks[1].text, "First line");
+        assert_eq!(blocks[2].block_type, BlockType::Poem);
+        assert_eq!(blocks[2].text, "Second line");
+        assert!(
+            blocks
+                .iter()
+                .any(|block| block.block_type == BlockType::Separator)
+        );
+    }
+
+    #[test]
+    fn preserves_fb2_tables_as_table_blocks() {
+        let book = parse_fb2(
+            br#"<FictionBook><body><section><table>
+                <tr><td><p>Header A</p></td><td><p>Header B</p></td></tr>
+                <tr><td><p>Cell A</p></td><td><p>Cell B</p></td></tr>
+            </table></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 table");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, BlockType::Table);
+        assert_eq!(
+            blocks[0].table_rows.as_ref(),
+            Some(&vec![
+                vec!["Header A".to_string(), "Header B".to_string()],
+                vec!["Cell A".to_string(), "Cell B".to_string()],
+            ]),
         );
     }
 }

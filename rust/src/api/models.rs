@@ -61,7 +61,7 @@ impl BookFormat {
                 text: true,
                 images: true,
                 css: false,
-                footnotes: false,
+                footnotes: true,
             },
             BookFormat::Rtf => FormatCapabilities {
                 metadata: false,
@@ -118,6 +118,17 @@ impl BookFormat {
                 footnotes: false,
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod format_capability_tests {
+    use super::BookFormat;
+
+    #[test]
+    fn docx_advertises_its_footnote_support() {
+        assert!(BookFormat::Docx.capabilities().footnotes);
+        assert!(!BookFormat::Txt.capabilities().footnotes);
     }
 }
 

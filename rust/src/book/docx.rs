@@ -34,8 +34,9 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let doc_text = decode_bytes(&document_xml, encoding_name);
 
     let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
+    let footnotes = parse_footnotes(&mut zip, encoding_name)?;
     let (blocks, chapter_title) =
-        parse_document_xml_with_hyperlinks(&doc_text, &hyperlink_targets)?;
+        parse_document_xml_with_hyperlinks(&doc_text, &hyperlink_targets, &footnotes)?;
 
     let id = crate::book::sha256_hex(bytes);
 
@@ -55,9 +56,11 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         }]
     };
 
-    let metadata = serde_json::json!({
-        "created": created_date,
-    });
+    let mut metadata = serde_json::Map::new();
+    metadata.insert("created".into(), serde_json::Value::String(created_date));
+    if !footnotes.is_empty() {
+        metadata.insert("footnotes".into(), serde_json::json!(footnotes));
+    }
 
     let images = extract_images(&mut zip);
     let cover_url = if let Some(img) = images.first() {
@@ -82,7 +85,7 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         description: None,
         cover_url,
         chapters,
-        metadata: Some(metadata),
+        metadata: Some(serde_json::Value::Object(metadata)),
         book_format: BookFormat::Docx,
         language: None,
         warnings: Vec::new(),
@@ -165,6 +168,60 @@ fn parse_hyperlink_relationships(
     Ok(targets)
 }
 
+fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
+    let Some(bytes) =
+        zip.read_file_limited("word/footnotes.xml", crate::api::models::MAX_CHAPTER_SIZE)?
+    else {
+        return Ok(HashMap::new());
+    };
+    let text = decode_bytes(&bytes, encoding_name);
+    let mut reader = Reader::from_str(&text);
+    reader.config_mut().trim_text(false);
+    let mut footnotes = HashMap::new();
+    let mut current_id: Option<String> = None;
+    let mut current_text = String::new();
+    let mut in_text = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"footnote" => {
+                current_id = xml_attribute(element, b"id")
+                    .filter(|id| id.parse::<i32>().is_ok_and(|id| id > 0));
+                current_text.clear();
+            }
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = current_id.is_some();
+            }
+            Ok(Event::Text(ref value)) if in_text => {
+                current_text.push_str(&value.xml10_content().unwrap_or_default());
+            }
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
+                in_text = false;
+            }
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"p" => {
+                if !current_text.ends_with('\n') && !current_text.is_empty() {
+                    current_text.push('\n');
+                }
+            }
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"footnote" => {
+                if let Some(id) = current_id.take() {
+                    let note = current_text.trim().to_string();
+                    if !note.is_empty() {
+                        footnotes.insert(id, note);
+                    }
+                }
+                current_text.clear();
+                in_text = false;
+            }
+            Ok(_) => {}
+            Err(_) => return Ok(HashMap::new()),
+        }
+    }
+
+    Ok(footnotes)
+}
+
 /// Extract image metadata from word/media/ without loading bytes.
 /// Use `get_asset_bytes()` (RCE-10.2) for lazy data loading.
 fn extract_images(zip: &mut ZipFile<'_>) -> Vec<EmbeddedImage> {
@@ -199,12 +256,13 @@ fn mime_from_name(name: &str) -> String {
 
 #[cfg(test)]
 fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
-    parse_document_xml_with_hyperlinks(text, &HashMap::new())
+    parse_document_xml_with_hyperlinks(text, &HashMap::new(), &HashMap::new())
 }
 
 fn parse_document_xml_with_hyperlinks(
     text: &str,
     hyperlink_targets: &HashMap<String, String>,
+    footnotes: &HashMap<String, String>,
 ) -> Result<(Vec<ReaderBlock>, String)> {
     let mut reader = Reader::from_str(text);
     // Whitespace between XML elements is ignored outside runs; preserve spaces
@@ -232,6 +290,7 @@ fn parse_document_xml_with_hyperlinks(
     let mut current_span_bold = false;
     let mut current_span_italic = false;
     let mut current_span_href: Option<String> = None;
+    let mut current_note_ref: Option<String> = None;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
     let mut current_table_cell = String::new();
@@ -273,6 +332,7 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_bold = false;
                         current_span_italic = false;
                         current_span_href = None;
+                        current_note_ref = None;
                         pstyle_val.clear();
                         paragraph_is_numbered = false;
                         paragraph_numbering_id = None;
@@ -289,6 +349,10 @@ fn parse_document_xml_with_hyperlinks(
                                     .and_then(|id| hyperlink_targets.get(&id).cloned())
                             })
                             .and_then(|href| crate::book::sanitize_href(&href));
+                    }
+                    "w:footnoteReference" if in_paragraph => {
+                        current_note_ref =
+                            word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
                     }
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
@@ -402,7 +466,7 @@ fn parse_document_xml_with_hyperlinks(
                                 text: trimmed,
                                 block_type,
                                 image_url: None,
-                                note_ref: None,
+                                note_ref: current_note_ref.take(),
                                 rich_spans: if has_formatting {
                                     Some(rich_spans.clone())
                                 } else {
@@ -447,6 +511,7 @@ fn parse_document_xml_with_hyperlinks(
                         rich_spans.clear();
                         current_span_text.clear();
                         current_span_href = None;
+                        current_note_ref = None;
                     }
                     "w:hyperlink" if in_paragraph => current_span_href = None,
                     "w:tc" if in_table_cell => {
@@ -503,6 +568,10 @@ fn parse_document_xml_with_hyperlinks(
                     "w:numPr" if in_paragraph => paragraph_is_numbered = true,
                     "w:numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
+                    }
+                    "w:footnoteReference" if in_paragraph => {
+                        current_note_ref =
+                            word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
                     }
                     "w:b" if in_run => current_span_bold = word_bool_value(e),
                     "w:i" if in_run => current_span_italic = word_bool_value(e),
@@ -749,8 +818,8 @@ mod tests {
         let hyperlinks =
             HashMap::from([(String::from("rId7"), String::from("https://example.com"))]);
 
-        let (blocks, _) =
-            parse_document_xml_with_hyperlinks(xml, &hyperlinks).expect("parse DOCX links");
+        let (blocks, _) = parse_document_xml_with_hyperlinks(xml, &hyperlinks, &HashMap::new())
+            .expect("parse DOCX links");
         let spans = blocks[0].rich_spans.as_ref().expect("rich spans");
 
         assert_eq!(blocks[0].text, "See website and chapter");
@@ -791,5 +860,42 @@ mod tests {
             .expect("rich spans");
 
         assert_eq!(spans[0].href.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn extracts_docx_footnotes_and_links_references() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Text</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p></w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/footnotes.xml", options)
+            .expect("start footnotes XML");
+        zip.write_all(
+            br#"<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:footnote w:id="-1"><w:p><w:r><w:t>separator</w:t></w:r></w:p></w:footnote><w:footnote w:id="1"><w:p><w:r><w:t>Footnote text</w:t></w:r></w:p></w:footnote></w:footnotes>"#,
+        )
+        .expect("write footnotes XML");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse DOCX footnote");
+
+        assert_eq!(book.chapters[0].blocks[0].note_ref.as_deref(), Some("1"));
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["1"].as_str()),
+            Some("Footnote text")
+        );
     }
 }
