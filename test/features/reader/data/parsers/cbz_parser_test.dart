@@ -38,6 +38,7 @@ void main() {
     expect(book.title, 'Комикс');
     expect(book.chapters, hasLength(1));
     expect(book.chapters.single.blocks, hasLength(3));
+    expect(book.coverUrl, 'data:image/webp;base64,AQ==');
     expect(
       book.chapters.single.blocks.map((ReaderBlock block) => block.imageUrl),
       [

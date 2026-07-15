@@ -60,6 +60,7 @@ final class CbzParser implements BookParser {
         id: fileName ?? 'unknown.cbz',
         title: comicInfo?.title ?? _titleFromFileName(fileName),
         authors: comicInfo?.authors ?? const [],
+        coverUrl: blocks.first.imageUrl,
         metadata: metadata.isEmpty ? null : metadata,
         chapters: [
           ReaderChapter(index: 0, title: 'Страницы', blocks: blocks),

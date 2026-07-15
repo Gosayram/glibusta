@@ -138,7 +138,8 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             text_align: None,
             note_id: None,
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let cover_url = first_image_cover(&blocks);
 
     let fallback_title = path
         .file_stem()
@@ -160,7 +161,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         title,
         authors,
         description: None,
-        cover_url: None,
+        cover_url,
         chapters: vec![ReaderChapter {
             index: 0,
             title: "Pages".to_owned(),
@@ -173,6 +174,13 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+fn first_image_cover(blocks: &[ReaderBlock]) -> Option<String> {
+    blocks
+        .iter()
+        .find(|block| block.block_type == BlockType::Image)
+        .and_then(|block| block.image_url.clone())
 }
 
 #[derive(Default)]
@@ -343,7 +351,10 @@ fn trim_leading_zeroes(number: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{image_media_type, natural_cmp, parse_cbr_path, parse_comic_info};
+    use super::{
+        first_image_cover, image_media_type, natural_cmp, parse_cbr_path, parse_comic_info,
+    };
+    use crate::api::models::{BlockType, ReaderBlock};
     use std::cmp::Ordering;
 
     #[test]
@@ -404,6 +415,31 @@ mod tests {
         let info = parse_comic_info(&bytes).expect("parse UTF-16 ComicInfo.xml");
 
         assert_eq!(info.title.as_deref(), Some("Comic"));
+    }
+
+    #[test]
+    fn uses_the_first_comic_page_as_the_cover() {
+        let blocks = vec![ReaderBlock {
+            index: 0,
+            text: String::new(),
+            block_type: BlockType::Image,
+            image_url: Some("data:image/png;base64,cGFnZQ==".to_owned()),
+            note_ref: None,
+            rich_spans: None,
+            heading_level: None,
+            ordered: None,
+            list_items: None,
+            table_rows: None,
+            image_alt: None,
+            text_indent: None,
+            text_align: None,
+            note_id: None,
+        }];
+
+        assert_eq!(
+            first_image_cover(&blocks).as_deref(),
+            Some("data:image/png;base64,cGFnZQ==")
+        );
     }
 
     #[test]
