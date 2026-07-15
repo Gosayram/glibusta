@@ -9,6 +9,7 @@ import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import '../../library/domain/book_file_repository.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
@@ -138,16 +139,61 @@ class BookOpenService {
     if (parser == null) {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
     }
-    return parser
+    final book = await parser
         .parseFile(filePath)
         .timeout(
           _parsingTimeout,
           onTimeout: () => throw TimeoutException(
             'Разбор ${bookFormat.name} занял слишком много времени.',
           ),
-        )
-        .then((book) => book.withCleanedBlocks());
+        );
+    final cleaned = book.withCleanedBlocks();
+    if (bookFormat != BookFormat.docx || bookId == null) return cleaned;
+
+    return _materializeDocxImages(cleaned, filePath, bookId);
   }
+
+  Future<NormalizedBook> _materializeDocxImages(
+    NormalizedBook book,
+    String filePath,
+    String bookId,
+  ) async {
+    final assetIds = <String>{
+      for (final chapter in book.chapters)
+        for (final block in chapter.blocks)
+          if (block.type == BlockType.image)
+            if (block.imageUrl case final String assetId) assetId,
+    };
+    if (assetIds.isEmpty) return book;
+
+    final bookDir = await cache.getBookDir(bookId);
+    final imagesDir = Directory('${bookDir.path}/docx_images');
+    await imagesDir.create(recursive: true);
+    final resolved = <String, String>{};
+
+    for (final assetId in assetIds) {
+      try {
+        final imageFile = File('${imagesDir.path}/${_docxImageFileName(assetId)}');
+        if (!await imageFile.exists()) {
+          final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
+          await imageFile.writeAsBytes(bytes, flush: true);
+        }
+        resolved[assetId] = imageFile.path;
+      } on Object catch (e, st) {
+        _logger.warning(
+          'Unable to materialize DOCX image $assetId',
+          name: 'Reader',
+          error: e,
+          st: st,
+        );
+      }
+    }
+
+    return book.withResolvedImageUrls(resolved);
+  }
+
+  static String _docxImageFileName(String assetId) =>
+      Uri.encodeComponent(assetId).replaceAll('%', '_');
 
   String _extractBookId(String filePath) {
     final name = filePath.split('/').last;

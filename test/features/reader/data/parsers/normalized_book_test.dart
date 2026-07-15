@@ -82,6 +82,43 @@ void main() {
       expect(meta.chapterCount, 2);
       expect(meta.chapterTitles, ['Ch1', 'Ch2']);
     });
+
+    test('withResolvedImageUrls replaces only matching image asset IDs', () {
+      const book = NormalizedBook(
+        id: 'docx',
+        title: 'DOCX',
+        authors: [],
+        chapters: [
+          ReaderChapter(
+            index: 0,
+            title: '',
+            blocks: [
+              ReaderBlock(index: 0, text: 'Text'),
+              ReaderBlock(
+                index: 1,
+                text: '',
+                type: BlockType.image,
+                imageUrl: 'word/media/image1.png',
+              ),
+              ReaderBlock(
+                index: 2,
+                text: '',
+                type: BlockType.image,
+                imageUrl: 'word/media/missing.png',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final resolved = book.withResolvedImageUrls({
+        'word/media/image1.png': '/cache/docx_images/image1.png',
+      });
+
+      expect(resolved.chapters[0].blocks[0].text, 'Text');
+      expect(resolved.chapters[0].blocks[1].imageUrl, '/cache/docx_images/image1.png');
+      expect(resolved.chapters[0].blocks[2].imageUrl, 'word/media/missing.png');
+    });
   });
 
   group('ReaderChapter', () {

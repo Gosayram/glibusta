@@ -34,9 +34,14 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let doc_text = decode_bytes(&document_xml, encoding_name);
 
     let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
+    let image_targets = parse_image_relationships(&mut zip, encoding_name)?;
     let footnotes = parse_footnotes(&mut zip, encoding_name)?;
-    let (blocks, chapter_title) =
-        parse_document_xml_with_hyperlinks(&doc_text, &hyperlink_targets, &footnotes)?;
+    let (blocks, chapter_title) = parse_document_xml_with_hyperlinks(
+        &doc_text,
+        &hyperlink_targets,
+        &image_targets,
+        &footnotes,
+    )?;
 
     let id = crate::book::sha256_hex(bytes);
 
@@ -168,6 +173,63 @@ fn parse_hyperlink_relationships(
     Ok(targets)
 }
 
+fn parse_image_relationships(
+    zip: &mut ZipFile<'_>,
+    encoding_name: &str,
+) -> Result<HashMap<String, String>> {
+    let Some(bytes) = zip.read_file_limited(
+        "word/_rels/document.xml.rels",
+        crate::api::models::MAX_CHAPTER_SIZE,
+    )?
+    else {
+        return Ok(HashMap::new());
+    };
+    let text = decode_bytes(&bytes, encoding_name);
+    let mut reader = Reader::from_str(&text);
+    let mut targets = HashMap::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Empty(ref element)) | Ok(Event::Start(ref element))
+                if element.local_name().as_ref() == b"Relationship" =>
+            {
+                let id = xml_attribute(element, b"Id");
+                let relation_type = xml_attribute(element, b"Type");
+                let target = xml_attribute(element, b"Target");
+                if relation_type.is_some_and(|relation_type| relation_type.ends_with("/image")) {
+                    if let (Some(id), Some(target)) = (id, target) {
+                        if let Some(path) = document_relative_path(&target) {
+                            targets.insert(id, path);
+                        }
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(_) => return Ok(HashMap::new()),
+        }
+    }
+
+    Ok(targets)
+}
+
+fn document_relative_path(target: &str) -> Option<String> {
+    if target.is_empty() || target.starts_with('/') || target.contains('\\') {
+        return None;
+    }
+    let mut components = Vec::new();
+    for component in target.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                components.pop()?;
+            }
+            component => components.push(component),
+        }
+    }
+    (!components.is_empty()).then(|| format!("word/{}", components.join("/")))
+}
+
 fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
     let Some(bytes) =
         zip.read_file_limited("word/footnotes.xml", crate::api::models::MAX_CHAPTER_SIZE)?
@@ -256,12 +318,13 @@ fn mime_from_name(name: &str) -> String {
 
 #[cfg(test)]
 fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
-    parse_document_xml_with_hyperlinks(text, &HashMap::new(), &HashMap::new())
+    parse_document_xml_with_hyperlinks(text, &HashMap::new(), &HashMap::new(), &HashMap::new())
 }
 
 fn parse_document_xml_with_hyperlinks(
     text: &str,
     hyperlink_targets: &HashMap<String, String>,
+    image_targets: &HashMap<String, String>,
     footnotes: &HashMap<String, String>,
 ) -> Result<(Vec<ReaderBlock>, String)> {
     let mut reader = Reader::from_str(text);
@@ -291,6 +354,7 @@ fn parse_document_xml_with_hyperlinks(
     let mut current_span_italic = false;
     let mut current_span_href: Option<String> = None;
     let mut current_note_ref: Option<String> = None;
+    let mut current_image_assets: Vec<String> = Vec::new();
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
     let mut current_table_cell = String::new();
@@ -333,6 +397,7 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_italic = false;
                         current_span_href = None;
                         current_note_ref = None;
+                        current_image_assets.clear();
                         pstyle_val.clear();
                         paragraph_is_numbered = false;
                         paragraph_numbering_id = None;
@@ -353,6 +418,13 @@ fn parse_document_xml_with_hyperlinks(
                     "w:footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
+                    }
+                    "a:blip" if in_paragraph => {
+                        if let Some(asset) = word_attribute(e, b"embed")
+                            .and_then(|id| image_targets.get(&id).cloned())
+                        {
+                            current_image_assets.push(asset);
+                        }
                     }
                     "w:pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
@@ -507,6 +579,30 @@ fn parse_document_xml_with_hyperlinks(
                             pending_list_numbering_id = None;
                         }
 
+                        if !in_table_cell && !current_image_assets.is_empty() {
+                            flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
+                            pending_list_numbering_id = None;
+                            for image_url in std::mem::take(&mut current_image_assets) {
+                                blocks.push(ReaderBlock {
+                                    index: block_index,
+                                    text: String::new(),
+                                    block_type: BlockType::Image,
+                                    image_url: Some(image_url),
+                                    note_ref: None,
+                                    rich_spans: None,
+                                    heading_level: None,
+                                    ordered: None,
+                                    list_items: None,
+                                    table_rows: None,
+                                    image_alt: None,
+                                    text_indent: None,
+                                    text_align: None,
+                                    note_id: None,
+                                });
+                                block_index += 1;
+                            }
+                        }
+
                         in_paragraph = false;
                         rich_spans.clear();
                         current_span_text.clear();
@@ -572,6 +668,13 @@ fn parse_document_xml_with_hyperlinks(
                     "w:footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
+                    }
+                    "a:blip" if in_paragraph => {
+                        if let Some(asset) = word_attribute(e, b"embed")
+                            .and_then(|id| image_targets.get(&id).cloned())
+                        {
+                            current_image_assets.push(asset);
+                        }
                     }
                     "w:b" if in_run => current_span_bold = word_bool_value(e),
                     "w:i" if in_run => current_span_italic = word_bool_value(e),
@@ -818,8 +921,9 @@ mod tests {
         let hyperlinks =
             HashMap::from([(String::from("rId7"), String::from("https://example.com"))]);
 
-        let (blocks, _) = parse_document_xml_with_hyperlinks(xml, &hyperlinks, &HashMap::new())
-            .expect("parse DOCX links");
+        let (blocks, _) =
+            parse_document_xml_with_hyperlinks(xml, &hyperlinks, &HashMap::new(), &HashMap::new())
+                .expect("parse DOCX links");
         let spans = blocks[0].rich_spans.as_ref().expect("rich spans");
 
         assert_eq!(blocks[0].text, "See website and chapter");
@@ -860,6 +964,60 @@ mod tests {
             .expect("rich spans");
 
         assert_eq!(spans[0].href.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn exposes_drawing_relationships_as_image_blocks() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:r><w:drawing><a:blip r:embed="rIdImage"/></w:drawing></w:r></w:p></w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/_rels/document.xml.rels", options)
+            .expect("start relationships XML");
+        zip.write_all(
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/></Relationships>"#,
+        )
+        .expect("write relationships XML");
+        zip.start_file("word/media/image1.png", options)
+            .expect("start image");
+        zip.write_all(b"PNG").expect("write image");
+        zip.finish().expect("finish DOCX archive");
+
+        let archive = bytes.into_inner();
+        let book = parse_docx(&archive, None).expect("parse DOCX image");
+
+        assert_eq!(book.chapters[0].blocks.len(), 1);
+        assert_eq!(
+            book.chapters[0].blocks[0].block_type,
+            crate::api::models::BlockType::Image
+        );
+        assert_eq!(
+            book.chapters[0].blocks[0].image_url.as_deref(),
+            Some("word/media/image1.png")
+        );
+
+        let path =
+            std::env::temp_dir().join(format!("glibusta-docx-image-{}.docx", uuid::Uuid::new_v4()));
+        std::fs::write(&path, archive).expect("write DOCX fixture");
+        let image = crate::api::api::get_asset_bytes(
+            path.to_string_lossy().into_owned(),
+            "word/media/image1.png".to_string(),
+        );
+        let _ = std::fs::remove_file(path);
+
+        assert_eq!(image.expect("extract DOCX image"), b"PNG");
     }
 
     #[test]

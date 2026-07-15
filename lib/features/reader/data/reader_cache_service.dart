@@ -39,7 +39,7 @@ final class ReaderCacheService {
   final AppLogger _logger;
 
   static const int _splitCacheVersion = 1;
-  static const int _parserCacheVersion = 1;
+  static const int _parserCacheVersion = 2;
 
   Future<String> get booksCacheDir async {
     final dir = await _storage.cacheDir();

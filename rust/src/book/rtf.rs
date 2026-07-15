@@ -163,6 +163,9 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
     let mut unicode_fallback_count = 1usize;
+    let mut in_table_row = false;
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    let mut current_table_row: Vec<String> = Vec::new();
 
     while i < bytes.len() {
         match bytes[i] {
@@ -221,7 +224,13 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                 let cmd = std::str::from_utf8(&bytes[cmd_start..i]).unwrap_or("");
 
                 match cmd {
+                    "par" | "line" | "newline" | "page" | "sect" if in_table_row => {
+                        if !span_text.is_empty() {
+                            span_text.push('\n');
+                        }
+                    }
                     "par" | "line" | "newline" | "page" | "sect" => {
+                        flush_rtf_table(&mut blocks, &mut block_index, &mut table_rows);
                         push_rtf_paragraph(
                             &mut blocks,
                             &mut block_index,
@@ -229,6 +238,37 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                             &mut span_text,
                             &mut fmt,
                         );
+                    }
+                    "trowd" => {
+                        push_rtf_paragraph(
+                            &mut blocks,
+                            &mut block_index,
+                            &mut rich_spans,
+                            &mut span_text,
+                            &mut fmt,
+                        );
+                        in_table_row = true;
+                        current_table_row.clear();
+                    }
+                    "cell" if in_table_row => {
+                        current_table_row.push(take_rtf_table_cell(
+                            &mut rich_spans,
+                            &mut span_text,
+                            &mut fmt,
+                        ));
+                    }
+                    "row" if in_table_row => {
+                        if !span_text.is_empty() || !rich_spans.is_empty() {
+                            current_table_row.push(take_rtf_table_cell(
+                                &mut rich_spans,
+                                &mut span_text,
+                                &mut fmt,
+                            ));
+                        }
+                        if !current_table_row.is_empty() {
+                            table_rows.push(std::mem::take(&mut current_table_row));
+                        }
+                        in_table_row = false;
                     }
                     "tab" => span_text.push('\t'),
                     "lquote" | "lq" => span_text.push('\u{2018}'),
@@ -360,6 +400,19 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
         }
     }
 
+    if in_table_row {
+        if !span_text.is_empty() || !rich_spans.is_empty() {
+            current_table_row.push(take_rtf_table_cell(
+                &mut rich_spans,
+                &mut span_text,
+                &mut fmt,
+            ));
+        }
+        if !current_table_row.is_empty() {
+            table_rows.push(current_table_row);
+        }
+    }
+    flush_rtf_table(&mut blocks, &mut block_index, &mut table_rows);
     push_rtf_paragraph(
         &mut blocks,
         &mut block_index,
@@ -455,6 +508,55 @@ fn push_rtf_paragraph(
     *fmt = RtfFmt::default();
 }
 
+fn take_rtf_table_cell(
+    rich_spans: &mut Vec<RichSpan>,
+    span_text: &mut String,
+    fmt: &mut RtfFmt,
+) -> String {
+    flush_span(rich_spans, span_text, fmt);
+    let text = rich_spans
+        .iter()
+        .map(|span| span.text.as_str())
+        .collect::<String>();
+    rich_spans.clear();
+    span_text.clear();
+    *fmt = RtfFmt::default();
+    normalize_whitespace(&text)
+}
+
+fn flush_rtf_table(
+    blocks: &mut Vec<ReaderBlock>,
+    block_index: &mut i32,
+    table_rows: &mut Vec<Vec<String>>,
+) {
+    if table_rows.is_empty() {
+        return;
+    }
+    let rows = std::mem::take(table_rows);
+    let text = rows
+        .iter()
+        .map(|row| row.join(" | "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    blocks.push(ReaderBlock {
+        index: *block_index,
+        text,
+        block_type: BlockType::Table,
+        image_url: None,
+        note_ref: None,
+        rich_spans: None,
+        heading_level: None,
+        ordered: None,
+        list_items: None,
+        table_rows: Some(rows),
+        image_alt: None,
+        text_indent: None,
+        text_align: None,
+        note_id: None,
+    });
+    *block_index += 1;
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_rtf;
@@ -514,5 +616,25 @@ mod tests {
             parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8")).expect("parse Unicode escape");
 
         assert_eq!(book.chapters[0].blocks[0].text, "П");
+    }
+
+    #[test]
+    fn preserves_rtf_tables_as_table_blocks() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi\trowd\cellx1000\intbl Header A\cell\cellx2000\intbl Header B\cell\row\trowd\cellx1000\intbl Cell A\cell\cellx2000\intbl Cell B\cell\row}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF table");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Table);
+        assert_eq!(
+            blocks[0].table_rows.as_ref(),
+            Some(&vec![
+                vec!["Header A".to_string(), "Header B".to_string()],
+                vec!["Cell A".to_string(), "Cell B".to_string()],
+            ]),
+        );
     }
 }

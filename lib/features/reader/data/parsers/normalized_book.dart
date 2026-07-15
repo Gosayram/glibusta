@@ -67,6 +67,35 @@ class NormalizedBook {
       metadata: metadata,
     );
   }
+
+  NormalizedBook withResolvedImageUrls(Map<String, String> urls) {
+    if (urls.isEmpty) return this;
+    return NormalizedBook(
+      id: id,
+      title: title,
+      authors: authors,
+      description: description,
+      coverUrl: coverUrl,
+      chapters: chapters
+          .map(
+            (chapter) => ReaderChapter(
+              index: chapter.index,
+              title: chapter.title,
+              smilEntries: chapter.smilEntries,
+              blocks: chapter.blocks
+                  .map(
+                    (block) => switch (urls[block.imageUrl]) {
+                      final String url => block.withImageUrl(url),
+                      _ => block,
+                    },
+                  )
+                  .toList(),
+            ),
+          )
+          .toList(),
+      metadata: metadata,
+    );
+  }
 }
 
 class NormalizedBookMetadata {
@@ -224,6 +253,25 @@ class ReaderBlock {
     this.noteId,
     this.whiteSpaceMode,
   });
+
+  ReaderBlock withImageUrl(String value) => ReaderBlock(
+    index: index,
+    text: text,
+    type: type,
+    imageUrl: value,
+    noteRef: noteRef,
+    richSpans: richSpans,
+    headingLevel: headingLevel,
+    ordered: ordered,
+    listItems: listItems,
+    tableRows: tableRows,
+    imageAlt: imageAlt,
+    imageCaption: imageCaption,
+    textIndent: textIndent,
+    textAlign: textAlign,
+    noteId: noteId,
+    whiteSpaceMode: whiteSpaceMode,
+  );
 
   Map<String, dynamic> toJson() => {
     'index': index,
