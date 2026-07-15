@@ -3,7 +3,9 @@ use std::sync::LazyLock;
 use anyhow::{Result, bail};
 use regex::Regex;
 
-use crate::api::models::{BlockType, BookFormat, MAX_FILE_SIZE, NormalizedBook, ReaderBlock};
+use crate::api::models::{
+    BlockType, BookFormat, MAX_FILE_SIZE, NormalizedBook, ReaderBlock, TocEntry,
+};
 
 mod chapters;
 mod cover;
@@ -440,6 +442,14 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     let authors = split_authors(metadata.author.as_deref());
 
     let chapters = MobiChapterSplitter::new().split(&blocks);
+    let toc = chapters
+        .iter()
+        .map(|chapter| TocEntry {
+            title: chapter.title.clone(),
+            chapter_index: chapter.index,
+            children: Vec::new(),
+        })
+        .collect();
 
     let cover_extractor = MobiCoverExtractor;
     let cover_bytes = cover_extractor.extract(bytes, &palm_db, &header, &metadata);
@@ -480,6 +490,10 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         "mobiKf8Likely".to_string(),
         serde_json::json!(is_likely_kf8(&header, record0)),
     );
+    meta.insert(
+        "mobiTocSource".to_string(),
+        serde_json::Value::String("chapter-splitter".to_string()),
+    );
     if let Some(ref cover) = cover_bytes {
         meta.insert("mobiCoverBytes".to_string(), serde_json::json!(cover.len()));
     }
@@ -506,7 +520,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         language: metadata.language.map(|s| s.to_string()),
         warnings: Vec::new(),
         images: Vec::new(),
-        toc: Vec::new(),
+        toc,
     })
 }
 

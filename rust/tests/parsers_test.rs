@@ -726,8 +726,7 @@ fn test_fb2_empty_body() {
 // MOBI — minimal in-memory fixture + golden test
 // ---------------------------------------------------------------------------
 
-fn create_minimal_mobi() -> Vec<u8> {
-    let text = b"<html><body><p>Hello MOBI</p><p>Second paragraph.</p></body></html>";
+fn create_mobi_with_text(text: &[u8]) -> Vec<u8> {
     let text_len = text.len() as u32;
 
     let record0_offset = 94u32; // 78 header + 16 record table
@@ -788,6 +787,10 @@ fn create_minimal_mobi() -> Vec<u8> {
     buf
 }
 
+fn create_minimal_mobi() -> Vec<u8> {
+    create_mobi_with_text(b"<html><body><p>Hello MOBI</p><p>Second paragraph.</p></body></html>")
+}
+
 #[test]
 fn test_mobi_basic_parse() {
     let mobi_bytes = create_minimal_mobi();
@@ -795,6 +798,20 @@ fn test_mobi_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert!(!book.chapters[0].blocks.is_empty(), "should have blocks");
     assert_eq!(book.book_format, BookFormat::Mobi);
+}
+
+#[test]
+fn test_mobi_builds_toc_from_detected_chapters() {
+    let mobi_bytes = create_mobi_with_text(
+        b"<html><body><h1>Chapter One</h1><p>First.</p><h1>Chapter Two</h1><p>Second.</p></body></html>",
+    );
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi_bytes, None).unwrap();
+
+    assert_eq!(book.toc.len(), 2);
+    assert_eq!(book.toc[0].title, "Chapter One");
+    assert_eq!(book.toc[0].chapter_index, 0);
+    assert_eq!(book.toc[1].title, "Chapter Two");
+    assert_eq!(book.toc[1].chapter_index, 1);
 }
 
 #[test]
