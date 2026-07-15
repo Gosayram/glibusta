@@ -5,6 +5,8 @@ use crate::api::models::{
 use crate::book::archive;
 use crate::book::encoding::{attr_eq, get_xml_attr};
 use anyhow::{Context, Result, bail};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 
@@ -16,11 +18,17 @@ pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         );
     }
 
-    let raw_bytes = if looks_like_zip(bytes) {
+    let (raw_bytes, archive_binaries, archive_media_types) = if looks_like_zip(bytes) {
         let mut zip = archive::decode_zip(bytes).context("Failed to open FB2.ZIP")?;
-        find_fb2_in_zip(&mut zip)?.context("No .fb2 file found in archive")?
+        let raw_bytes = find_fb2_in_zip(&mut zip)?.context("No .fb2 file found in archive")?;
+        let (binaries, media_types) = read_zip_image_resources(&mut zip)?;
+        (raw_bytes, binaries, media_types)
     } else {
-        bytes.to_vec()
+        (
+            bytes.to_vec(),
+            std::collections::HashMap::new(),
+            std::collections::HashMap::new(),
+        )
     };
 
     let encoding_name = forced_encoding
@@ -31,10 +39,15 @@ pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
     let (xml_text, _) = encoding.decode_without_bom_handling(&raw_bytes);
     let xml_text = xml_text.into_owned();
 
-    parse_fb2_xml(&xml_text, &raw_bytes)
+    parse_fb2_xml(&xml_text, &raw_bytes, archive_binaries, archive_media_types)
 }
 
-fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
+fn parse_fb2_xml(
+    xml_text: &str,
+    bytes: &[u8],
+    mut binaries: std::collections::HashMap<String, String>,
+    mut binary_media_types: std::collections::HashMap<String, String>,
+) -> Result<NormalizedBook> {
     let mut reader = Reader::from_str(xml_text);
     reader.config_mut().trim_text(true);
 
@@ -100,11 +113,6 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
     let mut current_binary_id: Option<String> = None;
     let mut current_binary_media_type: Option<String> = None;
     let mut cover_media_type: Option<String> = None;
-
-    // Collect all binary data for inline images
-    let mut binaries: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    let mut binary_media_types: std::collections::HashMap<String, String> =
-        std::collections::HashMap::new();
 
     loop {
         match reader.read_event() {
@@ -971,6 +979,62 @@ fn find_fb2_in_zip(zip: &mut archive::ZipFile<'_>) -> Result<Option<Vec<u8>>> {
         return Ok(None);
     };
     zip.read_file_limited(&name, crate::api::models::MAX_FILE_SIZE as usize)
+}
+
+fn read_zip_image_resources(
+    zip: &mut archive::ZipFile<'_>,
+) -> Result<(
+    std::collections::HashMap<String, String>,
+    std::collections::HashMap<String, String>,
+)> {
+    let mut binaries = std::collections::HashMap::new();
+    let mut media_types = std::collections::HashMap::new();
+
+    for name in zip.entry_names().to_vec() {
+        let Some(key) = normalized_zip_image_path(&name) else {
+            continue;
+        };
+        let Some(media_type) = image_media_type(&key) else {
+            continue;
+        };
+        let Some(bytes) = zip.read_file_limited(&name, MAX_IMAGE_SIZE)? else {
+            continue;
+        };
+        binaries.insert(key.clone(), STANDARD.encode(bytes));
+        media_types.insert(key, media_type.to_string());
+    }
+
+    Ok((binaries, media_types))
+}
+
+fn normalized_zip_image_path(path: &str) -> Option<String> {
+    let normalized = path.trim().replace('\\', "/");
+    if normalized.is_empty()
+        || normalized.starts_with('/')
+        || normalized
+            .split('/')
+            .any(|part| part.is_empty() || part == "..")
+    {
+        return None;
+    }
+    Some(
+        normalized
+            .strip_prefix("./")
+            .unwrap_or(&normalized)
+            .to_string(),
+    )
+}
+
+fn image_media_type(path: &str) -> Option<&'static str> {
+    match path.rsplit_once('.')?.1.to_ascii_lowercase().as_str() {
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "png" => Some("image/png"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "bmp" => Some("image/bmp"),
+        "tif" | "tiff" => Some("image/tiff"),
+        _ => None,
+    }
 }
 
 fn is_fb2_book_entry(name: &str) -> bool {

@@ -222,6 +222,57 @@ fn test_path_parser_opens_fb2_zip() {
 }
 
 #[test]
+fn test_fb2_zip_rejects_a_corrupted_entry() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("book.fb2", options)
+        .expect("create FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write FB2 fixture");
+    zip.finish().expect("finish FB2.ZIP fixture");
+
+    let mut bytes = buffer.into_inner();
+    let payload_start = bytes
+        .windows(b"<FictionBook".len())
+        .position(|window| window == b"<FictionBook")
+        .expect("locate stored FB2 payload");
+    bytes[payload_start] ^= 1;
+
+    let error = glibusta_core::book::fb2::parse_fb2(&bytes, None)
+        .expect_err("a ZIP entry with an invalid CRC must be rejected");
+    assert!(error.to_string().contains("Failed to extract ZIP entry"));
+}
+
+#[test]
+fn test_fb2_zip_resolves_relative_image_resources() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("book.fb2", options)
+        .expect("create FB2 entry");
+    zip.write_all(
+        br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><image l:href="images/page.webp"/></section></body></FictionBook>"##,
+    )
+    .expect("write FB2 fixture");
+    zip.start_file("images/page.webp", options)
+        .expect("create image entry");
+    zip.write_all(&[0x52, 0x49, 0x46, 0x46])
+        .expect("write image entry");
+    zip.finish().expect("finish FB2.ZIP fixture");
+
+    let book = glibusta_core::book::fb2::parse_fb2(&buffer.into_inner(), None)
+        .expect("parse FB2.ZIP with external image resource");
+
+    assert_eq!(
+        book.chapters[0].blocks[0].image_url.as_deref(),
+        Some("data:image/webp;base64,UklGRg==")
+    );
+}
+
+#[test]
 fn test_fb2_preserves_paragraphs_with_windows_line_endings() {
     let xml = MINIMAL_FB2.replace("\n", "\r\n");
 
