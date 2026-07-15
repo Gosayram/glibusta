@@ -4,6 +4,14 @@ use crate::api::models::{
 use crate::book::normalize_whitespace;
 use anyhow::Result;
 use base64::Engine;
+use std::sync::LazyLock;
+
+/// Extended half of IBM PC code page 437, used by the RTF `\pc` header.
+static CP437_EXTENDED: LazyLock<Vec<char>> = LazyLock::new(|| {
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ "
+        .chars()
+        .collect()
+});
 
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let encoding_name = forced_encoding.unwrap_or_else(|| detect_rtf_encoding(bytes));
@@ -64,6 +72,9 @@ fn detect_rtf_encoding(bytes: &[u8]) -> &str {
     if has_rtf_control_word(head, b"\\mac") {
         return "macintosh";
     }
+    if has_rtf_control_word(head, b"\\pc") {
+        return "ibm437";
+    }
     "windows-1252"
 }
 
@@ -102,10 +113,26 @@ fn codepage_to_encoding(cp: u16) -> &'static str {
 }
 
 fn decode_with_encoding(bytes: &[u8], encoding: &str) -> String {
+    if encoding.eq_ignore_ascii_case("ibm437") {
+        return decode_cp437(bytes);
+    }
     let (decoded, _, _) = encoding_rs::Encoding::for_label(encoding.as_bytes())
         .unwrap_or(encoding_rs::WINDOWS_1252)
         .decode(bytes);
     decoded.into_owned()
+}
+
+fn decode_cp437(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|&byte| {
+            if byte < 0x80 {
+                char::from(byte)
+            } else {
+                CP437_EXTENDED[(byte - 0x80) as usize]
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone, Default)]
@@ -522,6 +549,14 @@ fn skip_unicode_fallback(body: &str, mut index: usize, count: usize) -> usize {
 
 /// Decode an RTF `\\'hh` escape with the document's declared ANSI code page.
 fn append_encoded_byte(output: &mut String, byte: u8, encoding_name: &str) {
+    if encoding_name.eq_ignore_ascii_case("ibm437") {
+        output.push(if byte < 0x80 {
+            char::from(byte)
+        } else {
+            CP437_EXTENDED[(byte - 0x80) as usize]
+        });
+        return;
+    }
     let encoding = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
         .unwrap_or(encoding_rs::WINDOWS_1252);
     let encoded = [byte];
@@ -738,6 +773,13 @@ mod tests {
     #[test]
     fn decodes_mac_roman_documents() {
         let book = parse_rtf(b"{\\rtf1\\mac Caf\x8e}", None).expect("parse MacRoman RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Café");
+    }
+
+    #[test]
+    fn decodes_ibm_pc_code_page_437_documents() {
+        let book = parse_rtf(br"{\rtf1\pc Caf\'82}", None).expect("parse CP437 RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Café");
     }
