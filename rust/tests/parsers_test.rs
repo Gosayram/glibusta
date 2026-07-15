@@ -167,6 +167,32 @@ fn test_fb2_zip_skips_macos_metadata_before_the_book() {
     assert_eq!(book.title, "Туманность Андромеды");
 }
 
+#[test]
+fn test_fb2_zip_uses_the_first_regular_book_when_multiple_are_present() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("first.fb2", options)
+        .expect("create first FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write first FB2 fixture");
+    zip.start_file("second.fb2", options)
+        .expect("create second FB2 entry");
+    zip.write_all(
+        MINIMAL_FB2
+            .replace("Туманность Андромеды", "Second book")
+            .as_bytes(),
+    )
+    .expect("write second FB2 fixture");
+    zip.finish().expect("finish multi-book FB2.ZIP fixture");
+
+    let book = glibusta_core::book::fb2::parse_fb2(&buffer.into_inner(), None)
+        .expect("parse the first regular FB2 from a multi-book archive");
+
+    assert_eq!(book.title, "Туманность Андромеды");
+}
+
 // ---------------------------------------------------------------------------
 // TXT tests — encoding detection + chapter splitting
 // ---------------------------------------------------------------------------
@@ -821,6 +847,13 @@ fn test_mobi_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert!(!book.chapters[0].blocks.is_empty(), "should have blocks");
     assert_eq!(book.book_format, BookFormat::Mobi);
+}
+
+#[test]
+fn test_mobi_truncated_file_returns_an_error_without_panicking() {
+    let result = glibusta_core::book::mobi::parse_mobi(&create_minimal_mobi()[..80], None);
+
+    assert!(result.is_err());
 }
 
 #[test]
