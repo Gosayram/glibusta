@@ -138,6 +138,25 @@ void main() {
     expect(book.title, 'Комикс');
   });
 
+  test('reads namespaced ComicInfo.xml metadata', () async {
+    final comicInfo = utf8.encode('''
+      <ci:ComicInfo xmlns:ci="urn:comic-info">
+        <ci:Title>Namespace comic</ci:Title><ci:Writer>A, B</ci:Writer>
+      </ci:ComicInfo>
+    ''');
+    final archive = Archive()
+      ..addFile(ArchiveFile('ComicInfo.xml', comicInfo.length, comicInfo))
+      ..addFile(ArchiveFile('001.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'comic.cbz',
+    );
+
+    expect(book.title, 'Namespace comic');
+    expect(book.authors, ['A', 'B']);
+  });
+
   test('routes CBR files to the path-based native RAR parser', () async {
     expect(parser.supports(BookFormat.cbz), isTrue);
     expect(parser.supports(BookFormat.cbr), isTrue);

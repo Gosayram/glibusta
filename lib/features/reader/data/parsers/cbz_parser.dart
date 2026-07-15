@@ -190,7 +190,9 @@ final class CbzParser implements BookParser {
         _decodeComicInfoXml(file.content as List<int>),
       );
       String? value(String name) {
-        final elements = document.findAllElements(name);
+        final elements = document.descendants.whereType<XmlElement>().where(
+          (element) => element.localName == name,
+        );
         if (elements.isEmpty) return null;
         final text = elements.first.innerText.trim();
         return text.isEmpty ? null : text;
