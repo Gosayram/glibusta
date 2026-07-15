@@ -1,8 +1,9 @@
 use crate::api::models::{
-    BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
+    BlockType, BookFormat, MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
 };
 use crate::book::normalize_whitespace;
 use anyhow::Result;
+use base64::Engine;
 
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let encoding_name = forced_encoding.unwrap_or_else(|| detect_rtf_encoding(bytes));
@@ -115,6 +116,13 @@ struct RtfFmt {
     font_size_half_pts: i32,
 }
 
+struct RtfPicture {
+    group_depth: i32,
+    hex: String,
+    media_type: Option<&'static str>,
+    exceeds_limit: bool,
+}
+
 impl RtfFmt {
     fn heading_level(&self) -> Option<i32> {
         const DEFAULT: i32 = 24;
@@ -166,6 +174,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut in_table_row = false;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
+    let mut picture: Option<RtfPicture> = None;
 
     while i < bytes.len() {
         match bytes[i] {
@@ -183,6 +192,14 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                 i += 1;
             }
             b'}' => {
+                if picture
+                    .as_ref()
+                    .is_some_and(|picture| picture.group_depth == brace_depth)
+                {
+                    if let Some(picture) = picture.take() {
+                        push_rtf_picture(&mut blocks, &mut block_index, picture);
+                    }
+                }
                 if brace_depth > 0 {
                     brace_depth -= 1;
                 }
@@ -249,6 +266,31 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                         );
                         in_table_row = true;
                         current_table_row.clear();
+                    }
+                    "pict" => {
+                        push_rtf_paragraph(
+                            &mut blocks,
+                            &mut block_index,
+                            &mut rich_spans,
+                            &mut span_text,
+                            &mut fmt,
+                        );
+                        picture = Some(RtfPicture {
+                            group_depth: brace_depth,
+                            hex: String::new(),
+                            media_type: None,
+                            exceeds_limit: false,
+                        });
+                    }
+                    "pngblip" if picture.is_some() => {
+                        if let Some(picture) = picture.as_mut() {
+                            picture.media_type = Some("image/png");
+                        }
+                    }
+                    "jpegblip" if picture.is_some() => {
+                        if let Some(picture) = picture.as_mut() {
+                            picture.media_type = Some("image/jpeg");
+                        }
                     }
                     "cell" if in_table_row => {
                         current_table_row.push(take_rtf_table_cell(
@@ -382,6 +424,23 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                 }
                 if i < bytes.len() && bytes[i] == b' ' {
                     i += 1;
+                }
+            }
+            _ if !skip_group && picture.is_some() => {
+                if let Some(ch) = body[i..].chars().next() {
+                    if ch.is_ascii_hexdigit() {
+                        if let Some(picture) = picture.as_mut() {
+                            let max_hex_len = MAX_IMAGE_SIZE.saturating_mul(2);
+                            if picture.hex.len() < max_hex_len {
+                                picture.hex.push(ch);
+                            } else {
+                                picture.exceeds_limit = true;
+                            }
+                        }
+                    }
+                    i += ch.len_utf8();
+                } else {
+                    break;
                 }
             }
             _ if !skip_group && brace_depth > 0 => {
@@ -557,6 +616,50 @@ fn flush_rtf_table(
     *block_index += 1;
 }
 
+fn push_rtf_picture(blocks: &mut Vec<ReaderBlock>, block_index: &mut i32, picture: RtfPicture) {
+    let Some(media_type) = picture.media_type else {
+        return;
+    };
+    if picture.exceeds_limit || picture.hex.len() % 2 != 0 {
+        return;
+    }
+
+    let mut bytes = Vec::with_capacity(picture.hex.len() / 2);
+    for pair in picture.hex.as_bytes().chunks_exact(2) {
+        let Ok(pair) = std::str::from_utf8(pair) else {
+            return;
+        };
+        let Ok(byte) = u8::from_str_radix(pair, 16) else {
+            return;
+        };
+        bytes.push(byte);
+    }
+    if bytes.is_empty() || bytes.len() > MAX_IMAGE_SIZE {
+        return;
+    }
+
+    blocks.push(ReaderBlock {
+        index: *block_index,
+        text: String::new(),
+        block_type: BlockType::Image,
+        image_url: Some(format!(
+            "data:{media_type};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        )),
+        note_ref: None,
+        rich_spans: None,
+        heading_level: None,
+        ordered: None,
+        list_items: None,
+        table_rows: None,
+        image_alt: None,
+        text_indent: None,
+        text_align: None,
+        note_id: None,
+    });
+    *block_index += 1;
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_rtf;
@@ -635,6 +738,25 @@ mod tests {
                 vec!["Header A".to_string(), "Header B".to_string()],
                 vec!["Cell A".to_string(), "Cell B".to_string()],
             ]),
+        );
+    }
+
+    #[test]
+    fn extracts_rtf_png_picture_as_an_image_block() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi{\pict\pngblip 89504E470D0A1A0A}}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF picture");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Image);
+        assert!(
+            blocks[0]
+                .image_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("data:image/png;base64,")),
         );
     }
 }
