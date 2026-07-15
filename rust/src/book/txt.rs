@@ -139,7 +139,7 @@ fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
             continue;
         }
         if CHAPTER_HEADING_RE.is_match(text) {
-            continue;
+            return text.to_string();
         }
         if SHORT_LINE_RE.is_match(text) {
             continue;
@@ -150,7 +150,10 @@ fn extract_title_from_first_line(blocks: &[ReaderBlock]) -> String {
         }
         return text.to_string();
     }
-    blocks.first().map(|b| b.text.clone()).unwrap_or_default()
+    blocks
+        .first()
+        .map(|block| block.text.clone())
+        .unwrap_or_default()
 }
 
 fn is_chapter_heading(text: &str, re: &Regex) -> bool {
@@ -308,5 +311,13 @@ mod tests {
         let book = parse_txt("äöå café Görünen".as_bytes(), None).expect("parse UTF-8 TXT");
 
         assert_eq!(book.chapters[0].blocks[0].text, "äöå café Görünen");
+    }
+
+    #[test]
+    fn uses_the_initial_chapter_heading_when_no_separate_title_exists() {
+        let book = parse_txt(b"Chapter 1\n\nThe first chapter text.", Some("utf-8"))
+            .expect("parse TXT chapter");
+
+        assert_eq!(book.title, "Chapter 1");
     }
 }
