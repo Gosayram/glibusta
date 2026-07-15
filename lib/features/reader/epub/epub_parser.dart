@@ -44,7 +44,7 @@ final class CustomEpubParser {
       // LW-6.1: Parse SMIL media overlay if present
       final List<SmilEntry>? smilEntries;
       if (spineItem.mediaOverlay != null) {
-        smilEntries = _parseSmilForChapter(epub, opf, spineItem.mediaOverlay!);
+        smilEntries = await _parseSmilForChapter(epub, opf, spineItem.mediaOverlay!);
       } else {
         smilEntries = null;
       }
@@ -82,13 +82,41 @@ final class CustomEpubParser {
   }
 
   /// LW-6.1: Parse SMIL file referenced by a spine item's media-overlay attribute.
-  List<SmilEntry>? _parseSmilForChapter(EpubArchive epub, EpubOpfData opf, String smilId) {
+  Future<List<SmilEntry>?> _parseSmilForChapter(
+    EpubArchive epub,
+    EpubOpfData opf,
+    String smilId,
+  ) async {
     final smilResource = opf.resources[smilId];
     if (smilResource == null || !smilResource.href.endsWith('.smil')) return null;
     try {
       final smilText = epub.readText(smilResource.fullPath);
       final entries = SmilParser.parse(smilText);
-      return entries.isEmpty ? null : entries;
+      if (entries.isEmpty) return null;
+
+      final audioPaths = <String, String?>{};
+      final resolvedEntries = <SmilEntry>[];
+      for (final entry in entries) {
+        var audioPath = audioPaths[entry.audioSrc];
+        if (!audioPaths.containsKey(entry.audioSrc)) {
+          audioPath = await imageStore.saveAudio(
+            epub: epub,
+            smilPath: smilResource.fullPath,
+            audioHref: entry.audioSrc,
+          );
+          audioPaths[entry.audioSrc] = audioPath;
+        }
+        resolvedEntries.add(
+          SmilEntry(
+            textRef: entry.textRef,
+            paragraphId: entry.paragraphId,
+            audioSrc: audioPath ?? entry.audioSrc,
+            clipBegin: entry.clipBegin,
+            clipEnd: entry.clipEnd,
+          ),
+        );
+      }
+      return resolvedEntries;
     } on Object catch (_) {
       return null;
     }

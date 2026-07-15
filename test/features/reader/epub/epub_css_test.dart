@@ -58,6 +58,61 @@ void main() {
     }
   });
 
+  test('extracts the local audio file referenced by a SMIL media overlay', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_audio_test_');
+    try {
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'META-INF/container.xml',
+            '''
+              <container><rootfiles>
+                <rootfile full-path="OEBPS/content.opf"/>
+              </rootfiles></container>''',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/content.opf',
+            '''
+              <package><metadata><title>Audio EPUB</title></metadata><manifest>
+                <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+                <item id="overlay" href="audio/overlay.smil" media-type="application/smil+xml"/>
+                <item id="audio" href="audio/chapter.mp3" media-type="audio/mpeg"/>
+              </manifest><spine><itemref idref="chapter" media-overlay="overlay"/></spine></package>''',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/chapter.xhtml',
+            '<html><body><p id="p1">Narrated paragraph</p></body></html>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/audio/overlay.smil',
+            '''
+              <smil><body><par>
+                <text src="../chapter.xhtml#p1"/>
+                <audio src="chapter.mp3" clipBegin="0s" clipEnd="2s"/>
+              </par></body></smil>''',
+          ),
+        )
+        ..addFile(ArchiveFile('OEBPS/audio/chapter.mp3', 3, [1, 2, 3]));
+      final file = File('${temporaryDirectory.path}/audio.epub');
+      await file.writeAsBytes(ZipEncoder().encode(archive));
+
+      final book = await CustomEpubParser(
+        imageStore: EpubImageStore(temporaryDirectory),
+      ).parse(file.path);
+      final entry = book.chapters.single.smilEntries!.single;
+
+      expect(await File(entry.audioSrc).readAsBytes(), [1, 2, 3]);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('applies class and inline paragraph CSS layout properties', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_css_test_');
     try {

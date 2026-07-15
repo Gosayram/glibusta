@@ -22,7 +22,7 @@ class KaraokeService {
   int _currentEntryIndex = -1;
 
   /// Load SMIL entries and audio file.
-  Future<void> load({
+  Future<bool> load({
     required List<SmilEntry> entries,
     required String audioPath,
   }) async {
@@ -33,8 +33,11 @@ class KaraokeService {
       await _player.setFilePath(audioPath);
 
       _positionSub = _player.positionStream.listen(_onPositionChanged);
+      return true;
     } on Object catch (e) {
+      _entries = [];
       debugPrint('Karaoke load failed: $e');
+      return false;
     }
   }
 
@@ -67,6 +70,7 @@ class KaraokeService {
   bool get isPlaying => _player.playing;
   Duration get position => _player.position;
   Stream<bool> get playingStream => _player.playingStream;
+  Stream<Duration> get positionStream => _player.positionStream;
 
   void dispose() {
     _positionSub?.cancel(); // ignore: discarded_futures

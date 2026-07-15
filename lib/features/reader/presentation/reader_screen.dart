@@ -1312,15 +1312,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderChapter chapter,
   ) async {
     final entries = chapter.smilEntries!;
+    final audioPaths = entries.map((entry) => entry.audioSrc).toSet();
+    if (audioPaths.length != 1 || audioPaths.single.isEmpty) {
+      _showKaraokeUnavailable(context);
+      return;
+    }
     final blocks = chapter.blocks.map((b) => b.text).toList();
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (_) => KaraokeOverlay(entries: entries, chapterBlocks: blocks),
+      builder: (_) => KaraokeOverlay(
+        entries: entries,
+        chapterBlocks: blocks,
+        audioPath: audioPaths.single,
+      ),
     );
   }
 
-  /// LW-6.1: placeholder for karaoke sync; wire KaraokeService when SMIL pipeline lands.
   void _showKaraokeUnavailable(BuildContext context) {
     unawaited(
       showDialog<void>(
@@ -1328,8 +1336,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Аудиосинхронизация'),
           content: const Text(
-            'Функция караоке будет доступна в книгах с аудиодорожкой.\n\n'
-            'Сейчас нет загруженных SMIL-данных для синхронизации.',
+            'Для синхронизации нужна одна доступная аудиодорожка для текущей главы.',
           ),
           actions: [
             TextButton(
