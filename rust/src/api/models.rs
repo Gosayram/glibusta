@@ -172,7 +172,7 @@ impl BookFormat {
             "fb2" | "fb2.zip" => BookFormat::Fb2,
             "epub" => BookFormat::Epub,
             "txt" => BookFormat::Txt,
-            "docx" => BookFormat::Docx,
+            "docx" | "docm" => BookFormat::Docx,
             "rtf" => BookFormat::Rtf,
             "mobi" => BookFormat::Mobi,
             "azw3" | "azw" => BookFormat::Azw3,
@@ -186,8 +186,8 @@ impl BookFormat {
 
     pub fn extensions() -> &'static [&'static str] {
         &[
-            "fb2", "fb2.zip", "epub", "txt", "docx", "rtf", "mobi", "azw3", "azw", "prc", "pdf",
-            "djvu", "djv", "cbr",
+            "fb2", "fb2.zip", "epub", "txt", "docx", "docm", "rtf", "mobi", "azw3", "azw", "prc",
+            "pdf", "djvu", "djv", "cbr",
         ]
     }
 }

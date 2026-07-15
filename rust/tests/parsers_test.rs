@@ -439,6 +439,7 @@ fn test_book_format_from_ext() {
     assert_eq!(BookFormat::from_ext("ePuB"), BookFormat::Epub);
     assert_eq!(BookFormat::from_ext("TXT"), BookFormat::Txt);
     assert_eq!(BookFormat::from_ext("docx"), BookFormat::Docx);
+    assert_eq!(BookFormat::from_ext("docm"), BookFormat::Docx);
     assert_eq!(BookFormat::from_ext("mobi"), BookFormat::Mobi);
     assert_eq!(BookFormat::from_ext("pdf"), BookFormat::Pdf);
     assert_eq!(BookFormat::from_ext("djvu"), BookFormat::Djvu);

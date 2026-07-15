@@ -16,4 +16,8 @@ const List<String> supportedBookExtensions = [
   'prc',
   'djvu',
   'djv',
+  'docx',
+  'docm',
+  'cbz',
+  'cbr',
 ];
