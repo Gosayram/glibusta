@@ -427,31 +427,30 @@ impl NormalizedBook {
 
     /// Compute content_hash per chapter for stable anchors during reparse.
     pub fn chapter_hashes(&self) -> Vec<(i32, String)> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         self.chapters
             .iter()
             .map(|ch| {
-                let mut hasher = DefaultHasher::new();
-                ch.title.hash(&mut hasher);
+                let mut content = Vec::new();
+                append_hash_part(&mut content, &ch.title);
                 for b in &ch.blocks {
-                    b.text.hash(&mut hasher);
+                    append_hash_part(&mut content, &b.text);
                 }
-                (ch.index, format!("{:016x}", hasher.finish()))
+                (ch.index, stable_short_hash(&content))
             })
             .collect()
     }
 
     /// RCE-15.2: Stable chapter ID from title + content.
     pub fn chapter_id(&self, chapter_index: usize) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         if let Some(ch) = self.chapters.get(chapter_index) {
-            let mut h = DefaultHasher::new();
-            self.title.hash(&mut h);
-            ch.title.hash(&mut h);
-            ch.blocks.len().hash(&mut h);
-            format!("ch_{:016x}", h.finish())
+            let mut content = Vec::new();
+            append_hash_part(&mut content, &self.title);
+            append_hash_part(&mut content, &ch.title);
+            content.extend_from_slice(&(ch.blocks.len() as u64).to_le_bytes());
+            for block in &ch.blocks {
+                append_hash_part(&mut content, &block.text);
+            }
+            format!("ch_{}", stable_short_hash(&content))
         } else {
             format!("ch_missing_{}", chapter_index)
         }
@@ -459,15 +458,13 @@ impl NormalizedBook {
 
     /// RCE-15.3: Stable block ID from chapter + block content.
     pub fn block_id(&self, chapter_index: usize, block_index: usize) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
         if let Some(ch) = self.chapters.get(chapter_index) {
             if let Some(b) = ch.blocks.get(block_index) {
-                let mut h = DefaultHasher::new();
-                self.title.hash(&mut h);
-                ch.title.hash(&mut h);
-                b.text.hash(&mut h);
-                format!("blk_{:016x}", h.finish())
+                let mut content = Vec::new();
+                append_hash_part(&mut content, &self.title);
+                append_hash_part(&mut content, &ch.title);
+                append_hash_part(&mut content, &b.text);
+                format!("blk_{}", stable_short_hash(&content))
             } else {
                 format!("blk_missing_{}_{}", chapter_index, block_index)
             }
@@ -478,11 +475,7 @@ impl NormalizedBook {
 
     /// RCE-15.4: Stable asset ID from image URL.
     pub fn asset_id(url: &str) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut h = DefaultHasher::new();
-        url.hash(&mut h);
-        format!("asset_{:016x}", h.finish())
+        format!("asset_{}", stable_short_hash(url.as_bytes()))
     }
 
     /// RCE-15.6: Stable annotation anchor from chapter + block + char offset.
@@ -547,6 +540,15 @@ impl NormalizedBook {
         }
         0
     }
+}
+
+fn append_hash_part(output: &mut Vec<u8>, value: &str) {
+    output.extend_from_slice(&(value.len() as u64).to_le_bytes());
+    output.extend_from_slice(value.as_bytes());
+}
+
+fn stable_short_hash(bytes: &[u8]) -> String {
+    crate::book::sha256_hex(bytes)[..16].to_string()
 }
 
 /// Simple Levenshtein distance for small strings.

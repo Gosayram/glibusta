@@ -93,7 +93,8 @@ fn split_paragraphs(text: &str) -> Vec<String> {
     let mut paragraphs = Vec::new();
     let mut current = String::new();
 
-    for line in text.split(['\n', '\r']) {
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    for line in normalized.split('\n') {
         if line.trim().is_empty() {
             let paragraph = normalize_whitespace(&current);
             if !paragraph.is_empty() {

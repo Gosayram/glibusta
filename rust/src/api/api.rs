@@ -610,9 +610,9 @@ fn read_archive_asset(
         })
         .cloned();
     match matching_name {
-        Some(name) => Ok(zip
+        Some(name) => zip
             .read_file_limited(&name, MAX_IMAGE_SIZE)?
-            .unwrap_or_default()),
+            .ok_or_else(|| anyhow::anyhow!("Asset '{asset_id}' is no longer available in archive")),
         None => Err(anyhow::anyhow!("Asset '{asset_id}' not found in archive")),
     }
 }

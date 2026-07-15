@@ -328,8 +328,9 @@ fn parse_fb2_xml(
                 } else if in_genre {
                     genres.push(text.into_owned());
                 } else if in_lang {
+                    language = Some(text.into_owned());
+                } else if in_p && in_body {
                     let owned = text.into_owned();
-                    language = Some(owned.clone());
                     if let Some(last) = current_rich_spans.last_mut() {
                         if last.text.is_empty() && last.href.is_some() {
                             last.text = owned;
@@ -350,7 +351,9 @@ fn parse_fb2_xml(
             }
             Ok(Event::CData(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default();
-                if in_book_title && title.is_empty() {
+                if in_notes_body && (in_p || in_poem) {
+                    current_note_text.push_str(&text);
+                } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
                 } else if in_first_name || in_middle_name || in_last_name {
                     current_author_parts.push(text.into_owned());

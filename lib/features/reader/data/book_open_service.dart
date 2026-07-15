@@ -184,10 +184,10 @@ class BookOpenService {
     for (final assetId in assetIds) {
       try {
         final imageFile = File('${imagesDir.path}/${_docxImageFileName(assetId)}');
-        if (!await imageFile.exists()) {
-          final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
-          await imageFile.writeAsBytes(bytes, flush: true);
-        }
+        final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
+        final temporaryFile = File('${imageFile.path}.tmp');
+        await temporaryFile.writeAsBytes(bytes, flush: true);
+        await temporaryFile.rename(imageFile.path);
         resolved[assetId] = imageFile.path;
       } on Object catch (e, st) {
         _logger.warning(

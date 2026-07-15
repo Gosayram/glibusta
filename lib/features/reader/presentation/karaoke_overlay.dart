@@ -75,7 +75,7 @@ class _KaraokeOverlayState extends State<KaraokeOverlay> {
   }
 
   Future<void> _stop() async {
-    await _karaokeService.stop();
+    await _karaokeService.rewind();
     if (mounted) {
       setState(() {
         _isPlaying = false;

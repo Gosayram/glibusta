@@ -59,6 +59,12 @@ class KaraokeService {
 
   Future<void> play() => _player.play();
   Future<void> pause() => _player.pause();
+  Future<void> rewind() async {
+    await _player.pause();
+    await _player.seek(Duration.zero);
+    _currentEntryIndex = -1;
+  }
+
   Future<void> stop() async {
     await _positionSub?.cancel();
     _positionSub = null;
