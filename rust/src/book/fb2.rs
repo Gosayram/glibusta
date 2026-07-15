@@ -189,7 +189,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     b"text-author" if in_body => in_text_author = true,
                     b"poem" if in_body => in_poem = true,
                     b"stanza" if in_body && in_poem => {
-                        if !current_text.trim().is_empty() {
+                        if !in_notes_body && !current_text.trim().is_empty() {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text: current_text.trim().to_string(),
@@ -198,22 +198,26 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                             });
                             block_index += 1;
                         }
-                        current_text.clear();
+                        if !in_notes_body {
+                            current_text.clear();
+                        }
                         in_stanza = true;
                     }
                     b"v" if in_body && in_poem => {
-                        flush_fb2_block(
-                            &mut body_blocks,
-                            &mut current_text,
-                            &mut current_rich_spans,
-                            &mut current_span_text,
-                            &mut block_index,
-                            if in_cite {
-                                BlockType::Cite
-                            } else {
-                                BlockType::Poem
-                            },
-                        );
+                        if !in_notes_body {
+                            flush_fb2_block(
+                                &mut body_blocks,
+                                &mut current_text,
+                                &mut current_rich_spans,
+                                &mut current_span_text,
+                                &mut block_index,
+                                if in_cite {
+                                    BlockType::Cite
+                                } else {
+                                    BlockType::Poem
+                                },
+                            );
+                        }
                     }
                     b"cite" if in_body => in_cite = true,
                     b"pre" if in_body => in_pre = true,
@@ -272,7 +276,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             }
             Ok(Event::Text(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default();
-                if in_notes_body && in_p {
+                if in_notes_body && (in_p || in_poem) {
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
@@ -307,7 +311,7 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
             }
             Ok(Event::GeneralRef(ref e)) => {
                 let text = e.xml10_content().unwrap_or_default();
-                if in_notes_body && in_p {
+                if in_notes_body && (in_p || in_poem) {
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
@@ -617,6 +621,13 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     in_stanza = false;
                 }
                 b"stanza" if in_body && in_stanza => {
+                    if in_notes_body {
+                        if !current_note_text.ends_with('\n') {
+                            current_note_text.push('\n');
+                        }
+                        in_stanza = false;
+                        continue;
+                    }
                     if !current_text.trim().is_empty() {
                         body_blocks.push(ReaderBlock {
                             index: block_index,
@@ -637,6 +648,12 @@ fn parse_fb2_xml(xml_text: &str, bytes: &[u8]) -> Result<NormalizedBook> {
                     in_stanza = false;
                 }
                 b"v" if in_body && in_poem => {
+                    if in_notes_body {
+                        if !current_note_text.ends_with('\n') {
+                            current_note_text.push('\n');
+                        }
+                        continue;
+                    }
                     flush_fb2_block(
                         &mut body_blocks,
                         &mut current_text,
@@ -1153,6 +1170,25 @@ mod tests {
                 .as_ref()
                 .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
             Some("Footnote text")
+        );
+    }
+
+    #[test]
+    fn preserves_line_breaks_for_poetry_inside_footnotes() {
+        let book = parse_fb2(
+            br#"<FictionBook><body><section><p>Text</p></section></body>
+                <body name="notes"><section id="n1"><poem><stanza>
+                <v>First line</v><v>Second line</v></stanza></poem></section></body>
+            </FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 note with poetry");
+
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
+            Some("First line\nSecond line")
         );
     }
 
