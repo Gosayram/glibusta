@@ -371,24 +371,24 @@ fn parse_document_xml_with_hyperlinks(
             }
             Ok(Event::Start(ref e)) => {
                 element_depth += 1;
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
-                    "w:body" => in_body = true,
-                    "w:tbl" if in_body && !in_table => {
+                    "body" => in_body = true,
+                    "tbl" if in_body && !in_table => {
                         flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
                         pending_list_numbering_id = None;
                         in_table = true;
                         table_rows.clear();
                     }
-                    "w:tr" if in_table => {
+                    "tr" if in_table => {
                         in_table_row = true;
                         current_table_row.clear();
                     }
-                    "w:tc" if in_table_row => {
+                    "tc" if in_table_row => {
                         in_table_cell = true;
                         current_table_cell.clear();
                     }
-                    "w:p" if in_body => {
+                    "p" if in_body => {
                         in_paragraph = true;
                         current_text.clear();
                         rich_spans.clear();
@@ -402,11 +402,11 @@ fn parse_document_xml_with_hyperlinks(
                         paragraph_is_numbered = false;
                         paragraph_numbering_id = None;
                     }
-                    "w:numPr" if in_paragraph => paragraph_is_numbered = true,
-                    "w:numId" if in_paragraph && paragraph_is_numbered => {
+                    "numPr" if in_paragraph => paragraph_is_numbered = true,
+                    "numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
                     }
-                    "w:hyperlink" if in_paragraph => {
+                    "hyperlink" if in_paragraph => {
                         current_span_href = word_attribute(e, b"anchor")
                             .map(|anchor| format!("#{anchor}"))
                             .or_else(|| {
@@ -415,18 +415,18 @@ fn parse_document_xml_with_hyperlinks(
                             })
                             .and_then(|href| crate::book::sanitize_href(&href));
                     }
-                    "w:footnoteReference" if in_paragraph => {
+                    "footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
                     }
-                    "a:blip" if in_paragraph => {
+                    "blip" if in_paragraph => {
                         if let Some(asset) = word_attribute(e, b"embed")
                             .and_then(|id| image_targets.get(&id).cloned())
                         {
                             current_image_assets.push(asset);
                         }
                     }
-                    "w:pStyle" if in_paragraph => {
+                    "pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|a| a.ok()) {
                             if is_word_value_attribute(attr.key.as_ref()) {
                                 pstyle_val = String::from_utf8_lossy(&attr.value).into_owned();
@@ -434,18 +434,18 @@ fn parse_document_xml_with_hyperlinks(
                         }
                         in_pstyle = true;
                     }
-                    "w:r" if in_paragraph => {
+                    "r" if in_paragraph => {
                         in_run = true;
                         current_span_text.clear();
                         current_span_bold = false;
                         current_span_italic = false;
                     }
-                    "w:b" if in_run => current_span_bold = word_bool_value(e),
-                    "w:i" if in_run => current_span_italic = word_bool_value(e),
-                    "w:tab" if in_run => {
+                    "b" if in_run => current_span_bold = word_bool_value(e),
+                    "i" if in_run => current_span_italic = word_bool_value(e),
+                    "tab" if in_run => {
                         current_span_text.push('\t');
                     }
-                    "w:br" if in_run => {
+                    "br" if in_run => {
                         current_span_text.push('\n');
                     }
                     _ => {}
@@ -479,15 +479,15 @@ fn parse_document_xml_with_hyperlinks(
                 element_depth = element_depth
                     .checked_sub(1)
                     .ok_or_else(|| anyhow::anyhow!("DOCX XML parse error: unexpected end tag"))?;
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
-                    "w:body" => {
+                    "body" => {
                         flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
                         pending_list_numbering_id = None;
                         in_body = false;
                     }
-                    "w:pStyle" => in_pstyle = false,
-                    "w:r" if in_paragraph => {
+                    "pStyle" => in_pstyle = false,
+                    "r" if in_paragraph => {
                         if !current_span_text.is_empty() {
                             rich_spans.push(RichSpan {
                                 text: current_span_text.clone(),
@@ -501,7 +501,7 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_text.clear();
                         in_run = false;
                     }
-                    "w:p" if in_paragraph => {
+                    "p" if in_paragraph => {
                         // Combine all span texts for the block text field
                         let full_text: String =
                             rich_spans.iter().map(|s| s.text.as_str()).collect();
@@ -609,19 +609,19 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_href = None;
                         current_note_ref = None;
                     }
-                    "w:hyperlink" if in_paragraph => current_span_href = None,
-                    "w:tc" if in_table_cell => {
+                    "hyperlink" if in_paragraph => current_span_href = None,
+                    "tc" if in_table_cell => {
                         current_table_row.push(current_table_cell.trim().to_string());
                         current_table_cell.clear();
                         in_table_cell = false;
                     }
-                    "w:tr" if in_table_row => {
+                    "tr" if in_table_row => {
                         if !current_table_row.is_empty() {
                             table_rows.push(std::mem::take(&mut current_table_row));
                         }
                         in_table_row = false;
                     }
-                    "w:tbl" if in_table => {
+                    "tbl" if in_table => {
                         if !table_rows.is_empty() {
                             let table_text = table_rows
                                 .iter()
@@ -652,34 +652,34 @@ fn parse_document_xml_with_hyperlinks(
                 }
             }
             Ok(Event::Empty(ref e)) => {
-                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
-                    "w:pStyle" if in_paragraph => {
+                    "pStyle" if in_paragraph => {
                         for attr in e.attributes().filter_map(|attr| attr.ok()) {
                             if is_word_value_attribute(attr.key.as_ref()) {
                                 pstyle_val = String::from_utf8_lossy(&attr.value).into_owned();
                             }
                         }
                     }
-                    "w:numPr" if in_paragraph => paragraph_is_numbered = true,
-                    "w:numId" if in_paragraph && paragraph_is_numbered => {
+                    "numPr" if in_paragraph => paragraph_is_numbered = true,
+                    "numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
                     }
-                    "w:footnoteReference" if in_paragraph => {
+                    "footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
                     }
-                    "a:blip" if in_paragraph => {
+                    "blip" if in_paragraph => {
                         if let Some(asset) = word_attribute(e, b"embed")
                             .and_then(|id| image_targets.get(&id).cloned())
                         {
                             current_image_assets.push(asset);
                         }
                     }
-                    "w:b" if in_run => current_span_bold = word_bool_value(e),
-                    "w:i" if in_run => current_span_italic = word_bool_value(e),
-                    "w:tab" if in_run => current_span_text.push('\t'),
-                    "w:br" if in_run => current_span_text.push('\n'),
+                    "b" if in_run => current_span_bold = word_bool_value(e),
+                    "i" if in_run => current_span_italic = word_bool_value(e),
+                    "tab" if in_run => current_span_text.push('\t'),
+                    "br" if in_run => current_span_text.push('\n'),
                     _ => {}
                 }
             }
@@ -832,6 +832,21 @@ mod tests {
         assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Heading);
         assert!(span.bold);
         assert!(!span.italic);
+    }
+
+    #[test]
+    fn parses_equivalently_with_alternate_namespace_prefixes() {
+        let xml = r#"
+            <d:document xmlns:d="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <d:body><d:p><d:r><d:rPr><d:b/></d:rPr><d:t>Bold</d:t></d:r></d:p></d:body>
+            </d:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse alternate-prefix DOCX XML");
+        let span = &blocks[0].rich_spans.as_ref().expect("formatted span")[0];
+
+        assert_eq!(blocks[0].text, "Bold");
+        assert!(span.bold);
     }
 
     #[test]
