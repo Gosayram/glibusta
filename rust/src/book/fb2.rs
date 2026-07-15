@@ -948,15 +948,20 @@ fn find_fb2_in_zip(zip: &mut archive::ZipFile<'_>) -> Result<Option<Vec<u8>>> {
     let Some(name) = zip
         .entry_names()
         .iter()
-        .find(|name| {
-            name.rsplit_once('.')
-                .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("fb2"))
-        })
+        .find(|name| is_fb2_book_entry(name))
         .cloned()
     else {
         return Ok(None);
     };
     zip.read_file_limited(&name, crate::api::models::MAX_FILE_SIZE as usize)
+}
+
+fn is_fb2_book_entry(name: &str) -> bool {
+    name.rsplit_once('.')
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("fb2"))
+        && !name
+            .split(['/', '\\'])
+            .any(|segment| segment == "__MACOSX" || segment.starts_with('.'))
 }
 
 fn detect_fb2_encoding(bytes: &[u8]) -> String {

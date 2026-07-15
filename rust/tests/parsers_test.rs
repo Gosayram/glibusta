@@ -145,6 +145,28 @@ fn test_fb2_zip_finds_case_insensitive_entry_name() {
     assert_eq!(book.title, "Туманность Андромеды");
 }
 
+#[test]
+fn test_fb2_zip_skips_macos_metadata_before_the_book() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("__MACOSX/book.fb2", options)
+        .expect("create macOS metadata entry");
+    zip.write_all(b"not an FB2 document")
+        .expect("write macOS metadata entry");
+    zip.start_file("book.fb2", options)
+        .expect("create FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write FB2 fixture");
+    zip.finish().expect("finish FB2.ZIP fixture");
+
+    let book = glibusta_core::book::fb2::parse_fb2(&buffer.into_inner(), None)
+        .expect("parse FB2.ZIP while skipping macOS metadata");
+
+    assert_eq!(book.title, "Туманность Андромеды");
+}
+
 // ---------------------------------------------------------------------------
 // TXT tests — encoding detection + chapter splitting
 // ---------------------------------------------------------------------------
