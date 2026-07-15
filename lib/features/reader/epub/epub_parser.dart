@@ -30,6 +30,7 @@ final class CustomEpubParser {
     final toc = await _parseToc(epub, opf, resolver);
 
     final chapters = <EpubChapter>[];
+    String? textDirection;
     var chapterCount = 0;
     for (final spineItem in opf.spineItems) {
       final resource = opf.resources[spineItem.idref];
@@ -39,6 +40,7 @@ final class CustomEpubParser {
         chapterPath: resource.fullPath,
         htmlText: htmlText,
       );
+      textDirection ??= result.textDirection;
       final title = _extractTitle(result.blocks);
 
       // LW-6.1: Parse SMIL media overlay if present
@@ -58,6 +60,7 @@ final class CustomEpubParser {
           styles: result.styles,
           linear: spineItem.linear,
           smilEntries: smilEntries,
+          textDirection: result.textDirection,
         ),
       );
       chapterCount++;
@@ -78,6 +81,7 @@ final class CustomEpubParser {
       toc: toc,
       coverImagePath: coverPath,
       isFixedLayout: opf.isFixedLayout,
+      textDirection: textDirection,
     );
   }
 

@@ -13,6 +13,7 @@ final class EpubBook {
     this.toc,
     this.coverImagePath,
     this.isFixedLayout = false,
+    this.textDirection,
   });
   final String title;
   final List<String> authors;
@@ -23,6 +24,7 @@ final class EpubBook {
   final List<TocItem>? toc;
   final String? coverImagePath;
   final bool isFixedLayout;
+  final String? textDirection;
 }
 
 final class EpubChapter {
@@ -34,6 +36,7 @@ final class EpubChapter {
     this.linear = true,
     this.styles,
     this.smilEntries,
+    this.textDirection,
   });
   final String id;
   final String href;
@@ -47,6 +50,7 @@ final class EpubChapter {
 
   /// LW-6.1: SMIL media overlay entries for karaoke audio sync.
   final List<SmilEntry>? smilEntries;
+  final String? textDirection;
 }
 
 sealed class ReaderBlock {

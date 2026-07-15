@@ -897,7 +897,10 @@ final class ReaderController {
     const snapMargin = 20.0; // ponytail: magnetic edge snapping
 
     // LW-7.2: RTL swap — in manga RTL, left=next, right=prev
-    final isRtl = settings.textDirection == ReaderTextDirection.rtl;
+    final bookTextDirection = _state.metadata?.metadata?['textDirection'];
+    final isRtl =
+        settings.textDirection == ReaderTextDirection.rtl ||
+        (settings.textDirection == ReaderTextDirection.auto && bookTextDirection == 'rtl');
     final leftAction = isRtl ? scrollToNext : scrollToPrevious;
     final rightAction = isRtl ? scrollToPrevious : scrollToNext;
 

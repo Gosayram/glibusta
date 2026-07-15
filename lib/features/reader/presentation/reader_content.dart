@@ -309,7 +309,7 @@ Widget _buildReaderBlock(
           ctx,
           block.text,
           style.copyWith(fontSize: s.fontSize * scale, fontWeight: FontWeight.bold),
-          block.textAlign ?? TextAlign.left,
+          block.textAlign ?? TextAlign.start,
         ),
       );
     case BlockType.subtitle:
@@ -330,7 +330,7 @@ Widget _buildReaderBlock(
           ctx,
           block.text,
           style.copyWith(fontStyle: FontStyle.italic, fontSize: s.fontSize * 0.95),
-          block.textAlign ?? TextAlign.right,
+          block.textAlign ?? TextAlign.end,
         ),
       );
     // HG-16.3: poems preserve line structure — no text wrapping
@@ -349,22 +349,25 @@ Widget _buildReaderBlock(
     case BlockType.cite:
       return Container(
         margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 1.5),
-        padding: const EdgeInsets.fromLTRB(24, 12, 12, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(24, 12, 12, 12),
         decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),
+          border: BorderDirectional(
+            start: BorderSide(
+              color: (style.color ?? Colors.black).withValues(alpha: 0.3),
+              width: 3,
+            ),
           ),
         ),
         child: _readerHighlightedText(
           ctx,
           block.text,
           style.copyWith(fontStyle: FontStyle.italic),
-          TextAlign.left,
+          TextAlign.start,
         ),
       );
     case BlockType.textAuthor:
       return Padding(
-        padding: EdgeInsets.only(top: s.paragraphSpacing, left: s.margin),
+        padding: EdgeInsetsDirectional.only(top: s.paragraphSpacing, start: s.margin),
         child: _readerHighlightedText(
           ctx,
           '— ${block.text}',
@@ -373,17 +376,20 @@ Widget _buildReaderBlock(
             fontStyle: FontStyle.italic,
             color: (style.color ?? Colors.black).withValues(alpha: 0.6),
           ),
-          TextAlign.right,
+          TextAlign.end,
           richSpans: block.richSpans,
         ),
       );
     case BlockType.quote:
       return Container(
         margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 1.5),
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 12, 12),
         decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: (style.color ?? Colors.black).withValues(alpha: 0.3), width: 3),
+          border: BorderDirectional(
+            start: BorderSide(
+              color: (style.color ?? Colors.black).withValues(alpha: 0.3),
+              width: 3,
+            ),
           ),
         ),
         child: _readerHighlightedText(
@@ -406,9 +412,9 @@ Widget _buildReaderBlock(
           padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
           child: Align(
             alignment: switch (s.imageAlignment) {
-              ImageAlignment.start => Alignment.centerLeft,
+              ImageAlignment.start => AlignmentDirectional.centerStart,
               ImageAlignment.center => Alignment.center,
-              ImageAlignment.end => Alignment.centerRight,
+              ImageAlignment.end => AlignmentDirectional.centerEnd,
             },
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 600 * s.imageWidth),
@@ -482,7 +488,7 @@ Widget _buildReaderBlock(
       return _readerListBlock(ctx, block, textAlign);
     case BlockType.listItem:
       return Padding(
-        padding: EdgeInsets.only(left: s.margin, bottom: s.paragraphSpacing * 0.5),
+        padding: EdgeInsetsDirectional.only(start: s.margin, bottom: s.paragraphSpacing * 0.5),
         child: _readerHighlightedText(ctx, '• ${block.text}', style, textAlign),
       );
     case BlockType.preformatted:
@@ -524,7 +530,7 @@ Widget _buildReaderBlock(
         padding: EdgeInsets.only(bottom: bottomPadding),
         child: blockHighlights != null && blockHighlights.isNotEmpty
             ? Padding(
-                padding: EdgeInsets.only(left: effectiveIndent),
+                padding: EdgeInsetsDirectional.only(start: effectiveIndent),
                 child: HighlightedText(
                   text: block.text,
                   style: effectiveStyle,
@@ -994,7 +1000,7 @@ Widget _readerListBlock(ReaderCtx ctx, ReaderBlock block, TextAlign textAlign) {
         final item = items[index];
         final bullet = isOrdered ? '${index + 1}.' : '\u2022';
         return Padding(
-          padding: const EdgeInsets.only(left: 24, bottom: 4),
+          padding: const EdgeInsetsDirectional.only(start: 24, bottom: 4),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1016,10 +1022,21 @@ Widget _readerListBlock(ReaderCtx ctx, ReaderBlock block, TextAlign textAlign) {
   );
 }
 
-TextDirection _readerTextDirection(ReaderTextDirection td, BuildContext context) {
+String? _bookTextDirection(NormalizedBookMetadata metadata) {
+  final value = metadata.metadata?['textDirection'];
+  return value is String && (value == 'ltr' || value == 'rtl') ? value : null;
+}
+
+TextDirection _readerTextDirection(
+  ReaderTextDirection td,
+  BuildContext context, {
+  String? bookTextDirection,
+}) {
   return switch (td) {
     ReaderTextDirection.ltr => TextDirection.ltr,
     ReaderTextDirection.rtl => TextDirection.rtl,
+    ReaderTextDirection.auto when bookTextDirection == 'rtl' => TextDirection.rtl,
+    ReaderTextDirection.auto when bookTextDirection == 'ltr' => TextDirection.ltr,
     ReaderTextDirection.auto => Directionality.of(context),
   };
 }
@@ -1227,7 +1244,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     }
 
     final effectiveMargin = _effectiveMargin(settings, settings.mode);
-    final textDirection = _readerTextDirection(settings.textDirection, context);
+    final textDirection = _readerTextDirection(
+      settings.textDirection,
+      context,
+      bookTextDirection: _bookTextDirection(widget.metadata),
+    );
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
 
     if (!_didScrollToProgress && widget.initialProgress > 0) {
@@ -1980,6 +2001,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final locale = s.hyphenation ? const Locale('ru') : null;
     final dir = switch (s.textDirection) {
       ReaderTextDirection.rtl => TextDirection.rtl,
+      ReaderTextDirection.auto when _bookTextDirection(widget.metadata) == 'rtl' =>
+        TextDirection.rtl,
       _ => TextDirection.ltr,
     };
     TextSpan textSpan;
@@ -2056,7 +2079,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         top: false,
         bottom: false,
         child: Directionality(
-          textDirection: _readerTextDirection(settings.textDirection, context),
+          textDirection: _readerTextDirection(
+            settings.textDirection,
+            context,
+            bookTextDirection: _bookTextDirection(widget.metadata),
+          ),
           child: _buildCoverPage(widget.metadata.coverUrl!, settings, style),
         ),
       );
@@ -2127,7 +2154,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       top: false,
       bottom: false,
       child: Directionality(
-        textDirection: _readerTextDirection(settings.textDirection, context),
+        textDirection: _readerTextDirection(
+          settings.textDirection,
+          context,
+          bookTextDirection: _bookTextDirection(widget.metadata),
+        ),
         child: Padding(
           padding: _effectiveMargin(settings, settings.mode),
           child: Column(
@@ -2168,7 +2199,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final leftIndex = index * 2;
     final rightIndex = index * 2 + 1;
     return Directionality(
-      textDirection: _readerTextDirection(widget.settings.textDirection, context),
+      textDirection: _readerTextDirection(
+        widget.settings.textDirection,
+        context,
+        bookTextDirection: _bookTextDirection(widget.metadata),
+      ),
       child: Row(
         children: [
           Expanded(

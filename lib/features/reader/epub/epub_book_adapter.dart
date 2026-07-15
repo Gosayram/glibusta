@@ -20,6 +20,7 @@ class EpubBookAdapter {
         'isFixedLayout': book.isFixedLayout,
         'hasToc': book.toc != null && book.toc!.isNotEmpty,
         'tocCount': book.toc?.length ?? 0,
+        if (book.textDirection != null) 'textDirection': book.textDirection,
       },
     );
   }

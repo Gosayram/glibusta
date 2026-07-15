@@ -160,4 +160,43 @@ void main() {
       await temporaryDirectory.delete(recursive: true);
     }
   });
+
+  test('preserves an EPUB RTL direction in normalized metadata', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_rtl_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '<html dir="rtl"><body><p>مرحبا بالعالم</p></body></html>',
+      );
+
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'RTL EPUB',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+              textDirection: parsed.textDirection,
+            ),
+          ],
+          resources: const {},
+          textDirection: parsed.textDirection,
+        ),
+        'rtl',
+      );
+
+      expect(normalized.metadata?['textDirection'], 'rtl');
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
 }

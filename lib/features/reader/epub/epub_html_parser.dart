@@ -16,16 +16,29 @@ final class EpubHtmlParser {
   final EpubImageStore imageStore;
   final EpubArchive epub;
 
-  Future<({List<ReaderBlock> blocks, Map<String, Map<String, String>>? styles})> parseChapter({
+  Future<
+    ({
+      List<ReaderBlock> blocks,
+      Map<String, Map<String, String>>? styles,
+      String? textDirection,
+    })
+  >
+  parseChapter({
     required String chapterPath,
     required String htmlText,
   }) async {
     final doc = XmlDocument.parse(htmlText);
     final styles = _extractCss(doc);
     final body = _findBody(doc);
-    if (body == null) return (blocks: const <ReaderBlock>[], styles: styles);
+    if (body == null) return (blocks: const <ReaderBlock>[], styles: styles, textDirection: null);
     final blocks = await _processChildren(body, chapterPath);
-    return (blocks: blocks, styles: styles);
+    final direction = (doc.rootElement.getAttribute('dir') ?? body.getAttribute('dir'))
+        ?.toLowerCase();
+    return (
+      blocks: blocks,
+      styles: styles,
+      textDirection: direction == 'rtl' || direction == 'ltr' ? direction : null,
+    );
   }
 
   /// MD-1.1: Extract CSS rules from <style> tags in the document.

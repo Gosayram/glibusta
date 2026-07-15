@@ -461,6 +461,59 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('300 сл/мин  ·  0/0'), findsOneWidget);
   });
+
+  testWidgets('uses EPUB RTL metadata for direction-aware list layout', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'rtl-book',
+            title: 'كتاب',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['فصل'],
+            metadata: {'textDirection': 'rtl'},
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'فصل',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: '',
+                  type: BlockType.list,
+                  listItems: [ReaderBlock(index: 0, text: 'عنصر')],
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Directionality && widget.textDirection == TextDirection.rtl,
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Padding &&
+            widget.padding is EdgeInsetsDirectional &&
+            (widget.padding as EdgeInsetsDirectional).start == 24,
+      ),
+      findsWidgets,
+    );
+  });
 }
 
 void _ignoreTap(TapUpDetails _) {}
