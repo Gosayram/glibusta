@@ -114,6 +114,7 @@ struct RtfFmt {
     italic: bool,
     superscript: bool,
     font_size_half_pts: i32,
+    href: Option<String>,
 }
 
 struct RtfPicture {
@@ -152,7 +153,7 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
             bold: fmt.bold,
             italic: fmt.italic,
             superscript: fmt.superscript,
-            href: None,
+            href: fmt.href.clone(),
             line_break: false,
         });
     }
@@ -175,11 +176,17 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
     let mut picture: Option<RtfPicture> = None;
+    let mut pending_hyperlink_href: Option<String> = None;
+    let mut hyperlink_result_depth: Option<i32> = None;
 
     while i < bytes.len() {
         match bytes[i] {
             b'{' => {
                 brace_depth += 1;
+                if bytes[i + 1..].starts_with(b"\\*\\fldinst") {
+                    let end = i.saturating_add(8192).min(bytes.len());
+                    pending_hyperlink_href = extract_rtf_hyperlink(&body[i..end]);
+                }
                 if bytes[i + 1..].starts_with(b"\\fonttbl")
                     || bytes[i + 1..].starts_with(b"\\colortbl")
                     || bytes[i + 1..].starts_with(b"\\stylesheet")
@@ -192,6 +199,10 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                 i += 1;
             }
             b'}' => {
+                if hyperlink_result_depth == Some(brace_depth) {
+                    flush_span(&mut rich_spans, &mut span_text, &fmt);
+                    hyperlink_result_depth = None;
+                }
                 if picture
                     .as_ref()
                     .is_some_and(|picture| picture.group_depth == brace_depth)
@@ -291,6 +302,11 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                         if let Some(picture) = picture.as_mut() {
                             picture.media_type = Some("image/jpeg");
                         }
+                    }
+                    "fldrslt" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.href = pending_hyperlink_href.take();
+                        hyperlink_result_depth = Some(brace_depth);
                     }
                     "cell" if in_table_row => {
                         current_table_row.push(take_rtf_table_cell(
@@ -660,6 +676,19 @@ fn push_rtf_picture(blocks: &mut Vec<ReaderBlock>, block_index: &mut i32, pictur
     *block_index += 1;
 }
 
+fn extract_rtf_hyperlink(instruction: &str) -> Option<String> {
+    const HYPERLINK: &str = "HYPERLINK";
+    let uppercase = instruction.to_ascii_uppercase();
+    let start = uppercase.find(HYPERLINK)? + HYPERLINK.len();
+    let target = instruction[start..].trim_start();
+    let href = if let Some(rest) = target.strip_prefix('"') {
+        rest.split('"').next()?
+    } else {
+        target.split_whitespace().next()?
+    };
+    crate::book::sanitize_href(href)
+}
+
 #[cfg(test)]
 mod tests {
     use super::parse_rtf;
@@ -758,5 +787,40 @@ mod tests {
                 .as_deref()
                 .is_some_and(|url| url.starts_with("data:image/png;base64,")),
         );
+    }
+
+    #[test]
+    fn preserves_rtf_hyperlink_field_targets() {
+        let book = parse_rtf(
+            br#"{\rtf1\ansi{\field{\*\fldinst{HYPERLINK "https://example.com"}}{\fldrslt{Example}}}}"#,
+            Some("utf-8"),
+        )
+        .expect("parse RTF hyperlink");
+
+        let block = &book.chapters[0].blocks[0];
+        assert_eq!(block.text, "Example");
+        assert_eq!(
+            block
+                .rich_spans
+                .as_ref()
+                .and_then(|spans| spans[0].href.as_deref()),
+            Some("https://example.com"),
+        );
+    }
+
+    #[test]
+    fn strips_dangerous_rtf_hyperlink_field_targets() {
+        let book = parse_rtf(
+            br#"{\rtf1\ansi{\field{\*\fldinst{HYPERLINK "javascript:alert(1)"}}{\fldrslt{Unsafe}}}}"#,
+            Some("utf-8"),
+        )
+        .expect("parse RTF hyperlink");
+
+        let span = &book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich span")[0];
+        assert_eq!(span.text, "Unsafe");
+        assert!(span.href.is_none());
     }
 }
