@@ -199,4 +199,30 @@ void main() {
       await temporaryDirectory.delete(recursive: true);
     }
   });
+
+  test('parses a ruby-heavy XHTML chapter repeatedly without retaining parser state', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_ruby_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final ruby = List<String>.filled(2000, '<ruby>漢<rt>かん</rt></ruby>').join();
+      final html = '<html><body><p>$ruby</p></body></html>';
+
+      final first = await parser.parseChapter(chapterPath: 'chapter.xhtml', htmlText: html);
+      final second = await parser.parseChapter(chapterPath: 'chapter.xhtml', htmlText: html);
+
+      final firstParagraph = first.blocks.single as ParagraphBlock;
+      final secondParagraph = second.blocks.single as ParagraphBlock;
+      final firstText = firstParagraph.spans.map((span) => span.text).join();
+      final secondText = secondParagraph.spans.map((span) => span.text).join();
+
+      expect(firstText, secondText);
+      expect(secondText, contains('漢'));
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
 }
