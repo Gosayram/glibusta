@@ -38,6 +38,29 @@ void main() {
     );
   });
 
+  test('keeps natural page order across nested chapter directories', () async {
+    final archive = Archive()
+      ..addFile(ArchiveFile('Chapter02/10.jpg', 1, <int>[4]))
+      ..addFile(ArchiveFile('Chapter01/2.jpg', 1, <int>[2]))
+      ..addFile(ArchiveFile('Chapter02/1.jpg', 1, <int>[3]))
+      ..addFile(ArchiveFile('Chapter01/1.jpg', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'nested.cbz',
+    );
+
+    expect(
+      book.chapters.single.blocks.map((ReaderBlock block) => block.imageUrl),
+      [
+        'data:image/jpeg;base64,AQ==',
+        'data:image/jpeg;base64,Ag==',
+        'data:image/jpeg;base64,Aw==',
+        'data:image/jpeg;base64,BA==',
+      ],
+    );
+  });
+
   test('rejects an archive without comic pages', () async {
     final archive = Archive()..addFile(ArchiveFile('info.txt', 1, <int>[0]));
     final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
