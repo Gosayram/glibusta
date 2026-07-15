@@ -26,34 +26,27 @@ class EpubBookAdapter {
 
   ReaderChapter _toChapter(epub.EpubChapter chapter, int index) {
     final styles = chapter.styles;
-    // MD-1.1: Extract text-indent/text-align from p selector, apply to all ParagraphBlocks
-    final double? pIndent;
-    final String? pAlign;
-    if (styles != null && styles.containsKey('p')) {
-      final pStyle = styles['p']!;
-      pIndent = _parsePx(pStyle['text-indent']);
-      pAlign = pStyle['text-align'];
-    } else {
-      pIndent = null;
-      pAlign = null;
-    }
 
     ReaderBlock applyCss(epub.ReaderBlock block, int idx) {
       final mapped = _toBlock(block, idx);
       if (mapped == null) return ReaderBlock(index: idx, text: '');
-      if (block is epub.ParagraphBlock && (pIndent != null || pAlign != null)) {
-        final align = pAlign != null
+      if (block is epub.ParagraphBlock) {
+        final paragraphStyles = _paragraphStyles(block, styles);
+        final indent = _parsePx(paragraphStyles['text-indent']);
+        final alignment = paragraphStyles['text-align'];
+        final align = alignment != null
             ? (TextAlign.values.firstWhere(
-                (e) => e.name == pAlign,
+                (e) => e.name == alignment,
                 orElse: () => TextAlign.left,
               ))
             : null;
+        if (indent == null && align == null) return mapped;
         return ReaderBlock(
           index: mapped.index,
           text: mapped.text,
           type: mapped.type,
           richSpans: mapped.richSpans,
-          textIndent: pIndent ?? mapped.textIndent,
+          textIndent: indent ?? mapped.textIndent,
           textAlign: align,
         );
       }
@@ -79,6 +72,19 @@ class EpubBookAdapter {
       blocks: blocks,
       smilEntries: chapter.smilEntries,
     );
+  }
+
+  Map<String, String> _paragraphStyles(
+    epub.ParagraphBlock block,
+    Map<String, Map<String, String>>? styles,
+  ) {
+    final result = <String, String>{...?(styles?['p'])};
+    for (final cssClass in block.cssClasses) {
+      result.addAll(styles?['.$cssClass'] ?? const {});
+      result.addAll(styles?['p.$cssClass'] ?? const {});
+    }
+    result.addAll(block.inlineStyles);
+    return result;
   }
 
   ReaderBlock? _toBlock(epub.ReaderBlock block, int index) {

@@ -54,8 +54,19 @@ sealed class ReaderBlock {
 }
 
 final class ParagraphBlock extends ReaderBlock {
-  const ParagraphBlock(this.spans);
+  const ParagraphBlock(
+    this.spans, {
+    this.cssClasses = const [],
+    this.inlineStyles = const {},
+  });
   final List<TextSpan> spans;
+
+  /// CSS classes from the source paragraph, used by the adapter for the
+  /// supported paragraph layout properties.
+  final List<String> cssClasses;
+
+  /// Inline CSS declarations from the source paragraph.
+  final Map<String, String> inlineStyles;
 }
 
 final class HeadingBlock extends ReaderBlock {

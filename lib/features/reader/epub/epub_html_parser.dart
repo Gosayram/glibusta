@@ -106,7 +106,11 @@ final class EpubHtmlParser {
       case 'p':
         final spans = _extractInlineSpans(el, chapterPath);
         if (spans.isEmpty) return null;
-        return ParagraphBlock(spans);
+        return ParagraphBlock(
+          spans,
+          cssClasses: _cssClasses(el),
+          inlineStyles: _parseCssBody(el.getAttribute('style') ?? ''),
+        );
       case 'div':
       case 'section':
         final childBlocks = await _processChildren(el, chapterPath);
@@ -168,6 +172,12 @@ final class EpubHtmlParser {
         if (childBlocks.length == 1) return childBlocks.first;
         return SectionBlock(childBlocks);
     }
+  }
+
+  List<String> _cssClasses(XmlElement el) {
+    final value = el.getAttribute('class');
+    if (value == null || value.trim().isEmpty) return const [];
+    return value.split(RegExp(r'\s+')).where((cssClass) => cssClass.isNotEmpty).toList();
   }
 
   List<TextSpan> _extractInlineSpans(XmlElement el, String chapterPath) {
