@@ -514,6 +514,44 @@ void main() {
       findsWidgets,
     );
   });
+
+  testWidgets('dark reader themes ignore hardcoded EPUB text colors', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'dark-epub',
+            title: 'Dark EPUB',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Chapter'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Chapter',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: 'Hardcoded',
+                  richSpans: [RichSpan(text: 'Hardcoded', color: '#808080')],
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(theme: ReaderTheme.dark),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    expect(find.byType(ReaderContentBody), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _ignoreTap(TapUpDetails _) {}

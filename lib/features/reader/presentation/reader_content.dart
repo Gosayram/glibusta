@@ -579,6 +579,7 @@ Widget _readerHighlightedText(
         style,
         ctx.linkColor,
         onLinkTap: ctx.onLinkTap,
+        applyBookColors: _applyBookColors(ctx.settings, ctx.brightness),
       );
       if (firstLineIndent > 0) {
         spans.insert(0, WidgetSpan(child: SizedBox(width: firstLineIndent)));
@@ -678,6 +679,7 @@ List<InlineSpan> _readerRichTextSpans(
   Color linkColor, {
   ValueChanged<String>? onLinkTap,
   bool forMeasurement = false,
+  bool applyBookColors = true,
 }) {
   final spans = <InlineSpan>[];
   for (final span in richSpans) {
@@ -691,7 +693,7 @@ List<InlineSpan> _readerRichTextSpans(
     if (span.href != null) {
       spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
     }
-    if (span.color != null) {
+    if (applyBookColors && span.color != null) {
       final cssColor = _cssColorFromString(span.color!);
       if (cssColor != null) spanStyle = spanStyle.copyWith(color: cssColor);
     }
@@ -748,6 +750,14 @@ List<InlineSpan> _readerRichTextSpans(
     }
   }
   return spans;
+}
+
+bool _applyBookColors(ReaderSettings settings, Brightness brightness) {
+  return switch (settings.theme) {
+    ReaderTheme.dark || ReaderTheme.oled || ReaderTheme.bedtime => false,
+    ReaderTheme.system => brightness != Brightness.dark,
+    _ => true,
+  };
 }
 
 List<InlineSpan> _readerHighlightedSpans(
@@ -2018,6 +2028,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         baseStyle,
         colors.link,
         forMeasurement: true,
+        applyBookColors: _applyBookColors(s, MediaQuery.platformBrightnessOf(context)),
       );
       textSpan = TextSpan(children: spans);
     } else {
