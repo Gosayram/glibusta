@@ -437,9 +437,9 @@ impl MobiHtmlParser {
     fn parse_inline(&self, chunk: &str) -> Vec<RichSpan> {
         let mut spans: Vec<RichSpan> = Vec::new();
         let mut buf = String::new();
-        let mut bold = false;
-        let mut italic = false;
-        let mut superscript = false;
+        let mut bold_depth = 0u32;
+        let mut italic_depth = 0u32;
+        let mut superscript_depth = 0u32;
         let mut href: Option<String> = None;
         let chars: Vec<char> = chunk.chars().collect();
         let len = chars.len();
@@ -470,19 +470,33 @@ impl MobiHtmlParser {
                 let is_self_closing = tag.ends_with("/>") || self.void_elements.contains(name);
 
                 if !is_closing && !is_self_closing && self.block_elements.contains(name) {
-                    self.flush_buf(&mut buf, &mut spans, bold, italic, superscript, &href);
+                    self.flush_buf(
+                        &mut buf,
+                        &mut spans,
+                        bold_depth > 0,
+                        italic_depth > 0,
+                        superscript_depth > 0,
+                        &href,
+                    );
                     i = tag_end + 1;
                     continue;
                 }
 
                 if !is_closing && !is_self_closing {
-                    self.flush_buf(&mut buf, &mut spans, bold, italic, superscript, &href);
+                    self.flush_buf(
+                        &mut buf,
+                        &mut spans,
+                        bold_depth > 0,
+                        italic_depth > 0,
+                        superscript_depth > 0,
+                        &href,
+                    );
                     if name == "b" || name == "strong" {
-                        bold = true;
+                        bold_depth = bold_depth.saturating_add(1);
                     } else if name == "i" || name == "em" {
-                        italic = true;
+                        italic_depth = italic_depth.saturating_add(1);
                     } else if name == "sup" {
-                        superscript = true;
+                        superscript_depth = superscript_depth.saturating_add(1);
                     } else if name == "a" {
                         if let Some(captures) = HREF_RE.captures(&tag) {
                             href = (1..=3)
@@ -495,13 +509,20 @@ impl MobiHtmlParser {
                 }
 
                 if is_closing {
-                    self.flush_buf(&mut buf, &mut spans, bold, italic, superscript, &href);
+                    self.flush_buf(
+                        &mut buf,
+                        &mut spans,
+                        bold_depth > 0,
+                        italic_depth > 0,
+                        superscript_depth > 0,
+                        &href,
+                    );
                     if name == "b" || name == "strong" {
-                        bold = false;
+                        bold_depth = bold_depth.saturating_sub(1);
                     } else if name == "i" || name == "em" {
-                        italic = false;
+                        italic_depth = italic_depth.saturating_sub(1);
                     } else if name == "sup" {
-                        superscript = false;
+                        superscript_depth = superscript_depth.saturating_sub(1);
                     } else if name == "a" {
                         href = None;
                     }
@@ -510,12 +531,19 @@ impl MobiHtmlParser {
                 }
 
                 if name == "br" || name == "br/" {
-                    self.flush_buf(&mut buf, &mut spans, bold, italic, superscript, &href);
+                    self.flush_buf(
+                        &mut buf,
+                        &mut spans,
+                        bold_depth > 0,
+                        italic_depth > 0,
+                        superscript_depth > 0,
+                        &href,
+                    );
                     spans.push(RichSpan {
                         text: "\n".to_string(),
-                        bold,
-                        italic,
-                        superscript,
+                        bold: bold_depth > 0,
+                        italic: italic_depth > 0,
+                        superscript: superscript_depth > 0,
                         href: href.clone(),
                         line_break: true,
                     });
@@ -534,7 +562,14 @@ impl MobiHtmlParser {
             }
         }
 
-        self.flush_buf(&mut buf, &mut spans, bold, italic, superscript, &href);
+        self.flush_buf(
+            &mut buf,
+            &mut spans,
+            bold_depth > 0,
+            italic_depth > 0,
+            superscript_depth > 0,
+            &href,
+        );
         spans
     }
 
@@ -675,5 +710,14 @@ mod tests {
         let blocks = MobiHtmlParser::new().parse("<mbp:pagebreak/><p>Привет, мир!</p>");
 
         assert_eq!(blocks[0].text, "Привет, мир!");
+    }
+
+    #[test]
+    fn preserves_outer_formatting_after_a_nested_equivalent_tag_closes() {
+        let blocks = MobiHtmlParser::new().parse("<p><b>Outer <strong>inner</strong> tail</b></p>");
+        let spans = blocks[0].rich_spans.as_ref().expect("rich spans");
+
+        assert_eq!(spans[2].text, "tail");
+        assert!(spans[2].bold);
     }
 }
