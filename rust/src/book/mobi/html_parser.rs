@@ -667,10 +667,13 @@ impl MobiHtmlParser {
                         }
                     }
                     // Unknown entity — keep as-is
-                    result.push(c);
-                    // We consumed one char above, push the rest up to semicolon
-                    for j in i + 1..=i + 1 + semi_pos {
-                        result.push(input.as_bytes()[j] as char);
+                    let entity_end = i + 2 + semi_pos;
+                    let literal = &input[i..entity_end];
+                    result.push_str(literal);
+                    // `&` was consumed by the iterator; consume the remaining
+                    // characters of the literal entity without treating byte
+                    // offsets as character counts.
+                    for _ in literal['&'.len_utf8()..].chars() {
                         chars.next();
                     }
                     continue;
@@ -719,5 +722,12 @@ mod tests {
 
         assert_eq!(spans[2].text, "tail");
         assert!(spans[2].bold);
+    }
+
+    #[test]
+    fn preserves_unknown_entities_with_unicode_content() {
+        let blocks = MobiHtmlParser::new().parse("<p>До &неизвестно; после</p>");
+
+        assert_eq!(blocks[0].text, "До &неизвестно; после");
     }
 }
