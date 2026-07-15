@@ -63,7 +63,7 @@ final class EpubHtmlParser {
       } else {
         continue;
       }
-      final trimmedText = text.trim();
+      final trimmedText = _stripCssComments(text).trim();
       if (trimmedText.isEmpty) continue;
       for (final raw in trimmedText.split('}')) {
         final trimmed = raw.trim();
@@ -88,6 +88,8 @@ final class EpubHtmlParser {
   bool _isStylesheetLink(XmlElement element) => (element.getAttribute('rel') ?? '')
       .split(RegExp(r'\s+'))
       .any((value) => value.toLowerCase() == 'stylesheet');
+
+  String _stripCssComments(String text) => text.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
 
   bool _isSupportedParagraphSelector(String selector) =>
       selector == 'p' ||

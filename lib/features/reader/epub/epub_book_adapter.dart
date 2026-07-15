@@ -164,8 +164,13 @@ class EpubBookAdapter {
     if (val == null) return null;
     final v = val.trim();
     if (v.endsWith('px')) return double.tryParse(v.substring(0, v.length - 2).trim());
-    if (v.endsWith('em')) {
-      final n = double.tryParse(v.substring(0, v.length - 2).trim());
+    final unit = v.endsWith('rem')
+        ? 'rem'
+        : v.endsWith('em')
+        ? 'em'
+        : null;
+    if (unit != null) {
+      final n = double.tryParse(v.substring(0, v.length - unit.length).trim());
       return n != null ? n * 16.0 : null;
     }
     return double.tryParse(v);

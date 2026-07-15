@@ -281,6 +281,86 @@ void main() {
     }
   });
 
+  test('ignores CSS comments when matching paragraph selectors', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_css_comment_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>
+            /* Exported by a common EPUB generator. */
+            .notice { text-align: center; }
+          </style></head><body><p class="notice">Paragraph</p></body></html>
+        ''',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+
+      expect(normalized.chapters.single.blocks.single.textAlign, TextAlign.center);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
+  test('converts rem font sizes from EPUB CSS', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_css_rem_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>p { font-size: 1.25rem; }</style></head>
+          <body><p>Paragraph</p></body></html>
+        ''',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+
+      expect(normalized.chapters.single.blocks.single.fontSize, 20);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('preserves an EPUB RTL direction in normalized metadata', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_rtl_test_');
     try {
