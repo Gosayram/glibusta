@@ -35,7 +35,7 @@ class EpubBookAdapter {
         final paragraphStyles = _paragraphStyles(block, styles);
         final indent = _parsePx(paragraphStyles['text-indent']);
         final fontSize = _parsePx(paragraphStyles['font-size']);
-        final alignment = paragraphStyles['text-align'];
+        final alignment = paragraphStyles['text-align']?.toLowerCase();
         final align = alignment != null
             ? (TextAlign.values.firstWhere(
                 (e) => e.name == alignment,
@@ -164,7 +164,7 @@ class EpubBookAdapter {
   /// MD-1.2: parse CSS px/em length to double. ponytail: only px and em.
   static double? _parsePx(String? val) {
     if (val == null) return null;
-    final v = val.trim();
+    final v = val.trim().toLowerCase();
     if (v.endsWith('px')) return double.tryParse(v.substring(0, v.length - 2).trim());
     final unit = v.endsWith('rem')
         ? 'rem'

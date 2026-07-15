@@ -103,7 +103,7 @@ final class EpubHtmlParser {
       if (d.isEmpty) continue;
       final colon = d.indexOf(':');
       if (colon < 0) continue;
-      final name = d.substring(0, colon).trim();
+      final name = d.substring(0, colon).trim().toLowerCase();
       final value = d.substring(colon + 1).trim();
       if (name.isNotEmpty && value.isNotEmpty) {
         props[name] = value;

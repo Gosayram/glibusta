@@ -361,6 +361,49 @@ void main() {
     }
   });
 
+  test('matches CSS property names case-insensitively', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp(
+      'epub_css_property_case_test_',
+    );
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>p { TEXT-ALIGN: center; FONT-SIZE: 20PX; }</style></head>
+          <body><p>Paragraph</p></body></html>
+        ''',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+      final block = normalized.chapters.single.blocks.single;
+
+      expect(block.textAlign, TextAlign.center);
+      expect(block.fontSize, 20);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('assigns unique block indices after flattening section content', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_section_index_test_');
     try {
