@@ -857,6 +857,22 @@ fn test_mobi_truncated_file_returns_an_error_without_panicking() {
 }
 
 #[test]
+fn test_mobi_preserves_safe_links_and_drops_unsafe_schemes() {
+    let mobi_bytes = create_mobi_with_text(
+        b"<html><body><p><a href=\"https://example.com\">Safe</a> <a href=\"javascript:alert(1)\">Unsafe</a></p></body></html>",
+    );
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi_bytes, None).unwrap();
+    let spans = book.chapters[0].blocks[0].rich_spans.as_ref().unwrap();
+
+    assert_eq!(spans[0].href.as_deref(), Some("https://example.com"));
+    assert!(
+        spans
+            .iter()
+            .any(|span| span.text == "Unsafe" && span.href.is_none())
+    );
+}
+
+#[test]
 fn test_mobi_builds_toc_from_detected_chapters() {
     let mobi_bytes = create_mobi_with_text(
         b"<html><body><h1>Chapter One</h1><p>First.</p><h1>Chapter Two</h1><p>Second.</p></body></html>",
