@@ -211,7 +211,10 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
             b'{' => {
                 brace_depth += 1;
                 if bytes[i + 1..].starts_with(b"\\*\\fldinst") {
-                    let end = i.saturating_add(8192).min(bytes.len());
+                    let mut end = i.saturating_add(8192).min(bytes.len());
+                    while end > i && !body.is_char_boundary(end) {
+                        end -= 1;
+                    }
                     pending_hyperlink_href = extract_rtf_hyperlink(&body[i..end]);
                 }
                 if bytes[i + 1..].starts_with(b"\\fonttbl")
@@ -255,21 +258,29 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                     break;
                 }
                 if bytes[i] == b'\'' {
-                    let hex_start = i + 1;
-                    let hex_end = hex_start.saturating_add(2);
-                    if hex_end <= bytes.len() {
+                    let mut escaped_bytes = Vec::new();
+                    loop {
+                        let hex_start = i + 1;
+                        let hex_end = hex_start.saturating_add(2);
+                        if hex_end > bytes.len() {
+                            i = bytes.len();
+                            break;
+                        }
                         if let Ok(byte_val) = u8::from_str_radix(
                             std::str::from_utf8(&bytes[hex_start..hex_end]).unwrap_or("00"),
                             16,
                         ) {
                             if byte_val >= 0x20 {
-                                append_encoded_byte(&mut span_text, byte_val, encoding_name);
+                                escaped_bytes.push(byte_val);
                             }
                         }
                         i = hex_end;
-                    } else {
-                        i = bytes.len();
+                        if bytes.get(i) != Some(&b'\\') || bytes.get(i + 1) != Some(&b'\'') {
+                            break;
+                        }
+                        i += 1;
                     }
+                    append_encoded_bytes(&mut span_text, &escaped_bytes, encoding_name);
                     continue;
                 }
                 let cmd_start = i;
@@ -548,19 +559,20 @@ fn skip_unicode_fallback(body: &str, mut index: usize, count: usize) -> usize {
 }
 
 /// Decode an RTF `\\'hh` escape with the document's declared ANSI code page.
-fn append_encoded_byte(output: &mut String, byte: u8, encoding_name: &str) {
+fn append_encoded_bytes(output: &mut String, bytes: &[u8], encoding_name: &str) {
     if encoding_name.eq_ignore_ascii_case("ibm437") {
-        output.push(if byte < 0x80 {
-            char::from(byte)
-        } else {
-            CP437_EXTENDED[(byte - 0x80) as usize]
-        });
+        for &byte in bytes {
+            output.push(if byte < 0x80 {
+                char::from(byte)
+            } else {
+                CP437_EXTENDED[(byte - 0x80) as usize]
+            });
+        }
         return;
     }
     let encoding = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
         .unwrap_or(encoding_rs::WINDOWS_1252);
-    let encoded = [byte];
-    let (decoded, _, _) = encoding.decode(&encoded);
+    let (decoded, _, _) = encoding.decode(bytes);
     output.push_str(&decoded);
 }
 
@@ -766,6 +778,17 @@ mod tests {
     fn decodes_escaped_bytes_using_the_declared_code_page() {
         let book = parse_rtf(br"{\rtf1\ansi\ansicpg1251\'cf\'f0\'e8\'e2\'e5\'f2}", None)
             .expect("parse Windows-1251 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет");
+    }
+
+    #[test]
+    fn decodes_consecutive_utf8_escaped_bytes_as_one_sequence() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi\ansicpg65001\'d0\'9f\'d1\'80\'d0\'b8\'d0\'b2\'d0\'b5\'d1\'82}",
+            None,
+        )
+        .expect("parse UTF-8 escaped RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Привет");
     }

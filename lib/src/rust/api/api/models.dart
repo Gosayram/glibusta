@@ -78,8 +78,7 @@ class BookDiff {
   static Future<BookDiff> compute({
     required NormalizedBook old,
     required NormalizedBook new_,
-  }) =>
-      RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
+  }) => RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
 
   @override
   int get hashCode =>
@@ -124,8 +123,7 @@ enum BookFormat {
         that: this,
       );
 
-  static Future<void> extensions() =>
-      RustLib.instance.api.crateApiModelsBookFormatExtensions();
+  static Future<void> extensions() => RustLib.instance.api.crateApiModelsBookFormatExtensions();
 
   static Future<BookFormat> fromExt({required String ext}) =>
       RustLib.instance.api.crateApiModelsBookFormatFromExt(ext: ext);
@@ -437,10 +435,9 @@ class NormalizedBook {
     newBook: newBook,
   );
 
-  Future<String> toJsonString() =>
-      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-        that: this,
-      );
+  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+    that: this,
+  );
 
   @override
   int get hashCode =>
@@ -490,9 +487,7 @@ class ParseWarning {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ParseWarning &&
-          runtimeType == other.runtimeType &&
-          message == other.message;
+      other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
 }
 
 class ReaderBlock {
@@ -681,8 +676,7 @@ class TocEntry {
   });
 
   @override
-  int get hashCode =>
-      title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
+  int get hashCode => title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
 
   @override
   bool operator ==(Object other) =>
