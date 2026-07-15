@@ -12,6 +12,27 @@ import 'package:glibusta/features/reader/epub/epub_parser.dart';
 import 'package:glibusta/features/reader/epub/epub_resource_resolver.dart';
 
 void main() {
+  test('parses XHTML with a UTF-8 BOM without exposing it in text', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_bom_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '\uFEFF<html><body><p>BOM-safe text</p></body></html>',
+      );
+
+      final paragraph = parsed.blocks.single as ParagraphBlock;
+      expect(paragraph.spans.map((span) => span.text).join(), 'BOM-safe text');
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('recovers an EPUB with a missing mimetype entry when its container is valid', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_recovery_test_');
     try {
