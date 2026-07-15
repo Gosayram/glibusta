@@ -785,6 +785,14 @@ mod tests {
     }
 
     #[test]
+    fn retains_text_from_an_unclosed_group() {
+        let book = parse_rtf(br"{\rtf1\ansi Unfinished text", Some("utf-8"))
+            .expect("parse incomplete RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Unfinished text");
+    }
+
+    #[test]
     fn skips_unicode_fallback_characters() {
         let book =
             parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8")).expect("parse Unicode escape");
