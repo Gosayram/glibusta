@@ -231,6 +231,7 @@ class ReaderBlock {
   final String? imageAlt;
   final String? imageCaption;
   final double? textIndent;
+  final double? fontSize;
   final TextAlign? textAlign;
   final String? noteId;
   final String? whiteSpaceMode; // MD-1.7: 'pre', 'pre-wrap', 'nowrap'
@@ -249,6 +250,7 @@ class ReaderBlock {
     this.imageAlt,
     this.imageCaption,
     this.textIndent,
+    this.fontSize,
     this.textAlign,
     this.noteId,
     this.whiteSpaceMode,
@@ -268,6 +270,7 @@ class ReaderBlock {
     imageAlt: imageAlt,
     imageCaption: imageCaption,
     textIndent: textIndent,
+    fontSize: fontSize,
     textAlign: textAlign,
     noteId: noteId,
     whiteSpaceMode: whiteSpaceMode,
@@ -289,6 +292,7 @@ class ReaderBlock {
     if (imageAlt != null) 'imageAlt': imageAlt,
     if (imageCaption != null) 'imageCaption': imageCaption,
     if (textIndent != null) 'textIndent': textIndent,
+    if (fontSize != null) 'fontSize': fontSize,
     if (textAlign != null || whiteSpaceMode != null)
       'textAlign': [
         if (textAlign != null) textAlign!.name,
@@ -320,6 +324,7 @@ class ReaderBlock {
     imageAlt: json['imageAlt'] as String?,
     imageCaption: json['imageCaption'] as String?,
     textIndent: (json['textIndent'] as num?)?.toDouble(),
+    fontSize: (json['fontSize'] as num?)?.toDouble(),
     textAlign: _parseTextAlign(json['textAlign']),
     noteId: json['noteId'] as String?,
     whiteSpaceMode: _parseWhiteSpaceMode(json['textAlign']),

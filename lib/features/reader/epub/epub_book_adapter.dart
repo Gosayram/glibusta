@@ -34,6 +34,7 @@ class EpubBookAdapter {
       if (block is epub.ParagraphBlock) {
         final paragraphStyles = _paragraphStyles(block, styles);
         final indent = _parsePx(paragraphStyles['text-indent']);
+        final fontSize = _parsePx(paragraphStyles['font-size']);
         final alignment = paragraphStyles['text-align'];
         final align = alignment != null
             ? (TextAlign.values.firstWhere(
@@ -41,13 +42,14 @@ class EpubBookAdapter {
                 orElse: () => TextAlign.left,
               ))
             : null;
-        if (indent == null && align == null) return mapped;
+        if (indent == null && fontSize == null && align == null) return mapped;
         return ReaderBlock(
           index: mapped.index,
           text: mapped.text,
           type: mapped.type,
           richSpans: mapped.richSpans,
           textIndent: indent ?? mapped.textIndent,
+          fontSize: fontSize ?? mapped.fontSize,
           textAlign: align,
         );
       }

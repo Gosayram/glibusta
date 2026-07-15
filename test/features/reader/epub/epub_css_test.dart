@@ -129,7 +129,7 @@ void main() {
             .centered { text-align: center; }
             p.centered { text-indent: 2em; }
           </style></head><body>
-            <p class="centered" style="text-indent: 24px">Paragraph</p>
+            <p class="centered" style="text-indent: 24px; font-size: 21px">Paragraph</p>
           </body></html>
         ''',
       );
@@ -156,6 +156,7 @@ void main() {
       expect(block.text, 'Paragraph');
       expect(block.textAlign, TextAlign.center);
       expect(block.textIndent, 24);
+      expect(block.fontSize, 21);
     } finally {
       await temporaryDirectory.delete(recursive: true);
     }

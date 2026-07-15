@@ -522,7 +522,10 @@ Widget _buildReaderBlock(
           : s.paragraphSpacing;
       // MD-1.7: white-space detection — ws:pre uses monospace, ws:nowrap prevents wrapping
       final wsMode = block.whiteSpaceMode;
-      final effectiveStyle = wsMode == 'pre' ? style.copyWith(fontFamily: 'monospace') : style;
+      var effectiveStyle = wsMode == 'pre' ? style.copyWith(fontFamily: 'monospace') : style;
+      if (block.fontSize != null) {
+        effectiveStyle = effectiveStyle.copyWith(fontSize: block.fontSize);
+      }
       final effectiveAlign = wsMode != null
           ? textAlign
           : (s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign));
@@ -1835,6 +1838,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       block.type,
       block.headingLevel,
       block.textIndent,
+      block.fontSize,
       block.richSpans,
       block.listItems,
       block.tableRows,
@@ -2032,7 +2036,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       );
       textSpan = TextSpan(children: spans);
     } else {
-      final fontSize = s.fontSize * effectiveFontScale;
+      final fontSize = block.fontSize ?? s.fontSize * effectiveFontScale;
       final textStyle = _readerTextStyle(s, colors).copyWith(
         fontSize: fontSize,
         height: s.lineHeight,
