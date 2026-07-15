@@ -276,6 +276,18 @@ mod tests {
     }
 
     #[test]
+    fn detects_chapters_separated_by_classic_mac_line_endings() {
+        let book = parse_txt(
+            b"A Mac Book\r\rChapter 1\r\rThe first chapter.",
+            Some("utf-8"),
+        )
+        .expect("parse TXT");
+
+        assert_eq!(book.chapters.len(), 2);
+        assert_eq!(book.chapters[1].title, "Chapter 1");
+    }
+
+    #[test]
     fn strips_utf8_bom_from_the_first_paragraph() {
         let book = parse_txt(b"\xEF\xBB\xBFBOM title\n\nBody", None).expect("parse BOM TXT");
 
