@@ -19,7 +19,7 @@ final class EpubHtmlParser {
   Future<
     ({
       List<ReaderBlock> blocks,
-      Map<String, Map<String, String>>? styles,
+      List<EpubCssRule>? styles,
       String? textDirection,
     })
   >
@@ -28,7 +28,7 @@ final class EpubHtmlParser {
     required String htmlText,
   }) async {
     final doc = XmlDocument.parse(htmlText);
-    final styles = _extractCss(doc);
+    final styles = await _extractCss(doc, chapterPath);
     final body = _findBody(doc);
     if (body == null) return (blocks: const <ReaderBlock>[], styles: styles, textDirection: null);
     final blocks = await _processChildren(body, chapterPath);
@@ -41,28 +41,58 @@ final class EpubHtmlParser {
     );
   }
 
-  /// MD-1.1: Extract CSS rules from <style> tags in the document.
-  /// ponytail: simple rule parser — tag, .class, tag.class selectors only.
-  Map<String, Map<String, String>>? _extractCss(XmlDocument doc) {
-    Map<String, Map<String, String>>? rules;
-    for (final style in doc.findAllElements('style')) {
-      final text = style.innerText.trim();
-      if (text.isEmpty) continue;
-      for (final raw in text.split('}')) {
+  /// Extract supported CSS rules in source order so the adapter can apply the
+  /// CSS cascade rather than the order of classes in the XHTML attribute.
+  Future<List<EpubCssRule>?> _extractCss(XmlDocument doc, String chapterPath) async {
+    List<EpubCssRule>? rules;
+    for (final element in doc.descendants.whereType<XmlElement>()) {
+      final String? text;
+      if (element.localName == 'style') {
+        text = element.innerText;
+      } else if (element.localName == 'link' && _isStylesheetLink(element)) {
+        final href = element.getAttribute('href');
+        final resource = href == null
+            ? null
+            : resolver.resolveFromHref(chapterPath: chapterPath, href: href);
+        if (resource == null || resource.type != EpubResourceType.css) continue;
+        try {
+          text = epub.readText(resource.fullPath);
+        } on Object catch (_) {
+          continue;
+        }
+      } else {
+        continue;
+      }
+      final trimmedText = text.trim();
+      if (trimmedText.isEmpty) continue;
+      for (final raw in trimmedText.split('}')) {
         final trimmed = raw.trim();
         if (trimmed.isEmpty) continue;
         final brace = trimmed.indexOf('{');
         if (brace < 0) continue;
-        final selector = trimmed.substring(0, brace).trim();
+        final selectors = trimmed.substring(0, brace).split(',');
         final body = trimmed.substring(brace + 1).trim();
-        if (selector.isEmpty || body.isEmpty) continue;
-        // Skip descendant selectors, pseudo-classes, @rules
-        if (selector.contains(' ') || selector.contains(':')) continue;
-        (rules ??= {})[selector] = (rules[selector] ?? {})..addAll(_parseCssBody(body));
+        if (body.isEmpty) continue;
+        final properties = _parseCssBody(body);
+        if (properties.isEmpty) continue;
+        for (final rawSelector in selectors) {
+          final selector = rawSelector.trim();
+          if (!_isSupportedParagraphSelector(selector)) continue;
+          (rules ??= []).add(EpubCssRule(selector: selector, properties: properties));
+        }
       }
     }
     return rules;
   }
+
+  bool _isStylesheetLink(XmlElement element) => (element.getAttribute('rel') ?? '')
+      .split(RegExp(r'\s+'))
+      .any((value) => value.toLowerCase() == 'stylesheet');
+
+  bool _isSupportedParagraphSelector(String selector) =>
+      selector == 'p' ||
+      RegExp(r'^\.[-_a-zA-Z][-_a-zA-Z0-9]*$').hasMatch(selector) ||
+      RegExp(r'^p\.[-_a-zA-Z][-_a-zA-Z0-9]*$').hasMatch(selector);
 
   Map<String, String> _parseCssBody(String body) {
     final props = <String, String>{};

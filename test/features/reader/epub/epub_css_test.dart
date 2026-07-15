@@ -183,6 +183,104 @@ void main() {
     }
   });
 
+  test('applies CSS specificity and source order independently of class order', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_css_cascade_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>
+            p { text-align: left; }
+            p.emphasis { text-align: right; }
+            .notice { text-align: center; }
+            .notice { text-indent: 1em; }
+            .notice { text-indent: 2em; }
+          </style></head><body><p class="emphasis notice">Paragraph</p></body></html>
+        ''',
+      );
+
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+      final block = normalized.chapters.single.blocks.single;
+
+      expect(block.textAlign, TextAlign.right);
+      expect(block.textIndent, 32);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
+  test('includes linked stylesheets in the chapter CSS cascade', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_linked_css_test_');
+    try {
+      final archive = Archive()
+        ..addFile(ArchiveFile.string('OEBPS/styles/book.css', '.notice { text-align: center; }'));
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver({
+          'styles': const EpubResource(
+            id: 'styles',
+            href: 'styles/book.css',
+            fullPath: 'OEBPS/styles/book.css',
+            mediaType: 'text/css',
+            properties: {},
+            type: EpubResourceType.css,
+          ),
+        }),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(archive),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'OEBPS/text/chapter.xhtml',
+        htmlText: '''
+          <html><head><link rel="stylesheet" href="../styles/book.css" /></head>
+          <body><p class="notice">Paragraph</p></body></html>
+        ''',
+      );
+
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'text/chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+
+      expect(normalized.chapters.single.blocks.single.textAlign, TextAlign.center);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('preserves an EPUB RTL direction in normalized metadata', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_rtl_test_');
     try {

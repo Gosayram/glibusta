@@ -794,6 +794,14 @@ mod tests {
     }
 
     #[test]
+    fn decodes_shift_jis_escaped_bytes_as_one_sequence() {
+        let book = parse_rtf(br"{\rtf1\ansi\ansicpg932\'93\'fa\'96\'7b}", None)
+            .expect("parse Shift-JIS escaped RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "日本");
+    }
+
+    #[test]
     fn decodes_mac_roman_documents() {
         let book = parse_rtf(b"{\\rtf1\\mac Caf\x8e}", None).expect("parse MacRoman RTF");
 

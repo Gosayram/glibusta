@@ -79,15 +79,35 @@ class EpubBookAdapter {
 
   Map<String, String> _paragraphStyles(
     epub.ParagraphBlock block,
-    Map<String, Map<String, String>>? styles,
+    List<epub.EpubCssRule>? styles,
   ) {
-    final result = <String, String>{...?(styles?['p'])};
-    for (final cssClass in block.cssClasses) {
-      result.addAll(styles?['.$cssClass'] ?? const {});
-      result.addAll(styles?['p.$cssClass'] ?? const {});
+    final result = <String, String>{};
+    final priorities = <String, int>{};
+    for (var sourceOrder = 0; sourceOrder < (styles?.length ?? 0); sourceOrder++) {
+      final rule = styles![sourceOrder];
+      final specificity = _matchingParagraphSpecificity(rule.selector, block.cssClasses);
+      if (specificity == null) continue;
+      for (final entry in rule.properties.entries) {
+        final priority = specificity * (styles.length + 1) + sourceOrder;
+        if (priority >= (priorities[entry.key] ?? -1)) {
+          result[entry.key] = entry.value;
+          priorities[entry.key] = priority;
+        }
+      }
     }
     result.addAll(block.inlineStyles);
     return result;
+  }
+
+  int? _matchingParagraphSpecificity(String selector, List<String> cssClasses) {
+    if (selector == 'p') return 1;
+    if (selector.startsWith('p.')) {
+      return cssClasses.contains(selector.substring(2)) ? 11 : null;
+    }
+    if (selector.startsWith('.')) {
+      return cssClasses.contains(selector.substring(1)) ? 10 : null;
+    }
+    return null;
   }
 
   ReaderBlock? _toBlock(epub.ReaderBlock block, int index) {

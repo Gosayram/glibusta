@@ -44,13 +44,24 @@ final class EpubChapter {
   final List<ReaderBlock> blocks;
   final bool linear;
 
-  /// CSS rules extracted from chapter's <style> tags.
-  /// Key: selector ("p", ".poem", "p.poem"), Value: property map.
-  final Map<String, Map<String, String>>? styles;
+  /// CSS rules extracted from chapter's <style> tags, in stylesheet order.
+  ///
+  /// Keeping rules separate is necessary for the CSS cascade: two selectors
+  /// may set the same property with different specificity.
+  final List<EpubCssRule>? styles;
 
   /// LW-6.1: SMIL media overlay entries for karaoke audio sync.
   final List<SmilEntry>? smilEntries;
   final String? textDirection;
+}
+
+final class EpubCssRule {
+  const EpubCssRule({required this.selector, required this.properties});
+
+  /// Supported selectors are intentionally limited to `p`, `.class`, and
+  /// `p.class`, which are sufficient for paragraph layout properties.
+  final String selector;
+  final Map<String, String> properties;
 }
 
 sealed class ReaderBlock {

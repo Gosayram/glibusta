@@ -9,6 +9,8 @@ use quick_xml::events::{BytesStart, Event};
 use serde::Deserialize;
 use std::collections::HashMap;
 
+type ListNumberingKey = (String, String);
+
 pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > crate::api::models::MAX_FILE_SIZE {
         anyhow::bail!("DOCX exceeds maximum file size");
@@ -36,11 +38,13 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
     let image_targets = parse_image_relationships(&mut zip, encoding_name)?;
     let footnotes = parse_footnotes(&mut zip, encoding_name)?;
+    let numbering_styles = parse_numbering_styles(&mut zip, encoding_name)?;
     let (blocks, chapter_title) = parse_document_xml_with_hyperlinks(
         &doc_text,
         &hyperlink_targets,
         &image_targets,
         &footnotes,
+        &numbering_styles,
     )?;
 
     let id = crate::book::sha256_hex(bytes);
@@ -284,6 +288,89 @@ fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap
     Ok(footnotes)
 }
 
+/// Resolve Word's `numId` and nesting level to whether it is an ordered list.
+/// DOCX keeps this information in `word/numbering.xml`, separate from the
+/// paragraphs that reference it.
+fn parse_numbering_styles(
+    zip: &mut ZipFile<'_>,
+    encoding_name: &str,
+) -> Result<HashMap<ListNumberingKey, bool>> {
+    let Some(bytes) =
+        zip.read_file_limited("word/numbering.xml", crate::api::models::MAX_CHAPTER_SIZE)?
+    else {
+        return Ok(HashMap::new());
+    };
+    let text = decode_bytes(&bytes, encoding_name);
+
+    let mut reader = Reader::from_str(&text);
+    let mut abstract_levels = HashMap::<ListNumberingKey, bool>::new();
+    let mut abstract_id: Option<String> = None;
+    let mut level: Option<String> = None;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"abstractNum" => abstract_id = word_attribute(element, b"abstractNumId"),
+                    b"lvl" => level = word_attribute(element, b"ilvl"),
+                    b"numFmt" => {
+                        if let (Some(abstract_id), Some(level), Some(format)) = (
+                            abstract_id.as_ref(),
+                            level.as_ref(),
+                            word_value_attribute(element),
+                        ) {
+                            abstract_levels.insert(
+                                (abstract_id.clone(), level.clone()),
+                                !format.eq_ignore_ascii_case("bullet"),
+                            );
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref element)) => match element.local_name().as_ref() {
+                b"abstractNum" => abstract_id = None,
+                b"lvl" => level = None,
+                _ => {}
+            },
+            Err(_) => return Ok(HashMap::new()),
+            Ok(_) => {}
+        }
+    }
+
+    let mut reader = Reader::from_str(&text);
+    let mut styles = HashMap::new();
+    let mut num_id: Option<String> = None;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref element)) | Ok(Event::Empty(ref element)) => {
+                match element.local_name().as_ref() {
+                    b"num" => num_id = word_attribute(element, b"numId"),
+                    b"abstractNumId" => {
+                        if let (Some(num_id), Some(abstract_id)) =
+                            (num_id.as_ref(), word_value_attribute(element))
+                        {
+                            for ((resolved_abstract_id, level), ordered) in &abstract_levels {
+                                if resolved_abstract_id == &abstract_id {
+                                    styles.insert((num_id.clone(), level.clone()), *ordered);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"num" => {
+                num_id = None;
+            }
+            Err(_) => return Ok(HashMap::new()),
+            Ok(_) => {}
+        }
+    }
+    Ok(styles)
+}
+
 /// Extract image metadata from word/media/ without loading bytes.
 /// Use `get_asset_bytes()` (RCE-10.2) for lazy data loading.
 fn extract_images(zip: &mut ZipFile<'_>) -> Vec<EmbeddedImage> {
@@ -318,7 +405,13 @@ fn mime_from_name(name: &str) -> String {
 
 #[cfg(test)]
 fn parse_document_xml(text: &str) -> Result<(Vec<ReaderBlock>, String)> {
-    parse_document_xml_with_hyperlinks(text, &HashMap::new(), &HashMap::new(), &HashMap::new())
+    parse_document_xml_with_hyperlinks(
+        text,
+        &HashMap::new(),
+        &HashMap::new(),
+        &HashMap::new(),
+        &HashMap::new(),
+    )
 }
 
 fn parse_document_xml_with_hyperlinks(
@@ -326,6 +419,7 @@ fn parse_document_xml_with_hyperlinks(
     hyperlink_targets: &HashMap<String, String>,
     image_targets: &HashMap<String, String>,
     footnotes: &HashMap<String, String>,
+    numbering_styles: &HashMap<ListNumberingKey, bool>,
 ) -> Result<(Vec<ReaderBlock>, String)> {
     let mut reader = Reader::from_str(text);
     // Whitespace between XML elements is ignored outside runs; preserve spaces
@@ -344,7 +438,9 @@ fn parse_document_xml_with_hyperlinks(
     let mut in_table_cell = false;
     let mut paragraph_is_numbered = false;
     let mut paragraph_numbering_id: Option<String> = None;
-    let mut pending_list_numbering_id: Option<String> = None;
+    let mut paragraph_numbering_level: Option<String> = None;
+    let mut pending_list_numbering_key: Option<ListNumberingKey> = None;
+    let mut pending_list_ordered = true;
     let mut pstyle_val = String::new();
 
     let mut current_text = String::new();
@@ -375,8 +471,13 @@ fn parse_document_xml_with_hyperlinks(
                 match tag.as_str() {
                     "body" => in_body = true,
                     "tbl" if in_body && !in_table => {
-                        flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
-                        pending_list_numbering_id = None;
+                        flush_docx_list(
+                            &mut blocks,
+                            &mut pending_list_items,
+                            &mut block_index,
+                            pending_list_ordered,
+                        );
+                        pending_list_numbering_key = None;
                         in_table = true;
                         table_rows.clear();
                     }
@@ -401,10 +502,14 @@ fn parse_document_xml_with_hyperlinks(
                         pstyle_val.clear();
                         paragraph_is_numbered = false;
                         paragraph_numbering_id = None;
+                        paragraph_numbering_level = None;
                     }
                     "numPr" if in_paragraph => paragraph_is_numbered = true,
                     "numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
+                    }
+                    "ilvl" if in_paragraph && paragraph_is_numbered => {
+                        paragraph_numbering_level = word_value_attribute(e);
                     }
                     "hyperlink" if in_paragraph => {
                         current_span_href = word_attribute(e, b"anchor")
@@ -482,8 +587,13 @@ fn parse_document_xml_with_hyperlinks(
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => {
-                        flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
-                        pending_list_numbering_id = None;
+                        flush_docx_list(
+                            &mut blocks,
+                            &mut pending_list_items,
+                            &mut block_index,
+                            pending_list_ordered,
+                        );
+                        pending_list_numbering_key = None;
                         in_body = false;
                     }
                     "pStyle" => in_pstyle = false,
@@ -554,13 +664,27 @@ fn parse_document_xml_with_hyperlinks(
                                 note_id: None,
                             };
                             if paragraph_is_numbered {
-                                if pending_list_numbering_id != paragraph_numbering_id {
+                                let numbering_key =
+                                    paragraph_numbering_id.clone().map(|numbering_id| {
+                                        (
+                                            numbering_id,
+                                            paragraph_numbering_level.clone().unwrap_or_default(),
+                                        )
+                                    });
+                                let ordered = numbering_key
+                                    .as_ref()
+                                    .and_then(|key| numbering_styles.get(key))
+                                    .copied()
+                                    .unwrap_or(true);
+                                if pending_list_numbering_key != numbering_key {
                                     flush_docx_list(
                                         &mut blocks,
                                         &mut pending_list_items,
                                         &mut block_index,
+                                        pending_list_ordered,
                                     );
-                                    pending_list_numbering_id = paragraph_numbering_id.clone();
+                                    pending_list_numbering_key = numbering_key;
+                                    pending_list_ordered = ordered;
                                 }
                                 pending_list_items.push(paragraph);
                             } else {
@@ -568,20 +692,31 @@ fn parse_document_xml_with_hyperlinks(
                                     &mut blocks,
                                     &mut pending_list_items,
                                     &mut block_index,
+                                    pending_list_ordered,
                                 );
-                                pending_list_numbering_id = None;
+                                pending_list_numbering_key = None;
                                 paragraph.index = block_index;
                                 blocks.push(paragraph);
                                 block_index += 1;
                             }
                         } else if !in_table_cell {
-                            flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
-                            pending_list_numbering_id = None;
+                            flush_docx_list(
+                                &mut blocks,
+                                &mut pending_list_items,
+                                &mut block_index,
+                                pending_list_ordered,
+                            );
+                            pending_list_numbering_key = None;
                         }
 
                         if !in_table_cell && !current_image_assets.is_empty() {
-                            flush_docx_list(&mut blocks, &mut pending_list_items, &mut block_index);
-                            pending_list_numbering_id = None;
+                            flush_docx_list(
+                                &mut blocks,
+                                &mut pending_list_items,
+                                &mut block_index,
+                                pending_list_ordered,
+                            );
+                            pending_list_numbering_key = None;
                             for image_url in std::mem::take(&mut current_image_assets) {
                                 blocks.push(ReaderBlock {
                                     index: block_index,
@@ -665,6 +800,9 @@ fn parse_document_xml_with_hyperlinks(
                     "numId" if in_paragraph && paragraph_is_numbered => {
                         paragraph_numbering_id = word_value_attribute(e);
                     }
+                    "ilvl" if in_paragraph && paragraph_is_numbered => {
+                        paragraph_numbering_level = word_value_attribute(e);
+                    }
                     "footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
@@ -731,6 +869,7 @@ fn flush_docx_list(
     blocks: &mut Vec<ReaderBlock>,
     pending_items: &mut Vec<ReaderBlock>,
     block_index: &mut i32,
+    ordered: bool,
 ) {
     if pending_items.is_empty() {
         return;
@@ -749,7 +888,7 @@ fn flush_docx_list(
         note_ref: None,
         rich_spans: None,
         heading_level: None,
-        ordered: Some(true),
+        ordered: Some(ordered),
         list_items: Some(items),
         table_rows: None,
         image_alt: None,
@@ -921,6 +1060,46 @@ mod tests {
     }
 
     #[test]
+    fn preserves_bullet_lists_from_numbering_xml() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+                <w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>One</w:t></w:r></w:p>
+                <w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="7"/></w:numPr></w:pPr><w:r><w:t>Two</w:t></w:r></w:p>
+            </w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/numbering.xml", options)
+            .expect("start numbering XML");
+        zip.write_all(
+            br#"<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:abstractNum w:abstractNumId="3"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>
+                <w:num w:numId="7"><w:abstractNumId w:val="3"/></w:num>
+            </w:numbering>"#,
+        )
+        .expect("write numbering XML");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse DOCX bullet list");
+        let list = &book.chapters[0].blocks[0];
+
+        assert_eq!(list.block_type, crate::api::models::BlockType::List);
+        assert_eq!(list.ordered, Some(false));
+        assert_eq!(list.text, "One\nTwo");
+    }
+
+    #[test]
     fn preserves_external_and_bookmark_hyperlinks() {
         let xml = r#"
             <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -936,9 +1115,14 @@ mod tests {
         let hyperlinks =
             HashMap::from([(String::from("rId7"), String::from("https://example.com"))]);
 
-        let (blocks, _) =
-            parse_document_xml_with_hyperlinks(xml, &hyperlinks, &HashMap::new(), &HashMap::new())
-                .expect("parse DOCX links");
+        let (blocks, _) = parse_document_xml_with_hyperlinks(
+            xml,
+            &hyperlinks,
+            &HashMap::new(),
+            &HashMap::new(),
+            &HashMap::new(),
+        )
+        .expect("parse DOCX links");
         let spans = blocks[0].rich_spans.as_ref().expect("rich spans");
 
         assert_eq!(blocks[0].text, "See website and chapter");
