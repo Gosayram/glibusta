@@ -275,8 +275,11 @@ impl MobiHtmlParser {
                     }
                 }
             }
-            result.push(bytes[i] as char);
-            i += 1;
+            let Some(character) = html[i..].chars().next() else {
+                break;
+            };
+            result.push(character);
+            i += character.len_utf8();
         }
 
         result
@@ -326,9 +329,10 @@ impl MobiHtmlParser {
                     let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
                     let close_tag = format!("</{}>", name);
                     if let Some(close_idx) = remaining.find(&close_tag) {
-                        let inner: String = chars[i..i + close_idx].iter().collect();
+                        let close_char_idx = remaining[..close_idx].chars().count();
+                        let inner: String = chars[i..i + close_char_idx].iter().collect();
                         buf.push_str(&inner);
-                        i = i + close_idx + close_tag.len();
+                        i = i + close_char_idx + close_tag.chars().count();
                     }
                     let s = buf.trim().to_string();
                     if !s.is_empty() {
@@ -350,9 +354,10 @@ impl MobiHtmlParser {
                     i = tag_end + 1;
                     let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
                     if let Some(close_idx) = remaining.find("</p>") {
-                        let inner: String = chars[i..i + close_idx].iter().collect();
+                        let close_char_idx = remaining[..close_idx].chars().count();
+                        let inner: String = chars[i..i + close_char_idx].iter().collect();
                         buf.push_str(&inner);
-                        i = i + close_idx + 4;
+                        i = i + close_char_idx + 4;
                     }
                     let s = buf.trim().to_string();
                     if !s.is_empty() {
@@ -369,10 +374,11 @@ impl MobiHtmlParser {
                     }
                     let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
                     if let Some(close_idx) = remaining.find("</div>") {
-                        let inner: String = chars[i..i + close_idx].iter().collect();
+                        let close_char_idx = remaining[..close_idx].chars().count();
+                        let inner: String = chars[i..i + close_char_idx].iter().collect();
                         let sub_chunks = self.split_into_block_chunks(&inner);
                         result.extend(sub_chunks);
-                        i = i + close_idx + 6;
+                        i = i + close_char_idx + 6;
                     } else {
                         buf.push_str(&tag);
                         i = tag_end + 1;
@@ -662,5 +668,12 @@ mod tests {
 
         let span = &blocks[0].rich_spans.as_ref().expect("rich span")[0];
         assert_eq!(span.href.as_deref(), Some("chapter-2.html"));
+    }
+
+    #[test]
+    fn preserves_utf8_text_while_removing_mobi_metadata_tags() {
+        let blocks = MobiHtmlParser::new().parse("<mbp:pagebreak/><p>Привет, мир!</p>");
+
+        assert_eq!(blocks[0].text, "Привет, мир!");
     }
 }
