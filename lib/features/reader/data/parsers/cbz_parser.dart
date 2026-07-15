@@ -186,7 +186,7 @@ final class CbzParser implements BookParser {
 
     try {
       final document = XmlDocument.parse(
-        utf8.decode(file.content as List<int>, allowMalformed: true),
+        _decodeComicInfoXml(file.content as List<int>),
       );
       String? value(String name) {
         final elements = document.findAllElements(name);
@@ -205,6 +205,26 @@ final class CbzParser implements BookParser {
     } on XmlException {
       return null;
     }
+  }
+
+  String _decodeComicInfoXml(List<int> bytes) {
+    if (bytes.length >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe) {
+      return _decodeUtf16(bytes, littleEndian: true);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xfe && bytes[1] == 0xff) {
+      return _decodeUtf16(bytes, littleEndian: false);
+    }
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  String _decodeUtf16(List<int> bytes, {required bool littleEndian}) {
+    final codeUnits = <int>[];
+    for (var index = 2; index + 1 < bytes.length; index += 2) {
+      final first = bytes[index];
+      final second = bytes[index + 1];
+      codeUnits.add(littleEndian ? first | (second << 8) : second | (first << 8));
+    }
+    return String.fromCharCodes(codeUnits);
   }
 }
 

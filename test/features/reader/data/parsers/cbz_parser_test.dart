@@ -22,6 +22,16 @@ void main() {
     return Uint8List.fromList(encoded);
   }
 
+  List<int> utf16LeWithBom(String value) {
+    final bytes = <int>[0xff, 0xfe];
+    for (final unit in value.codeUnits) {
+      bytes
+        ..add(unit & 0xff)
+        ..add(unit >> 8);
+    }
+    return bytes;
+  }
+
   test('parses CBZ images in natural filename order and skips non-image files', () async {
     final book = await parser.parse(createComicArchive(), fileName: 'Комикс.cbz');
 
@@ -85,19 +95,20 @@ void main() {
   });
 
   test('uses ComicInfo.xml metadata when present', () async {
-    final archive = Archive()
-      ..addFile(
-        ArchiveFile(
-          'ComicInfo.xml',
-          146,
-          utf8.encode('''
+    final comicInfo = utf8.encode('''
             <ComicInfo>
               <Title>Город героев</Title>
               <Writer>Автор</Writer>
               <Series>Серия</Series>
               <Number>7</Number>
             </ComicInfo>
-          '''),
+          ''');
+    final archive = Archive()
+      ..addFile(
+        ArchiveFile(
+          'ComicInfo.xml',
+          comicInfo.length,
+          comicInfo,
         ),
       )
       ..addFile(ArchiveFile('001.png', 1, <int>[1]));
@@ -110,6 +121,20 @@ void main() {
     expect(book.title, 'Город героев');
     expect(book.authors, ['Автор']);
     expect(book.metadata, {'series': 'Серия', 'number': '7'});
+  });
+
+  test('reads UTF-16 ComicInfo.xml metadata', () async {
+    final comicInfo = utf16LeWithBom('<ComicInfo><Title>Комикс</Title></ComicInfo>');
+    final archive = Archive()
+      ..addFile(ArchiveFile('ComicInfo.xml', comicInfo.length, comicInfo))
+      ..addFile(ArchiveFile('001.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'comic.cbz',
+    );
+
+    expect(book.title, 'Комикс');
   });
 
   test('routes CBR files to the path-based native RAR parser', () async {
