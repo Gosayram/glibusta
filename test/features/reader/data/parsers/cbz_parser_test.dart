@@ -38,6 +38,12 @@ void main() {
     );
   });
 
+  test('parses a CBZ archive with a generic ZIP filename', () async {
+    final book = await parser.parse(createComicArchive(), fileName: 'comic.zip');
+
+    expect(book.chapters.single.blocks, hasLength(3));
+  });
+
   test('keeps natural page order across nested chapter directories', () async {
     final archive = Archive()
       ..addFile(ArchiveFile('Chapter02/10.jpg', 1, <int>[4]))

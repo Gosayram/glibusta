@@ -193,6 +193,54 @@ fn test_fb2_zip_uses_the_first_regular_book_when_multiple_are_present() {
     assert_eq!(book.title, "Туманность Андромеды");
 }
 
+#[test]
+fn test_path_parser_opens_fb2_zip() {
+    let path = std::env::temp_dir().join(format!(
+        "glibusta_fb2_zip_{}_{}.fb2.zip",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("book.fb2", options)
+        .expect("create FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write FB2 fixture");
+    zip.finish().expect("finish FB2.ZIP fixture");
+    fs::write(&path, buffer.into_inner()).expect("write FB2.ZIP fixture");
+
+    let result = glibusta_core::api::api::parse_book(path.to_string_lossy().into_owned());
+    let _ = fs::remove_file(&path);
+    let book = result.expect("path parser should open .fb2.zip");
+
+    assert_eq!(book.title, "Туманность Андромеды");
+}
+
+#[test]
+fn test_fb2_preserves_paragraphs_with_windows_line_endings() {
+    let xml = MINIMAL_FB2.replace("\n", "\r\n");
+
+    let book = glibusta_core::book::fb2::parse_fb2(xml.as_bytes(), None)
+        .expect("parse FB2 with Windows line endings");
+    let blocks = &book.chapters[0].blocks;
+
+    assert!(
+        blocks
+            .iter()
+            .any(|block| block.text == "Звёзды сияли над пустыней.")
+    );
+    assert!(
+        blocks
+            .iter()
+            .any(|block| block.text == "Ветер доносил запах полыни.")
+    );
+}
+
 // ---------------------------------------------------------------------------
 // TXT tests — encoding detection + chapter splitting
 // ---------------------------------------------------------------------------
@@ -484,6 +532,7 @@ This is a second paragraph.\par
 #[test]
 fn test_book_format_from_ext() {
     assert_eq!(BookFormat::from_ext("fb2"), BookFormat::Fb2);
+    assert_eq!(BookFormat::from_ext("zip"), BookFormat::Fb2);
     assert_eq!(BookFormat::from_ext("ePuB"), BookFormat::Epub);
     assert_eq!(BookFormat::from_ext("TXT"), BookFormat::Txt);
     assert_eq!(BookFormat::from_ext("docx"), BookFormat::Docx);

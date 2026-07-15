@@ -169,7 +169,7 @@ impl BookFormat {
 
     pub fn from_ext(ext: &str) -> Self {
         match ext.to_lowercase().as_str() {
-            "fb2" | "fb2.zip" => BookFormat::Fb2,
+            "fb2" | "fb2.zip" | "zip" => BookFormat::Fb2,
             "epub" => BookFormat::Epub,
             "txt" => BookFormat::Txt,
             "docx" | "docm" => BookFormat::Docx,

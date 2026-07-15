@@ -14,6 +14,7 @@ import '../../library/domain/book_file_repository.dart';
 import '../epub/epub_book_adapter.dart';
 import '../epub/epub_image_store.dart';
 import '../epub/epub_parser.dart' as new_epub;
+import 'parsers/book_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
@@ -139,7 +140,7 @@ class BookOpenService {
     if (parser == null) {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
     }
-    final book = await parser
+    Future<NormalizedBook> parseWithTimeout(BookParser selectedParser) => selectedParser
         .parseFile(filePath)
         .timeout(
           _parsingTimeout,
@@ -147,6 +148,15 @@ class BookOpenService {
             'Разбор ${bookFormat.name} занял слишком много времени.',
           ),
         );
+
+    NormalizedBook book;
+    try {
+      book = await parseWithTimeout(parser);
+    } on ParserFailure catch (_) {
+      if (!filePath.toLowerCase().endsWith('.zip')) rethrow;
+      final cbzParser = _registry.parserFor(BookFormat.cbz);
+      book = await parseWithTimeout(cbzParser);
+    }
     final cleaned = book.withCleanedBlocks();
     if (bookFormat != BookFormat.docx || bookId == null) return cleaned;
 

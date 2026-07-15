@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
 
@@ -264,11 +265,24 @@ class BookImportService {
     }
 
     try {
-      ctx.book = await parser.parse(
-        ctx.bytes,
-        fileName: ctx.filePath.split('/').last,
-        forcedEncoding: ctx.forcedEncoding,
-      );
+      try {
+        ctx.book = await parser.parse(
+          ctx.bytes,
+          fileName: ctx.filePath.split('/').last,
+          forcedEncoding: ctx.forcedEncoding,
+        );
+      } on ParserFailure catch (_) {
+        if (ctx.ext != 'zip') rethrow;
+        ctx.book = await _registry
+            .parserFor(BookFormat.cbz)
+            .parse(
+              ctx.bytes,
+              fileName: ctx.filePath.split('/').last,
+              forcedEncoding: ctx.forcedEncoding,
+            );
+        ctx.format = BookFormat.cbz;
+      }
+
       if (ctx.book!.metadata != null) {
         ctx.coverBytes = ctx.book!.metadata!['mobiCoverBytes'] as Uint8List?;
       }
@@ -413,7 +427,7 @@ class BookImportService {
     if (!importableExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
-    final format = bookFormatForImportExtension(ext);
+    var format = bookFormatForImportExtension(ext);
     if (external.size > 0 && isBookFileTooLarge(format, external.size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, external.size));
     }
@@ -497,7 +511,14 @@ class BookImportService {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }
 
-      final book = await parser.parseFile(cachedPath);
+      late final NormalizedBook book;
+      try {
+        book = await parser.parseFile(cachedPath);
+      } on ParserFailure catch (_) {
+        if (ext != 'zip') rethrow;
+        book = await _registry.parserFor(BookFormat.cbz).parseFile(cachedPath);
+        format = BookFormat.cbz;
+      }
 
       Uint8List? extCoverBytes;
       if (book.metadata != null) {
@@ -773,7 +794,7 @@ class _ImportCtx {
   String? externalUri;
 
   late final String ext;
-  late final BookFormat format;
+  late BookFormat format;
   late final File file;
   late final Uint8List bytes;
   late final int fileSize;
