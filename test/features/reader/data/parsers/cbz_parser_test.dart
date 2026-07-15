@@ -71,6 +71,13 @@ void main() {
     );
   });
 
+  test('returns a parser failure for corrupted CBZ bytes', () async {
+    await expectLater(
+      parser.parse(Uint8List.fromList(<int>[0x50, 0x4b, 0x03]), fileName: 'broken.cbz'),
+      throwsA(isA<ParserFailure>()),
+    );
+  });
+
   test('uses ComicInfo.xml metadata when present', () async {
     final archive = Archive()
       ..addFile(
