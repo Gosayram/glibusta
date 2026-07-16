@@ -404,6 +404,46 @@ void main() {
     }
   });
 
+  test('applies supported media-query CSS rules', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_css_media_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>
+            @media screen { p { text-align: justify; } }
+          </style></head><body><p>Paragraph</p></body></html>
+        ''',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Test',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+              styles: parsed.styles,
+            ),
+          ],
+          resources: const {},
+        ),
+        'test',
+      );
+
+      expect(normalized.chapters.single.blocks.single.textAlign, TextAlign.justify);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('assigns unique block indices after flattening section content', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_section_index_test_');
     try {

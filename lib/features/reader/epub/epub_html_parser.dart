@@ -63,7 +63,7 @@ final class EpubHtmlParser {
       } else {
         continue;
       }
-      final trimmedText = _stripCssComments(text).trim();
+      final trimmedText = _expandSupportedMediaRules(_stripCssComments(text)).trim();
       if (trimmedText.isEmpty) continue;
       for (final raw in trimmedText.split('}')) {
         final trimmed = raw.trim();
@@ -90,6 +90,48 @@ final class EpubHtmlParser {
       .any((value) => value.toLowerCase() == 'stylesheet');
 
   String _stripCssComments(String text) => text.replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
+
+  /// Keeps rules from CSS media blocks that unambiguously target the reader.
+  /// Viewport-dependent and print rules are intentionally ignored because this
+  /// lightweight parser does not evaluate media features.
+  String _expandSupportedMediaRules(String text) {
+    final result = StringBuffer();
+    var index = 0;
+    while (index < text.length) {
+      final mediaStart = text.toLowerCase().indexOf('@media', index);
+      if (mediaStart < 0) {
+        result.write(text.substring(index));
+        break;
+      }
+      result.write(text.substring(index, mediaStart));
+      final openBrace = text.indexOf('{', mediaStart);
+      if (openBrace < 0) {
+        result.write(text.substring(mediaStart));
+        break;
+      }
+      var depth = 1;
+      var closeBrace = openBrace + 1;
+      while (closeBrace < text.length && depth > 0) {
+        final character = text[closeBrace];
+        if (character == '{') depth++;
+        if (character == '}') depth--;
+        closeBrace++;
+      }
+      if (depth != 0) {
+        result.write(text.substring(mediaStart));
+        break;
+      }
+      final query = text.substring(mediaStart + '@media'.length, openBrace).trim().toLowerCase();
+      if (query == 'screen' ||
+          query == 'all' ||
+          query.startsWith('screen ') ||
+          query.startsWith('all ')) {
+        result.write(_expandSupportedMediaRules(text.substring(openBrace + 1, closeBrace - 1)));
+      }
+      index = closeBrace;
+    }
+    return result.toString();
+  }
 
   bool _isSupportedParagraphSelector(String selector) =>
       selector == 'p' ||
