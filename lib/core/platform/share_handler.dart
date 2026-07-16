@@ -8,16 +8,18 @@ import '../../features/library/data/book_import_service.dart';
 import '../../features/reader/data/parsers/format_detector.dart';
 import '../logging/app_logger.dart';
 
+typedef SharedBookImporter = Future<ImportResult> Function(String filePath);
+
 class ShareHandler {
   StreamSubscription<List<SharedMediaFile>>? _subscription;
   final _logger = AppLogger();
 
-  void init(BuildContext context, BookImportService importService) {
+  void init(BuildContext context, SharedBookImporter importFile) {
     _logger.info('ShareHandler initialized', name: 'Share');
     _subscription = ReceiveSharingIntent.instance.getMediaStream().listen(
       (files) {
         if (!context.mounted) return;
-        _handleSharedFiles(files, context, importService);
+        _handleSharedFiles(files, context, importFile);
       },
       onError: (Object e, StackTrace st) {
         _logger.warning(
@@ -32,8 +34,9 @@ class ShareHandler {
     unawaited(
       ReceiveSharingIntent.instance.getInitialMedia().then(
         (files) {
+          unawaited(_resetInitialMedia());
           if (!context.mounted) return;
-          _handleSharedFiles(files, context, importService);
+          _handleSharedFiles(files, context, importFile);
         },
         onError: (Object e, StackTrace st) {
           _logger.warning(
@@ -47,10 +50,23 @@ class ShareHandler {
     );
   }
 
+  Future<void> _resetInitialMedia() async {
+    try {
+      await ReceiveSharingIntent.instance.reset();
+    } on Object catch (error, stackTrace) {
+      _logger.warning(
+        'Initial share intent reset failed: $error',
+        name: 'Share',
+        error: error,
+        st: stackTrace,
+      );
+    }
+  }
+
   void _handleSharedFiles(
     List<SharedMediaFile> files,
     BuildContext context,
-    BookImportService importService,
+    SharedBookImporter importFile,
   ) {
     _logger.info('Shared ${files.length} files', name: 'Share');
     for (final file in files) {
@@ -61,8 +77,7 @@ class ShareHandler {
       }
 
       unawaited(
-        importService
-            .importFile(file.path)
+        importFile(file.path)
             .then((result) {
               if (!context.mounted) return;
               unawaited(

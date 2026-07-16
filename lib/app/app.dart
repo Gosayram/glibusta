@@ -73,7 +73,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> with WidgetsBindingOb
     if (!_shareHandlerInitialized) {
       _shareHandlerInitialized = true;
       final importService = ref.read(bookImportServiceProvider);
-      _shareHandler.init(context, importService);
+      _shareHandler.init(context, importService.importFile);
     }
     if (!_downloadListenerInitialized) {
       _downloadListenerInitialized = true;
