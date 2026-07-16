@@ -108,4 +108,23 @@ void main() {
     expect(chapter, isNotNull);
     expect(chapter!.title, startsWith('Chapter '));
   });
+
+  test('rejects a book ID that could escape the cache directory', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => null,
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+
+    await expectLater(
+      service.putChapter(
+        '../outside',
+        const ReaderChapter(index: 0, title: 'Chapter', blocks: []),
+      ),
+      throwsArgumentError,
+    );
+    expect(await Directory('${root.path}/outside').exists(), isFalse);
+  });
 }

@@ -48,11 +48,13 @@ final class ReaderCacheService {
   }
 
   Future<File> _getLegacyCacheFile(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     return File('$dir/$bookId.json');
   }
 
   Future<Directory> getBookDir(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     final bookDir = Directory('$dir/$bookId');
     if (!await bookDir.exists()) {
@@ -62,8 +64,19 @@ final class ReaderCacheService {
   }
 
   Future<Directory> _getExistingBookDir(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     return Directory('$dir/$bookId');
+  }
+
+  static void _validateBookId(String bookId) {
+    if (bookId.isEmpty ||
+        bookId == '.' ||
+        bookId == '..' ||
+        bookId.contains('/') ||
+        bookId.contains(r'\')) {
+      throw ArgumentError.value(bookId, 'bookId', 'must be a single path segment');
+    }
   }
 
   File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
