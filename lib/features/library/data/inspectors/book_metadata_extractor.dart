@@ -8,13 +8,17 @@ import '../../../reader/data/parsers/parser_registry.dart';
 final class BookMetadataExtractor {
   static const _metadataTimeout = Duration(seconds: 12);
 
-  final _registry = BookParserRegistry.defaultInstance;
+  BookMetadataExtractor({BookParserRegistry? parserRegistry})
+    : _registry = parserRegistry ?? BookParserRegistry.defaultInstance;
+
+  final BookParserRegistry _registry;
 
   Future<BookMetadata> extract({
     required String path,
     required Uint8List bytes,
     required BookFormat format,
     required BookEncodingDetector encodingDetector,
+    bool isCompleteFile = true,
   }) async {
     if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.djvu) {
       return const BookMetadata();
@@ -39,6 +43,13 @@ final class BookMetadataExtractor {
         // Encoding detection timed out — proceed without forced encoding.
       } on Object catch (_) {
         // Encoding detection failed — proceed without forced encoding.
+      }
+      if (!isCompleteFile) {
+        return BookMetadata(
+          title: _titleFromFileName(fileName),
+          encoding: detectedEncoding?.encoding,
+          encodingConfidence: detectedEncoding?.confidence,
+        );
       }
       final book = await parser
           .parse(

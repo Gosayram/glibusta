@@ -71,6 +71,7 @@ final class BookFileInspector {
       bytes: metadataBytes,
       format: format,
       encodingDetector: encodingDetector,
+      isCompleteFile: metadataBytes.length == fileSize,
     );
 
     final decision = _decide(format: format, metadata: metadata);
