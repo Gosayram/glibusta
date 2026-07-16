@@ -6,6 +6,8 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/core/storage/external_book_file.dart';
+import 'package:glibusta/core/storage/storage_bridge.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
 import 'package:glibusta/features/library/data/cover_extraction_service.dart';
 import 'package:glibusta/features/library/data/inspectors/book_inspection_result.dart';
@@ -132,6 +134,53 @@ void main() {
 
       expect(results.map((result) => result.isSuccess), everyElement(isTrue));
       expect(parser.parseFileCalls, 1);
+    });
+
+    test('coalesces identical content imported from different external URIs', () async {
+      final parseStarted = Completer<void>();
+      final allowParsing = Completer<void>();
+      final parser = _RecordingParser(
+        parseStarted: parseStarted,
+        parseFileGate: allowParsing.future,
+      );
+      final storage = _TestAppFileStorage(tempDir);
+      service = BookImportService(
+        db,
+        storage,
+        CoverExtractionService(storage),
+        parserRegistry: BookParserRegistry([parser]),
+      );
+      final firstCacheFile = File('${tempDir.path}/external_first.epub');
+      final secondCacheFile = File('${tempDir.path}/external_second.epub');
+      final contents = List<int>.filled(200, 1);
+      await firstCacheFile.writeAsBytes(contents);
+      await secondCacheFile.writeAsBytes(contents);
+      final bridge = _QueuedStorageBridge([firstCacheFile.path, secondCacheFile.path]);
+      const firstExternal = ExternalBookFile(
+        uri: 'content://books/first',
+        name: 'first.epub',
+        size: 200,
+        extension: 'epub',
+      );
+      const secondExternal = ExternalBookFile(
+        uri: 'content://books/second',
+        name: 'second.epub',
+        size: 200,
+        extension: 'epub',
+      );
+
+      final firstImport = service.importFromExternal(firstExternal, bridge: bridge);
+      await parseStarted.future;
+      final secondImport = service.importFromExternal(secondExternal, bridge: bridge);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(parser.parseFileCalls, 1);
+      expect(await secondCacheFile.exists(), isFalse);
+      allowParsing.complete();
+
+      final results = await Future.wait([firstImport, secondImport]);
+      expect(results.map((result) => result.isSuccess), everyElement(isTrue));
+      expect(bridge.copyCalls, 2);
     });
   });
 
@@ -268,4 +317,33 @@ final class _TestAppFileStorage implements AppFileStorage {
 
   @override
   Future<Directory> tempDir() => _directory('temp');
+}
+
+final class _QueuedStorageBridge implements StorageBridge {
+  _QueuedStorageBridge(this._paths);
+
+  final List<String> _paths;
+  int copyCalls = 0;
+
+  @override
+  Future<String?> copyToCache(String fileUri) async {
+    final path = _paths[copyCalls];
+    copyCalls++;
+    return path;
+  }
+
+  @override
+  Future<List<ExternalBookFile>> scanBooks(String folderUri) async => const [];
+
+  @override
+  Future<int> countBooks(String folderUri) async => 0;
+
+  @override
+  Future<String?> pickFolder() async => null;
+
+  @override
+  Future<List<String>> getPersistedUris() async => const [];
+
+  @override
+  Future<bool> forgetUri(String uri) async => true;
 }

@@ -141,9 +141,27 @@ class BookImportService {
     _ImportCtx ctx,
     Future<ImportResult> Function() import,
   ) {
-    final key = '${ctx.contentHash}:${ctx.format.name}:${ctx.forcedEncoding ?? ''}';
+    final key = _contentImportKey(ctx.contentHash, ctx.format, ctx.forcedEncoding);
     return _coalesceByKey(_contentImportLocks, key, import);
   }
+
+  Future<ImportResult> _coalesceExternalContentImport({
+    required String contentHash,
+    required BookFormat format,
+    required File cacheFile,
+    required Future<ImportResult> Function() import,
+  }) async {
+    final key = _contentImportKey(contentHash, format, null);
+    final activeImport = _contentImportLocks[key];
+    if (activeImport != null) {
+      await _tryDelete(cacheFile.path);
+      return activeImport;
+    }
+    return _coalesceByKey(_contentImportLocks, key, import);
+  }
+
+  String _contentImportKey(String contentHash, BookFormat format, String? forcedEncoding) =>
+      '$contentHash:${format.name}:${forcedEncoding ?? ''}';
 
   Future<ImportResult> _coalesceByKey(
     Map<String, Future<ImportResult>> locks,
@@ -466,44 +484,77 @@ class BookImportService {
     if (!importableExtensions.contains(ext)) {
       return ImportResult.failure('Формат не поддерживается: .$ext');
     }
-    var format = bookFormatForImportExtension(ext);
+    final format = bookFormatForImportExtension(ext);
     if (external.size > 0 && isBookFileTooLarge(format, external.size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, external.size));
     }
 
-    late String bookId;
     File? cacheFile;
     try {
       final cachedPath = await bridge.copyToCache(external.uri);
       if (cachedPath == null) {
         return ImportResult.failure('Не удалось прочитать файл: ${external.name}');
       }
-      cacheFile = File(cachedPath);
-      if (!await cacheFile.exists() || await cacheFile.length() == 0) {
+      final cachedFile = File(cachedPath);
+      cacheFile = cachedFile;
+      if (!await cachedFile.exists() || await cachedFile.length() == 0) {
         await _tryDelete(cachedPath);
         return ImportResult.failure('Файл пуст: ${external.name}');
       }
 
-      final fileSize = await cacheFile.length();
+      final fileSize = await cachedFile.length();
       if (isBookFileTooLarge(format, fileSize)) {
         await _tryDelete(cachedPath);
         return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
       }
 
-      final digest = await sha256.bind(cacheFile.openRead()).first;
+      final digest = await sha256.bind(cachedFile.openRead()).first;
       final contentHash = digest.toString();
-      bookId = contentHash;
+      return _coalesceExternalContentImport(
+        contentHash: contentHash,
+        format: format,
+        cacheFile: cachedFile,
+        import: () => _importCachedExternalBook(
+          external: external,
+          cacheFile: cachedFile,
+          format: format,
+          fileSize: fileSize,
+          contentHash: contentHash,
+        ),
+      );
+    } on Object catch (e) {
+      _logger.warning(
+        'External import failed for ${external.name}: $e',
+        name: 'Import',
+        error: e,
+      );
+      if (cacheFile != null) {
+        await _tryDelete(cacheFile.path);
+      }
+      return ImportResult.failure(_friendlyImportError(e));
+    }
+  }
+
+  Future<ImportResult> _importCachedExternalBook({
+    required ExternalBookFile external,
+    required File cacheFile,
+    required BookFormat format,
+    required int fileSize,
+    required String contentHash,
+  }) async {
+    final ext = external.extension.toLowerCase();
+    final bookId = contentHash;
+    var resolvedFormat = format;
+    try {
       final existing = await _findByHash(contentHash);
       if (existing != null) {
-        await _tryDelete(cachedPath);
+        await _tryDelete(cacheFile.path);
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
-      if (const FormatCapabilityService().isDocumentOnly(format)) {
+      if (const FormatCapabilityService().isDocumentOnly(resolvedFormat)) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
-        final documentBookId = contentHash;
-        bookId = documentBookId;
-        final targetFile = await _storage.bookFile(documentBookId, format);
+        final targetFile = await _storage.bookFile(bookId, resolvedFormat);
         await targetFile.parent.create(recursive: true);
         await _moveCacheFileToStorage(cacheFile, targetFile);
 
@@ -512,10 +563,10 @@ class BookImportService {
               .into(_database.savedBooks)
               .insertOnConflictUpdate(
                 SavedBooksCompanion.insert(
-                  id: documentBookId,
+                  id: bookId,
                   title: title,
                   authorIds: const Value([]),
-                  description: Value(_documentDescription(format)),
+                  description: Value(_documentDescription(resolvedFormat)),
                   sourceUrl: Value(external.uri),
                   contentHash: Value(contentHash),
                   fileSize: Value(fileSize),
@@ -529,10 +580,10 @@ class BookImportService {
               .into(_database.downloads)
               .insertOnConflictUpdate(
                 DownloadsCompanion.insert(
-                  id: documentBookId,
-                  bookId: documentBookId,
+                  id: bookId,
+                  bookId: bookId,
                   bookTitle: Value(title),
-                  format: format.name,
+                  format: resolvedFormat.name,
                   sourceUrl: external.uri,
                   targetPath: Value(targetFile.path),
                   status: DownloadStatusDb.completed,
@@ -552,11 +603,11 @@ class BookImportService {
 
       late final NormalizedBook book;
       try {
-        book = await parser.parseFile(cachedPath);
+        book = await parser.parseFile(cacheFile.path);
       } on ParserFailure catch (_) {
         if (ext != 'zip') rethrow;
-        book = await _registry.parserFor(BookFormat.cbz).parseFile(cachedPath);
-        format = BookFormat.cbz;
+        book = await _registry.parserFor(BookFormat.cbz).parseFile(cacheFile.path);
+        resolvedFormat = BookFormat.cbz;
       }
 
       Uint8List? extCoverBytes;
@@ -566,7 +617,7 @@ class BookImportService {
 
       final targetFile = await _storage.bookFile(
         bookId,
-        format,
+        resolvedFormat,
       );
       await targetFile.parent.create(recursive: true);
       await _moveCacheFileToStorage(cacheFile, targetFile);
@@ -608,7 +659,7 @@ class BookImportService {
                 id: bookId,
                 bookId: bookId,
                 bookTitle: Value(book.title),
-                format: formatToDbString(formatForExtension(ext)),
+                format: formatToDbString(resolvedFormat),
                 sourceUrl: external.uri,
                 targetPath: Value(targetFile.path),
                 status: DownloadStatusDb.completed,
@@ -631,14 +682,9 @@ class BookImportService {
         name: 'Import',
         error: e,
       );
-      if (cacheFile != null) {
-        await _tryDelete(cacheFile.path);
-      }
+      await _tryDelete(cacheFile.path);
       try {
-        final targetFile = await _storage.bookFile(
-          bookId,
-          bookFormatForImportExtension(ext),
-        );
+        final targetFile = await _storage.bookFile(bookId, resolvedFormat);
         if (await targetFile.exists()) {
           await targetFile.delete();
         }
