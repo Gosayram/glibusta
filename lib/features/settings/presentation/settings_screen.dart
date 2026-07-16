@@ -702,6 +702,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } on MissingPluginException {
       if (!context.mounted) return;
       unawaited(SmartDialog.showToast('Недоступно на этой платформе'));
+    } on PlatformException catch (error, stackTrace) {
+      AppLogger().warning(
+        'Storage permission channel failed: ${error.message}',
+        name: 'Settings',
+        error: error,
+        st: stackTrace,
+      );
+      if (!context.mounted) return;
+      unawaited(SmartDialog.showToast('Не удалось проверить разрешение: ${error.message}'));
     }
   }
 

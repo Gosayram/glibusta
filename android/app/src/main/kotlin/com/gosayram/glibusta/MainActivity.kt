@@ -22,6 +22,13 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : FlutterFragmentActivity() {
 
+    private companion object {
+        val supportedBookExtensions = setOf(
+            "epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc",
+            "djvu", "djv", "docx", "docm", "cbz", "cbr",
+        )
+    }
+
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private val DJVU_CHANNEL = "glibusta/djvu"
     private val maxImportFileBytes = 500L * 1024 * 1024
@@ -143,8 +150,7 @@ class MainActivity : FlutterFragmentActivity() {
                     if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) {
                         result.success(true)
                     } else {
-                        pendingPermResult = result
-                        notifPermLauncher.launch(perm)
+                        requestRuntimePermission(perm, result)
                     }
                 } else {
                     result.success(true)
@@ -170,8 +176,7 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         result.success(false)
                     } else {
-                        pendingPermResult = result
-                        notifPermLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                        requestRuntimePermission(android.Manifest.permission.READ_EXTERNAL_STORAGE, result)
                     }
                 }
             }
@@ -201,10 +206,9 @@ class MainActivity : FlutterFragmentActivity() {
         val root = DocumentFile.fromTreeUri(this, treeUri)
             ?: throw IllegalStateException("Cannot access folder")
 
-        val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
         val books = mutableListOf<Map<String, Any>>()
 
-        collectBooks(root, supportedExtensions, books)
+        collectBooks(root, books)
 
         return books
     }
@@ -212,7 +216,6 @@ class MainActivity : FlutterFragmentActivity() {
     private fun countBooks(treeUri: Uri): Int {
         val root = DocumentFile.fromTreeUri(this, treeUri)
             ?: throw IllegalStateException("Cannot access folder")
-        val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
         val directories = ArrayDeque<DocumentFile>().apply { add(root) }
         var count = 0
         while (directories.isNotEmpty()) {
@@ -223,7 +226,7 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 val name = file.name ?: continue
                 val extension = name.substringAfterLast('.', "").lowercase()
-                if (file.isFile && !isHiddenOrTemporary(name) && extension in supportedExtensions) {
+                if (file.isFile && !isHiddenOrTemporary(name) && extension in supportedBookExtensions) {
                     count++
                 }
             }
@@ -233,7 +236,6 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun collectBooks(
         directory: DocumentFile,
-        supportedExtensions: Set<String>,
         books: MutableList<Map<String, Any>>,
     ) {
         val directories = ArrayDeque<DocumentFile>().apply { add(directory) }
@@ -249,7 +251,7 @@ class MainActivity : FlutterFragmentActivity() {
                 if (isHiddenOrTemporary(name)) continue
 
                 val ext = name.substringAfterLast('.', "").lowercase()
-                if (ext !in supportedExtensions) continue
+                if (ext !in supportedBookExtensions) continue
 
                 books.add(mapOf(
                     "uri" to file.uri.toString(),
@@ -320,6 +322,15 @@ class MainActivity : FlutterFragmentActivity() {
         }
         val extension = displayName?.substringAfterLast('.', "").orEmpty()
         return extension.takeIf(String::isNotBlank)?.let { ".${it}" } ?: ".tmp"
+    }
+
+    private fun requestRuntimePermission(permission: String, result: MethodChannel.Result) {
+        if (pendingPermResult != null) {
+            result.error("PERMISSION_REQUEST_IN_PROGRESS", "A permission request is already open", null)
+            return
+        }
+        pendingPermResult = result
+        notifPermLauncher.launch(permission)
     }
 
     private fun hasStoragePermission(): Boolean {
