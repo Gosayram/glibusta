@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -95,6 +96,37 @@ void main() {
       expect(results.map((result) => result.isSuccess), everyElement(isTrue));
       expect(results.first.title, results.last.title);
     });
+
+    test('coalesces identical content imported from different paths', () async {
+      final parseStarted = Completer<void>();
+      final allowParsing = Completer<void>();
+      final parser = _RecordingParser(
+        parseStarted: parseStarted,
+        parseFileGate: allowParsing.future,
+      );
+      final storage = _TestAppFileStorage(tempDir);
+      service = BookImportService(
+        db,
+        storage,
+        CoverExtractionService(storage),
+        parserRegistry: BookParserRegistry([parser]),
+      );
+      final firstFile = File('${tempDir.path}/first.epub');
+      final secondFile = File('${tempDir.path}/second.epub');
+      final contents = List<int>.filled(200, 1);
+      await firstFile.writeAsBytes(contents);
+      await secondFile.writeAsBytes(contents);
+
+      final firstImport = service.importFile(firstFile.path);
+      await parseStarted.future;
+      final secondImport = service.importFile(secondFile.path);
+      allowParsing.complete();
+
+      final results = await Future.wait([firstImport, secondImport]);
+
+      expect(results.map((result) => result.isSuccess), everyElement(isTrue));
+      expect(parser.parseFileCalls, 1);
+    });
   });
 
   group('bookFormatForImportExtension', () {
@@ -150,8 +182,12 @@ void main() {
 }
 
 final class _RecordingParser implements BookParser {
+  _RecordingParser({this.parseStarted, this.parseFileGate});
+
   int parseCalls = 0;
   int parseFileCalls = 0;
+  final Completer<void>? parseStarted;
+  final Future<void>? parseFileGate;
 
   @override
   Future<NormalizedBook> parse(
@@ -166,6 +202,10 @@ final class _RecordingParser implements BookParser {
   @override
   Future<NormalizedBook> parseFile(String filePath, {String? forcedEncoding}) async {
     parseFileCalls++;
+    if (parseStarted case final parseStarted? when !parseStarted.isCompleted) {
+      parseStarted.complete();
+    }
+    await parseFileGate;
     return const NormalizedBook(id: 'path', title: 'Path', authors: []);
   }
 

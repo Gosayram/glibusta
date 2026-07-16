@@ -47,6 +47,7 @@ class BookImportService {
 
   final BookParserRegistry _registry;
   final Map<String, Future<ImportResult>> _importLocks = {};
+  final Map<String, Future<ImportResult>> _contentImportLocks = {};
 
   static String generateAuthorId(String name) {
     final normalized = name.trim().toLowerCase();
@@ -129,20 +130,40 @@ class BookImportService {
     Future<ImportResult> Function() import,
   ) {
     final normalizedPath = filePath.replaceAll(r'\', '/');
-    final activeImport = _importLocks[normalizedPath];
+    return _coalesceByKey(_importLocks, normalizedPath, import);
+  }
+
+  /// Shares one in-flight import after its content identity is known.
+  ///
+  /// The format and explicit encoding remain part of the key because both can
+  /// change how identical bytes are interpreted.
+  Future<ImportResult> _coalesceContentImport(
+    _ImportCtx ctx,
+    Future<ImportResult> Function() import,
+  ) {
+    final key = '${ctx.contentHash}:${ctx.format.name}:${ctx.forcedEncoding ?? ''}';
+    return _coalesceByKey(_contentImportLocks, key, import);
+  }
+
+  Future<ImportResult> _coalesceByKey(
+    Map<String, Future<ImportResult>> locks,
+    String key,
+    Future<ImportResult> Function() import,
+  ) {
+    final activeImport = locks[key];
     if (activeImport != null) return activeImport;
 
     late final Future<ImportResult> result;
     result = Future.sync(import).whenComplete(() {
-      if (identical(_importLocks[normalizedPath], result)) {
-        final removedImport = _importLocks.remove(normalizedPath);
+      if (identical(locks[key], result)) {
+        final removedImport = locks.remove(key);
         assert(
           identical(removedImport, result),
           'An import lock must only remove its own in-flight result.',
         );
       }
     });
-    _importLocks[normalizedPath] = result;
+    locks[key] = result;
     return result;
   }
 
@@ -153,7 +174,10 @@ class BookImportService {
     if (inspectResult != null) return inspectResult;
 
     await _readAndHash(ctx);
+    return _coalesceContentImport(ctx, () => _completeBookImport(ctx));
+  }
 
+  Future<ImportResult> _completeBookImport(_ImportCtx ctx) async {
     final dedupResult = await _deduplicate(ctx);
     if (dedupResult != null) return dedupResult;
 
@@ -164,7 +188,7 @@ class BookImportService {
       await _copyToStorage(ctx);
       await _registerBookInDb(ctx);
     } on Object catch (e) {
-      _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
+      _logger.warning('Import failed for ${ctx.filePath}: $e', name: 'Import', error: e);
       await _cleanupFailedImport(ctx);
       return ImportResult.failure(_friendlyImportError(e));
     }
@@ -180,19 +204,22 @@ class BookImportService {
     if (inspectResult != null) return inspectResult;
 
     await _readAndHash(ctx);
+    return _coalesceContentImport(ctx, () => _completeDocumentImport(ctx));
+  }
 
+  Future<ImportResult> _completeDocumentImport(_ImportCtx ctx) async {
     final dedupResult = await _deduplicate(ctx);
     if (dedupResult != null) return dedupResult;
 
     ctx.title =
-        inspection.title ?? inspection.path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
+        ctx.inspection!.title ?? ctx.filePath.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
 
     try {
       await _copyToStorage(ctx);
       await _registerDocumentInDb(ctx);
     } on Object catch (e) {
       _logger.warning(
-        'Document import failed for ${inspection.path}: $e',
+        'Document import failed for ${ctx.filePath}: $e',
         name: 'Import',
         error: e,
       );
