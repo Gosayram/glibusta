@@ -120,6 +120,12 @@ void main() {
       final firstImport = service.importFile(firstFile.path);
       await parseStarted.future;
       final secondImport = service.importFile(secondFile.path);
+
+      // Let the second file reach the content lock while the first parser is
+      // still blocked. Releasing immediately makes this race test depend on
+      // the scheduler rather than the lock behaviour it is meant to cover.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(parser.parseFileCalls, 1);
       allowParsing.complete();
 
       final results = await Future.wait([firstImport, secondImport]);
