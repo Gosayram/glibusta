@@ -96,9 +96,6 @@ final class ReaderCacheService {
       '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryFileSequence++}.tmp',
     );
     await tmp.writeAsString(contents, flush: true);
-    if (await target.exists()) {
-      await target.delete();
-    }
     await tmp.rename(target.path);
   }
 
