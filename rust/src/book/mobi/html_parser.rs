@@ -211,12 +211,7 @@ impl MobiHtmlParser {
         while i < len {
             if bytes[i] == b'<' {
                 // Check for mbp: tag
-                if i + 5 < len
-                    && bytes[i + 1] == b'm'
-                    && bytes[i + 2] == b'b'
-                    && bytes[i + 3] == b'p'
-                    && bytes[i + 4] == b':'
-                {
+                if i + 5 < len && bytes[i + 1..i + 5].eq_ignore_ascii_case(b"mbp:") {
                     if let Some(end) = memchr::memchr(b'>', &bytes[i..]) {
                         i = i + end + 1;
                         continue;
@@ -729,5 +724,13 @@ mod tests {
         let blocks = MobiHtmlParser::new().parse("<p>До &неизвестно; после</p>");
 
         assert_eq!(blocks[0].text, "До &неизвестно; после");
+    }
+
+    #[test]
+    fn strips_uppercase_mobi_pagebreak_tags() {
+        let blocks = MobiHtmlParser::new().parse("<MBP:pagebreak/><p>Next page</p>");
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "Next page");
     }
 }
