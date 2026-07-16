@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -126,5 +127,68 @@ void main() {
       throwsArgumentError,
     );
     expect(await Directory('${root.path}/outside').exists(), isFalse);
+  });
+
+  test('rejects a manifest with duplicate chapter indices', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => const CacheSourceFingerprint(
+        format: 'txt',
+        fileSize: 1,
+        fileMtime: 1,
+        contentHash: 'hash',
+      ),
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+    const book = NormalizedBook(
+      id: 'content-hash',
+      title: 'Book',
+      authors: [],
+      chapters: [
+        ReaderChapter(index: 0, title: 'First', blocks: []),
+        ReaderChapter(index: 1, title: 'Second', blocks: []),
+      ],
+    );
+
+    await service.putBook('book', book);
+    final metadata = await service.getMetadata('book');
+    final bookDir = await service.getBookDir('book');
+    final manifestFile = File('${bookDir.path}/manifest.json');
+    final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+    manifest['chapters'] = [0, 0];
+    await manifestFile.writeAsString(jsonEncode(manifest));
+
+    expect(await service.isCacheValid('book', metadata!), isFalse);
+  });
+
+  test('rejects a chapter whose contents no longer match the manifest', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => const CacheSourceFingerprint(
+        format: 'txt',
+        fileSize: 1,
+        fileMtime: 1,
+        contentHash: 'hash',
+      ),
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+    const book = NormalizedBook(
+      id: 'content-hash',
+      title: 'Book',
+      authors: [],
+      chapters: [ReaderChapter(index: 0, title: 'Original', blocks: [])],
+    );
+
+    await service.putBook('book', book);
+    final bookDir = await service.getBookDir('book');
+    await File('${bookDir.path}/ch_0.json').writeAsString(
+      jsonEncode(const ReaderChapter(index: 0, title: 'Tampered', blocks: []).toJson()),
+    );
+
+    expect(await service.getChapter('book', 0), isNull);
   });
 }

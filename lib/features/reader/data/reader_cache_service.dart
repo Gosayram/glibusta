@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+
 import '../../../core/database/full_text_search.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -38,7 +40,7 @@ final class ReaderCacheService {
   final FullTextSearchService? _ftsService;
   final AppLogger _logger;
 
-  static const int _splitCacheVersion = 1;
+  static const int _splitCacheVersion = 2;
   static const int _parserCacheVersion = 2;
   static int _temporaryFileSequence = 0;
 
@@ -86,10 +88,14 @@ final class ReaderCacheService {
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
   Future<void> _writeJsonAtomically(File target, Object? value) async {
+    await _writeTextAtomically(target, jsonEncode(value));
+  }
+
+  Future<void> _writeTextAtomically(File target, String contents) async {
     final tmp = File(
       '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryFileSequence++}.tmp',
     );
-    await tmp.writeAsString(jsonEncode(value), flush: true);
+    await tmp.writeAsString(contents, flush: true);
     if (await target.exists()) {
       await target.delete();
     }
@@ -132,6 +138,14 @@ final class ReaderCacheService {
       final chapterFile = _getChapterFile(bookDir, index);
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
+      final expectedChecksum = await _getChapterChecksum(bookDir, index);
+      if (expectedChecksum != null && _chapterChecksum(json) != expectedChecksum) {
+        _logger.warning(
+          'Cached chapter $index for $bookId failed integrity verification',
+          name: 'ReaderCache',
+        );
+        return null;
+      }
       return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
     } on Object catch (e) {
       _logger.warning(
@@ -273,6 +287,7 @@ final class ReaderCacheService {
         final cachedContentHash = manifest['contentHash'] as String?;
         final chapterCount = manifest['chapterCount'] as int?;
         final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
+        final chapterChecksums = manifest['chapterChecksums'] as Map<String, dynamic>?;
         final source = await _fingerprintProvider(bookId);
         if (source == null) {
           return false;
@@ -284,10 +299,18 @@ final class ReaderCacheService {
             cachedFileMtime != source.fileMtime ||
             cachedContentHash != source.contentHash ||
             chapterCount != meta.chapterCount ||
-            chapters.length != meta.chapterCount) {
+            chapters.length != meta.chapterCount ||
+            chapterChecksums == null ||
+            chapterChecksums.length != meta.chapterCount) {
+          return false;
+        }
+        if (chapters.toSet().length != meta.chapterCount ||
+            chapters.any((index) => index < 0 || index >= meta.chapterCount)) {
           return false;
         }
         for (final index in chapters) {
+          final checksum = chapterChecksums['$index'];
+          if (checksum is! String || checksum.length != 64) return false;
           if (!await _getChapterFile(bookDir, index).exists()) return false;
         }
         return true;
@@ -309,9 +332,12 @@ final class ReaderCacheService {
     final metaFile = _getMetadataFile(bookDir);
     final source = await _fingerprintProvider(bookId);
     await _writeJsonAtomically(metaFile, book.toMetadata().toJson());
+    final chapterChecksums = <String, String>{};
     for (final chapter in book.chapters) {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
-      await _writeJsonAtomically(chapterFile, chapter.toJson());
+      final chapterJson = jsonEncode(chapter.toJson());
+      await _writeTextAtomically(chapterFile, chapterJson);
+      chapterChecksums['${chapter.index}'] = _chapterChecksum(chapterJson);
     }
     await _writeJsonAtomically(
       _getManifestFile(bookDir),
@@ -325,12 +351,25 @@ final class ReaderCacheService {
         'contentHash': source?.contentHash,
         'chapterCount': book.chapters.length,
         'chapters': book.chapters.map((chapter) => chapter.index).toList(),
+        'chapterChecksums': chapterChecksums,
       },
     );
 
     // Index content for full-text search
     await _indexFtsContent(bookId, book);
   }
+
+  Future<String?> _getChapterChecksum(Directory bookDir, int index) async {
+    final manifestFile = _getManifestFile(bookDir);
+    if (!await manifestFile.exists()) return null;
+    final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+    final checksums = manifest['chapterChecksums'];
+    if (checksums is! Map<String, dynamic>) return null;
+    final checksum = checksums['$index'];
+    return checksum is String ? checksum : null;
+  }
+
+  static String _chapterChecksum(String json) => sha256.convert(utf8.encode(json)).toString();
 
   Future<void> _indexFtsContent(String bookId, NormalizedBook book) async {
     if (_ftsService == null) return;
