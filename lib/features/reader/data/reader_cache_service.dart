@@ -40,6 +40,7 @@ final class ReaderCacheService {
 
   static const int _splitCacheVersion = 1;
   static const int _parserCacheVersion = 2;
+  static int _temporaryFileSequence = 0;
 
   Future<String> get booksCacheDir async {
     final dir = await _storage.cacheDir();
@@ -72,7 +73,9 @@ final class ReaderCacheService {
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
   Future<void> _writeJsonAtomically(File target, Object? value) async {
-    final tmp = File('${target.path}.tmp');
+    final tmp = File(
+      '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryFileSequence++}.tmp',
+    );
     await tmp.writeAsString(jsonEncode(value), flush: true);
     if (await target.exists()) {
       await target.delete();

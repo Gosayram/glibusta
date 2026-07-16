@@ -84,4 +84,28 @@ void main() {
     expect(await image.exists(), isTrue);
     expect(await service.getMetadata('book'), isNull);
   });
+
+  test('concurrent chapter writes do not share a temporary file', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => null,
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+
+    await Future.wait(
+      List.generate(
+        8,
+        (index) => service.putChapter(
+          'book',
+          ReaderChapter(index: 0, title: 'Chapter $index', blocks: const []),
+        ),
+      ),
+    );
+
+    final chapter = await service.getChapter('book', 0);
+    expect(chapter, isNotNull);
+    expect(chapter!.title, startsWith('Chapter '));
+  });
 }
