@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
-// These functions are ignored because they are not marked as `pub`: `levenshtein_distance`, `levenshtein_ratio`
+// These functions are ignored because they are not marked as `pub`: `append_hash_part`, `levenshtein_distance`, `levenshtein_ratio`, `stable_short_hash`, `text_fragments`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `ParserEvent`, `TextNormalizationMode`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
@@ -78,7 +78,8 @@ class BookDiff {
   static Future<BookDiff> compute({
     required NormalizedBook old,
     required NormalizedBook new_,
-  }) => RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
+  }) =>
+      RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
 
   @override
   int get hashCode =>
@@ -123,7 +124,8 @@ enum BookFormat {
         that: this,
       );
 
-  static Future<void> extensions() => RustLib.instance.api.crateApiModelsBookFormatExtensions();
+  static Future<void> extensions() =>
+      RustLib.instance.api.crateApiModelsBookFormatExtensions();
 
   static Future<BookFormat> fromExt({required String ext}) =>
       RustLib.instance.api.crateApiModelsBookFormatFromExt(ext: ext);
@@ -435,9 +437,10 @@ class NormalizedBook {
     newBook: newBook,
   );
 
-  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-    that: this,
-  );
+  Future<String> toJsonString() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+        that: this,
+      );
 
   @override
   int get hashCode =>
@@ -487,7 +490,9 @@ class ParseWarning {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
+      other is ParseWarning &&
+          runtimeType == other.runtimeType &&
+          message == other.message;
 }
 
 class ReaderBlock {
@@ -676,7 +681,8 @@ class TocEntry {
   });
 
   @override
-  int get hashCode => title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
+  int get hashCode =>
+      title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
 
   @override
   bool operator ==(Object other) =>
