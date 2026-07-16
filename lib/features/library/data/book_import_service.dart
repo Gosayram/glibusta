@@ -18,6 +18,7 @@ import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
 
+import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';
 import '../../reader/data/parsers/parser_registry.dart';
@@ -37,9 +38,14 @@ class BookImportService {
   final CoverExtractionService _coverService;
   final _logger = AppLogger();
 
-  BookImportService(this._database, this._storage, this._coverService);
+  BookImportService(
+    this._database,
+    this._storage,
+    this._coverService, {
+    BookParserRegistry? parserRegistry,
+  }) : _registry = parserRegistry ?? BookParserRegistry.defaultInstance;
 
-  final _registry = BookParserRegistry.defaultInstance;
+  final BookParserRegistry _registry;
   final Map<String, Future<ImportResult>> _importLocks = {};
 
   static String generateAuthorId(String name) {
@@ -229,14 +235,17 @@ class BookImportService {
   }
 
   Future<void> _readAndHash(_ImportCtx ctx) async {
-    ctx.bytes = await ctx.file.readAsBytes();
-    if (ctx.bytes.isEmpty) {
+    final fileSize = await ctx.file.length();
+    if (fileSize == 0) {
       throw StateError('Файл пуст: ${ctx.filePath}');
     }
-    ctx.fileSize = ctx.bytes.length;
+    if (isBookFileTooLarge(ctx.format, fileSize)) {
+      throw StateError(bookFileTooLargeMessage(ctx.format, fileSize));
+    }
+    ctx.fileSize = fileSize;
     ctx.contentHash = ctx.inspection != null && ctx.inspection!.hash.isNotEmpty
         ? ctx.inspection!.hash
-        : sha256.convert(ctx.bytes).toString();
+        : (await sha256.bind(ctx.file.openRead()).first).toString();
     ctx.bookId = ctx.contentHash;
   }
 
@@ -266,20 +275,10 @@ class BookImportService {
 
     try {
       try {
-        ctx.book = await parser.parse(
-          ctx.bytes,
-          fileName: ctx.filePath.split('/').last,
-          forcedEncoding: ctx.forcedEncoding,
-        );
+        ctx.book = await _parseBook(parser, ctx);
       } on ParserFailure catch (_) {
         if (ctx.ext != 'zip') rethrow;
-        ctx.book = await _registry
-            .parserFor(BookFormat.cbz)
-            .parse(
-              ctx.bytes,
-              fileName: ctx.filePath.split('/').last,
-              forcedEncoding: ctx.forcedEncoding,
-            );
+        ctx.book = await _parseBook(_registry.parserFor(BookFormat.cbz), ctx);
         ctx.format = BookFormat.cbz;
       }
 
@@ -290,6 +289,19 @@ class BookImportService {
       return ImportResult.failure(_friendlyImportError(e));
     }
     return null;
+  }
+
+  Future<NormalizedBook> _parseBook(BookParser parser, _ImportCtx ctx) async {
+    final forcedEncoding = ctx.forcedEncoding;
+    if (forcedEncoding == null) {
+      return parser.parseFile(ctx.filePath);
+    }
+    final bytes = ctx.bytes ??= await ctx.file.readAsBytes();
+    return parser.parse(
+      bytes,
+      fileName: ctx.filePath.split('/').last,
+      forcedEncoding: forcedEncoding,
+    );
   }
 
   Future<void> _copyToStorage(_ImportCtx ctx) async {
@@ -796,7 +808,7 @@ class _ImportCtx {
   late final String ext;
   late BookFormat format;
   late final File file;
-  late final Uint8List bytes;
+  Uint8List? bytes;
   late final int fileSize;
   late final String contentHash;
   String bookId = '';

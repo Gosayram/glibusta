@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,7 +8,10 @@ import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
 import 'package:glibusta/features/library/data/cover_extraction_service.dart';
 import 'package:glibusta/features/library/data/inspectors/book_inspection_result.dart';
+import 'package:glibusta/features/reader/data/parsers/book_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
+import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
+import 'package:glibusta/features/reader/data/parsers/parser_registry.dart';
 import 'package:glibusta/shared/models/book.dart';
 
 void main() {
@@ -30,6 +34,24 @@ void main() {
   });
 
   group('importFile', () {
+    test('uses the path parser without loading a normal import into Dart memory', () async {
+      final parser = _RecordingParser();
+      service = BookImportService(
+        db,
+        _TestAppFileStorage(tempDir),
+        CoverExtractionService(_TestAppFileStorage(tempDir)),
+        parserRegistry: BookParserRegistry([parser]),
+      );
+      final file = File('${tempDir.path}/path_based.epub');
+      await file.writeAsBytes(List<int>.filled(200, 1));
+
+      final result = await service.importFile(file.path);
+
+      expect(result.isSuccess, isTrue);
+      expect(parser.parseFileCalls, 1);
+      expect(parser.parseCalls, 0);
+    });
+
     test('returns failure for unsupported extension', () async {
       final result = await service.importFile('/tmp/test.pdf');
       expect(result.isSuccess, isFalse);
@@ -125,6 +147,30 @@ void main() {
       expect(batch.failureCount, 1);
     });
   });
+}
+
+final class _RecordingParser implements BookParser {
+  int parseCalls = 0;
+  int parseFileCalls = 0;
+
+  @override
+  Future<NormalizedBook> parse(
+    Uint8List bytes, {
+    String? fileName,
+    String? forcedEncoding,
+  }) async {
+    parseCalls++;
+    return const NormalizedBook(id: 'bytes', title: 'Bytes', authors: []);
+  }
+
+  @override
+  Future<NormalizedBook> parseFile(String filePath, {String? forcedEncoding}) async {
+    parseFileCalls++;
+    return const NormalizedBook(id: 'path', title: 'Path', authors: []);
+  }
+
+  @override
+  bool supports(BookFormat format) => format == BookFormat.epub;
 }
 
 final class _TestAppFileStorage implements AppFileStorage {
