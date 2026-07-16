@@ -90,11 +90,14 @@ fn disk_cache_lookup(key: &std::path::Path) -> Option<NormalizedBook> {
         return None;
     }
     let data = fs::read(key).ok()?;
-    postcard::from_bytes(&data).ok()
+    serde_json::from_slice(&data).ok()
 }
 
 fn disk_cache_store(key: &std::path::Path, book: &NormalizedBook) {
-    let Ok(data) = postcard::to_allocvec(book) else {
+    // The public model uses `skip_serializing_if`, which is not round-trippable
+    // in postcard's positional struct encoding. JSON preserves omitted optional
+    // fields and makes older binary cache entries safely degrade to a cache miss.
+    let Ok(data) = serde_json::to_vec(book) else {
         return;
     };
     if data.len() as u64 > MAX_FILE_SIZE {
@@ -1046,8 +1049,8 @@ mod cover_data_uri_tests {
 #[cfg(test)]
 mod parse_api_tests {
     use super::{
-        MAX_FILE_SIZE, parse_book, parse_book_legacy, read_archive_asset, repair_normalized_book,
-        search_in_book, toc_has_invalid_chapter,
+        MAX_FILE_SIZE, disk_cache_lookup, disk_cache_store, parse_book, parse_book_legacy,
+        read_archive_asset, repair_normalized_book, search_in_book, toc_has_invalid_chapter,
     };
     use crate::api::models::{BlockType, TocEntry};
     use std::io::{Cursor, Write};
@@ -1073,6 +1076,31 @@ mod parse_api_tests {
             serde_json::to_value(path_book).expect("serialize path book"),
             serde_json::to_value(legacy_book).expect("serialize legacy book"),
         );
+    }
+
+    #[test]
+    fn disk_cache_round_trips_and_ignores_corrupted_data() {
+        let directory =
+            std::env::temp_dir().join(format!("glibusta-disk-cache-test-{}", uuid::Uuid::new_v4()));
+        let key = directory.join("book.bin");
+        let book = parse_book_legacy(
+            b"Cached title\n\nCached body.".to_vec(),
+            "txt".to_owned(),
+            None,
+        )
+        .expect("parse cache fixture");
+
+        disk_cache_store(&key, &book);
+        let cached = disk_cache_lookup(&key).expect("deserialize cached book");
+        assert_eq!(
+            serde_json::to_value(cached).expect("serialize cached book"),
+            serde_json::to_value(book).expect("serialize source book"),
+        );
+
+        std::fs::write(&key, b"corrupted disk cache").expect("corrupt cache fixture");
+        assert!(disk_cache_lookup(&key).is_none());
+
+        let _ = std::fs::remove_dir_all(directory);
     }
 
     #[test]
