@@ -95,8 +95,18 @@ final class ReaderCacheService {
     final tmp = File(
       '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryFileSequence++}.tmp',
     );
-    await tmp.writeAsString(contents, flush: true);
-    await tmp.rename(target.path);
+    try {
+      await tmp.writeAsString(contents, flush: true);
+      await tmp.rename(target.path);
+    } finally {
+      try {
+        if (await tmp.exists()) {
+          await tmp.delete();
+        }
+      } on FileSystemException {
+        // Preserve the write or rename error when cleanup itself also fails.
+      }
+    }
   }
 
   Future<NormalizedBookMetadata?> getMetadata(String bookId) async {

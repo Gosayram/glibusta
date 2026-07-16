@@ -131,6 +131,32 @@ void main() {
     expect((await service.getChapter('book', 0))?.title, 'Replacement chapter');
   });
 
+  test('removes the temporary file when chapter replacement fails', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => null,
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+    final bookDir = await service.getBookDir('book');
+    await Directory('${bookDir.path}/ch_0.json').create();
+
+    await expectLater(
+      service.putChapter(
+        'book',
+        const ReaderChapter(index: 0, title: 'Chapter', blocks: []),
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    final remainingTemporaryFiles = await bookDir
+        .list()
+        .where((entity) => entity.path.endsWith('.tmp'))
+        .toList();
+    expect(remainingTemporaryFiles, isEmpty);
+  });
+
   test('rejects a book ID that could escape the cache directory', () async {
     final root = await Directory.systemTemp.createTemp('reader_cache_');
     addTearDown(() => root.delete(recursive: true));
