@@ -832,6 +832,14 @@ mod tests {
     }
 
     #[test]
+    fn skips_multiple_unicode_fallback_characters_including_hex_escapes() {
+        let book = parse_rtf(br"{\rtf1\ansi\uc2\u1055\'3f?}", Some("utf-8"))
+            .expect("parse Unicode escape with two fallback characters");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "П");
+    }
+
+    #[test]
     fn preserves_rtf_tables_as_table_blocks() {
         let book = parse_rtf(
             br"{\rtf1\ansi\trowd\cellx1000\intbl Header A\cell\cellx2000\intbl Header B\cell\row\trowd\cellx1000\intbl Cell A\cell\cellx2000\intbl Cell B\cell\row}",
