@@ -392,6 +392,19 @@ mod tests {
     }
 
     #[test]
+    fn parses_utf8_bom_comic_info_metadata() {
+        let bytes = b"\xEF\xBB\xBF<ComicInfo><Title>\xD0\x9A\xD0\xBE\xD0\xBC\xD0\xB8\xD0\xBA\xD1\x81</Title><Writer>\xD0\x90\xD0\xB2\xD1\x82\xD0\xBE\xD1\x80</Writer></ComicInfo>";
+
+        let info = parse_comic_info(bytes).expect("parse UTF-8 BOM ComicInfo.xml");
+
+        assert_eq!(info.title.as_deref(), Some("Комикс"));
+        assert_eq!(
+            info.authors.as_deref(),
+            Some([String::from("Автор")].as_slice())
+        );
+    }
+
+    #[test]
     fn parses_utf16le_comic_info_metadata() {
         let xml = "<ComicInfo><Title>Комикс</Title><Writer>Автор</Writer></ComicInfo>";
         let mut bytes = vec![0xFF, 0xFE];

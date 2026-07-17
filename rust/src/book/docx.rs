@@ -37,7 +37,8 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
     let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
     let image_targets = parse_image_relationships(&mut zip, encoding_name)?;
-    let footnotes = parse_footnotes(&mut zip, encoding_name)?;
+    let mut footnotes = parse_footnotes(&mut zip, encoding_name)?;
+    footnotes.extend(parse_endnotes(&mut zip, encoding_name)?);
     let numbering_styles = parse_numbering_styles(&mut zip, encoding_name)?;
     let (blocks, chapter_title) = parse_document_xml_with_hyperlinks(
         &doc_text,
@@ -235,8 +236,25 @@ fn document_relative_path(target: &str) -> Option<String> {
 }
 
 fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
-    let Some(bytes) =
-        zip.read_file_limited("word/footnotes.xml", crate::api::models::MAX_CHAPTER_SIZE)?
+    parse_notes(zip, encoding_name, "word/footnotes.xml", b"footnote")
+}
+
+fn parse_endnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
+    Ok(
+        parse_notes(zip, encoding_name, "word/endnotes.xml", b"endnote")?
+            .into_iter()
+            .map(|(id, text)| (format!("endnote:{id}"), text))
+            .collect(),
+    )
+}
+
+fn parse_notes(
+    zip: &mut ZipFile<'_>,
+    encoding_name: &str,
+    entry_name: &str,
+    note_element: &[u8],
+) -> Result<HashMap<String, String>> {
+    let Some(bytes) = zip.read_file_limited(entry_name, crate::api::models::MAX_CHAPTER_SIZE)?
     else {
         return Ok(HashMap::new());
     };
@@ -251,7 +269,7 @@ fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
-            Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"footnote" => {
+            Ok(Event::Start(ref element)) if element.local_name().as_ref() == note_element => {
                 current_id = xml_attribute(element, b"id")
                     .filter(|id| id.parse::<i32>().is_ok_and(|id| id > 0));
                 current_text.clear();
@@ -270,7 +288,7 @@ fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap
                     current_text.push('\n');
                 }
             }
-            Ok(Event::End(ref element)) if element.local_name().as_ref() == b"footnote" => {
+            Ok(Event::End(ref element)) if element.local_name().as_ref() == note_element => {
                 if let Some(id) = current_id.take() {
                     let note = current_text.trim().to_string();
                     if !note.is_empty() {
@@ -523,6 +541,11 @@ fn parse_document_xml_with_hyperlinks(
                     "footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
+                    }
+                    "endnoteReference" if in_paragraph => {
+                        current_note_ref = word_attribute(e, b"id")
+                            .map(|id| format!("endnote:{id}"))
+                            .filter(|id| footnotes.contains_key(id));
                     }
                     "blip" if in_paragraph => {
                         if let Some(asset) = word_attribute(e, b"embed")
@@ -806,6 +829,11 @@ fn parse_document_xml_with_hyperlinks(
                     "footnoteReference" if in_paragraph => {
                         current_note_ref =
                             word_attribute(e, b"id").filter(|id| footnotes.contains_key(id));
+                    }
+                    "endnoteReference" if in_paragraph => {
+                        current_note_ref = word_attribute(e, b"id")
+                            .map(|id| format!("endnote:{id}"))
+                            .filter(|id| footnotes.contains_key(id));
                     }
                     "blip" if in_paragraph => {
                         if let Some(asset) = word_attribute(e, b"embed")
@@ -1253,6 +1281,46 @@ mod tests {
                 .as_ref()
                 .and_then(|metadata| metadata["footnotes"]["1"].as_str()),
             Some("Footnote text")
+        );
+    }
+
+    #[test]
+    fn extracts_docx_endnotes_and_links_references() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Text</w:t></w:r><w:r><w:endnoteReference w:id="1"/></w:r></w:p></w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/endnotes.xml", options)
+            .expect("start endnotes XML");
+        zip.write_all(
+            br#"<w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:id="-1"><w:p><w:r><w:t>separator</w:t></w:r></w:p></w:endnote><w:endnote w:id="1"><w:p><w:r><w:t>Endnote text</w:t></w:r></w:p></w:endnote></w:endnotes>"#,
+        )
+        .expect("write endnotes XML");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse DOCX endnote");
+
+        assert_eq!(
+            book.chapters[0].blocks[0].note_ref.as_deref(),
+            Some("endnote:1")
+        );
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["endnote:1"].as_str()),
+            Some("Endnote text")
         );
     }
 }

@@ -232,6 +232,10 @@ fn parse_fb2_xml(
                     }
                     b"cite" if in_body => in_cite = true,
                     b"pre" if in_body => in_pre = true,
+                    // `<code>` is not part of the core FB2 schema, but occurs in
+                    // real-world books as a block extension. Treat it like `<pre>`
+                    // when it is not inline paragraph content.
+                    b"code" if in_body && !in_p => in_pre = true,
                     b"strong" if in_p || in_subtitle => {
                         flush_rich_span(
                             &mut current_rich_spans,
@@ -305,6 +309,8 @@ fn parse_fb2_xml(
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
                     append_binary_data(&mut current_text, &text)?;
+                } else if in_pre && in_body {
+                    current_text.push_str(&text);
                 } else if in_table_cell {
                     current_table_cell.push_str(&text);
                 } else if in_p && in_body {
@@ -336,6 +342,8 @@ fn parse_fb2_xml(
                     genres.push(text.into_owned());
                 } else if in_lang {
                     language = Some(text.into_owned());
+                } else if in_pre && in_body {
+                    current_text.push_str(&text);
                 } else if in_p && in_body {
                     let owned = text.into_owned();
                     if let Some(last) = current_rich_spans.last_mut() {
@@ -372,6 +380,8 @@ fn parse_fb2_xml(
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
                     append_binary_data(&mut current_text, &text)?;
+                } else if in_pre && in_body {
+                    current_text.push_str(&text);
                 } else if in_table_cell {
                     current_table_cell.push_str(&text);
                 } else if in_p && in_body {
@@ -702,7 +712,18 @@ fn parse_fb2_xml(
                         &mut current_rich_spans,
                         &mut current_span_text,
                         &mut block_index,
-                        BlockType::Paragraph,
+                        BlockType::Preformatted,
+                    );
+                    in_pre = false;
+                }
+                b"code" if in_body && in_pre => {
+                    flush_fb2_block(
+                        &mut body_blocks,
+                        &mut current_text,
+                        &mut current_rich_spans,
+                        &mut current_span_text,
+                        &mut block_index,
+                        BlockType::Preformatted,
                     );
                     in_pre = false;
                 }
@@ -1389,5 +1410,32 @@ mod tests {
 
         assert_eq!(spans[2].text, "tail");
         assert!(spans[2].bold);
+    }
+
+    #[test]
+    fn ignores_embedded_stylesheet_without_leaking_css_into_book_content() {
+        let book = parse_fb2(
+            br#"<FictionBook><stylesheet type="text/css">p { color: red; }</stylesheet><body><section><p>Visible text</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with an embedded stylesheet");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].text, "Visible text");
+    }
+
+    #[test]
+    fn preserves_block_code_as_preformatted_content() {
+        let book = parse_fb2(
+            br#"<FictionBook><body><section><code>let answer = 42;</code></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with a code block");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, BlockType::Preformatted);
+        assert_eq!(blocks[0].text, "let answer = 42;");
     }
 }

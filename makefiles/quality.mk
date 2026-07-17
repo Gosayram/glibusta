@@ -35,12 +35,12 @@ install-python-tools: require-python ## Install local Python quality tools
 .PHONY: format
 format: require-dart ## Format Dart sources
 	@$(PRINT_STEP) "Formatting Dart sources"
-	$(DART_FORMAT) $(DART_FORMAT_PATHS)
+	$(DART_FORMAT) $$(find $(DART_FORMAT_PATHS) -type f -name '*.dart' ! -path 'lib/src/rust/*')
 
 .PHONY: format-check
 format-check: require-dart ## Check Dart formatting
 	@$(PRINT_STEP) "Checking Dart formatting"
-	$(DART_FORMAT) --set-exit-if-changed $(DART_FORMAT_PATHS)
+	$(DART_FORMAT) --set-exit-if-changed $$(find $(DART_FORMAT_PATHS) -type f -name '*.dart' ! -path 'lib/src/rust/*')
 
 .PHONY: fix
 fix: require-dart ## Apply Dart automated fixes
