@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -502,6 +506,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.broken_image), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders transparent WebP comic pages without dropping alpha', (tester) async {
+    const transparentWebp = 'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'transparent-comic',
+            title: 'Transparent comic',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Pages'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Pages',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: '',
+                  type: BlockType.image,
+                  imageUrl: 'data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=',
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    final provider = image.image as MemoryImage;
+    final codec = await ui.instantiateImageCodec(provider.bytes);
+    final frame = await codec.getNextFrame();
+    final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    codec.dispose();
+    frame.image.dispose();
+
+    expect(rgba, isNotNull);
+    expect(rgba!.getUint8(3), 0, reason: 'top-left pixel must remain transparent');
+    expect(rgba.getUint8(15), 255, reason: 'bottom-right pixel must remain opaque');
+    expect(find.byIcon(Icons.broken_image), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

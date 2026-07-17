@@ -33,6 +33,33 @@ void main() {
     }
   });
 
+  test('keeps numeric in-book links as ordinary link spans', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_numeric_link_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><body><p>See <a href="#12">12</a> and
+          <a href="chapter.xhtml#verse-3">3</a>.</p></body></html>
+        ''',
+      );
+
+      final paragraph = parsed.blocks.single as ParagraphBlock;
+      expect(
+        paragraph.spans.where((span) => span.href != null).map((span) => span.href),
+        <String?>['#12', 'chapter.xhtml#verse-3'],
+      );
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('does not turn active markup or footnote backgrounds into reader blocks', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_active_markup_test_');
     try {

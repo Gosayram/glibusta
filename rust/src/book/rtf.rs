@@ -824,6 +824,25 @@ mod tests {
     }
 
     #[test]
+    fn preserves_plaintext_when_par_control_backslashes_are_missing() {
+        // Some sync tools have been observed to turn `\\par` into `par`.
+        // Treating an arbitrary `par` suffix as a paragraph break would corrupt
+        // legitimate prose, so retain the malformed source verbatim instead.
+        let book = parse_rtf(
+            br"{\rtf1\ansi First paragraph.par
+Second paragraph.par
+}",
+            Some("utf-8"),
+        )
+        .expect("parse malformed paragraph controls");
+
+        assert_eq!(
+            book.chapters[0].blocks[0].text,
+            "First paragraph.par\nSecond paragraph.par",
+        );
+    }
+
+    #[test]
     fn skips_unicode_fallback_characters() {
         let book =
             parse_rtf(br"{\rtf1\ansi\uc1\u1055?}", Some("utf-8")).expect("parse Unicode escape");

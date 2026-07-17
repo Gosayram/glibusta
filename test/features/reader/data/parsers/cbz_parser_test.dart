@@ -10,6 +10,7 @@ import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 
 void main() {
   final parser = CbzParser();
+  const transparentWebp = 'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
 
   Uint8List createComicArchive() {
     final archive = Archive()
@@ -95,6 +96,19 @@ void main() {
         'data:image/avif;base64,AAE=',
       ],
     );
+  });
+
+  test('preserves a transparent WebP page for the platform image decoder', () async {
+    final webpBytes = base64Decode(transparentWebp);
+    final archive = Archive()..addFile(ArchiveFile('001.webp', webpBytes.length, webpBytes));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'transparent.cbz',
+    );
+
+    expect(book.coverUrl, 'data:image/webp;base64,$transparentWebp');
+    expect(book.chapters.single.blocks.single.imageUrl, book.coverUrl);
   });
 
   test('rejects an archive without comic pages', () async {

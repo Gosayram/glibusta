@@ -2263,7 +2263,8 @@ fn extract_chapter_title(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_nav_xhtml;
+    use super::{parse_nav_xhtml, parse_xhtml_to_blocks};
+    use crate::api::models::BlockType;
 
     #[test]
     fn parses_epub3_nav_toc_with_nested_entries() {
@@ -2282,5 +2283,27 @@ mod tests {
         assert_eq!(toc[0].title, "Chapter 1");
         assert_eq!(toc[0].children[0].title, "Part 1");
         assert_eq!(toc[1].title, "Chapter 2");
+    }
+
+    #[test]
+    fn preserves_numeric_in_book_links_as_regular_spans() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            r##"<html><body><p>See <a href="#12">12</a> and <a href="chapter.xhtml#verse-3">3</a>.</p></body></html>"##,
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].block_type, BlockType::Paragraph);
+        assert_eq!(
+            blocks[0]
+                .rich_spans
+                .as_ref()
+                .expect("links retain rich spans")
+                .iter()
+                .filter_map(|span| span.href.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["#12", "chapter.xhtml#verse-3"],
+        );
     }
 }
