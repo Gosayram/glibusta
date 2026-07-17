@@ -8,15 +8,17 @@ use std::sync::LazyLock;
 
 // ARC-10.2: Lazy-compiled regex patterns (avoid recompilation on every call)
 static CHAPTER_HEADING_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+")
-        .unwrap()
+    Regex::new(
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+|^(番外|外传)(?:\s|[：:（(]|$)",
+    )
+    .unwrap()
 });
 
 static SHORT_LINE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\s\d]+$").unwrap());
 
 static CHAPTER_SPLIT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
+        r"(?i)^(глава|часть|пролог|эпилог|chapter|part|prologue|epilogue|section|§)\s+[\dIVXLCDM\.]+|^(番外|外传)(?:\s|[：:（(]|$)|^[\dIVXLCDM]+\.\s|^[IVXLCDM]+\.\s|^\d+\.\d+\s|^§\s+\d+",
     )
     .unwrap()
 });
@@ -338,6 +340,41 @@ mod tests {
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0].text, "Null separated text");
         assert_eq!(blocks[1].text, "Second paragraph");
+        assert!(blocks.iter().all(|block| !block.text.contains('\0')));
+    }
+
+    #[test]
+    fn adds_chinese_extra_chapters_to_the_toc() {
+        let book = parse_txt(
+            "小说标题\n\n第一章\n\n正文\n\n番外：后日谈\n\n番外正文\n\n外传 特别篇\n\n外传正文"
+                .as_bytes(),
+            Some("utf-8"),
+        )
+        .expect("parse TXT with Chinese chapter prefixes");
+
+        assert_eq!(
+            book.toc
+                .iter()
+                .map(|entry| entry.title.as_str())
+                .collect::<Vec<_>>(),
+            ["小说标题", "番外：后日谈", "外传 特别篇"],
+        );
+    }
+
+    #[test]
+    fn normalizes_mixed_line_endings_and_null_bytes_in_one_pass() {
+        let book = parse_txt(
+            b"Mixed title\r\n\r\nFirst\r\nwrapped\nline\r\0\r\nSecond\0paragraph\r\r\nThird",
+            Some("utf-8"),
+        )
+        .expect("parse TXT with mixed separators");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 4);
+        assert_eq!(blocks[0].text, "Mixed title");
+        assert_eq!(blocks[1].text, "First wrapped line");
+        assert_eq!(blocks[2].text, "Second paragraph");
+        assert_eq!(blocks[3].text, "Third");
         assert!(blocks.iter().all(|block| !block.text.contains('\0')));
     }
 }

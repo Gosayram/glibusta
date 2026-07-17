@@ -393,19 +393,33 @@ fn create_epub_with_opf(include_mimetype: bool, opf: &[u8]) -> Vec<u8> {
 }
 
 fn create_epub_with_opf_and_chapter(include_mimetype: bool, opf: &[u8], chapter: &[u8]) -> Vec<u8> {
+    create_epub_with_named_container_entries(
+        include_mimetype.then_some("mimetype"),
+        "META-INF/container.xml",
+        opf,
+        chapter,
+    )
+}
+
+fn create_epub_with_named_container_entries(
+    mimetype_entry: Option<&str>,
+    container_entry: &str,
+    opf: &[u8],
+    chapter: &[u8],
+) -> Vec<u8> {
     let mut buf = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut buf);
 
     let options =
         zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
 
-    if include_mimetype {
+    if let Some(mimetype_entry) = mimetype_entry {
         // EPUB requires this as the first, uncompressed ZIP entry.
-        zip.start_file("mimetype", options).unwrap();
+        zip.start_file(mimetype_entry, options).unwrap();
         zip.write_all(b"application/epub+zip").unwrap();
     }
 
-    zip.start_file("META-INF/container.xml", options).unwrap();
+    zip.start_file(container_entry, options).unwrap();
     zip.write_all(
         br#"<?xml version="1.0"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -524,6 +538,40 @@ fn test_epub_without_mimetype_is_rejected() {
             .expect_err("EPUB without a mimetype entry must not be accepted");
 
     assert!(error.to_string().contains("mimetype"));
+}
+
+#[test]
+fn test_epub_with_uppercase_mimetype_entry_is_rejected() {
+    // EPUB 3.3 OCF paths are case-sensitive, and the required root entry is
+    // specifically named `mimetype`; accepting `MIMETYPE` would accept a
+    // non-conformant EPUB container.
+    let epub = create_epub_with_named_container_entries(
+        Some("MIMETYPE"),
+        "META-INF/container.xml",
+        MINIMAL_EPUB_OPF,
+        b"<html><body><p>Chapter</p></body></html>",
+    );
+
+    let error = glibusta_core::book::epub::parse_epub(&epub, None)
+        .expect_err("uppercase mimetype entry must not be accepted as EPUB");
+
+    assert!(error.to_string().contains("mimetype"));
+}
+
+#[test]
+fn test_epub_with_uppercase_meta_inf_directory_is_rejected() {
+    // `META-INF/container.xml` is also an exact, case-sensitive OCF path.
+    let epub = create_epub_with_named_container_entries(
+        Some("mimetype"),
+        "META-INF/CONTAINER.XML",
+        MINIMAL_EPUB_OPF,
+        b"<html><body><p>Chapter</p></body></html>",
+    );
+
+    let error = glibusta_core::book::epub::parse_epub(&epub, None)
+        .expect_err("non-canonical META-INF path must not be accepted as EPUB");
+
+    assert!(error.to_string().contains("META-INF/container.xml"));
 }
 
 #[test]

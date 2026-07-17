@@ -1017,6 +1017,32 @@ mod tests {
     }
 
     #[test]
+    fn ignores_unknown_and_custom_xml_fields_without_losing_field_result() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                xmlns:cx="urn:example:custom">
+                <w:body>
+                    <w:customXml w:element="cx:metadata" cx:storeItemID="{test}">
+                        <w:p><w:r><w:t>Before field. </w:t></w:r>
+                            <w:sdt><w:sdtPr><w:tag w:val="unsupported-control"/></w:sdtPr>
+                                <w:sdtContent><w:fldSimple w:instr="DATE">
+                                    <w:r><w:t>2026-07-18</w:t></w:r>
+                                </w:fldSimple></w:sdtContent>
+                            </w:sdt>
+                            <w:unknownField cx:value="ignored"><w:r><w:t> After field.</w:t></w:r></w:unknownField>
+                        </w:p>
+                    </w:customXml>
+                </w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("custom DOCX XML must degrade safely");
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "Before field. 2026-07-18 After field.");
+    }
+
+    #[test]
     fn preserves_self_closing_tabs_in_runs() {
         let xml = r#"
             <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
