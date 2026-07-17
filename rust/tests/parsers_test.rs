@@ -356,27 +356,7 @@ fn test_txt_single_chapter_no_split() {
 // EPUB tests — minimal in-memory EPUB
 // ---------------------------------------------------------------------------
 
-fn create_minimal_epub() -> Vec<u8> {
-    let mut buf = std::io::Cursor::new(Vec::new());
-    let mut zip = zip::ZipWriter::new(&mut buf);
-
-    let options =
-        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
-
-    zip.start_file("META-INF/container.xml", options).unwrap();
-    zip.write_all(
-        br#"<?xml version="1.0"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-  <rootfiles>
-    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
-  </rootfiles>
-</container>"#,
-    )
-    .unwrap();
-
-    zip.start_file("content.opf", options).unwrap();
-    zip.write_all(
-        br#"<?xml version="1.0"?>
+const MINIMAL_EPUB_OPF: &[u8] = br#"<?xml version="1.0"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0">
   <metadata>
     <dc:title>Test EPUB</dc:title>
@@ -391,9 +371,38 @@ fn create_minimal_epub() -> Vec<u8> {
   <spine toc="ncx">
     <itemref idref="chapter1"/>
   </spine>
-</package>"#,
+</package>"#;
+
+fn create_minimal_epub() -> Vec<u8> {
+    create_epub_with_opf(true, MINIMAL_EPUB_OPF)
+}
+
+fn create_epub_with_opf(include_mimetype: bool, opf: &[u8]) -> Vec<u8> {
+    let mut buf = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buf);
+
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+
+    if include_mimetype {
+        // EPUB requires this as the first, uncompressed ZIP entry.
+        zip.start_file("mimetype", options).unwrap();
+        zip.write_all(b"application/epub+zip").unwrap();
+    }
+
+    zip.start_file("META-INF/container.xml", options).unwrap();
+    zip.write_all(
+        br#"<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>"#,
     )
     .unwrap();
+
+    zip.start_file("content.opf", options).unwrap();
+    zip.write_all(opf).unwrap();
 
     zip.start_file("toc.ncx", options).unwrap();
     zip.write_all(
@@ -458,6 +467,26 @@ fn test_epub_corrupted_archive_is_rejected() {
         .expect_err("corrupted EPUB must not be parsed");
 
     assert!(error.to_string().contains("Failed to open EPUB archive"));
+}
+
+#[test]
+fn test_epub_without_mimetype_is_rejected() {
+    let error =
+        glibusta_core::book::epub::parse_epub(&create_epub_with_opf(false, MINIMAL_EPUB_OPF), None)
+            .expect_err("EPUB without a mimetype entry must not be accepted");
+
+    assert!(error.to_string().contains("mimetype"));
+}
+
+#[test]
+fn test_epub_with_non_opf_package_document_is_rejected() {
+    let error = glibusta_core::book::epub::parse_epub(
+        &create_epub_with_opf(true, b"<?xml version=\"1.0\"?><not-an-opf/>"),
+        None,
+    )
+    .expect_err("a non-OPF package document must not be accepted");
+
+    assert!(error.to_string().contains("OPF"));
 }
 
 // ---------------------------------------------------------------------------

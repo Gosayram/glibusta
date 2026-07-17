@@ -955,13 +955,26 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
     if (isDataUri) {
       final data = imageUrl.split(',');
       if (data.length == 2) {
-        return Image.memory(base64Decode(data.last), fit: fit);
+        return Image.memory(
+          base64Decode(data.last),
+          fit: fit,
+          errorBuilder: (_, _, _) => const Icon(
+            Icons.broken_image,
+            size: 64,
+            color: Colors.white,
+          ),
+        );
       }
     }
     if (isFileUri || isPlainPath) {
       return Image.file(
         File(isFileUri ? uri.path : imageUrl),
         fit: fit,
+        errorBuilder: (_, _, _) => const Icon(
+          Icons.broken_image,
+          size: 64,
+          color: Colors.white,
+        ),
       );
     }
     return const Icon(Icons.broken_image, size: 64, color: Colors.white);
@@ -2581,16 +2594,34 @@ class _FixedLayoutBody extends StatelessWidget {
       final separator = url.indexOf(',');
       if (separator > 0 && url.substring(0, separator).toLowerCase().contains(';base64')) {
         try {
-          return Image.memory(base64Decode(url.substring(separator + 1)), fit: fit);
+          return Image.memory(
+            base64Decode(url.substring(separator + 1)),
+            fit: fit,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.broken_image,
+              size: 64,
+              color: Colors.white,
+            ),
+          );
         } on FormatException {
           return const Icon(Icons.broken_image, size: 64, color: Colors.white);
         }
       }
     }
     if (uri != null && uri.scheme == 'file') {
-      return Image.file(File(uri.path), fit: fit);
+      return Image.file(
+        File(uri.path),
+        fit: fit,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 64, color: Colors.white),
+      );
     }
-    if (uri == null || !uri.isAbsolute) return Image.file(File(url), fit: fit);
+    if (uri == null || !uri.isAbsolute) {
+      return Image.file(
+        File(url),
+        fit: fit,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 64, color: Colors.white),
+      );
+    }
     return const Icon(Icons.broken_image, size: 64, color: Colors.white);
   }
 }

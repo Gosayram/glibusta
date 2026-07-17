@@ -29,6 +29,13 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         );
     }
 
+    let mimetype = zip
+        .read_file_limited("mimetype", 64)?
+        .context("EPUB missing mimetype entry")?;
+    if mimetype != b"application/epub+zip" {
+        bail!("EPUB has an invalid mimetype entry");
+    }
+
     let encoding_name = forced_encoding.unwrap_or("utf-8");
 
     let container_xml = zip
@@ -410,12 +417,19 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     // LW-8.1: track rendition property name for <meta property="rendition:*">text</meta>
     let mut in_rendition_meta = false;
     let mut current_rendition_prop = String::new();
+    let mut saw_root_element = false;
 
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if !saw_root_element {
+                    if tag != "package" {
+                        bail!("OPF root element must be <package>");
+                    }
+                    saw_root_element = true;
+                }
                 match tag.as_str() {
                     "metadata" => in_metadata = true,
                     "manifest" => in_manifest = true,
@@ -581,6 +595,12 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
             // Handle self-closing tags like <item ... /> and <itemref ... />
             Ok(Event::Empty(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if !saw_root_element {
+                    if tag != "package" {
+                        bail!("OPF root element must be <package>");
+                    }
+                    saw_root_element = true;
+                }
                 if in_manifest && tag == "item" {
                     let id = get_xml_attr(e, b"id");
                     let href = get_xml_attr(e, b"href");
@@ -633,6 +653,10 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
             Err(e) => bail!("OPF parse error: {}", e),
             _ => {}
         }
+    }
+
+    if !saw_root_element {
+        bail!("OPF package document is empty");
     }
 
     Ok((metadata, manifest_items, spine_ids, ncx_id))

@@ -100,7 +100,7 @@ final class CbzParser implements BookParser {
   }
 
   List<ArchiveFile> _sortedImageFiles(Archive archive) {
-    const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'};
+    const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'jxl', 'avif'};
     final files = archive.files.where((f) {
       if (f.isFile) {
         final ext = f.name.split('.').last.toLowerCase();
@@ -164,6 +164,10 @@ final class CbzParser implements BookParser {
         return 'image/bmp';
       case 'tiff':
         return 'image/tiff';
+      case 'jxl':
+        return 'image/jxl';
+      case 'avif':
+        return 'image/avif';
       default:
         return 'image/jpeg';
     }

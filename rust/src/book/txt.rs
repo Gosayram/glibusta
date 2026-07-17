@@ -93,7 +93,12 @@ fn split_paragraphs(text: &str) -> Vec<String> {
     let mut paragraphs = Vec::new();
     let mut current = String::new();
 
-    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    // NUL is not reader content. Treat it as whitespace so an embedded byte
+    // cannot join words, while a NUL-only line remains a paragraph separator.
+    let normalized = text
+        .replace('\0', " ")
+        .replace("\r\n", "\n")
+        .replace('\r', "\n");
     for line in normalized.split('\n') {
         if line.trim().is_empty() {
             let paragraph = normalize_whitespace(&current);
@@ -319,5 +324,20 @@ mod tests {
             .expect("parse TXT chapter");
 
         assert_eq!(book.title, "Chapter 1");
+    }
+
+    #[test]
+    fn normalizes_null_bytes_without_creating_spurious_paragraphs() {
+        let book = parse_txt(
+            b"Null\0separated text\r\n\r\n\0\r\n\r\nSecond paragraph",
+            Some("utf-8"),
+        )
+        .expect("parse TXT with null bytes");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].text, "Null separated text");
+        assert_eq!(blocks[1].text, "Second paragraph");
+        assert!(blocks.iter().all(|block| !block.text.contains('\0')));
     }
 }

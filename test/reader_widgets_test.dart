@@ -462,6 +462,49 @@ void main() {
     expect(find.text('300 сл/мин  ·  0/0'), findsOneWidget);
   });
 
+  testWidgets('shows a controlled placeholder for an unsupported comic image codec', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'comic',
+            title: 'Comic',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Pages'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Pages',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: '',
+                  type: BlockType.image,
+                  imageUrl: 'data:image/jxl;base64,/wo=',
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.broken_image), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('uses EPUB RTL metadata for direction-aware list layout', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

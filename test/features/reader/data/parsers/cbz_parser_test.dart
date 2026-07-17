@@ -78,6 +78,25 @@ void main() {
     );
   });
 
+  test('keeps JXL and AVIF pages so the reader can show its image fallback', () async {
+    final archive = Archive()
+      ..addFile(ArchiveFile('002.avif', 2, <int>[0, 1]))
+      ..addFile(ArchiveFile('001.jxl', 2, <int>[0xff, 0x0a]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'modern-codecs.cbz',
+    );
+
+    expect(
+      book.chapters.single.blocks.map((ReaderBlock block) => block.imageUrl),
+      [
+        'data:image/jxl;base64,/wo=',
+        'data:image/avif;base64,AAE=',
+      ],
+    );
+  });
+
   test('rejects an archive without comic pages', () async {
     final archive = Archive()..addFile(ArchiveFile('info.txt', 1, <int>[0]));
     final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
