@@ -12,17 +12,23 @@ impl MobiCoverExtractor {
         header: &MobiHeader,
         metadata: &MobiMetadata,
     ) -> Option<Vec<u8>> {
-        let record_index = self.find_cover_record_index(header, metadata)?;
-        if record_index >= palm_db.records.len() {
-            return None;
+        let declared_cover = self.find_cover_record_index(header, metadata);
+        let first_image = (header.first_image_record_index > 0)
+            .then_some(header.first_image_record_index as usize);
+
+        for record_index in [declared_cover, first_image].into_iter().flatten() {
+            // EXTH 201 is optional metadata and may point to a stale or
+            // non-image record. Keep the standard first-image fallback, but
+            // never accept a candidate without an image signature.
+            let Some(bytes) = self.safe_record_bytes(full_bytes, palm_db, record_index) else {
+                continue;
+            };
+            if let Some(image) = self.validate_image_bytes(bytes) {
+                return Some(image);
+            }
         }
 
-        let bytes = self.safe_record_bytes(full_bytes, palm_db, record_index)?;
-        if bytes.len() < 8 {
-            return None;
-        }
-
-        self.validate_image_bytes(bytes)
+        None
     }
 
     fn find_cover_record_index(
@@ -143,5 +149,89 @@ mod tests {
             .expect("cover image at first_image_record_index + EXTH offset");
 
         assert_eq!(cover, b"\x89PNG\r\n\x1a\n");
+    }
+
+    #[test]
+    fn falls_back_to_first_image_when_declared_cover_is_not_an_image() {
+        let bytes = [
+            [0_u8; 8].as_slice(),
+            b"\xff\xd8cover".as_slice(),
+            b"not an image".as_slice(),
+        ]
+        .concat();
+        let palm_db = PalmDb {
+            name: String::new(),
+            records: vec![
+                PalmRecord {
+                    offset: 0,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 8,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 15,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+            ],
+        };
+        let header = MobiHeader {
+            compression: 1,
+            text_encoding: 0,
+            text_record_count: 0,
+            record_size: 0,
+            full_name_offset: 0,
+            full_name_length: 0,
+            exth_flags: 0,
+            first_image_record_index: 1,
+        };
+        let mut metadata = MobiMetadata::default();
+        metadata.cover_record_index = Some(1);
+
+        let cover = MobiCoverExtractor
+            .extract(&bytes, &palm_db, &header, &metadata)
+            .expect("safe first-image fallback");
+
+        assert_eq!(cover, b"\xff\xd8cover");
+    }
+
+    #[test]
+    fn rejects_non_image_cover_candidates() {
+        let bytes = [[0_u8; 8].as_slice(), b"plain text".as_slice()].concat();
+        let palm_db = PalmDb {
+            name: String::new(),
+            records: vec![
+                PalmRecord {
+                    offset: 0,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 8,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+            ],
+        };
+        let header = MobiHeader {
+            compression: 1,
+            text_encoding: 0,
+            text_record_count: 0,
+            record_size: 0,
+            full_name_offset: 0,
+            full_name_length: 0,
+            exth_flags: 0,
+            first_image_record_index: 1,
+        };
+
+        assert!(
+            MobiCoverExtractor
+                .extract(&bytes, &palm_db, &header, &MobiMetadata::default())
+                .is_none()
+        );
     }
 }

@@ -33,6 +33,44 @@ void main() {
     }
   });
 
+  test('does not turn active markup or footnote backgrounds into reader blocks', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_active_markup_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html xmlns:epub="http://www.idpf.org/2007/ops"><head><style>
+            .footnote { background-image: url('tracking.png'); }
+          </style></head><body>
+            <p>Visible <script>alert('not reader text')</script><iframe
+              srcdoc="&lt;p&gt;active&lt;/p&gt;">fallback frame text</iframe> prose.</p>
+            <aside epub:type="footnote" class="footnote"><p>Legitimate footnote.</p></aside>
+          </body></html>
+        ''',
+      );
+      final text = parsed.blocks
+          .whereType<ParagraphBlock>()
+          .expand((block) => block.spans)
+          .map((span) => span.text)
+          .join('\n');
+
+      expect(text, contains('Visible'));
+      expect(text, contains('prose.'));
+      expect(text, contains('Legitimate footnote.'));
+      expect(text, isNot(contains("alert('not reader text')")));
+      expect(text, isNot(contains('fallback frame text')));
+      expect(parsed.blocks.whereType<ImageBlock>(), isEmpty);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('recovers an EPUB with a missing mimetype entry when its container is valid', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_recovery_test_');
     try {

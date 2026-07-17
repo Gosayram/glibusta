@@ -222,7 +222,11 @@ fn document_relative_path(target: &str) -> Option<String> {
     if target.is_empty() || target.starts_with('/') || target.contains('\\') {
         return None;
     }
-    let mut components = Vec::new();
+    // Relationship targets are resolved relative to `word/document.xml`, whose
+    // parent is `word/`. Starting there also accepts valid OPC paths such as
+    // `../word/media/image.png` without allowing a target to escape the
+    // package root.
+    let mut components = vec!["word"];
     for component in target.split('/') {
         match component {
             "" | "." => {}
@@ -232,7 +236,7 @@ fn document_relative_path(target: &str) -> Option<String> {
             component => components.push(component),
         }
     }
-    (!components.is_empty()).then(|| format!("word/{}", components.join("/")))
+    (!components.is_empty()).then(|| components.join("/"))
 }
 
 fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
@@ -397,7 +401,7 @@ fn extract_images(zip: &mut ZipFile<'_>) -> Vec<EmbeddedImage> {
         .filter(|name| name.starts_with("word/media/"))
         .map(|name| {
             let media_type = mime_from_name(name);
-            let id = name.rsplit('/').next().unwrap_or(name).to_string();
+            let id = name.strip_prefix("word/media/").unwrap_or(name).to_string();
             EmbeddedImage {
                 id,
                 media_type,
@@ -1271,6 +1275,64 @@ mod tests {
         let _ = std::fs::remove_file(path);
 
         assert_eq!(image.expect("extract DOCX image"), b"PNG");
+    }
+
+    #[test]
+    fn resolves_relative_nested_media_from_alternate_content() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<word:document xmlns:word="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:draw="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><word:body><word:p><mc:AlternateContent><mc:Choice Requires="draw"><word:r><word:drawing><draw:blip rel:embed="picture-7"/></word:drawing></word:r></mc:Choice></mc:AlternateContent></word:p></word:body></word:document>"#,
+        )
+        .expect("write document XML");
+        zip.start_file("word/_rels/document.xml.rels", options)
+            .expect("start relationships XML");
+        zip.write_all(
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="picture-7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../word/media/figures/cover.webp"/></Relationships>"#,
+        )
+        .expect("write relationships XML");
+        zip.start_file("word/media/figures/cover.webp", options)
+            .expect("start nested image");
+        zip.write_all(b"WEBP").expect("write nested image");
+        zip.finish().expect("finish DOCX archive");
+
+        let archive = bytes.into_inner();
+        let book = parse_docx(&archive, None).expect("parse DOCX with nested image");
+
+        assert_eq!(book.images.len(), 1);
+        assert_eq!(book.images[0].id, "figures/cover.webp");
+        assert_eq!(
+            book.cover_url.as_deref(),
+            Some("data:image/webp;base64,V0VCUA==")
+        );
+        assert_eq!(book.chapters[0].blocks.len(), 1);
+        assert_eq!(
+            book.chapters[0].blocks[0].image_url.as_deref(),
+            Some("word/media/figures/cover.webp")
+        );
+
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-docx-nested-image-{}.docx",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, archive).expect("write DOCX fixture");
+        let image = crate::api::api::get_asset_bytes(
+            path.to_string_lossy().into_owned(),
+            "word/media/figures/cover.webp".to_string(),
+        );
+        let _ = std::fs::remove_file(path);
+
+        assert_eq!(image.expect("extract nested DOCX image"), b"WEBP");
     }
 
     #[test]

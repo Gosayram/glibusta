@@ -16,6 +16,15 @@ final class EpubHtmlParser {
   final EpubImageStore imageStore;
   final EpubArchive epub;
 
+  static const Set<String> _nonReaderElements = <String>{
+    'script',
+    'style',
+    'iframe',
+    'object',
+    'embed',
+    'template',
+  };
+
   Future<
     ({
       List<ReaderBlock> blocks,
@@ -189,6 +198,7 @@ final class EpubHtmlParser {
     String chapterPath,
   ) async {
     final tag = el.localName;
+    if (_nonReaderElements.contains(tag)) return null;
     switch (tag) {
       case 'p':
         final spans = _extractInlineSpans(el, chapterPath);
@@ -317,6 +327,7 @@ final class EpubHtmlParser {
         }
       } else if (node is XmlElement) {
         final tag = node.localName;
+        if (_nonReaderElements.contains(tag)) continue;
         var newBold = bold;
         var newItalic = italic;
         var newSuperscript = superscript;

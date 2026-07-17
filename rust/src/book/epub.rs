@@ -1073,6 +1073,15 @@ fn css_hides_element(
     })
 }
 
+/// These elements are not reader content. Their attributes are not retained in
+/// `ReaderBlock`, and their descendants must not become fallback text either.
+fn element_discards_reader_content(tag: &[u8]) -> bool {
+    matches!(
+        tag,
+        b"script" | b"style" | b"iframe" | b"object" | b"embed" | b"template"
+    )
+}
+
 fn inline_style_hides_content(style: &str) -> bool {
     style.split(';').any(|declaration| {
         let Some((name, value)) = declaration.split_once(':') else {
@@ -1265,10 +1274,18 @@ fn parse_xhtml_to_blocks(
             Ok(Event::Start(ref e)) => {
                 let local_name = e.local_name();
                 let name = local_name.as_ref();
-                let element_is_hidden = css_hides_element(e, name, css);
+                // The native reader renders only `ReaderBlock` data, never HTML.
+                // Still discard active/fallback markup here so it cannot leak into
+                // visible text or image placeholders.
+                let element_is_hidden = hidden_depth > 0
+                    || element_discards_reader_content(name)
+                    || css_hides_element(e, name, css);
                 hidden_elements.push(element_is_hidden);
                 if element_is_hidden {
                     hidden_depth += 1;
+                }
+                if hidden_depth > 0 {
+                    continue;
                 }
                 match name {
                     b"body" => in_body = true,
@@ -1558,6 +1575,12 @@ fn parse_xhtml_to_blocks(
             Ok(Event::End(ref e)) => {
                 let local_name = e.local_name();
                 let name = local_name.as_ref();
+                if hidden_depth > 0 {
+                    if hidden_elements.pop().unwrap_or(false) {
+                        hidden_depth = hidden_depth.saturating_sub(1);
+                    }
+                    continue;
+                }
                 match name {
                     b"body" => in_body = false,
                     b"aside" if in_block && block_type == BlockType::Footnote => {
@@ -2018,7 +2041,7 @@ fn parse_xhtml_to_blocks(
                     } else {
                         current_text.push('\n');
                     }
-                } else if name == b"img" && in_block {
+                } else if name == b"img" && in_block && !element_is_hidden {
                     // Inline image inside paragraph - treat as text placeholder
                     let src = get_xml_attr(e, b"src").unwrap_or_default();
                     span_text.push_str(&format!("[img:{}]", src));

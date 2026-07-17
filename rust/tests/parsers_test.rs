@@ -524,6 +524,38 @@ fn test_epub_hidden_css_content_is_not_emitted() {
 }
 
 #[test]
+fn test_epub_discards_active_markup_and_footnote_background_assets() {
+    let epub = create_epub_with_opf_and_chapter(
+        true,
+        MINIMAL_EPUB_OPF,
+        br#"<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <head><style>.footnote { background-image: url('tracking.png'); }</style></head>
+  <body>
+    <p>Visible <script>alert('not reader text')</script><iframe srcdoc="&lt;p&gt;active&lt;/p&gt;">fallback frame text</iframe> prose.</p>
+    <aside epub:type="footnote" class="footnote"><p>Legitimate footnote.</p></aside>
+  </body>
+</html>"#,
+    );
+
+    let book = glibusta_core::book::epub::parse_epub(&epub, None).unwrap();
+    let blocks = &book.chapters[0].blocks;
+    let text = blocks
+        .iter()
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(text.contains("Visible"));
+    assert!(text.contains("prose."));
+    assert!(text.contains("Legitimate footnote."));
+    for rejected in ["alert('not reader text')", "fallback frame text", "active"] {
+        assert!(!text.contains(rejected), "active markup leaked: {rejected}");
+    }
+    assert!(blocks.iter().all(|block| block.image_url.is_none()));
+}
+
+#[test]
 fn test_epub_corrupted_archive_is_rejected() {
     let error = glibusta_core::book::epub::parse_epub(b"not an EPUB archive", None)
         .expect_err("corrupted EPUB must not be parsed");
