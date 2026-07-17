@@ -234,7 +234,13 @@ class BookOpenService {
     );
   }
 
-  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) => cache.getMetadata(bookId);
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    final metadata = await cache.getMetadata(bookId);
+    if (metadata == null || !await cache.isCacheValid(bookId, metadata)) {
+      return null;
+    }
+    return metadata;
+  }
 
   Future<ReaderChapter?> loadChapter(String bookId, int index) => cache.getChapter(bookId, index);
 
