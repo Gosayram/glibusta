@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
@@ -524,7 +523,7 @@ void main() {
             chapterCount: 1,
             chapterTitles: ['Pages'],
           ),
-          loadedChapters: const {
+          loadedChapters: {
             0: ReaderChapter(
               index: 0,
               title: 'Pages',
@@ -533,7 +532,7 @@ void main() {
                   index: 0,
                   text: '',
                   type: BlockType.image,
-                  imageUrl: 'data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=',
+                  imageUrl: 'data:image/webp;base64,$transparentWebp',
                 ),
               ],
             ),
@@ -549,6 +548,7 @@ void main() {
 
     final image = tester.widget<Image>(find.byType(Image));
     final provider = image.image as MemoryImage;
+    expect(provider.bytes, base64Decode(transparentWebp));
     final codec = await ui.instantiateImageCodec(provider.bytes);
     final frame = await codec.getNextFrame();
     final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
