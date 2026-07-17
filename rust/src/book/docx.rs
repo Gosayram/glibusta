@@ -455,7 +455,7 @@ fn parse_document_xml_with_hyperlinks(
     let mut in_paragraph = false;
     let mut in_run = false;
     let mut in_pstyle = false;
-    let mut in_table = false;
+    let mut table_depth = 0usize;
     let mut in_table_row = false;
     let mut in_table_cell = false;
     let mut paragraph_is_numbered = false;
@@ -492,22 +492,24 @@ fn parse_document_xml_with_hyperlinks(
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
                     "body" => in_body = true,
-                    "tbl" if in_body && !in_table => {
-                        flush_docx_list(
-                            &mut blocks,
-                            &mut pending_list_items,
-                            &mut block_index,
-                            pending_list_ordered,
-                        );
-                        pending_list_numbering_key = None;
-                        in_table = true;
-                        table_rows.clear();
+                    "tbl" if in_body => {
+                        if table_depth == 0 {
+                            flush_docx_list(
+                                &mut blocks,
+                                &mut pending_list_items,
+                                &mut block_index,
+                                pending_list_ordered,
+                            );
+                            pending_list_numbering_key = None;
+                            table_rows.clear();
+                        }
+                        table_depth += 1;
                     }
-                    "tr" if in_table => {
+                    "tr" if table_depth == 1 => {
                         in_table_row = true;
                         current_table_row.clear();
                     }
-                    "tc" if in_table_row => {
+                    "tc" if table_depth == 1 && in_table_row => {
                         in_table_cell = true;
                         current_table_cell.clear();
                     }
@@ -772,19 +774,20 @@ fn parse_document_xml_with_hyperlinks(
                         current_note_ref = None;
                     }
                     "hyperlink" if in_paragraph => current_span_href = None,
-                    "tc" if in_table_cell => {
+                    "tc" if table_depth == 1 && in_table_cell => {
                         current_table_row.push(current_table_cell.trim().to_string());
                         current_table_cell.clear();
                         in_table_cell = false;
                     }
-                    "tr" if in_table_row => {
+                    "tr" if table_depth == 1 && in_table_row => {
                         if !current_table_row.is_empty() {
                             table_rows.push(std::mem::take(&mut current_table_row));
                         }
                         in_table_row = false;
                     }
-                    "tbl" if in_table => {
-                        if !table_rows.is_empty() {
+                    "tbl" if table_depth > 0 => {
+                        table_depth -= 1;
+                        if table_depth == 0 && !table_rows.is_empty() {
                             let table_text = table_rows
                                 .iter()
                                 .map(|row| row.join(" | "))
@@ -808,7 +811,6 @@ fn parse_document_xml_with_hyperlinks(
                             });
                             block_index += 1;
                         }
-                        in_table = false;
                     }
                     _ => {}
                 }
@@ -1082,6 +1084,33 @@ mod tests {
                 vec!["Name".into(), "Value".into()],
                 vec!["Author".into(), "Ursula".into()],
             ])
+        );
+    }
+
+    #[test]
+    fn preserves_outer_table_when_a_cell_contains_a_nested_table() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:tbl><w:tr>
+                    <w:tc><w:p><w:r><w:t>Before nested</w:t></w:r></w:p>
+                        <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Nested value</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+                        <w:p><w:r><w:t>After nested</w:t></w:r></w:p>
+                    </w:tc>
+                    <w:tc><w:p><w:r><w:t>Sibling</w:t></w:r></w:p></w:tc>
+                </w:tr></w:tbl></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse nested DOCX table");
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Table);
+        assert_eq!(
+            blocks[0].table_rows,
+            Some(vec![vec![
+                "Before nested\nNested value\nAfter nested".into(),
+                "Sibling".into(),
+            ]]),
         );
     }
 

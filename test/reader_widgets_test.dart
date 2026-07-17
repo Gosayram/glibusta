@@ -510,6 +510,8 @@ void main() {
 
   testWidgets('renders transparent WebP comic pages without dropping alpha', (tester) async {
     const transparentWebp = 'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
+    const transparentWebpUri =
+        'data:image/webp;base64,UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);
 
@@ -523,7 +525,7 @@ void main() {
             chapterCount: 1,
             chapterTitles: ['Pages'],
           ),
-          loadedChapters: {
+          loadedChapters: const {
             0: ReaderChapter(
               index: 0,
               title: 'Pages',
@@ -532,7 +534,7 @@ void main() {
                   index: 0,
                   text: '',
                   type: BlockType.image,
-                  imageUrl: 'data:image/webp;base64,$transparentWebp',
+                  imageUrl: transparentWebpUri,
                 ),
               ],
             ),
@@ -551,7 +553,7 @@ void main() {
     expect(provider.bytes, base64Decode(transparentWebp));
     final codec = await ui.instantiateImageCodec(provider.bytes);
     final frame = await codec.getNextFrame();
-    final rgba = await frame.image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final rgba = await frame.image.toByteData();
     codec.dispose();
     frame.image.dispose();
 

@@ -50,6 +50,40 @@ final class EpubHtmlParser {
     );
   }
 
+  /// Whether [htmlText] is only a spine wrapper for the selected cover image.
+  /// The reader inserts its own cover page, so retaining this document would
+  /// show the same image twice.
+  bool isSingleCoverImageDocument({
+    required String chapterPath,
+    required String htmlText,
+    required EpubResource cover,
+  }) {
+    try {
+      final body = _findBody(XmlDocument.parse(htmlText));
+      if (body == null || body.innerText.trim().isNotEmpty) return false;
+      final images = body.descendants.whereType<XmlElement>().where(
+        (element) => element.localName == 'img' || element.localName == 'image',
+      );
+      final image = images.length == 1 ? images.single : null;
+      if (image == null) return false;
+      final href = image.localName == 'img'
+          ? image.getAttribute('src')
+          : _attributeByLocalName(image, 'href');
+      if (href == null || href.isEmpty) return false;
+      final resolved = resolver.resolveFromHref(chapterPath: chapterPath, href: href);
+      return resolved?.fullPath == cover.fullPath;
+    } on Object catch (_) {
+      return false;
+    }
+  }
+
+  String? _attributeByLocalName(XmlElement element, String localName) {
+    for (final attribute in element.attributes) {
+      if (attribute.name.local == localName) return attribute.value;
+    }
+    return null;
+  }
+
   /// Extract supported CSS rules in source order so the adapter can apply the
   /// CSS cascade rather than the order of classes in the XHTML attribute.
   Future<List<EpubCssRule>?> _extractCss(XmlDocument doc, String chapterPath) async {

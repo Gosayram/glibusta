@@ -144,6 +144,64 @@ void main() {
     }
   });
 
+  test('does not expose an SVG cover wrapper as a second reader chapter', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_svg_cover_test_');
+    try {
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'META-INF/container.xml',
+            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/>'
+                '</rootfiles></container>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/content.opf',
+            '<package><metadata><title>SVG cover</title>'
+                '<meta name="cover" content="cover-image"/></metadata><manifest>'
+                '<item id="cover-image" href="images/cover.svg" media-type="image/svg+xml"/>'
+                '<item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>'
+                '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
+                '</manifest><spine><itemref idref="cover-page"/><itemref idref="chapter"/>'
+                '</spine></package>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/images/cover.svg',
+            '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/cover.xhtml',
+            '<html><body><svg xmlns="http://www.w3.org/2000/svg">'
+                '<image href="images/cover.svg"/></svg></body></html>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/chapter.xhtml',
+            '<html><body><p>Actual chapter text.</p></body></html>',
+          ),
+        );
+      final file = File('${temporaryDirectory.path}/svg-cover.epub');
+      await file.writeAsBytes(ZipEncoder().encode(archive));
+
+      final book = await CustomEpubParser(
+        imageStore: EpubImageStore(temporaryDirectory),
+      ).parse(file.path);
+
+      expect(book.coverImagePath, endsWith('.svg'));
+      expect(book.chapters, hasLength(1));
+      final paragraph = book.chapters.single.blocks.single as ParagraphBlock;
+      expect(paragraph.spans.single.text, 'Actual chapter text.');
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('extracts the local audio file referenced by a SMIL media overlay', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_audio_test_');
     try {

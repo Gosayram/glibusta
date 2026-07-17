@@ -127,14 +127,13 @@ fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
     if encoding_name.eq_ignore_ascii_case("utf-8") {
         Ok(String::from_utf8_lossy(bytes).into_owned())
     } else {
-        let (decoded, _, had_errors) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
+        let (decoded, _) = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
             .unwrap_or(encoding_rs::UTF_8)
-            .decode(bytes);
-        if had_errors {
-            Ok(String::from_utf8_lossy(bytes).into_owned())
-        } else {
-            Ok(decoded.into_owned())
-        }
+            .decode_without_bom_handling(bytes);
+        // Keep the decoder's partial result when the selected legacy encoding
+        // contains malformed trailing bytes. Falling back to lossy UTF-8 would
+        // turn every preceding non-UTF-8 byte into U+FFFD as well.
+        Ok(decoded.into_owned())
     }
 }
 
@@ -273,6 +272,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
 #[cfg(test)]
 mod tests {
     use super::parse_txt;
+    use encoding_rs::{ISO_2022_JP, WINDOWS_1251};
 
     #[test]
     fn detects_chapters_separated_by_windows_line_endings() {
@@ -311,6 +311,35 @@ mod tests {
         let book = parse_txt(b"\x8f\xe0\xa8\xa2\xa5\xe2", None).expect("parse CP866 TXT");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Привет");
+    }
+
+    #[test]
+    fn auto_detects_cp1251_without_losing_non_utf8_text() {
+        let (bytes, _, _) = WINDOWS_1251.encode(
+            "Заголовок русской книги\n\nЭто достаточно длинный абзац на русском языке для определения кодировки.",
+        );
+        let book = parse_txt(&bytes, None).expect("parse CP1251 TXT");
+
+        assert_eq!(book.title, "Заголовок русской книги");
+        assert!(
+            book.chapters[0].blocks[1]
+                .text
+                .contains("достаточно длинный абзац")
+        );
+    }
+
+    #[test]
+    fn preserves_iso_2022_jp_prefix_before_incomplete_escape_sequence() {
+        let (encoded, _, _) = ISO_2022_JP.encode("日本語の本文");
+        let mut bytes = encoded.into_owned();
+        // An incomplete escape sequence is a decoder error, but must not cause
+        // the valid Japanese text already decoded from this file to be retried
+        // as lossy UTF-8.
+        bytes.extend_from_slice(b"\x1b$");
+
+        let book = parse_txt(&bytes, Some("iso-2022-jp")).expect("parse ISO-2022-JP TXT");
+
+        assert!(book.chapters[0].blocks[0].text.starts_with("日本語の本文"));
     }
 
     #[test]

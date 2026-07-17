@@ -66,8 +66,8 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let description = metadata.get("description").cloned();
     let language = metadata.get("language").cloned();
 
-    let cover_url =
-        extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, encoding_name)?;
+    let (cover_url, cover_href) = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir)?
+        .map_or((None, None), |cover| (Some(cover.url), Some(cover.href)));
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     let mut chapter_index = 0i32;
@@ -131,6 +131,15 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             .collect();
         blocks.retain(is_renderable);
         block_index = next_block_index;
+
+        // A spine document containing only the already selected cover image is
+        // a wrapper for the synthetic reader cover page, not a second chapter.
+        if cover_href
+            .as_deref()
+            .is_some_and(|href| is_single_cover_image_document(&blocks, &item_href, href))
+        {
+            continue;
+        }
 
         // If quick-xml produced nothing, try html5ever for malformed HTML content.
         // html5ever handles unclosed tags, bare &, and other real-world HTML soup.
@@ -781,13 +790,17 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
     entries
 }
 
+struct ExtractedCover {
+    url: String,
+    href: String,
+}
+
 fn extract_cover_url(
     zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     metadata: &HashMap<String, String>,
     opf_dir: &str,
-    _encoding_name: &str,
-) -> Result<Option<String>> {
+) -> Result<Option<ExtractedCover>> {
     // Try cover-id from <meta name="cover" content="..."/>
     if let Some(cover_id) = metadata.get("cover-id") {
         if let Some(item) = manifest.get(cover_id.as_str()) {
@@ -796,8 +809,8 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(cover));
+            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(ExtractedCover { url, href }));
             }
         }
     }
@@ -810,8 +823,8 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(cover));
+            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(ExtractedCover { url, href }));
             }
         }
     }
@@ -824,13 +837,54 @@ fn extract_cover_url(
             } else {
                 format!("{}/{}", opf_dir, item.href)
             };
-            if let Some(cover) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(cover));
+            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
+                return Ok(Some(ExtractedCover { url, href }));
             }
         }
     }
 
     Ok(None)
+}
+
+fn is_single_cover_image_document(
+    blocks: &[ReaderBlock],
+    document_href: &str,
+    cover_href: &str,
+) -> bool {
+    let [block] = blocks else {
+        return false;
+    };
+    if block.block_type != BlockType::Image || !block.text.trim().is_empty() {
+        return false;
+    }
+    let Some(image_href) = block.image_url.as_deref() else {
+        return false;
+    };
+    resolve_epub_href(document_href, image_href).as_deref() == Some(cover_href)
+}
+
+fn resolve_epub_href(document_href: &str, href: &str) -> Option<String> {
+    let href = href.split('#').next()?.trim();
+    if href.is_empty() || href.contains("://") || href.starts_with('/') {
+        return None;
+    }
+    let base_dir = document_href.rsplit_once('/').map_or("", |(dir, _)| dir);
+    let path = if base_dir.is_empty() {
+        href.to_string()
+    } else {
+        format!("{base_dir}/{href}")
+    };
+    let mut segments = Vec::new();
+    for segment in path.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                segments.pop()?;
+            }
+            _ => segments.push(segment),
+        }
+    }
+    Some(segments.join("/"))
 }
 
 fn read_cover_image(zip: &mut ZipFile<'_>, href: &str, media_type: &str) -> Result<Option<String>> {

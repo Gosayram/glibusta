@@ -481,6 +481,53 @@ fn test_epub_toc_ncx() {
 }
 
 #[test]
+fn test_epub_svg_cover_wrapper_is_not_a_second_reader_chapter() {
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut bytes);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+
+    zip.start_file("mimetype", options).unwrap();
+    zip.write_all(b"application/epub+zip").unwrap();
+    zip.start_file("META-INF/container.xml", options).unwrap();
+    zip.write_all(
+        br#"<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>"#,
+    )
+    .unwrap();
+    zip.start_file("OEBPS/content.opf", options).unwrap();
+    zip.write_all(
+        br#"<package><metadata><title>SVG cover</title><meta name="cover" content="cover-image"/></metadata><manifest>
+          <item id="cover-image" href="images/cover.svg" media-type="image/svg+xml"/>
+          <item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+        </manifest><spine><itemref idref="cover-page"/><itemref idref="chapter"/></spine></package>"#,
+    )
+    .unwrap();
+    zip.start_file("OEBPS/images/cover.svg", options).unwrap();
+    zip.write_all(br#"<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>"#)
+        .unwrap();
+    zip.start_file("OEBPS/cover.xhtml", options).unwrap();
+    zip.write_all(
+        br#"<html xmlns="http://www.w3.org/1999/xhtml"><body><svg xmlns="http://www.w3.org/2000/svg"><image href="images/cover.svg"/></svg></body></html>"#,
+    )
+    .unwrap();
+    zip.start_file("OEBPS/chapter.xhtml", options).unwrap();
+    zip.write_all(br#"<html><body><p>Actual chapter text.</p></body></html>"#)
+        .unwrap();
+    zip.finish().unwrap();
+
+    let book = glibusta_core::book::epub::parse_epub(&bytes.into_inner(), None).unwrap();
+
+    assert!(book.cover_url.is_some(), "the SVG remains the book cover");
+    assert_eq!(
+        book.chapters.len(),
+        1,
+        "the wrapper must not duplicate the cover page"
+    );
+    assert_eq!(book.chapters[0].blocks[0].text, "Actual chapter text.");
+}
+
+#[test]
 fn test_epub_hidden_css_content_is_not_emitted() {
     let epub = create_epub_with_opf_and_chapter(
         true,

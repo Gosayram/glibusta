@@ -26,6 +26,7 @@ final class CustomEpubParser {
       imageStore: imageStore,
       epub: epub,
     );
+    final coverResource = _findCoverResource(opf);
 
     final toc = await _parseToc(epub, opf, resolver);
 
@@ -36,6 +37,14 @@ final class CustomEpubParser {
       final resource = opf.resources[spineItem.idref];
       if (resource == null || resource.type != EpubResourceType.xhtml) continue;
       final htmlText = epub.readText(resource.fullPath);
+      if (coverResource != null &&
+          htmlParser.isSingleCoverImageDocument(
+            chapterPath: resource.fullPath,
+            htmlText: htmlText,
+            cover: coverResource,
+          )) {
+        continue;
+      }
       final result = await htmlParser.parseChapter(
         chapterPath: resource.fullPath,
         htmlText: htmlText,
@@ -170,6 +179,12 @@ final class CustomEpubParser {
     required EpubArchive epub,
     required EpubOpfData opf,
   }) async {
+    final cover = _findCoverResource(opf);
+    if (cover == null || !isSupportedImage(cover.mediaType)) return null;
+    return imageStore.saveImage(epub: epub, resource: cover);
+  }
+
+  EpubResource? _findCoverResource(EpubOpfData opf) {
     EpubResource? cover;
     if (opf.coverId != null) cover = opf.resources[opf.coverId!];
     cover ??= opf.resources.values.firstWhereOrNull(
@@ -178,7 +193,6 @@ final class CustomEpubParser {
     cover ??= opf.resources.values.firstWhereOrNull(
       (EpubResource r) => r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
     );
-    if (cover == null || !isSupportedImage(cover.mediaType)) return null;
-    return imageStore.saveImage(epub: epub, resource: cover);
+    return cover != null && isSupportedImage(cover.mediaType) ? cover : null;
   }
 }
