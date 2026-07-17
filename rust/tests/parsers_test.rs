@@ -378,6 +378,21 @@ fn create_minimal_epub() -> Vec<u8> {
 }
 
 fn create_epub_with_opf(include_mimetype: bool, opf: &[u8]) -> Vec<u8> {
+    create_epub_with_opf_and_chapter(
+        include_mimetype,
+        opf,
+        br#"<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><title>Chapter 1</title></head>
+  <body>
+    <p>First paragraph.</p>
+    <p>Second paragraph.</p>
+  </body>
+</html>"#,
+    )
+}
+
+fn create_epub_with_opf_and_chapter(include_mimetype: bool, opf: &[u8], chapter: &[u8]) -> Vec<u8> {
     let mut buf = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut buf);
 
@@ -423,17 +438,7 @@ fn create_epub_with_opf(include_mimetype: bool, opf: &[u8]) -> Vec<u8> {
     .unwrap();
 
     zip.start_file("chapter1.xhtml", options).unwrap();
-    zip.write_all(
-        br#"<?xml version="1.0" encoding="utf-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head><title>Chapter 1</title></head>
-  <body>
-    <p>First paragraph.</p>
-    <p>Second paragraph.</p>
-  </body>
-</html>"#,
-    )
-    .unwrap();
+    zip.write_all(chapter).unwrap();
 
     zip.finish().unwrap();
     buf.into_inner()
@@ -459,6 +464,49 @@ fn test_epub_toc_ncx() {
     let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
     assert!(!book.toc.is_empty(), "TOC should have entries");
     assert_eq!(book.toc[0].title, "Chapter 1");
+}
+
+#[test]
+fn test_epub_hidden_css_content_is_not_emitted() {
+    let epub = create_epub_with_opf_and_chapter(
+        true,
+        MINIMAL_EPUB_OPF,
+        br#"<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <style>
+      .hidden { display: none; }
+      .invisible { visibility: hidden; }
+    </style>
+  </head>
+  <body>
+    <p>Visible <span class="hidden">hidden inline</span> text.</p>
+    <p class="hidden">hidden block</p>
+    <p class="invisible">invisible block</p>
+    <p style="display: none">hidden inline style</p>
+    <div class="hidden"><p>hidden descendant</p></div>
+  </body>
+</html>"#,
+    );
+
+    let book = glibusta_core::book::epub::parse_epub(&epub, None).unwrap();
+    let text = book.chapters[0]
+        .blocks
+        .iter()
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert_eq!(text, "Visibletext.");
+    for hidden in [
+        "hidden inline",
+        "hidden block",
+        "invisible block",
+        "hidden inline style",
+        "hidden descendant",
+    ] {
+        assert!(!text.contains(hidden), "hidden content leaked: {hidden}");
+    }
 }
 
 #[test]

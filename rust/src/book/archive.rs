@@ -81,9 +81,17 @@ impl<'a> ZipFile<'a> {
     /// The size is validated from ZIP metadata before allocating the output
     /// buffer, so a malformed entry cannot force an unbounded extraction.
     pub fn read_file_limited(&mut self, name: &str, max_size: usize) -> Result<Option<Vec<u8>>> {
-        let Ok(mut file) = self.archive.by_name(name) else {
+        // Read by index rather than `by_name`: legacy ZIP archives can contain
+        // non-UTF-8 filenames (for example CP866 Cyrillic names). `zip`
+        // exposes a display string decoded as CP437, but that string cannot be
+        // converted back to the original raw bytes for a name lookup.
+        let Some(index) = self.entry_names.iter().position(|entry| entry == name) else {
             return Ok(None);
         };
+        let mut file = self
+            .archive
+            .by_index(index)
+            .context("Failed to read ZIP entry")?;
         let size = usize::try_from(file.size()).context("ZIP entry size does not fit usize")?;
         if size > max_size {
             anyhow::bail!(
@@ -178,7 +186,7 @@ mod tests {
         write_u16(&mut bytes, compression_method);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
-        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, crc32fast::hash(payload));
         write_u32(&mut bytes, compressed_size);
         write_u32(&mut bytes, uncompressed_size);
         write_u16(&mut bytes, name.len() as u16);
@@ -194,7 +202,7 @@ mod tests {
         write_u16(&mut bytes, compression_method);
         write_u16(&mut bytes, 0);
         write_u16(&mut bytes, 0);
-        write_u32(&mut bytes, 0);
+        write_u32(&mut bytes, crc32fast::hash(payload));
         write_u32(&mut bytes, compressed_size);
         write_u32(&mut bytes, uncompressed_size);
         write_u16(&mut bytes, name.len() as u16);
@@ -266,5 +274,29 @@ mod tests {
             .expect_err("extracted bytes must respect the caller limit");
 
         assert!(error.to_string().contains("after extraction"));
+    }
+
+    #[test]
+    fn reads_cp866_named_fb2_entry() {
+        // ZIP's legacy filename flag declares CP437, but FB2.ZIP archives made
+        // by older Cyrillic tools commonly store a CP866 filename instead.
+        // The visible name is decoded as CP437 by the `zip` crate, so reading
+        // it must still use the entry's raw archive index.
+        let bytes = single_entry_zip_fixture(
+            b"\x8a\xad\xa8\xa3\xa0.fb2", // "Книга.fb2" in CP866.
+            0,
+            b"<FictionBook/>",
+            14,
+            14,
+        );
+        let mut zip = ZipFile::open(&bytes).expect("open archive");
+        let name = zip.entry_names()[0].clone();
+
+        let content = zip
+            .read_file_limited(&name, 1024)
+            .expect("read entry")
+            .expect("entry should exist");
+
+        assert_eq!(content, b"<FictionBook/>");
     }
 }

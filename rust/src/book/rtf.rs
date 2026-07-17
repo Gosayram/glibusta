@@ -879,6 +879,23 @@ mod tests {
     }
 
     #[test]
+    fn extracts_rtf_jpeg_picture_as_an_image_block() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi{\pict\jpegblip FFD8FFE000104A4649460001}}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF picture");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 1, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, crate::api::models::BlockType::Image);
+        assert_eq!(
+            blocks[0].image_url.as_deref(),
+            Some("data:image/jpeg;base64,/9j/4AAQSkZJRgAB"),
+        );
+    }
+
+    #[test]
     fn preserves_rtf_hyperlink_field_targets() {
         let book = parse_rtf(
             br#"{\rtf1\ansi{\field{\*\fldinst{HYPERLINK "https://example.com"}}{\fldrslt{Example}}}}"#,

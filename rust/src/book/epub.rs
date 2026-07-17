@@ -1048,21 +1048,72 @@ fn apply_css_props(
     }
 }
 
+fn css_hides_element(
+    element: &quick_xml::events::BytesStart<'_>,
+    tag: &[u8],
+    css: &HashMap<String, HashMap<String, String>>,
+) -> bool {
+    if get_xml_attr(element, b"style").is_some_and(|style| inline_style_hides_content(&style)) {
+        return true;
+    }
+
+    let Ok(tag) = std::str::from_utf8(tag) else {
+        return false;
+    };
+    if css.get(tag).is_some_and(css_properties_hide_content) {
+        return true;
+    }
+
+    get_xml_attr(element, b"class").is_some_and(|classes| {
+        classes.split_whitespace().any(|class| {
+            css.get(&format!(".{class}"))
+                .or_else(|| css.get(&format!("{tag}.{class}")))
+                .is_some_and(css_properties_hide_content)
+        })
+    })
+}
+
+fn inline_style_hides_content(style: &str) -> bool {
+    style.split(';').any(|declaration| {
+        let Some((name, value)) = declaration.split_once(':') else {
+            return false;
+        };
+        matches!(name.trim(), "display" | "visibility")
+            && ((name.trim() == "display" && css_value_is(value, "none"))
+                || (name.trim() == "visibility"
+                    && (css_value_is(value, "hidden") || css_value_is(value, "collapse"))))
+    })
+}
+
+fn css_properties_hide_content(props: &HashMap<String, String>) -> bool {
+    props
+        .get("display")
+        .is_some_and(|value| css_value_is(value, "none"))
+        || props
+            .get("visibility")
+            .is_some_and(|value| css_value_is(value, "hidden") || css_value_is(value, "collapse"))
+}
+
+fn css_value_is(value: &str, expected: &str) -> bool {
+    value
+        .split_ascii_whitespace()
+        .next()
+        .is_some_and(|value| value.eq_ignore_ascii_case(expected))
+}
+
 /// RCE-7.3: Inline CSS normalization — apply CSS properties to a ReaderBlock.
 /// ponytail: text-indent, text-align, white-space, margin-left, line-height, font-weight, font-style, color, display.
 fn apply_props(block: &mut ReaderBlock, props: &HashMap<String, String>) {
-    // RCE-7.3: display:none removes every renderable payload from the block.
-    if let Some(display) = props.get("display") {
-        if display.trim() == "none" {
-            block.text.clear();
-            block.block_type = BlockType::Paragraph;
-            block.image_url = None;
-            block.image_alt = None;
-            block.rich_spans = None;
-            block.list_items = None;
-            block.table_rows = None;
-            return;
-        }
+    // RCE-7.3: hidden CSS removes every renderable payload from the block.
+    if css_properties_hide_content(props) {
+        block.text.clear();
+        block.block_type = BlockType::Paragraph;
+        block.image_url = None;
+        block.image_alt = None;
+        block.rich_spans = None;
+        block.list_items = None;
+        block.table_rows = None;
+        return;
     }
     if let Some(indent) = props.get("text-indent") {
         if let Some(v) = parse_css_length(indent) {
@@ -1184,7 +1235,9 @@ fn parse_xhtml_to_blocks(
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
     let mut blockquote_depth: i32 = 0;
-    let mut current_class: Option<&str> = None;
+    let mut block_class: Option<&str> = None;
+    let mut hidden_elements: Vec<bool> = Vec::new();
+    let mut hidden_depth = 0usize;
 
     // Rich span tracking
     let mut rich_spans: Vec<RichSpan> = Vec::new();
@@ -1212,7 +1265,11 @@ fn parse_xhtml_to_blocks(
             Ok(Event::Start(ref e)) => {
                 let local_name = e.local_name();
                 let name = local_name.as_ref();
-                current_class = get_class_attr_arena(e, &arena);
+                let element_is_hidden = css_hides_element(e, name, css);
+                hidden_elements.push(element_is_hidden);
+                if element_is_hidden {
+                    hidden_depth += 1;
+                }
                 match name {
                     b"body" => in_body = true,
                     b"aside" if in_body => {
@@ -1258,6 +1315,7 @@ fn parse_xhtml_to_blocks(
                         span_text.clear();
                         in_block = true;
                         in_pre = name == b"pre";
+                        block_class = get_class_attr_arena(e, &arena);
                         block_type = if blockquote_depth > 0 {
                             BlockType::Quote
                         } else {
@@ -1291,6 +1349,7 @@ fn parse_xhtml_to_blocks(
                             in_block = true;
                             block_type = BlockType::Heading;
                             heading_level = Some(digit as i32 - b'0' as i32);
+                            block_class = get_class_attr_arena(e, &arena);
                         }
                     }
                     b"blockquote" if in_body => {
@@ -1317,6 +1376,7 @@ fn parse_xhtml_to_blocks(
                         in_block = true;
                         block_type = BlockType::Quote;
                         heading_level = None;
+                        block_class = get_class_attr_arena(e, &arena);
                         blockquote_depth += 1;
                     }
                     b"table" if in_body => {
@@ -1448,7 +1508,7 @@ fn parse_xhtml_to_blocks(
                         href =
                             get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                     }
-                    b"br" if in_block => {
+                    b"br" if in_block && hidden_depth == 0 => {
                         span_text.push('\n');
                         current_text.push('\n');
                     }
@@ -1456,7 +1516,7 @@ fn parse_xhtml_to_blocks(
                 }
             }
             Ok(Event::Text(ref e)) => {
-                if in_body {
+                if in_body && hidden_depth == 0 {
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block {
                         span_text.push_str(&text);
@@ -1470,7 +1530,7 @@ fn parse_xhtml_to_blocks(
                 }
             }
             Ok(Event::CData(ref e)) => {
-                if in_body {
+                if in_body && hidden_depth == 0 {
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block || in_table {
                         span_text.push_str(&text);
@@ -1483,7 +1543,7 @@ fn parse_xhtml_to_blocks(
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
-                if in_body {
+                if in_body && hidden_depth == 0 {
                     let text = e.xml10_content().unwrap_or_default();
                     if in_block || in_table {
                         span_text.push_str(&text);
@@ -1557,7 +1617,7 @@ fn parse_xhtml_to_blocks(
                                 },
                                 note_id: None,
                             });
-                            if let Some(cls) = current_class {
+                            if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "p", Some(cls), css);
                                     apply_css_props(last, "pre", Some(cls), css);
@@ -1583,6 +1643,7 @@ fn parse_xhtml_to_blocks(
                         italic = false;
                         superscript = false;
                         href = None;
+                        block_class = None;
                     }
                     b if b.starts_with(b"h")
                         && b.len() == 2
@@ -1627,7 +1688,7 @@ fn parse_xhtml_to_blocks(
                                         Some(lv @ 1..=6) => H_TAGS[(lv - 1) as usize],
                                         _ => "h1",
                                     };
-                                    if let Some(cls) = current_class {
+                                    if let Some(cls) = block_class {
                                         if let Some(last) = blocks.last_mut() {
                                             apply_css_props(last, htag, Some(cls), css);
                                         }
@@ -1649,6 +1710,7 @@ fn parse_xhtml_to_blocks(
                                 italic = false;
                                 superscript = false;
                                 href = None;
+                                block_class = None;
                                 blockquote_depth = (blockquote_depth - 1).max(0);
                             }
                         }
@@ -1684,7 +1746,7 @@ fn parse_xhtml_to_blocks(
                                 text_align: None,
                                 note_id: None,
                             });
-                            if let Some(cls) = current_class {
+                            if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "blockquote", Some(cls), css);
                                 }
@@ -1699,6 +1761,7 @@ fn parse_xhtml_to_blocks(
                         italic = false;
                         superscript = false;
                         href = None;
+                        block_class = None;
                     }
                     b"td" | b"th" if in_table => {
                         let t = span_text.trim().to_string();
@@ -1881,11 +1944,15 @@ fn parse_xhtml_to_blocks(
                     }
                     _ => {}
                 }
+                if hidden_elements.pop().unwrap_or(false) {
+                    hidden_depth = hidden_depth.saturating_sub(1);
+                }
             }
             Ok(Event::Empty(ref e)) => {
                 let local_name = e.local_name();
                 let name = local_name.as_ref();
-                if name == b"hr" && in_body {
+                let element_is_hidden = hidden_depth > 0 || css_hides_element(e, name, css);
+                if name == b"hr" && in_body && !element_is_hidden {
                     blocks.push(ReaderBlock {
                         index: block_index,
                         text: String::new(),
@@ -1903,7 +1970,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                     });
                     block_index += 1;
-                } else if name == b"img" && in_body {
+                } else if name == b"img" && in_body && !element_is_hidden {
                     let src = get_xml_attr(e, b"src");
                     let alt = get_xml_attr(e, b"alt");
                     blocks.push(ReaderBlock {
@@ -1923,7 +1990,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                     });
                     block_index += 1;
-                } else if name == b"image" && in_body {
+                } else if name == b"image" && in_body && !element_is_hidden {
                     // CRT-1.15: SVG <image> tags — extract raster fallback from xlink:href or href
                     let src = get_xml_attr(e, b"xlink:href").or_else(|| get_xml_attr(e, b"href"));
                     if let Some(image_src) = src {
@@ -1945,7 +2012,7 @@ fn parse_xhtml_to_blocks(
                         });
                         block_index += 1;
                     }
-                } else if name == b"br" && in_body {
+                } else if name == b"br" && in_body && !element_is_hidden {
                     if in_block {
                         span_text.push('\n');
                     } else {
