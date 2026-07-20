@@ -43,10 +43,23 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
 
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     for (i, paragraph) in paragraphs.into_iter().enumerate() {
+        let is_scene_break = is_scene_break(&paragraph);
         blocks.push(ReaderBlock {
             index: i as i32,
-            text: paragraph,
-            block_type: BlockType::Paragraph,
+            // A scene break belongs to the surrounding chapter.  Preserve it
+            // as the reader's semantic separator instead of an ordinary text
+            // paragraph, so it cannot become a synthetic heading or a
+            // separately styled section.
+            text: if is_scene_break {
+                String::new()
+            } else {
+                paragraph
+            },
+            block_type: if is_scene_break {
+                BlockType::Separator
+            } else {
+                BlockType::Paragraph
+            },
             image_url: None,
             note_ref: None,
             rich_spans: None,
@@ -89,6 +102,21 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         images: Vec::new(),
         toc,
     })
+}
+
+fn is_scene_break(text: &str) -> bool {
+    let trimmed = text.trim();
+    let Some(marker) = trimmed.chars().next() else {
+        return false;
+    };
+    if marker == '*' {
+        return trimmed.chars().count() >= 3 && trimmed.chars().all(|c| c == marker);
+    }
+
+    // `normalize_whitespace` converts `---` to `—-` before this point.  Both
+    // spellings represent an input separator, whereas a single em dash is
+    // ordinary prose punctuation.
+    trimmed.chars().count() >= 2 && trimmed.chars().all(|c| matches!(c, '-' | '—'))
 }
 
 fn split_paragraphs(text: &str) -> Vec<String> {
@@ -271,7 +299,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
 
 #[cfg(test)]
 mod tests {
-    use super::parse_txt;
+    use super::{BlockType, parse_txt};
     use encoding_rs::{ISO_2022_JP, WINDOWS_1251};
 
     #[test]
@@ -405,5 +433,28 @@ mod tests {
         assert_eq!(blocks[2].text, "Second paragraph");
         assert_eq!(blocks[3].text, "Third");
         assert!(blocks.iter().all(|block| !block.text.contains('\0')));
+    }
+
+    #[test]
+    fn keeps_scene_breaks_inside_the_preceding_chapter() {
+        let book = parse_txt(
+            b"Book title\n\nChapter 1\n\nFirst scene\n\n***\n\nSecond scene\n\n---\n\nThird scene\n\nChapter 2\n\nFinal scene",
+            Some("utf-8"),
+        )
+        .expect("parse TXT with scene breaks");
+
+        assert_eq!(book.chapters.len(), 3);
+        let first_chapter = &book.chapters[1];
+        assert_eq!(first_chapter.title, "Chapter 1");
+        assert_eq!(
+            first_chapter
+                .blocks
+                .iter()
+                .filter(|block| block.block_type == BlockType::Separator)
+                .count(),
+            2
+        );
+        assert!(first_chapter.blocks.iter().all(|block| block.text != "***"));
+        assert!(first_chapter.blocks.iter().all(|block| block.text != "---"));
     }
 }

@@ -2189,9 +2189,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         ),
         child: Padding(
           padding: _effectiveMargin(settings, settings.mode),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: content,
+          // Blocks are deliberately kept intact by the paginator. When one
+          // exceeds a small viewport, retain the page boundary and make its
+          // remainder reachable instead of overflowing the PageView.
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: content,
+            ),
           ),
         ),
       ),

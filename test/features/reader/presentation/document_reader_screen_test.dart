@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/reader/presentation/djvu_reader_screen.dart';
 import 'package:glibusta/features/reader/presentation/pdf_reader_screen.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 void main() {
   String missingDocumentPath(String extension) =>
@@ -24,5 +25,24 @@ void main() {
     await tester.pump();
 
     expect(find.text('Файл не найден'), findsOneWidget);
+  });
+
+  group('PDF link safety', () {
+    test('allows only an in-document destination within the page range', () {
+      const destination = PdfDest(2, PdfDestCommand.fit, null);
+      const link = PdfLink([], dest: destination);
+
+      expect(isSafePdfLink(link, 2), isTrue);
+      expect(isSafePdfLink(link, 1), isFalse);
+    });
+
+    test('rejects malformed and external URI links', () {
+      const invalidDestination = PdfDest(0, PdfDestCommand.fit, null);
+      const invalidLink = PdfLink([], dest: invalidDestination);
+      final externalLink = PdfLink([], url: Uri.parse('https://attacker.invalid/callback'));
+
+      expect(isSafePdfLink(invalidLink, 10), isFalse);
+      expect(isSafePdfLink(externalLink, 10), isFalse);
+    });
   });
 }

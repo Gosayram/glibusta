@@ -294,10 +294,32 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     let mmap = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
     let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     book.book_format = format;
+    if format == BookFormat::Txt {
+        apply_txt_filename_author(&mut book, Path::new(&path));
+    }
     // Store in both caches
     memory_cache_store(fingerprint, book.clone());
     disk_cache_store(&cache_key, &book);
     Ok(book)
+}
+
+/// TXT has no reliable embedded author metadata.  Use a conservative
+/// `Author - Title.txt` filename fallback only for path-based imports and only
+/// when the parser did not already provide an author.
+fn apply_txt_filename_author(book: &mut NormalizedBook, path: &Path) {
+    if !book.authors.is_empty() {
+        return;
+    }
+    let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+        return;
+    };
+    let author = [" — ", " – ", " - "]
+        .iter()
+        .find_map(|separator| stem.split_once(separator).map(|(author, _)| author.trim()))
+        .filter(|author| !author.is_empty() && author.chars().any(char::is_alphabetic));
+    if let Some(author) = author {
+        book.authors.push(author.to_string());
+    }
 }
 
 /// RCE-1.4: Extract a single chapter from a book file.
@@ -1096,11 +1118,13 @@ mod document_open_smoke_tests {
 #[cfg(test)]
 mod parse_api_tests {
     use super::{
-        MAX_FILE_SIZE, disk_cache_lookup, disk_cache_store, parse_book, parse_book_legacy,
-        read_archive_asset, repair_normalized_book, search_in_book, toc_has_invalid_chapter,
+        MAX_FILE_SIZE, apply_txt_filename_author, disk_cache_lookup, disk_cache_store, parse_book,
+        parse_book_legacy, read_archive_asset, repair_normalized_book, search_in_book,
+        toc_has_invalid_chapter,
     };
     use crate::api::models::{BlockType, TocEntry};
     use std::io::{Cursor, Write};
+    use std::path::Path;
 
     #[test]
     fn path_and_legacy_txt_parsers_return_the_same_book() {
@@ -1123,6 +1147,37 @@ mod parse_api_tests {
             serde_json::to_value(path_book).expect("serialize path book"),
             serde_json::to_value(legacy_book).expect("serialize legacy book"),
         );
+    }
+
+    #[test]
+    fn txt_path_import_uses_author_from_filename_without_replacing_book_title() {
+        let path = std::env::temp_dir().join(format!(
+            "Тестовый Автор - filename-metadata-{}.txt",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, "Declared title\n\nBook content.").expect("write temporary TXT file");
+
+        let result = parse_book(path.to_string_lossy().into_owned());
+        let _ = std::fs::remove_file(&path);
+        let book = result.expect("parse temporary TXT file");
+
+        assert_eq!(book.title, "Declared title");
+        assert_eq!(book.authors, ["Тестовый Автор"]);
+    }
+
+    #[test]
+    fn txt_filename_author_does_not_replace_declared_metadata() {
+        let mut book = parse_book_legacy(
+            b"Declared title\n\nBook content.".to_vec(),
+            "txt".to_owned(),
+            None,
+        )
+        .expect("parse TXT fixture");
+        book.authors = vec!["Declared author".to_string()];
+
+        apply_txt_filename_author(&mut book, Path::new("Filename author - filename title.txt"));
+
+        assert_eq!(book.authors, ["Declared author"]);
     }
 
     #[test]

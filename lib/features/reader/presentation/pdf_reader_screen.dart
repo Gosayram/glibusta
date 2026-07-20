@@ -3,7 +3,20 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+/// Returns whether [link] can be resolved within the opened document.
+///
+/// PDF URI actions are deliberately not forwarded to a platform launcher: a
+/// local book must not be able to trigger a browser, intent, or other external
+/// application. Only bounded in-document destinations are actionable.
+@visibleForTesting
+bool isSafePdfLink(PdfLink link, int pageCount) {
+  final destination = link.dest;
+  return link.url == null &&
+      destination != null &&
+      destination.pageNumber >= 1 &&
+      destination.pageNumber <= pageCount;
+}
 
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
@@ -202,9 +215,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
               },
               linkHandlerParams: PdfLinkHandlerParams(
                 onLinkTap: (link) {
-                  final url = link.url;
-                  if (url != null) {
-                    unawaited(launchUrl(url));
+                  final destination = link.dest;
+                  if (isSafePdfLink(link, _controller.pageCount) && destination != null) {
+                    unawaited(_controller.goToDest(destination));
                   }
                 },
               ),

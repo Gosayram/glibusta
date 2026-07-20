@@ -654,6 +654,124 @@ void main() {
     expect(find.byType(ReaderContentBody), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('keeps a wide EPUB table horizontally reachable', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    const lastCell = 'rightmost-column';
+
+    await tester.pumpWidget(
+      wrapInApp(
+        SizedBox(
+          width: 320,
+          height: 240,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'wide-table',
+              title: 'Wide table',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: const {
+              0: ReaderChapter(
+                index: 0,
+                title: '',
+                blocks: [
+                  ReaderBlock(
+                    index: 0,
+                    text: '',
+                    type: BlockType.table,
+                    tableRows: [
+                      ['first-column', 'middle-column', lastCell],
+                      [
+                        'unbreakable-content-that-makes-the-table-wider-than-the-reader',
+                        'more-unbreakable-content-that-preserves-the-natural-column-width',
+                        'final-unbreakable-content-that-needs-horizontal-scrolling',
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            },
+            settings: const ReaderSettings(mode: ReaderMode.continuous),
+            scrollController: scrollController,
+            onTap: _ignoreTap,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final tableScroller = find.byWidgetPredicate(
+      (widget) => widget is SingleChildScrollView && widget.scrollDirection == Axis.horizontal,
+    );
+    expect(tableScroller, findsOneWidget);
+    expect(tester.getRect(find.text(lastCell)).left, greaterThan(320));
+
+    final tableScrollable = tester.state<ScrollableState>(
+      find.descendant(of: tableScroller, matching: find.byType(Scrollable)),
+    );
+    expect(tableScrollable.position.maxScrollExtent, greaterThan(0));
+    tableScrollable.position.jumpTo(tableScrollable.position.maxScrollExtent);
+    await tester.pump();
+
+    expect(tester.getRect(find.text(lastCell)).left, lessThan(320));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('keeps an oversized paginated block vertically reachable', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final longBlock = List<String>.filled(80, 'A very tall reader block.').join('\n');
+
+    await tester.pumpWidget(
+      wrapInApp(
+        SizedBox(
+          width: 320,
+          height: 180,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'oversized-block',
+              title: 'Oversized block',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: {
+              0: ReaderChapter(
+                index: 0,
+                title: '',
+                blocks: [ReaderBlock(index: 0, text: longBlock)],
+              ),
+            },
+            settings: const ReaderSettings(),
+            scrollController: scrollController,
+            onTap: _ignoreTap,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final pageScroller = find.byWidgetPredicate(
+      (widget) => widget is SingleChildScrollView && widget.scrollDirection == Axis.vertical,
+    );
+    expect(pageScroller, findsOneWidget);
+
+    final scrollable = tester.state<ScrollableState>(
+      find.descendant(of: pageScroller, matching: find.byType(Scrollable)),
+    );
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+
+    await tester.drag(pageScroller, const Offset(0, -120));
+    await tester.pumpAndSettle();
+
+    expect(scrollable.position.pixels, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _ignoreTap(TapUpDetails _) {}
