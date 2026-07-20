@@ -12,29 +12,13 @@ use serde_json::Value;
 /// an interpreter, so the full parser test suite belongs in `make miri-full`.
 #[cfg(test)]
 mod miri_smoke_tests {
-    use crate::api::models::BookFormat;
-    use crate::book::{sanitize_href, txt::parse_txt};
+    use crate::book::{normalize_whitespace, sanitize_href};
 
     #[test]
-    fn parses_a_small_text_book_without_unsafe_aliasing() {
-        let book = parse_txt(b"Title\n\nFirst paragraph.\nSecond line.", Some("utf-8"))
-            .expect("small UTF-8 book must parse");
+    fn normalizes_text_without_unsafe_aliasing() {
+        let normalized = normalize_whitespace("  First\r\nsecond -- \"quoted\"...  ");
 
-        assert_eq!(book.book_format, BookFormat::Txt);
-        assert!(!book.title.is_empty());
-        assert_eq!(book.chapters.len(), 1);
-        assert!(
-            book.chapters[0]
-                .blocks
-                .iter()
-                .any(|block| block.text == "Title")
-        );
-        assert!(
-            book.chapters[0]
-                .blocks
-                .iter()
-                .any(|block| block.text.contains("First paragraph."))
-        );
+        assert_eq!(normalized, "First second — «quoted»…");
     }
 
     #[test]
