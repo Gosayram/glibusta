@@ -18,6 +18,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
   final int chapterIndex;
   final int paragraphIndex;
+  final String selectedText;
   final VoidCallback onDismiss;
   final ValueChanged<String>? onSearchInBook;
 
@@ -26,6 +27,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
     required this.bookId,
     required this.chapterIndex,
     required this.paragraphIndex,
+    required this.selectedText,
     required this.onDismiss,
     this.onSearchInBook,
   });
@@ -40,14 +42,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   @override
   void initState() {
     super.initState();
-    unawaited(_getSelectedText());
-  }
-
-  Future<void> _getSelectedText() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (mounted && data?.text != null && data!.text!.isNotEmpty) {
-      setState(() => _selectedText = data.text);
-    }
+    _selectedText = widget.selectedText;
   }
 
   @override

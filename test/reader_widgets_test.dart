@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
@@ -18,10 +19,12 @@ import 'package:glibusta/features/reader/presentation/reader_content.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
+import 'package:glibusta/features/reader/presentation/reader_selection_toolbar.dart';
 
 class _FakeBookOpenService extends BookOpenService {
-  _FakeBookOpenService(AppDatabase database)
-    : super(
+  _FakeBookOpenService(AppDatabase database, {ReaderChapter? chapter})
+    : _chapterOverride = chapter,
+      super(
         AppFileStorageImpl(),
         BookFileRepositoryImpl(database),
         logger: AppLogger(),
@@ -34,6 +37,10 @@ class _FakeBookOpenService extends BookOpenService {
       ReaderBlock(index: 0, text: 'Текст книги успешно загружен.'),
     ],
   );
+
+  static const _defaultChapter = _chapter;
+
+  final ReaderChapter? _chapterOverride;
 
   @override
   Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
@@ -48,7 +55,37 @@ class _FakeBookOpenService extends BookOpenService {
 
   @override
   Future<ReaderChapter?> loadChapter(String bookId, int index) async {
-    return index == 0 ? _chapter : null;
+    return index == 0 ? _chapterOverride ?? _chapter : null;
+  }
+}
+
+class _TwoChapterBookOpenService extends _FakeBookOpenService {
+  _TwoChapterBookOpenService(super.database);
+
+  static const _secondChapter = ReaderChapter(
+    index: 1,
+    title: 'Глава 2',
+    blocks: [ReaderBlock(index: 0, text: 'Текст второй главы.')],
+  );
+
+  @override
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    return const NormalizedBookMetadata(
+      id: 'book-1',
+      title: 'Тестовая книга',
+      authors: ['Автор'],
+      chapterCount: 2,
+      chapterTitles: ['Глава 1', 'Глава 2'],
+    );
+  }
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    return switch (index) {
+      0 => _FakeBookOpenService._defaultChapter,
+      1 => _secondChapter,
+      _ => null,
+    };
   }
 }
 
@@ -463,6 +500,98 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     });
+
+    testWidgets(
+      'ignores small macOS precise scroll deltas in paginated mode',
+      (tester) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              bookOpenServiceProvider.overrideWithValue(_TwoChapterBookOpenService(db)),
+              readerSettingsProvider.overrideWith(
+                () => _TestReaderSettingsNotifier(const ReaderSettings()),
+              ),
+            ],
+            child: const MaterialApp(home: ReaderScreen(bookId: 'book-1')),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final content = find.byType(ReaderContentBody);
+        final pointer = TestPointer(1, ui.PointerDeviceKind.mouse);
+        await tester.sendEventToBinding(pointer.hover(tester.getCenter(content)));
+        for (var i = 0; i < 6; i++) {
+          await tester.sendEventToBinding(pointer.scroll(const Offset(0, 10)));
+        }
+        await tester.pumpAndSettle();
+
+        expect(tester.widget<ReaderContentBody>(content).initialPage, 0);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+      variant: const TargetPlatformVariant(<TargetPlatform>{TargetPlatform.macOS}),
+    );
+
+    testWidgets(
+      'keeps a soft-hyphenated first-word selection and paragraph anchor',
+      (tester) async {
+        tester.view.physicalSize = const ui.Size(1600, 1200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        const firstWord = 'пре\u00adвращение';
+        const paragraph = '$firstWord начинается с мягкого переноса.';
+        const chapter = ReaderChapter(
+          index: 0,
+          title: 'Глава 1',
+          blocks: [ReaderBlock(index: 0, text: paragraph)],
+        );
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              databaseProvider.overrideWithValue(db),
+              bookOpenServiceProvider.overrideWithValue(
+                _FakeBookOpenService(db, chapter: chapter),
+              ),
+              readerSettingsProvider.overrideWith(
+                () => _TestReaderSettingsNotifier(const ReaderSettings()),
+              ),
+            ],
+            child: const MaterialApp(home: ReaderScreen(bookId: 'book-1')),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final renderParagraph = tester.renderObject<RenderParagraph>(
+          find.byWidgetPredicate(
+            (widget) => widget is RichText && widget.text.toPlainText().contains(firstWord),
+          ),
+        );
+        final caretOffset = renderParagraph.getOffsetForCaret(
+          const TextPosition(offset: 2),
+          const ui.Rect.fromLTWH(0, 0, 2, 20),
+        );
+        final gesture = await tester.startGesture(renderParagraph.localToGlobal(caretOffset));
+        addTearDown(gesture.removePointer);
+        await tester.pump(const Duration(milliseconds: 500));
+        await gesture.up();
+        await tester.pumpAndSettle();
+
+        expect(renderParagraph.selections, hasLength(1));
+        final toolbar = tester.widget<ReaderSelectionToolbar>(
+          find.byType(ReaderSelectionToolbar),
+        );
+        expect(toolbar.selectedText, firstWord);
+        expect(toolbar.chapterIndex, 0);
+        expect(toolbar.paragraphIndex, 0);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+      },
+      variant: const TargetPlatformVariant(<TargetPlatform>{TargetPlatform.android}),
+    );
   });
 
   testWidgets('RSVP skip controls work when the loaded chapter has no text', (tester) async {

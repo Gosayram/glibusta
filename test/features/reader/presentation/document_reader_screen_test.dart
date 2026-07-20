@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,30 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: PdfReaderScreen(filePath: path)));
 
     expect(find.text('Файл не найден: $path'), findsOneWidget);
+  });
+
+  testWidgets('image-only PDF keeps rendering but disables text search', (tester) async {
+    final file = File(
+      '${Directory.systemTemp.path}/glibusta-image-only-${DateTime.now().microsecondsSinceEpoch}.pdf',
+    );
+    await file.writeAsBytes(_imageOnlyPdfBytes());
+    addTearDown(file.delete);
+
+    final semanticsHandle = tester.ensureSemantics();
+    addTearDown(semanticsHandle.dispose);
+
+    await tester.pumpWidget(MaterialApp(home: PdfReaderScreen(filePath: file.path)));
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(
+      find.text('В PDF не найден извлекаемый текст. Поиск и копирование недоступны.'),
+      findsOneWidget,
+    );
+    expect(tester.widget<IconButton>(find.byIcon(Icons.search)).onPressed, isNull);
+    expect(
+      find.bySemanticsLabel('В PDF не найден извлекаемый текст. Поиск и копирование недоступны.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('DjVu reader reports a missing document instead of calling Rust', (tester) async {
@@ -61,4 +86,44 @@ void main() {
       );
     });
   });
+}
+
+Uint8List _imageOnlyPdfBytes() {
+  final objects = <List<int>>[
+    '%PDF-1.4\n'.codeUnits,
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'.codeUnits,
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'.codeUnits,
+    '''
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100]
+   /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>
+endobj
+'''
+        .codeUnits,
+    '4 0 obj\n<< /Length 31 >>\nstream\nq 100 0 0 100 0 0 cm /Im0 Do Q\nendstream\nendobj\n'
+        .codeUnits,
+    <int>[
+      ...'5 0 obj\n<< /Type /XObject /Subtype /Image /Width 1 /Height 1 '
+              '/ColorSpace /DeviceRGB /BitsPerComponent 8 /Length 3 >>\nstream\n'
+          .codeUnits,
+      255,
+      255,
+      255,
+      ...'\nendstream\nendobj\n'.codeUnits,
+    ],
+  ];
+  final offsets = <int>[];
+  var length = objects.first.length;
+  for (final object in objects.skip(1)) {
+    offsets.add(length);
+    length += object.length;
+  }
+  final xrefOffset = length;
+  final xref = StringBuffer('xref\n0 6\n0000000000 65535 f \n');
+  for (final offset in offsets) {
+    xref.writeln('${offset.toString().padLeft(10, '0')} 00000 n ');
+  }
+  xref.write('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n$xrefOffset\n%%EOF\n');
+
+  return Uint8List.fromList([...objects.expand((object) => object), ...xref.toString().codeUnits]);
 }

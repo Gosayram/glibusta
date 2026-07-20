@@ -210,13 +210,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
   }
 
-  // Trackpad/mouse wheel scroll → page turn
+  // Trackpad/mouse wheel scroll → page turn.
+  //
+  // On macOS, Flutter forwards Magic Mouse's precise scrolling as many small
+  // PointerScrollEvents, but does not expose AppKit's
+  // `hasPreciseScrollingDeltas` flag. Do not accumulate those pixel deltas:
+  // only the discrete wheel-sized events should turn a paginated page.
   double _scrollAccumulator = 0;
   static const double _scrollThreshold = 50;
+  static const double _macOSDiscreteScrollDelta = 40;
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
-      _scrollAccumulator += event.scrollDelta.dy;
+      final scrollDelta = event.scrollDelta.dy;
+      if (defaultTargetPlatform == TargetPlatform.macOS &&
+          scrollDelta.abs() < _macOSDiscreteScrollDelta) {
+        return;
+      }
+      _scrollAccumulator += scrollDelta;
       if (_scrollAccumulator.abs() >= _scrollThreshold) {
         if (_scrollAccumulator > 0) {
           _goToNextPage();
@@ -1049,6 +1060,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               bookId: widget.bookId,
               chapterIndex: readerState.currentPosition.chapterIndex,
               paragraphIndex: readerState.currentPosition.paragraphIndex,
+              selectedText: _selectedText!,
               onDismiss: () => setState(() => _selectedText = null),
               onSearchInBook: (query) {
                 setState(() {
