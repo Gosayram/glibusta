@@ -10,6 +10,69 @@ use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fb2RootPhase {
+    Stylesheets,
+    Bodies,
+    Binaries,
+}
+
+fn validate_fb2_root_child(
+    name: &[u8],
+    phase: &mut Fb2RootPhase,
+    description_count: &mut u32,
+    body_count: &mut u32,
+) -> Result<()> {
+    match name {
+        b"stylesheet" if *phase == Fb2RootPhase::Stylesheets => Ok(()),
+        b"description" if *phase == Fb2RootPhase::Stylesheets && *description_count == 0 => {
+            *description_count += 1;
+            *phase = Fb2RootPhase::Bodies;
+            Ok(())
+        }
+        b"body" if *phase == Fb2RootPhase::Bodies => {
+            *body_count += 1;
+            Ok(())
+        }
+        b"binary" if *phase == Fb2RootPhase::Bodies || *phase == Fb2RootPhase::Binaries => {
+            *phase = Fb2RootPhase::Binaries;
+            Ok(())
+        }
+        b"description" if *description_count > 0 => {
+            bail!("FB2 root must contain exactly one description element")
+        }
+        b"body" if *description_count == 0 => {
+            bail!("FB2 body must follow the description element")
+        }
+        b"body" => bail!("FB2 body elements must precede binary elements"),
+        b"binary" if *body_count == 0 => {
+            bail!("FB2 binary elements must follow at least one body element")
+        }
+        b"stylesheet" => bail!("FB2 stylesheet elements must precede description"),
+        _ => bail!(
+            "FB2 root contains unsupported or out-of-order element '{}'",
+            String::from_utf8_lossy(name)
+        ),
+    }
+}
+
+fn validate_fb2_root_structure(
+    root_closed: bool,
+    description_count: u32,
+    body_count: u32,
+) -> Result<()> {
+    if !root_closed {
+        bail!("FB2 document must contain a complete FictionBook root element");
+    }
+    if description_count != 1 {
+        bail!("FB2 root must contain exactly one description element");
+    }
+    if body_count == 0 {
+        bail!("FB2 root must contain at least one body element");
+    }
+    Ok(())
+}
+
 pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > MAX_FILE_SIZE {
         bail!(
@@ -125,12 +188,33 @@ fn parse_fb2_xml(
     let mut current_binary_media_type: Option<String> = None;
     let mut cover_media_type: Option<String> = None;
     let mut cover_image_ref: Option<String> = None;
+    let mut root_depth = 0usize;
+    let mut root_closed = false;
+    let mut root_phase = Fb2RootPhase::Stylesheets;
+    let mut root_description_count = 0u32;
+    let mut root_body_count = 0u32;
 
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
-                eprintln!("start={:?}, in_p={in_p}", e.name());
+                let name = e.name();
+                if root_depth == 0 {
+                    if root_closed || name.as_ref() != b"FictionBook" {
+                        bail!("FB2 document must have FictionBook as its root element");
+                    }
+                    root_depth = 1;
+                } else {
+                    if root_depth == 1 {
+                        validate_fb2_root_child(
+                            name.as_ref(),
+                            &mut root_phase,
+                            &mut root_description_count,
+                            &mut root_body_count,
+                        )?;
+                    }
+                    root_depth += 1;
+                }
                 match e.name().as_ref() {
                     b"title-info" => in_title_info = true,
                     b"book-title" if in_title_info => in_book_title = true,
@@ -497,7 +581,13 @@ fn parse_fb2_xml(
                 }
             }
             Ok(Event::End(ref e)) => {
-                eprintln!("end={:?}, in_p={in_p}", e.name());
+                if root_depth == 0 {
+                    bail!("FB2 document contains an unexpected closing element");
+                }
+                root_depth -= 1;
+                if root_depth == 0 {
+                    root_closed = true;
+                }
                 match e.name().as_ref() {
                     b"title-info" => in_title_info = false,
                     b"book-title" => in_book_title = false,
@@ -675,7 +765,6 @@ fn parse_fb2_xml(
                         current_span_code_depth = 0;
                         current_span_style_names.clear();
                         current_span_href = None;
-                        eprintln!("after link href={current_span_href:?}");
                         in_p = false;
                     }
                     b"subtitle" if in_body => {
@@ -884,7 +973,6 @@ fn parse_fb2_xml(
                         in_image = false;
                     }
                     b"strong" if in_p => {
-                        eprintln!("matched end strong");
                         flush_rich_span(
                             &mut current_rich_spans,
                             &mut current_span_text,
@@ -901,7 +989,6 @@ fn parse_fb2_xml(
                         current_span_bold = current_span_bold_depth > 0;
                     }
                     b"emphasis" if in_p => {
-                        eprintln!("matched end emphasis");
                         flush_rich_span(
                             &mut current_rich_spans,
                             &mut current_span_text,
@@ -918,7 +1005,6 @@ fn parse_fb2_xml(
                         current_span_italic = current_span_italic_depth > 0;
                     }
                     b"a" if in_p => {
-                        eprintln!("matched end link");
                         flush_rich_span(
                             &mut current_rich_spans,
                             &mut current_span_text,
@@ -932,9 +1018,6 @@ fn parse_fb2_xml(
                             &current_span_href,
                         );
                         current_span_href = None;
-                        eprintln!(
-                            "end link state: bold={current_span_bold} italic={current_span_italic} href={current_span_href:?}"
-                        );
                     }
                     b"sup" if in_p => {
                         flush_rich_span(
@@ -1021,58 +1104,70 @@ fn parse_fb2_xml(
                     _ => {}
                 }
             }
-            Ok(Event::Empty(ref e)) => match e.name().as_ref() {
-                b"empty-line" if in_body => {
-                    body_blocks.push(ReaderBlock {
-                        index: block_index,
-                        text: String::new(),
-                        block_type: BlockType::Separator,
-                        image_url: None,
-                        note_ref: None,
-                        rich_spans: None,
-                        heading_level: None,
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    block_index += 1;
+            Ok(Event::Empty(ref e)) => {
+                if root_depth == 1 {
+                    validate_fb2_root_child(
+                        e.name().as_ref(),
+                        &mut root_phase,
+                        &mut root_description_count,
+                        &mut root_body_count,
+                    )?;
                 }
-                b"image" if in_coverpage => {
-                    cover_image_ref = get_fb2_href(e);
+                match e.name().as_ref() {
+                    b"empty-line" if in_body => {
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Separator,
+                            image_url: None,
+                            note_ref: None,
+                            rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        block_index += 1;
+                    }
+                    b"image" if in_coverpage => {
+                        cover_image_ref = get_fb2_href(e);
+                    }
+                    b"image" if in_body && !in_coverpage => {
+                        let href = get_fb2_href(e).unwrap_or_default();
+                        let key = href.trim_start_matches('#').to_string();
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Image,
+                            image_url: fb2_binary_reference(&key),
+                            note_ref: None,
+                            rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        block_index += 1;
+                    }
+                    _ => {}
                 }
-                b"image" if in_body && !in_coverpage => {
-                    let href = get_fb2_href(e).unwrap_or_default();
-                    let key = href.trim_start_matches('#').to_string();
-                    body_blocks.push(ReaderBlock {
-                        index: block_index,
-                        text: String::new(),
-                        block_type: BlockType::Image,
-                        image_url: fb2_binary_reference(&key),
-                        note_ref: None,
-                        rich_spans: None,
-                        heading_level: None,
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    block_index += 1;
-                }
-                _ => {}
-            },
+            }
             Err(e) => {
                 bail!("FB2 XML parse error: {}", e);
             }
             _ => {}
         }
     }
+
+    validate_fb2_root_structure(root_closed, root_description_count, root_body_count)?;
 
     let cover_url = cover_image_ref
         .as_deref()
@@ -1450,6 +1545,54 @@ mod tests {
     use crate::api::models::BlockType;
 
     #[test]
+    fn accepts_schema_ordered_root_children() {
+        let book = parse_fb2(
+            br#"<FictionBook>
+                <stylesheet type="text/css">p { color: red; }</stylesheet>
+                <stylesheet type="text/css"/>
+                <description><title-info><book-title>Ordered root</book-title></title-info></description>
+                <body><section><p>Reader content.</p></section></body>
+                <body name="notes"><section id="note"><p>Note.</p></section></body>
+                <binary id="cover" content-type="image/png">iVBORw0KGgo=</binary>
+            </FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("schema-ordered FB2 root must parse");
+
+        assert_eq!(book.title, "Ordered root");
+        assert_eq!(book.chapters[0].blocks[0].text, "Reader content.");
+    }
+
+    #[test]
+    fn rejects_out_of_order_or_duplicate_root_children() {
+        for (xml, expected_error) in [
+            (
+                "<FictionBook><description/><body/><description/></FictionBook>",
+                "exactly one description",
+            ),
+            (
+                "<FictionBook><description/><binary/><body/></FictionBook>",
+                "body elements must precede binary",
+            ),
+            (
+                "<FictionBook><body/></FictionBook>",
+                "body must follow the description",
+            ),
+            (
+                "<FictionBook><description/></FictionBook>",
+                "at least one body",
+            ),
+        ] {
+            let error = parse_fb2(xml.as_bytes(), Some("utf-8"))
+                .expect_err("invalid FB2 root order must return a controlled error");
+            assert!(
+                error.to_string().contains(expected_error),
+                "unexpected error: {error:#}",
+            );
+        }
+    }
+
+    #[test]
     fn preserves_title_info_fields_represented_by_normalized_book() {
         let book = parse_fb2(
             br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink">
@@ -1570,7 +1713,7 @@ mod tests {
     fn rejects_oversized_image_in_cdata() {
         let base64 = "A".repeat(max_base64_image_size() + 1);
         let fb2 = format!(
-            "<FictionBook><binary id=\"illustration\"><![CDATA[{base64}]]></binary></FictionBook>"
+            "<FictionBook><description/><body/><binary id=\"illustration\"><![CDATA[{base64}]]></binary></FictionBook>"
         );
 
         let error = parse_fb2(fb2.as_bytes(), Some("utf-8"))
@@ -1582,7 +1725,7 @@ mod tests {
     #[test]
     fn preserves_declared_mime_type_for_binary_cover() {
         let book = parse_fb2(
-            br#"<FictionBook><description><title-info><book-title>PNG cover</book-title></title-info></description><binary id="cover.png" content-type="image/png">iVBORw0KGgo=</binary></FictionBook>"#,
+            br#"<FictionBook><description><title-info><book-title>PNG cover</book-title></title-info></description><body/><binary id="cover.png" content-type="image/png">iVBORw0KGgo=</binary></FictionBook>"#,
             Some("utf-8"),
         )
         .expect("parse FB2 with PNG cover");
@@ -1680,7 +1823,7 @@ mod tests {
     #[test]
     fn preserves_declared_mime_type_for_inline_binary_images() {
         let book = parse_fb2(
-            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><image l:href="#illustration.webp"/></section></body><binary id="illustration.webp" content-type="image/webp">UklGRg==</binary></FictionBook>"##,
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description/><body><section><image l:href="#illustration.webp"/></section></body><binary id="illustration.webp" content-type="image/webp">UklGRg==</binary></FictionBook>"##,
             Some("utf-8"),
         )
         .expect("parse FB2 with WebP illustration");
@@ -1696,7 +1839,7 @@ mod tests {
     #[test]
     fn preserves_safe_link_targets_and_drops_unsafe_schemes() {
         let book = parse_fb2(
-            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><p><a l:href="#note-1">Local</a><a l:href="notes/chapter.fb2#note-2">Relative</a><a l:href="https://example.test/reference">External</a><a l:href="java&#x0A;script:alert(1)">JavaScript</a><a l:href="vbscript:msgbox(1)">VBScript</a><a l:href="data:text/html,unsafe">Data</a></p></section></body></FictionBook>"##,
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description/><body><section><p><a l:href="#note-1">Local</a><a l:href="notes/chapter.fb2#note-2">Relative</a><a l:href="https://example.test/reference">External</a><a l:href="java&#x0A;script:alert(1)">JavaScript</a><a l:href="vbscript:msgbox(1)">VBScript</a><a l:href="data:text/html,unsafe">Data</a></p></section></body></FictionBook>"##,
             Some("utf-8"),
         )
         .expect("parse FB2 link matrix");
@@ -1725,7 +1868,7 @@ mod tests {
     fn links_namespaced_footnote_references_to_notes() {
         let book = parse_fb2(
             br##"<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0" xmlns:l="http://www.w3.org/1999/xlink">
-                <body><section><p>Text<a l:href="#n1" type="note">1</a></p></section></body>
+                <description/><body><section><p>Text<a l:href="#n1" type="note">1</a></p></section></body>
                 <body name="notes"><section id="n1"><p>Footnote text</p></section></body>
             </FictionBook>"##,
             Some("utf-8"),
@@ -1746,7 +1889,7 @@ mod tests {
     #[test]
     fn preserves_line_breaks_for_poetry_inside_footnotes() {
         let book = parse_fb2(
-            br#"<FictionBook><body><section><p>Text</p></section></body>
+            br#"<FictionBook><description/><body><section><p>Text</p></section></body>
                 <body name="notes"><section id="n1"><poem><stanza>
                 <v>First line</v><v>Second line</v></stanza></poem></section></body>
             </FictionBook>"#,
@@ -1765,7 +1908,7 @@ mod tests {
     #[test]
     fn preserves_epigraph_and_stanza_boundaries() {
         let book = parse_fb2(
-            br#"<FictionBook><body><section>
+            br#"<FictionBook><description/><body><section>
                 <epigraph>Opening quote</epigraph>
                 <poem><stanza><v>First line</v><v>Second line</v></stanza></poem>
             </section></body></FictionBook>"#,
@@ -1790,7 +1933,7 @@ mod tests {
     #[test]
     fn preserves_fb2_tables_as_table_blocks() {
         let book = parse_fb2(
-            br#"<FictionBook><body><section><table>
+            br#"<FictionBook><description/><body><section><table>
                 <tr><td><p>Header A</p></td><td><p>Header B</p></td></tr>
                 <tr><td><p>Cell A</p></td><td><p>Cell B</p></td></tr>
             </table></section></body></FictionBook>"#,
@@ -1813,7 +1956,7 @@ mod tests {
     #[test]
     fn preserves_outer_inline_formatting_after_nested_equivalent_tags() {
         let book = parse_fb2(
-            br#"<FictionBook><body><section><p><strong>Outer <strong>inner</strong> tail</strong></p></section></body></FictionBook>"#,
+            br#"<FictionBook><description/><body><section><p><strong>Outer <strong>inner</strong> tail</strong></p></section></body></FictionBook>"#,
             Some("utf-8"),
         )
         .expect("parse FB2 with nested formatting");
@@ -1829,7 +1972,7 @@ mod tests {
     #[test]
     fn preserves_nested_inline_semantics_and_links() {
         let book = parse_fb2(
-            br##"<FictionBook xmlns:xlink="http://www.w3.org/1999/xlink"><body><section><p>plain <strong>bold <emphasis>both <a xlink:href="#note">link <strikethrough>strike <sub>sub</sub></strikethrough></a></emphasis></strong> <style name="code"><code>mono</code></style><sup>up</sup></p></section></body></FictionBook>"##,
+            br##"<FictionBook xmlns:xlink="http://www.w3.org/1999/xlink"><description/><body><section><p>plain <strong>bold <emphasis>both <a xlink:href="#note">link <strikethrough>strike <sub>sub</sub></strikethrough></a></emphasis></strong> <style name="code"><code>mono</code></style><sup>up</sup></p></section></body></FictionBook>"##,
             Some("utf-8"),
         )
         .expect("parse FB2 with nested inline semantics");
@@ -1868,7 +2011,7 @@ mod tests {
     #[test]
     fn ignores_embedded_stylesheet_without_leaking_css_into_book_content() {
         let book = parse_fb2(
-            br#"<FictionBook><stylesheet type="text/css">p { color: red; }</stylesheet><body><section><p>Visible text</p></section></body></FictionBook>"#,
+            br#"<FictionBook><stylesheet type="text/css">p { color: red; }</stylesheet><description/><body><section><p>Visible text</p></section></body></FictionBook>"#,
             Some("utf-8"),
         )
         .expect("parse FB2 with an embedded stylesheet");
@@ -1881,7 +2024,7 @@ mod tests {
     #[test]
     fn preserves_block_code_as_preformatted_content() {
         let book = parse_fb2(
-            br#"<FictionBook><body><section><code>let answer = 42;</code></section></body></FictionBook>"#,
+            br#"<FictionBook><description/><body><section><code>let answer = 42;</code></section></body></FictionBook>"#,
             Some("utf-8"),
         )
         .expect("parse FB2 with a code block");

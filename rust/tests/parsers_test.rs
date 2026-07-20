@@ -254,7 +254,7 @@ fn test_fb2_zip_resolves_relative_image_resources() {
     zip.start_file("book.fb2", options)
         .expect("create FB2 entry");
     zip.write_all(
-        br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><image l:href="images/page.webp"/></section></body></FictionBook>"##,
+        br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description/><body><section><image l:href="images/page.webp"/></section></body></FictionBook>"##,
     )
     .expect("write FB2 fixture");
     zip.start_file("images/page.webp", options)
@@ -1067,7 +1067,10 @@ fn test_txt_single_line() {
 fn test_fb2_malformed_xml() {
     let bad_fb2 = b"<?xml version=\"1.0\"?><FictionBook><title>Test</title></FictionBook>";
     let result = glibusta_core::book::fb2::parse_fb2(bad_fb2, None);
-    assert!(result.is_ok(), "Should handle malformed FB2 gracefully");
+    assert!(
+        result.is_err(),
+        "schema-invalid FB2 must return a controlled error"
+    );
 }
 
 #[test]
@@ -1395,6 +1398,22 @@ fn test_mobi_rejects_nonstandard_palm_doc_logical_record_size() {
         .expect_err("PalmDOC logical records must be 4096 bytes");
 
     assert!(error.to_string().contains("logical record size"));
+}
+
+#[test]
+fn test_mobi_rejects_unsupported_huff_cdic_compression() {
+    let mut mobi = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
+    mobi[record0_offset..record0_offset + 2].copy_from_slice(&17480u16.to_be_bytes());
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("HUFF/CDIC MOBI must not be decoded with the PalmDOC codec");
+
+    assert!(
+        error
+            .to_string()
+            .contains("Unsupported MOBI compression: 17480")
+    );
 }
 
 #[test]
