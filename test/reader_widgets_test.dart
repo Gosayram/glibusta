@@ -717,7 +717,7 @@ void main() {
                     ],
                   ),
                 },
-                settings: const ReaderSettings(theme: ReaderTheme.system, mode: ReaderMode.focus),
+                settings: const ReaderSettings(mode: ReaderMode.focus),
                 scrollController: scrollController,
                 onTap: _ignoreTap,
               ),
@@ -727,9 +727,15 @@ void main() {
       ),
     );
 
-    final richText = tester.widget<RichText>(find.text('Link'));
-    final textSpan = richText.text as TextSpan;
-    final linkSpan = textSpan.children!.single as TextSpan;
+    await tester.pumpAndSettle();
+
+    final text = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && widget.textSpan?.toPlainText().endsWith('Link') == true,
+      ),
+    );
+    final textSpan = text.textSpan! as TextSpan;
+    final linkSpan = textSpan.children!.last as TextSpan;
     expect(linkSpan.style!.color, const Color(0xFF64B5F6));
   });
 
