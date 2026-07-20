@@ -16,8 +16,6 @@ pub mod txt;
 
 pub(crate) use hash::sha256_hex;
 
-use crate::api::models::RichSpan;
-
 /// Strip dangerous schemes from href (javascript:, vbscript:, data:).
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     let trimmed = href.trim();
@@ -36,32 +34,6 @@ pub(crate) fn sanitize_href(href: &str) -> Option<String> {
         }
     }
     Some(trimmed.to_string())
-}
-
-/// Flush accumulated span_text into a RichSpan if formatting is active.
-pub(crate) fn flush_rich_span(
-    spans: &mut Vec<RichSpan>,
-    span_text: &mut String,
-    bold: bool,
-    italic: bool,
-    superscript: bool,
-    href: &Option<String>,
-) {
-    let text = span_text.trim().to_string();
-    if text.is_empty() && href.is_none() {
-        return;
-    }
-    if bold || italic || superscript || href.is_some() {
-        spans.push(RichSpan {
-            text,
-            bold,
-            italic,
-            superscript,
-            href: href.clone(),
-            line_break: false,
-        });
-    }
-    span_text.clear();
 }
 
 /// Collapse whitespace + normalize typography (dashes, quotes, ellipsis).

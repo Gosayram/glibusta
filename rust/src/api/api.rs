@@ -1047,6 +1047,53 @@ mod cover_data_uri_tests {
 }
 
 #[cfg(test)]
+mod document_open_smoke_tests {
+    use super::{djvu_page_count, extract_djvu_text, render_djvu_thumbnail};
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
+    fn malformed_djvu_path() -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-malformed-djvu-{}.djvu",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, b"this is not a DjVu document")
+            .expect("write malformed DjVu fixture");
+        path
+    }
+
+    #[test]
+    fn malformed_djvu_is_reported_by_every_path_api_without_panicking() {
+        let path = malformed_djvu_path();
+        let path_text = path.to_string_lossy().into_owned();
+
+        let page_count = catch_unwind(AssertUnwindSafe(|| djvu_page_count(path_text.clone())));
+        let text = catch_unwind(AssertUnwindSafe(|| extract_djvu_text(path_text.clone())));
+        let thumbnail = catch_unwind(AssertUnwindSafe(|| {
+            render_djvu_thumbnail(path_text, 0, 1080)
+        }));
+
+        let _ = std::fs::remove_file(path);
+
+        assert!(page_count.expect("page count must not panic").is_err());
+        assert!(text.expect("text extraction must not panic").is_err());
+        assert!(
+            thumbnail
+                .expect("thumbnail rendering must not panic")
+                .is_err()
+        );
+    }
+
+    #[cfg(not(feature = "pdf"))]
+    #[test]
+    fn disabled_pdf_ffi_api_returns_a_controlled_error() {
+        let error = super::pdf_page_count("ignored.pdf".to_string())
+            .expect_err("PDF API must report that the optional native engine is disabled");
+
+        assert!(error.to_string().contains("PDF support disabled"));
+    }
+}
+
+#[cfg(test)]
 mod parse_api_tests {
     use super::{
         MAX_FILE_SIZE, disk_cache_lookup, disk_cache_store, parse_book, parse_book_legacy,

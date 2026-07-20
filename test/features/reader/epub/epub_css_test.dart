@@ -60,6 +60,58 @@ void main() {
     }
   });
 
+  test('keeps EPUB pagebreak markers out of the reflow text stream', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_pagebreak_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+            <p>Before the marker.</p>
+            <span epub:type="pagebreak" id="page-12" title="12" />
+            <p>After the marker.</p>
+          </body></html>
+        ''',
+      );
+      final marker = parsed.blocks.whereType<PageBreakBlock>().single;
+      expect(marker.label, '12');
+
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Pagebreak fixture',
+          authors: const [],
+          chapters: [
+            EpubChapter(
+              id: 'chapter',
+              href: 'chapter.xhtml',
+              title: 'Chapter',
+              blocks: parsed.blocks,
+            ),
+          ],
+          resources: const {},
+        ),
+        'pagebreak',
+      );
+
+      expect(
+        normalized.chapters.single.blocks.map((block) => block.text),
+        <String>['Before the marker.', 'After the marker.'],
+      );
+      expect(
+        normalized.chapters.single.blocks.map((block) => block.index),
+        <int>[0, 1],
+      );
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('does not turn active markup or footnote backgrounds into reader blocks', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_active_markup_test_');
     try {

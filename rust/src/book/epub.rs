@@ -3,7 +3,6 @@ use crate::api::models::{
 };
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{attr_eq, decode_bytes, get_class_attr_arena, get_xml_attr};
-use crate::book::flush_rich_span;
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -1309,6 +1308,7 @@ fn parse_xhtml_to_blocks(
     let mut italic = false;
     let mut superscript = false;
     let mut href: Option<String> = None;
+    let mut footnote_id: Option<String> = None;
 
     // Table state
     let mut table_rows: Vec<Vec<String>> = Vec::new();
@@ -1361,6 +1361,28 @@ fn parse_xhtml_to_blocks(
                             in_block = true;
                             block_type = BlockType::Footnote;
                             href = None;
+                            footnote_id = get_xml_attr(e, b"id");
+                        }
+                    }
+                    b"p" | b"pre" if in_body && in_block && block_type == BlockType::Footnote => {
+                        if !current_text.is_empty() {
+                            flush_rich_span(
+                                &mut rich_spans,
+                                &mut span_text,
+                                bold,
+                                italic,
+                                superscript,
+                                &href,
+                            );
+                            current_text.push('\n');
+                            rich_spans.push(RichSpan {
+                                text: String::new(),
+                                bold: false,
+                                italic: false,
+                                superscript: false,
+                                href: None,
+                                line_break: true,
+                            });
                         }
                     }
                     b"p" | b"pre" if in_body => {
@@ -1638,6 +1660,14 @@ fn parse_xhtml_to_blocks(
                 match name {
                     b"body" => in_body = false,
                     b"aside" if in_block && block_type == BlockType::Footnote => {
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
                         flush_block(
                             &mut blocks,
                             &mut current_text,
@@ -1645,7 +1675,7 @@ fn parse_xhtml_to_blocks(
                             &mut block_index,
                             BlockType::Footnote,
                             None,
-                            None,
+                            footnote_id.take(),
                         );
                         current_text.clear();
                         rich_spans.clear();
@@ -2157,6 +2187,32 @@ fn parse_xhtml_to_blocks(
     (blocks, block_index, page_breaks)
 }
 
+/// Flush every EPUB inline segment, including unstyled text.
+///
+/// Reader blocks render `rich_spans` instead of their plain `text`; keeping
+/// only styled spans therefore drops prose around a footnote reference.
+fn flush_rich_span(
+    spans: &mut Vec<RichSpan>,
+    span_text: &mut String,
+    bold: bool,
+    italic: bool,
+    superscript: bool,
+    href: &Option<String>,
+) {
+    let text = std::mem::take(span_text);
+    if text.is_empty() {
+        return;
+    }
+    spans.push(RichSpan {
+        text,
+        bold,
+        italic,
+        superscript,
+        href: href.clone(),
+        line_break: false,
+    });
+}
+
 #[allow(dead_code)]
 fn push_block(
     blocks: &mut Vec<ReaderBlock>,
@@ -2359,5 +2415,44 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["#12", "chapter.xhtml#verse-3"],
         );
+    }
+
+    #[test]
+    fn preserves_dense_footnote_links_and_identifies_note_asides() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            r##"<html xmlns:epub="http://www.idpf.org/2007/ops"><body>
+                <p>One<a href="#note-1" epub:type="noteref"><sup>1</sup></a>, then
+                two<a href="#note-2" epub:type="noteref"><sup>2</sup></a>.</p>
+                <aside id="note-1" epub:type="footnote"><p>First note.</p></aside>
+                <aside id="note-2" epub:type="footnote"><p>Second note.</p></aside>
+            </body></html>"##,
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        let source = &blocks[0];
+        let source_spans = source.rich_spans.as_ref().expect("link spans are retained");
+        assert_eq!(
+            source_spans
+                .iter()
+                .map(|span| span.text.as_str())
+                .collect::<String>(),
+            source.text,
+            "unstyled prose around dense references must remain renderable"
+        );
+        assert_eq!(
+            source_spans
+                .iter()
+                .filter_map(|span| span.href.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["#note-1", "#note-2"],
+        );
+
+        assert_eq!(blocks[1].block_type, BlockType::Footnote);
+        assert_eq!(blocks[1].note_id.as_deref(), Some("note-1"));
+        assert_eq!(blocks[1].text, "First note.");
+        assert_eq!(blocks[2].block_type, BlockType::Footnote);
+        assert_eq!(blocks[2].note_id.as_deref(), Some("note-2"));
+        assert_eq!(blocks[2].text, "Second note.");
     }
 }

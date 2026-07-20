@@ -21,7 +21,7 @@ class PdfReaderScreen extends StatefulWidget {
 
 class _PdfReaderScreenState extends State<PdfReaderScreen> {
   late final PdfViewerController _controller;
-  late final PdfTextSearcher _searcher;
+  PdfTextSearcher? _searcher;
   final _searchController = TextEditingController();
   bool _showSearch = false;
   int? _currentPage;
@@ -31,12 +31,11 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void initState() {
     super.initState();
     _controller = PdfViewerController();
-    _searcher = PdfTextSearcher(_controller);
   }
 
   @override
   void dispose() {
-    _searcher.dispose();
+    _searcher?.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -51,6 +50,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       );
     }
 
+    final searcher = _searcher ??= PdfTextSearcher(_controller);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -111,7 +111,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 }
               },
               pagePaintCallbacks: [
-                _searcher.pageTextMatchPaintCallback,
+                searcher.pageTextMatchPaintCallback,
               ],
               viewerOverlayBuilder: (context, size, handleLinkTap) {
                 return [
@@ -254,7 +254,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
               left: 0,
               right: 0,
               child: _SearchOverlay(
-                searcher: _searcher,
+                searcher: searcher,
                 searchController: _searchController,
                 onClose: () => setState(() => _showSearch = false),
               ),
