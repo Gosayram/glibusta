@@ -333,7 +333,8 @@ fn parse_fb2_xml(
                             current_span_style_names.last(),
                             &current_span_href,
                         );
-                        current_span_subscript_depth = current_span_subscript_depth.saturating_add(1);
+                        current_span_subscript_depth =
+                            current_span_subscript_depth.saturating_add(1);
                         current_span_subscript = true;
                     }
                     b"strikethrough" if in_p || in_subtitle => {
@@ -498,114 +499,392 @@ fn parse_fb2_xml(
             Ok(Event::End(ref e)) => {
                 eprintln!("end={:?}, in_p={in_p}", e.name());
                 match e.name().as_ref() {
-                b"title-info" => in_title_info = false,
-                b"book-title" => in_book_title = false,
-                b"annotation" => {
-                    in_annotation = false;
-                    description = Some(description.take().unwrap_or_default().trim().to_string());
-                }
-                b"first-name" => in_first_name = false,
-                b"middle-name" => in_middle_name = false,
-                b"last-name" => in_last_name = false,
-                b"nickname" => in_nickname = false,
-                b"author" => {
-                    if !current_author_parts.is_empty() {
-                        authors.push(current_author_parts.join(" "));
-                        current_author_parts.clear();
+                    b"title-info" => in_title_info = false,
+                    b"book-title" => in_book_title = false,
+                    b"annotation" => {
+                        in_annotation = false;
+                        description =
+                            Some(description.take().unwrap_or_default().trim().to_string());
                     }
-                    in_author = false;
-                }
-                b"genre" => in_genre = false,
-                b"lang" => in_lang = false,
-                b"coverpage" => in_coverpage = false,
-                b"binary" => {
-                    if in_binary && !current_text.is_empty() {
-                        if let Some(ref id) = current_binary_id {
-                            if id.starts_with("cover") && cover_data.is_none() {
-                                cover_data = Some(current_text.trim().to_string());
-                                cover_media_type = current_binary_media_type.clone();
-                            }
-                            binaries.insert(id.clone(), current_text.trim().to_string());
-                            if let Some(media_type) = current_binary_media_type.clone() {
-                                binary_media_types.insert(id.clone(), media_type);
+                    b"first-name" => in_first_name = false,
+                    b"middle-name" => in_middle_name = false,
+                    b"last-name" => in_last_name = false,
+                    b"nickname" => in_nickname = false,
+                    b"author" => {
+                        if !current_author_parts.is_empty() {
+                            authors.push(current_author_parts.join(" "));
+                            current_author_parts.clear();
+                        }
+                        in_author = false;
+                    }
+                    b"genre" => in_genre = false,
+                    b"lang" => in_lang = false,
+                    b"coverpage" => in_coverpage = false,
+                    b"binary" => {
+                        if in_binary && !current_text.is_empty() {
+                            if let Some(ref id) = current_binary_id {
+                                if id.starts_with("cover") && cover_data.is_none() {
+                                    cover_data = Some(current_text.trim().to_string());
+                                    cover_media_type = current_binary_media_type.clone();
+                                }
+                                binaries.insert(id.clone(), current_text.trim().to_string());
+                                if let Some(media_type) = current_binary_media_type.clone() {
+                                    binary_media_types.insert(id.clone(), media_type);
+                                }
                             }
                         }
+                        in_binary = false;
+                        current_binary_id = None;
+                        current_binary_media_type = None;
+                        current_text.clear();
                     }
-                    in_binary = false;
-                    current_binary_id = None;
-                    current_binary_media_type = None;
-                    current_text.clear();
-                }
-                b"body" => {
-                    in_body = false;
-                    in_notes_body = false;
-                }
-                b"td" if in_table_cell => {
-                    current_table_row.push(
-                        current_table_cell
-                            .split_whitespace()
-                            .collect::<Vec<_>>()
-                            .join(" "),
-                    );
-                    current_table_cell.clear();
-                    in_table_cell = false;
-                }
-                b"tr" if in_table_row => {
-                    table_rows.push(std::mem::take(&mut current_table_row));
-                    in_table_row = false;
-                }
-                b"table" if in_table => {
-                    if in_table_row {
+                    b"body" => {
+                        in_body = false;
+                        in_notes_body = false;
+                    }
+                    b"td" if in_table_cell => {
+                        current_table_row.push(
+                            current_table_cell
+                                .split_whitespace()
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        );
+                        current_table_cell.clear();
+                        in_table_cell = false;
+                    }
+                    b"tr" if in_table_row => {
                         table_rows.push(std::mem::take(&mut current_table_row));
                         in_table_row = false;
                     }
-                    if !table_rows.is_empty() {
+                    b"table" if in_table => {
+                        if in_table_row {
+                            table_rows.push(std::mem::take(&mut current_table_row));
+                            in_table_row = false;
+                        }
+                        if !table_rows.is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: String::new(),
+                                block_type: BlockType::Table,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: Some(std::mem::take(&mut table_rows)),
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        in_table = false;
+                        in_table_cell = false;
+                        current_table_cell.clear();
+                    }
+                    b"section" => {
+                        if in_notes_body {
+                            if let Some(ref id) = current_note_id {
+                                let text = current_note_text.trim().to_string();
+                                if !text.is_empty() {
+                                    footnotes.insert(id.clone(), text);
+                                }
+                            }
+                            current_note_id = None;
+                            current_note_text.clear();
+                        } else {
+                            if section_depth > 0 {
+                                section_depth -= 1;
+                            }
+                            if section_depth == 0 {
+                                in_section = false;
+                                if !body_blocks.is_empty() {
+                                    chapters_blocks.push(std::mem::take(&mut body_blocks));
+                                }
+                            }
+                        }
+                    }
+                    b"p" if in_body => {
+                        if !current_span_text.trim().is_empty() {
+                            flush_rich_span(
+                                &mut current_rich_spans,
+                                &mut current_span_text,
+                                current_span_bold,
+                                current_span_italic,
+                                current_span_superscript,
+                                current_span_subscript,
+                                current_span_strikethrough,
+                                current_span_code,
+                                current_span_style_names.last(),
+                                &current_span_href,
+                            );
+                        }
+                        let text = if current_rich_spans.is_empty() {
+                            let t = current_span_text.trim().to_string();
+                            current_span_text.clear();
+                            t
+                        } else {
+                            current_rich_spans
+                                .iter()
+                                .map(|s| s.text.as_str())
+                                .collect::<Vec<_>>()
+                                .join("")
+                                .trim()
+                                .to_string()
+                        };
+
+                        if !text.is_empty() || !current_rich_spans.is_empty() {
+                            let rich = if current_rich_spans.is_empty() {
+                                None
+                            } else {
+                                Some(std::mem::take(&mut current_rich_spans))
+                            };
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::Paragraph,
+                                image_url: None,
+                                note_ref: current_note_ref.take(),
+                                rich_spans: rich,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        current_rich_spans.clear();
+                        current_span_text.clear();
+                        current_span_bold = false;
+                        current_span_italic = false;
+                        current_span_superscript = false;
+                        current_span_subscript = false;
+                        current_span_strikethrough = false;
+                        current_span_code = false;
+                        current_span_bold_depth = 0;
+                        current_span_italic_depth = 0;
+                        current_span_superscript_depth = 0;
+                        current_span_subscript_depth = 0;
+                        current_span_strikethrough_depth = 0;
+                        current_span_code_depth = 0;
+                        current_span_style_names.clear();
+                        current_span_href = None;
+                        eprintln!("after link href={current_span_href:?}");
+                        in_p = false;
+                    }
+                    b"subtitle" if in_body => {
+                        let text = current_text.trim().to_string();
+                        current_text.clear();
+                        if !text.is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::Subtitle,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        in_subtitle = false;
+                    }
+                    b"epigraph" if in_body => {
+                        let text = current_text.trim().to_string();
+                        current_text.clear();
+                        if !text.is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::Epigraph,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        in_epigraph = false;
+                    }
+                    b"text-author" if in_body => {
+                        let text = current_text.trim().to_string();
+                        current_text.clear();
+                        if !text.is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text,
+                                block_type: BlockType::TextAuthor,
+                                image_url: None,
+                                note_ref: None,
+                                rich_spans: None,
+                                heading_level: None,
+                                ordered: None,
+                                list_items: None,
+                                table_rows: None,
+                                image_alt: None,
+                                text_indent: None,
+                                text_align: None,
+                                note_id: None,
+                            });
+                            block_index += 1;
+                        }
+                        in_text_author = false;
+                    }
+                    b"poem" if in_body && in_poem => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Poem,
+                        );
+                        in_poem = false;
+                        in_stanza = false;
+                    }
+                    b"stanza" if in_body && in_stanza => {
+                        if in_notes_body {
+                            if !current_note_text.ends_with('\n') {
+                                current_note_text.push('\n');
+                            }
+                            in_stanza = false;
+                            continue;
+                        }
+                        if !current_text.trim().is_empty() {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: current_text.trim().to_string(),
+                                block_type: BlockType::Poem,
+                                ..default_block()
+                            });
+                            block_index += 1;
+                        }
+                        current_text.clear();
                         body_blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
-                            block_type: BlockType::Table,
+                            block_type: BlockType::Separator,
+                            ..default_block()
+                        });
+                        block_index += 1;
+                        in_stanza = false;
+                    }
+                    b"v" if in_body && in_poem => {
+                        if in_notes_body {
+                            if !current_note_text.ends_with('\n') {
+                                current_note_text.push('\n');
+                            }
+                            continue;
+                        }
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Poem,
+                        );
+                    }
+                    b"cite" if in_body && in_cite => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Cite,
+                        );
+                        in_cite = false;
+                    }
+                    b"pre" if in_body && in_pre => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Preformatted,
+                        );
+                        in_pre = false;
+                    }
+                    b"code" if in_body && in_pre => {
+                        flush_fb2_block(
+                            &mut body_blocks,
+                            &mut current_text,
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            &mut block_index,
+                            BlockType::Preformatted,
+                        );
+                        in_pre = false;
+                    }
+                    b"empty-line" if in_body => {
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Separator,
                             image_url: None,
                             note_ref: None,
                             rich_spans: None,
                             heading_level: None,
                             ordered: None,
                             list_items: None,
-                            table_rows: Some(std::mem::take(&mut table_rows)),
+                            table_rows: None,
                             image_alt: None,
                             text_indent: None,
                             text_align: None,
                             note_id: None,
                         });
                         block_index += 1;
+                        in_empty_line = false;
                     }
-                    in_table = false;
-                    in_table_cell = false;
-                    current_table_cell.clear();
-                }
-                b"section" => {
-                    if in_notes_body {
-                        if let Some(ref id) = current_note_id {
-                            let text = current_note_text.trim().to_string();
-                            if !text.is_empty() {
-                                footnotes.insert(id.clone(), text);
-                            }
-                        }
-                        current_note_id = None;
-                        current_note_text.clear();
-                    } else {
-                        if section_depth > 0 {
-                            section_depth -= 1;
-                        }
-                        if section_depth == 0 {
-                            in_section = false;
-                            if !body_blocks.is_empty() {
-                                chapters_blocks.push(std::mem::take(&mut body_blocks));
-                            }
-                        }
+                    b"image" if in_body && !in_coverpage => {
+                        let image_ref = current_image_ref
+                            .take()
+                            .unwrap_or_else(|| current_text.trim().to_string());
+                        current_text.clear();
+                        let key = image_ref.trim_start_matches('#').to_string();
+                        body_blocks.push(ReaderBlock {
+                            index: block_index,
+                            text: String::new(),
+                            block_type: BlockType::Image,
+                            image_url: fb2_binary_reference(&key),
+                            note_ref: None,
+                            rich_spans: None,
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        block_index += 1;
+                        in_image = false;
                     }
-                }
-                b"p" if in_body => {
-                    if !current_span_text.trim().is_empty() {
+                    b"strong" if in_p => {
+                        eprintln!("matched end strong");
                         flush_rich_span(
                             &mut current_rich_spans,
                             &mut current_span_text,
@@ -618,401 +897,127 @@ fn parse_fb2_xml(
                             current_span_style_names.last(),
                             &current_span_href,
                         );
+                        current_span_bold_depth = current_span_bold_depth.saturating_sub(1);
+                        current_span_bold = current_span_bold_depth > 0;
                     }
-                    let text = if current_rich_spans.is_empty() {
-                        let t = current_span_text.trim().to_string();
-                        current_span_text.clear();
-                        t
-                    } else {
-                        current_rich_spans
-                            .iter()
-                            .map(|s| s.text.as_str())
-                            .collect::<Vec<_>>()
-                            .join("")
-                            .trim()
-                            .to_string()
-                    };
-
-                    if !text.is_empty() || !current_rich_spans.is_empty() {
-                        let rich = if current_rich_spans.is_empty() {
-                            None
-                        } else {
-                            Some(std::mem::take(&mut current_rich_spans))
-                        };
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text,
-                            block_type: BlockType::Paragraph,
-                            image_url: None,
-                            note_ref: current_note_ref.take(),
-                            rich_spans: rich,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    b"emphasis" if in_p => {
+                        eprintln!("matched end emphasis");
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_italic_depth = current_span_italic_depth.saturating_sub(1);
+                        current_span_italic = current_span_italic_depth > 0;
                     }
-                    current_rich_spans.clear();
-                    current_span_text.clear();
-                    current_span_bold = false;
-                    current_span_italic = false;
-                    current_span_superscript = false;
-                    current_span_subscript = false;
-                    current_span_strikethrough = false;
-                    current_span_code = false;
-                    current_span_bold_depth = 0;
-                    current_span_italic_depth = 0;
-                    current_span_superscript_depth = 0;
-                    current_span_subscript_depth = 0;
-                    current_span_strikethrough_depth = 0;
-                    current_span_code_depth = 0;
-                    current_span_style_names.clear();
-                    current_span_href = None;
-                    eprintln!("after link href={current_span_href:?}");
-                    in_p = false;
-                }
-                b"subtitle" if in_body => {
-                    let text = current_text.trim().to_string();
-                    current_text.clear();
-                    if !text.is_empty() {
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text,
-                            block_type: BlockType::Subtitle,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    b"a" if in_p => {
+                        eprintln!("matched end link");
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_href = None;
+                        eprintln!(
+                            "end link state: bold={current_span_bold} italic={current_span_italic} href={current_span_href:?}"
+                        );
                     }
-                    in_subtitle = false;
-                }
-                b"epigraph" if in_body => {
-                    let text = current_text.trim().to_string();
-                    current_text.clear();
-                    if !text.is_empty() {
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text,
-                            block_type: BlockType::Epigraph,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    b"sup" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_superscript_depth =
+                            current_span_superscript_depth.saturating_sub(1);
+                        current_span_superscript = current_span_superscript_depth > 0;
                     }
-                    in_epigraph = false;
-                }
-                b"text-author" if in_body => {
-                    let text = current_text.trim().to_string();
-                    current_text.clear();
-                    if !text.is_empty() {
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text,
-                            block_type: BlockType::TextAuthor,
-                            image_url: None,
-                            note_ref: None,
-                            rich_spans: None,
-                            heading_level: None,
-                            ordered: None,
-                            list_items: None,
-                            table_rows: None,
-                            image_alt: None,
-                            text_indent: None,
-                            text_align: None,
-                            note_id: None,
-                        });
-                        block_index += 1;
+                    b"sub" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_subscript_depth =
+                            current_span_subscript_depth.saturating_sub(1);
+                        current_span_subscript = current_span_subscript_depth > 0;
                     }
-                    in_text_author = false;
-                }
-                b"poem" if in_body && in_poem => {
-                    flush_fb2_block(
-                        &mut body_blocks,
-                        &mut current_text,
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        &mut block_index,
-                        BlockType::Poem,
-                    );
-                    in_poem = false;
-                    in_stanza = false;
-                }
-                b"stanza" if in_body && in_stanza => {
-                    if in_notes_body {
-                        if !current_note_text.ends_with('\n') {
-                            current_note_text.push('\n');
-                        }
-                        in_stanza = false;
-                        continue;
+                    b"strikethrough" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_strikethrough_depth =
+                            current_span_strikethrough_depth.saturating_sub(1);
+                        current_span_strikethrough = current_span_strikethrough_depth > 0;
                     }
-                    if !current_text.trim().is_empty() {
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text: current_text.trim().to_string(),
-                            block_type: BlockType::Poem,
-                            ..default_block()
-                        });
-                        block_index += 1;
+                    b"code" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_code_depth = current_span_code_depth.saturating_sub(1);
+                        current_span_code = current_span_code_depth > 0;
                     }
-                    current_text.clear();
-                    body_blocks.push(ReaderBlock {
-                        index: block_index,
-                        text: String::new(),
-                        block_type: BlockType::Separator,
-                        ..default_block()
-                    });
-                    block_index += 1;
-                    in_stanza = false;
-                }
-                b"v" if in_body && in_poem => {
-                    if in_notes_body {
-                        if !current_note_text.ends_with('\n') {
-                            current_note_text.push('\n');
-                        }
-                        continue;
+                    b"style" if in_p => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_style_names.pop();
                     }
-                    flush_fb2_block(
-                        &mut body_blocks,
-                        &mut current_text,
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        &mut block_index,
-                        BlockType::Poem,
-                    );
-                }
-                b"cite" if in_body && in_cite => {
-                    flush_fb2_block(
-                        &mut body_blocks,
-                        &mut current_text,
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        &mut block_index,
-                        BlockType::Cite,
-                    );
-                    in_cite = false;
-                }
-                b"pre" if in_body && in_pre => {
-                    flush_fb2_block(
-                        &mut body_blocks,
-                        &mut current_text,
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        &mut block_index,
-                        BlockType::Preformatted,
-                    );
-                    in_pre = false;
-                }
-                b"code" if in_body && in_pre => {
-                    flush_fb2_block(
-                        &mut body_blocks,
-                        &mut current_text,
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        &mut block_index,
-                        BlockType::Preformatted,
-                    );
-                    in_pre = false;
-                }
-                b"empty-line" if in_body => {
-                    body_blocks.push(ReaderBlock {
-                        index: block_index,
-                        text: String::new(),
-                        block_type: BlockType::Separator,
-                        image_url: None,
-                        note_ref: None,
-                        rich_spans: None,
-                        heading_level: None,
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    block_index += 1;
-                    in_empty_line = false;
-                }
-                b"image" if in_body && !in_coverpage => {
-                    let image_ref = current_image_ref
-                        .take()
-                        .unwrap_or_else(|| current_text.trim().to_string());
-                    current_text.clear();
-                    let key = image_ref.trim_start_matches('#').to_string();
-                    body_blocks.push(ReaderBlock {
-                        index: block_index,
-                        text: String::new(),
-                        block_type: BlockType::Image,
-                        image_url: fb2_binary_reference(&key),
-                        note_ref: None,
-                        rich_spans: None,
-                        heading_level: None,
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    block_index += 1;
-                    in_image = false;
-                }
-                b"strong" if in_p => {
-                    eprintln!("matched end strong");
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_bold_depth = current_span_bold_depth.saturating_sub(1);
-                    current_span_bold = current_span_bold_depth > 0;
-                }
-                b"emphasis" if in_p => {
-                    eprintln!("matched end emphasis");
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_italic_depth = current_span_italic_depth.saturating_sub(1);
-                    current_span_italic = current_span_italic_depth > 0;
-                }
-                b"a" if in_p => {
-                    eprintln!("matched end link");
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_href = None;
-                    eprintln!("end link state: bold={current_span_bold} italic={current_span_italic} href={current_span_href:?}");
-                }
-                b"sup" if in_p => {
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_superscript_depth =
-                        current_span_superscript_depth.saturating_sub(1);
-                    current_span_superscript = current_span_superscript_depth > 0;
-                }
-                b"sub" if in_p => {
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_subscript_depth = current_span_subscript_depth.saturating_sub(1);
-                    current_span_subscript = current_span_subscript_depth > 0;
-                }
-                b"strikethrough" if in_p => {
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_strikethrough_depth =
-                        current_span_strikethrough_depth.saturating_sub(1);
-                    current_span_strikethrough = current_span_strikethrough_depth > 0;
-                }
-                b"code" if in_p => {
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_code_depth = current_span_code_depth.saturating_sub(1);
-                    current_span_code = current_span_code_depth > 0;
-                }
-                b"style" if in_p => {
-                    flush_rich_span(
-                        &mut current_rich_spans,
-                        &mut current_span_text,
-                        current_span_bold,
-                        current_span_italic,
-                        current_span_superscript,
-                        current_span_subscript,
-                        current_span_strikethrough,
-                        current_span_code,
-                        current_span_style_names.last(),
-                        &current_span_href,
-                    );
-                    current_span_style_names.pop();
-                }
                     _ => {}
                 }
             }
@@ -1364,7 +1369,7 @@ fn flush_rich_span(
     href: &Option<String>,
 ) {
     let text = std::mem::take(span_text);
-    if text.trim().is_empty() && href.is_none() {
+    if text.trim().is_empty() {
         return;
     }
     spans.push(RichSpan {
@@ -1699,8 +1704,13 @@ mod tests {
             .expect("rich spans");
 
         assert_eq!(
-            spans.iter().map(|span| span.text.as_str()).collect::<Vec<_>>(),
-            ["plain", "bold", "both", "link", "strike", "sub", "", "mono", "up"],
+            spans
+                .iter()
+                .map(|span| span.text.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "plain", "bold", "both", "link", "strike", "sub", "mono", "up"
+            ],
         );
         assert!(spans[1].bold);
         assert!(spans[2].bold && spans[2].italic);
@@ -1717,7 +1727,7 @@ mod tests {
                 .any(|span| span.text == "mono" && span.style_name.as_deref() == Some("code")),
             "{spans:#?}"
         );
-        assert!(spans[8].superscript);
+        assert!(spans[7].superscript);
     }
 
     #[test]

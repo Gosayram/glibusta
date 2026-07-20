@@ -136,6 +136,10 @@ void main() {
       const span = RichSpan(
         text: 'Hello ',
         bold: true,
+        subscript: true,
+        strikethrough: true,
+        code: true,
+        styleName: 'code',
         href: 'http://example.com',
       );
       final json = span.toJson();
@@ -145,6 +149,10 @@ void main() {
       expect(restored.bold, isTrue);
       expect(restored.italic, isFalse);
       expect(restored.superscript, isFalse);
+      expect(restored.subscript, isTrue);
+      expect(restored.strikethrough, isTrue);
+      expect(restored.code, isTrue);
+      expect(restored.styleName, 'code');
       expect(restored.href, 'http://example.com');
     });
 
@@ -153,6 +161,10 @@ void main() {
       expect(span.bold, isFalse);
       expect(span.italic, isFalse);
       expect(span.superscript, isFalse);
+      expect(span.subscript, isFalse);
+      expect(span.strikethrough, isFalse);
+      expect(span.code, isFalse);
+      expect(span.styleName, isNull);
       expect(span.href, isNull);
     });
 
