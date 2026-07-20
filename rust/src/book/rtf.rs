@@ -295,6 +295,13 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                     append_encoded_bytes(&mut span_text, &escaped_bytes, encoding_name);
                     continue;
                 }
+                if matches!(bytes[i], b'\\' | b'{' | b'}') {
+                    // RTF control symbols escape literal syntax characters.
+                    // They are not control words and must survive as text.
+                    span_text.push(char::from(bytes[i]));
+                    i += 1;
+                    continue;
+                }
                 let cmd_start = i;
                 while i < bytes.len() && (bytes[i].is_ascii_alphabetic() || bytes[i] == b'*') {
                     i += 1;
@@ -839,6 +846,20 @@ mod tests {
             .expect("parse UTF-8 RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Привет, мир!");
+    }
+
+    #[test]
+    fn preserves_escaped_rtf_control_symbols_as_literal_text() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi Curly \{left\} and slash \\ remain text}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF control symbols");
+
+        assert_eq!(
+            book.chapters[0].blocks[0].text,
+            "Curly {left} and slash \\ remain text",
+        );
     }
 
     #[test]

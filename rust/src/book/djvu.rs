@@ -60,13 +60,12 @@ impl DjvuEngine {
         let doc = DjVuDocument::parse(bytes).context("Failed to parse DjVu document")?;
         let mut text = String::new();
         for i in 0..doc.page_count() {
-            if let Ok(page) = doc.page(i) {
-                if let Ok(Some(page_text)) = page.text() {
-                    if !page_text.trim().is_empty() {
-                        text.push_str(&page_text);
-                        text.push('\n');
-                    }
-                }
+            let page = doc.page(i).context("Failed to access DjVu page")?;
+            if let Some(page_text) = page.text().context("Failed to decode DjVu text layer")?
+                && !page_text.trim().is_empty()
+            {
+                text.push_str(&page_text);
+                text.push('\n');
             }
         }
         Ok(text)
@@ -83,7 +82,10 @@ impl DjvuEngine {
         let mut chapters = Vec::new();
         for i in 0..page_count {
             let page = doc.page(i).context(format!("Failed to get page {}", i))?;
-            let page_text = page.text().ok().flatten().unwrap_or_default();
+            let page_text = page
+                .text()
+                .context("Failed to decode DjVu text layer")?
+                .unwrap_or_default();
             let blocks = if page_text.trim().is_empty() {
                 vec![ReaderBlock {
                     index: 0,

@@ -1499,6 +1499,31 @@ mod tests {
     }
 
     #[test]
+    fn ignores_custom_info_and_stylesheet_processing_instruction() {
+        let book = parse_fb2(
+            br#"<?xml version="1.0" encoding="utf-8"?>
+                <?xml-stylesheet type="text/xsl" href="https://example.test/untrusted.xsl"?>
+                <FictionBook><description>
+                    <title-info>
+                        <book-title>Safe title</book-title>
+                        <author><nickname>Safe author</nickname></author>
+                    </title-info>
+                    <custom-info info-type="tracking">https://example.test/custom</custom-info>
+                </description><body><section><p>Safe content.</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("custom metadata must not affect FB2 parsing");
+
+        assert_eq!(book.title, "Safe title");
+        assert_eq!(book.authors, ["Safe author"]);
+        assert_eq!(book.chapters[0].blocks[0].text, "Safe content.");
+        assert!(
+            book.description.is_none(),
+            "custom-info must not become reader metadata"
+        );
+    }
+
+    #[test]
     #[cfg_attr(
         miri,
         ignore = "large CDATA limit test is prohibitively slow under Miri"

@@ -133,6 +133,7 @@ mod tests {
         };
         let header = MobiHeader {
             compression: 1,
+            encryption_type: 0,
             text_encoding: 0,
             text_record_count: 0,
             record_size: 0,
@@ -181,6 +182,7 @@ mod tests {
         };
         let header = MobiHeader {
             compression: 1,
+            encryption_type: 0,
             text_encoding: 0,
             text_record_count: 0,
             record_size: 0,
@@ -219,6 +221,7 @@ mod tests {
         };
         let header = MobiHeader {
             compression: 1,
+            encryption_type: 0,
             text_encoding: 0,
             text_record_count: 0,
             record_size: 0,

@@ -390,6 +390,16 @@ fn description_for(header: &MobiHeader) -> String {
     }
 }
 
+fn reject_encrypted_mobi(header: &MobiHeader) -> Result<()> {
+    if header.encryption_type != 0 {
+        bail!(
+            "Encrypted MOBI is not supported (PalmDOC encryption type {})",
+            header.encryption_type
+        );
+    }
+    Ok(())
+}
+
 fn is_likely_kf8(header: &MobiHeader, record0: &[u8]) -> bool {
     let _ = header;
     let (text, _, _) = encoding_rs::WINDOWS_1252.decode(record0);
@@ -453,6 +463,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     let palm_db = PalmDbParser.parse(bytes)?;
     let legacy_record0 = record_bytes(bytes, &palm_db, 0)?;
     let legacy_header = MobiHeaderParser.parse(legacy_record0)?;
+    reject_encrypted_mobi(&legacy_header)?;
     let legacy_metadata = ExthParser.parse(legacy_record0, &legacy_header)?;
     let (header_record_index, record0, header, metadata, using_kf8) =
         if let Some((header_index, kf8_record0, kf8_header, kf8_metadata)) =
@@ -462,6 +473,8 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         } else {
             (0, legacy_record0, legacy_header, legacy_metadata, false)
         };
+
+    reject_encrypted_mobi(&header)?;
 
     let text_extractor = MobiTextExtractor::new();
     let first_text_record_index = header_record_index

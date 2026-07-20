@@ -1305,6 +1305,18 @@ fn test_mobi_truncated_file_returns_an_error_without_panicking() {
 }
 
 #[test]
+fn test_mobi_rejects_encrypted_palm_doc_before_text_decode() {
+    let mut mobi = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
+    mobi[record0_offset + 12..record0_offset + 14].copy_from_slice(&1u16.to_be_bytes());
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("encrypted MOBI must not be decoded as plaintext");
+
+    assert!(error.to_string().to_ascii_lowercase().contains("encrypted"));
+}
+
+#[test]
 fn test_mobi_preserves_safe_links_and_drops_unsafe_schemes() {
     let mobi_bytes = create_mobi_with_text(
         b"<html><body><p><a href=\"https://example.com\">Safe</a> <a href=\"javascript:alert(1)\">Unsafe</a></p></body></html>",
@@ -1387,6 +1399,23 @@ fn test_djvu_extract_text_empty() {
 fn test_djvu_extract_text() {
     let text = glibusta_core::book::djvu::DjvuEngine::extract_text(DJVU_WITH_TEXT).unwrap();
     assert_eq!(text.trim(), "Hello World");
+}
+
+#[test]
+fn test_djvu_corrupt_text_layer_returns_controlled_error() {
+    let mut corrupt = DJVU_WITH_TEXT.to_vec();
+    *corrupt
+        .last_mut()
+        .expect("DjVu text fixture must contain a TXTz payload") ^= 0xFF;
+
+    let text_error = glibusta_core::book::djvu::DjvuEngine::extract_text(&corrupt)
+        .expect_err("corrupt TXTz must not be silently treated as an empty text layer");
+    assert!(text_error.to_string().contains("text layer"));
+
+    let parse_error = glibusta_core::book::djvu::DjvuEngine::parse_djvu(&corrupt).expect_err(
+        "book parser must surface corrupt TXTz instead of producing a placeholder page",
+    );
+    assert!(parse_error.to_string().contains("text layer"));
 }
 
 #[test]
