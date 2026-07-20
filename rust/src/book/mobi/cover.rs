@@ -142,6 +142,7 @@ mod tests {
             full_name_length: 0,
             exth_flags: 0,
             first_image_record_index: 1,
+            extra_data_flags: 0,
         };
         let mut metadata = MobiMetadata::default();
         metadata.cover_record_index = Some(1);
@@ -192,6 +193,7 @@ mod tests {
             full_name_length: 0,
             exth_flags: 0,
             first_image_record_index: 1,
+            extra_data_flags: 0,
         };
         let mut metadata = MobiMetadata::default();
         metadata.cover_record_index = Some(1);
@@ -232,6 +234,7 @@ mod tests {
             full_name_length: 0,
             exth_flags: 0,
             first_image_record_index: 1,
+            extra_data_flags: 0,
         };
 
         assert!(

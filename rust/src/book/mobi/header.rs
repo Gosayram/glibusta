@@ -14,6 +14,7 @@ pub(crate) struct MobiHeader {
     pub full_name_length: u32,
     pub exth_flags: u32,
     pub first_image_record_index: u32,
+    pub extra_data_flags: u32,
 }
 
 pub(crate) struct MobiHeaderParser;
@@ -24,6 +25,7 @@ impl MobiHeaderParser {
     const FULL_NAME_END: usize = 92;
     const FIRST_IMAGE_RECORD_END: usize = 112;
     const EXTH_FLAGS_END: usize = 132;
+    const EXTRA_DATA_FLAGS_END: usize = 228;
 
     pub fn parse(&self, record0: &[u8]) -> Result<MobiHeader> {
         let reader = BinaryReader::new(record0);
@@ -62,6 +64,11 @@ impl MobiHeaderParser {
         } else {
             0
         };
+        let extra_data_flags = if header_length >= Self::EXTRA_DATA_FLAGS_END {
+            reader.u32be(mobi_offset + 224)?
+        } else {
+            0
+        };
 
         Ok(MobiHeader {
             compression: reader.u16be(0)?,
@@ -74,6 +81,7 @@ impl MobiHeaderParser {
             full_name_length,
             exth_flags,
             first_image_record_index,
+            extra_data_flags,
         })
     }
 }

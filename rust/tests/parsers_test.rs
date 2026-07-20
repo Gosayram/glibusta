@@ -1297,6 +1297,26 @@ fn create_mobi_with_inline_image(recindex: u32) -> Vec<u8> {
     ])
 }
 
+fn create_mobi_with_extra_record_data() -> Vec<u8> {
+    let mut header = create_mobi_header_record(4100, 2, &[]);
+    header[28..30].copy_from_slice(&65001u16.to_be_bytes());
+    // Extra Record Data Flags live at record-0 offset 0xf0 (MOBI header + 224).
+    // Bit 0 carries UTF-8 overlap bytes; bit 1 carries a size-delimited index
+    // entry that must be peeled first while walking backwards.
+    header[16 + 224..16 + 228].copy_from_slice(&3u32.to_be_bytes());
+
+    let mut first_record = vec![b'a'; 4095];
+    first_record.push(0xF0); // First byte of 😀.
+    first_record.extend_from_slice(&[0x9F, 0x98, 0x80, 0x03]); // overlap + count
+    first_record.extend_from_slice(&[0x55, 0x82]); // index data + backward VWI size=2
+
+    create_palm_mobi(vec![
+        header,
+        first_record,
+        vec![0x9F, 0x98, 0x80, b'b', 0x00, 0x55, 0x82],
+    ])
+}
+
 #[test]
 fn test_mobi_basic_parse() {
     let mobi_bytes = create_minimal_mobi();
@@ -1337,6 +1357,37 @@ fn test_mobi_recindex_is_relative_to_first_image_record() {
         image.image_url.as_deref(),
         Some("data:image/gif;base64,R0lGODlhc2Vjb25kLWltYWdl"),
     );
+}
+
+#[test]
+fn test_mobi_strips_extra_record_data_before_utf8_decode() {
+    let book = glibusta_core::book::mobi::parse_mobi(&create_mobi_with_extra_record_data(), None)
+        .expect("parse MOBI with trailing metadata and split UTF-8 character");
+    let text = book.chapters[0]
+        .blocks
+        .iter()
+        .map(|block| block.text.as_str())
+        .collect::<String>();
+
+    assert_eq!(text, format!("{}😀b", "a".repeat(4095)));
+    assert!(text.ends_with("😀b"));
+    assert!(!text.contains('\u{3}'));
+}
+
+#[test]
+fn test_mobi_rejects_malformed_extra_record_data() {
+    let mut mobi = create_mobi_with_extra_record_data();
+    let first_text_offset = u32::from_be_bytes([mobi[86], mobi[87], mobi[88], mobi[89]]) as usize;
+    let second_text_offset = u32::from_be_bytes([mobi[94], mobi[95], mobi[96], mobi[97]]) as usize;
+    // Bit 1 requires a backward VWI. Make its terminal byte non-terminal so
+    // the parser cannot derive a bounded entry size.
+    mobi[second_text_offset - 1] = 0x01;
+    assert!(second_text_offset > first_text_offset);
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("malformed trailing entry must be rejected before decompression");
+
+    assert!(error.to_string().contains("trailing entry"));
 }
 
 #[test]

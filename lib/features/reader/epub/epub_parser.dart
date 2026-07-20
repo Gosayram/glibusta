@@ -190,7 +190,8 @@ final class CustomEpubParser {
       if (coverId != null) opf.resources[coverId],
       opf.resources.values.firstWhereOrNull((EpubResource r) => r.isCoverImage),
       opf.resources.values.firstWhereOrNull(
-        (EpubResource r) => r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
+        (EpubResource r) =>
+            r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
       ),
     ];
     return candidates.whereType<EpubResource>().firstWhereOrNull(

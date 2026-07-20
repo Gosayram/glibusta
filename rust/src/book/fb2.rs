@@ -25,6 +25,13 @@ struct Fb2SectionStructure {
     has_streaming_content: bool,
 }
 
+#[derive(serde::Serialize)]
+struct Fb2SequenceMetadata {
+    name: Option<String>,
+    number: Option<String>,
+    children: Vec<Fb2SequenceMetadata>,
+}
+
 fn enter_fb2_section(stack: &mut Vec<Fb2SectionStructure>) -> Result<()> {
     if stack.len() >= MAX_FB2_SECTION_DEPTH {
         bail!("FB2 section nesting exceeds the maximum depth of {MAX_FB2_SECTION_DEPTH}");
@@ -199,6 +206,25 @@ fn parse_fb2_xml(
 
     let mut current_text = String::new();
     let mut current_author_parts: Vec<String> = Vec::new();
+    let mut in_translator = false;
+    let mut current_translator_parts: Vec<String> = Vec::new();
+    let mut translators: Vec<String> = Vec::new();
+    let mut keywords: Option<String> = None;
+    let mut in_keywords = false;
+    let mut current_keywords = String::new();
+    let mut dates: Vec<serde_json::Value> = Vec::new();
+    let mut in_date = false;
+    let mut current_date = String::new();
+    let mut current_date_value: Option<String> = None;
+    let mut src_language: Option<String> = None;
+    let mut in_src_lang = false;
+    let mut current_src_lang = String::new();
+    let mut sequences: Vec<Fb2SequenceMetadata> = Vec::new();
+    let mut sequence_stack: Vec<Fb2SequenceMetadata> = Vec::new();
+    let mut in_publish_info = false;
+    let mut publish_info = serde_json::Map::new();
+    let mut publish_field: Option<&'static str> = None;
+    let mut current_publish_value = String::new();
     let mut current_rich_spans: Vec<RichSpan> = Vec::new();
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
@@ -255,16 +281,52 @@ fn parse_fb2_xml(
                     b"title-info" => in_title_info = true,
                     b"book-title" if in_title_info => in_book_title = true,
                     b"annotation" if in_title_info => in_annotation = true,
-                    b"author" if in_title_info => {
+                    b"author" if in_title_info && !in_translator => {
                         in_author = true;
                         current_author_parts.clear();
                     }
-                    b"first-name" if in_author => in_first_name = true,
-                    b"middle-name" if in_author => in_middle_name = true,
-                    b"last-name" if in_author => in_last_name = true,
-                    b"nickname" if in_author => in_nickname = true,
+                    b"first-name" if in_author || in_translator => in_first_name = true,
+                    b"middle-name" if in_author || in_translator => in_middle_name = true,
+                    b"last-name" if in_author || in_translator => in_last_name = true,
+                    b"nickname" if in_author || in_translator => in_nickname = true,
                     b"genre" if in_title_info => in_genre = true,
                     b"lang" if in_title_info => in_lang = true,
+                    b"src-lang" if in_title_info => {
+                        in_src_lang = true;
+                        current_src_lang.clear();
+                    }
+                    b"keywords" if in_title_info => {
+                        in_keywords = true;
+                        current_keywords.clear();
+                    }
+                    b"date" if in_title_info => {
+                        in_date = true;
+                        current_date.clear();
+                        current_date_value = get_xml_attr(e, b"value");
+                    }
+                    b"translator" if in_title_info => {
+                        in_translator = true;
+                        current_translator_parts.clear();
+                    }
+                    b"sequence" if in_title_info => sequence_stack.push(Fb2SequenceMetadata {
+                        name: get_xml_attr(e, b"name"),
+                        number: get_xml_attr(e, b"number"),
+                        children: Vec::new(),
+                    }),
+                    b"publish-info" => in_publish_info = true,
+                    b"book-name" | b"publisher" | b"city" | b"year" | b"isbn"
+                        if in_publish_info =>
+                    {
+                        publish_field = Some(match e.name().as_ref() {
+                            b"book-name" => "bookName",
+                            b"publisher" => "publisher",
+                            b"city" => "city",
+                            b"year" => "year",
+                            b"isbn" => "isbn",
+                            _ => unreachable!(),
+                        });
+                        current_publish_value.clear();
+                    }
                     b"coverpage" => in_coverpage = true,
                     b"binary" => {
                         let binary_id = get_xml_attr(e, b"id").unwrap_or_default();
@@ -557,12 +619,24 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
+                } else if in_translator
+                    && (in_first_name || in_middle_name || in_last_name || in_nickname)
+                {
+                    current_translator_parts.push(text.into_owned());
                 } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
                 } else if in_lang {
                     language = Some(text.into_owned());
+                } else if in_src_lang {
+                    current_src_lang.push_str(&text);
+                } else if in_keywords {
+                    current_keywords.push_str(&text);
+                } else if in_date {
+                    current_date.push_str(&text);
+                } else if publish_field.is_some() {
+                    current_publish_value.push_str(&text);
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
@@ -594,12 +668,24 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
+                } else if in_translator
+                    && (in_first_name || in_middle_name || in_last_name || in_nickname)
+                {
+                    current_translator_parts.push(text.into_owned());
                 } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
                 } else if in_lang {
                     language = Some(text.into_owned());
+                } else if in_src_lang {
+                    current_src_lang.push_str(&text);
+                } else if in_keywords {
+                    current_keywords.push_str(&text);
+                } else if in_date {
+                    current_date.push_str(&text);
+                } else if publish_field.is_some() {
+                    current_publish_value.push_str(&text);
                 } else if in_pre && in_body {
                     current_text.push_str(&text);
                 } else if in_p && in_body {
@@ -628,12 +714,24 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
+                } else if in_translator
+                    && (in_first_name || in_middle_name || in_last_name || in_nickname)
+                {
+                    current_translator_parts.push(text.into_owned());
                 } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
                 } else if in_lang {
                     language = Some(text.into_owned());
+                } else if in_src_lang {
+                    current_src_lang.push_str(&text);
+                } else if in_keywords {
+                    current_keywords.push_str(&text);
+                } else if in_date {
+                    current_date.push_str(&text);
+                } else if publish_field.is_some() {
+                    current_publish_value.push_str(&text);
                 } else if in_annotation {
                     description = Some(description.take().unwrap_or_default() + &text);
                 } else if in_binary {
@@ -688,6 +786,52 @@ fn parse_fb2_xml(
                     }
                     b"genre" => in_genre = false,
                     b"lang" => in_lang = false,
+                    b"src-lang" if in_src_lang => {
+                        src_language = Some(current_src_lang.trim().to_string());
+                        current_src_lang.clear();
+                        in_src_lang = false;
+                    }
+                    b"keywords" if in_keywords => {
+                        keywords = Some(current_keywords.trim().to_string());
+                        current_keywords.clear();
+                        in_keywords = false;
+                    }
+                    b"date" if in_date => {
+                        dates.push(serde_json::json!({
+                            "text": current_date.trim(),
+                            "value": current_date_value.take(),
+                        }));
+                        current_date.clear();
+                        in_date = false;
+                    }
+                    b"translator" if in_translator => {
+                        if !current_translator_parts.is_empty() {
+                            translators.push(current_translator_parts.join(" "));
+                            current_translator_parts.clear();
+                        }
+                        in_translator = false;
+                    }
+                    b"sequence" if in_title_info => {
+                        if let Some(sequence) = sequence_stack.pop() {
+                            if let Some(parent) = sequence_stack.last_mut() {
+                                parent.children.push(sequence);
+                            } else {
+                                sequences.push(sequence);
+                            }
+                        }
+                    }
+                    b"book-name" | b"publisher" | b"city" | b"year" | b"isbn"
+                        if publish_field.is_some() =>
+                    {
+                        if let Some(field) = publish_field.take() {
+                            publish_info.insert(
+                                field.to_string(),
+                                serde_json::Value::String(current_publish_value.trim().to_string()),
+                            );
+                        }
+                        current_publish_value.clear();
+                    }
+                    b"publish-info" => in_publish_info = false,
                     b"coverpage" => in_coverpage = false,
                     b"binary" => {
                         if in_binary && !current_text.is_empty() {
@@ -1204,6 +1348,18 @@ fn parse_fb2_xml(
                     )?;
                 }
                 match e.name().as_ref() {
+                    b"sequence" if in_title_info => {
+                        let sequence = Fb2SequenceMetadata {
+                            name: get_xml_attr(e, b"name"),
+                            number: get_xml_attr(e, b"number"),
+                            children: Vec::new(),
+                        };
+                        if let Some(parent) = sequence_stack.last_mut() {
+                            parent.children.push(sequence);
+                        } else {
+                            sequences.push(sequence);
+                        }
+                    }
                     b"empty-line" if in_body => {
                         body_blocks.push(ReaderBlock {
                             index: block_index,
@@ -1319,6 +1475,27 @@ fn parse_fb2_xml(
         // NormalizedBook has no dedicated genre field. Preserve raw FB2 codes
         // instead of guessing an unofficial 2.0 → 2.1 mapping.
         metadata.insert("genres".to_string(), serde_json::json!(genres));
+    }
+    if let Some(keywords) = keywords.filter(|keywords| !keywords.is_empty()) {
+        metadata.insert("keywords".to_string(), serde_json::json!(keywords));
+    }
+    if !dates.is_empty() {
+        metadata.insert("dates".to_string(), serde_json::json!(dates));
+    }
+    if let Some(src_language) = src_language.filter(|language| !language.is_empty()) {
+        metadata.insert("srcLanguage".to_string(), serde_json::json!(src_language));
+    }
+    if !translators.is_empty() {
+        metadata.insert("translators".to_string(), serde_json::json!(translators));
+    }
+    if !sequences.is_empty() {
+        metadata.insert("sequences".to_string(), serde_json::json!(sequences));
+    }
+    if !publish_info.is_empty() {
+        metadata.insert(
+            "publication".to_string(),
+            serde_json::Value::Object(publish_info),
+        );
     }
     let metadata = (!metadata.is_empty()).then_some(serde_json::Value::Object(metadata));
 
@@ -1725,6 +1902,14 @@ mod tests {
                 .as_deref()
                 .is_some_and(|url| url.starts_with("data:image/png;base64,"))
         );
+        let metadata = book.metadata.as_ref().expect("extended metadata");
+        assert_eq!(metadata["keywords"], "analytical engine, notes");
+        assert_eq!(metadata["dates"][0]["text"], "1843");
+        assert_eq!(metadata["dates"][0]["value"], "1843-01-01");
+        assert_eq!(metadata["srcLanguage"], "fr");
+        assert_eq!(metadata["translators"], serde_json::json!(["Translator"]));
+        assert_eq!(metadata["sequences"][0]["name"], "Collected");
+        assert_eq!(metadata["sequences"][0]["children"][0]["name"], "Volume");
         assert_eq!(book.chapters[0].blocks[0].text, "Reader content.");
     }
 
@@ -1749,7 +1934,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_source_document_and_publication_metadata() {
+    fn preserves_publication_metadata_without_overriding_canonical_title_info() {
         let book = parse_fb2(
             br#"<FictionBook><description>
                 <title-info><book-title>Canonical title</book-title><author><nickname>Canonical author</nickname></author></title-info>
@@ -1759,10 +1944,22 @@ mod tests {
             </description><body><section><p>Canonical content.</p></section></body></FictionBook>"#,
             Some("utf-8"),
         )
-        .expect("ignore FB2 metadata that is not represented by NormalizedBook");
+        .expect("parse FB2 source and publication metadata");
 
         assert_eq!(book.title, "Canonical title");
         assert_eq!(book.authors, ["Canonical author"]);
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["publication"]["publisher"].as_str()),
+            Some("Publisher"),
+        );
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["publication"]["isbn"].as_str()),
+            Some("isbn"),
+        );
         assert_eq!(book.chapters[0].blocks[0].text, "Canonical content.");
     }
 

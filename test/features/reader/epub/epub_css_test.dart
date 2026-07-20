@@ -294,6 +294,48 @@ void main() {
     }
   });
 
+  test('falls back when the OPF cover id references a non-image resource', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_cover_fallback_test_');
+    try {
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'META-INF/container.xml',
+            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/content.opf',
+            '''<package><metadata><title>Cover fallback</title><meta name="cover" content="cover-page"/></metadata><manifest><item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/><item id="cover-image" href="images/cover.png" media-type="image/png" properties="cover-image"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="cover-page"/><itemref idref="chapter"/></spine></package>''',
+          ),
+        )
+        ..addFile(ArchiveFile('OEBPS/images/cover.png', 1, [0]))
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/cover.xhtml',
+            '<html><body><p>Cover page</p></body></html>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/chapter.xhtml',
+            '<html><body><p>Actual chapter text.</p></body></html>',
+          ),
+        );
+      final file = File('${temporaryDirectory.path}/cover-fallback.epub');
+      await file.writeAsBytes(ZipEncoder().encode(archive));
+
+      final book = await CustomEpubParser(
+        imageStore: EpubImageStore(temporaryDirectory),
+      ).parse(file.path);
+
+      expect(book.coverImagePath, endsWith('.png'));
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('extracts the local audio file referenced by a SMIL media overlay', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_audio_test_');
     try {

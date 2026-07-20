@@ -508,6 +508,36 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('keeps fixed-layout page count stable while chapters load lazily', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'fixed-layout',
+            title: 'Fixed layout',
+            authors: [],
+            chapterCount: 3,
+            chapterTitles: ['1', '2', '3'],
+            metadata: {'isFixedLayout': true},
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(index: 0, title: '1', blocks: []),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    final delegate = pageView.childrenDelegate as SliverChildBuilderDelegate;
+    expect(delegate.estimatedChildCount, 3);
+  });
+
   testWidgets('renders transparent WebP comic pages without dropping alpha', (tester) async {
     const transparentWebp = 'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
     const transparentWebpUri =

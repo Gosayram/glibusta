@@ -227,7 +227,10 @@ impl MobiTextExtractor {
         let decompressor = PalmDocDecompressor;
 
         for i in first_text_record_index..last_text_record_index {
-            let record = record_bytes(full_bytes, palm_db, i)?;
+            let record = strip_extra_record_data(
+                record_bytes(full_bytes, palm_db, i)?,
+                header.extra_data_flags,
+            )?;
             let remaining = text_length
                 .checked_sub(chunks.len())
                 .ok_or_else(|| anyhow::anyhow!("PalmDOC text exceeds declared length"))?;
@@ -331,6 +334,69 @@ impl MobiTextExtractor {
         }
         blocks
     }
+}
+
+/// Remove per-record metadata declared by MOBI Extra Record Data Flags before
+/// treating a PalmDOC record as compressed/text content. Entries for bits 2+
+/// are `<data><backward-VWI size>` and therefore must be consumed from the
+/// highest set bit down; bit 1 is the multibyte overlap tail.
+fn strip_extra_record_data(record: &[u8], extra_data_flags: u32) -> Result<&[u8]> {
+    let mut end = record.len();
+
+    for bit in (1..u32::BITS).rev() {
+        if extra_data_flags & (1_u32 << bit) == 0 {
+            continue;
+        }
+        let entry_size = backward_vwi_entry_size(&record[..end])?;
+        end = end
+            .checked_sub(entry_size)
+            .ok_or_else(|| anyhow::anyhow!("MOBI trailing entry exceeds record length"))?;
+    }
+
+    if extra_data_flags & 1 != 0 {
+        let count_and_flags = *record
+            .get(end.checked_sub(1).ok_or_else(|| {
+                anyhow::anyhow!("MOBI multibyte overlap is missing its count byte")
+            })?)
+            .ok_or_else(|| anyhow::anyhow!("MOBI multibyte overlap is truncated"))?;
+        let overlap_size = usize::from(count_and_flags & 0x03)
+            .checked_add(1)
+            .ok_or_else(|| anyhow::anyhow!("MOBI multibyte overlap size overflows"))?;
+        end = end
+            .checked_sub(overlap_size)
+            .ok_or_else(|| anyhow::anyhow!("MOBI multibyte overlap exceeds record length"))?;
+    }
+
+    Ok(&record[..end])
+}
+
+fn backward_vwi_entry_size(record: &[u8]) -> Result<usize> {
+    let mut start = record.len();
+    let mut width = 0usize;
+    loop {
+        start = start
+            .checked_sub(1)
+            .ok_or_else(|| anyhow::anyhow!("MOBI trailing entry is missing its backward VWI"))?;
+        width += 1;
+        if width > 5 {
+            bail!("MOBI trailing entry backward VWI exceeds u32 width");
+        }
+        if record[start] & 0x80 != 0 {
+            break;
+        }
+    }
+
+    let mut value = 0usize;
+    for &byte in &record[start..] {
+        value = value
+            .checked_shl(7)
+            .and_then(|value| value.checked_add(usize::from(byte & 0x7F)))
+            .ok_or_else(|| anyhow::anyhow!("MOBI trailing entry VWI overflows usize"))?;
+    }
+    if value < width || value > record.len() {
+        bail!("Invalid MOBI trailing entry size");
+    }
+    Ok(value)
 }
 
 fn resolve_inline_images(

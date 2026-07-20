@@ -108,9 +108,23 @@ impl ExthParser {
             });
         }
         use nom::Parser;
-        let (_, records) = count(exth_record, rec_count as usize)
-            .parse(records_data)
-            .unwrap_or_default();
+        let (padding, records) = match count(exth_record, rec_count as usize).parse(records_data) {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                return Ok(MobiMetadata {
+                    has_exth: true,
+                    ..MobiMetadata::default()
+                });
+            }
+        };
+        // EXTH is 4-byte aligned. The bytes after declared records are only
+        // alignment padding, never a hidden metadata record.
+        if padding.len() > 3 || padding.iter().any(|&byte| byte != 0) {
+            return Ok(MobiMetadata {
+                has_exth: true,
+                ..MobiMetadata::default()
+            });
+        }
 
         let mut title: Option<String> = None;
         let mut author: Option<String> = None;
@@ -198,6 +212,7 @@ mod tests {
             full_name_length: 0,
             exth_flags: 0x40,
             first_image_record_index: 0,
+            extra_data_flags: 0,
         }
     }
 
@@ -215,5 +230,29 @@ mod tests {
 
         assert!(metadata.has_exth);
         assert!(metadata.title.is_none());
+    }
+
+    #[test]
+    fn accepts_zero_alignment_padding_and_rejects_non_padding_bytes() {
+        let mut record0 = Vec::from(&b"EXTH"[..]);
+        record0.extend_from_slice(&28u32.to_be_bytes());
+        record0.extend_from_slice(&1u32.to_be_bytes());
+        record0.extend_from_slice(&503u32.to_be_bytes());
+        record0.extend_from_slice(&13u32.to_be_bytes());
+        record0.extend_from_slice(b"Title");
+        record0.extend_from_slice(&[0, 0, 0]);
+
+        let metadata = ExthParser
+            .parse(&record0, &exth_header())
+            .expect("zero EXTH alignment padding must be accepted");
+        assert_eq!(metadata.title.as_deref(), Some("Title"));
+
+        let last_byte = record0.len() - 1;
+        record0[last_byte] = 1;
+        let malformed = ExthParser
+            .parse(&record0, &exth_header())
+            .expect("malformed optional EXTH metadata must not fail book parsing");
+        assert!(malformed.has_exth);
+        assert!(malformed.title.is_none());
     }
 }
