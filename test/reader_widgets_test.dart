@@ -685,6 +685,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('focus mode uses the dark system link color', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MediaQuery(
+          data: const MediaQueryData(platformBrightness: Brightness.dark),
+          child: MaterialApp(
+            theme: ThemeData.dark(),
+            home: Scaffold(
+              body: ReaderContentBody(
+                metadata: const NormalizedBookMetadata(
+                  id: 'system-dark-focus',
+                  title: 'System dark focus',
+                  authors: [],
+                  chapterCount: 1,
+                  chapterTitles: ['Chapter'],
+                ),
+                loadedChapters: const {
+                  0: ReaderChapter(
+                    index: 0,
+                    title: 'Chapter',
+                    blocks: [
+                      ReaderBlock(
+                        index: 0,
+                        text: 'Link',
+                        richSpans: [RichSpan(text: 'Link', href: '#target')],
+                      ),
+                    ],
+                  ),
+                },
+                settings: const ReaderSettings(theme: ReaderTheme.system, mode: ReaderMode.focus),
+                scrollController: scrollController,
+                onTap: _ignoreTap,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final richText = tester.widget<RichText>(find.text('Link'));
+    final textSpan = richText.text as TextSpan;
+    final linkSpan = textSpan.children!.single as TextSpan;
+    expect(linkSpan.style!.color, const Color(0xFF64B5F6));
+  });
+
   testWidgets('keeps a wide EPUB table horizontally reachable', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

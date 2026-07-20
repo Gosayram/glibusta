@@ -1634,12 +1634,18 @@ class _FocusModeBody extends StatelessWidget {
               )
             : EdgeInsets.all(settings.margin);
 
+        final colors =
+            customColors ??
+            ReaderColors.forThemeWithContext(
+              settings.theme,
+              MediaQuery.platformBrightnessOf(context),
+            );
         final readerCtx = ReaderCtx(
           settings: settings,
           customColors: customColors,
           highlightQuery: highlightQuery,
-          linkColor: ReaderColors.forTheme(settings.theme).link,
-          brightness: Theme.of(context).brightness,
+          linkColor: colors.link,
+          brightness: MediaQuery.platformBrightnessOf(context),
           onLinkTap: onLinkTap,
         );
 

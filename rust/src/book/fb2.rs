@@ -2087,6 +2087,58 @@ mod tests {
     }
 
     #[test]
+    fn imports_compact_cp1251_fb2_21_compatibility_corpus_fixture() {
+        let xml = r##"<?xml version="1.0" encoding="windows-1251"?>
+            <FictionBook xmlns:alt="http://www.w3.org/1999/xlink">
+              <description><title-info><book-title>Тестовая книга</book-title><lang>ru</lang><output>paid</output></title-info></description>
+              <body><section><section><section>
+                <p>Основной<a alt:href="#note-1" type="note">1</a><strikethrough>зачеркнуто</strikethrough><style name="code">Стиль</style></p>
+                <output>не показывать</output>
+              </section></section></section>
+              <section><table><tr><th>Заголовок</th></tr><tr><td>Ячейка</td></tr></table></section></body>
+              <body name="notes"><section id="note-1"><p>Текст сноски</p></section></body>
+            </FictionBook>"##;
+        let (bytes, _, _) = encoding_rs::WINDOWS_1251.encode(xml);
+
+        let book = parse_fb2(&bytes, None).expect("parse compact CP1251 FB2 2.1 fixture");
+
+        assert_eq!(book.title, "Тестовая книга");
+        assert_eq!(book.language.as_deref(), Some("ru"));
+        assert_eq!(book.chapters.len(), 2);
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("formatted paragraph spans");
+        assert!(
+            spans
+                .iter()
+                .any(|span| span.href.as_deref() == Some("#note-1"))
+        );
+        assert!(spans.iter().any(|span| span.strikethrough));
+        assert!(
+            spans
+                .iter()
+                .any(|span| span.style_name.as_deref() == Some("code"))
+        );
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["note-1"].as_str()),
+            Some("Текст сноски"),
+        );
+        assert_eq!(
+            book.chapters[1].blocks[0].table_rows.as_deref(),
+            Some(&[vec!["Заголовок".to_string()], vec!["Ячейка".to_string()]][..]),
+        );
+        assert!(
+            book.chapters
+                .iter()
+                .flat_map(|chapter| &chapter.blocks)
+                .all(|block| !block.text.contains("не показывать")),
+        );
+    }
+
+    #[test]
     fn falls_back_for_unknown_or_false_utf8_declarations_without_corrupting_windows_1252() {
         let title = "Résumé — café";
         let (encoded_title, _, _) = encoding_rs::WINDOWS_1252.encode(title);

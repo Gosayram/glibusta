@@ -14,6 +14,14 @@ pub(crate) struct MobiMetadata {
     pub author: Option<CompactString>,
     pub language: Option<CompactString>,
     pub description: Option<CompactString>,
+    pub fixed_layout: bool,
+    pub book_type: Option<CompactString>,
+    pub orientation_lock: Option<CompactString>,
+    pub resource_count: Option<u32>,
+    pub original_resolution: Option<CompactString>,
+    pub zero_gutter: bool,
+    pub zero_margin: bool,
+    pub metadata_resource_uri: Option<CompactString>,
     pub cover_record_index: Option<u32>,
     /// PalmDB record containing the KF8 boundary marker (EXTH 121).
     /// The KF8 MOBI header, when present, is the following record.
@@ -28,6 +36,14 @@ impl MobiMetadata {
             author: None,
             language: None,
             description: None,
+            fixed_layout: false,
+            book_type: None,
+            orientation_lock: None,
+            resource_count: None,
+            original_resolution: None,
+            zero_gutter: false,
+            zero_margin: false,
+            metadata_resource_uri: None,
             cover_record_index: None,
             kf8_boundary_record_index: None,
             has_exth: false,
@@ -130,6 +146,14 @@ impl ExthParser {
         let mut author: Option<String> = None;
         let mut language: Option<String> = None;
         let mut description: Option<String> = None;
+        let mut fixed_layout = false;
+        let mut book_type: Option<String> = None;
+        let mut orientation_lock: Option<String> = None;
+        let mut resource_count: Option<u32> = None;
+        let mut original_resolution: Option<String> = None;
+        let mut zero_gutter = false;
+        let mut zero_margin = false;
+        let mut metadata_resource_uri: Option<String> = None;
         let mut cover_record_index: Option<u32> = None;
         let mut kf8_boundary_record_index: Option<u32> = None;
 
@@ -163,6 +187,52 @@ impl ExthParser {
                             .to_string(),
                     );
                 }
+                122 => {
+                    fixed_layout = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .eq_ignore_ascii_case("true");
+                }
+                123 => {
+                    book_type = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
+                }
+                124 => {
+                    orientation_lock = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
+                }
+                125 if data.len() == 4 => {
+                    resource_count = Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
+                }
+                126 => {
+                    original_resolution = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
+                }
+                127 => {
+                    zero_gutter = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .eq_ignore_ascii_case("true");
+                }
+                128 => {
+                    zero_margin = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .eq_ignore_ascii_case("true");
+                }
+                129 => {
+                    metadata_resource_uri = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
+                }
                 201 if data.len() >= 4 => {
                     cover_record_index =
                         Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
@@ -180,6 +250,14 @@ impl ExthParser {
             author: author.map(CompactString::new),
             language: language.map(CompactString::new),
             description: description.map(CompactString::new),
+            fixed_layout,
+            book_type: book_type.map(CompactString::new),
+            orientation_lock: orientation_lock.map(CompactString::new),
+            resource_count,
+            original_resolution: original_resolution.map(CompactString::new),
+            zero_gutter,
+            zero_margin,
+            metadata_resource_uri: metadata_resource_uri.map(CompactString::new),
             cover_record_index,
             kf8_boundary_record_index,
             has_exth: true,

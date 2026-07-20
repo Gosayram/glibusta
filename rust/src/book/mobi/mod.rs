@@ -718,6 +718,70 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     if let Some(idx) = metadata.cover_record_index {
         meta.insert("mobiCoverRecordIndex".to_string(), serde_json::json!(idx));
     }
+    let comic_book_type = metadata
+        .book_type
+        .as_deref()
+        .is_some_and(|book_type| book_type.eq_ignore_ascii_case("comic"));
+    let has_layout_hints = metadata.fixed_layout
+        || comic_book_type
+        || metadata.orientation_lock.is_some()
+        || metadata.resource_count.is_some()
+        || metadata.original_resolution.is_some()
+        || metadata.zero_gutter
+        || metadata.zero_margin
+        || metadata.metadata_resource_uri.is_some();
+    if has_layout_hints {
+        // Glibusta has no fixed-layout MOBI renderer. Retain the producer hints
+        // for diagnostics while deliberately keeping the validated text stream
+        // on the normal reflow path.
+        meta.insert(
+            "mobiLayoutPolicy".to_string(),
+            serde_json::Value::String("reflow_fallback".to_string()),
+        );
+        meta.insert(
+            "mobiFixedLayout".to_string(),
+            serde_json::json!(metadata.fixed_layout),
+        );
+        meta.insert(
+            "mobiComicBookType".to_string(),
+            serde_json::json!(comic_book_type),
+        );
+        meta.insert(
+            "mobiZeroGutter".to_string(),
+            serde_json::json!(metadata.zero_gutter),
+        );
+        meta.insert(
+            "mobiZeroMargin".to_string(),
+            serde_json::json!(metadata.zero_margin),
+        );
+        if let Some(value) = &metadata.book_type {
+            meta.insert(
+                "mobiBookType".to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+        if let Some(value) = &metadata.orientation_lock {
+            meta.insert(
+                "mobiOrientationLock".to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+        if let Some(value) = metadata.resource_count {
+            meta.insert("mobiResourceCount".to_string(), serde_json::json!(value));
+        }
+        if let Some(value) = &metadata.original_resolution {
+            meta.insert(
+                "mobiOriginalResolution".to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+        if let Some(value) = &metadata.metadata_resource_uri {
+            meta.insert(
+                "mobiMetadataResourceUri".to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+    }
 
     Ok(NormalizedBook {
         id: stable_id(None, bytes),

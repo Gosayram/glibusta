@@ -1391,6 +1391,88 @@ fn test_mobi_rejects_malformed_extra_record_data() {
 }
 
 #[test]
+fn test_mobi_corruption_regression_corpus_has_controlled_outcomes() {
+    // PalmDB offsets must remain ordered and inside the input.  Use three
+    // records so the third offset can be in range yet still regress.
+    let text = b"<p>Corpus text</p>";
+    let mut unsorted_offsets = create_palm_mobi(vec![
+        create_mobi_header_record(text.len() as u32, 1, &[]),
+        text.to_vec(),
+        b"unused resource".to_vec(),
+    ]);
+    let second_offset = u32::from_be_bytes([
+        unsorted_offsets[86],
+        unsorted_offsets[87],
+        unsorted_offsets[88],
+        unsorted_offsets[89],
+    ]);
+    unsorted_offsets[94..98].copy_from_slice(&second_offset.saturating_sub(1).to_be_bytes());
+    let error = glibusta_core::book::mobi::parse_mobi(&unsorted_offsets, None)
+        .expect_err("an in-range but unsorted PalmDB offset must be rejected");
+    assert!(error.to_string().contains("not sorted"));
+
+    let mut out_of_range_offset = create_minimal_mobi();
+    out_of_range_offset[78..82].copy_from_slice(&u32::MAX.to_be_bytes());
+    let error = glibusta_core::book::mobi::parse_mobi(&out_of_range_offset, None)
+        .expect_err("an out-of-range PalmDB offset must be rejected");
+    assert!(error.to_string().contains("record offset"));
+
+    // EXTH metadata is optional: a corrupt declared length must degrade to
+    // base MOBI metadata without affecting the verified text stream.
+    let mut exth_header = create_mobi_header_record(
+        text.len() as u32,
+        1,
+        &[(503, b"Corrupt optional title".to_vec())],
+    );
+    let exth_offset = exth_header
+        .windows(4)
+        .position(|window| window == b"EXTH")
+        .expect("fixture contains EXTH");
+    exth_header[exth_offset + 4..exth_offset + 8].copy_from_slice(&u32::MAX.to_be_bytes());
+    let book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![exth_header, text.to_vec()]),
+        None,
+    )
+    .expect("malformed optional EXTH must not crash or discard readable text");
+    assert_eq!(book.chapters[0].blocks[0].text, "Corpus text");
+
+    let record_count_error = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![
+            create_mobi_header_record(4097, 1, &[]),
+            vec![b'x'; 4096],
+        ]),
+        None,
+    )
+    .expect_err("inconsistent PalmDOC record count must be rejected");
+    assert!(record_count_error.to_string().contains("record count"));
+
+    let mut unsupported_compression = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([
+        unsupported_compression[78],
+        unsupported_compression[79],
+        unsupported_compression[80],
+        unsupported_compression[81],
+    ]) as usize;
+    unsupported_compression[record0_offset..record0_offset + 2]
+        .copy_from_slice(&17480u16.to_be_bytes());
+    let error = glibusta_core::book::mobi::parse_mobi(&unsupported_compression, None)
+        .expect_err("unsupported compression must be rejected before decoding");
+    assert!(error.to_string().contains("Unsupported MOBI compression"));
+
+    let mut malformed_vwi = create_mobi_with_extra_record_data();
+    let second_text_offset = u32::from_be_bytes([
+        malformed_vwi[94],
+        malformed_vwi[95],
+        malformed_vwi[96],
+        malformed_vwi[97],
+    ]) as usize;
+    malformed_vwi[second_text_offset - 1] = 0x01;
+    let error = glibusta_core::book::mobi::parse_mobi(&malformed_vwi, None)
+        .expect_err("malformed extra-data VWI must be rejected before decompression");
+    assert!(error.to_string().contains("trailing entry"));
+}
+
+#[test]
 fn test_mobi_ignores_optional_audio_and_video_records_after_text() {
     let text = b"<p>Readable MOBI text</p>";
     let mobi = create_palm_mobi(vec![
@@ -1513,6 +1595,44 @@ fn test_mobi_decodes_utf8_and_falls_back_safely_for_unknown_code_pages() {
     .expect("an unknown code page must use the controlled UTF-8 fallback");
     assert_eq!(fallback_book.title, "Запасной заголовок");
     assert_eq!(fallback_book.chapters[0].blocks[0].text, "Привет");
+}
+
+#[test]
+fn test_mobi_fixed_layout_hints_keep_text_on_explicit_reflow_fallback() {
+    let text = b"<p>Accessible fallback text</p>";
+    let book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![
+            create_mobi_header_record(
+                text.len() as u32,
+                1,
+                &[
+                    (122, b"true".to_vec()),
+                    (123, b"comic".to_vec()),
+                    (124, b"landscape".to_vec()),
+                    (125, 21u32.to_be_bytes().to_vec()),
+                    (126, b"1072x1448".to_vec()),
+                    (127, b"true".to_vec()),
+                    (128, b"true".to_vec()),
+                    (129, b"kindle:embed:0001".to_vec()),
+                ],
+            ),
+            text.to_vec(),
+        ]),
+        None,
+    )
+    .expect("fixed-layout EXTH hints must not prevent text parsing");
+
+    assert_eq!(book.chapters[0].blocks[0].text, "Accessible fallback text");
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiLayoutPolicy"], "reflow_fallback");
+    assert_eq!(metadata["mobiFixedLayout"], true);
+    assert_eq!(metadata["mobiComicBookType"], true);
+    assert_eq!(metadata["mobiOrientationLock"], "landscape");
+    assert_eq!(metadata["mobiResourceCount"], 21);
+    assert_eq!(metadata["mobiOriginalResolution"], "1072x1448");
+    assert_eq!(metadata["mobiZeroGutter"], true);
+    assert_eq!(metadata["mobiZeroMargin"], true);
+    assert_eq!(metadata["mobiMetadataResourceUri"], "kindle:embed:0001");
 }
 
 #[test]
