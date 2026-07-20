@@ -3,10 +3,46 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/logging/app_logger.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/features/library/domain/book_file_repository.dart';
+import 'package:glibusta/features/reader/data/book_open_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_content_helper.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
+
+class _LongBookOpenService extends BookOpenService {
+  _LongBookOpenService(AppDatabase database)
+    : super(
+        AppFileStorageImpl(),
+        BookFileRepositoryImpl(database),
+        logger: AppLogger(),
+      );
+
+  static const int chapterCount = 100;
+
+  @override
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    return NormalizedBookMetadata(
+      id: bookId,
+      title: 'Long reader session',
+      authors: const [],
+      chapterCount: chapterCount,
+      chapterTitles: List<String>.generate(chapterCount, (index) => 'Chapter $index'),
+    );
+  }
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    if (index < 0 || index >= chapterCount) return null;
+    return ReaderChapter(
+      index: index,
+      title: 'Chapter $index',
+      blocks: [ReaderBlock(index: 0, text: 'Content for chapter $index')],
+    );
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -234,10 +270,17 @@ void main() {
   });
 
   group('ReaderController', () {
-    Future<ReaderController> createController(WidgetTester tester, String bookId) async {
+    Future<ReaderController> createController(
+      WidgetTester tester,
+      String bookId, {
+      BookOpenService? bookOpenService,
+    }) async {
       late ReaderController ctrl;
       final container = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)],
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          if (bookOpenService != null) bookOpenServiceProvider.overrideWithValue(bookOpenService),
+        ],
       );
       addTearDown(container.dispose);
       await tester.runAsync(() async {
@@ -320,6 +363,35 @@ void main() {
     testWidgets('dispose does not throw', (tester) async {
       final ctrl = await createController(tester, 'book1');
       expect(() => ctrl.dispose(), returnsNormally);
+    });
+
+    testWidgets('long chapter jumps keep the async chapter window bounded', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+      );
+      await tester.runAsync(ctrl.loadBook);
+      expect(ctrl.state.loadedChapters.keys, everyElement(inInclusiveRange(0, chapterWindowSize)));
+
+      for (final chapterIndex in <int>[10, 20, 30, 40, 50, 60, 70, 80, 90]) {
+        ctrl.handlePageChanged(chapterIndex);
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump();
+
+        expect(ctrl.state.loadedChapters.length, lessThanOrEqualTo(chapterWindowSize * 2 + 1));
+        expect(
+          ctrl.state.loadedChapters.keys,
+          everyElement(
+            inInclusiveRange(
+              chapterIndex - (chapterWindowSize + 1),
+              chapterIndex + (chapterWindowSize + 1),
+            ),
+          ),
+        );
+      }
+
+      ctrl.dispose();
     });
   });
 }

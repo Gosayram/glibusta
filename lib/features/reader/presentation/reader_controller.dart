@@ -456,7 +456,11 @@ final class ReaderController {
       );
       // Discard stale results if a newer chapter load superseded this one.
       if (_disposed || generation != _chapterLoadGeneration) return;
-      _updateState(_state.copyWith(loadedChapters: updated, isDynamicallyLoading: false));
+      // Chapter loading captures the current window before awaiting I/O.  Evict
+      // again after that work completes so the captured, now-distant chapters
+      // cannot be reintroduced after the eager eviction in [handlePageChanged].
+      final windowed = _content.evictDistantChapters(centerIndex, updated);
+      _updateState(_state.copyWith(loadedChapters: windowed, isDynamicallyLoading: false));
     } on Object catch (error, stackTrace) {
       if (_disposed || generation != _chapterLoadGeneration) return;
       if (!_loaded) rethrow;

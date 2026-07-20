@@ -2090,6 +2090,38 @@ fn test_mobi_deterministic_corruption_corpus_never_panics() {
 }
 
 #[test]
+#[cfg_attr(
+    miri,
+    ignore = "deterministic byte mutation property is covered by native tests"
+)]
+fn test_mobi_single_byte_mutation_property_never_panics() {
+    // A compact, deterministic stand-in for a fuzz seed: exercise every byte
+    // of a valid PalmDB/MOBI container with values that commonly turn lengths,
+    // offsets and compression flags into boundary values.  This stays fast
+    // enough for the normal native suite while covering the parser's complete
+    // input surface, rather than only hand-picked header fields.
+    let valid = create_minimal_mobi();
+
+    for index in 0..valid.len() {
+        for replacement in [0, u8::MAX] {
+            if valid[index] == replacement {
+                continue;
+            }
+            let mut corrupted = valid.clone();
+            corrupted[index] = replacement;
+
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                glibusta_core::book::mobi::parse_mobi(&corrupted, None)
+            }));
+            assert!(
+                result.is_ok(),
+                "MOBI parser panicked after mutating byte {index} to {replacement:#04x}",
+            );
+        }
+    }
+}
+
+#[test]
 #[cfg_attr(miri, ignore = "path cache uses external filesystem state")]
 fn test_rejected_mobi_never_populates_path_cache() {
     let path = std::env::temp_dir().join(format!(

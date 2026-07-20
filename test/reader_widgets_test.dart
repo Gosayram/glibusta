@@ -16,6 +16,7 @@ import 'package:glibusta/features/reader/data/reader_colors.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
 import 'package:glibusta/features/reader/presentation/reader_content.dart';
+import 'package:glibusta/features/reader/presentation/reader_controller.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
@@ -496,6 +497,63 @@ void main() {
 
       expect(contentGesture.onLongPress, isNull);
       expect(selectionArea.onSelectionChanged, isNotNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('Back restores the position before an in-chapter footnote link', (tester) async {
+      const chapter = ReaderChapter(
+        index: 0,
+        title: 'Глава 1',
+        blocks: [
+          ReaderBlock(
+            index: 0,
+            text: 'Перейти к примечанию',
+            richSpans: [RichSpan(text: 'Перейти к примечанию', href: '#note-1')],
+          ),
+          ReaderBlock(
+            index: 1,
+            text: 'Текст примечания.',
+            type: BlockType.footnote,
+            noteId: 'note-1',
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            bookOpenServiceProvider.overrideWithValue(
+              _FakeBookOpenService(db, chapter: chapter),
+            ),
+            readerSettingsProvider.overrideWith(
+              () => _TestReaderSettingsNotifier(const ReaderSettings()),
+            ),
+          ],
+          child: const MaterialApp(home: ReaderScreen(bookId: 'book-1')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final controller = ProviderScope.containerOf(
+        tester.element(find.byType(ReaderScreen)),
+      ).read(readerControllerProvider('book-1'));
+      expect(controller.state.currentPosition.paragraphIndex, 0);
+
+      // ReaderContentBody receives this callback from the tappable rich span.
+      // Calling it here isolates navigation history from text-layout hit testing.
+      tester.widget<ReaderContentBody>(find.byType(ReaderContentBody)).onLinkTap!('#note-1');
+      await tester.pumpAndSettle();
+
+      expect(controller.hasLinkBack, isTrue);
+      expect(controller.state.currentPosition.paragraphIndex, 1);
+
+      expect(controller.popLinkPosition(), isTrue);
+      await tester.pumpAndSettle();
+
+      expect(controller.hasLinkBack, isFalse);
+      expect(controller.state.currentPosition.paragraphIndex, 0);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
