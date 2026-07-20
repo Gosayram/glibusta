@@ -657,7 +657,11 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         None,
     ]);
 
-    let authors = split_authors(metadata.author.as_deref());
+    let authors = metadata
+        .authors
+        .iter()
+        .flat_map(|author| split_authors(Some(author)))
+        .collect::<Vec<_>>();
 
     let chapters = MobiChapterSplitter::new().split(&blocks);
     let toc = chapters
@@ -698,6 +702,42 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         meta.insert(
             "mobiLanguage".to_string(),
             serde_json::Value::String(lang.to_string()),
+        );
+    }
+    if !metadata.authors.is_empty() {
+        meta.insert(
+            "mobiAuthors".to_string(),
+            serde_json::Value::Array(
+                metadata
+                    .authors
+                    .iter()
+                    .map(|author| serde_json::Value::String(author.to_string()))
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(value) = &metadata.publisher {
+        meta.insert(
+            "mobiPublisher".to_string(),
+            serde_json::Value::String(value.to_string()),
+        );
+    }
+    if let Some(value) = &metadata.isbn {
+        meta.insert(
+            "mobiIsbn".to_string(),
+            serde_json::Value::String(value.to_string()),
+        );
+    }
+    if !metadata.subjects.is_empty() {
+        meta.insert(
+            "mobiSubjects".to_string(),
+            serde_json::Value::Array(
+                metadata
+                    .subjects
+                    .iter()
+                    .map(|subject| serde_json::Value::String(subject.to_string()))
+                    .collect(),
+            ),
         );
     }
     meta.insert(

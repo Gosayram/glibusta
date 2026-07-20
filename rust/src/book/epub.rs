@@ -27,6 +27,13 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             crate::api::models::MAX_EXTRACTED_FILES
         );
     }
+    if zip
+        .entry_names()
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case("META-INF/encryption.xml"))
+    {
+        bail!("Encrypted EPUB is not supported");
+    }
 
     let mimetype = zip
         .read_file_limited("mimetype", 64)?

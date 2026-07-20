@@ -429,6 +429,32 @@ fn create_minimal_epub() -> Vec<u8> {
     create_epub_with_opf(true, MINIMAL_EPUB_OPF)
 }
 
+fn create_encrypted_epub() -> Vec<u8> {
+    let mut buf = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buf);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("mimetype", options).unwrap();
+    zip.write_all(b"application/epub+zip").unwrap();
+    zip.start_file("META-INF/encryption.xml", options).unwrap();
+    zip.write_all(
+        br#"<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><EncryptedData><CipherData><CipherReference URI="chapter1.xhtml"/></CipherData></EncryptedData></encryption>"#,
+    )
+    .unwrap();
+    zip.start_file("META-INF/container.xml", options).unwrap();
+    zip.write_all(
+        br#"<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>"#,
+    )
+    .unwrap();
+    zip.start_file("content.opf", options).unwrap();
+    zip.write_all(MINIMAL_EPUB_OPF).unwrap();
+    zip.start_file("chapter1.xhtml", options).unwrap();
+    zip.write_all(b"<html><body><p>Encrypted payload</p></body></html>")
+        .unwrap();
+    zip.finish().unwrap();
+    buf.into_inner()
+}
+
 fn create_epub_with_opf(include_mimetype: bool, opf: &[u8]) -> Vec<u8> {
     create_epub_with_opf_and_chapter(
         include_mimetype,
@@ -703,6 +729,35 @@ fn test_epub_corrupted_archive_is_rejected() {
         .expect_err("corrupted EPUB must not be parsed");
 
     assert!(error.to_string().contains("Failed to open EPUB archive"));
+}
+
+#[test]
+fn test_encrypted_epub_returns_controlled_error_without_caching_a_partial_book() {
+    let path = std::env::temp_dir().join(format!(
+        "glibusta-encrypted-epub-{}_{}.epub",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    let path_text = path.to_string_lossy().into_owned();
+    fs::write(&path, create_encrypted_epub()).expect("write encrypted EPUB fixture");
+
+    let result = glibusta_core::api::api::parse_book(path_text.clone());
+    let cache_state = glibusta_core::api::api::check_book_cache(path_text);
+    let _ = fs::remove_file(path);
+
+    let error = result.expect_err("encrypted EPUB must not be partially imported");
+    assert!(
+        error
+            .to_string()
+            .contains("Encrypted EPUB is not supported")
+    );
+    assert!(
+        cache_state.expect("check encrypted EPUB cache state").0,
+        "a rejected EPUB must not be cached",
+    );
 }
 
 #[test]
@@ -1613,6 +1668,43 @@ fn test_mobi_decodes_cp1252_text_title_and_exth_language() {
     let full_name_book = glibusta_core::book::mobi::parse_mobi(&full_name_mobi, None)
         .expect("CP1252 Full Name must decode");
     assert_eq!(full_name_book.title, "Le café");
+}
+
+#[test]
+fn test_mobi_preserves_repeated_exth_authors_and_subjects_with_metadata() {
+    let text = b"<p>EXTH metadata fixture</p>";
+    let book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![
+            create_mobi_header_record(
+                text.len() as u32,
+                1,
+                &[
+                    (100, b"Alice Author".to_vec()),
+                    (100, b"Bob Author".to_vec()),
+                    (101, b"Test Publisher".to_vec()),
+                    (103, b"Validated description".to_vec()),
+                    (104, b"978-1-234567-89-7".to_vec()),
+                    (105, b"Fiction".to_vec()),
+                    (105, b"Adventure".to_vec()),
+                    (524, b"en".to_vec()),
+                ],
+            ),
+            text.to_vec(),
+        ]),
+        None,
+    )
+    .expect("valid repeated EXTH records must parse");
+
+    assert_eq!(book.authors, ["Alice Author", "Bob Author"]);
+    assert_eq!(book.description.as_deref(), Some("Validated description"));
+    assert_eq!(book.language.as_deref(), Some("en"));
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiPublisher"], "Test Publisher");
+    assert_eq!(metadata["mobiIsbn"], "978-1-234567-89-7");
+    assert_eq!(
+        metadata["mobiSubjects"],
+        serde_json::json!(["Fiction", "Adventure"])
+    );
 }
 
 #[test]

@@ -11,7 +11,10 @@ use super::{MobiHeader, encoding};
 /// ARC-2.2: CompactString for stack-allocated metadata strings.
 pub(crate) struct MobiMetadata {
     pub title: Option<CompactString>,
-    pub author: Option<CompactString>,
+    pub authors: Vec<CompactString>,
+    pub publisher: Option<CompactString>,
+    pub isbn: Option<CompactString>,
+    pub subjects: Vec<CompactString>,
     pub language: Option<CompactString>,
     pub description: Option<CompactString>,
     pub fixed_layout: bool,
@@ -33,7 +36,10 @@ impl MobiMetadata {
     pub fn default() -> Self {
         Self {
             title: None,
-            author: None,
+            authors: Vec::new(),
+            publisher: None,
+            isbn: None,
+            subjects: Vec::new(),
             language: None,
             description: None,
             fixed_layout: false,
@@ -143,7 +149,10 @@ impl ExthParser {
         }
 
         let mut title: Option<String> = None;
-        let mut author: Option<String> = None;
+        let mut authors: Vec<String> = Vec::new();
+        let mut publisher: Option<String> = None;
+        let mut isbn: Option<String> = None;
+        let mut subjects: Vec<String> = Vec::new();
         let mut language: Option<String> = None;
         let mut description: Option<String> = None;
         let mut fixed_layout = false;
@@ -160,11 +169,20 @@ impl ExthParser {
         for (rec_type, data) in &records {
             match rec_type {
                 100 => {
-                    author = Some(
-                        encoding::decode_text(data, header.text_encoding)
-                            .trim()
-                            .to_string(),
-                    );
+                    let value = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .to_string();
+                    if !value.is_empty() {
+                        authors.push(value);
+                    }
+                }
+                101 => {
+                    let value = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .to_string();
+                    if !value.is_empty() {
+                        publisher = Some(value);
+                    }
                 }
                 503 => {
                     title = Some(
@@ -186,6 +204,22 @@ impl ExthParser {
                             .trim()
                             .to_string(),
                     );
+                }
+                104 => {
+                    let value = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .to_string();
+                    if !value.is_empty() {
+                        isbn = Some(value);
+                    }
+                }
+                105 => {
+                    let value = encoding::decode_text(data, header.text_encoding)
+                        .trim()
+                        .to_string();
+                    if !value.is_empty() {
+                        subjects.push(value);
+                    }
                 }
                 122 => {
                     fixed_layout = encoding::decode_text(data, header.text_encoding)
@@ -247,7 +281,10 @@ impl ExthParser {
 
         Ok(MobiMetadata {
             title: title.map(CompactString::new),
-            author: author.map(CompactString::new),
+            authors: authors.into_iter().map(CompactString::new).collect(),
+            publisher: publisher.map(CompactString::new),
+            isbn: isbn.map(CompactString::new),
+            subjects: subjects.into_iter().map(CompactString::new).collect(),
             language: language.map(CompactString::new),
             description: description.map(CompactString::new),
             fixed_layout,
@@ -332,5 +369,21 @@ mod tests {
             .expect("malformed optional EXTH metadata must not fail book parsing");
         assert!(malformed.has_exth);
         assert!(malformed.title.is_none());
+    }
+
+    #[test]
+    fn rejects_record_data_that_exceeds_the_declared_exth_bounds() {
+        let mut record0 = Vec::from(&b"EXTH"[..]);
+        record0.extend_from_slice(&20u32.to_be_bytes());
+        record0.extend_from_slice(&1u32.to_be_bytes());
+        record0.extend_from_slice(&100u32.to_be_bytes());
+        record0.extend_from_slice(&12u32.to_be_bytes());
+
+        let metadata = ExthParser
+            .parse(&record0, &exth_header())
+            .expect("malformed optional EXTH metadata must not fail book parsing");
+
+        assert!(metadata.has_exth);
+        assert!(metadata.authors.is_empty());
     }
 }
