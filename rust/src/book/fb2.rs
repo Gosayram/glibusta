@@ -142,6 +142,8 @@ fn parse_fb2_xml(
     let mut in_epigraph = false;
     let mut in_image = false;
     let mut current_image_ref: Option<String> = None;
+    let mut current_image_alt: Option<String> = None;
+    let mut current_image_id: Option<String> = None;
     let mut in_empty_line = false;
     let mut in_coverpage = false;
     let mut in_binary = false;
@@ -294,6 +296,9 @@ fn parse_fb2_xml(
                     b"image" if in_body && !in_coverpage => {
                         in_image = true;
                         current_image_ref = get_fb2_href(e);
+                        current_image_alt =
+                            get_xml_attr(e, b"alt").or_else(|| get_xml_attr(e, b"title"));
+                        current_image_id = get_xml_attr(e, b"id");
                     }
                     b"text-author" if in_body => in_text_author = true,
                     b"poem" if in_body => in_poem = true,
@@ -964,10 +969,10 @@ fn parse_fb2_xml(
                             ordered: None,
                             list_items: None,
                             table_rows: None,
-                            image_alt: None,
+                            image_alt: current_image_alt.take(),
                             text_indent: None,
                             text_align: None,
-                            note_id: None,
+                            note_id: current_image_id.take(),
                         });
                         block_index += 1;
                         in_image = false;
@@ -1150,10 +1155,11 @@ fn parse_fb2_xml(
                             ordered: None,
                             list_items: None,
                             table_rows: None,
-                            image_alt: None,
+                            image_alt: get_xml_attr(e, b"alt")
+                                .or_else(|| get_xml_attr(e, b"title")),
                             text_indent: None,
                             text_align: None,
-                            note_id: None,
+                            note_id: get_xml_attr(e, b"id"),
                         });
                         block_index += 1;
                     }
@@ -1834,6 +1840,27 @@ mod tests {
                 .as_deref()
                 .is_some_and(|url| url.starts_with("data:image/webp;base64,"))
         );
+    }
+
+    #[test]
+    fn preserves_fb2_21_image_alt_and_anchor_without_affecting_binary_lookup() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description><title-info><coverpage><image l:href="#cover-art" alt="Cover alternative" title="Cover title" id="cover-anchor"/></coverpage></title-info></description><body><section><image l:href="#inline-art" alt="Inline alternative" title="Inline title" id="inline-anchor"/></section></body><binary id="cover-art" content-type="image/png">AQID</binary><binary id="inline-art" content-type="image/jpeg">AQID</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 2.1 image attributes");
+
+        assert_eq!(
+            book.cover_url.as_deref(),
+            Some("data:image/png;base64,AQID")
+        );
+        let image = &book.chapters[0].blocks[0];
+        assert_eq!(
+            image.image_url.as_deref(),
+            Some("data:image/jpeg;base64,AQID")
+        );
+        assert_eq!(image.image_alt.as_deref(), Some("Inline alternative"));
+        assert_eq!(image.note_id.as_deref(), Some("inline-anchor"));
     }
 
     #[test]

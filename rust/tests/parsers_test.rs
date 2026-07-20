@@ -1401,6 +1401,30 @@ fn test_mobi_rejects_nonstandard_palm_doc_logical_record_size() {
 }
 
 #[test]
+fn test_mobi_honors_variable_header_length_before_reading_optional_fields() {
+    let mut mobi = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
+    let mobi_offset = record0_offset + 16;
+
+    // A 16-byte MOBI header contains text encoding, but not the optional Full
+    // Name offsets. Values after that declared boundary must remain ignored.
+    mobi[mobi_offset + 4..mobi_offset + 8].copy_from_slice(&16u32.to_be_bytes());
+    mobi[mobi_offset + 84..mobi_offset + 88].copy_from_slice(&200u32.to_be_bytes());
+    mobi[mobi_offset + 88..mobi_offset + 92].copy_from_slice(&14u32.to_be_bytes());
+    mobi[record0_offset + 200..record0_offset + 214].copy_from_slice(b"Injected title");
+
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect("a valid short header must ignore trailing optional fields");
+
+    assert_eq!(book.title, "Test MOBI");
+
+    mobi[mobi_offset + 4..mobi_offset + 8].copy_from_slice(&249u32.to_be_bytes());
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("declared MOBI header cannot extend past record 0");
+    assert!(error.to_string().contains("header length exceeds record 0"));
+}
+
+#[test]
 fn test_mobi_rejects_unsupported_huff_cdic_compression() {
     let mut mobi = create_minimal_mobi();
     let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
