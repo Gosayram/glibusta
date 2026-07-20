@@ -2,6 +2,7 @@ use anyhow::Result;
 use compact_str::CompactString;
 use nom::IResult;
 use nom::bytes::streaming::{tag, take};
+use nom::error::{Error, ErrorKind};
 use nom::multi::count;
 use nom::number::streaming::be_u32;
 
@@ -51,6 +52,9 @@ fn exth_record(input: &[u8]) -> IResult<&[u8], (u32, Vec<u8>)> {
     let (input, rec_type) = be_u32(input)?;
     let (input, size) = be_u32(input)?;
     // size includes the 8-byte header (type + size)
+    if size < 8 {
+        return Err(nom::Err::Failure(Error::new(input, ErrorKind::Verify)));
+    }
     let data_len = (size as usize).saturating_sub(8);
     let (input, data) = take(data_len)(input)?;
     Ok((input, (rec_type, data.to_vec())))
@@ -159,5 +163,41 @@ impl ExthParser {
                 && record0[i + 2] == 0x54
                 && record0[i + 3] == 0x48
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExthParser, MobiHeader};
+
+    fn exth_header() -> MobiHeader {
+        MobiHeader {
+            compression: 1,
+            encryption_type: 0,
+            text_length: 0,
+            text_encoding: 1252,
+            text_record_count: 0,
+            record_size: 4096,
+            full_name_offset: 0,
+            full_name_length: 0,
+            exth_flags: 0x40,
+            first_image_record_index: 0,
+        }
+    }
+
+    #[test]
+    fn rejects_exth_record_smaller_than_its_eight_byte_header() {
+        let mut record0 = Vec::from(&b"EXTH"[..]);
+        record0.extend_from_slice(&20u32.to_be_bytes());
+        record0.extend_from_slice(&1u32.to_be_bytes());
+        record0.extend_from_slice(&503u32.to_be_bytes());
+        record0.extend_from_slice(&4u32.to_be_bytes());
+
+        let metadata = ExthParser
+            .parse(&record0, &exth_header())
+            .expect("malformed optional EXTH metadata must not fail book parsing");
+
+        assert!(metadata.has_exth);
+        assert!(metadata.title.is_none());
     }
 }

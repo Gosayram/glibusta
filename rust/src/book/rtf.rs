@@ -205,6 +205,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut block_index = 0i32;
     let mut unicode_fallback_count = 1usize;
+    let mut pending_high_surrogate: Option<u16> = None;
     let mut in_table_row = false;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
@@ -217,6 +218,11 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut pending_note_id: Option<String> = None;
 
     while i < bytes.len() {
+        if pending_high_surrogate.is_some()
+            && (bytes[i] != b'\\' || bytes.get(i + 1) != Some(&b'u'))
+        {
+            flush_pending_surrogate(&mut span_text, &mut pending_high_surrogate);
+        }
         match bytes[i] {
             b'{' => {
                 brace_depth += 1;
@@ -477,12 +483,22 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                         }
                         if num_start < i {
                             let num_str = std::str::from_utf8(&bytes[num_start..i]).unwrap_or("0");
-                            if let Ok(mut code_point) = num_str.parse::<i32>() {
-                                if negative {
-                                    code_point += 65536;
-                                }
-                                if let Some(c) = char::from_u32(code_point as u32) {
-                                    span_text.push(c);
+                            if let Ok(value) = num_str.parse::<i32>() {
+                                let code_unit = if negative {
+                                    value
+                                        .checked_neg()
+                                        .and_then(|signed| signed.checked_add(65536))
+                                } else {
+                                    Some(value)
+                                };
+                                if let Some(unit) =
+                                    code_unit.and_then(|unit| u16::try_from(unit).ok())
+                                {
+                                    append_rtf_unicode_unit(
+                                        &mut span_text,
+                                        &mut pending_high_surrogate,
+                                        unit,
+                                    );
                                 }
                             }
                         }
@@ -548,6 +564,8 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
         }
     }
 
+    flush_pending_surrogate(&mut span_text, &mut pending_high_surrogate);
+
     if in_table_row {
         if !span_text.is_empty() || !rich_spans.is_empty() {
             current_table_row.push(take_rtf_table_cell(
@@ -571,6 +589,37 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     );
 
     blocks
+}
+
+fn append_rtf_unicode_unit(
+    output: &mut String,
+    pending_high_surrogate: &mut Option<u16>,
+    unit: u16,
+) {
+    if let Some(high) = pending_high_surrogate.take() {
+        if (0xDC00..=0xDFFF).contains(&unit) {
+            let code_point =
+                0x1_0000 + (((u32::from(high) - 0xD800) << 10) | (u32::from(unit) - 0xDC00));
+            // The range calculation above only produces valid Unicode scalar values.
+            output.push(char::from_u32(code_point).expect("valid UTF-16 surrogate pair"));
+            return;
+        }
+        output.push(char::REPLACEMENT_CHARACTER);
+    }
+
+    if (0xD800..=0xDBFF).contains(&unit) {
+        *pending_high_surrogate = Some(unit);
+    } else if (0xDC00..=0xDFFF).contains(&unit) {
+        output.push(char::REPLACEMENT_CHARACTER);
+    } else if let Some(character) = char::from_u32(u32::from(unit)) {
+        output.push(character);
+    }
+}
+
+fn flush_pending_surrogate(output: &mut String, pending_high_surrogate: &mut Option<u16>) {
+    if pending_high_surrogate.take().is_some() {
+        output.push(char::REPLACEMENT_CHARACTER);
+    }
 }
 
 /// Skip the fallback representation following an RTF `\\uN` escape.
@@ -920,6 +969,22 @@ mod tests {
             book.chapters[0].blocks[0].text,
             "Curly {left} and slash \\ remain text",
         );
+    }
+
+    #[test]
+    fn preserves_unicode_surrogate_pairs() {
+        let book = parse_rtf(br"{\rtf1\ansi\uc1 Emoji: \u-10179?\u-8704?\par}", None)
+            .expect("parse RTF with a supplementary-plane character");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Emoji: 😀");
+    }
+
+    #[test]
+    fn replaces_unpaired_unicode_surrogates_before_following_text() {
+        let book = parse_rtf(br"{\rtf1\ansi\uc1 Broken: \u-10179?x\par}", None)
+            .expect("parse RTF with an unpaired surrogate");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Broken: �x");
     }
 
     #[test]

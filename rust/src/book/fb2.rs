@@ -17,6 +17,38 @@ enum Fb2RootPhase {
     Binaries,
 }
 
+const MAX_FB2_SECTION_DEPTH: usize = 64;
+
+#[derive(Default)]
+struct Fb2SectionStructure {
+    has_nested_section: bool,
+    has_streaming_content: bool,
+}
+
+fn enter_fb2_section(stack: &mut Vec<Fb2SectionStructure>) -> Result<()> {
+    if stack.len() >= MAX_FB2_SECTION_DEPTH {
+        bail!("FB2 section nesting exceeds the maximum depth of {MAX_FB2_SECTION_DEPTH}");
+    }
+    if let Some(parent) = stack.last_mut() {
+        if parent.has_streaming_content {
+            bail!("FB2 section cannot mix nested sections with streaming content");
+        }
+        parent.has_nested_section = true;
+    }
+    stack.push(Fb2SectionStructure::default());
+    Ok(())
+}
+
+fn mark_fb2_section_content(stack: &mut [Fb2SectionStructure]) -> Result<()> {
+    if let Some(section) = stack.last_mut() {
+        if section.has_nested_section {
+            bail!("FB2 section cannot mix nested sections with streaming content");
+        }
+        section.has_streaming_content = true;
+    }
+    Ok(())
+}
+
 fn validate_fb2_root_child(
     name: &[u8],
     phase: &mut Fb2RootPhase,
@@ -137,6 +169,7 @@ fn parse_fb2_xml(
     let mut in_genre = false;
     let mut in_body = false;
     let mut in_section = false;
+    let mut in_content_title = false;
     let mut in_p = false;
     let mut in_subtitle = false;
     let mut in_epigraph = false;
@@ -186,6 +219,7 @@ fn parse_fb2_xml(
     let mut current_table_row: Vec<String> = Vec::new();
     let mut current_table_cell = String::new();
     let mut section_depth = 0i32;
+    let mut section_structure: Vec<Fb2SectionStructure> = Vec::new();
     let mut current_binary_id: Option<String> = None;
     let mut current_binary_media_type: Option<String> = None;
     let mut cover_media_type: Option<String> = None;
@@ -254,6 +288,7 @@ fn parse_fb2_xml(
                             current_note_id = get_xml_attr(e, b"id");
                             current_note_text.clear();
                         } else {
+                            enter_fb2_section(&mut section_structure)?;
                             section_depth += 1;
                             if section_depth == 1 {
                                 if !body_blocks.is_empty() {
@@ -267,6 +302,7 @@ fn parse_fb2_xml(
                         }
                     }
                     b"table" if in_body && !in_notes_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
                         in_table = true;
                         table_rows.clear();
                     }
@@ -279,6 +315,9 @@ fn parse_fb2_xml(
                         current_table_cell.clear();
                     }
                     b"p" if in_body => {
+                        if !in_notes_body {
+                            mark_fb2_section_content(&mut section_structure)?;
+                        }
                         if in_table_cell {
                             if !current_table_cell.is_empty() {
                                 current_table_cell.push('\n');
@@ -287,21 +326,41 @@ fn parse_fb2_xml(
                             in_p = true;
                         }
                     }
-                    b"subtitle" if in_body => in_subtitle = true,
-                    b"epigraph" if in_body => in_epigraph = true,
-                    b"empty-line" if in_body => in_empty_line = true,
+                    b"title" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_content_title = true;
+                    }
+                    b"subtitle" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_subtitle = true;
+                    }
+                    b"epigraph" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_epigraph = true;
+                    }
+                    b"empty-line" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_empty_line = true;
+                    }
                     b"image" if in_coverpage => {
                         cover_image_ref = get_fb2_href(e);
                     }
                     b"image" if in_body && !in_coverpage => {
+                        mark_fb2_section_content(&mut section_structure)?;
                         in_image = true;
                         current_image_ref = get_fb2_href(e);
                         current_image_alt =
                             get_xml_attr(e, b"alt").or_else(|| get_xml_attr(e, b"title"));
                         current_image_id = get_xml_attr(e, b"id");
                     }
-                    b"text-author" if in_body => in_text_author = true,
-                    b"poem" if in_body => in_poem = true,
+                    b"text-author" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_text_author = true;
+                    }
+                    b"poem" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_poem = true;
+                    }
                     b"stanza" if in_body && in_poem => {
                         if !in_notes_body && !current_text.trim().is_empty() {
                             body_blocks.push(ReaderBlock {
@@ -333,12 +392,21 @@ fn parse_fb2_xml(
                             );
                         }
                     }
-                    b"cite" if in_body => in_cite = true,
-                    b"pre" if in_body => in_pre = true,
+                    b"cite" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_cite = true;
+                    }
+                    b"pre" if in_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_pre = true;
+                    }
                     // `<code>` is not part of the core FB2 schema, but occurs in
                     // real-world books as a block extension. Treat it like `<pre>`
                     // when it is not inline paragraph content.
-                    b"code" if in_body && !in_p => in_pre = true,
+                    b"code" if in_body && !in_p => {
+                        mark_fb2_section_content(&mut section_structure)?;
+                        in_pre = true;
+                    }
                     b"strong" if in_p || in_subtitle => {
                         flush_rich_span(
                             &mut current_rich_spans,
@@ -596,7 +664,7 @@ fn parse_fb2_xml(
                 match e.name().as_ref() {
                     b"title-info" => in_title_info = false,
                     b"book-title" => in_book_title = false,
-                    b"annotation" => {
+                    b"annotation" if in_title_info => {
                         in_annotation = false;
                         description =
                             Some(description.take().unwrap_or_default().trim().to_string());
@@ -690,6 +758,7 @@ fn parse_fb2_xml(
                             current_note_id = None;
                             current_note_text.clear();
                         } else {
+                            section_structure.pop();
                             if section_depth > 0 {
                                 section_depth -= 1;
                             }
@@ -739,11 +808,17 @@ fn parse_fb2_xml(
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text,
-                                block_type: BlockType::Paragraph,
+                                block_type: if in_content_title {
+                                    BlockType::Heading
+                                } else if in_epigraph {
+                                    BlockType::Epigraph
+                                } else {
+                                    BlockType::Paragraph
+                                },
                                 image_url: None,
                                 note_ref: current_note_ref.take(),
                                 rich_spans: rich,
-                                heading_level: None,
+                                heading_level: in_content_title.then_some(section_depth.max(1)),
                                 ordered: None,
                                 list_items: None,
                                 table_rows: None,
@@ -772,6 +847,7 @@ fn parse_fb2_xml(
                         current_span_href = None;
                         in_p = false;
                     }
+                    b"title" if in_body => in_content_title = false,
                     b"subtitle" if in_body => {
                         let text = current_text.trim().to_string();
                         current_text.clear();
@@ -1142,6 +1218,7 @@ fn parse_fb2_xml(
                         cover_image_ref = get_fb2_href(e);
                     }
                     b"image" if in_body && !in_coverpage => {
+                        mark_fb2_section_content(&mut section_structure)?;
                         let href = get_fb2_href(e).unwrap_or_default();
                         let key = href.trim_start_matches('#').to_string();
                         body_blocks.push(ReaderBlock {
@@ -1547,7 +1624,7 @@ fn flush_fb2_block(
 
 #[cfg(test)]
 mod tests {
-    use super::{max_base64_image_size, parse_fb2};
+    use super::{MAX_FB2_SECTION_DEPTH, max_base64_image_size, parse_fb2};
     use crate::api::models::BlockType;
 
     #[test]
@@ -1861,6 +1938,79 @@ mod tests {
         );
         assert_eq!(image.image_alt.as_deref(), Some("Inline alternative"));
         assert_eq!(image.note_id.as_deref(), Some("inline-anchor"));
+    }
+
+    #[test]
+    fn preserves_supported_body_and_section_structure() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description/><body><title><p>Body title</p></title><epigraph><p>Body epigraph</p></epigraph><image l:href="#body-art"/><section><title><p>Section title</p></title><epigraph><p>Section epigraph</p></epigraph><annotation><p>Section annotation</p></annotation><image l:href="#section-art"/></section><section><section><section><p>Deep text</p></section></section></section></body><binary id="body-art" content-type="image/png">AQID</binary><binary id="section-art" content-type="image/jpeg">AQID</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse supported FB2 body and section structure");
+
+        assert_eq!(book.chapters.len(), 3);
+        assert_eq!(
+            book.chapters[0]
+                .blocks
+                .iter()
+                .map(|block| (&block.block_type, block.text.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (&BlockType::Heading, "Body title"),
+                (&BlockType::Epigraph, "Body epigraph"),
+                (&BlockType::Image, ""),
+            ],
+        );
+        assert_eq!(
+            book.chapters[1]
+                .blocks
+                .iter()
+                .map(|block| (&block.block_type, block.text.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (&BlockType::Heading, "Section title"),
+                (&BlockType::Epigraph, "Section epigraph"),
+                (&BlockType::Paragraph, "Section annotation"),
+                (&BlockType::Image, ""),
+            ],
+        );
+        assert_eq!(book.chapters[2].blocks[0].text, "Deep text");
+        assert_eq!(
+            book.chapters[0].blocks[2].image_url.as_deref(),
+            Some("data:image/png;base64,AQID")
+        );
+        assert_eq!(
+            book.chapters[1].blocks[3].image_url.as_deref(),
+            Some("data:image/jpeg;base64,AQID")
+        );
+        assert!(book.description.is_none());
+    }
+
+    #[test]
+    fn rejects_mixed_nested_sections_and_streaming_content() {
+        let error = parse_fb2(
+            br#"<FictionBook><description/><body><section><section><p>Child</p></section><p>Parent stream</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect_err("mixed section content must be rejected");
+
+        assert!(error.to_string().contains("cannot mix nested sections"));
+    }
+
+    #[test]
+    fn rejects_excessive_section_nesting() {
+        let mut xml = String::from("<FictionBook><description/><body>");
+        for _ in 0..=MAX_FB2_SECTION_DEPTH {
+            xml.push_str("<section>");
+        }
+        for _ in 0..=MAX_FB2_SECTION_DEPTH {
+            xml.push_str("</section>");
+        }
+        xml.push_str("</body></FictionBook>");
+
+        let error = parse_fb2(xml.as_bytes(), Some("utf-8"))
+            .expect_err("excessive nesting must be rejected");
+        assert!(error.to_string().contains("maximum depth"));
     }
 
     #[test]

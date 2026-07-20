@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
@@ -41,6 +42,47 @@ import 'reading_info_provider.dart';
 import 'table_of_contents_sheet.dart';
 
 enum _ReadingInfoPosition { header, footer }
+
+typedef ExternalLinkOpener = Future<bool> Function(Uri uri);
+
+Future<bool> _openExternalLink(Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
+
+/// Shows the explicit confirmation required before leaving the reader.
+Future<void> showExternalLinkConfirmation(
+  BuildContext context,
+  Uri uri, {
+  ExternalLinkOpener openExternalLink = _openExternalLink,
+}) async {
+  final host = uri.host.isNotEmpty ? uri.host : uri.toString();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Внешняя ссылка'),
+      content: Text('Открыть ссылку?\n$host'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Отмена'),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.of(dialogContext).pop();
+            try {
+              await openExternalLink(uri);
+            } on Object catch (error, stackTrace) {
+              developer.log(
+                'Unable to open an external reader link',
+                error: error,
+                stackTrace: stackTrace,
+              );
+            }
+          },
+          child: const Text('Открыть'),
+        ),
+      ],
+    ),
+  );
+}
 
 class ReaderScreen extends ConsumerStatefulWidget {
   const ReaderScreen({super.key, required this.bookId});
@@ -410,29 +452,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _showExternalLinkDialog(String href) {
     final uri = Uri.tryParse(href);
     if (uri == null) return;
-    final host = uri.host.isNotEmpty ? uri.host : href;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Внешняя ссылка'),
-          content: Text('Открыть ссылку?\n$host'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
-              },
-              child: const Text('Открыть'),
-            ),
-          ],
-        ),
-      ),
-    );
+    unawaited(showExternalLinkConfirmation(context, uri));
   }
 
   void _checkBookFinished(ReaderState readerState) {
