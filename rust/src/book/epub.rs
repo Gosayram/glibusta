@@ -1663,7 +1663,10 @@ fn parse_xhtml_to_blocks(
             }
             Ok(Event::GeneralRef(ref e)) => {
                 if in_body && hidden_depth == 0 {
-                    let text = e.xml10_content().unwrap_or_default();
+                    // `GeneralRef` is emitted for an entity that the XML reader
+                    // cannot resolve. Keep its source spelling rather than
+                    // silently dropping the delimiters from visible prose.
+                    let text = format!("&{};", String::from_utf8_lossy(e.as_ref()));
                     if in_block || in_table {
                         span_text.push_str(&text);
                         if in_block {
@@ -2482,6 +2485,35 @@ mod tests {
         assert_eq!(blocks[2].block_type, BlockType::Footnote);
         assert_eq!(blocks[2].note_id.as_deref(), Some("note-2"));
         assert_eq!(blocks[2].text, "Second note.");
+    }
+
+    #[test]
+    fn preserves_unknown_entities_as_literal_text() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            "<html><body><p>Before &unknown; after.</p></body></html>",
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "Before&unknown;after.");
+    }
+
+    #[test]
+    fn falls_back_for_malformed_xhtml_after_a_complete_block() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            "<html><body><p>First paragraph.</p><p>Second paragraph.",
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(
+            blocks
+                .iter()
+                .map(|block| block.text.as_str())
+                .collect::<Vec<_>>(),
+            ["First paragraph.", "Second paragraph."],
+        );
     }
 
     #[cfg(not(miri))]

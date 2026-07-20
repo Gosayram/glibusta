@@ -23,6 +23,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Direct distribution uses `flutter build apk --split-per-abi` for
+        // these exact targets. Keep Gradle variants aligned with the Rust
+        // libraries produced by `rust-build-android`, so an APK/AAB cannot
+        // accidentally package unsupported x86 native libraries.
+        ndk {
+            abiFilters += setOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     dependencies {
