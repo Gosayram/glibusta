@@ -185,14 +185,16 @@ final class CustomEpubParser {
   }
 
   EpubResource? _findCoverResource(EpubOpfData opf) {
-    EpubResource? cover;
-    if (opf.coverId != null) cover = opf.resources[opf.coverId!];
-    cover ??= opf.resources.values.firstWhereOrNull(
-      (EpubResource r) => r.isCoverImage,
+    final coverId = opf.coverId;
+    final candidates = <EpubResource?>[
+      if (coverId != null) opf.resources[coverId],
+      opf.resources.values.firstWhereOrNull((EpubResource r) => r.isCoverImage),
+      opf.resources.values.firstWhereOrNull(
+        (EpubResource r) => r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
+      ),
+    ];
+    return candidates.whereType<EpubResource>().firstWhereOrNull(
+      (EpubResource resource) => isSupportedImage(resource.mediaType),
     );
-    cover ??= opf.resources.values.firstWhereOrNull(
-      (EpubResource r) => r.type == EpubResourceType.image && r.id.toLowerCase().contains('cover'),
-    );
-    return cover != null && isSupportedImage(cover.mediaType) ? cover : null;
   }
 }

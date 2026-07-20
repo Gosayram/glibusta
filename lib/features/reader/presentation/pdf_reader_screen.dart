@@ -299,6 +299,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
               right: 16,
               bottom: 16,
               child: Semantics(
+                excludeSemantics: true,
                 liveRegion: true,
                 label: 'В PDF не найден извлекаемый текст. Поиск и копирование недоступны.',
                 child: const _NoExtractablePdfTextNotice(),
@@ -311,7 +312,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   Future<void> _detectTextAvailability(PdfDocument document) async {
     try {
-      for (final page in document.pages) {
+      for (final page in document.pages.take(10)) {
         if ((await page.loadStructuredText()).fullText.trim().isNotEmpty) {
           if (mounted) {
             setState(() => _textAvailability = PdfTextAvailability.available);

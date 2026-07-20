@@ -39,6 +39,7 @@ final class ReaderCacheService {
   final AppFileStorage _storage;
   final FullTextSearchService? _ftsService;
   final AppLogger _logger;
+  final Map<String, Map<String, String>> _chapterChecksumsByBook = {};
 
   static const int _splitCacheVersion = 2;
   static const int _parserCacheVersion = 2;
@@ -145,7 +146,7 @@ final class ReaderCacheService {
       final chapterFile = _getChapterFile(bookDir, index);
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
-      final expectedChecksum = await _getChapterChecksum(bookDir, index);
+      final expectedChecksum = await _getChapterChecksum(bookId, bookDir, index);
       if (expectedChecksum != null && _chapterChecksum(json) != expectedChecksum) {
         _logger.warning(
           'Cached chapter $index for $bookId failed integrity verification',
@@ -208,6 +209,7 @@ final class ReaderCacheService {
         'Reader cache invalidated for $bookId (preserveImages=$preserveImages)',
         name: 'ReaderCache',
       );
+      _chapterChecksumsByBook.remove(bookId);
     } on Object catch (e) {
       _logger.warning(
         'Failed to invalidate reader cache for $bookId: $e',
@@ -281,6 +283,7 @@ final class ReaderCacheService {
     Directory bookDir,
     NormalizedBookMetadata meta,
   ) async {
+    _chapterChecksumsByBook.remove(bookId);
     final manifestFile = _getManifestFile(bookDir);
     if (await manifestFile.exists()) {
       try {
@@ -320,6 +323,9 @@ final class ReaderCacheService {
           if (checksum is! String || checksum.length != 64) return false;
           if (!await _getChapterFile(bookDir, index).exists()) return false;
         }
+        _chapterChecksumsByBook[bookId] = chapterChecksums.map(
+          (index, checksum) => MapEntry(index, checksum as String),
+        );
         return true;
       } on Object catch (e) {
         _logger.warning(
@@ -361,19 +367,27 @@ final class ReaderCacheService {
         'chapterChecksums': chapterChecksums,
       },
     );
+    _chapterChecksumsByBook[bookId] = Map<String, String>.from(chapterChecksums);
 
     // Index content for full-text search
     await _indexFtsContent(bookId, book);
   }
 
-  Future<String?> _getChapterChecksum(Directory bookDir, int index) async {
+  Future<String?> _getChapterChecksum(String bookId, Directory bookDir, int index) async {
+    final cachedChecksums = _chapterChecksumsByBook[bookId];
+    if (cachedChecksums != null) return cachedChecksums['$index'];
+
     final manifestFile = _getManifestFile(bookDir);
     if (!await manifestFile.exists()) return null;
     final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
     final checksums = manifest['chapterChecksums'];
     if (checksums is! Map<String, dynamic>) return null;
-    final checksum = checksums['$index'];
-    return checksum is String ? checksum : null;
+    final parsedChecksums = <String, String>{};
+    for (final MapEntry<String, dynamic> entry in checksums.entries) {
+      if (entry.value is String) parsedChecksums[entry.key] = entry.value as String;
+    }
+    _chapterChecksumsByBook[bookId] = parsedChecksums;
+    return parsedChecksums['$index'];
   }
 
   static String _chapterChecksum(String json) => sha256.convert(utf8.encode(json)).toString();

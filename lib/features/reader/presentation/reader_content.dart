@@ -728,12 +728,12 @@ List<InlineSpan> _readerRichTextSpans(
         ]),
       );
     }
-    if (span.href != null) {
-      spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
-    }
     if (applyBookColors && span.color != null) {
       final cssColor = _cssColorFromString(span.color!);
       if (cssColor != null) spanStyle = spanStyle.copyWith(color: cssColor);
+    }
+    if (span.href != null) {
+      spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
     }
     if (span.superscript || span.subscript) {
       final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
@@ -996,15 +996,19 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
     if (isDataUri) {
       final data = imageUrl.split(',');
       if (data.length == 2) {
-        return Image.memory(
-          base64Decode(data.last),
-          fit: fit,
-          errorBuilder: (_, _, _) => const Icon(
-            Icons.broken_image,
-            size: 64,
-            color: Colors.white,
-          ),
-        );
+        try {
+          return Image.memory(
+            base64Decode(data.last),
+            fit: fit,
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.broken_image,
+              size: 64,
+              color: Colors.white,
+            ),
+          );
+        } on FormatException {
+          return const Icon(Icons.broken_image, size: 64, color: Colors.white);
+        }
       }
     }
     if (isFileUri || isPlainPath) {
@@ -1262,6 +1266,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     // LW-8.1: fixed-layout override — each spine item is a full page
     if (_isFixedLayout()) {
       return _FixedLayoutBody(
+        metadata: widget.metadata,
         loadedChapters: widget.loadedChapters,
         settings: settings,
         initialPage: widget.initialPage,
@@ -2544,6 +2549,7 @@ class _SmoothScrollBehavior extends ScrollBehavior {
 /// positioning, no SVG — add when test corpus includes those features.
 class _FixedLayoutBody extends StatelessWidget {
   const _FixedLayoutBody({
+    required this.metadata,
     required this.loadedChapters,
     required this.settings,
     required this.initialPage,
@@ -2551,6 +2557,7 @@ class _FixedLayoutBody extends StatelessWidget {
     this.onPageChanged,
   });
 
+  final NormalizedBookMetadata metadata;
   final Map<int, ReaderChapter> loadedChapters;
   final ReaderSettings settings;
   final int initialPage;
@@ -2562,7 +2569,7 @@ class _FixedLayoutBody extends StatelessWidget {
     final theme = Theme.of(context);
     return PageView.builder(
       onPageChanged: onPageChanged,
-      itemCount: loadedChapters.length,
+      itemCount: metadata.chapterCount,
       itemBuilder: (_, index) {
         final chapter = loadedChapters[index];
         if (chapter == null) return const SizedBox.shrink();
