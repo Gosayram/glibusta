@@ -2155,6 +2155,38 @@ fn test_rejected_mobi_never_populates_path_cache() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "path import uses external filesystem state")]
+fn test_mobi_path_import_never_modifies_reader_sidecars() {
+    let directory = std::env::temp_dir().join(format!(
+        "glibusta-mobi-sidecars-{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    fs::create_dir(&directory).expect("create fixture directory");
+    let mobi_path = directory.join("book.mobi");
+    let mbp_path = directory.join("book.mbp");
+    let lps_path = directory.join("book.lps");
+    let sidecar = b"third-party reader bookmark data";
+    fs::write(&mobi_path, create_minimal_mobi()).expect("write MOBI fixture");
+    fs::write(&mbp_path, sidecar).expect("write existing MBP sidecar");
+
+    let book = glibusta_core::api::api::parse_book(mobi_path.to_string_lossy().into_owned())
+        .expect("parse MOBI without touching reader sidecars");
+
+    assert_eq!(book.title, "Test MOBI");
+    assert_eq!(fs::read(&mbp_path).expect("read MBP sidecar"), sidecar);
+    assert!(
+        !lps_path.exists(),
+        "MOBI import must not create an LPS synchronization sidecar",
+    );
+
+    fs::remove_dir_all(directory).expect("remove fixture directory");
+}
+
+#[test]
 fn test_mobi_preserves_safe_links_and_drops_unsafe_schemes() {
     let mobi_bytes = create_mobi_with_text(
         b"<html><body><p><a href=\"https://example.com\">Safe</a> <a href=\"javascript:alert(1)\">Unsafe</a></p></body></html>",

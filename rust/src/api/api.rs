@@ -1150,6 +1150,32 @@ mod parse_api_tests {
     }
 
     #[test]
+    fn nested_path_rtf_parser_preserves_the_same_bytes_as_legacy_import() {
+        let bytes = br"{\rtf1\ansi First paragraph.\par Second paragraph.\par}".to_vec();
+        let directory = std::env::temp_dir().join(format!(
+            "glibusta-rtf-subdirectory-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let path = directory.join("nested").join("book.rtf");
+        std::fs::create_dir_all(path.parent().expect("nested RTF parent"))
+            .expect("create nested RTF directory");
+        std::fs::write(&path, &bytes).expect("write nested RTF fixture");
+
+        let result = (|| {
+            let path_book = parse_book(path.to_string_lossy().into_owned())?;
+            let legacy_book = parse_book_legacy(bytes, "rtf".to_owned(), None)?;
+            anyhow::Result::<_>::Ok((path_book, legacy_book))
+        })();
+        let _ = std::fs::remove_dir_all(directory);
+
+        let (path_book, legacy_book) = result.expect("parse nested RTF through both APIs");
+        assert_eq!(
+            serde_json::to_value(path_book).expect("serialize path book"),
+            serde_json::to_value(legacy_book).expect("serialize legacy book"),
+        );
+    }
+
+    #[test]
     fn txt_path_import_uses_author_from_filename_without_replacing_book_title() {
         let path = std::env::temp_dir().join(format!(
             "Тестовый Автор - filename-metadata-{}.txt",

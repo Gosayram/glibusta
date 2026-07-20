@@ -1781,7 +1781,8 @@ fn parse_xhtml_to_blocks(
                     // `GeneralRef` is emitted for an entity that the XML reader
                     // cannot resolve. Keep its source spelling rather than
                     // silently dropping the delimiters from visible prose.
-                    let text = format!("&{};", String::from_utf8_lossy(e.as_ref()));
+                    let text = decode_xhtml_general_ref(e.as_ref())
+                        .unwrap_or_else(|| format!("&{};", String::from_utf8_lossy(e.as_ref())));
                     if in_block || in_table {
                         span_text.push_str(&text);
                         if in_block {
@@ -2331,6 +2332,26 @@ fn parse_xhtml_to_blocks(
     (blocks, block_index, page_breaks)
 }
 
+/// Decode the numeric and non-breaking-space entity references emitted as
+/// `GeneralRef` by `quick-xml`. Other unresolved XHTML entities stay literal
+/// so malformed input remains visible to the reader.
+fn decode_xhtml_general_ref(reference: &[u8]) -> Option<String> {
+    let reference = std::str::from_utf8(reference).ok()?;
+    if reference.eq_ignore_ascii_case("nbsp") {
+        return Some('\u{a0}'.to_string());
+    }
+    let value = reference
+        .strip_prefix("#x")
+        .or_else(|| reference.strip_prefix("#X"))
+        .and_then(|hex| u32::from_str_radix(hex, 16).ok())
+        .or_else(|| {
+            reference
+                .strip_prefix('#')
+                .and_then(|decimal| decimal.parse::<u32>().ok())
+        })?;
+    char::from_u32(value).map(|character| character.to_string())
+}
+
 /// Collapse formatting whitespace in ordinary XHTML text nodes while retaining
 /// a single space at a text-node boundary. The latter matters for unresolved
 /// entities, which quick-xml reports as a separate `GeneralRef` event.
@@ -2647,6 +2668,21 @@ mod tests {
 
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].text, "Before &unknown; after.");
+    }
+
+    #[test]
+    fn preserves_non_breaking_spaces_in_epub_prose() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            "<html><body><p>В&#160;доме горел свет. И&nbsp;за окном дождь.</p></body></html>",
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(
+            blocks[0].text,
+            "В\u{a0}доме горел свет. И\u{a0}за окном дождь."
+        );
     }
 
     #[test]
