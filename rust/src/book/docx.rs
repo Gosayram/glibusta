@@ -633,6 +633,10 @@ fn parse_document_xml_with_hyperlinks(
                                 bold: current_span_bold,
                                 italic: current_span_italic,
                                 superscript: false,
+                                subscript: false,
+                                strikethrough: false,
+                                code: false,
+                                style_name: None,
                                 href: current_span_href.clone(),
                                 line_break: false,
                             });

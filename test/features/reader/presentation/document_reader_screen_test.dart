@@ -45,4 +45,20 @@ void main() {
       expect(isSafePdfLink(externalLink, 10), isFalse);
     });
   });
+
+  group('PDF text availability', () {
+    test('reports an image-only or whitespace-only document as not searchable', () {
+      expect(
+        PdfTextAvailability.fromPageTexts(['', '  \n\t']),
+        PdfTextAvailability.unavailable,
+      );
+    });
+
+    test('keeps search available when any page has extracted text', () {
+      expect(
+        PdfTextAvailability.fromPageTexts(['', 'Глава 1']),
+        PdfTextAvailability.available,
+      );
+    });
+  });
 }

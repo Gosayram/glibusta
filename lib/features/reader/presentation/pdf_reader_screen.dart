@@ -18,6 +18,23 @@ bool isSafePdfLink(PdfLink link, int pageCount) {
       destination.pageNumber <= pageCount;
 }
 
+/// Whether the PDF backend can extract any text from the opened document.
+///
+/// Image-only scans still render normally, but must not imply that search or
+/// assistive-text features are available. Whitespace-only extraction is also
+/// treated as unavailable because it cannot be searched or announced usefully.
+@visibleForTesting
+enum PdfTextAvailability {
+  available,
+  unavailable;
+
+  static PdfTextAvailability fromPageTexts(Iterable<String> pageTexts) {
+    return pageTexts.any((text) => text.trim().isNotEmpty)
+        ? PdfTextAvailability.available
+        : PdfTextAvailability.unavailable;
+  }
+}
+
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
     required this.filePath,
@@ -39,6 +56,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   bool _showSearch = false;
   int? _currentPage;
   int? _totalPages;
+  PdfTextAvailability? _textAvailability;
 
   @override
   void initState() {
@@ -73,7 +91,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () => setState(() => _showSearch = !_showSearch),
+            onPressed: _textAvailability == PdfTextAvailability.unavailable
+                ? null
+                : () => setState(() => _showSearch = !_showSearch),
           ),
           PopupMenuButton<String>(
             onSelected: _handleMenuAction,
@@ -121,6 +141,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 final doc = documentRef.resolveListenable().document;
                 if (doc != null && mounted) {
                   setState(() => _totalPages = doc.pages.length);
+                  unawaited(_detectTextAvailability(doc));
                 }
               },
               pagePaintCallbacks: [
@@ -272,9 +293,41 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 onClose: () => setState(() => _showSearch = false),
               ),
             ),
+          if (_textAvailability == PdfTextAvailability.unavailable)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Semantics(
+                liveRegion: true,
+                label: 'В PDF не найден извлекаемый текст. Поиск и копирование недоступны.',
+                child: const _NoExtractablePdfTextNotice(),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  Future<void> _detectTextAvailability(PdfDocument document) async {
+    try {
+      for (final page in document.pages) {
+        if ((await page.loadStructuredText()).fullText.trim().isNotEmpty) {
+          if (mounted) {
+            setState(() => _textAvailability = PdfTextAvailability.available);
+          }
+          return;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _textAvailability = PdfTextAvailability.unavailable;
+        _showSearch = false;
+      });
+    } on Object {
+      // Keep the viewer usable when a malformed page cannot expose text. It is
+      // more accurate to leave availability unknown than to label it a scan.
+    }
   }
 
   String get _appBarTitle {
@@ -349,6 +402,26 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
     );
     return result;
+  }
+}
+
+class _NoExtractablePdfTextNotice extends StatelessWidget {
+  const _NoExtractablePdfTextNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      elevation: 3,
+      child: const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text(
+          'В PDF не найден извлекаемый текст. Поиск и копирование недоступны.',
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
   }
 }
 

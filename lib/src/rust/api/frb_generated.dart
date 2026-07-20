@@ -2798,15 +2798,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RichSpan dco_decode_rich_span(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return RichSpan(
       text: dco_decode_String(arr[0]),
       bold: dco_decode_bool(arr[1]),
       italic: dco_decode_bool(arr[2]),
       superscript: dco_decode_bool(arr[3]),
-      href: dco_decode_opt_String(arr[4]),
-      lineBreak: dco_decode_bool(arr[5]),
+      subscript: dco_decode_bool(arr[4]),
+      strikethrough: dco_decode_bool(arr[5]),
+      code: dco_decode_bool(arr[6]),
+      styleName: dco_decode_opt_String(arr[7]),
+      href: dco_decode_opt_String(arr[8]),
+      lineBreak: dco_decode_bool(arr[9]),
     );
   }
 
@@ -3593,6 +3597,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     final var_bold = sse_decode_bool(deserializer);
     final var_italic = sse_decode_bool(deserializer);
     final var_superscript = sse_decode_bool(deserializer);
+    final var_subscript = sse_decode_bool(deserializer);
+    final var_strikethrough = sse_decode_bool(deserializer);
+    final var_code = sse_decode_bool(deserializer);
+    final var_styleName = sse_decode_opt_String(deserializer);
     final var_href = sse_decode_opt_String(deserializer);
     final var_lineBreak = sse_decode_bool(deserializer);
     return RichSpan(
@@ -3600,6 +3608,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       bold: var_bold,
       italic: var_italic,
       superscript: var_superscript,
+      subscript: var_subscript,
+      strikethrough: var_strikethrough,
+      code: var_code,
+      styleName: var_styleName,
       href: var_href,
       lineBreak: var_lineBreak,
     );
@@ -4327,6 +4339,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.bold, serializer);
     sse_encode_bool(self.italic, serializer);
     sse_encode_bool(self.superscript, serializer);
+    sse_encode_bool(self.subscript, serializer);
+    sse_encode_bool(self.strikethrough, serializer);
+    sse_encode_bool(self.code, serializer);
+    sse_encode_opt_String(self.styleName, serializer);
     sse_encode_opt_String(self.href, serializer);
     sse_encode_bool(self.lineBreak, serializer);
   }

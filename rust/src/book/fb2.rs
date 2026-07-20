@@ -70,6 +70,7 @@ fn parse_fb2_xml(
     let mut in_first_name = false;
     let mut in_middle_name = false;
     let mut in_last_name = false;
+    let mut in_nickname = false;
     let mut in_genre = false;
     let mut in_body = false;
     let mut in_section = false;
@@ -105,9 +106,16 @@ fn parse_fb2_xml(
     let mut current_span_bold = false;
     let mut current_span_italic = false;
     let mut current_span_superscript = false;
+    let mut current_span_subscript = false;
+    let mut current_span_strikethrough = false;
+    let mut current_span_code = false;
     let mut current_span_bold_depth = 0u32;
     let mut current_span_italic_depth = 0u32;
     let mut current_span_superscript_depth = 0u32;
+    let mut current_span_subscript_depth = 0u32;
+    let mut current_span_strikethrough_depth = 0u32;
+    let mut current_span_code_depth = 0u32;
+    let mut current_span_style_names: Vec<String> = Vec::new();
     let mut current_span_href: Option<String> = None;
     let mut table_rows: Vec<Vec<String>> = Vec::new();
     let mut current_table_row: Vec<String> = Vec::new();
@@ -116,11 +124,13 @@ fn parse_fb2_xml(
     let mut current_binary_id: Option<String> = None;
     let mut current_binary_media_type: Option<String> = None;
     let mut cover_media_type: Option<String> = None;
+    let mut cover_image_ref: Option<String> = None;
 
     loop {
         match reader.read_event() {
             Ok(Event::Eof) => break,
             Ok(Event::Start(ref e)) => {
+                eprintln!("start={:?}, in_p={in_p}", e.name());
                 match e.name().as_ref() {
                     b"title-info" => in_title_info = true,
                     b"book-title" if in_title_info => in_book_title = true,
@@ -132,6 +142,7 @@ fn parse_fb2_xml(
                     b"first-name" if in_author => in_first_name = true,
                     b"middle-name" if in_author => in_middle_name = true,
                     b"last-name" if in_author => in_last_name = true,
+                    b"nickname" if in_author => in_nickname = true,
                     b"genre" if in_title_info => in_genre = true,
                     b"lang" if in_title_info => in_lang = true,
                     b"coverpage" => in_coverpage = true,
@@ -193,6 +204,9 @@ fn parse_fb2_xml(
                     b"subtitle" if in_body => in_subtitle = true,
                     b"epigraph" if in_body => in_epigraph = true,
                     b"empty-line" if in_body => in_empty_line = true,
+                    b"image" if in_coverpage => {
+                        cover_image_ref = get_fb2_href(e);
+                    }
                     b"image" if in_body && !in_coverpage => {
                         in_image = true;
                         current_image_ref = get_fb2_href(e);
@@ -243,6 +257,10 @@ fn parse_fb2_xml(
                             current_span_bold,
                             current_span_italic,
                             current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
                             &current_span_href,
                         );
                         current_span_bold_depth = current_span_bold_depth.saturating_add(1);
@@ -255,6 +273,10 @@ fn parse_fb2_xml(
                             current_span_bold,
                             current_span_italic,
                             current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
                             &current_span_href,
                         );
                         current_span_italic_depth = current_span_italic_depth.saturating_add(1);
@@ -267,6 +289,10 @@ fn parse_fb2_xml(
                             current_span_bold,
                             current_span_italic,
                             current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
                             &current_span_href,
                         );
                         current_span_href =
@@ -284,11 +310,79 @@ fn parse_fb2_xml(
                             current_span_bold,
                             current_span_italic,
                             current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
                             &current_span_href,
                         );
                         current_span_superscript_depth =
                             current_span_superscript_depth.saturating_add(1);
                         current_span_superscript = true;
+                    }
+                    b"sub" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_subscript_depth = current_span_subscript_depth.saturating_add(1);
+                        current_span_subscript = true;
+                    }
+                    b"strikethrough" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_strikethrough_depth =
+                            current_span_strikethrough_depth.saturating_add(1);
+                        current_span_strikethrough = true;
+                    }
+                    b"code" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_code_depth = current_span_code_depth.saturating_add(1);
+                        current_span_code = true;
+                    }
+                    b"style" if in_p || in_subtitle => {
+                        flush_rich_span(
+                            &mut current_rich_spans,
+                            &mut current_span_text,
+                            current_span_bold,
+                            current_span_italic,
+                            current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
+                            &current_span_href,
+                        );
+                        current_span_style_names.push(get_xml_attr(e, b"name").unwrap_or_default());
                     }
                     _ => {}
                 }
@@ -299,7 +393,7 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
-                } else if in_first_name || in_middle_name || in_last_name {
+                } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
@@ -336,7 +430,7 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
-                } else if in_first_name || in_middle_name || in_last_name {
+                } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
@@ -370,7 +464,7 @@ fn parse_fb2_xml(
                     current_note_text.push_str(&text);
                 } else if in_book_title && title.is_empty() {
                     title = text.into_owned();
-                } else if in_first_name || in_middle_name || in_last_name {
+                } else if in_first_name || in_middle_name || in_last_name || in_nickname {
                     current_author_parts.push(text.into_owned());
                 } else if in_genre {
                     genres.push(text.into_owned());
@@ -401,7 +495,9 @@ fn parse_fb2_xml(
                     current_text.push_str(&text);
                 }
             }
-            Ok(Event::End(ref e)) => match e.name().as_ref() {
+            Ok(Event::End(ref e)) => {
+                eprintln!("end={:?}, in_p={in_p}", e.name());
+                match e.name().as_ref() {
                 b"title-info" => in_title_info = false,
                 b"book-title" => in_book_title = false,
                 b"annotation" => {
@@ -411,6 +507,7 @@ fn parse_fb2_xml(
                 b"first-name" => in_first_name = false,
                 b"middle-name" => in_middle_name = false,
                 b"last-name" => in_last_name = false,
+                b"nickname" => in_nickname = false,
                 b"author" => {
                     if !current_author_parts.is_empty() {
                         authors.push(current_author_parts.join(" "));
@@ -515,6 +612,10 @@ fn parse_fb2_xml(
                             current_span_bold,
                             current_span_italic,
                             current_span_superscript,
+                            current_span_subscript,
+                            current_span_strikethrough,
+                            current_span_code,
+                            current_span_style_names.last(),
                             &current_span_href,
                         );
                     }
@@ -561,10 +662,18 @@ fn parse_fb2_xml(
                     current_span_bold = false;
                     current_span_italic = false;
                     current_span_superscript = false;
+                    current_span_subscript = false;
+                    current_span_strikethrough = false;
+                    current_span_code = false;
                     current_span_bold_depth = 0;
                     current_span_italic_depth = 0;
                     current_span_superscript_depth = 0;
+                    current_span_subscript_depth = 0;
+                    current_span_strikethrough_depth = 0;
+                    current_span_code_depth = 0;
+                    current_span_style_names.clear();
                     current_span_href = None;
+                    eprintln!("after link href={current_span_href:?}");
                     in_p = false;
                 }
                 b"subtitle" if in_body => {
@@ -773,39 +882,55 @@ fn parse_fb2_xml(
                     in_image = false;
                 }
                 b"strong" if in_p => {
+                    eprintln!("matched end strong");
                     flush_rich_span(
                         &mut current_rich_spans,
                         &mut current_span_text,
                         current_span_bold,
                         current_span_italic,
                         current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
                         &current_span_href,
                     );
                     current_span_bold_depth = current_span_bold_depth.saturating_sub(1);
                     current_span_bold = current_span_bold_depth > 0;
                 }
                 b"emphasis" if in_p => {
+                    eprintln!("matched end emphasis");
                     flush_rich_span(
                         &mut current_rich_spans,
                         &mut current_span_text,
                         current_span_bold,
                         current_span_italic,
                         current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
                         &current_span_href,
                     );
                     current_span_italic_depth = current_span_italic_depth.saturating_sub(1);
                     current_span_italic = current_span_italic_depth > 0;
                 }
                 b"a" if in_p => {
+                    eprintln!("matched end link");
                     flush_rich_span(
                         &mut current_rich_spans,
                         &mut current_span_text,
                         current_span_bold,
                         current_span_italic,
                         current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
                         &current_span_href,
                     );
                     current_span_href = None;
+                    eprintln!("end link state: bold={current_span_bold} italic={current_span_italic} href={current_span_href:?}");
                 }
                 b"sup" if in_p => {
                     flush_rich_span(
@@ -814,14 +939,83 @@ fn parse_fb2_xml(
                         current_span_bold,
                         current_span_italic,
                         current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
                         &current_span_href,
                     );
                     current_span_superscript_depth =
                         current_span_superscript_depth.saturating_sub(1);
                     current_span_superscript = current_span_superscript_depth > 0;
                 }
-                _ => {}
-            },
+                b"sub" if in_p => {
+                    flush_rich_span(
+                        &mut current_rich_spans,
+                        &mut current_span_text,
+                        current_span_bold,
+                        current_span_italic,
+                        current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
+                        &current_span_href,
+                    );
+                    current_span_subscript_depth = current_span_subscript_depth.saturating_sub(1);
+                    current_span_subscript = current_span_subscript_depth > 0;
+                }
+                b"strikethrough" if in_p => {
+                    flush_rich_span(
+                        &mut current_rich_spans,
+                        &mut current_span_text,
+                        current_span_bold,
+                        current_span_italic,
+                        current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
+                        &current_span_href,
+                    );
+                    current_span_strikethrough_depth =
+                        current_span_strikethrough_depth.saturating_sub(1);
+                    current_span_strikethrough = current_span_strikethrough_depth > 0;
+                }
+                b"code" if in_p => {
+                    flush_rich_span(
+                        &mut current_rich_spans,
+                        &mut current_span_text,
+                        current_span_bold,
+                        current_span_italic,
+                        current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
+                        &current_span_href,
+                    );
+                    current_span_code_depth = current_span_code_depth.saturating_sub(1);
+                    current_span_code = current_span_code_depth > 0;
+                }
+                b"style" if in_p => {
+                    flush_rich_span(
+                        &mut current_rich_spans,
+                        &mut current_span_text,
+                        current_span_bold,
+                        current_span_italic,
+                        current_span_superscript,
+                        current_span_subscript,
+                        current_span_strikethrough,
+                        current_span_code,
+                        current_span_style_names.last(),
+                        &current_span_href,
+                    );
+                    current_span_style_names.pop();
+                }
+                    _ => {}
+                }
+            }
             Ok(Event::Empty(ref e)) => match e.name().as_ref() {
                 b"empty-line" if in_body => {
                     body_blocks.push(ReaderBlock {
@@ -841,6 +1035,9 @@ fn parse_fb2_xml(
                         note_id: None,
                     });
                     block_index += 1;
+                }
+                b"image" if in_coverpage => {
+                    cover_image_ref = get_fb2_href(e);
                 }
                 b"image" if in_body && !in_coverpage => {
                     let href = get_fb2_href(e).unwrap_or_default();
@@ -872,7 +1069,15 @@ fn parse_fb2_xml(
         }
     }
 
-    let cover_url = cover_data.map(|data| binary_data_uri(&data, cover_media_type.as_ref()));
+    let cover_url = cover_image_ref
+        .as_deref()
+        .map(|reference| reference.trim_start_matches('#'))
+        .and_then(|id| {
+            binaries
+                .get(id)
+                .map(|data| binary_data_uri(data, binary_media_types.get(id)))
+        })
+        .or_else(|| cover_data.map(|data| binary_data_uri(&data, cover_media_type.as_ref())));
 
     let mut chapters = if !chapters_blocks.is_empty() {
         // Sections were found — build chapters from them
@@ -1152,6 +1357,10 @@ fn flush_rich_span(
     bold: bool,
     italic: bool,
     superscript: bool,
+    subscript: bool,
+    strikethrough: bool,
+    code: bool,
+    style_name: Option<&String>,
     href: &Option<String>,
 ) {
     let text = std::mem::take(span_text);
@@ -1163,6 +1372,10 @@ fn flush_rich_span(
         bold,
         italic,
         superscript,
+        subscript,
+        strikethrough,
+        code,
+        style_name: style_name.cloned(),
         href: href.clone(),
         line_break: false,
     });
@@ -1182,6 +1395,10 @@ fn flush_fb2_block(
         false,
         false,
         false,
+        false,
+        false,
+        false,
+        None,
         &None,
     );
     let t = crate::book::normalize_typography(current_text.trim());
@@ -1218,6 +1435,63 @@ fn flush_fb2_block(
 mod tests {
     use super::{max_base64_image_size, parse_fb2};
     use crate::api::models::BlockType;
+
+    #[test]
+    fn preserves_title_info_fields_represented_by_normalized_book() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink">
+                <description><title-info>
+                    <genre match="90">science</genre><genre match="10">fiction</genre>
+                    <author><first-name>Ada</first-name><last-name>Lovelace</last-name></author>
+                    <author><nickname>The Poet</nickname></author>
+                    <book-title>Metadata fixture</book-title>
+                    <annotation><p>First annotation paragraph.</p><p>Second paragraph.</p></annotation>
+                    <keywords>analytical engine, notes</keywords>
+                    <date value="1843-01-01">1843</date><lang>en</lang><src-lang>fr</src-lang>
+                    <translator><nickname>Translator</nickname></translator>
+                    <sequence name="Collected"><sequence name="Volume" number="1"/></sequence>
+                    <coverpage><image l:href="#front-art"/></coverpage>
+                </title-info></description>
+                <body><section><p>Reader content.</p></section></body>
+                <binary id="front-art" content-type="image/png">iVBORw0KGgo=</binary>
+            </FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse complete title-info metadata");
+
+        assert_eq!(book.title, "Metadata fixture");
+        assert_eq!(book.authors, ["Ada Lovelace", "The Poet"]);
+        assert_eq!(book.language.as_deref(), Some("en"));
+        assert!(
+            book.description
+                .as_deref()
+                .is_some_and(|description| description.contains("First annotation paragraph."))
+        );
+        assert!(
+            book.cover_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("data:image/png;base64,"))
+        );
+        assert_eq!(book.chapters[0].blocks[0].text, "Reader content.");
+    }
+
+    #[test]
+    fn ignores_source_document_and_publication_metadata() {
+        let book = parse_fb2(
+            br#"<FictionBook><description>
+                <title-info><book-title>Canonical title</book-title><author><nickname>Canonical author</nickname></author></title-info>
+                <src-title-info><book-title>Source title</book-title><author><nickname>Source author</nickname></author></src-title-info>
+                <document-info><author><nickname>Document author</nickname></author><id>uuid</id><version>2.0</version><history><p>history</p></history><src-url>https://example.test/source</src-url></document-info>
+                <publish-info><book-name>Published title</book-name><publisher>Publisher</publisher><city>City</city><year>2026</year><isbn>isbn</isbn></publish-info>
+            </description><body><section><p>Canonical content.</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("ignore FB2 metadata that is not represented by NormalizedBook");
+
+        assert_eq!(book.title, "Canonical title");
+        assert_eq!(book.authors, ["Canonical author"]);
+        assert_eq!(book.chapters[0].blocks[0].text, "Canonical content.");
+    }
 
     #[test]
     #[cfg_attr(
@@ -1410,6 +1684,40 @@ mod tests {
 
         assert_eq!(spans[2].text, "tail");
         assert!(spans[2].bold);
+    }
+
+    #[test]
+    fn preserves_nested_inline_semantics_and_links() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:xlink="http://www.w3.org/1999/xlink"><body><section><p>plain <strong>bold <emphasis>both <a xlink:href="#note">link <strikethrough>strike <sub>sub</sub></strikethrough></a></emphasis></strong> <style name="code"><code>mono</code></style><sup>up</sup></p></section></body></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with nested inline semantics");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(
+            spans.iter().map(|span| span.text.as_str()).collect::<Vec<_>>(),
+            ["plain", "bold", "both", "link", "strike", "sub", "", "mono", "up"],
+        );
+        assert!(spans[1].bold);
+        assert!(spans[2].bold && spans[2].italic);
+        assert_eq!(spans[3].href.as_deref(), Some("#note"));
+        assert!(spans[4].strikethrough && spans[4].href.is_some());
+        assert!(spans[5].subscript && spans[5].strikethrough);
+        assert!(
+            spans.iter().any(|span| span.text == "mono" && span.code),
+            "{spans:#?}"
+        );
+        assert!(
+            spans
+                .iter()
+                .any(|span| span.text == "mono" && span.style_name.as_deref() == Some("code")),
+            "{spans:#?}"
+        );
+        assert!(spans[8].superscript);
     }
 
     #[test]

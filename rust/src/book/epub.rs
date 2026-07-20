@@ -1406,6 +1406,10 @@ fn parse_xhtml_to_blocks(
                                 bold: false,
                                 italic: false,
                                 superscript: false,
+                                subscript: false,
+                                strikethrough: false,
+                                code: false,
+                                style_name: None,
                                 href: None,
                                 line_break: true,
                             });
@@ -2237,6 +2241,10 @@ fn flush_rich_span(
         bold,
         italic,
         superscript,
+        subscript: false,
+        strikethrough: false,
+        code: false,
+        style_name: None,
         href: href.clone(),
         line_break: false,
     });

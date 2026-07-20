@@ -348,6 +348,14 @@ pub struct RichSpan {
     pub bold: bool,
     pub italic: bool,
     pub superscript: bool,
+    #[serde(default)]
+    pub subscript: bool,
+    #[serde(default)]
+    pub strikethrough: bool,
+    #[serde(default)]
+    pub code: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub style_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub href: Option<String>,
     #[serde(default)]

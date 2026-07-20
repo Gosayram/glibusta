@@ -29,7 +29,7 @@
 use crate::api::api::*;
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -2953,6 +2953,10 @@ impl SseDecode for crate::api::models::RichSpan {
         let mut var_bold = <bool>::sse_decode(deserializer);
         let mut var_italic = <bool>::sse_decode(deserializer);
         let mut var_superscript = <bool>::sse_decode(deserializer);
+        let mut var_subscript = <bool>::sse_decode(deserializer);
+        let mut var_strikethrough = <bool>::sse_decode(deserializer);
+        let mut var_code = <bool>::sse_decode(deserializer);
+        let mut var_styleName = <Option<String>>::sse_decode(deserializer);
         let mut var_href = <Option<String>>::sse_decode(deserializer);
         let mut var_lineBreak = <bool>::sse_decode(deserializer);
         return crate::api::models::RichSpan {
@@ -2960,6 +2964,10 @@ impl SseDecode for crate::api::models::RichSpan {
             bold: var_bold,
             italic: var_italic,
             superscript: var_superscript,
+            subscript: var_subscript,
+            strikethrough: var_strikethrough,
+            code: var_code,
+            style_name: var_styleName,
             href: var_href,
             line_break: var_lineBreak,
         };
@@ -3568,6 +3576,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::RichSpan {
             self.bold.into_into_dart().into_dart(),
             self.italic.into_into_dart().into_dart(),
             self.superscript.into_into_dart().into_dart(),
+            self.subscript.into_into_dart().into_dart(),
+            self.strikethrough.into_into_dart().into_dart(),
+            self.code.into_into_dart().into_dart(),
+            self.style_name.into_into_dart().into_dart(),
             self.href.into_into_dart().into_dart(),
             self.line_break.into_into_dart().into_dart(),
         ]
@@ -4186,6 +4198,10 @@ impl SseEncode for crate::api::models::RichSpan {
         <bool>::sse_encode(self.bold, serializer);
         <bool>::sse_encode(self.italic, serializer);
         <bool>::sse_encode(self.superscript, serializer);
+        <bool>::sse_encode(self.subscript, serializer);
+        <bool>::sse_encode(self.strikethrough, serializer);
+        <bool>::sse_encode(self.code, serializer);
+        <Option<String>>::sse_encode(self.style_name, serializer);
         <Option<String>>::sse_encode(self.href, serializer);
         <bool>::sse_encode(self.line_break, serializer);
     }
@@ -4253,7 +4269,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -4321,7 +4337,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

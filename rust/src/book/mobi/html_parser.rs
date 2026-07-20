@@ -539,6 +539,10 @@ impl MobiHtmlParser {
                         bold: bold_depth > 0,
                         italic: italic_depth > 0,
                         superscript: superscript_depth > 0,
+                        subscript: false,
+                        strikethrough: false,
+                        code: false,
+                        style_name: None,
                         href: href.clone(),
                         line_break: true,
                     });
@@ -588,6 +592,10 @@ impl MobiHtmlParser {
                 bold,
                 italic,
                 superscript,
+                subscript: false,
+                strikethrough: false,
+                code: false,
+                style_name: None,
                 href: href.clone(),
                 line_break: false,
             });

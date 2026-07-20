@@ -693,6 +693,41 @@ List<InlineSpan> _readerRichTextSpans(
     var spanStyle = baseStyle;
     if (span.bold) spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
     if (span.italic) spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
+    if (span.code) spanStyle = spanStyle.copyWith(fontFamily: 'monospace');
+    switch (span.styleName?.trim().toLowerCase()) {
+      case 'strong':
+      case 'bold':
+        spanStyle = spanStyle.copyWith(fontWeight: FontWeight.bold);
+        break;
+      case 'emphasis':
+      case 'italic':
+        spanStyle = spanStyle.copyWith(fontStyle: FontStyle.italic);
+        break;
+      case 'code':
+        spanStyle = spanStyle.copyWith(fontFamily: 'monospace');
+        break;
+      case 'strikethrough':
+      case 'strike':
+        spanStyle = spanStyle.copyWith(
+          decoration: TextDecoration.combine([
+            if (spanStyle.decoration != null) spanStyle.decoration!,
+            TextDecoration.lineThrough,
+          ]),
+        );
+        break;
+      case null:
+      case '':
+      default:
+        break;
+    }
+    if (span.strikethrough) {
+      spanStyle = spanStyle.copyWith(
+        decoration: TextDecoration.combine([
+          if (spanStyle.decoration != null) spanStyle.decoration!,
+          TextDecoration.lineThrough,
+        ]),
+      );
+    }
     if (span.href != null) {
       spanStyle = spanStyle.copyWith(color: linkColor, decoration: TextDecoration.underline);
     }
@@ -700,7 +735,7 @@ List<InlineSpan> _readerRichTextSpans(
       final cssColor = _cssColorFromString(span.color!);
       if (cssColor != null) spanStyle = spanStyle.copyWith(color: cssColor);
     }
-    if (span.superscript) {
+    if (span.superscript || span.subscript) {
       final supFontSize = baseStyle.fontSize != null ? baseStyle.fontSize! * 0.7 : 12.0;
       final supStyle = spanStyle.copyWith(fontSize: supFontSize);
       // TextPainter cannot lay out WidgetSpan without placeholder dimensions.
@@ -717,7 +752,10 @@ List<InlineSpan> _readerRichTextSpans(
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
             child: Transform.translate(
-              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              offset: Offset(
+                0,
+                (span.superscript ? -1 : 1) * (baseStyle.fontSize ?? 16) * 0.3,
+              ),
               child: GestureDetector(
                 onTap: () => onLinkTap(href),
                 child: Text(span.text, style: supStyle),
@@ -731,7 +769,10 @@ List<InlineSpan> _readerRichTextSpans(
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
             child: Transform.translate(
-              offset: Offset(0, -(baseStyle.fontSize ?? 16) * 0.3),
+              offset: Offset(
+                0,
+                (span.superscript ? -1 : 1) * (baseStyle.fontSize ?? 16) * 0.3,
+              ),
               child: Text(span.text, style: supStyle),
             ),
           ),

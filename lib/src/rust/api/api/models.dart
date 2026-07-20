@@ -595,6 +595,10 @@ class RichSpan {
   final bool bold;
   final bool italic;
   final bool superscript;
+  final bool subscript;
+  final bool strikethrough;
+  final bool code;
+  final String? styleName;
   final String? href;
   final bool lineBreak;
 
@@ -603,6 +607,10 @@ class RichSpan {
     required this.bold,
     required this.italic,
     required this.superscript,
+    required this.subscript,
+    required this.strikethrough,
+    required this.code,
+    this.styleName,
     this.href,
     required this.lineBreak,
   });
@@ -613,6 +621,10 @@ class RichSpan {
       bold.hashCode ^
       italic.hashCode ^
       superscript.hashCode ^
+      subscript.hashCode ^
+      strikethrough.hashCode ^
+      code.hashCode ^
+      styleName.hashCode ^
       href.hashCode ^
       lineBreak.hashCode;
 
@@ -625,6 +637,10 @@ class RichSpan {
           bold == other.bold &&
           italic == other.italic &&
           superscript == other.superscript &&
+          subscript == other.subscript &&
+          strikethrough == other.strikethrough &&
+          code == other.code &&
+          styleName == other.styleName &&
           href == other.href &&
           lineBreak == other.lineBreak;
 }

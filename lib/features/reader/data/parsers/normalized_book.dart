@@ -409,6 +409,10 @@ class RichSpan {
   final bool bold;
   final bool italic;
   final bool superscript;
+  final bool subscript;
+  final bool strikethrough;
+  final bool code;
+  final String? styleName;
   final bool lineBreak;
   final String? href;
   final String? color;
@@ -418,6 +422,10 @@ class RichSpan {
     this.bold = false,
     this.italic = false,
     this.superscript = false,
+    this.subscript = false,
+    this.strikethrough = false,
+    this.code = false,
+    this.styleName,
     this.lineBreak = false,
     this.href,
     this.color,
@@ -428,6 +436,10 @@ class RichSpan {
     if (bold) 'bold': true,
     if (italic) 'italic': true,
     if (superscript) 'superscript': true,
+    if (subscript) 'subscript': true,
+    if (strikethrough) 'strikethrough': true,
+    if (code) 'code': true,
+    if (styleName != null) 'styleName': styleName,
     if (lineBreak) 'lineBreak': true,
     if (href != null) 'href': href,
     if (color != null) 'color': color,
@@ -438,6 +450,10 @@ class RichSpan {
     bold: json['bold'] as bool? ?? false,
     italic: json['italic'] as bool? ?? false,
     superscript: json['superscript'] as bool? ?? false,
+    subscript: json['subscript'] as bool? ?? false,
+    strikethrough: json['strikethrough'] as bool? ?? false,
+    code: json['code'] as bool? ?? false,
+    styleName: json['styleName'] as String?,
     lineBreak: json['lineBreak'] as bool? ?? false,
     href: json['href'] as String?,
     color: json['color'] as String?,

@@ -180,6 +180,10 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
             bold: fmt.bold,
             italic: fmt.italic,
             superscript: fmt.superscript,
+            subscript: false,
+            strikethrough: false,
+            code: false,
+            style_name: None,
             href: fmt.href.clone(),
             line_break: false,
         });
