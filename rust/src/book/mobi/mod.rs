@@ -124,6 +124,11 @@ struct PalmDbParser;
 impl PalmDbParser {
     fn parse(&self, bytes: &[u8]) -> Result<PalmDb> {
         let reader = BinaryReader::new(bytes);
+        if bytes.get(60..64) != Some(b"BOOK".as_slice())
+            || bytes.get(64..68) != Some(b"MOBI".as_slice())
+        {
+            bail!("Invalid PalmDB/MOBI container type or creator");
+        }
         let record_count = reader.u16be(76)? as usize;
         let table_end = 78 + record_count * 8;
 

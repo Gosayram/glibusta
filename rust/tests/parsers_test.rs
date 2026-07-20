@@ -1229,6 +1229,8 @@ fn create_palm_mobi(records: Vec<Vec<u8>>) -> Vec<u8> {
     bytes.extend_from_slice(b"Dual MOBI");
     bytes.resize(32, 0);
     bytes.resize(76, 0);
+    bytes[60..64].copy_from_slice(b"BOOK");
+    bytes[64..68].copy_from_slice(b"MOBI");
     bytes.extend_from_slice(&(records.len() as u16).to_be_bytes());
     for (index, offset) in offsets.iter().enumerate() {
         bytes.extend_from_slice(&offset.to_be_bytes());
@@ -1302,6 +1304,21 @@ fn test_mobi_truncated_file_returns_an_error_without_panicking() {
     let result = glibusta_core::book::mobi::parse_mobi(&create_minimal_mobi()[..80], None);
 
     assert!(result.is_err());
+}
+
+#[test]
+fn test_mobi_rejects_non_book_mobi_palm_database_container() {
+    let mut mobi = create_minimal_mobi();
+    mobi[60..64].copy_from_slice(b"DATA");
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("a non-BOOK Palm database must not be accepted as MOBI");
+
+    assert!(error.to_string().contains("container"));
+
+    mobi[60..64].copy_from_slice(b"BOOK");
+    mobi[64..68].copy_from_slice(b"READ");
+    assert!(glibusta_core::book::mobi::parse_mobi(&mobi, None).is_err());
 }
 
 #[test]

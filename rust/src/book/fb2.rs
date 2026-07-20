@@ -1525,6 +1525,37 @@ mod tests {
     }
 
     #[test]
+    fn ignores_output_policy_metadata_without_hiding_book_content() {
+        let book = parse_fb2(
+            br#"<FictionBook><description><title-info>
+                    <book-title>Preview</book-title>
+                    <author><nickname>Author</nickname></author>
+                    <output>paid</output><part>sample</part>
+                    <output-document-class>commercial</output-document-class>
+                </title-info></description>
+                <body><section><title><p>Chapter</p></title>
+                    <output>do not render this policy</output>
+                    <part>do not render this policy either</part>
+                    <p>Visible reader content.</p>
+                </section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("FB2 output policy metadata must not reject the book");
+
+        assert_eq!(book.title, "Preview");
+        assert_eq!(book.authors, ["Author"]);
+        assert_eq!(book.chapters[0].blocks[0].text, "Chapter");
+        assert_eq!(book.chapters[0].blocks[1].text, "Visible reader content.");
+        assert!(
+            book.chapters[0]
+                .blocks
+                .iter()
+                .all(|block| !block.text.contains("do not render")),
+            "output policy directives must not become reader content",
+        );
+    }
+
+    #[test]
     #[cfg_attr(
         miri,
         ignore = "large CDATA limit test is prohibitively slow under Miri"

@@ -140,6 +140,7 @@ struct RtfFmt {
     bold: bool,
     italic: bool,
     superscript: bool,
+    subscript: bool,
     font_size_half_pts: i32,
     href: Option<String>,
 }
@@ -180,7 +181,7 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
             bold: fmt.bold,
             italic: fmt.italic,
             superscript: fmt.superscript,
-            subscript: false,
+            subscript: fmt.subscript,
             strikethrough: false,
             code: false,
             style_name: None,
@@ -428,10 +429,17 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                     "super" => {
                         flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.superscript = true;
+                        fmt.subscript = false;
                     }
                     "sub" => {
                         flush_span(&mut rich_spans, &mut span_text, &fmt);
                         fmt.superscript = false;
+                        fmt.subscript = true;
+                    }
+                    "nosupersub" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.superscript = false;
+                        fmt.subscript = false;
                     }
                     "ul" | "ulnone" | "strike" | "scaps" | "highlight" => {}
                     "fs" => {
@@ -836,6 +844,32 @@ mod tests {
                 ("plain", false, false),
                 ("italic", false, true),
                 ("normal", false, false),
+            ],
+        );
+    }
+
+    #[test]
+    fn preserves_subscript_and_superscript_semantics() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi H\sub 2\nosupersub O and x\super 2\nosupersub}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF vertical alignment");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(
+            spans
+                .iter()
+                .map(|span| (span.text.trim(), span.subscript, span.superscript))
+                .collect::<Vec<_>>(),
+            vec![
+                ("H", false, false),
+                ("2", true, false),
+                ("O and x", false, false),
+                ("2", false, true),
             ],
         );
     }
