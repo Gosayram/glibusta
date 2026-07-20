@@ -1311,11 +1311,16 @@ fn parse_fb2_xml(
 
     let id = crate::book::sha256_hex(bytes);
 
-    let metadata = if footnotes.is_empty() {
-        None
-    } else {
-        Some(serde_json::json!({ "footnotes": footnotes }))
-    };
+    let mut metadata = serde_json::Map::new();
+    if !footnotes.is_empty() {
+        metadata.insert("footnotes".to_string(), serde_json::json!(footnotes));
+    }
+    if !genres.is_empty() {
+        // NormalizedBook has no dedicated genre field. Preserve raw FB2 codes
+        // instead of guessing an unofficial 2.0 → 2.1 mapping.
+        metadata.insert("genres".to_string(), serde_json::json!(genres));
+    }
+    let metadata = (!metadata.is_empty()).then_some(serde_json::Value::Object(metadata));
 
     Ok(NormalizedBook {
         id,
@@ -1721,6 +1726,26 @@ mod tests {
                 .is_some_and(|url| url.starts_with("data:image/png;base64,"))
         );
         assert_eq!(book.chapters[0].blocks[0].text, "Reader content.");
+    }
+
+    #[test]
+    fn preserves_raw_unknown_genre_codes_without_guessing_a_mapping() {
+        let book = parse_fb2(
+            br#"<FictionBook><description><title-info><genre>sf_history</genre><genre>custom-unmapped</genre></title-info></description><body><section><p>Content</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 with unknown genres");
+
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["genres"].as_array())
+                .expect("raw genres are retained")
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect::<Vec<_>>(),
+            vec!["sf_history", "custom-unmapped"],
+        );
     }
 
     #[test]

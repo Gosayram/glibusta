@@ -1281,6 +1281,22 @@ fn create_mobi_with_invalid_kf8_boundary() -> Vec<u8> {
     ])
 }
 
+fn create_mobi_with_inline_image(recindex: u32) -> Vec<u8> {
+    let text = format!(
+        "<p>Before illustration</p><img recindex=\"{recindex}\" alt=\"Map\"/><p>After illustration</p>"
+    );
+    let mut header = create_mobi_header_record(text.len() as u32, 1, &[]);
+    // MOBI record indexes are absolute PalmDB record indexes. The first image
+    // follows record 0 (header) and record 1 (text) in this fixture.
+    header[16 + 108..16 + 112].copy_from_slice(&2u32.to_be_bytes());
+    create_palm_mobi(vec![
+        header,
+        text.into_bytes(),
+        b"\x89PNG\r\n\x1a\ninline-image".to_vec(),
+        b"GIF89asecond-image".to_vec(),
+    ])
+}
+
 #[test]
 fn test_mobi_basic_parse() {
     let mobi_bytes = create_minimal_mobi();
@@ -1288,6 +1304,39 @@ fn test_mobi_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert!(!book.chapters[0].blocks.is_empty(), "should have blocks");
     assert_eq!(book.book_format, BookFormat::Mobi);
+}
+
+#[test]
+fn test_mobi_resolves_inline_recindex_images() {
+    let book = glibusta_core::book::mobi::parse_mobi(&create_mobi_with_inline_image(1), None)
+        .expect("parse MOBI with inline image");
+    let image = book.chapters[0]
+        .blocks
+        .iter()
+        .find(|block| block.block_type == BlockType::Image)
+        .expect("inline recindex image block");
+
+    assert_eq!(image.image_alt.as_deref(), Some("Map"));
+    assert_eq!(
+        image.image_url.as_deref(),
+        Some("data:image/png;base64,iVBORw0KGgppbmxpbmUtaW1hZ2U="),
+    );
+}
+
+#[test]
+fn test_mobi_recindex_is_relative_to_first_image_record() {
+    let book = glibusta_core::book::mobi::parse_mobi(&create_mobi_with_inline_image(2), None)
+        .expect("parse MOBI with a second inline image resource");
+    let image = book.chapters[0]
+        .blocks
+        .iter()
+        .find(|block| block.block_type == BlockType::Image)
+        .expect("inline recindex image block");
+
+    assert_eq!(
+        image.image_url.as_deref(),
+        Some("data:image/gif;base64,R0lGODlhc2Vjb25kLWltYWdl"),
+    );
 }
 
 #[test]
@@ -1343,6 +1392,76 @@ fn test_mobi_ignores_optional_and_unknown_records_after_text() {
 
     assert_eq!(parsed_text, "The only MOBI text record");
     assert!(book.images.is_empty());
+}
+
+#[test]
+fn test_mobi_decodes_cp1252_text_title_and_exth_language() {
+    let text = b"<p>Le caf\xE9</p>";
+    let mut header = create_mobi_header_record(
+        text.len() as u32,
+        1,
+        &[(503, b"Le caf\xE9".to_vec()), (524, b"fr".to_vec())],
+    );
+    header[28..30].copy_from_slice(&1252u16.to_be_bytes());
+
+    let book =
+        glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(vec![header, text.to_vec()]), None)
+            .expect("CP1252 MOBI metadata and text must decode");
+
+    assert_eq!(book.title, "Le café");
+    assert_eq!(book.language.as_deref(), Some("fr"));
+    assert_eq!(book.chapters[0].blocks[0].text, "Le café");
+
+    let mut full_name_mobi = create_mobi_with_text(text);
+    let record0_offset = u32::from_be_bytes([
+        full_name_mobi[78],
+        full_name_mobi[79],
+        full_name_mobi[80],
+        full_name_mobi[81],
+    ]) as usize;
+    let mobi_offset = record0_offset + 16;
+    full_name_mobi[mobi_offset + 84..mobi_offset + 88].copy_from_slice(&220u32.to_be_bytes());
+    full_name_mobi[mobi_offset + 88..mobi_offset + 92]
+        .copy_from_slice(&(b"Le caf\xE9".len() as u32).to_be_bytes());
+    full_name_mobi[record0_offset + 220..record0_offset + 227].copy_from_slice(b"Le caf\xE9");
+
+    let full_name_book = glibusta_core::book::mobi::parse_mobi(&full_name_mobi, None)
+        .expect("CP1252 Full Name must decode");
+    assert_eq!(full_name_book.title, "Le café");
+}
+
+#[test]
+fn test_mobi_decodes_utf8_and_falls_back_safely_for_unknown_code_pages() {
+    let text = "<p>Привет</p>".as_bytes().to_vec();
+    let mut utf8_header = create_mobi_header_record(
+        text.len() as u32,
+        1,
+        &[(503, "Книга".as_bytes().to_vec()), (524, b"ru".to_vec())],
+    );
+    utf8_header[28..30].copy_from_slice(&65001u16.to_be_bytes());
+
+    let utf8_book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![utf8_header, text.clone()]),
+        None,
+    )
+    .expect("UTF-8 MOBI metadata and text must decode");
+    assert_eq!(utf8_book.title, "Книга");
+    assert_eq!(utf8_book.language.as_deref(), Some("ru"));
+    assert_eq!(utf8_book.chapters[0].blocks[0].text, "Привет");
+
+    let mut unknown_encoding_header = create_mobi_header_record(
+        text.len() as u32,
+        1,
+        &[(503, "Запасной заголовок".as_bytes().to_vec())],
+    );
+    unknown_encoding_header[28..30].copy_from_slice(&u16::MAX.to_be_bytes());
+    let fallback_book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![unknown_encoding_header, text]),
+        None,
+    )
+    .expect("an unknown code page must use the controlled UTF-8 fallback");
+    assert_eq!(fallback_book.title, "Запасной заголовок");
+    assert_eq!(fallback_book.chapters[0].blocks[0].text, "Привет");
 }
 
 #[test]

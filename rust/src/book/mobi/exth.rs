@@ -6,7 +6,7 @@ use nom::error::{Error, ErrorKind};
 use nom::multi::count;
 use nom::number::streaming::be_u32;
 
-use super::MobiHeader;
+use super::{MobiHeader, encoding};
 
 /// ARC-2.2: CompactString for stack-allocated metadata strings.
 pub(crate) struct MobiMetadata {
@@ -122,16 +122,32 @@ impl ExthParser {
         for (rec_type, data) in &records {
             match rec_type {
                 100 => {
-                    author = Some(String::from_utf8_lossy(data).trim().to_string());
+                    author = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
                 }
                 503 => {
-                    title = Some(String::from_utf8_lossy(data).trim().to_string());
+                    title = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
                 }
                 524 => {
-                    language = Some(String::from_utf8_lossy(data).trim().to_string());
+                    language = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
                 }
                 103 => {
-                    description = Some(String::from_utf8_lossy(data).trim().to_string());
+                    description = Some(
+                        encoding::decode_text(data, header.text_encoding)
+                            .trim()
+                            .to_string(),
+                    );
                 }
                 201 if data.len() >= 4 => {
                     cover_record_index =

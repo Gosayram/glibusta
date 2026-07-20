@@ -14,6 +14,17 @@ static STRIP_OUTER_RE: LazyLock<Regex> =
 static HREF_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)\bhref\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+))"#).unwrap()
 });
+static IMG_TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?is)<img\b[^>]*>").unwrap());
+static RECINDEX_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?i)\brecindex\s*=\s*(?:\"(\d+)\"|'(\d+)'|(\d+))"#).unwrap());
+static ALT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?i)\balt\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s>]+))"#).unwrap()
+});
+
+enum MobiHtmlChunk {
+    Text(String),
+    Image { recindex: u32, alt: Option<String> },
+}
 
 pub(crate) struct MobiHtmlParser {
     block_elements: HashSet<&'static str>,
@@ -82,62 +93,67 @@ impl MobiHtmlParser {
         let mut idx = 0i32;
 
         for chunk in &block_chunks {
-            let trimmed = chunk.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
+            for chunk in self.split_inline_images(chunk) {
+                let MobiHtmlChunk::Text(chunk) = chunk else {
+                    let MobiHtmlChunk::Image { recindex, alt } = chunk else {
+                        unreachable!("MobiHtmlChunk has only text and image variants");
+                    };
+                    blocks.push(ReaderBlock {
+                        index: idx,
+                        text: alt.clone().unwrap_or_default(),
+                        block_type: BlockType::Image,
+                        image_url: Some(format!("mobi-recindex:{recindex}")),
+                        note_ref: None,
+                        rich_spans: None,
+                        heading_level: None,
+                        ordered: None,
+                        list_items: None,
+                        table_rows: None,
+                        image_alt: alt,
+                        text_indent: None,
+                        text_align: None,
+                        note_id: None,
+                    });
+                    idx += 1;
+                    continue;
+                };
+                let trimmed = chunk.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
 
-            let lower = trimmed.to_lowercase();
-            if self.is_heading(&lower) {
-                let text = self.extract_text_from_chunk(trimmed);
-                if !text.is_empty() {
-                    let level = self.extract_heading_level(&lower);
+                let lower = trimmed.to_lowercase();
+                if self.is_heading(&lower) {
+                    let text = self.extract_text_from_chunk(trimmed);
+                    if !text.is_empty() {
+                        let level = self.extract_heading_level(&lower);
+                        blocks.push(ReaderBlock {
+                            index: idx,
+                            text,
+                            block_type: BlockType::Heading,
+                            image_url: None,
+                            note_ref: None,
+                            rich_spans: Some(self.parse_inline(trimmed)),
+                            heading_level: Some(level),
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        idx += 1;
+                    }
+                } else if lower.starts_with("<hr") || lower.starts_with("<hr/>") || lower == "<hr>"
+                {
                     blocks.push(ReaderBlock {
                         index: idx,
-                        text,
-                        block_type: BlockType::Heading,
+                        text: String::new(),
+                        block_type: BlockType::Separator,
                         image_url: None,
                         note_ref: None,
-                        rich_spans: Some(self.parse_inline(trimmed)),
-                        heading_level: Some(level),
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    idx += 1;
-                }
-            } else if lower.starts_with("<hr") || lower.starts_with("<hr/>") || lower == "<hr>" {
-                blocks.push(ReaderBlock {
-                    index: idx,
-                    text: String::new(),
-                    block_type: BlockType::Separator,
-                    image_url: None,
-                    note_ref: None,
-                    rich_spans: None,
-                    heading_level: None,
-                    ordered: None,
-                    list_items: None,
-                    table_rows: None,
-                    image_alt: None,
-                    text_indent: None,
-                    text_align: None,
-                    note_id: None,
-                });
-                idx += 1;
-            } else if self.is_blockquote(&lower) {
-                let text = self.extract_text_from_chunk(trimmed);
-                if !text.is_empty() {
-                    blocks.push(ReaderBlock {
-                        index: idx,
-                        text,
-                        block_type: BlockType::Quote,
-                        image_url: None,
-                        note_ref: None,
-                        rich_spans: Some(self.parse_inline(trimmed)),
+                        rich_spans: None,
                         heading_level: None,
                         ordered: None,
                         list_items: None,
@@ -148,29 +164,50 @@ impl MobiHtmlParser {
                         note_id: None,
                     });
                     idx += 1;
-                }
-            } else {
-                let inner = self.strip_outer_block_tag(trimmed);
-                let spans = self.parse_inline(&inner);
-                let text = self.spans_to_text(&spans);
-                if !text.is_empty() {
-                    blocks.push(ReaderBlock {
-                        index: idx,
-                        text,
-                        block_type: BlockType::Paragraph,
-                        image_url: None,
-                        note_ref: None,
-                        rich_spans: if spans.is_empty() { None } else { Some(spans) },
-                        heading_level: None,
-                        ordered: None,
-                        list_items: None,
-                        table_rows: None,
-                        image_alt: None,
-                        text_indent: None,
-                        text_align: None,
-                        note_id: None,
-                    });
-                    idx += 1;
+                } else if self.is_blockquote(&lower) {
+                    let text = self.extract_text_from_chunk(trimmed);
+                    if !text.is_empty() {
+                        blocks.push(ReaderBlock {
+                            index: idx,
+                            text,
+                            block_type: BlockType::Quote,
+                            image_url: None,
+                            note_ref: None,
+                            rich_spans: Some(self.parse_inline(trimmed)),
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        idx += 1;
+                    }
+                } else {
+                    let inner = self.strip_outer_block_tag(trimmed);
+                    let spans = self.parse_inline(&inner);
+                    let text = self.spans_to_text(&spans);
+                    if !text.is_empty() {
+                        blocks.push(ReaderBlock {
+                            index: idx,
+                            text,
+                            block_type: BlockType::Paragraph,
+                            image_url: None,
+                            note_ref: None,
+                            rich_spans: if spans.is_empty() { None } else { Some(spans) },
+                            heading_level: None,
+                            ordered: None,
+                            list_items: None,
+                            table_rows: None,
+                            image_alt: None,
+                            text_indent: None,
+                            text_align: None,
+                            note_id: None,
+                        });
+                        idx += 1;
+                    }
                 }
             }
         }
@@ -200,6 +237,40 @@ impl MobiHtmlParser {
         }
 
         blocks
+    }
+
+    fn split_inline_images(&self, chunk: &str) -> Vec<MobiHtmlChunk> {
+        let mut chunks = Vec::new();
+        let mut cursor = 0;
+
+        for tag in IMG_TAG_RE.find_iter(chunk) {
+            if tag.start() > cursor {
+                chunks.push(MobiHtmlChunk::Text(chunk[cursor..tag.start()].to_string()));
+            }
+            let recindex = RECINDEX_RE
+                .captures(tag.as_str())
+                .and_then(|captures| {
+                    (1..=3)
+                        .find_map(|index| captures.get(index))
+                        .and_then(|value| value.as_str().parse::<u32>().ok())
+                })
+                .filter(|index| *index > 0);
+            if let Some(recindex) = recindex {
+                let alt = ALT_RE
+                    .captures(tag.as_str())
+                    .and_then(|captures| (1..=3).find_map(|index| captures.get(index)))
+                    .map(|value| self.decode_entities(value.as_str()));
+                chunks.push(MobiHtmlChunk::Image { recindex, alt });
+            } else {
+                chunks.push(MobiHtmlChunk::Text(tag.as_str().to_string()));
+            }
+            cursor = tag.end();
+        }
+
+        if cursor < chunk.len() {
+            chunks.push(MobiHtmlChunk::Text(chunk[cursor..].to_string()));
+        }
+        chunks
     }
 
     fn strip_mbp_and_comments(&self, html: &str) -> String {

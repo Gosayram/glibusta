@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use anyhow::{Result, bail};
 use regex::Regex;
 
 use crate::api::models::{
-    BlockType, BookFormat, MAX_FILE_SIZE, NormalizedBook, ReaderBlock, TocEntry,
+    BlockType, BookFormat, MAX_FILE_SIZE, MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock, TocEntry,
 };
 
 mod chapters;
@@ -29,6 +30,7 @@ static AUTHORS_SPLIT_RE: LazyLock<Regex> =
 
 const MAX_TOTAL_TEXT_BYTES: usize = 32 * 1024 * 1024;
 const PALMDOC_LOGICAL_RECORD_BYTES: usize = 4096;
+const MAX_INLINE_IMAGE_DATA_BYTES: usize = 128 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // BinaryReader
@@ -256,7 +258,9 @@ impl MobiTextExtractor {
     ) -> Result<Vec<ReaderBlock>> {
         let text = self.extract_text(full_bytes, palm_db, header, first_text_record_index)?;
         if self.looks_like_html(&text) {
-            Ok(self.html_parser.parse(&text))
+            let mut blocks = self.html_parser.parse(&text);
+            resolve_inline_images(full_bytes, palm_db, header, &mut blocks);
+            Ok(blocks)
         } else {
             Ok(self.plain_text_to_blocks(&text))
         }
@@ -329,6 +333,69 @@ impl MobiTextExtractor {
     }
 }
 
+fn resolve_inline_images(
+    full_bytes: &[u8],
+    palm_db: &PalmDb,
+    header: &MobiHeader,
+    blocks: &mut Vec<ReaderBlock>,
+) {
+    let mut resolved = HashMap::<u32, Option<String>>::new();
+    let mut total_data_uri_bytes = 0usize;
+
+    blocks.retain_mut(|block| {
+        if block.block_type != BlockType::Image {
+            return true;
+        }
+        let Some(recindex) = block
+            .image_url
+            .as_deref()
+            .and_then(|url| url.strip_prefix("mobi-recindex:"))
+            .and_then(|value| value.parse::<u32>().ok())
+        else {
+            return false;
+        };
+
+        let image_url = if let Some(cached) = resolved.get(&recindex) {
+            cached.clone()
+        } else {
+            let image_url = inline_image_data_uri(full_bytes, palm_db, header, recindex);
+            resolved.insert(recindex, image_url.clone());
+            image_url
+        };
+        let Some(image_url) = image_url else {
+            return false;
+        };
+        let Some(next_total) = total_data_uri_bytes.checked_add(image_url.len()) else {
+            return false;
+        };
+        if next_total > MAX_INLINE_IMAGE_DATA_BYTES {
+            return false;
+        }
+        total_data_uri_bytes = next_total;
+        block.image_url = Some(image_url);
+        true
+    });
+
+    for (index, block) in blocks.iter_mut().enumerate() {
+        block.index = index as i32;
+    }
+}
+
+fn inline_image_data_uri(
+    full_bytes: &[u8],
+    palm_db: &PalmDb,
+    header: &MobiHeader,
+    recindex: u32,
+) -> Option<String> {
+    let relative_index = usize::try_from(recindex).ok()?.checked_sub(1)?;
+    let first_image = usize::try_from(header.first_image_record_index).ok()?;
+    let record_index = first_image.checked_add(relative_index)?;
+    let bytes = record_bytes(full_bytes, palm_db, record_index).ok()?;
+    (bytes.len() <= MAX_IMAGE_SIZE)
+        .then(|| encode_image_data_uri(bytes))
+        .flatten()
+}
+
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
@@ -358,7 +425,7 @@ fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
     if start >= record0.len() || end > record0.len() {
         return None;
     }
-    let name = String::from_utf8_lossy(&record0[start..end])
+    let name = encoding::decode_text(&record0[start..end], header.text_encoding)
         .trim()
         .to_string();
     if name.is_empty() { None } else { Some(name) }
@@ -461,7 +528,7 @@ fn kf8_section<'a>(
     Some((header_index, record0, header, metadata))
 }
 
-fn encode_cover_data_uri(bytes: &[u8]) -> Option<String> {
+fn encode_image_data_uri(bytes: &[u8]) -> Option<String> {
     let mime = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8 {
         "image/jpeg"
     } else if bytes.len() >= 4 && bytes[0] == 0x89 && bytes[1] == 0x50 {
@@ -538,7 +605,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
 
     let cover_extractor = MobiCoverExtractor;
     let cover_bytes = cover_extractor.extract(bytes, &palm_db, &header, &metadata);
-    let cover_url = cover_bytes.as_ref().and_then(|b| encode_cover_data_uri(b));
+    let cover_url = cover_bytes.as_ref().and_then(|b| encode_image_data_uri(b));
 
     let mut meta = serde_json::Map::new();
     meta.insert(
