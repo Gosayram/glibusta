@@ -470,6 +470,9 @@ fn parse_document_xml_with_hyperlinks(
     let mut current_span_text = String::new();
     let mut current_span_bold = false;
     let mut current_span_italic = false;
+    let mut current_span_superscript = false;
+    let mut current_span_subscript = false;
+    let mut current_span_strikethrough = false;
     let mut current_span_href: Option<String> = None;
     let mut current_note_ref: Option<String> = None;
     let mut current_image_assets: Vec<String> = Vec::new();
@@ -520,6 +523,9 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_text.clear();
                         current_span_bold = false;
                         current_span_italic = false;
+                        current_span_superscript = false;
+                        current_span_subscript = false;
+                        current_span_strikethrough = false;
                         current_span_href = None;
                         current_note_ref = None;
                         current_image_assets.clear();
@@ -573,9 +579,29 @@ fn parse_document_xml_with_hyperlinks(
                         current_span_text.clear();
                         current_span_bold = false;
                         current_span_italic = false;
+                        current_span_superscript = false;
+                        current_span_subscript = false;
+                        current_span_strikethrough = false;
                     }
                     "b" if in_run => current_span_bold = word_bool_value(e),
                     "i" if in_run => current_span_italic = word_bool_value(e),
+                    "strike" | "dstrike" if in_run => {
+                        current_span_strikethrough = word_bool_value(e);
+                    }
+                    "vertAlign" if in_run => match word_value_attribute(e).as_deref() {
+                        Some(value) if value.eq_ignore_ascii_case("superscript") => {
+                            current_span_superscript = true;
+                            current_span_subscript = false;
+                        }
+                        Some(value) if value.eq_ignore_ascii_case("subscript") => {
+                            current_span_subscript = true;
+                            current_span_superscript = false;
+                        }
+                        _ => {
+                            current_span_superscript = false;
+                            current_span_subscript = false;
+                        }
+                    },
                     "tab" if in_run => {
                         current_span_text.push('\t');
                     }
@@ -632,9 +658,9 @@ fn parse_document_xml_with_hyperlinks(
                                 text: current_span_text.clone(),
                                 bold: current_span_bold,
                                 italic: current_span_italic,
-                                superscript: false,
-                                subscript: false,
-                                strikethrough: false,
+                                superscript: current_span_superscript,
+                                subscript: current_span_subscript,
+                                strikethrough: current_span_strikethrough,
                                 code: false,
                                 style_name: None,
                                 href: current_span_href.clone(),
@@ -672,9 +698,14 @@ fn parse_document_xml_with_hyperlinks(
                                 chapter_title = trimmed.clone();
                             }
 
-                            let has_formatting = rich_spans
-                                .iter()
-                                .any(|s| s.bold || s.italic || s.superscript || s.href.is_some());
+                            let has_formatting = rich_spans.iter().any(|s| {
+                                s.bold
+                                    || s.italic
+                                    || s.superscript
+                                    || s.subscript
+                                    || s.strikethrough
+                                    || s.href.is_some()
+                            });
 
                             let mut paragraph = ReaderBlock {
                                 index: block_index + pending_list_items.len() as i32,
@@ -854,6 +885,23 @@ fn parse_document_xml_with_hyperlinks(
                     }
                     "b" if in_run => current_span_bold = word_bool_value(e),
                     "i" if in_run => current_span_italic = word_bool_value(e),
+                    "strike" | "dstrike" if in_run => {
+                        current_span_strikethrough = word_bool_value(e);
+                    }
+                    "vertAlign" if in_run => match word_value_attribute(e).as_deref() {
+                        Some(value) if value.eq_ignore_ascii_case("superscript") => {
+                            current_span_superscript = true;
+                            current_span_subscript = false;
+                        }
+                        Some(value) if value.eq_ignore_ascii_case("subscript") => {
+                            current_span_subscript = true;
+                            current_span_superscript = false;
+                        }
+                        _ => {
+                            current_span_superscript = false;
+                            current_span_subscript = false;
+                        }
+                    },
                     "tab" if in_run => current_span_text.push('\t'),
                     "br" if in_run => current_span_text.push('\n'),
                     _ => {}
@@ -990,6 +1038,26 @@ mod tests {
         assert!(!spans[0].italic);
         assert!(!spans[1].bold);
         assert!(spans[1].italic);
+    }
+
+    #[test]
+    fn preserves_vertical_alignment_and_strikethrough_run_properties() {
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+                <w:body><w:p>
+                    <w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>2</w:t></w:r>
+                    <w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>n</w:t></w:r>
+                    <w:r><w:rPr><w:strike/></w:rPr><w:t>obsolete</w:t></w:r>
+                </w:p></w:body>
+            </w:document>
+        "#;
+
+        let (blocks, _) = parse_document_xml(xml).expect("parse DOCX XML");
+        let spans = blocks[0].rich_spans.as_ref().expect("formatted spans");
+
+        assert!(spans[0].superscript);
+        assert!(spans[1].subscript);
+        assert!(spans[2].strikethrough);
     }
 
     #[test]

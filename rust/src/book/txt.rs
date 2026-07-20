@@ -131,7 +131,7 @@ fn split_paragraphs(text: &str) -> Vec<String> {
         .replace('\r', "\n");
     for line in normalized.split('\n') {
         if line.trim().is_empty() {
-            let paragraph = normalize_whitespace(&current);
+            let paragraph = normalize_txt_whitespace(&current);
             if !paragraph.is_empty() {
                 paragraphs.push(paragraph);
             }
@@ -144,11 +144,25 @@ fn split_paragraphs(text: &str) -> Vec<String> {
         }
     }
 
-    let paragraph = normalize_whitespace(&current);
+    let paragraph = normalize_txt_whitespace(&current);
     if !paragraph.is_empty() {
         paragraphs.push(paragraph);
     }
     paragraphs
+}
+
+/// TXT has no layout semantics besides whitespace. Preserve tabs as four
+/// spaces so imported indents remain readable instead of being collapsed by
+/// the shared prose normalizer.
+fn normalize_txt_whitespace(text: &str) -> String {
+    if !text.contains('\t') {
+        return normalize_whitespace(text);
+    }
+
+    text.split('\t')
+        .map(normalize_whitespace)
+        .collect::<Vec<_>>()
+        .join("    ")
 }
 
 fn decode_text(bytes: &[u8], encoding_name: &str) -> Result<String> {
@@ -398,6 +412,13 @@ mod tests {
         assert_eq!(blocks[0].text, "Null separated text");
         assert_eq!(blocks[1].text, "Second paragraph");
         assert!(blocks.iter().all(|block| !block.text.contains('\0')));
+    }
+
+    #[test]
+    fn expands_tabs_to_a_readable_fixed_width_indent() {
+        let book = parse_txt(b"Column\tValue", Some("utf-8")).expect("parse tabbed TXT");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Column    Value");
     }
 
     #[test]

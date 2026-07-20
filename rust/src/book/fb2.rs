@@ -1318,9 +1318,10 @@ fn detect_fb2_encoding(bytes: &[u8]) -> String {
                         if label.eq_ignore_ascii_case("utf-8")
                             && std::str::from_utf8(bytes).is_err()
                         {
-                            // Invalid UTF-8 declarations in legacy FB2 files are overwhelmingly
-                            // Windows-1251; decoding as UTF-8 would replace every Cyrillic byte.
-                            return "windows-1251".to_string();
+                            // A false UTF-8 declaration must not turn legacy bytes into
+                            // replacement characters. Use the same statistical fallback as a
+                            // missing/unknown declaration instead of assuming Cyrillic.
+                            return crate::book::encoding::detect_encoding(bytes).to_string();
                         }
                         return label.to_lowercase();
                     }
@@ -1565,6 +1566,49 @@ mod tests {
         let book = parse_fb2(&bytes, None).expect("parse CP1251 FB2 with false UTF-8 declaration");
 
         assert!(book.title.starts_with("Привет"), "{}", book.title);
+    }
+
+    #[test]
+    fn decodes_declared_windows_1250_and_windows_1252_fb2() {
+        for (label, title) in [
+            ("windows-1250", "Příliš žluťoučký kůň"),
+            ("windows-1252", "Résumé — café"),
+        ] {
+            let encoding = encoding_rs::Encoding::for_label(label.as_bytes())
+                .expect("fixture encoding must be supported");
+            let (encoded_title, _, _) = encoding.encode(title);
+            let mut bytes = format!(
+                "<?xml version=\"1.0\" encoding=\"{label}\"?><FictionBook><description><title-info><book-title>"
+            )
+            .into_bytes();
+            bytes.extend_from_slice(&encoded_title);
+            bytes.extend_from_slice(
+                b"</book-title></title-info></description><body><section><p>Text</p></section></body></FictionBook>",
+            );
+
+            let book = parse_fb2(&bytes, None).expect("parse declared legacy FB2");
+            assert_eq!(book.title, title, "{label}");
+        }
+    }
+
+    #[test]
+    fn falls_back_for_unknown_or_false_utf8_declarations_without_corrupting_windows_1252() {
+        let title = "Résumé — café";
+        let (encoded_title, _, _) = encoding_rs::WINDOWS_1252.encode(title);
+
+        for declaration in ["x-fictionbook-legacy", "utf-8"] {
+            let mut bytes = format!(
+                "<?xml version=\"1.0\" encoding=\"{declaration}\"?><FictionBook><description><title-info><book-title>"
+            )
+            .into_bytes();
+            bytes.extend_from_slice(&encoded_title);
+            bytes.extend_from_slice(
+                b"</book-title></title-info></description><body><section><p>Text</p></section></body></FictionBook>",
+            );
+
+            let book = parse_fb2(&bytes, None).expect("fallback must keep FB2 readable");
+            assert_eq!(book.title, title, "{declaration}");
+        }
     }
 
     #[test]
