@@ -1043,7 +1043,7 @@ mod tests {
         // legitimate prose, so retain the malformed source verbatim instead.
         let book = parse_rtf(
             br"{\rtf1\ansi First paragraph.par
-Second paragraph.par
+Second paragraph.par and an inlineparword
 }",
             Some("utf-8"),
         )
@@ -1051,8 +1051,9 @@ Second paragraph.par
 
         assert_eq!(
             book.chapters[0].blocks[0].text,
-            "First paragraph.par\nSecond paragraph.par",
+            "First paragraph.par\nSecond paragraph.par and an inlineparword",
         );
+        assert_eq!(book.chapters[0].blocks.len(), 1);
     }
 
     #[test]

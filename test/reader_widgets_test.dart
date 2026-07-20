@@ -685,6 +685,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('reapplies EPUB span colors when the reader theme changes', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    Widget buildReader(ReaderTheme theme) {
+      return wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'theme-switch-epub',
+            title: 'Theme switch EPUB',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Chapter'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Chapter',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: 'Colorful',
+                  richSpans: [RichSpan(text: 'Colorful', color: '#ff0000')],
+                ),
+              ],
+            ),
+          },
+          settings: ReaderSettings(theme: theme),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      );
+    }
+
+    Text coloredText() => tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && widget.textSpan?.toPlainText().endsWith('Colorful') == true,
+      ),
+    );
+
+    await tester.pumpWidget(buildReader(ReaderTheme.dark));
+    await tester.pumpAndSettle();
+    final darkSpan = (coloredText().textSpan! as TextSpan).children!.last as TextSpan;
+    expect(darkSpan.style!.color, const Color(0xFFE6E1E5));
+
+    await tester.pumpWidget(buildReader(ReaderTheme.light));
+    await tester.pumpAndSettle();
+    final lightSpan = (coloredText().textSpan! as TextSpan).children!.last as TextSpan;
+    expect(lightSpan.style!.color, const Color(0xFFFF0000));
+  });
+
   testWidgets('focus mode uses the dark system link color', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

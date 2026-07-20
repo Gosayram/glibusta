@@ -222,6 +222,58 @@ fn test_path_parser_opens_fb2_zip() {
 }
 
 #[test]
+fn test_sequential_fb2_zip_and_epub_opens_do_not_leak_archive_or_parser_state() {
+    let directory = std::env::temp_dir().join(format!(
+        "glibusta-sequential-archive-parser-{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    fs::create_dir_all(&directory).expect("create fixture directory");
+    let fb2_a_path = directory.join("first.zip");
+    let epub_path = directory.join("middle.epub");
+    let fb2_b_path = directory.join("last.zip");
+
+    let fb2_zip = |title: &str| {
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut buffer);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("book.fb2", options)
+            .expect("create FB2 entry");
+        zip.write_all(
+            MINIMAL_FB2
+                .replace("Туманность Андромеды", title)
+                .as_bytes(),
+        )
+        .expect("write FB2 fixture");
+        zip.finish().expect("finish FB2.ZIP fixture");
+        buffer.into_inner()
+    };
+    fs::write(&fb2_a_path, fb2_zip("First ZIP book")).expect("write first FB2.ZIP");
+    fs::write(&epub_path, create_minimal_epub()).expect("write EPUB");
+    fs::write(&fb2_b_path, fb2_zip("Last ZIP book")).expect("write last FB2.ZIP");
+
+    let result = (|| {
+        let first = glibusta_core::api::api::parse_book(fb2_a_path.to_string_lossy().into_owned())?;
+        let epub = glibusta_core::api::api::parse_book(epub_path.to_string_lossy().into_owned())?;
+        let last = glibusta_core::api::api::parse_book(fb2_b_path.to_string_lossy().into_owned())?;
+        anyhow::Result::<_>::Ok((first, epub, last))
+    })();
+    let _ = fs::remove_dir_all(&directory);
+
+    let (first, epub, last) = result.expect("sequential archive parsing");
+    assert_eq!(first.title, "First ZIP book");
+    assert_eq!(epub.title, "Test EPUB");
+    assert_eq!(last.title, "Last ZIP book");
+    assert_eq!(first.book_format, BookFormat::Fb2);
+    assert_eq!(epub.book_format, BookFormat::Epub);
+    assert_eq!(last.book_format, BookFormat::Fb2);
+}
+
+#[test]
 fn test_fb2_zip_rejects_a_corrupted_entry() {
     let mut buffer = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut buffer);
