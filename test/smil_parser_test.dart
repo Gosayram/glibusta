@@ -67,6 +67,25 @@ void main() {
       expect(entries[0].clipEnd, const Duration(milliseconds: 3200));
     });
 
+    test('parses normal-play-time values used by EPUB media overlays', () {
+      final xml = '''
+      <smil xmlns="http://www.w3.org/ns/SMIL">
+        <body>
+          <par>
+            <text src="chapter.xhtml#p1"/>
+            <audio src="audio.mp3" clipBegin="npt=1.25s" clipEnd="NPT=00:00:03.500"/>
+          </par>
+        </body>
+      </smil>
+      ''';
+
+      final entries = SmilParser.parse(xml);
+
+      expect(entries, hasLength(1));
+      expect(entries.single.clipBegin, const Duration(milliseconds: 1250));
+      expect(entries.single.clipEnd, const Duration(milliseconds: 3500));
+    });
+
     test('returns empty for SMIL without par elements', () {
       final xml = '''
       <smil xmlns="http://www.w3.org/ns/SMIL">

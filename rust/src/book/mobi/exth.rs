@@ -14,6 +14,9 @@ pub(crate) struct MobiMetadata {
     pub language: Option<CompactString>,
     pub description: Option<CompactString>,
     pub cover_record_index: Option<u32>,
+    /// PalmDB record containing the KF8 boundary marker (EXTH 121).
+    /// The KF8 MOBI header, when present, is the following record.
+    pub kf8_boundary_record_index: Option<u32>,
     pub has_exth: bool,
 }
 
@@ -25,6 +28,7 @@ impl MobiMetadata {
             language: None,
             description: None,
             cover_record_index: None,
+            kf8_boundary_record_index: None,
             has_exth: false,
         }
     }
@@ -109,6 +113,7 @@ impl ExthParser {
         let mut language: Option<String> = None;
         let mut description: Option<String> = None;
         let mut cover_record_index: Option<u32> = None;
+        let mut kf8_boundary_record_index: Option<u32> = None;
 
         for (rec_type, data) in &records {
             match rec_type {
@@ -128,6 +133,10 @@ impl ExthParser {
                     cover_record_index =
                         Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
                 }
+                121 if data.len() >= 4 => {
+                    kf8_boundary_record_index =
+                        Some(u32::from_be_bytes([data[0], data[1], data[2], data[3]]));
+                }
                 _ => {}
             }
         }
@@ -138,6 +147,7 @@ impl ExthParser {
             language: language.map(CompactString::new),
             description: description.map(CompactString::new),
             cover_record_index,
+            kf8_boundary_record_index,
             has_exth: true,
         })
     }

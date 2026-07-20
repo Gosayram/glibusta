@@ -7,6 +7,7 @@ use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use unrar_ng::Archive;
+use unrar_ng::error::{Code as UnrarErrorCode, UnrarError, When as UnrarErrorWhen};
 
 use crate::api::models::{
     BlockType, BookFormat, MAX_COMPRESSION_RATIO, MAX_EXTRACTED_FILES, MAX_FILE_SIZE,
@@ -27,9 +28,12 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         );
     }
 
-    let mut archive = Archive::new(path)
-        .open_for_processing()
-        .with_context(|| format!("Failed to open CBR archive: {}", path.display()))?;
+    let mut archive = Archive::new(path).open_for_processing().map_err(|error| {
+        cbr_unrar_error(
+            format!("Failed to open CBR archive: {}", path.display()),
+            error,
+        )
+    })?;
     let mut entry_count = 0usize;
     let mut total_uncompressed_size = 0u64;
     let mut images = Vec::new();
@@ -38,7 +42,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
     loop {
         let Some(entry) = archive
             .read_header()
-            .context("Failed to read CBR entry header")?
+            .map_err(|error| cbr_unrar_error("Failed to read CBR entry header", error))?
         else {
             break;
         };
@@ -75,21 +79,24 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             && entry.entry().is_file()
         {
             if entry_size <= MAX_COMIC_INFO_BYTES {
-                let (bytes, next_archive) =
-                    entry.read().context("Failed to extract ComicInfo.xml")?;
+                let (bytes, next_archive) = entry
+                    .read()
+                    .map_err(|error| cbr_unrar_error("Failed to extract ComicInfo.xml", error))?;
                 comic_info = parse_comic_info(&bytes);
                 archive = next_archive;
             } else {
-                archive = entry
-                    .skip()
-                    .context("Failed to skip oversized ComicInfo.xml")?;
+                archive = entry.skip().map_err(|error| {
+                    cbr_unrar_error("Failed to skip oversized ComicInfo.xml", error)
+                })?;
             }
             continue;
         }
 
         let Some(media_type) = image_media_type(&entry_name).filter(|_| entry.entry().is_file())
         else {
-            archive = entry.skip().context("Failed to skip CBR entry")?;
+            archive = entry
+                .skip()
+                .map_err(|error| cbr_unrar_error("Failed to skip CBR entry", error))?;
             continue;
         };
         if entry_size > MAX_IMAGE_SIZE as u64 {
@@ -100,7 +107,9 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             );
         }
 
-        let (bytes, next_archive) = entry.read().context("Failed to extract CBR image")?;
+        let (bytes, next_archive) = entry
+            .read()
+            .map_err(|error| cbr_unrar_error("Failed to extract CBR image", error))?;
         if bytes.len() > MAX_IMAGE_SIZE {
             bail!(
                 "CBR image '{}' exceeds maximum size after extraction",
@@ -174,6 +183,20 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+fn cbr_unrar_error(context: impl Into<String>, error: UnrarError) -> anyhow::Error {
+    if matches!(
+        error.code,
+        UnrarErrorCode::MissingPassword | UnrarErrorCode::BadPassword
+    ) {
+        return anyhow::anyhow!("CBR archive is encrypted and cannot be opened without a password");
+    }
+    if error.code == UnrarErrorCode::EOpen && error.when == UnrarErrorWhen::Process {
+        return anyhow::anyhow!("CBR archive is incomplete: a required volume is missing");
+    }
+
+    anyhow::Error::new(error).context(context.into())
 }
 
 fn first_image_cover(blocks: &[ReaderBlock]) -> Option<String> {
@@ -352,10 +375,12 @@ fn trim_leading_zeroes(number: &[u8]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::{
-        first_image_cover, image_media_type, natural_cmp, parse_cbr_path, parse_comic_info,
+        cbr_unrar_error, first_image_cover, image_media_type, natural_cmp, parse_cbr_path,
+        parse_comic_info,
     };
     use crate::api::models::{BlockType, ReaderBlock};
     use std::cmp::Ordering;
+    use unrar_ng::error::{Code as UnrarErrorCode, UnrarError, When as UnrarErrorWhen};
 
     // Minimal valid RAR4 archive from UnRAR's own test corpus. It contains a
     // `VERSION` file, not a comic page.
@@ -381,6 +406,32 @@ mod tests {
         assert_eq!(
             natural_cmp("pages/001.jpg", "pages/1.jpg"),
             Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn classifies_missing_cbr_password_as_a_controlled_error() {
+        let error = cbr_unrar_error(
+            "Failed to open CBR archive",
+            UnrarError::from(UnrarErrorCode::MissingPassword, UnrarErrorWhen::Open),
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "CBR archive is encrypted and cannot be opened without a password"
+        );
+    }
+
+    #[test]
+    fn classifies_a_missing_cbr_volume_as_a_controlled_error() {
+        let error = cbr_unrar_error(
+            "Failed to extract CBR image",
+            UnrarError::from(UnrarErrorCode::EOpen, UnrarErrorWhen::Process),
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "CBR archive is incomplete: a required volume is missing"
         );
     }
 

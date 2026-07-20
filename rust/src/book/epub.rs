@@ -1028,7 +1028,7 @@ fn extract_font_faces(text: &str) -> Vec<(String, String)> {
                         let block = &expanded[block_start..j - 1];
                         let mut font_family = String::new();
                         let mut src = String::new();
-                        for prop in block.split(';') {
+                        for prop in split_css_declarations(block) {
                             let prop = prop.trim();
                             if let Some(colon) = prop.find(':') {
                                 let name = prop[..colon].trim();
@@ -1060,6 +1060,32 @@ fn extract_font_faces(text: &str) -> Vec<(String, String)> {
         }
     }
     faces
+}
+
+/// Split CSS declarations without breaking `data:` URLs, whose base64 payload
+/// commonly contains a semicolon before the comma separator.
+#[cfg(not(miri))]
+fn split_css_declarations(block: &str) -> Vec<&str> {
+    let mut declarations = Vec::new();
+    let mut start = 0;
+    let mut paren_depth = 0u32;
+    let mut quote = None;
+
+    for (index, character) in block.char_indices() {
+        match character {
+            '\'' | '"' if quote.is_none() => quote = Some(character),
+            character if quote == Some(character) => quote = None,
+            '(' if quote.is_none() => paren_depth += 1,
+            ')' if quote.is_none() => paren_depth = paren_depth.saturating_sub(1),
+            ';' if quote.is_none() && paren_depth == 0 => {
+                declarations.push(&block[start..index]);
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    declarations.push(&block[start..]);
+    declarations
 }
 
 /// Apply CSS properties to a ReaderBlock by matching tag/class selectors.
@@ -2373,6 +2399,8 @@ fn extract_chapter_title(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(miri))]
+    use super::extract_font_faces;
     use super::{parse_nav_xhtml, parse_xhtml_to_blocks};
     use crate::api::models::BlockType;
 
@@ -2454,5 +2482,26 @@ mod tests {
         assert_eq!(blocks[2].block_type, BlockType::Footnote);
         assert_eq!(blocks[2].note_id.as_deref(), Some("note-2"));
         assert_eq!(blocks[2].text, "Second note.");
+    }
+
+    #[cfg(not(miri))]
+    #[test]
+    fn preserves_data_font_urls_with_semicolon_parameters() {
+        let faces = extract_font_faces(
+            r#"<html><head><style>
+                @font-face {
+                  font-family: "Embedded";
+                  src: url("data:font/woff2;charset=utf-8;base64,AAEC");
+                }
+            </style></head><body><p>Text</p></body></html>"#,
+        );
+
+        assert_eq!(
+            faces,
+            vec![(
+                "Embedded".to_string(),
+                "data:font/woff2;charset=utf-8;base64,AAEC".to_string(),
+            )]
+        );
     }
 }

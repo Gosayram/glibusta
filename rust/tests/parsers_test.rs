@@ -1187,6 +1187,82 @@ fn create_minimal_mobi() -> Vec<u8> {
     create_mobi_with_text(b"<html><body><p>Hello MOBI</p><p>Second paragraph.</p></body></html>")
 }
 
+fn create_mobi_header_record(text_record_count: u16, exth_records: &[(u32, Vec<u8>)]) -> Vec<u8> {
+    let mut record = vec![0; 248];
+    record[0..2].copy_from_slice(&1u16.to_be_bytes()); // PalmDOC compression = none
+    record[8..10].copy_from_slice(&text_record_count.to_be_bytes());
+    record[10..12].copy_from_slice(&4096u16.to_be_bytes());
+    record[16..20].copy_from_slice(b"MOBI");
+    record[20..24].copy_from_slice(&232u32.to_be_bytes());
+    record[28..30].copy_from_slice(&1252u16.to_be_bytes());
+
+    if !exth_records.is_empty() {
+        record[16 + 128..16 + 132].copy_from_slice(&0x40u32.to_be_bytes());
+        let exth_len = 12
+            + exth_records
+                .iter()
+                .map(|(_, data)| 8 + data.len())
+                .sum::<usize>();
+        record.extend_from_slice(b"EXTH");
+        record.extend_from_slice(&(exth_len as u32).to_be_bytes());
+        record.extend_from_slice(&(exth_records.len() as u32).to_be_bytes());
+        for (kind, data) in exth_records {
+            record.extend_from_slice(&kind.to_be_bytes());
+            record.extend_from_slice(&((8 + data.len()) as u32).to_be_bytes());
+            record.extend_from_slice(data);
+        }
+    }
+
+    record
+}
+
+fn create_palm_mobi(records: Vec<Vec<u8>>) -> Vec<u8> {
+    let table_end = 78 + records.len() * 8;
+    let mut offsets = Vec::with_capacity(records.len());
+    let mut next_offset = table_end;
+    for record in &records {
+        offsets.push(next_offset as u32);
+        next_offset += record.len();
+    }
+
+    let mut bytes = Vec::with_capacity(next_offset);
+    bytes.extend_from_slice(b"Dual MOBI");
+    bytes.resize(32, 0);
+    bytes.resize(76, 0);
+    bytes.extend_from_slice(&(records.len() as u16).to_be_bytes());
+    for (index, offset) in offsets.iter().enumerate() {
+        bytes.extend_from_slice(&offset.to_be_bytes());
+        bytes.extend_from_slice(&[0, 0, 0, index as u8]);
+    }
+    for record in records {
+        bytes.extend_from_slice(&record);
+    }
+    bytes
+}
+
+fn create_dual_format_mobi() -> Vec<u8> {
+    // EXTH 121 points at the BOUNDARY record (record 2). The following record
+    // is the KF8 header and its text starts at record 4.
+    let legacy_header = create_mobi_header_record(1, &[(121, 2u32.to_be_bytes().to_vec())]);
+    let kf8_header = create_mobi_header_record(1, &[]);
+    create_palm_mobi(vec![
+        legacy_header,
+        b"<p>Legacy KF7 text</p>".to_vec(),
+        b"BOUNDARY".to_vec(),
+        kf8_header,
+        b"<p>Modern KF8 text</p>".to_vec(),
+    ])
+}
+
+fn create_mobi_with_invalid_kf8_boundary() -> Vec<u8> {
+    let legacy_header = create_mobi_header_record(1, &[(121, 2u32.to_be_bytes().to_vec())]);
+    create_palm_mobi(vec![
+        legacy_header,
+        b"<p>Readable legacy text</p>".to_vec(),
+        b"not a KF8 boundary".to_vec(),
+    ])
+}
+
 #[test]
 fn test_mobi_basic_parse() {
     let mobi_bytes = create_minimal_mobi();
@@ -1194,6 +1270,31 @@ fn test_mobi_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert!(!book.chapters[0].blocks.is_empty(), "should have blocks");
     assert_eq!(book.book_format, BookFormat::Mobi);
+}
+
+#[test]
+fn test_mobi_dual_format_prefers_kf8_text_section() {
+    let book = glibusta_core::book::mobi::parse_mobi(&create_dual_format_mobi(), None).unwrap();
+    let text = book
+        .chapters
+        .iter()
+        .flat_map(|chapter| &chapter.blocks)
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(text.contains("Modern KF8 text"));
+    assert!(!text.contains("Legacy KF7 text"));
+    assert_eq!(book.metadata.unwrap()["mobiKf8Likely"], true);
+}
+
+#[test]
+fn test_mobi_invalid_kf8_boundary_falls_back_to_legacy_text() {
+    let book =
+        glibusta_core::book::mobi::parse_mobi(&create_mobi_with_invalid_kf8_boundary(), None)
+            .unwrap();
+
+    assert_eq!(book.chapters[0].blocks[0].text, "Readable legacy text");
 }
 
 #[test]

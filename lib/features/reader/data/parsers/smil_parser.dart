@@ -60,7 +60,13 @@ class SmilParser {
   /// Parse SMIL time values: "12.5s", "1m30s", "00:01:30.5", "7500ms"
   static Duration _parseTime(String? value) {
     if (value == null || value.isEmpty) return Duration.zero;
-    final v = value.trim();
+    final raw = value.trim();
+    // EPUB Media Overlays may use the SMIL normal-play-time prefix, e.g.
+    // `npt=12.5s` or `npt=00:01:30.5`. It describes the same clock values
+    // as the unprefixed forms below.
+    final v = raw.length >= 4 && raw.substring(0, 4).toLowerCase() == 'npt='
+        ? raw.substring(4).trim()
+        : raw;
 
     // Match "XXs" (seconds)
     if (v.endsWith('s') && !v.endsWith('ms')) {

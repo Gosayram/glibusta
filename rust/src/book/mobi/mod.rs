@@ -180,20 +180,24 @@ impl MobiTextExtractor {
         full_bytes: &[u8],
         palm_db: &PalmDb,
         header: &MobiHeader,
+        first_text_record_index: usize,
     ) -> Result<String> {
         if header.compression != 1 && header.compression != 2 {
             bail!("Unsupported MOBI compression: {}", header.compression);
         }
-        if header.text_record_count == 0
-            || (header.text_record_count as usize) >= palm_db.records.len()
-        {
+        let text_record_count = header.text_record_count as usize;
+        let Some(last_text_record_index) = first_text_record_index.checked_add(text_record_count)
+        else {
+            bail!("MOBI text record range overflows");
+        };
+        if text_record_count == 0 || last_text_record_index > palm_db.records.len() {
             bail!("Invalid MOBI text record count");
         }
 
         let mut chunks: Vec<u8> = Vec::new();
         let decompressor = PalmDocDecompressor;
 
-        for i in 1..=header.text_record_count as usize {
+        for i in first_text_record_index..last_text_record_index {
             let record = record_bytes(full_bytes, palm_db, i)?;
             let decompressed = if header.compression == 1 {
                 record.to_vec()
@@ -214,8 +218,9 @@ impl MobiTextExtractor {
         full_bytes: &[u8],
         palm_db: &PalmDb,
         header: &MobiHeader,
+        first_text_record_index: usize,
     ) -> Result<Vec<ReaderBlock>> {
-        let text = self.extract_text(full_bytes, palm_db, header)?;
+        let text = self.extract_text(full_bytes, palm_db, header, first_text_record_index)?;
         if self.looks_like_html(&text) {
             Ok(self.html_parser.parse(&text))
         } else {
@@ -391,6 +396,27 @@ fn is_likely_kf8(header: &MobiHeader, record0: &[u8]) -> bool {
     text.contains("BOUNDARY") || text.contains("FDST") || text.contains("RESC")
 }
 
+/// Return the KF8 header and metadata when a valid EXTH boundary points to a
+/// complete KF8 section. Broken dual-format metadata must not make an
+/// otherwise readable legacy MOBI fail to open.
+fn kf8_section<'a>(
+    full_bytes: &'a [u8],
+    palm_db: &PalmDb,
+    legacy_metadata: &MobiMetadata,
+) -> Option<(usize, &'a [u8], MobiHeader, MobiMetadata)> {
+    let boundary_index = legacy_metadata.kf8_boundary_record_index? as usize;
+    let boundary = record_bytes(full_bytes, palm_db, boundary_index).ok()?;
+    if boundary != b"BOUNDARY" {
+        return None;
+    }
+
+    let header_index = boundary_index.checked_add(1)?;
+    let record0 = record_bytes(full_bytes, palm_db, header_index).ok()?;
+    let header = MobiHeaderParser.parse(record0).ok()?;
+    let metadata = ExthParser.parse(record0, &header).ok()?;
+    Some((header_index, record0, header, metadata))
+}
+
 fn encode_cover_data_uri(bytes: &[u8]) -> Option<String> {
     let mime = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xD8 {
         "image/jpeg"
@@ -425,12 +451,24 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     }
 
     let palm_db = PalmDbParser.parse(bytes)?;
-    let record0 = record_bytes(bytes, &palm_db, 0)?;
-    let header = MobiHeaderParser.parse(record0)?;
-    let metadata = ExthParser.parse(record0, &header)?;
+    let legacy_record0 = record_bytes(bytes, &palm_db, 0)?;
+    let legacy_header = MobiHeaderParser.parse(legacy_record0)?;
+    let legacy_metadata = ExthParser.parse(legacy_record0, &legacy_header)?;
+    let (header_record_index, record0, header, metadata, using_kf8) =
+        if let Some((header_index, kf8_record0, kf8_header, kf8_metadata)) =
+            kf8_section(bytes, &palm_db, &legacy_metadata)
+        {
+            (header_index, kf8_record0, kf8_header, kf8_metadata, true)
+        } else {
+            (0, legacy_record0, legacy_header, legacy_metadata, false)
+        };
 
     let text_extractor = MobiTextExtractor::new();
-    let blocks = text_extractor.extract_blocks(bytes, &palm_db, &header)?;
+    let first_text_record_index = header_record_index
+        .checked_add(1)
+        .ok_or_else(|| anyhow::anyhow!("MOBI text record index overflows"))?;
+    let blocks =
+        text_extractor.extract_blocks(bytes, &palm_db, &header, first_text_record_index)?;
 
     let title = first_non_empty(&[
         metadata.title.as_deref(),
@@ -488,7 +526,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     );
     meta.insert(
         "mobiKf8Likely".to_string(),
-        serde_json::json!(is_likely_kf8(&header, record0)),
+        serde_json::json!(using_kf8 || is_likely_kf8(&header, record0)),
     );
     meta.insert(
         "mobiTocSource".to_string(),
