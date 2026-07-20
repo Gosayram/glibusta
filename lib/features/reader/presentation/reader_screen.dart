@@ -109,15 +109,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Timer? _relayoutTimer;
   bool _isRelayouting = false;
 
-  Future<void> _checkForSelectedText() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (mounted && data?.text != null && data!.text!.isNotEmpty && data.text != _selectedText) {
-      setState(() => _selectedText = data.text);
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -1079,6 +1070,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   ) {
     if (readerState.metadata == null) return const SizedBox.shrink();
     return SelectionAreaWrapper(
+      onSelectionChanged: (selectedContent) {
+        final selectedText = selectedContent?.plainText;
+        if (!mounted || selectedText == _selectedText) return;
+        setState(() => _selectedText = selectedText?.isNotEmpty == true ? selectedText : null);
+      },
       contextMenuBuilder: (BuildContext context, SelectableRegionState state) {
         return ReaderContextMenu(
           state: state,
@@ -1119,13 +1115,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               : null,
           onLongPress:
               _gestureCoordinator.canInteract &&
-                  settings.longPressAction != LongPressAction.disabled
-              ? () {
-                  _ctrl.handleLongPress();
-                  if (settings.longPressAction == LongPressAction.selectText) {
-                    unawaited(_checkForSelectedText());
-                  }
-                }
+                  settings.longPressAction != LongPressAction.disabled &&
+                  settings.longPressAction != LongPressAction.selectText
+              ? _ctrl.handleLongPress
               : null,
           behavior: HitTestBehavior.translucent,
           child: RepaintBoundary(

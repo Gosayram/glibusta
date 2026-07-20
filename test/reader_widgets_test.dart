@@ -434,6 +434,35 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
     });
+
+    testWidgets('leaves a long press to text selection when configured', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            bookOpenServiceProvider.overrideWithValue(_FakeBookOpenService(db)),
+            readerSettingsProvider.overrideWith(
+              () => _TestReaderSettingsNotifier(const ReaderSettings()),
+            ),
+          ],
+          child: const MaterialApp(home: ReaderScreen(bookId: 'book-1')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final contentGesture = tester.widget<GestureDetector>(
+        find.byWidgetPredicate(
+          (widget) => widget is GestureDetector && widget.child is RepaintBoundary,
+        ),
+      );
+      final selectionArea = tester.widget<SelectionArea>(find.byType(SelectionArea));
+
+      expect(contentGesture.onLongPress, isNull);
+      expect(selectionArea.onSelectionChanged, isNotNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
   });
 
   testWidgets('RSVP skip controls work when the loaded chapter has no text', (tester) async {

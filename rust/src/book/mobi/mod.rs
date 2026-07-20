@@ -31,6 +31,7 @@ static AUTHORS_SPLIT_RE: LazyLock<Regex> =
 const MAX_TOTAL_TEXT_BYTES: usize = 32 * 1024 * 1024;
 const PALMDOC_LOGICAL_RECORD_BYTES: usize = 4096;
 const MAX_INLINE_IMAGE_DATA_BYTES: usize = 128 * 1024 * 1024;
+const MAX_CONSECUTIVE_INDEX_RECORDS: usize = 1024;
 
 // ---------------------------------------------------------------------------
 // BinaryReader
@@ -482,6 +483,41 @@ fn record_bytes<'a>(full_bytes: &'a [u8], palm_db: &PalmDb, index: usize) -> Res
     Ok(&full_bytes[start..end])
 }
 
+/// Count the immediately following INDX/TAGX records without interpreting
+/// their producer-controlled offsets or tag bytes. Full MOBI navigation needs
+/// a validated decoder; this bounded probe keeps those records out of the text
+/// stream while retaining useful diagnostic metadata.
+fn consecutive_index_record_counts(
+    full_bytes: &[u8],
+    palm_db: &PalmDb,
+    first_text_record_index: usize,
+    text_record_count: u16,
+) -> (usize, usize) {
+    let Some(first_index_record) = first_text_record_index.checked_add(text_record_count as usize)
+    else {
+        return (0, 0);
+    };
+
+    let mut indx_count = 0;
+    let mut tagx_count = 0;
+    for record_index in first_index_record
+        ..palm_db
+            .records
+            .len()
+            .min(first_index_record.saturating_add(MAX_CONSECUTIVE_INDEX_RECORDS))
+    {
+        let Ok(record) = record_bytes(full_bytes, palm_db, record_index) else {
+            break;
+        };
+        match record.get(..4) {
+            Some(b"INDX") => indx_count += 1,
+            Some(b"TAGX") => tagx_count += 1,
+            _ => break,
+        }
+    }
+    (indx_count, tagx_count)
+}
+
 fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
     if header.full_name_length == 0 {
         return None;
@@ -649,6 +685,12 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         .ok_or_else(|| anyhow::anyhow!("MOBI text record index overflows"))?;
     let blocks =
         text_extractor.extract_blocks(bytes, &palm_db, &header, first_text_record_index)?;
+    let (indx_record_count, tagx_record_count) = consecutive_index_record_counts(
+        bytes,
+        &palm_db,
+        first_text_record_index,
+        header.text_record_count,
+    );
 
     let title = first_non_empty(&[
         metadata.title.as_deref(),
@@ -752,6 +794,16 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         "mobiTocSource".to_string(),
         serde_json::Value::String("chapter-splitter".to_string()),
     );
+    if indx_record_count != 0 || tagx_record_count != 0 {
+        meta.insert(
+            "mobiIndxRecordCount".to_string(),
+            serde_json::json!(indx_record_count),
+        );
+        meta.insert(
+            "mobiTagxRecordCount".to_string(),
+            serde_json::json!(tagx_record_count),
+        );
+    }
     if let Some(ref cover) = cover_bytes {
         meta.insert("mobiCoverBytes".to_string(), serde_json::json!(cover.len()));
     }

@@ -12,6 +12,98 @@ use quick_xml::events::Event;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+const IDPF_FONT_OBFUSCATION_ALGORITHM: &str = "http://www.idpf.org/2008/embedding";
+const ADOBE_FONT_OBFUSCATION_ALGORITHM: &str = "http://ns.adobe.com/pdf/enc#RC";
+
+fn encryption_algorithm(e: &quick_xml::events::BytesStart<'_>) -> Option<String> {
+    e.attributes().flatten().find_map(|attribute| {
+        (attribute.key.local_name().as_ref() == b"Algorithm")
+            .then(|| String::from_utf8_lossy(&attribute.value).into_owned())
+    })
+}
+
+fn is_font_obfuscation_algorithm(algorithm: &str) -> bool {
+    matches!(
+        algorithm,
+        IDPF_FONT_OBFUSCATION_ALGORITHM | ADOBE_FONT_OBFUSCATION_ALGORITHM
+    )
+}
+
+/// Reject content encryption while allowing the two EPUB font-obfuscation
+/// algorithms. Font obfuscation is reversible at render time and does not make
+/// the book content inaccessible to this parser.
+fn validate_epub_encryption(encryption_xml: &[u8]) -> Result<()> {
+    let mut reader = Reader::from_reader(encryption_xml);
+    let mut buffer = Vec::new();
+    let mut in_encrypted_data = false;
+    let mut has_algorithm = false;
+
+    loop {
+        match reader
+            .read_event_into(&mut buffer)
+            .context("Invalid META-INF/encryption.xml")?
+        {
+            Event::Start(e) => {
+                let name = e.local_name();
+                if name.as_ref() == b"EncryptedData" {
+                    if in_encrypted_data {
+                        bail!("Invalid nested EPUB EncryptedData entry");
+                    }
+                    in_encrypted_data = true;
+                    has_algorithm = false;
+                    if let Some(algorithm) = encryption_algorithm(&e) {
+                        if !is_font_obfuscation_algorithm(&algorithm) {
+                            bail!("EPUB encryption algorithm is not supported: {algorithm}");
+                        }
+                        has_algorithm = true;
+                    }
+                } else if in_encrypted_data && name.as_ref() == b"EncryptionMethod" {
+                    let Some(algorithm) = encryption_algorithm(&e) else {
+                        bail!("EPUB EncryptionMethod is missing its Algorithm attribute");
+                    };
+                    if !is_font_obfuscation_algorithm(&algorithm) {
+                        bail!("EPUB encryption algorithm is not supported: {algorithm}");
+                    }
+                    has_algorithm = true;
+                }
+            }
+            Event::Empty(e) => {
+                let name = e.local_name();
+                if name.as_ref() == b"EncryptedData" {
+                    let Some(algorithm) = encryption_algorithm(&e) else {
+                        bail!("EPUB EncryptedData is missing an encryption algorithm");
+                    };
+                    if !is_font_obfuscation_algorithm(&algorithm) {
+                        bail!("EPUB encryption algorithm is not supported: {algorithm}");
+                    }
+                } else if in_encrypted_data && name.as_ref() == b"EncryptionMethod" {
+                    let Some(algorithm) = encryption_algorithm(&e) else {
+                        bail!("EPUB EncryptionMethod is missing its Algorithm attribute");
+                    };
+                    if !is_font_obfuscation_algorithm(&algorithm) {
+                        bail!("EPUB encryption algorithm is not supported: {algorithm}");
+                    }
+                    has_algorithm = true;
+                }
+            }
+            Event::End(e) if e.local_name().as_ref() == b"EncryptedData" => {
+                if !has_algorithm {
+                    bail!("EPUB EncryptedData is missing an encryption algorithm");
+                }
+                in_encrypted_data = false;
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+        buffer.clear();
+    }
+
+    if in_encrypted_data {
+        bail!("Invalid unterminated EPUB EncryptedData entry");
+    }
+    Ok(())
+}
+
 pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > crate::api::models::MAX_FILE_SIZE {
         bail!("EPUB exceeds maximum file size");
@@ -27,12 +119,16 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             crate::api::models::MAX_EXTRACTED_FILES
         );
     }
-    if zip
+    if let Some(encryption_path) = zip
         .entry_names()
         .iter()
-        .any(|name| name.eq_ignore_ascii_case("META-INF/encryption.xml"))
+        .find(|name| name.eq_ignore_ascii_case("META-INF/encryption.xml"))
+        .cloned()
     {
-        bail!("Encrypted EPUB is not supported");
+        let encryption_xml = zip
+            .read_file_limited(&encryption_path, crate::api::models::MAX_CHAPTER_SIZE)?
+            .context("EPUB encryption entry disappeared from archive")?;
+        validate_epub_encryption(&encryption_xml)?;
     }
 
     let mimetype = zip
@@ -1319,7 +1415,10 @@ fn parse_xhtml_to_blocks(
 ) -> (Vec<ReaderBlock>, i32, Vec<usize>) {
     let arena = Bump::new();
     let mut reader = Reader::from_str(text);
-    reader.config_mut().trim_text(true);
+    // Keep text-node boundaries so an unresolved GeneralRef does not consume
+    // the whitespace on either side. Ordinary XHTML prose is normalised below;
+    // <pre> retains its original whitespace.
+    reader.config_mut().trim_text(false);
     reader.config_mut().allow_dangling_amp = true;
     let mut blocks: Vec<ReaderBlock> = Vec::new();
     let mut page_breaks: Vec<usize> = Vec::new();
@@ -1647,15 +1746,20 @@ fn parse_xhtml_to_blocks(
             }
             Ok(Event::Text(ref e)) => {
                 if in_body && hidden_depth == 0 {
-                    let text = e.xml10_content().unwrap_or_default();
+                    let decoded = e.xml10_content().unwrap_or_default();
+                    let text = if in_pre {
+                        decoded.into_owned()
+                    } else {
+                        collapse_xhtml_whitespace(&decoded)
+                    };
                     if in_block {
-                        span_text.push_str(&text);
-                        current_text.push_str(&text);
+                        append_xhtml_text(&mut span_text, &text);
+                        append_xhtml_text(&mut current_text, &text);
                     } else if in_table {
                         // Inside td/th - accumulate for cell
-                        span_text.push_str(&text);
+                        append_xhtml_text(&mut span_text, &text);
                     } else {
-                        current_text.push_str(&text);
+                        append_xhtml_text(&mut current_text, &text);
                     }
                 }
             }
@@ -2227,6 +2331,37 @@ fn parse_xhtml_to_blocks(
     (blocks, block_index, page_breaks)
 }
 
+/// Collapse formatting whitespace in ordinary XHTML text nodes while retaining
+/// a single space at a text-node boundary. The latter matters for unresolved
+/// entities, which quick-xml reports as a separate `GeneralRef` event.
+fn collapse_xhtml_whitespace(text: &str) -> String {
+    let mut collapsed = String::with_capacity(text.len());
+    let mut previous_was_whitespace = false;
+    for character in text.chars() {
+        if character.is_whitespace() {
+            if !previous_was_whitespace {
+                collapsed.push(' ');
+                previous_was_whitespace = true;
+            }
+        } else {
+            collapsed.push(character);
+            previous_was_whitespace = false;
+        }
+    }
+    collapsed
+}
+
+/// Append normalised XHTML text without duplicating a whitespace boundary
+/// introduced by a filtered inline element.
+fn append_xhtml_text(buffer: &mut String, text: &str) {
+    let text = if buffer.ends_with(char::is_whitespace) {
+        text.trim_start_matches(char::is_whitespace)
+    } else {
+        text
+    };
+    buffer.push_str(text);
+}
+
 /// Flush every EPUB inline segment, including unstyled text.
 ///
 /// Reader blocks render `rich_spans` instead of their plain `text`; keeping
@@ -2511,7 +2646,7 @@ mod tests {
         );
 
         assert_eq!(blocks.len(), 1);
-        assert_eq!(blocks[0].text, "Before&unknown;after.");
+        assert_eq!(blocks[0].text, "Before &unknown; after.");
     }
 
     #[test]

@@ -473,6 +473,21 @@ fn create_minimal_epub() -> Vec<u8> {
 }
 
 fn create_encrypted_epub() -> Vec<u8> {
+    create_epub_with_encryption(
+        br#"<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><EncryptedData><EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes256-cbc"/><CipherData><CipherReference URI="chapter1.xhtml"/></CipherData></EncryptedData></encryption>"#,
+    )
+}
+
+fn create_font_obfuscated_epub(algorithm: &str) -> Vec<u8> {
+    create_epub_with_encryption(
+        format!(
+            "<?xml version=\"1.0\"?><encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\"><EncryptedData><EncryptionMethod Algorithm=\"{algorithm}\"/><CipherData><CipherReference URI=\"font.woff\"/></CipherData></EncryptedData></encryption>"
+        )
+        .as_bytes(),
+    )
+}
+
+fn create_epub_with_encryption(encryption_xml: &[u8]) -> Vec<u8> {
     let mut buf = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut buf);
     let options =
@@ -480,10 +495,7 @@ fn create_encrypted_epub() -> Vec<u8> {
     zip.start_file("mimetype", options).unwrap();
     zip.write_all(b"application/epub+zip").unwrap();
     zip.start_file("META-INF/encryption.xml", options).unwrap();
-    zip.write_all(
-        br#"<?xml version="1.0"?><encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><EncryptedData><CipherData><CipherReference URI="chapter1.xhtml"/></CipherData></EncryptedData></encryption>"#,
-    )
-    .unwrap();
+    zip.write_all(encryption_xml).unwrap();
     zip.start_file("META-INF/container.xml", options).unwrap();
     zip.write_all(
         br#"<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>"#,
@@ -679,7 +691,7 @@ fn test_epub_hidden_css_content_is_not_emitted() {
         .collect::<Vec<_>>()
         .join("\n");
 
-    assert_eq!(text, "Visibletext.");
+    assert_eq!(text, "Visible text.");
     for hidden in [
         "hidden inline",
         "hidden block",
@@ -795,12 +807,33 @@ fn test_encrypted_epub_returns_controlled_error_without_caching_a_partial_book()
     assert!(
         error
             .to_string()
-            .contains("Encrypted EPUB is not supported")
+            .contains("EPUB encryption algorithm is not supported")
     );
     assert!(
         cache_state.expect("check encrypted EPUB cache state").0,
         "a rejected EPUB must not be cached",
     );
+}
+
+#[test]
+fn test_epub_allows_idpf_and_adobe_font_obfuscation() {
+    for algorithm in [
+        "http://www.idpf.org/2008/embedding",
+        "http://ns.adobe.com/pdf/enc#RC",
+    ] {
+        let book =
+            glibusta_core::book::epub::parse_epub(&create_font_obfuscated_epub(algorithm), None)
+                .unwrap_or_else(|error| {
+                    panic!("font obfuscation must be accepted for {algorithm}: {error}")
+                });
+
+        assert_eq!(book.title, "Test EPUB");
+        assert!(
+            book.chapters[0].blocks[0]
+                .text
+                .contains("Encrypted payload")
+        );
+    }
 }
 
 #[test]
@@ -1846,10 +1879,10 @@ fn test_mobi_ignores_malformed_indx_and_tagx_records_outside_text_range() {
     assert!(parsed_text.contains("Readable text"));
     assert!(!parsed_text.contains("INDX"));
     assert!(!parsed_text.contains("TAGX"));
-    assert_eq!(
-        book.metadata.expect("MOBI metadata")["mobiTocSource"],
-        "chapter-splitter"
-    );
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiTocSource"], "chapter-splitter");
+    assert_eq!(metadata["mobiIndxRecordCount"], 1);
+    assert_eq!(metadata["mobiTagxRecordCount"], 1);
 }
 
 #[test]
@@ -2000,6 +2033,93 @@ fn test_mobi_rejects_unsupported_huff_cdic_compression() {
             .to_string()
             .contains("Unsupported MOBI compression: 17480")
     );
+}
+
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "deterministic corruption corpus is covered by native tests"
+)]
+fn test_mobi_deterministic_corruption_corpus_never_panics() {
+    let valid = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([valid[78], valid[79], valid[80], valid[81]]) as usize;
+    let mut cases = Vec::new();
+    cases.push(valid[..80].to_vec());
+
+    let mut invalid_offset = valid.clone();
+    invalid_offset[78..82].copy_from_slice(&u32::MAX.to_be_bytes());
+    cases.push(invalid_offset);
+
+    let mut unsorted_offsets = valid.clone();
+    unsorted_offsets[86..90].copy_from_slice(&((record0_offset - 1) as u32).to_be_bytes());
+    cases.push(unsorted_offsets);
+
+    let mut unsupported_compression = valid.clone();
+    unsupported_compression[record0_offset..record0_offset + 2]
+        .copy_from_slice(&17480u16.to_be_bytes());
+    cases.push(unsupported_compression);
+
+    let mut invalid_record_count = valid.clone();
+    invalid_record_count[record0_offset + 8..record0_offset + 10]
+        .copy_from_slice(&2u16.to_be_bytes());
+    cases.push(invalid_record_count);
+
+    let mut invalid_header_length = valid.clone();
+    invalid_header_length[record0_offset + 20..record0_offset + 24]
+        .copy_from_slice(&u32::MAX.to_be_bytes());
+    cases.push(invalid_header_length);
+
+    let text = b"<p>EXTH length corpus</p>";
+    let mut invalid_exth_length = create_palm_mobi(vec![
+        create_mobi_header_record(text.len() as u32, 1, &[(503, b"Title".to_vec())]),
+        text.to_vec(),
+    ]);
+    let exth_offset = invalid_exth_length
+        .windows(4)
+        .position(|window| window == b"EXTH")
+        .expect("EXTH fixture marker");
+    invalid_exth_length[exth_offset + 4..exth_offset + 8].copy_from_slice(&u32::MAX.to_be_bytes());
+    cases.push(invalid_exth_length);
+
+    for bytes in cases {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            glibusta_core::book::mobi::parse_mobi(&bytes, None)
+        }));
+        assert!(result.is_ok(), "corrupt MOBI input must not panic");
+    }
+}
+
+#[test]
+#[cfg_attr(miri, ignore = "path cache uses external filesystem state")]
+fn test_rejected_mobi_never_populates_path_cache() {
+    let path = std::env::temp_dir().join(format!(
+        "glibusta-invalid-mobi-{}_{}.mobi",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    let path_text = path.to_string_lossy().into_owned();
+    let mut invalid_mobi = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([
+        invalid_mobi[78],
+        invalid_mobi[79],
+        invalid_mobi[80],
+        invalid_mobi[81],
+    ]) as usize;
+    invalid_mobi[record0_offset..record0_offset + 2].copy_from_slice(&17480u16.to_be_bytes());
+    fs::write(&path, invalid_mobi).expect("write invalid MOBI fixture");
+
+    assert!(glibusta_core::api::api::parse_book(path_text.clone()).is_err());
+    assert!(
+        glibusta_core::api::api::check_book_cache(path_text)
+            .expect("check cache after rejected MOBI")
+            .0,
+        "a rejected MOBI must not be cached",
+    );
+
+    fs::remove_file(path).expect("remove invalid MOBI fixture");
 }
 
 #[test]
