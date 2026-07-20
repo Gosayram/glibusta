@@ -1317,6 +1317,35 @@ fn test_mobi_ignores_optional_audio_and_video_records_after_text() {
 }
 
 #[test]
+fn test_mobi_ignores_optional_and_unknown_records_after_text() {
+    let text = b"<p>The only MOBI text record</p>";
+    let mobi = create_palm_mobi(vec![
+        create_mobi_header_record(text.len() as u32, 1, &[]),
+        text.to_vec(),
+        Vec::new(), // optional zero record
+        b"FLIS\0\xFFcontrol data".to_vec(),
+        b"FCIS\0\xFFcontrol data".to_vec(),
+        b"EOF\0\xFFcontrol data".to_vec(),
+        b"SRCS\0\xFFsource data".to_vec(),
+        b"CMET\0\xFFcompilation metadata".to_vec(),
+        b"UNKN\0\xFFnon-book record".to_vec(),
+    ]);
+
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect("optional records outside the declared text range must be ignored");
+    let parsed_text = book
+        .chapters
+        .iter()
+        .flat_map(|chapter| &chapter.blocks)
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert_eq!(parsed_text, "The only MOBI text record");
+    assert!(book.images.is_empty());
+}
+
+#[test]
 fn test_mobi_dual_format_prefers_kf8_text_section() {
     let book = glibusta_core::book::mobi::parse_mobi(&create_dual_format_mobi(), None).unwrap();
     let text = book

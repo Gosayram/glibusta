@@ -316,7 +316,7 @@ fn parse_fb2_xml(
                         in_table_row = true;
                         current_table_row.clear();
                     }
-                    b"td" if in_table_row => {
+                    b"td" | b"th" if in_table_row => {
                         in_table_cell = true;
                         current_table_cell.clear();
                     }
@@ -711,7 +711,7 @@ fn parse_fb2_xml(
                         in_body = false;
                         in_notes_body = false;
                     }
-                    b"td" if in_table_cell => {
+                    b"td" | b"th" if in_table_cell => {
                         current_table_row.push(
                             current_table_cell
                                 .split_whitespace()
@@ -1947,6 +1947,38 @@ mod tests {
         );
         assert_eq!(image.image_alt.as_deref(), Some("Inline alternative"));
         assert_eq!(image.note_id.as_deref(), Some("inline-anchor"));
+    }
+
+    #[test]
+    fn imports_fb2_21_compatibility_fixture_like_equivalent_fb2_20() {
+        let book_21 = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description><title-info><book-title>Canonical title</book-title><author><nickname>Canonical author</nickname></author></title-info><src-title-info><book-title>Source title must not replace canonical title</book-title><author><nickname>Source author</nickname></author></src-title-info></description><body><section><p><strong>Bold</strong><style name="emphasis">Styled</style></p><table><tr><th colspan="2">Header</th></tr><tr><td rowspan="2">Left</td><td>Right</td></tr></table><image l:href="#figure" title="Figure title" id="figure-anchor"/></section></body><binary id="figure" content-type="image/png">AQID</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 2.1 compatibility fixture");
+        let book_20 = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description><title-info><book-title>Canonical title</book-title><author><nickname>Canonical author</nickname></author></title-info></description><body><section><p><strong>Bold</strong><style name="emphasis">Styled</style></p><table><tr><td>Header</td></tr><tr><td>Left</td><td>Right</td></tr></table><image l:href="#figure"/></section></body><binary id="figure" content-type="image/png">AQID</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse equivalent FB2 2.0 fixture");
+
+        assert_eq!(book_21.title, book_20.title);
+        assert_eq!(book_21.authors, book_20.authors);
+        let blocks_21 = &book_21.chapters[0].blocks;
+        let blocks_20 = &book_20.chapters[0].blocks;
+        let expected_rows = vec![
+            vec!["Header".to_string()],
+            vec!["Left".to_string(), "Right".to_string()],
+        ];
+        assert_eq!(blocks_21[0].rich_spans, blocks_20[0].rich_spans);
+        assert_eq!(blocks_21[1].table_rows, blocks_20[1].table_rows);
+        assert_eq!(
+            blocks_21[1].table_rows.as_deref(),
+            Some(expected_rows.as_slice())
+        );
+        assert_eq!(blocks_21[2].image_url, blocks_20[2].image_url);
+        assert_eq!(blocks_21[2].image_alt.as_deref(), Some("Figure title"));
+        assert_eq!(blocks_21[2].note_id.as_deref(), Some("figure-anchor"));
     }
 
     #[test]
