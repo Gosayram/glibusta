@@ -1191,7 +1191,14 @@ fn get_fb2_href(element: &BytesStart<'_>) -> Option<String> {
         .attributes()
         .flatten()
         .find(|attribute| attribute.key.local_name().as_ref() == b"href")
-        .map(|attribute| String::from_utf8_lossy(&attribute.value).into_owned())
+        // Attribute values are XML-escaped. Normalize them before the scheme
+        // allow/deny check so `java&#x0A;script:` cannot bypass it.
+        .and_then(|attribute| {
+            attribute
+                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                .ok()
+                .map(|value| value.into_owned())
+        })
 }
 
 fn max_base64_image_size() -> usize {
@@ -1683,6 +1690,34 @@ mod tests {
                 .image_url
                 .as_deref()
                 .is_some_and(|url| url.starts_with("data:image/webp;base64,"))
+        );
+    }
+
+    #[test]
+    fn preserves_safe_link_targets_and_drops_unsafe_schemes() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><body><section><p><a l:href="#note-1">Local</a><a l:href="notes/chapter.fb2#note-2">Relative</a><a l:href="https://example.test/reference">External</a><a l:href="java&#x0A;script:alert(1)">JavaScript</a><a l:href="vbscript:msgbox(1)">VBScript</a><a l:href="data:text/html,unsafe">Data</a></p></section></body></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 link matrix");
+
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("links create rich spans");
+        assert_eq!(
+            spans
+                .iter()
+                .map(|span| (span.text.as_str(), span.href.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("Local", Some("#note-1")),
+                ("Relative", Some("notes/chapter.fb2#note-2")),
+                ("External", Some("https://example.test/reference")),
+                ("JavaScript", None),
+                ("VBScript", None),
+                ("Data", None),
+            ],
         );
     }
 

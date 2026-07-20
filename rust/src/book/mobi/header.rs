@@ -5,6 +5,7 @@ use super::BinaryReader;
 pub(crate) struct MobiHeader {
     pub compression: u16,
     pub encryption_type: u16,
+    pub text_length: u32,
     pub text_encoding: u16,
     pub text_record_count: u16,
     #[allow(dead_code)]
@@ -31,6 +32,7 @@ impl MobiHeaderParser {
         Ok(MobiHeader {
             compression: reader.u16be(0)?,
             encryption_type: reader.u16be(12)?,
+            text_length: reader.u32be(4)?,
             text_encoding: reader.u16be(mobi_offset + 12)?,
             text_record_count: reader.u16be(8)?,
             record_size: reader.u16be(10)?,

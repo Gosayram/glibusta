@@ -141,6 +141,7 @@ struct RtfFmt {
     italic: bool,
     superscript: bool,
     subscript: bool,
+    strikethrough: bool,
     font_size_half_pts: i32,
     href: Option<String>,
 }
@@ -182,7 +183,7 @@ fn flush_span(rich_spans: &mut Vec<RichSpan>, span_text: &mut String, fmt: &RtfF
             italic: fmt.italic,
             superscript: fmt.superscript,
             subscript: fmt.subscript,
-            strikethrough: false,
+            strikethrough: fmt.strikethrough,
             code: false,
             style_name: None,
             href: fmt.href.clone(),
@@ -441,7 +442,11 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                         fmt.superscript = false;
                         fmt.subscript = false;
                     }
-                    "ul" | "ulnone" | "strike" | "scaps" | "highlight" => {}
+                    "strike" => {
+                        flush_span(&mut rich_spans, &mut span_text, &fmt);
+                        fmt.strikethrough = bytes.get(i) != Some(&b'0');
+                    }
+                    "ul" | "ulnone" | "scaps" | "highlight" => {}
                     "fs" => {
                         let size_start = i;
                         while i < bytes.len() && bytes[i].is_ascii_digit() {
@@ -871,6 +876,27 @@ mod tests {
                 ("O and x", false, false),
                 ("2", false, true),
             ],
+        );
+    }
+
+    #[test]
+    fn preserves_strikethrough_semantics() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi Visible \strike deleted\strike0 restored}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF strikethrough");
+        let spans = book.chapters[0].blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("rich spans");
+
+        assert_eq!(
+            spans
+                .iter()
+                .map(|span| (span.text.trim(), span.strikethrough))
+                .collect::<Vec<_>>(),
+            vec![("Visible", false), ("deleted", true), ("restored", false)],
         );
     }
 

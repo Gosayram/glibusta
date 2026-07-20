@@ -1187,9 +1187,14 @@ fn create_minimal_mobi() -> Vec<u8> {
     create_mobi_with_text(b"<html><body><p>Hello MOBI</p><p>Second paragraph.</p></body></html>")
 }
 
-fn create_mobi_header_record(text_record_count: u16, exth_records: &[(u32, Vec<u8>)]) -> Vec<u8> {
+fn create_mobi_header_record(
+    text_length: u32,
+    text_record_count: u16,
+    exth_records: &[(u32, Vec<u8>)],
+) -> Vec<u8> {
     let mut record = vec![0; 248];
     record[0..2].copy_from_slice(&1u16.to_be_bytes()); // PalmDOC compression = none
+    record[4..8].copy_from_slice(&text_length.to_be_bytes());
     record[8..10].copy_from_slice(&text_record_count.to_be_bytes());
     record[10..12].copy_from_slice(&4096u16.to_be_bytes());
     record[16..20].copy_from_slice(b"MOBI");
@@ -1245,22 +1250,30 @@ fn create_palm_mobi(records: Vec<Vec<u8>>) -> Vec<u8> {
 fn create_dual_format_mobi() -> Vec<u8> {
     // EXTH 121 points at the BOUNDARY record (record 2). The following record
     // is the KF8 header and its text starts at record 4.
-    let legacy_header = create_mobi_header_record(1, &[(121, 2u32.to_be_bytes().to_vec())]);
-    let kf8_header = create_mobi_header_record(1, &[]);
+    let legacy_text = b"<p>Legacy KF7 text</p>";
+    let kf8_text = b"<p>Modern KF8 text</p>";
+    let legacy_header = create_mobi_header_record(
+        legacy_text.len() as u32,
+        1,
+        &[(121, 2u32.to_be_bytes().to_vec())],
+    );
+    let kf8_header = create_mobi_header_record(kf8_text.len() as u32, 1, &[]);
     create_palm_mobi(vec![
         legacy_header,
-        b"<p>Legacy KF7 text</p>".to_vec(),
+        legacy_text.to_vec(),
         b"BOUNDARY".to_vec(),
         kf8_header,
-        b"<p>Modern KF8 text</p>".to_vec(),
+        kf8_text.to_vec(),
     ])
 }
 
 fn create_mobi_with_invalid_kf8_boundary() -> Vec<u8> {
-    let legacy_header = create_mobi_header_record(1, &[(121, 2u32.to_be_bytes().to_vec())]);
+    let text = b"<p>Readable legacy text</p>";
+    let legacy_header =
+        create_mobi_header_record(text.len() as u32, 1, &[(121, 2u32.to_be_bytes().to_vec())]);
     create_palm_mobi(vec![
         legacy_header,
-        b"<p>Readable legacy text</p>".to_vec(),
+        text.to_vec(),
         b"not a KF8 boundary".to_vec(),
     ])
 }
@@ -1331,6 +1344,57 @@ fn test_mobi_rejects_encrypted_palm_doc_before_text_decode() {
         .expect_err("encrypted MOBI must not be decoded as plaintext");
 
     assert!(error.to_string().to_ascii_lowercase().contains("encrypted"));
+}
+
+#[test]
+fn test_mobi_rejects_palm_doc_text_length_that_does_not_match_records() {
+    for compression in [1u16, 2] {
+        let mut mobi = create_minimal_mobi();
+        let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
+        // The single logical PalmDOC record contains the fixture's actual
+        // text, but the header claims one additional byte.  Plain ASCII is a
+        // valid literal stream for compression 2 as well as compression 1.
+        let declared_length = u32::from_be_bytes([
+            mobi[record0_offset + 4],
+            mobi[record0_offset + 5],
+            mobi[record0_offset + 6],
+            mobi[record0_offset + 7],
+        ]);
+        mobi[record0_offset..record0_offset + 2].copy_from_slice(&compression.to_be_bytes());
+        mobi[record0_offset + 4..record0_offset + 8]
+            .copy_from_slice(&declared_length.saturating_add(1).to_be_bytes());
+
+        let error = glibusta_core::book::mobi::parse_mobi(&mobi, None).expect_err(
+            "PalmDOC text length must agree with decompressed records for every supported compression",
+        );
+
+        assert!(error.to_string().contains("text length"));
+    }
+}
+
+#[test]
+fn test_mobi_rejects_palm_doc_record_count_inconsistent_with_text_length() {
+    let mobi = create_palm_mobi(vec![
+        create_mobi_header_record(4097, 1, &[]),
+        vec![b'x'; 4096],
+    ]);
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("one record cannot contain a declared 4097-byte PalmDOC text stream");
+
+    assert!(error.to_string().contains("record count"));
+}
+
+#[test]
+fn test_mobi_rejects_nonstandard_palm_doc_logical_record_size() {
+    let mut mobi = create_minimal_mobi();
+    let record0_offset = u32::from_be_bytes([mobi[78], mobi[79], mobi[80], mobi[81]]) as usize;
+    mobi[record0_offset + 10..record0_offset + 12].copy_from_slice(&2048u16.to_be_bytes());
+
+    let error = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect_err("PalmDOC logical records must be 4096 bytes");
+
+    assert!(error.to_string().contains("logical record size"));
 }
 
 #[test]

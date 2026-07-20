@@ -27,8 +27,8 @@ pub(crate) static TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]*
 static AUTHORS_SPLIT_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?i)\s*(?:;|,|and|&)\s*"#).unwrap());
 
-const MAX_DECOMPRESSED_RECORD_BYTES: usize = 8 * 1024 * 1024;
 const MAX_TOTAL_TEXT_BYTES: usize = 32 * 1024 * 1024;
+const PALMDOC_LOGICAL_RECORD_BYTES: usize = 4096;
 
 // ---------------------------------------------------------------------------
 // BinaryReader
@@ -190,7 +190,29 @@ impl MobiTextExtractor {
         if header.compression != 1 && header.compression != 2 {
             bail!("Unsupported MOBI compression: {}", header.compression);
         }
+        if header.record_size as usize != PALMDOC_LOGICAL_RECORD_BYTES {
+            bail!(
+                "Unsupported PalmDOC logical record size: {}",
+                header.record_size
+            );
+        }
+        let text_length = usize::try_from(header.text_length)
+            .map_err(|_| anyhow::anyhow!("PalmDOC text length does not fit usize"))?;
+        if text_length > MAX_TOTAL_TEXT_BYTES {
+            bail!("MOBI declared text length is too large");
+        }
         let text_record_count = header.text_record_count as usize;
+        let expected_record_count = text_length
+            .checked_add(PALMDOC_LOGICAL_RECORD_BYTES - 1)
+            .ok_or_else(|| anyhow::anyhow!("PalmDOC text length overflows"))?
+            / PALMDOC_LOGICAL_RECORD_BYTES;
+        if text_record_count != expected_record_count {
+            bail!(
+                "PalmDOC text record count {} does not match declared text length {}",
+                text_record_count,
+                text_length
+            );
+        }
         let Some(last_text_record_index) = first_text_record_index.checked_add(text_record_count)
         else {
             bail!("MOBI text record range overflows");
@@ -204,15 +226,22 @@ impl MobiTextExtractor {
 
         for i in first_text_record_index..last_text_record_index {
             let record = record_bytes(full_bytes, palm_db, i)?;
+            let remaining = text_length
+                .checked_sub(chunks.len())
+                .ok_or_else(|| anyhow::anyhow!("PalmDOC text exceeds declared length"))?;
+            let expected_record_length = remaining.min(PALMDOC_LOGICAL_RECORD_BYTES);
             let decompressed = if header.compression == 1 {
+                if record.len() > expected_record_length {
+                    bail!("PalmDOC record exceeds its declared logical length");
+                }
                 record.to_vec()
             } else {
-                decompressor.decompress(record)?
+                decompressor.decompress_limited(record, expected_record_length)?
             };
-            chunks.extend_from_slice(&decompressed);
-            if chunks.len() > MAX_TOTAL_TEXT_BYTES {
-                bail!("MOBI text stream is too large");
+            if decompressed.len() != expected_record_length {
+                bail!("PalmDOC record length does not match declared text length");
             }
+            chunks.extend_from_slice(&decompressed);
         }
 
         Ok(encoding::decode_text(&chunks, header.text_encoding))
