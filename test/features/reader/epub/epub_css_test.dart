@@ -98,6 +98,54 @@ void main() {
     }
   });
 
+  test('keeps tables and absolute-positioned text in the reflow block stream', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_reflow_table_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'chapter.xhtml',
+        htmlText: '''
+          <html><head><style>
+            .margin-note { position: absolute; left: 40px; top: 10px; }
+          </style></head><body>
+            <p>Opening prose.</p>
+            <p class="margin-note">Margin note remains readable.</p>
+            <table><tbody>
+              <tr><th>Term</th><th>Definition</th></tr>
+              <tr><td>EPUB</td><td>Reflowable publication</td></tr>
+            </tbody></table>
+            <p>Closing prose.</p>
+          </body></html>
+        ''',
+      );
+
+      final table = parsed.blocks.whereType<TableBlock>().single;
+      expect(
+        table.rows,
+        <List<String>>[
+          <String>['Term', 'Definition'],
+          <String>['EPUB', 'Reflowable publication'],
+        ],
+      );
+      expect(
+        parsed.blocks
+            .whereType<ParagraphBlock>()
+            .expand((block) => block.spans)
+            .map(
+              (span) => span.text,
+            ),
+        contains('Margin note remains readable.'),
+      );
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('recovers an EPUB with a missing mimetype entry when its container is valid', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_recovery_test_');
     try {
@@ -151,20 +199,13 @@ void main() {
         ..addFile(
           ArchiveFile.string(
             'META-INF/container.xml',
-            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/>'
-                '</rootfiles></container>',
+            '''<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>''',
           ),
         )
         ..addFile(
           ArchiveFile.string(
             'OEBPS/content.opf',
-            '<package><metadata><title>SVG cover</title>'
-                '<meta name="cover" content="cover-image"/></metadata><manifest>'
-                '<item id="cover-image" href="images/cover.svg" media-type="image/svg+xml"/>'
-                '<item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/>'
-                '<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>'
-                '</manifest><spine><itemref idref="cover-page"/><itemref idref="chapter"/>'
-                '</spine></package>',
+            '''<package><metadata><title>SVG cover</title><meta name="cover" content="cover-image"/></metadata><manifest><item id="cover-image" href="images/cover.svg" media-type="image/svg+xml"/><item id="cover-page" href="cover.xhtml" media-type="application/xhtml+xml"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="cover-page"/><itemref idref="chapter"/></spine></package>''',
           ),
         )
         ..addFile(
@@ -176,8 +217,7 @@ void main() {
         ..addFile(
           ArchiveFile.string(
             'OEBPS/cover.xhtml',
-            '<html><body><svg xmlns="http://www.w3.org/2000/svg">'
-                '<image href="images/cover.svg"/></svg></body></html>',
+            '''<html><body><svg xmlns="http://www.w3.org/2000/svg"><image href="images/cover.svg"/></svg></body></html>''',
           ),
         )
         ..addFile(

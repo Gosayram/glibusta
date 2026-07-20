@@ -205,11 +205,18 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
     let mut picture: Option<RtfPicture> = None;
     let mut pending_hyperlink_href: Option<String> = None;
     let mut hyperlink_result_depth: Option<i32> = None;
+    // RTF bookmark destinations are the only local-link anchors the reader
+    // model can represent. Keep the most recent one until its paragraph is
+    // emitted as a block.
+    let mut pending_note_id: Option<String> = None;
 
     while i < bytes.len() {
         match bytes[i] {
             b'{' => {
                 brace_depth += 1;
+                if let Some(bookmark) = extract_rtf_bookmark(&body[i..]) {
+                    pending_note_id = Some(bookmark);
+                }
                 if bytes[i + 1..].starts_with(b"\\*\\fldinst") {
                     let mut end = i.saturating_add(8192).min(bytes.len());
                     while end > i && !body.is_char_boundary(end) {
@@ -220,6 +227,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                 if bytes[i + 1..].starts_with(b"\\fonttbl")
                     || bytes[i + 1..].starts_with(b"\\colortbl")
                     || bytes[i + 1..].starts_with(b"\\stylesheet")
+                    || is_rtf_header_or_footer_destination(&bytes[i + 1..])
                     || bytes[i + 1..].starts_with(b"\\*")
                 {
                     skip_group = true;
@@ -303,6 +311,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                             &mut rich_spans,
                             &mut span_text,
                             &mut fmt,
+                            &mut pending_note_id,
                         );
                     }
                     "trowd" => {
@@ -312,6 +321,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                             &mut rich_spans,
                             &mut span_text,
                             &mut fmt,
+                            &mut pending_note_id,
                         );
                         in_table_row = true;
                         current_table_row.clear();
@@ -323,6 +333,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                             &mut rich_spans,
                             &mut span_text,
                             &mut fmt,
+                            &mut pending_note_id,
                         );
                         picture = Some(RtfPicture {
                             group_depth: brace_depth,
@@ -532,6 +543,7 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
         &mut rich_spans,
         &mut span_text,
         &mut fmt,
+        &mut pending_note_id,
     );
 
     blocks
@@ -582,6 +594,7 @@ fn push_rtf_paragraph(
     rich_spans: &mut Vec<RichSpan>,
     span_text: &mut String,
     fmt: &mut RtfFmt,
+    pending_note_id: &mut Option<String>,
 ) {
     // Flush any remaining span with formatting into rich_spans
     flush_span(rich_spans, span_text, fmt);
@@ -621,7 +634,7 @@ fn push_rtf_paragraph(
             image_alt: None,
             text_indent: None,
             text_align: None,
-            note_id: None,
+            note_id: pending_note_id.take(),
         });
         *block_index += 1;
     }
@@ -728,12 +741,62 @@ fn extract_rtf_hyperlink(instruction: &str) -> Option<String> {
     let uppercase = instruction.to_ascii_uppercase();
     let start = uppercase.find(HYPERLINK)? + HYPERLINK.len();
     let target = instruction[start..].trim_start();
+    // RTF field instructions escape a literal backslash as `\\`. Local
+    // hyperlinks therefore commonly arrive as `HYPERLINK \\l "bookmark"`.
+    // The reader uses `#anchor` for in-book links.
+    if let Some(local_target) = target
+        .strip_prefix(r"\\l")
+        .or_else(|| target.strip_prefix(r"\l"))
+    {
+        let anchor = extract_rtf_field_argument(local_target.trim_start())?;
+        return (!anchor.is_empty()).then(|| format!("#{anchor}"));
+    }
     let href = if let Some(rest) = target.strip_prefix('"') {
         rest.split('"').next()?
     } else {
         target.split_whitespace().next()?
     };
     crate::book::sanitize_href(href)
+}
+
+fn extract_rtf_field_argument(value: &str) -> Option<&str> {
+    if let Some(rest) = value.strip_prefix('"') {
+        rest.split('"').next()
+    } else {
+        value.split_whitespace().next()
+    }
+}
+
+fn extract_rtf_bookmark(group: &str) -> Option<String> {
+    let value = group
+        .strip_prefix(r"{\*\bkmkstart")?
+        .trim_start()
+        .split('}')
+        .next()?
+        .trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn is_rtf_header_or_footer_destination(group: &[u8]) -> bool {
+    const DESTINATIONS: [&[u8]; 10] = [
+        b"\\header",
+        b"\\footer",
+        b"\\headerl",
+        b"\\headerr",
+        b"\\headerf",
+        b"\\footerl",
+        b"\\footerr",
+        b"\\footerf",
+        b"\\firstheader",
+        b"\\firstfooter",
+    ];
+
+    DESTINATIONS.iter().any(|destination| {
+        group.starts_with(destination)
+            && group
+                .get(destination.len())
+                .map_or(true, |next| !next.is_ascii_alphabetic())
+    })
 }
 
 #[cfg(test)]
@@ -947,5 +1010,73 @@ Second paragraph.par
             .expect("rich span")[0];
         assert_eq!(span.text, "Unsafe");
         assert!(span.href.is_none());
+    }
+
+    #[test]
+    fn ignores_headers_and_footers_without_discarding_body_text() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi{\header Running header\par}{\footer Page footer\par}Body text\par}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF with headers");
+
+        assert_eq!(
+            book.chapters[0]
+                .blocks
+                .iter()
+                .map(|block| block.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Body text"],
+        );
+    }
+
+    #[test]
+    fn preserves_local_hyperlinks_and_their_bookmark_targets() {
+        let book = parse_rtf(
+            br#"{\rtf1\ansi{\*\bkmkstart chapter-one}Chapter one\par{\field{\*\fldinst{HYPERLINK \\l "chapter-one"}}{\fldrslt{Jump}}}}"#,
+            Some("utf-8"),
+        )
+        .expect("parse RTF local hyperlink");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks[0].note_id.as_deref(), Some("chapter-one"));
+        assert_eq!(blocks[1].text, "Jump");
+        assert_eq!(
+            blocks[1]
+                .rich_spans
+                .as_ref()
+                .and_then(|spans| spans.first())
+                .and_then(|span| span.href.as_deref()),
+            Some("#chapter-one"),
+        );
+    }
+
+    #[test]
+    fn skips_list_table_metadata_without_losing_list_paragraphs() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi{\*\listtable{\list\listtemplateid1{\listlevel\levelnfc23\leveltext\'01\u8226 ?;}\listid1}}{\*\listoverridetable{\listoverride\listid1\ls1}}\pard\plain\ls1\ilvl0{\listtext\tab}First\par\pard\plain\ls1\ilvl0{\listtext\tab}Second\par}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF list table");
+
+        assert_eq!(
+            book.chapters[0]
+                .blocks
+                .iter()
+                .map(|block| block.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["First", "Second"],
+        );
+    }
+
+    #[test]
+    fn ignores_color_table_when_preserving_colored_text() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi{\colortbl;\red255\green0\blue0;}\cf1 Red\cf0  plain\par}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF color table");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Red plain");
     }
 }

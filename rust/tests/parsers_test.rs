@@ -571,6 +571,49 @@ fn test_epub_hidden_css_content_is_not_emitted() {
 }
 
 #[test]
+fn test_epub_tables_and_absolute_elements_reflow_as_reader_blocks() {
+    let epub = create_epub_with_opf_and_chapter(
+        true,
+        MINIMAL_EPUB_OPF,
+        br#"<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head><style>.margin-note { position: absolute; left: 40px; top: 10px; }</style></head>
+  <body>
+    <p>Opening prose.</p>
+    <p class="margin-note">Margin note remains readable.</p>
+    <table><tbody>
+      <tr><th>Term</th><th>Definition</th></tr>
+      <tr><td>EPUB</td><td>Reflowable publication</td></tr>
+    </tbody></table>
+    <p>Closing prose.</p>
+  </body>
+</html>"#,
+    );
+
+    let book = glibusta_core::book::epub::parse_epub(&epub, None).unwrap();
+    let blocks = &book.chapters[0].blocks;
+    let text = blocks
+        .iter()
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(text.contains("Margin note remains readable."));
+    assert!(text.contains("Term | Definition\nEPUB | Reflowable publication"));
+    assert!(
+        blocks.iter().any(|block| {
+            block.block_type == BlockType::Table
+                && block.table_rows.as_deref()
+                    == Some(&[
+                        vec!["Term".to_string(), "Definition".to_string()],
+                        vec!["EPUB".to_string(), "Reflowable publication".to_string()],
+                    ])
+        }),
+        "tables must remain structured reader blocks"
+    );
+}
+
+#[test]
 fn test_epub_discards_active_markup_and_footnote_background_assets() {
     let epub = create_epub_with_opf_and_chapter(
         true,
