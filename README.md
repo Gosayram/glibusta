@@ -28,6 +28,7 @@ Flibusta-compatible sources.
 - [Developer Tooling](#developer-tooling)
 - [Build Artifacts](#build-artifacts)
 - [Project Layout](#project-layout)
+- [DjVu Compatibility](#djvu-compatibility)
 - [License](#license)
 
 ## Status
@@ -67,16 +68,17 @@ Flibusta-compatible sources.
 
 ## Tech Stack
 
-| Layer            | Tooling                                                      |
-| ---------------- | ------------------------------------------------------------ |
-| UI               | Flutter, Material 3                                          |
-| State management | Riverpod 3                                                   |
-| Navigation       | Go Router                                                    |
-| HTTP             | Dio                                                          |
-| Local storage    | Drift SQLite                                                 |
-| Reader           | EPUB, FB2 parsers                                            |
-| Quality          | `flutter_lints`, `riverpod_lint`, Ruff, ShellCheck, Prettier |
-| Build            | Makefile modules under `makefiles/`                          |
+| Layer            | Tooling                                                                        |
+| ---------------- | ------------------------------------------------------------------------------ |
+| UI               | Flutter, Material 3                                                            |
+| State management | Riverpod 3                                                                     |
+| Navigation       | Go Router                                                                      |
+| HTTP             | Dio                                                                            |
+| Local storage    | Drift SQLite                                                                   |
+| Reader           | EPUB, FB2 parsers                                                              |
+| DjVu reference   | [DjVuLibre](https://github.com/DjvuNet/DjVuLibre.git) + `djvu-rs` oracle tests |
+| Quality          | `flutter_lints`, `riverpod_lint`, Ruff, ShellCheck, Prettier                   |
+| Build            | Makefile modules under `makefiles/`                                            |
 
 ## Quick Start
 
@@ -178,6 +180,17 @@ scripts/                # Signing, bootstrap, version bump, diagnostics
 hack/                   # Python API exploration scripts
 test/                   # Unit and widget tests
 ```
+
+## DjVu Compatibility
+
+The app's DjVu path is implemented with the pure-Rust `djvu-rs` crate. We use
+[DjVuLibre](https://github.com/DjvuNet/DjVuLibre.git), the free and open-source
+reference implementation, as an opt-in compatibility oracle for DjVu fixtures.
+It is not bundled or linked into the application at present.
+
+DjVuLibre is licensed under GPL-2.0-or-later. Consequently, any future native
+Android/macOS linking is subject to a separate distribution and license-compliance
+decision; the opt-in oracle test only invokes an already installed developer tool.
 
 ## License
 

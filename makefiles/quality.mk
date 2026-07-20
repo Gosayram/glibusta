@@ -127,6 +127,13 @@ rust-check: ## Full Rust build check
 	@$(PRINT_STEP) "Running cargo check"
 	cd rust && cargo check
 
+.PHONY: djvu-oracle-check
+djvu-oracle-check: ## Compare djvu-rs text extraction with locally installed DjVuLibre
+	@$(PRINT_STEP) "Running optional DjVuLibre compatibility oracle"
+	@command -v djvutxt >/dev/null || (echo "ERROR: install DjVuLibre (djvutxt) first" >&2; exit 1)
+	cd rust && cargo test --test djvulibre_oracle_test -- --ignored --exact djvu_rs_text_matches_djvulibre_reference
+	@$(PRINT_OK) "DjVuLibre oracle check passed"
+
 .PHONY: rust-lints
 rust-lints: ## Run ltrs spell-check on Rust comments/strings
 	@$(PRINT_STEP) "Checking Rust strings with LanguageTool"
