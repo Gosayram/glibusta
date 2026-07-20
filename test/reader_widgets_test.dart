@@ -11,6 +11,7 @@ import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/domain/book_file_repository.dart';
 import 'package:glibusta/features/reader/data/book_open_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
+import 'package:glibusta/features/reader/data/reader_colors.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
 import 'package:glibusta/features/reader/presentation/reader_content.dart';
@@ -683,6 +684,66 @@ void main() {
 
     expect(find.byType(ReaderContentBody), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dark reader theme keeps quote and cite blocks readable without a light surface', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'dark-quote-epub',
+            title: 'Dark quote EPUB',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Chapter'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Chapter',
+              blocks: [
+                ReaderBlock(index: 0, text: 'Quoted EPUB content', type: BlockType.quote),
+                ReaderBlock(index: 1, text: 'Cited callout content', type: BlockType.cite),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(theme: ReaderTheme.dark),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    final colors = ReaderColors.forTheme(ReaderTheme.dark);
+    final quote = tester.widget<Text>(find.text('Quoted EPUB content'));
+    final cite = tester.widget<Text>(find.text('Cited callout content'));
+    for (final text in [quote, cite]) {
+      expect(text.style?.color, colors.text);
+      expect(text.style?.fontStyle, FontStyle.italic);
+      final foreground = text.style!.color!;
+      final lighter = foreground.computeLuminance() > colors.scaffold.computeLuminance()
+          ? foreground
+          : colors.scaffold;
+      final darker = identical(lighter, foreground) ? colors.scaffold : foreground;
+      expect(
+        (lighter.computeLuminance() + 0.05) / (darker.computeLuminance() + 0.05),
+        greaterThanOrEqualTo(4.5),
+      );
+    }
+
+    for (final text in ['Quoted EPUB content', 'Cited callout content']) {
+      final container = tester.widget<Container>(
+        find.ancestor(of: find.text(text), matching: find.byType(Container)).first,
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      expect(decoration.color, isNull, reason: 'semantic reader blocks keep the reader surface');
+      expect(decoration.border, isA<BorderDirectional>());
+    }
   });
 
   testWidgets('reapplies EPUB span colors when the reader theme changes', (tester) async {

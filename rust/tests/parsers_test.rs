@@ -38,6 +38,49 @@ fn test_path_cache_invalidates_when_source_file_is_replaced() {
     fs::remove_file(path).expect("remove cache fixture");
 }
 
+#[cfg(not(miri))]
+#[test]
+fn test_large_fb2_path_import_is_bounded_and_preserves_structure() {
+    const PARAGRAPH_COUNT: usize = 256;
+    const PARAGRAPH_BYTES: usize = 4096;
+
+    let path = std::env::temp_dir().join(format!(
+        "glibusta-large-fb2-{}_{}.fb2",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system clock should be after Unix epoch")
+            .as_nanos(),
+    ));
+    let payload = "x".repeat(PARAGRAPH_BYTES);
+    let mut xml = String::with_capacity(PARAGRAPH_COUNT * (PARAGRAPH_BYTES + 8));
+    xml.push_str("<FictionBook><description><title-info><book-title>Large fixture</book-title></title-info></description><body><section>");
+    for _ in 0..PARAGRAPH_COUNT {
+        xml.push_str("<p>");
+        xml.push_str(&payload);
+        xml.push_str("</p>");
+    }
+    xml.push_str("</section></body></FictionBook>");
+    assert!(
+        xml.len() >= 1024 * 1024,
+        "fixture must exercise a large input"
+    );
+    fs::write(&path, xml).expect("write large FB2 fixture");
+
+    let started = std::time::Instant::now();
+    let result = glibusta_core::api::api::parse_book(path.to_string_lossy().into_owned());
+    let elapsed = started.elapsed();
+    let _ = fs::remove_file(path);
+
+    let book = result.expect("large FB2 path import");
+    assert_eq!(book.title, "Large fixture");
+    assert_eq!(book.chapters.len(), 1);
+    assert_eq!(book.chapters[0].blocks.len(), PARAGRAPH_COUNT);
+    // This is a liveness guard, not a machine-performance target: it catches
+    // accidental unbounded work while leaving broad headroom for debug builds.
+    assert!(elapsed < std::time::Duration::from_secs(30), "{elapsed:?}");
+}
+
 // ---------------------------------------------------------------------------
 // FB2 tests — parse from XML string
 // ---------------------------------------------------------------------------
@@ -1777,6 +1820,36 @@ fn test_mobi_fixed_layout_hints_keep_text_on_explicit_reflow_fallback() {
     assert_eq!(metadata["mobiZeroGutter"], true);
     assert_eq!(metadata["mobiZeroMargin"], true);
     assert_eq!(metadata["mobiMetadataResourceUri"], "kindle:embed:0001");
+}
+
+#[test]
+fn test_mobi_ignores_malformed_indx_and_tagx_records_outside_text_range() {
+    let text = b"<h1>Chapter One</h1><p>Readable text</p>";
+    let book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![
+            create_mobi_header_record(text.len() as u32, 1, &[]),
+            text.to_vec(),
+            b"INDX\x00\x00\x00\x04\xFFmalformed index offsets".to_vec(),
+            b"TAGX\x00\x00\x00\x0C\xFF\xFF\xFF\xFFinvalid control bytes".to_vec(),
+        ]),
+        None,
+    )
+    .expect("untrusted index records must not prevent the declared text stream from opening");
+    let parsed_text = book
+        .chapters
+        .iter()
+        .flat_map(|chapter| &chapter.blocks)
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(parsed_text.contains("Readable text"));
+    assert!(!parsed_text.contains("INDX"));
+    assert!(!parsed_text.contains("TAGX"));
+    assert_eq!(
+        book.metadata.expect("MOBI metadata")["mobiTocSource"],
+        "chapter-splitter"
+    );
 }
 
 #[test]
