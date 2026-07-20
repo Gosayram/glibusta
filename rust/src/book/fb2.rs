@@ -282,12 +282,18 @@ fn parse_fb2_xml(
                     b"body" => {
                         in_body = true;
                         in_notes_body = attr_eq(e, b"name", b"notes");
+                        if language.is_none() {
+                            language = get_xml_attr(e, b"xml:lang");
+                        }
                     }
                     b"section" if in_body => {
                         if in_notes_body {
                             current_note_id = get_xml_attr(e, b"id");
                             current_note_text.clear();
                         } else {
+                            if language.is_none() {
+                                language = get_xml_attr(e, b"xml:lang");
+                            }
                             enter_fb2_section(&mut section_structure)?;
                             section_depth += 1;
                             if section_depth == 1 {
@@ -812,6 +818,8 @@ fn parse_fb2_xml(
                                     BlockType::Heading
                                 } else if in_epigraph {
                                     BlockType::Epigraph
+                                } else if in_cite {
+                                    BlockType::Cite
                                 } else {
                                     BlockType::Paragraph
                                 },
@@ -1008,7 +1016,8 @@ fn parse_fb2_xml(
                         );
                         in_pre = false;
                     }
-                    b"empty-line" if in_body => {
+                    b"empty-line" if in_body && !in_notes_body => {
+                        mark_fb2_section_content(&mut section_structure)?;
                         body_blocks.push(ReaderBlock {
                             index: block_index,
                             text: String::new(),
@@ -2011,6 +2020,46 @@ mod tests {
         let error = parse_fb2(xml.as_bytes(), Some("utf-8"))
             .expect_err("excessive nesting must be rejected");
         assert!(error.to_string().contains("maximum depth"));
+    }
+
+    #[test]
+    fn preserves_fb2_content_boundaries_and_body_language() {
+        let book = parse_fb2(
+            br#"<FictionBook><description/><body xml:lang="fr"><section xml:lang="de"><title><p>Chapter title</p></title><subtitle>Subtitle</subtitle><empty-line/><cite><p>Quoted paragraph</p><text-author>Quoted author</text-author></cite><poem><stanza><v>First verse</v><v>Second verse</v></stanza></poem><p>Ordinary paragraph</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 content boundaries");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(book.language.as_deref(), Some("fr"));
+        assert_eq!(
+            blocks
+                .iter()
+                .map(|block| (&block.block_type, block.text.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (&BlockType::Heading, "Chapter title"),
+                (&BlockType::Subtitle, "Subtitle"),
+                (&BlockType::Separator, ""),
+                (&BlockType::Cite, "Quoted paragraph"),
+                (&BlockType::TextAuthor, "Quoted author"),
+                (&BlockType::Poem, "First verse"),
+                (&BlockType::Poem, "Second verse"),
+                (&BlockType::Separator, ""),
+                (&BlockType::Paragraph, "Ordinary paragraph"),
+            ],
+        );
+    }
+
+    #[test]
+    fn uses_section_xml_language_when_body_does_not_declare_one() {
+        let book = parse_fb2(
+            br#"<FictionBook><description/><body><section xml:lang="de"><p>In German</p></section></body></FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 section language");
+
+        assert_eq!(book.language.as_deref(), Some("de"));
     }
 
     #[test]

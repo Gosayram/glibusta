@@ -1291,6 +1291,32 @@ fn test_mobi_basic_parse() {
 }
 
 #[test]
+fn test_mobi_ignores_optional_audio_and_video_records_after_text() {
+    let text = b"<p>Readable MOBI text</p>";
+    let mobi = create_palm_mobi(vec![
+        create_mobi_header_record(text.len() as u32, 1, &[]),
+        text.to_vec(),
+        b"AUDI\0\xFFnot a text record".to_vec(),
+        b"VIDE\0\xFFnot an image record".to_vec(),
+    ]);
+
+    let book = glibusta_core::book::mobi::parse_mobi(&mobi, None)
+        .expect("optional media records after the declared text stream must be ignored");
+    let parsed_text = book
+        .chapters
+        .iter()
+        .flat_map(|chapter| &chapter.blocks)
+        .map(|block| block.text.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert_eq!(parsed_text, "Readable MOBI text");
+    assert!(!parsed_text.contains("AUDI"));
+    assert!(!parsed_text.contains("VIDE"));
+    assert!(book.images.is_empty());
+}
+
+#[test]
 fn test_mobi_dual_format_prefers_kf8_text_section() {
     let book = glibusta_core::book::mobi::parse_mobi(&create_dual_format_mobi(), None).unwrap();
     let text = book
