@@ -208,12 +208,24 @@ miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
 	rustup toolchain install nightly --component miri 2>&1
 
 .PHONY: miri-check
-miri-check: require-rust ## Run Rust tests under Miri (UB detection, requires nightly)
-	@$(PRINT_STEP) "Running Miri UB checks"
+miri-check: require-rust ## Run fast deterministic Rust UB smoke tests under Miri
+	@$(PRINT_STEP) "Running Miri UB smoke checks"
 	@NIGHTLY_BIN="$$(dirname "$$(rustup which --toolchain nightly cargo 2>/dev/null)")"; \
 	if [ -n "$$NIGHTLY_BIN" ] && PATH="$$NIGHTLY_BIN:$$PATH" rustup run nightly cargo miri --version >/dev/null 2>&1; then \
-		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-disable-isolation" rustup run nightly cargo miri test && \
+		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows" rustup run nightly cargo miri test --lib miri_smoke_tests && \
 		$(PRINT_OK) "Miri checks passed"; \
+	else \
+		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \
+		exit 1; \
+	fi
+
+.PHONY: miri-full
+miri-full: require-rust ## Run the complete Rust test suite under Miri (slow, manual/CI)
+	@$(PRINT_STEP) "Running full Miri UB checks"
+	@NIGHTLY_BIN="$$(dirname "$$(rustup which --toolchain nightly cargo 2>/dev/null)")"; \
+	if [ -n "$$NIGHTLY_BIN" ] && PATH="$$NIGHTLY_BIN:$$PATH" rustup run nightly cargo miri --version >/dev/null 2>&1; then \
+		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows" rustup run nightly cargo miri test && \
+		$(PRINT_OK) "Full Miri checks passed"; \
 	else \
 		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \
 		exit 1; \
