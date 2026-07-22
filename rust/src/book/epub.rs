@@ -3,12 +3,12 @@ use crate::api::models::{
 };
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{attr_eq, decode_bytes, get_class_attr_arena, get_xml_attr};
-use anyhow::{bail, Context, Result};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, bail};
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use bumpalo::Bump;
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use serde::Deserialize;
 use std::collections::HashMap;
 
