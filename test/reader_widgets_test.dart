@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
@@ -749,6 +750,52 @@ void main() {
                   text: '',
                   type: BlockType.image,
                   imageUrl: 'data:image/webp;base64,abc!',
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.broken_image), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('shows a controlled placeholder when a cached SVG is invalid', (tester) async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('glibusta-invalid-svg-');
+    addTearDown(() => temporaryDirectory.delete(recursive: true));
+    final invalidSvg = File('${temporaryDirectory.path}/cover.svg');
+    await invalidSvg.writeAsString('<svg><broken></svg>');
+
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'broken-svg',
+            title: 'Broken SVG',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Pages'],
+          ),
+          loadedChapters: {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Pages',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: '',
+                  type: BlockType.image,
+                  imageUrl: invalidSvg.path,
                 ),
               ],
             ),

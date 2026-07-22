@@ -172,6 +172,10 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .map_or((None, None), |cover| (Some(cover.url), Some(cover.href)));
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
+    // Maps each spine document to its first rendered reader chapter. A single
+    // XHTML document may be split at CSS page breaks, while an empty or cover
+    // wrapper document intentionally has no reader chapter at all.
+    let mut spine_chapter_indices: HashMap<String, i32> = HashMap::new();
     let mut chapter_index = 0i32;
     let mut block_index = 0i32;
     let mut warnings: Vec<crate::api::models::ParseWarning> = Vec::new();
@@ -276,6 +280,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 
         // MD-1.4: split chapter at CSS page-break-before points
         let chapter_title = extract_chapter_title(&xhtml_text);
+        let first_chapter_index = chapter_index;
         if page_breaks_in_file.is_empty() {
             chapters.push(ReaderChapter {
                 index: chapter_index,
@@ -310,6 +315,10 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
                     chapter_index += 1;
                 }
             }
+        }
+
+        if chapter_index > first_chapter_index {
+            spine_chapter_indices.insert(item_href, first_chapter_index);
         }
     }
 
@@ -354,7 +363,14 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     };
 
     // ---- TOC extraction ----
-    let toc = extract_epub_toc(&mut zip, &manifest_items, &ncx_id, opf_dir, encoding_name)?;
+    let toc = extract_epub_toc(
+        &mut zip,
+        &manifest_items,
+        &ncx_id,
+        opf_dir,
+        encoding_name,
+        &spine_chapter_indices,
+    )?;
 
     if cover_url.is_none() {
         warnings.push(crate::api::models::ParseWarning {
@@ -395,16 +411,30 @@ fn extract_epub_toc(
     ncx_id: &Option<String>,
     opf_dir: &str,
     encoding_name: &str,
+    spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Vec<TocEntry>> {
     // Try EPUB 3 nav.xhtml first (preferred)
-    if let Some(toc) = try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name)? {
+    if let Some(toc) = try_parse_nav_xhtml(
+        zip,
+        manifest,
+        opf_dir,
+        encoding_name,
+        spine_chapter_indices,
+    )? {
         if !toc.is_empty() {
             return Ok(toc);
         }
     }
 
     // Fall back to EPUB 2 NCX
-    if let Some(toc) = try_parse_ncx(zip, manifest, ncx_id, opf_dir, encoding_name)? {
+    if let Some(toc) = try_parse_ncx(
+        zip,
+        manifest,
+        ncx_id,
+        opf_dir,
+        encoding_name,
+        spine_chapter_indices,
+    )? {
         return Ok(toc);
     }
 
@@ -416,6 +446,7 @@ fn try_parse_nav_xhtml(
     manifest: &HashMap<String, ManifestItem>,
     opf_dir: &str,
     encoding_name: &str,
+    spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Option<Vec<TocEntry>>> {
     let Some(nav_item) = manifest.values().find(|item| {
         item.properties.iter().any(|p| p == "nav") && item.media_type == "application/xhtml+xml"
@@ -432,7 +463,11 @@ fn try_parse_nav_xhtml(
         return Ok(None);
     };
     let text = decode_bytes(&bytes, encoding_name);
-    Ok(Some(parse_nav_xhtml(&text)))
+    Ok(Some(resolve_toc_entries(
+        parse_nav_xhtml(&text),
+        &nav_path,
+        spine_chapter_indices,
+    )))
 }
 
 fn try_parse_ncx(
@@ -441,6 +476,7 @@ fn try_parse_ncx(
     ncx_id: &Option<String>,
     opf_dir: &str,
     encoding_name: &str,
+    spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Option<Vec<TocEntry>>> {
     // Find NCX: either by spine toc attribute or by media-type
     let ncx_item = ncx_id
@@ -464,7 +500,11 @@ fn try_parse_ncx(
         return Ok(None);
     };
     let text = decode_bytes(&bytes, encoding_name);
-    Ok(Some(parse_ncx(&text)))
+    Ok(Some(resolve_toc_entries(
+        parse_ncx(&text),
+        &ncx_path,
+        spine_chapter_indices,
+    )))
 }
 
 struct ManifestItem {
