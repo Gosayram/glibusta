@@ -637,6 +637,7 @@ fn test_epub_toc_ncx() {
     let book = glibusta_core::book::epub::parse_epub(&epub_bytes, None).unwrap();
     assert!(!book.toc.is_empty(), "TOC should have entries");
     assert_eq!(book.toc[0].title, "Chapter 1");
+    assert_eq!(book.toc[0].chapter_index, 0, "TOC target must be navigable");
 }
 
 #[test]

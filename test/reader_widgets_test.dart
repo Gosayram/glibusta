@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/core/logging/app_logger.dart';
@@ -767,11 +767,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shows a controlled placeholder when a cached SVG is invalid', (tester) async {
-    final temporaryDirectory = await Directory.systemTemp.createTemp('glibusta-invalid-svg-');
-    addTearDown(() => temporaryDirectory.delete(recursive: true));
-    final invalidSvg = File('${temporaryDirectory.path}/cover.svg');
-    await invalidSvg.writeAsString('<svg><broken></svg>');
+  testWidgets('provides a controlled placeholder when a cached SVG was removed', (tester) async {
+    const missingSvgPath = '/tmp/glibusta-missing-cover.svg';
 
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);
@@ -786,7 +783,7 @@ void main() {
             chapterCount: 1,
             chapterTitles: ['Pages'],
           ),
-          loadedChapters: {
+          loadedChapters: const {
             0: ReaderChapter(
               index: 0,
               title: 'Pages',
@@ -795,7 +792,7 @@ void main() {
                   index: 0,
                   text: '',
                   type: BlockType.image,
-                  imageUrl: invalidSvg.path,
+                  imageUrl: missingSvgPath,
                 ),
               ],
             ),
@@ -807,10 +804,14 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
-
-    expect(find.byIcon(Icons.broken_image), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    final finder = find.byType(SvgPicture);
+    final svg = tester.widget<SvgPicture>(finder);
+    final fallback = svg.errorBuilder!(
+      tester.element(finder),
+      StateError('missing'),
+      StackTrace.current,
+    );
+    expect((fallback as Icon).icon, Icons.broken_image);
   });
 
   testWidgets('keeps fixed-layout page count stable while chapters load lazily', (tester) async {

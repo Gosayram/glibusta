@@ -893,6 +893,11 @@ Widget _readerImageWidget(
                   height: 100,
                   child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
                 ),
+                errorBuilder: (_, _, _) => Icon(
+                  Icons.broken_image,
+                  size: 64,
+                  color: errorColor,
+                ),
               )
             : Image.file(
                 File(path),

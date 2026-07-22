@@ -46,6 +46,14 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   }
 
   @override
+  void didUpdateWidget(covariant ReaderSelectionToolbar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedText != oldWidget.selectedText) {
+      _selectedText = widget.selectedText;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 

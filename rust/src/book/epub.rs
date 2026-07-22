@@ -2734,6 +2734,7 @@ mod tests {
 
         assert_eq!(toc.len(), 2);
         assert_eq!(toc[0].title, "Chapter 1");
+        assert_eq!(toc[0].href, "chapter-1.xhtml");
         assert_eq!(toc[0].children[0].title, "Part 1");
         assert_eq!(toc[1].title, "Chapter 2");
     }

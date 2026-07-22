@@ -60,11 +60,21 @@ class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
     required this.filePath,
     this.initialPage = 1,
+    @visibleForTesting this.testViewer,
+    @visibleForTesting this.testTextAvailabilityLoader,
     super.key,
   });
 
   final String filePath;
   final int initialPage;
+
+  /// Replaces the native PDFium-backed viewer in widget tests.
+  ///
+  /// Production callers leave this null and use [PdfViewer.file].
+  final Widget? testViewer;
+
+  /// Reports text availability without opening a native PDF document in tests.
+  final Future<PdfTextAvailability> Function()? testTextAvailabilityLoader;
 
   @override
   State<PdfReaderScreen> createState() => _PdfReaderScreenState();
@@ -83,6 +93,10 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
   void initState() {
     super.initState();
     _controller = PdfViewerController();
+    final textAvailabilityLoader = widget.testTextAvailabilityLoader;
+    if (textAvailabilityLoader != null) {
+      unawaited(_loadTestTextAvailability(textAvailabilityLoader));
+    }
   }
 
   @override
@@ -134,175 +148,176 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       ),
       body: Stack(
         children: [
-          PdfViewer.file(
-            widget.filePath,
-            controller: _controller,
-            initialPageNumber: widget.initialPage,
-            params: PdfViewerParams(
-              backgroundColor: colorScheme.surface,
-              margin: 4,
-              textSelectionParams: const PdfTextSelectionParams(),
-              sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
-                maxScale: 8.0,
-                minScale: 0.1,
-                useAlternativeFitScaleAsMinScale: true,
-                onePassRenderingScaleThreshold: 200 / 72,
-              ),
-              scrollPhysics: const FixedOverscrollPhysics(maxOverscroll: 120),
-              onPageChanged: (pageNumber) {
-                if (mounted) setState(() => _currentPage = pageNumber);
-              },
-              onDocumentChanged: (document) {
-                if (document != null && mounted) {
-                  setState(() => _totalPages = document.pages.length);
-                }
-              },
-              onDocumentLoadFinished: (documentRef, loadSucceeded) {
-                if (!loadSucceeded || !mounted) return;
-                final doc = documentRef.resolveListenable().document;
-                if (doc != null && mounted) {
-                  setState(() => _totalPages = doc.pages.length);
-                  unawaited(_detectTextAvailability(doc));
-                }
-              },
-              pagePaintCallbacks: [
-                searcher.pageTextMatchPaintCallback,
-              ],
-              viewerOverlayBuilder: (context, size, handleLinkTap) {
-                return [
-                  Positioned(
-                    right: 8,
-                    top: size.height * 0.1,
-                    bottom: size.height * 0.1,
-                    child: PdfViewerScrollThumb(controller: _controller),
+          widget.testViewer ??
+              PdfViewer.file(
+                widget.filePath,
+                controller: _controller,
+                initialPageNumber: widget.initialPage,
+                params: PdfViewerParams(
+                  backgroundColor: colorScheme.surface,
+                  margin: 4,
+                  textSelectionParams: const PdfTextSelectionParams(),
+                  sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
+                    maxScale: 8.0,
+                    minScale: 0.1,
+                    useAlternativeFitScaleAsMinScale: true,
+                    onePassRenderingScaleThreshold: 200 / 72,
                   ),
-                  Positioned(
-                    bottom: 8,
-                    left: size.width * 0.1,
-                    right: size.width * 0.1,
-                    child: PdfViewerScrollThumb(
-                      controller: _controller,
-                      orientation: ScrollbarOrientation.bottom,
-                    ),
-                  ),
-                ];
-              },
-              pageOverlaysBuilder: (context, pageRect, page) {
-                return [
-                  Positioned(
-                    bottom: 4,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '${page.pageNumber}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ),
-                ];
-              },
-              loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CircularProgressIndicator(
-                        value: totalBytes != null ? bytesDownloaded / totalBytes : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        totalBytes != null
-                            ? '${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
-                            : 'Загрузка...',
-                      ),
-                    ],
-                  ),
-                );
-              },
-              errorBannerBuilder: (context, error, stackTrace, documentRef) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Ошибка загрузки PDF',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$error',
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                );
-              },
-              linkHandlerParams: PdfLinkHandlerParams(
-                onLinkTap: (link) {
-                  final destination = link.dest;
-                  if (isSafePdfLink(link, _controller.pageCount) && destination != null) {
-                    unawaited(_controller.goToDest(destination));
-                  }
-                },
-              ),
-              getPageRenderingScale: (context, page, controller, estimatedScale) {
-                final w = page.width * estimatedScale;
-                final h = page.height * estimatedScale;
-                if (w > 4096 || h > 4096) {
-                  return (200 / 72.0).clamp(
-                    estimatedScale * 0.5,
-                    estimatedScale,
-                  );
-                }
-                return estimatedScale;
-              },
-              buildContextMenu: (context, params) {
-                if (!params.isTextSelectionEnabled) return null;
-                return PopupMenuButton<String>(
-                  onSelected: (value) {
-                    params.dismissContextMenu();
-                    if (value == 'copy') {
-                      unawaited(
-                        params.textSelectionDelegate.copyTextSelection(),
-                      );
-                    } else if (value == 'clear') {
-                      unawaited(
-                        params.textSelectionDelegate.clearTextSelection(),
-                      );
+                  scrollPhysics: const FixedOverscrollPhysics(maxOverscroll: 120),
+                  onPageChanged: (pageNumber) {
+                    if (mounted) setState(() => _currentPage = pageNumber);
+                  },
+                  onDocumentChanged: (document) {
+                    if (document != null && mounted) {
+                      setState(() => _totalPages = document.pages.length);
                     }
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'copy',
-                      child: Text('Копировать'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'clear',
-                      child: Text('Снять выделение'),
-                    ),
+                  onDocumentLoadFinished: (documentRef, loadSucceeded) {
+                    if (!loadSucceeded || !mounted) return;
+                    final doc = documentRef.resolveListenable().document;
+                    if (doc != null && mounted) {
+                      setState(() => _totalPages = doc.pages.length);
+                      unawaited(_detectTextAvailability(doc));
+                    }
+                  },
+                  pagePaintCallbacks: [
+                    searcher.pageTextMatchPaintCallback,
                   ],
-                );
-              },
-            ),
-          ),
+                  viewerOverlayBuilder: (context, size, handleLinkTap) {
+                    return [
+                      Positioned(
+                        right: 8,
+                        top: size.height * 0.1,
+                        bottom: size.height * 0.1,
+                        child: PdfViewerScrollThumb(controller: _controller),
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        left: size.width * 0.1,
+                        right: size.width * 0.1,
+                        child: PdfViewerScrollThumb(
+                          controller: _controller,
+                          orientation: ScrollbarOrientation.bottom,
+                        ),
+                      ),
+                    ];
+                  },
+                  pageOverlaysBuilder: (context, pageRect, page) {
+                    return [
+                      Positioned(
+                        bottom: 4,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${page.pageNumber}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ];
+                  },
+                  loadingBannerBuilder: (context, bytesDownloaded, totalBytes) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            value: totalBytes != null ? bytesDownloaded / totalBytes : null,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            totalBytes != null
+                                ? '${(bytesDownloaded / 1024).toStringAsFixed(0)} KB / ${(totalBytes / 1024).toStringAsFixed(0)} KB'
+                                : 'Загрузка...',
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  errorBannerBuilder: (context, error, stackTrace, documentRef) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Ошибка загрузки PDF',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$error',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  linkHandlerParams: PdfLinkHandlerParams(
+                    onLinkTap: (link) {
+                      final destination = link.dest;
+                      if (isSafePdfLink(link, _controller.pageCount) && destination != null) {
+                        unawaited(_controller.goToDest(destination));
+                      }
+                    },
+                  ),
+                  getPageRenderingScale: (context, page, controller, estimatedScale) {
+                    final w = page.width * estimatedScale;
+                    final h = page.height * estimatedScale;
+                    if (w > 4096 || h > 4096) {
+                      return (200 / 72.0).clamp(
+                        estimatedScale * 0.5,
+                        estimatedScale,
+                      );
+                    }
+                    return estimatedScale;
+                  },
+                  buildContextMenu: (context, params) {
+                    if (!params.isTextSelectionEnabled) return null;
+                    return PopupMenuButton<String>(
+                      onSelected: (value) {
+                        params.dismissContextMenu();
+                        if (value == 'copy') {
+                          unawaited(
+                            params.textSelectionDelegate.copyTextSelection(),
+                          );
+                        } else if (value == 'clear') {
+                          unawaited(
+                            params.textSelectionDelegate.clearTextSelection(),
+                          );
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'copy',
+                          child: Text('Копировать'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'clear',
+                          child: Text('Снять выделение'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
           if (_showSearch)
             Positioned(
               top: 0,
@@ -348,6 +363,23 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     } on Object {
       // Keep the viewer usable when a malformed page cannot expose text. It is
       // more accurate to leave availability unknown than to label it a scan.
+    }
+  }
+
+  Future<void> _loadTestTextAvailability(
+    Future<PdfTextAvailability> Function() loadTextAvailability,
+  ) async {
+    try {
+      final availability = await loadTextAvailability();
+      if (!mounted) return;
+      setState(() {
+        _textAvailability = availability;
+        if (availability == PdfTextAvailability.unavailable) {
+          _showSearch = false;
+        }
+      });
+    } on Object {
+      // A test loader has the same best-effort semantics as native extraction.
     }
   }
 
