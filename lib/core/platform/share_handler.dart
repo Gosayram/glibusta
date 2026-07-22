@@ -17,14 +17,20 @@ class ShareHandler {
     : _cacheSharedUri = cacheSharedUri ?? StorageBridgeImpl().copyToCache;
 
   StreamSubscription<List<SharedMediaFile>>? _subscription;
+  var _subscriptionGeneration = 0;
   final SharedUriCache _cacheSharedUri;
   final _logger = AppLogger();
 
   void init(BuildContext context, SharedBookImporter importFile) {
     _logger.info('ShareHandler initialized', name: 'Share');
+    final generation = ++_subscriptionGeneration;
+    final previousSubscription = _subscription;
+    if (previousSubscription != null) {
+      unawaited(previousSubscription.cancel());
+    }
     _subscription = ReceiveSharingIntent.instance.getMediaStream().listen(
       (files) {
-        if (!context.mounted) return;
+        if (_subscriptionGeneration != generation || !context.mounted) return;
         _handleSharedFiles(files, context, importFile);
       },
       onError: (Object e, StackTrace st) {
@@ -44,7 +50,7 @@ class ShareHandler {
           // cold-start payload alive while acknowledging that intent.
           final sharedFiles = List<SharedMediaFile>.of(files);
           unawaited(_resetInitialMedia());
-          if (!context.mounted) return;
+          if (_subscriptionGeneration != generation || !context.mounted) return;
           _handleSharedFiles(sharedFiles, context, importFile);
         },
         onError: (Object e, StackTrace st) {
@@ -131,6 +137,7 @@ class ShareHandler {
   }
 
   void dispose() {
+    _subscriptionGeneration++;
     unawaited(_subscription?.cancel());
     _subscription = null;
   }

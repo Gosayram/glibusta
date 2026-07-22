@@ -131,4 +131,51 @@ void main() {
     expect(imported, isFalse);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('reinitializing only imports live Open-with files once', (tester) async {
+    final mediaController = StreamController<List<SharedMediaFile>>.broadcast(sync: true);
+    ReceiveSharingIntent.setMockValues(
+      initialMedia: const [],
+      mediaStream: mediaController.stream,
+    );
+    final handler = ShareHandler();
+    final firstImports = <String>[];
+    final secondImports = <String>[];
+    late BuildContext context;
+    addTearDown(() async {
+      handler.dispose();
+      await mediaController.close();
+      ReceiveSharingIntent.setMockValues(
+        initialMedia: const [],
+        mediaStream: const Stream<List<SharedMediaFile>>.empty(),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (buildContext) {
+            context = buildContext;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    handler.init(context, (path) async {
+      firstImports.add(path);
+      return ImportResult.failure('unexpected');
+    });
+    handler.init(context, (path) async {
+      secondImports.add(path);
+      return ImportResult.failure('test import result');
+    });
+
+    mediaController.add([
+      SharedMediaFile(path: '/cache/reopened.epub', type: SharedMediaType.file),
+    ]);
+    await tester.pump();
+
+    expect(firstImports, isEmpty);
+    expect(secondImports, ['/cache/reopened.epub']);
+  });
 }

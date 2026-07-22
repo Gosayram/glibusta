@@ -2191,6 +2191,27 @@ fn test_mobi_index_probe_is_bounded_and_reports_truncation() {
 }
 
 #[test]
+fn test_mobi_index_probe_does_not_report_truncation_at_terminal_limit() {
+    let text = b"<p>Readable text</p>";
+    let mut records = vec![
+        create_mobi_header_record(text.len() as u32, 1, &[]),
+        text.to_vec(),
+    ];
+    records.extend(std::iter::repeat_n(b"INDX".to_vec(), 1024));
+    // A non-index record immediately after the bounded prefix proves that the
+    // probe reached a complete sequence rather than truncating producer data.
+    records.push(b"next resource record".to_vec());
+
+    let book = glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(records), None)
+        .expect("a terminal bounded index sequence must not prevent opening");
+
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiIndxRecordCount"], 1024);
+    assert!(metadata.get("mobiIndexProbeTruncated").is_none());
+    assert_eq!(metadata["mobiTocSource"], "chapter-splitter");
+}
+
+#[test]
 fn test_mobi_dual_format_prefers_kf8_text_section() {
     let book = glibusta_core::book::mobi::parse_mobi(&create_dual_format_mobi(), None).unwrap();
     let text = book
