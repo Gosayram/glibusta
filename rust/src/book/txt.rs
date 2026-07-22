@@ -314,7 +314,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
 #[cfg(test)]
 mod tests {
     use super::{BlockType, parse_txt};
-    use encoding_rs::{ISO_2022_JP, WINDOWS_1251};
+    use encoding_rs::{BIG5, GBK, ISO_2022_JP, KOI8_R, SHIFT_JIS, WINDOWS_1251};
 
     #[test]
     fn detects_chapters_separated_by_windows_line_endings() {
@@ -368,6 +368,73 @@ mod tests {
                 .text
                 .contains("достаточно длинный абзац")
         );
+    }
+
+    #[test]
+    fn auto_detects_koi8_r_text() {
+        let (bytes, _, _) = KOI8_R.encode(
+            "Заголовок книги\n\nДостаточно длинный русский абзац нужен для устойчивого определения KOI8-R.",
+        );
+
+        let book = parse_txt(&bytes, None).expect("parse KOI8-R TXT");
+
+        assert_eq!(book.title, "Заголовок книги");
+        assert!(
+            book.chapters[0].blocks[1]
+                .text
+                .contains("устойчивого определения")
+        );
+    }
+
+    #[test]
+    fn auto_detects_cjk_legacy_encodings() {
+        for (encoding, text) in [
+            (
+                SHIFT_JIS,
+                "日本語の本の題名\n\nこれは文字コードを判定するための十分に長い日本語の文章です。",
+            ),
+            (
+                BIG5,
+                "繁體中文書名\n\n這是一段足夠長的繁體中文內容，用來驗證自動編碼偵測。",
+            ),
+            (
+                GBK,
+                "简体中文书名\n\n这是一段足够长的简体中文内容，用来验证自动编码检测。",
+            ),
+        ] {
+            let (bytes, _, _) = encoding.encode(text);
+
+            let book = parse_txt(&bytes, None).expect("parse legacy CJK TXT");
+
+            assert_eq!(
+                book.chapters[0].blocks[0].text,
+                text.split("\n\n").next().unwrap()
+            );
+            assert_eq!(
+                book.chapters[0].blocks[1].text,
+                text.split("\n\n").nth(1).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn decodes_utf16_bom_in_both_byte_orders() {
+        for (little_endian, bom) in [(true, [0xff, 0xfe]), (false, [0xfe, 0xff])] {
+            let mut bytes = bom.to_vec();
+            for unit in "UTF-16 title\n\nBody".encode_utf16() {
+                let encoded = if little_endian {
+                    unit.to_le_bytes()
+                } else {
+                    unit.to_be_bytes()
+                };
+                bytes.extend_from_slice(&encoded);
+            }
+
+            let book = parse_txt(&bytes, None).expect("parse UTF-16 BOM TXT");
+
+            assert_eq!(book.title, "UTF-16 title");
+            assert_eq!(book.chapters[0].blocks[1].text, "Body");
+        }
     }
 
     #[test]
