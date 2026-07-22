@@ -1073,6 +1073,14 @@ mod document_open_smoke_tests {
     use super::{djvu_page_count, extract_djvu_text, render_djvu_thumbnail};
     use std::panic::{AssertUnwindSafe, catch_unwind};
 
+    // A minimal single-page document. Keeping this local makes the path-API
+    // smoke test independent from parser integration fixtures.
+    const MINIMAL_DJVU: &[u8] = &[
+        0x41, 0x54, 0x26, 0x54, 0x46, 0x4f, 0x52, 0x4d, 0x00, 0x00, 0x00, 0x20, 0x44, 0x4a, 0x56,
+        0x55, 0x49, 0x4e, 0x46, 0x4f, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x02, 0x00, 0x02, 0x18, 0x00,
+        0x2c, 0x01, 0x16, 0x01, 0x53, 0x6a, 0x62, 0x7a, 0x00, 0x00, 0x00, 0x02, 0xab, 0x7f,
+    ];
+
     fn malformed_djvu_path() -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!(
             "glibusta-malformed-djvu-{}.djvu",
@@ -1081,6 +1089,16 @@ mod document_open_smoke_tests {
         std::fs::write(&path, b"this is not a DjVu document")
             .expect("write malformed DjVu fixture");
         path
+    }
+
+    fn missing_djvu_path() -> String {
+        std::env::temp_dir()
+            .join(format!(
+                "glibusta-missing-djvu-{}.djvu",
+                uuid::Uuid::new_v4()
+            ))
+            .to_string_lossy()
+            .into_owned()
     }
 
     #[test]
@@ -1102,6 +1120,38 @@ mod document_open_smoke_tests {
             thumbnail
                 .expect("thumbnail rendering must not panic")
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn missing_djvu_is_reported_by_every_path_api_without_panicking() {
+        let path = missing_djvu_path();
+
+        let page_count = catch_unwind(AssertUnwindSafe(|| djvu_page_count(path.clone())));
+        let text = catch_unwind(AssertUnwindSafe(|| extract_djvu_text(path.clone())));
+        let thumbnail = catch_unwind(AssertUnwindSafe(|| render_djvu_thumbnail(path, 0, 1080)));
+
+        assert!(page_count.expect("page count must not panic").is_err());
+        assert!(text.expect("text extraction must not panic").is_err());
+        assert!(
+            thumbnail
+                .expect("thumbnail rendering must not panic")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn djvu_path_api_accepts_a_cyrillic_filename() {
+        let path =
+            std::env::temp_dir().join(format!("glibusta-книга-{}.djvu", uuid::Uuid::new_v4()));
+        std::fs::write(&path, MINIMAL_DJVU).expect("write DjVu fixture with a Cyrillic name");
+
+        let page_count = djvu_page_count(path.to_string_lossy().into_owned());
+
+        let _ = std::fs::remove_file(path);
+        assert_eq!(
+            page_count.expect("Cyrillic path must reach the DjVu parser"),
+            1
         );
     }
 

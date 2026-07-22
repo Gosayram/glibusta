@@ -1784,8 +1784,9 @@ fn parse_xhtml_to_blocks(
                     if in_block {
                         append_xhtml_text(&mut span_text, &text);
                         append_xhtml_text(&mut current_text, &text);
-                    } else if in_table {
-                        // Inside td/th - accumulate for cell
+                    } else if in_table || in_list {
+                        // Table cells and list items are accumulated separately
+                        // until their container is flushed.
                         append_xhtml_text(&mut span_text, &text);
                     } else {
                         append_xhtml_text(&mut current_text, &text);
@@ -1795,7 +1796,7 @@ fn parse_xhtml_to_blocks(
             Ok(Event::CData(ref e)) => {
                 if in_body && hidden_depth == 0 {
                     let text = e.xml10_content().unwrap_or_default();
-                    if in_block || in_table {
+                    if in_block || in_table || in_list {
                         span_text.push_str(&text);
                         if in_block {
                             current_text.push_str(&text);
@@ -1812,7 +1813,7 @@ fn parse_xhtml_to_blocks(
                     // silently dropping the delimiters from visible prose.
                     let text = decode_xhtml_general_ref(e.as_ref())
                         .unwrap_or_else(|| format!("&{};", String::from_utf8_lossy(e.as_ref())));
-                    if in_block || in_table {
+                    if in_block || in_table || in_list {
                         span_text.push_str(&text);
                         if in_block {
                             current_text.push_str(&text);
