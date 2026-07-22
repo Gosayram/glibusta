@@ -1,28 +1,23 @@
 pub(crate) fn decode_utf16(bytes: &[u8]) -> String {
     if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-            .collect();
-        return String::from_utf16_lossy(&units);
+        return decode_utf16_units(&bytes[2..], u16::from_le_bytes);
     }
     if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
-            .collect();
-        return String::from_utf16_lossy(&units);
+        return decode_utf16_units(&bytes[2..], u16::from_be_bytes);
     }
-    let mut buf = String::with_capacity(bytes.len() / 2);
-    let mut i = 0;
-    while i + 1 < bytes.len() {
-        let code = (bytes[i] as u32) | ((bytes[i + 1] as u32) << 8);
-        if let Some(c) = char::from_u32(code) {
-            buf.push(c);
-        }
-        i += 2;
-    }
-    buf
+
+    // MOBI's UTF-16 code page does not require a BOM. Treat BOM-less input as
+    // little-endian, but still decode the complete u16 sequence so surrogate
+    // pairs survive rather than being silently discarded one unit at a time.
+    decode_utf16_units(bytes, u16::from_le_bytes)
+}
+
+fn decode_utf16_units(bytes: &[u8], from_bytes: fn([u8; 2]) -> u16) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|chunk| from_bytes([chunk[0], chunk[1]]))
+        .collect();
+    String::from_utf16_lossy(&units)
 }
 
 pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {

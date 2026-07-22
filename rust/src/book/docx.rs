@@ -110,13 +110,58 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
 }
 
 /// DOCX XML parts are normally UTF-8, but OPC/XML also permits UTF-16 parts.
-/// An explicit user choice remains authoritative; otherwise detect the BOM (and
-/// retain the existing charset fallback) for every XML part independently.
+/// An explicit user choice remains authoritative; otherwise use the BOM, a
+/// valid XML declaration, then the existing charset fallback for each part.
 fn decode_docx_xml(bytes: &[u8], forced_encoding: Option<&str>) -> String {
-    decode_bytes(
-        bytes,
-        forced_encoding.unwrap_or_else(|| detect_encoding(bytes)),
-    )
+    let (bytes, bom_encoding) = match bytes {
+        [0xEF, 0xBB, 0xBF, rest @ ..] => (rest, Some("utf-8")),
+        [0xFF, 0xFE, rest @ ..] => (rest, Some("utf-16le")),
+        [0xFE, 0xFF, rest @ ..] => (rest, Some("utf-16be")),
+        _ => (bytes, None),
+    };
+    let encoding = forced_encoding
+        .or(bom_encoding)
+        .or_else(|| utf16_encoding_without_bom(bytes))
+        .or_else(|| xml_declared_encoding(bytes).filter(is_supported_encoding))
+        .unwrap_or_else(|| detect_encoding(bytes));
+
+    decode_bytes(bytes, encoding)
+}
+
+fn utf16_encoding_without_bom(bytes: &[u8]) -> Option<&'static str> {
+    match bytes {
+        [b'<', 0, ..] => Some("utf-16le"),
+        [0, b'<', ..] => Some("utf-16be"),
+        _ => None,
+    }
+}
+
+fn is_supported_encoding(label: &&str) -> bool {
+    encoding_rs::Encoding::for_label_no_replacement(label.as_bytes()).is_some()
+}
+
+/// Extract a declared encoding from the bounded ASCII XML declaration. UTF-16
+/// declarations without a BOM are handled before this because their bytes are
+/// not ASCII-compatible.
+fn xml_declared_encoding(bytes: &[u8]) -> Option<&str> {
+    let declaration_end = bytes
+        .get(..bytes.len().min(1024))?
+        .windows(2)
+        .position(|window| window == b"?>")?;
+    let declaration = std::str::from_utf8(&bytes[..declaration_end]).ok()?;
+    let lower = declaration.to_ascii_lowercase();
+    let encoding_start = lower.find("encoding")? + "encoding".len();
+    let value = declaration[encoding_start..]
+        .trim_start()
+        .strip_prefix('=')?
+        .trim_start();
+    let quote = value.chars().next()?;
+    if quote != '\'' && quote != '\"' {
+        return None;
+    }
+    let value = &value[quote.len_utf8()..];
+    let end = value.find(quote)?;
+    Some(&value[..end])
 }
 
 #[derive(Deserialize)]
@@ -1031,6 +1076,29 @@ mod tests {
         bytes
     }
 
+    fn utf16be_xml(xml: &str) -> Vec<u8> {
+        let mut bytes = vec![0xFE, 0xFF];
+        for unit in xml.encode_utf16() {
+            bytes.extend_from_slice(&unit.to_be_bytes());
+        }
+        bytes
+    }
+
+    fn docx_with_xml_parts(core_xml: &[u8], document_xml: &[u8]) -> Vec<u8> {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(core_xml).expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(document_xml).expect("write document XML");
+        zip.finish().expect("finish DOCX archive");
+        bytes.into_inner()
+    }
+
     fn malformed_docx() -> Vec<u8> {
         let mut bytes = Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(&mut bytes);
@@ -1092,6 +1160,84 @@ mod tests {
         assert_eq!(book.title, "UTF-16 title");
         assert_eq!(book.authors, ["Автор"]);
         assert_eq!(book.chapters[0].blocks[0].text, "Привет, UTF-16 DOCX.");
+    }
+
+    #[test]
+    fn auto_detects_utf16be_docx_xml_parts() {
+        let core_xml = utf16be_xml(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>BE title</dc:title></cp:coreProperties>"#,
+        );
+        let document_xml = utf16be_xml(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body><w:p><w:r><w:t>Привет, UTF-16 BE.</w:t></w:r></w:p></w:body>
+            </w:document>"#,
+        );
+
+        let book = parse_docx(&docx_with_xml_parts(&core_xml, &document_xml), None)
+            .expect("parse UTF-16BE DOCX");
+
+        assert_eq!(book.title, "BE title");
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет, UTF-16 BE.");
+    }
+
+    #[test]
+    fn honors_declared_legacy_encoding_in_docx_xml_parts() {
+        let core = r#"<?xml version="1.0" encoding="windows-1251"?>
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Книга</dc:title></cp:coreProperties>"#;
+        let document = r#"<?xml version="1.0" encoding="windows-1251"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body><w:p><w:r><w:t>Текст в CP1251.</w:t></w:r></w:p></w:body>
+            </w:document>"#;
+        let (core_xml, _, _) = encoding_rs::WINDOWS_1251.encode(core);
+        let (document_xml, _, _) = encoding_rs::WINDOWS_1251.encode(document);
+
+        let book = parse_docx(
+            &docx_with_xml_parts(core_xml.as_ref(), document_xml.as_ref()),
+            None,
+        )
+        .expect("parse declared Windows-1251 DOCX");
+
+        assert_eq!(book.title, "Книга");
+        assert_eq!(book.chapters[0].blocks[0].text, "Текст в CP1251.");
+    }
+
+    #[test]
+    fn strips_utf8_bom_from_docx_xml_parts() {
+        let core = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><cp:coreProperties xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><dc:title>BOM title</dc:title></cp:coreProperties>";
+        let document = b"\xEF\xBB\xBF<?xml version=\"1.0\"?><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>BOM-safe text.</w:t></w:r></w:p></w:body></w:document>";
+
+        let book =
+            parse_docx(&docx_with_xml_parts(core, document), None).expect("parse UTF-8 BOM DOCX");
+
+        assert_eq!(book.title, "BOM title");
+        assert_eq!(book.chapters[0].blocks[0].text, "BOM-safe text.");
+        assert!(!book.chapters[0].blocks[0].text.starts_with('\u{feff}'));
+    }
+
+    #[test]
+    fn forced_docx_encoding_overrides_misdeclared_xml() {
+        let core = r#"<?xml version="1.0" encoding="utf-8"?>
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Книга</dc:title></cp:coreProperties>"#;
+        let document = r#"<?xml version="1.0" encoding="utf-8"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body><w:p><w:r><w:t>Принудительная кодировка.</w:t></w:r></w:p></w:body>
+            </w:document>"#;
+        let (core_xml, _, _) = encoding_rs::WINDOWS_1251.encode(core);
+        let (document_xml, _, _) = encoding_rs::WINDOWS_1251.encode(document);
+
+        let book = parse_docx(
+            &docx_with_xml_parts(core_xml.as_ref(), document_xml.as_ref()),
+            Some("windows-1251"),
+        )
+        .expect("forced encoding must override XML declaration");
+
+        assert_eq!(book.title, "Книга");
+        assert_eq!(book.chapters[0].blocks[0].text, "Принудительная кодировка.");
     }
 
     #[test]

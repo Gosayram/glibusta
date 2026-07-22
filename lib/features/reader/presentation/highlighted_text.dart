@@ -27,6 +27,7 @@ class HighlightedText extends StatefulWidget {
 class _HighlightedTextState extends State<HighlightedText> {
   TextPainter? _textPainter;
   Size _lastSize = Size.zero;
+  TextDirection? _lastTextDirection;
 
   static const _colorMap = <String, Color>{
     'yellow': Color(0x40FFEB3B),
@@ -64,7 +65,7 @@ class _HighlightedTextState extends State<HighlightedText> {
         final maxWidth = constraints.maxWidth;
         if (maxWidth <= 0) return _buildText();
 
-        _ensureTextPainter(maxWidth);
+        _ensureTextPainter(maxWidth, Directionality.of(context));
 
         return CustomPaint(
           size: Size(maxWidth, _textPainter!.height),
@@ -87,15 +88,20 @@ class _HighlightedTextState extends State<HighlightedText> {
     );
   }
 
-  void _ensureTextPainter(double maxWidth) {
-    if (_textPainter != null && _lastSize.width == maxWidth) return;
+  void _ensureTextPainter(double maxWidth, TextDirection textDirection) {
+    if (_textPainter != null &&
+        _lastSize.width == maxWidth &&
+        _lastTextDirection == textDirection) {
+      return;
+    }
 
     _textPainter?.dispose();
     _textPainter = TextPainter(
       text: TextSpan(text: widget.text, style: widget.style),
-      textDirection: TextDirection.ltr,
+      textDirection: textDirection,
     )..layout(maxWidth: maxWidth);
     _lastSize = Size(maxWidth, _textPainter!.height);
+    _lastTextDirection = textDirection;
   }
 }
 

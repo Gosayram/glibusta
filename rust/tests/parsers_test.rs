@@ -1988,12 +1988,14 @@ fn test_mobi_decodes_utf8_and_falls_back_safely_for_unknown_code_pages() {
 }
 
 #[test]
-fn test_mobi_decodes_utf16le_and_utf16be_bom_text_and_exth_metadata() {
-    fn utf16_with_bom(text: &str, little_endian: bool) -> Vec<u8> {
-        let mut bytes = if little_endian {
+fn test_mobi_decodes_utf16_text_and_exth_metadata() {
+    fn utf16(text: &str, little_endian: bool, include_bom: bool) -> Vec<u8> {
+        let mut bytes = if include_bom && little_endian {
             vec![0xFF, 0xFE]
-        } else {
+        } else if include_bom {
             vec![0xFE, 0xFF]
+        } else {
+            Vec::new()
         };
         for unit in text.encode_utf16() {
             let encoded = if little_endian {
@@ -2007,8 +2009,8 @@ fn test_mobi_decodes_utf16le_and_utf16be_bom_text_and_exth_metadata() {
     }
 
     for little_endian in [true, false] {
-        let text = utf16_with_bom("<p>Привет 😀</p>", little_endian);
-        let title = utf16_with_bom("Книга", little_endian);
+        let text = utf16("<p>Привет 😀</p>", little_endian, true);
+        let title = utf16("Книга", little_endian, true);
         let mut header = create_mobi_header_record(text.len() as u32, 1, &[(503, title)]);
         header[28..30].copy_from_slice(&65002u16.to_be_bytes());
 
@@ -2018,6 +2020,19 @@ fn test_mobi_decodes_utf16le_and_utf16be_bom_text_and_exth_metadata() {
         assert_eq!(book.title, "Книга");
         assert_eq!(book.chapters[0].blocks[0].text, "Привет 😀");
     }
+
+    // MOBI's UTF-16 code page permits BOM-less content. This must be decoded
+    // as a u16 sequence, not one code unit at a time: the latter drops both
+    // halves of the supplementary scalar below.
+    let text = utf16("<p>Привет 😀</p>", true, false);
+    let title = utf16("Книга 😀", true, false);
+    let mut header = create_mobi_header_record(text.len() as u32, 1, &[(503, title)]);
+    header[28..30].copy_from_slice(&65002u16.to_be_bytes());
+
+    let book = glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(vec![header, text]), None)
+        .expect("BOM-less UTF-16LE MOBI text and EXTH metadata must decode");
+    assert_eq!(book.title, "Книга 😀");
+    assert_eq!(book.chapters[0].blocks[0].text, "Привет 😀");
 }
 
 #[test]
