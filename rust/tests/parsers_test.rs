@@ -1747,6 +1747,29 @@ fn test_mobi_decodes_cp1252_text_title_and_exth_language() {
 }
 
 #[test]
+fn test_mobi_preserves_raw_locale_fields_without_inventing_a_bcp47_mapping() {
+    let text = b"<p>Locale fixture</p>";
+    let mut header = create_mobi_header_record(text.len() as u32, 1, &[(524, b"en-GB".to_vec())]);
+    // MOBI header offsets are relative to its magic at record-0 offset 16:
+    // 0x5c locale, 0x60 dictionary input locale, 0x64 dictionary output locale.
+    header[16 + 92..16 + 96].copy_from_slice(&2057u32.to_be_bytes());
+    header[16 + 96..16 + 100].copy_from_slice(&1033u32.to_be_bytes());
+    header[16 + 100..16 + 104].copy_from_slice(&1036u32.to_be_bytes());
+
+    let book =
+        glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(vec![header, text.to_vec()]), None)
+            .expect("MOBI locale fields must not affect decoding");
+
+    // EXTH 524 is already a textual language tag and is therefore the only
+    // locale-related value suitable for NormalizedBook.language.
+    assert_eq!(book.language.as_deref(), Some("en-GB"));
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiLocale"], 2057);
+    assert_eq!(metadata["mobiInputLanguage"], 1033);
+    assert_eq!(metadata["mobiOutputLanguage"], 1036);
+}
+
+#[test]
 fn test_mobi_preserves_repeated_exth_authors_and_subjects_with_metadata() {
     let text = b"<p>EXTH metadata fixture</p>";
     let book = glibusta_core::book::mobi::parse_mobi(

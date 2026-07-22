@@ -740,6 +740,23 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         "mobiExthPresent".to_string(),
         serde_json::json!(metadata.has_exth),
     );
+    // MOBI stores these as locale integers, not BCP-47 tags. Preserve the
+    // values for diagnostics/round-tripping without guessing a language tag.
+    if let Some(locale) = header.locale {
+        meta.insert("mobiLocale".to_string(), serde_json::json!(locale));
+    }
+    if let Some(input_language) = header.input_language {
+        meta.insert(
+            "mobiInputLanguage".to_string(),
+            serde_json::json!(input_language),
+        );
+    }
+    if let Some(output_language) = header.output_language {
+        meta.insert(
+            "mobiOutputLanguage".to_string(),
+            serde_json::json!(output_language),
+        );
+    }
     if let Some(ref lang) = metadata.language {
         meta.insert(
             "mobiLanguage".to_string(),

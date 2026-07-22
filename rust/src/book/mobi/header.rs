@@ -12,6 +12,14 @@ pub(crate) struct MobiHeader {
     pub record_size: u16,
     pub full_name_offset: u32,
     pub full_name_length: u32,
+    /// MOBI's Windows-LCID-like book locale. This is deliberately kept raw:
+    /// the MOBI reference describes its byte layout but does not define a
+    /// complete mapping to BCP-47.
+    pub locale: Option<u32>,
+    /// Dictionary source locale, when the variable-length header contains it.
+    pub input_language: Option<u32>,
+    /// Dictionary target locale, when the variable-length header contains it.
+    pub output_language: Option<u32>,
     pub exth_flags: u32,
     pub first_image_record_index: u32,
     pub extra_data_flags: u32,
@@ -23,6 +31,9 @@ impl MobiHeaderParser {
     const MOBI_OFFSET: usize = 16;
     const MIN_HEADER_LENGTH: usize = 16;
     const FULL_NAME_END: usize = 92;
+    const LOCALE_END: usize = 96;
+    const INPUT_LANGUAGE_END: usize = 100;
+    const OUTPUT_LANGUAGE_END: usize = 104;
     const FIRST_IMAGE_RECORD_END: usize = 112;
     const EXTH_FLAGS_END: usize = 132;
     const EXTRA_DATA_FLAGS_END: usize = 228;
@@ -54,6 +65,15 @@ impl MobiHeaderParser {
         } else {
             (0, 0)
         };
+        let locale = (header_length >= Self::LOCALE_END)
+            .then(|| reader.u32be(mobi_offset + 92))
+            .transpose()?;
+        let input_language = (header_length >= Self::INPUT_LANGUAGE_END)
+            .then(|| reader.u32be(mobi_offset + 96))
+            .transpose()?;
+        let output_language = (header_length >= Self::OUTPUT_LANGUAGE_END)
+            .then(|| reader.u32be(mobi_offset + 100))
+            .transpose()?;
         let first_image_record_index = if header_length >= Self::FIRST_IMAGE_RECORD_END {
             reader.u32be(mobi_offset + 108)?
         } else {
@@ -79,6 +99,9 @@ impl MobiHeaderParser {
             record_size: reader.u16be(10)?,
             full_name_offset,
             full_name_length,
+            locale,
+            input_language,
+            output_language,
             exth_flags,
             first_image_record_index,
             extra_data_flags,

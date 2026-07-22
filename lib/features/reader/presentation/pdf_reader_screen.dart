@@ -35,6 +35,27 @@ enum PdfTextAvailability {
   }
 }
 
+/// The small opening sample keeps scan detection from extracting every page of
+/// a large PDF before the reader becomes interactive.
+@visibleForTesting
+const pdfTextAvailabilitySamplePageLimit = 10;
+
+/// Checks only the opening pages supplied by [pageTextLoaders].
+///
+/// Keeping this separate from the PDF backend makes the bounded-work contract
+/// directly regression-testable without a large PDF fixture.
+@visibleForTesting
+Future<PdfTextAvailability> detectPdfTextAvailability(
+  Iterable<Future<String> Function()> pageTextLoaders,
+) async {
+  for (final loadText in pageTextLoaders.take(pdfTextAvailabilitySamplePageLimit)) {
+    if ((await loadText()).trim().isNotEmpty) {
+      return PdfTextAvailability.available;
+    }
+  }
+  return PdfTextAvailability.unavailable;
+}
+
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
     required this.filePath,
@@ -312,17 +333,16 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
   Future<void> _detectTextAvailability(PdfDocument document) async {
     try {
-      for (final page in document.pages.take(10)) {
-        if ((await page.loadStructuredText()).fullText.trim().isNotEmpty) {
-          if (mounted) {
-            setState(() => _textAvailability = PdfTextAvailability.available);
-          }
-          return;
-        }
-      }
+      final availability = await detectPdfTextAvailability(
+        document.pages.map(
+          (page) =>
+              () async => (await page.loadStructuredText()).fullText,
+        ),
+      );
       if (!mounted) return;
       setState(() {
-        _textAvailability = PdfTextAvailability.unavailable;
+        _textAvailability = availability;
+        if (availability == PdfTextAvailability.available) return;
         _showSearch = false;
       });
     } on Object {

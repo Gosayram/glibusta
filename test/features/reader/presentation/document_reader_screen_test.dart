@@ -85,6 +85,43 @@ void main() {
         PdfTextAvailability.available,
       );
     });
+
+    test('samples at most the first ten pages before declaring a PDF image-only', () async {
+      final loadedPages = <int>[];
+      final availability = await detectPdfTextAvailability(
+        List.generate(
+          12,
+          (index) => () async {
+            loadedPages.add(index + 1);
+            return index == 10 ? 'Text beyond the opening sample' : ' \n\t ';
+          },
+        ),
+      );
+
+      expect(availability, PdfTextAvailability.unavailable);
+      expect(loadedPages, List.generate(pdfTextAvailabilitySamplePageLimit, (index) => index + 1));
+    });
+
+    test('stops the bounded sample as soon as it finds extracted text', () async {
+      final loadedPages = <int>[];
+      final availability = await detectPdfTextAvailability([
+        () async {
+          loadedPages.add(1);
+          return '  ';
+        },
+        () async {
+          loadedPages.add(2);
+          return 'Глава 1';
+        },
+        () async {
+          loadedPages.add(3);
+          return 'must not be loaded';
+        },
+      ]);
+
+      expect(availability, PdfTextAvailability.available);
+      expect(loadedPages, [1, 2]);
+    });
   });
 }
 
