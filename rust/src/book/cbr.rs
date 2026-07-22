@@ -392,6 +392,10 @@ mod tests {
         0x00, 0x8f, 0xec, 0x8a, 0x45, 0xcc, 0x23, 0xc8, 0x48, 0x08, 0x83, 0x62, 0xfe, 0x5f, 0xdd,
         0x5c, 0x53, 0x88, 0xf0, 0x72, 0xc4, 0x3d, 0x7b, 0x00, 0x40, 0x07, 0x00,
     ];
+    // RAR5 marker followed by an intentionally incomplete main header.  This
+    // is not presented as a valid RAR5/solid fixture; it only exercises the
+    // native parser's damaged-RAR5 error path without an external RAR writer.
+    const TRUNCATED_RAR5_HEADER: &[u8] = b"Rar!\x1a\x07\x01\x00\x00";
 
     #[test]
     fn recognizes_supported_image_extensions_case_insensitively() {
@@ -569,5 +573,23 @@ mod tests {
         let _ = std::fs::remove_file(path);
 
         assert!(result.is_err(), "truncated RAR4 archive must be rejected");
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "UnRAR is a native C++ dependency that Miri cannot execute"
+    )]
+    fn rejects_a_truncated_rar5_header_without_panicking() {
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-truncated-rar5-cbr-{}.cbr",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, TRUNCATED_RAR5_HEADER).expect("write truncated RAR5 header fixture");
+
+        let result = parse_cbr_path(&path);
+        let _ = std::fs::remove_file(path);
+
+        assert!(result.is_err(), "truncated RAR5 archive must be rejected");
     }
 }

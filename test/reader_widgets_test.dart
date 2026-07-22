@@ -864,6 +864,57 @@ void main() {
     );
   });
 
+  testWidgets('renders EPUB rich-span hard breaks as a newline', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'epub-hard-break',
+            title: 'EPUB hard break',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Chapter'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Chapter',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: 'First\nsecond line.',
+                  richSpans: [
+                    RichSpan(text: 'First', href: '#note'),
+                    RichSpan(text: '', lineBreak: true),
+                    RichSpan(text: 'second', href: '#note'),
+                    RichSpan(text: ' line.'),
+                  ],
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final text = tester.widget<Text>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.textSpan?.toPlainText().endsWith('First\nsecond line.') == true,
+      ),
+    );
+    expect(text.textSpan!.toPlainText(), endsWith('First\nsecond line.'));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dark reader themes ignore hardcoded EPUB text colors', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

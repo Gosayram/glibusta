@@ -3,12 +3,12 @@ use crate::api::models::{
 };
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{attr_eq, decode_bytes, get_class_attr_arena, get_xml_attr};
-use anyhow::{Context, Result, bail};
-use base64::Engine;
+use anyhow::{bail, Context, Result};
 use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bumpalo::Bump;
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -1738,7 +1738,30 @@ fn parse_xhtml_to_blocks(
                             get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                     }
                     b"br" if in_block && hidden_depth == 0 => {
-                        span_text.push('\n');
+                        // The reader renders rich spans when present. Represent
+                        // `<br>` explicitly there as well as in the plain block
+                        // text, otherwise the visual hard break is lost as soon
+                        // as surrounding inline content creates rich spans.
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        rich_spans.push(RichSpan {
+                            text: String::new(),
+                            bold: false,
+                            italic: false,
+                            superscript: false,
+                            subscript: false,
+                            strikethrough: false,
+                            code: false,
+                            style_name: None,
+                            href: None,
+                            line_break: true,
+                        });
                         current_text.push('\n');
                     }
                     _ => {}
@@ -2266,7 +2289,29 @@ fn parse_xhtml_to_blocks(
                     }
                 } else if name == b"br" && in_body && !element_is_hidden {
                     if in_block {
-                        span_text.push('\n');
+                        // Self-closing `<br/>` is reported as `Event::Empty`,
+                        // so it must follow the same rich-span path as `<br>`.
+                        flush_rich_span(
+                            &mut rich_spans,
+                            &mut span_text,
+                            bold,
+                            italic,
+                            superscript,
+                            &href,
+                        );
+                        rich_spans.push(RichSpan {
+                            text: String::new(),
+                            bold: false,
+                            italic: false,
+                            superscript: false,
+                            subscript: false,
+                            strikethrough: false,
+                            code: false,
+                            style_name: None,
+                            href: None,
+                            line_break: true,
+                        });
+                        current_text.push('\n');
                     } else {
                         current_text.push('\n');
                     }
@@ -2683,6 +2728,29 @@ mod tests {
             blocks[0].text,
             "В\u{a0}доме горел свет. И\u{a0}за окном дождь."
         );
+    }
+
+    #[test]
+    fn preserves_br_as_a_rich_span_line_break() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            r##"<html><body><p><a href="#note">First<br/>second</a> line.</p></body></html>"##,
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].text, "First\nsecond line.");
+        let spans = blocks[0]
+            .rich_spans
+            .as_ref()
+            .expect("inline link keeps spans");
+        assert_eq!(spans.len(), 4);
+        assert_eq!(spans[0].text, "First");
+        assert_eq!(spans[0].href.as_deref(), Some("#note"));
+        assert!(spans[1].line_break);
+        assert_eq!(spans[2].text, "second");
+        assert_eq!(spans[2].href.as_deref(), Some("#note"));
+        assert_eq!(spans[3].text, " line.");
     }
 
     #[test]
