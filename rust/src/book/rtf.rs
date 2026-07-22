@@ -517,7 +517,10 @@ fn rtf_to_rich_blocks(body: &str, encoding_name: &str) -> Vec<ReaderBlock> {
                             .unwrap_or("0")
                             .parse::<usize>()
                         {
-                            i += len;
+                            // A malformed `\\bin` length can be `usize::MAX`.
+                            // Saturating here makes it an end-of-input skip instead
+                            // of overflowing the parser cursor in debug builds.
+                            i = i.saturating_add(len);
                         }
                         continue;
                     }
@@ -1034,6 +1037,17 @@ mod tests {
             .expect("parse incomplete RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Unfinished text");
+    }
+
+    #[test]
+    fn malformed_bin_length_does_not_overflow_the_parser_cursor() {
+        let book = parse_rtf(
+            br"{\rtf1\ansi Before\bin18446744073709551615 ignored}",
+            Some("utf-8"),
+        )
+        .expect("parse RTF with an oversized binary length");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Before");
     }
 
     #[test]

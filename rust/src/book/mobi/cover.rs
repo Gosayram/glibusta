@@ -13,13 +13,28 @@ impl MobiCoverExtractor {
         metadata: &MobiMetadata,
     ) -> Option<Vec<u8>> {
         let declared_cover = self.find_cover_record_index(header, metadata);
-        let first_image = (header.first_image_record_index > 0)
-            .then_some(header.first_image_record_index as usize);
-
-        for record_index in [declared_cover, first_image].into_iter().flatten() {
+        if let Some(record_index) = declared_cover {
             // EXTH 201 is optional metadata and may point to a stale or
-            // non-image record. Keep the standard first-image fallback, but
-            // never accept a candidate without an image signature.
+            // non-image record. Prefer it when valid, but never accept a
+            // candidate without an image signature.
+            if let Some(bytes) = self.safe_record_bytes(full_bytes, palm_db, record_index) {
+                if let Some(image) = self.validate_image_bytes(bytes) {
+                    return Some(image);
+                }
+            }
+        }
+
+        let first_image = (header.first_image_record_index > 0)
+            .then_some(header.first_image_record_index as usize)?;
+        // MOBI producers occasionally leave stale cover metadata or place a
+        // thumbnail/non-image placeholder at the first image record. Scan the
+        // resource tail for the first supported image instead of giving up on
+        // the whole cover. This only inspects record slices and clones the
+        // selected image after the size/signature checks.
+        for record_index in first_image..palm_db.records.len() {
+            if declared_cover == Some(record_index) {
+                continue;
+            }
             let Some(bytes) = self.safe_record_bytes(full_bytes, palm_db, record_index) else {
                 continue;
             };
@@ -209,6 +224,66 @@ mod tests {
             .expect("safe first-image fallback");
 
         assert_eq!(cover, b"\xff\xd8cover");
+    }
+
+    #[test]
+    fn falls_back_to_later_image_when_first_image_record_is_not_renderable() {
+        let bytes = [
+            [0_u8; 8].as_slice(),
+            b"thumbnail placeholder".as_slice(),
+            b"not an image either".as_slice(),
+            b"GIF89a cover".as_slice(),
+        ]
+        .concat();
+        let palm_db = PalmDb {
+            name: String::new(),
+            records: vec![
+                PalmRecord {
+                    offset: 0,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 8,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 29,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+                PalmRecord {
+                    offset: 48,
+                    attributes: 0,
+                    unique_id: 0,
+                },
+            ],
+        };
+        let header = MobiHeader {
+            compression: 1,
+            encryption_type: 0,
+            text_length: 0,
+            text_encoding: 0,
+            text_record_count: 0,
+            record_size: 0,
+            full_name_offset: 0,
+            full_name_length: 0,
+            locale: None,
+            input_language: None,
+            output_language: None,
+            exth_flags: 0,
+            first_image_record_index: 1,
+            extra_data_flags: 0,
+        };
+        let mut metadata = MobiMetadata::default();
+        metadata.cover_record_index = Some(1);
+
+        let cover = MobiCoverExtractor
+            .extract(&bytes, &palm_db, &header, &metadata)
+            .expect("later valid image must be used after stale cover records");
+
+        assert_eq!(cover, b"GIF89a cover");
     }
 
     #[test]

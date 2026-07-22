@@ -1105,6 +1105,47 @@ void main() {
     expect(lightSpan.style!.color, const Color(0xFFFF0000));
   });
 
+  testWidgets('renders UTF-8 umlauts from reader blocks without replacement characters', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    const paragraph = 'F\u00fcr Gr\u00f6\u00dfe und M\u00f6glichkeit: \u00e4\u00f6\u00fc\u00df.';
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'utf8-umlauts',
+            title: 'UTF-8 umlauts',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Chapter'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Chapter',
+              blocks: [ReaderBlock(index: 0, text: paragraph)],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final renderedParagraph = tester.widget<RichText>(
+      find.byWidgetPredicate(
+        (widget) => widget is RichText && widget.text.toPlainText().contains(paragraph),
+      ),
+    );
+    expect(renderedParagraph.text.toPlainText(), contains(paragraph));
+    expect(renderedParagraph.text.toPlainText(), isNot(contains('\u{fffd}')));
+  });
+
   testWidgets('focus mode uses the dark system link color', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

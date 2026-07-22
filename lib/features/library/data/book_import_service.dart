@@ -327,9 +327,7 @@ class BookImportService {
         ctx.format = BookFormat.cbz;
       }
 
-      if (ctx.book!.metadata != null) {
-        ctx.coverBytes = ctx.book!.metadata!['mobiCoverBytes'] as Uint8List?;
-      }
+      ctx.coverBytes = _coverBytesForBook(ctx.book!);
     } on Object catch (e) {
       return ImportResult.failure(_friendlyImportError(e));
     }
@@ -616,10 +614,7 @@ class BookImportService {
         resolvedFormat = BookFormat.cbz;
       }
 
-      Uint8List? extCoverBytes;
-      if (book.metadata != null) {
-        extCoverBytes = book.metadata!['mobiCoverBytes'] as Uint8List?;
-      }
+      final extCoverBytes = _coverBytesForBook(book);
 
       final targetFile = await _storage.bookFile(
         bookId,
@@ -867,6 +862,37 @@ class BookImportService {
     } on Object catch (e) {
       _logger.warning('Cover extraction failed for $bookId: $e', name: 'Import', error: e);
     }
+  }
+
+  Uint8List? _coverBytesForBook(NormalizedBook book) {
+    final metadataCover = book.metadata?['mobiCoverBytes'];
+    if (metadataCover is Uint8List && metadataCover.isNotEmpty) {
+      return metadataCover;
+    }
+    return coverBytesFromDataUri(book.coverUrl);
+  }
+}
+
+/// Decodes parser-provided image data without allowing a malformed cover URL
+/// to fail book import. Rust MOBI parsing exposes cover data through `coverUrl`
+/// because arbitrary JSON metadata is opaque across the bridge.
+@visibleForTesting
+Uint8List? coverBytesFromDataUri(String? coverUrl, {int maxBytes = 50 * 1024 * 1024}) {
+  if (coverUrl == null) return null;
+  final separator = coverUrl.indexOf(',');
+  if (separator <= 0) return null;
+  final metadata = coverUrl.substring(0, separator).toLowerCase();
+  if (!metadata.startsWith('data:image/') || !metadata.contains(';base64')) {
+    return null;
+  }
+  final encoded = coverUrl.substring(separator + 1);
+  final maxEncodedBytes = ((maxBytes + 2) ~/ 3) * 4;
+  if (encoded.length > maxEncodedBytes) return null;
+  try {
+    final decoded = base64Decode(encoded);
+    return decoded.length <= maxBytes ? Uint8List.fromList(decoded) : null;
+  } on FormatException {
+    return null;
   }
 }
 
