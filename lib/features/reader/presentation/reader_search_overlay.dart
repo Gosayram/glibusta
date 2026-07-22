@@ -62,6 +62,14 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   }
 
   void _onQueryChanged(String query) {
+    // The trailing clear action depends on the controller value, which does not
+    // rebuild this widget by itself.
+    setState(() {});
+    if (query.trim().isEmpty) {
+      _debounce.cancel();
+      unawaited(_performSearch(''));
+      return;
+    }
     _debounce.run(() => _performSearch(query));
   }
 
@@ -138,6 +146,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       icon: const Icon(Icons.clear),
                       color: textColor,
                       onPressed: () {
+                        _debounce.cancel();
                         _controller.clear();
                         unawaited(_performSearch(''));
                       },

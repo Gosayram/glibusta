@@ -1935,6 +1935,25 @@ fn test_mobi_ignores_malformed_indx_and_tagx_records_outside_text_range() {
 }
 
 #[test]
+fn test_mobi_index_probe_is_bounded_and_reports_truncation() {
+    let text = b"<p>Readable text</p>";
+    let mut records = vec![
+        create_mobi_header_record(text.len() as u32, 1, &[]),
+        text.to_vec(),
+    ];
+    records.extend(std::iter::repeat_n(b"INDX".to_vec(), 1025));
+
+    let book = glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(records), None)
+        .expect("untrusted index records beyond the bounded probe must not prevent opening");
+
+    let metadata = book.metadata.expect("MOBI metadata");
+    assert_eq!(metadata["mobiIndxRecordCount"], 1024);
+    assert_eq!(metadata["mobiTagxRecordCount"], 0);
+    assert_eq!(metadata["mobiIndexProbeTruncated"], true);
+    assert_eq!(metadata["mobiTocSource"], "chapter-splitter");
+}
+
+#[test]
 fn test_mobi_dual_format_prefers_kf8_text_section() {
     let book = glibusta_core::book::mobi::parse_mobi(&create_dual_format_mobi(), None).unwrap();
     let text = book

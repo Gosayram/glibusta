@@ -703,7 +703,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         .ok_or_else(|| anyhow::anyhow!("MOBI text record index overflows"))?;
     let blocks =
         text_extractor.extract_blocks(bytes, &palm_db, &header, first_text_record_index)?;
-    let (indx_record_count, tagx_record_count) = consecutive_index_record_counts(
+    let index_record_probe = consecutive_index_record_counts(
         bytes,
         &palm_db,
         first_text_record_index,
@@ -829,14 +829,20 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
         "mobiTocSource".to_string(),
         serde_json::Value::String("chapter-splitter".to_string()),
     );
-    if indx_record_count != 0 || tagx_record_count != 0 {
+    if index_record_probe.indx_count != 0 || index_record_probe.tagx_count != 0 {
         meta.insert(
             "mobiIndxRecordCount".to_string(),
-            serde_json::json!(indx_record_count),
+            serde_json::json!(index_record_probe.indx_count),
         );
         meta.insert(
             "mobiTagxRecordCount".to_string(),
-            serde_json::json!(tagx_record_count),
+            serde_json::json!(index_record_probe.tagx_count),
+        );
+    }
+    if index_record_probe.truncated {
+        meta.insert(
+            "mobiIndexProbeTruncated".to_string(),
+            serde_json::json!(true),
         );
     }
     if let Some(ref cover) = cover_bytes {

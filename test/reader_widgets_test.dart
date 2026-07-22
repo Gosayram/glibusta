@@ -796,6 +796,52 @@ void main() {
     expect(delegate.estimatedChildCount, 3);
   });
 
+  testWidgets('opens a fixed-layout EPUB at its restored spine page', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'fixed-layout-restore',
+            title: 'Fixed layout',
+            authors: [],
+            chapterCount: 3,
+            chapterTitles: ['1', '2', '3'],
+            metadata: {'isFixedLayout': true},
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: '1',
+              blocks: [ReaderBlock(index: 0, text: 'page 1')],
+            ),
+            1: ReaderChapter(
+              index: 1,
+              title: '2',
+              blocks: [ReaderBlock(index: 0, text: 'page 2')],
+            ),
+            2: ReaderChapter(
+              index: 2,
+              title: '3',
+              blocks: [ReaderBlock(index: 0, text: 'page 3')],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          initialPage: 2,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('page 3'), findsOneWidget);
+    expect(find.text('page 1'), findsNothing);
+  });
+
   testWidgets('renders transparent WebP comic pages without dropping alpha', (tester) async {
     const transparentWebp = 'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
     const transparentWebpUri =

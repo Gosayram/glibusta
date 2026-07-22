@@ -41,6 +41,34 @@ void main() {
     await tester.pump();
     expect(find.text('fresh result'), findsOneWidget);
   });
+
+  testWidgets('clearing a query cancels its pending debounce', (tester) async {
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'obsolete');
+    await tester.pump();
+    expect(find.byIcon(Icons.clear), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.clear));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(service.queries, isEmpty);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Ничего не найдено'), findsNothing);
+  });
 }
 
 const _emptyBook = NormalizedBook(id: 'test', title: 'Test', authors: []);

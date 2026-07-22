@@ -2569,7 +2569,7 @@ class _SmoothScrollBehavior extends ScrollBehavior {
 /// LW-8.1: Fixed-layout EPUB — each spine item is a full-screen page.
 /// ponytail: image pages full-screen, text pages centered. No absolute
 /// positioning, no SVG — add when test corpus includes those features.
-class _FixedLayoutBody extends StatelessWidget {
+class _FixedLayoutBody extends StatefulWidget {
   const _FixedLayoutBody({
     required this.metadata,
     required this.loadedChapters,
@@ -2587,13 +2587,52 @@ class _FixedLayoutBody extends StatelessWidget {
   final void Function(int page)? onPageChanged;
 
   @override
+  State<_FixedLayoutBody> createState() => _FixedLayoutBodyState();
+}
+
+class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
+  late final PageController _pageController;
+
+  int _clampPage(int page) {
+    final chapterCount = widget.metadata.chapterCount;
+    if (chapterCount <= 0) return 0;
+    return page.clamp(0, chapterCount - 1);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _clampPage(widget.initialPage));
+  }
+
+  @override
+  void didUpdateWidget(covariant _FixedLayoutBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialPage == oldWidget.initialPage) return;
+
+    final targetPage = _clampPage(widget.initialPage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _pageController.hasClients) {
+        _pageController.jumpToPage(targetPage);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return PageView.builder(
-      onPageChanged: onPageChanged,
-      itemCount: metadata.chapterCount,
+      controller: _pageController,
+      onPageChanged: widget.onPageChanged,
+      itemCount: widget.metadata.chapterCount,
       itemBuilder: (_, index) {
-        final chapter = loadedChapters[index];
+        final chapter = widget.loadedChapters[index];
         if (chapter == null) return const SizedBox.shrink();
 
         final imgBlocks = chapter.blocks
@@ -2609,7 +2648,7 @@ class _FixedLayoutBody extends StatelessWidget {
 
   Widget _imagePage(String url, BuildContext context) {
     return GestureDetector(
-      onTapUp: onTap,
+      onTapUp: widget.onTap,
       child: InteractiveViewer(
         child: Center(
           child: _loadImage(url, BoxFit.contain),
@@ -2621,7 +2660,7 @@ class _FixedLayoutBody extends StatelessWidget {
   Widget _textPage(ReaderChapter chapter, ThemeData theme, BuildContext context) {
     final textColor = theme.brightness == Brightness.dark ? Colors.white : Colors.black;
     return GestureDetector(
-      onTapUp: onTap,
+      onTapUp: widget.onTap,
       child: ColoredBox(
         color: theme.scaffoldBackgroundColor,
         child: SafeArea(
