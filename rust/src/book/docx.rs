@@ -1379,6 +1379,48 @@ mod tests {
     }
 
     #[test]
+    fn extracts_floating_anchor_images_without_interpreting_wrap_layout() {
+        // Word stores floating pictures under `wp:anchor` rather than
+        // `wp:inline`.  The normalized reader model deliberately has no Word
+        // page-layout layer, but the image itself must remain available as an
+        // image block regardless of its wrapping settings.
+        let xml = r#"
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+                xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <w:body><w:p>
+                <w:r><w:t>Text around a floating picture.</w:t></w:r>
+                <w:r><w:drawing><wp:anchor behindDoc="0">
+                  <a:graphic><a:graphicData><a:blip r:embed="rIdFloat"/></a:graphicData></a:graphic>
+                </wp:anchor></w:drawing></w:r>
+              </w:p></w:body>
+            </w:document>
+        "#;
+        let images = HashMap::from([(
+            String::from("rIdFloat"),
+            String::from("word/media/floating.png"),
+        )]);
+
+        let (blocks, _) = parse_document_xml_with_hyperlinks(
+            xml,
+            &HashMap::new(),
+            &images,
+            &HashMap::new(),
+            &HashMap::new(),
+        )
+        .expect("parse floating DOCX image");
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].text, "Text around a floating picture.");
+        assert_eq!(blocks[1].block_type, crate::api::models::BlockType::Image);
+        assert_eq!(
+            blocks[1].image_url.as_deref(),
+            Some("word/media/floating.png")
+        );
+    }
+
+    #[test]
     fn resolves_relative_nested_media_from_alternate_content() {
         let mut bytes = Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(&mut bytes);

@@ -1737,32 +1737,38 @@ fn parse_xhtml_to_blocks(
                         href =
                             get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
                     }
-                    b"br" if in_block && hidden_depth == 0 => {
+                    b"br" if hidden_depth == 0 => {
                         // The reader renders rich spans when present. Represent
                         // `<br>` explicitly there as well as in the plain block
                         // text, otherwise the visual hard break is lost as soon
                         // as surrounding inline content creates rich spans.
-                        flush_rich_span(
-                            &mut rich_spans,
-                            &mut span_text,
-                            bold,
-                            italic,
-                            superscript,
-                            &href,
-                        );
-                        rich_spans.push(RichSpan {
-                            text: String::new(),
-                            bold: false,
-                            italic: false,
-                            superscript: false,
-                            subscript: false,
-                            strikethrough: false,
-                            code: false,
-                            style_name: None,
-                            href: None,
-                            line_break: true,
-                        });
-                        current_text.push('\n');
+                        if in_block {
+                            flush_rich_span(
+                                &mut rich_spans,
+                                &mut span_text,
+                                bold,
+                                italic,
+                                superscript,
+                                &href,
+                            );
+                            rich_spans.push(RichSpan {
+                                text: String::new(),
+                                bold: false,
+                                italic: false,
+                                superscript: false,
+                                subscript: false,
+                                strikethrough: false,
+                                code: false,
+                                style_name: None,
+                                href: None,
+                                line_break: true,
+                            });
+                            current_text.push('\n');
+                        } else if in_table || in_list {
+                            span_text.push('\n');
+                        } else {
+                            current_text.push('\n');
+                        }
                     }
                     _ => {}
                 }
@@ -2312,6 +2318,11 @@ fn parse_xhtml_to_blocks(
                             line_break: true,
                         });
                         current_text.push('\n');
+                    } else if in_table || in_list {
+                        // Table cells and list items are accumulated in
+                        // `span_text`, so writing to `current_text` here loses
+                        // their hard break when the container is flushed.
+                        span_text.push('\n');
                     } else {
                         current_text.push('\n');
                     }
@@ -2751,6 +2762,45 @@ mod tests {
         assert_eq!(spans[2].text, "second");
         assert_eq!(spans[2].href.as_deref(), Some("#note"));
         assert_eq!(spans[3].text, " line.");
+    }
+
+    #[test]
+    fn preserves_br_inside_table_cells_and_list_items() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            "<html><body><table><tr><td>First<br/>second</td></tr></table><ul><li>Third<br></br>fourth</li></ul></body></html>",
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(
+            blocks
+                .iter()
+                .map(|block| (&block.block_type, block.text.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (&BlockType::Table, "First\nsecond"),
+                (&BlockType::List, "Third\nfourth"),
+            ],
+        );
+        assert_eq!(blocks[0].block_type, BlockType::Table);
+        assert_eq!(blocks[0].text, "First\nsecond");
+        assert_eq!(
+            blocks[0]
+                .table_rows
+                .as_ref()
+                .expect("table keeps cell content"),
+            &vec![vec!["First\nsecond".to_string()]],
+        );
+
+        assert_eq!(blocks[1].text, "Third\nfourth");
+        assert_eq!(
+            blocks[1]
+                .list_items
+                .as_ref()
+                .expect("list keeps item content")[0]
+                .text,
+            "Third\nfourth"
+        );
     }
 
     #[test]
