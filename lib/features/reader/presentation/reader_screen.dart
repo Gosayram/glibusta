@@ -22,6 +22,7 @@ import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
+import '../data/epub_anchor_resolver.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
 import '../data/reading_info_model.dart';
@@ -366,6 +367,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _showFootnotePopover(anchor, noteText);
         return;
       }
+    }
+
+    final target = resolveEpubAnchorTarget(
+      metadata: readerState.metadata?.metadata,
+      currentChapterIndex: readerState.currentPosition.chapterIndex,
+      href: href,
+    );
+    if (target != null) {
+      _ctrl.pushLinkPosition();
+      _ctrl.jumpToPosition(
+        readerState.currentPosition.copyWith(
+          bookId: widget.bookId,
+          chapterIndex: target.chapterIndex,
+          paragraphIndex: target.paragraphIndex,
+        ),
+      );
+      return;
     }
 
     // Fallback: search for block with matching noteId (legacy)

@@ -1184,6 +1184,84 @@ void main() {
     expect(scrollable.position.pixels, greaterThan(0));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('keeps a Russian preposition and following word on one narrow reader line', (
+    tester,
+  ) async {
+    const phrase = 'В\u00a0доме';
+    const text = 'x $phrase y';
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    Widget buildReader(double width) {
+      return wrapInApp(
+        SizedBox(
+          width: width,
+          height: 180,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'nbsp-reader',
+              title: 'NBSP reader',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: const {
+              0: ReaderChapter(
+                index: 0,
+                title: '',
+                blocks: [ReaderBlock(index: 0, text: text)],
+              ),
+            },
+            settings: const ReaderSettings(
+              mode: ReaderMode.continuous,
+              margin: 0,
+              fontSize: 20,
+            ),
+            scrollController: scrollController,
+            onTap: _ignoreTap,
+          ),
+        ),
+      );
+    }
+
+    Finder paragraphFinder() => find.byWidgetPredicate(
+      (widget) => widget is RichText && widget.text.toPlainText().contains(phrase),
+    );
+
+    await tester.pumpWidget(buildReader(300));
+    await tester.pumpAndSettle();
+
+    final wideParagraph = tester.renderObject<RenderParagraph>(paragraphFinder());
+    final renderedText = wideParagraph.text.toPlainText();
+    final phraseStart = renderedText.indexOf(phrase);
+    expect(phraseStart, greaterThanOrEqualTo(0));
+    final phraseBox = wideParagraph
+        .getBoxesForSelection(
+          TextSelection(baseOffset: phraseStart, extentOffset: phraseStart + phrase.length),
+        )
+        .single;
+
+    // There is enough room for the phrase itself, but not for the leading
+    // "x ". A regular space would leave "В" on the first line; NBSP must
+    // move both words together to the next line.
+    await tester.pumpWidget(buildReader(phraseBox.right - phraseBox.left + 1));
+    await tester.pumpAndSettle();
+
+    final narrowParagraph = tester.renderObject<RenderParagraph>(paragraphFinder());
+    final prepositionBox = narrowParagraph
+        .getBoxesForSelection(
+          TextSelection(baseOffset: phraseStart, extentOffset: phraseStart + 1),
+        )
+        .single;
+    final nounStart = phraseStart + 'В\u00a0'.length;
+    final nounBox = narrowParagraph
+        .getBoxesForSelection(TextSelection(baseOffset: nounStart, extentOffset: nounStart + 4))
+        .single;
+
+    expect(prepositionBox.top, nounBox.top);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 void _ignoreTap(TapUpDetails _) {}

@@ -70,6 +70,7 @@ final class CustomEpubParser {
           linear: spineItem.linear,
           smilEntries: smilEntries,
           textDirection: result.textDirection,
+          fullPath: resource.fullPath,
         ),
       );
       chapterCount++;

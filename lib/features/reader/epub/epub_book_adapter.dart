@@ -5,15 +5,32 @@ import 'epub_models.dart' as epub;
 
 class EpubBookAdapter {
   NormalizedBook toNormalizedBook(epub.EpubBook book, String bookId) {
+    final chapters = [
+      for (var i = 0; i < book.chapters.length; i++) _toChapter(book.chapters[i], i),
+    ];
+    final chapterPaths = [
+      for (final chapter in book.chapters) chapter.fullPath ?? chapter.href,
+    ];
+    final anchors = <String, Map<String, int>>{
+      for (var i = 0; i < chapterPaths.length; i++)
+        chapterPaths[i]: {'chapterIndex': i, 'paragraphIndex': 0},
+    };
+    for (var chapterIndex = 0; chapterIndex < chapters.length; chapterIndex++) {
+      for (final entry in _blockAnchorIndexes(book.chapters[chapterIndex]).entries) {
+        for (final anchorId in entry.value) {
+          anchors.putIfAbsent('${chapterPaths[chapterIndex]}#$anchorId', () {
+            return {'chapterIndex': chapterIndex, 'paragraphIndex': entry.key};
+          });
+        }
+      }
+    }
     return NormalizedBook(
       id: bookId,
       title: book.title,
       authors: book.authors,
       description: book.description,
       coverUrl: book.coverImagePath,
-      chapters: [
-        for (var i = 0; i < book.chapters.length; i++) _toChapter(book.chapters[i], i),
-      ],
+      chapters: chapters,
       metadata: {
         'language': book.language,
         'totalChapters': book.chapters.length,
@@ -21,8 +38,37 @@ class EpubBookAdapter {
         'hasToc': book.toc != null && book.toc!.isNotEmpty,
         'tocCount': book.toc?.length ?? 0,
         if (book.textDirection != null) 'textDirection': book.textDirection,
+        'epubChapterPaths': chapterPaths,
+        'epubAnchors': anchors,
       },
     );
+  }
+
+  Map<int, List<String>> _blockAnchorIndexes(epub.EpubChapter chapter) {
+    final result = <int, List<String>>{};
+    var index = 0;
+    void visit(epub.ReaderBlock block) {
+      if (block is epub.SectionBlock) {
+        for (final child in block.children) {
+          visit(child);
+        }
+        return;
+      }
+      final mapped = _toBlock(block, index);
+      if (mapped == null || (mapped.text.isEmpty && mapped.imageUrl == null)) return;
+      final anchorIds = switch (block) {
+        epub.ParagraphBlock(:final anchorIds) => anchorIds,
+        epub.HeadingBlock(:final anchorIds) => anchorIds,
+        _ => const <String>[],
+      };
+      if (anchorIds.isNotEmpty) result[index] = anchorIds;
+      index++;
+    }
+
+    for (final block in chapter.blocks) {
+      visit(block);
+    }
+    return result;
   }
 
   ReaderChapter _toChapter(epub.EpubChapter chapter, int index) {
@@ -51,6 +97,7 @@ class EpubBookAdapter {
           textIndent: indent ?? mapped.textIndent,
           fontSize: fontSize ?? mapped.fontSize,
           textAlign: align,
+          noteId: mapped.noteId,
         );
       }
       return mapped;
@@ -115,16 +162,18 @@ class EpubBookAdapter {
   ReaderBlock? _toBlock(epub.ReaderBlock block, int index) {
     return switch (block) {
       epub.PageBreakBlock() => null,
-      epub.ParagraphBlock(:final spans) => ReaderBlock(
+      epub.ParagraphBlock(:final spans, :final anchorId) => ReaderBlock(
         index: index,
         text: spans.map((s) => s.text).join(),
         richSpans: _toRichSpans(spans),
+        noteId: anchorId,
       ),
-      epub.HeadingBlock(:final text, :final level) => ReaderBlock(
+      epub.HeadingBlock(:final text, :final level, :final anchorId) => ReaderBlock(
         index: index,
         text: text,
         type: BlockType.heading,
         headingLevel: level,
+        noteId: anchorId,
       ),
       epub.ImageBlock(:final localPath, :final alt, :final caption) => ReaderBlock(
         index: index,

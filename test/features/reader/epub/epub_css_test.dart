@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart' show TextAlign;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/features/reader/data/epub_anchor_resolver.dart';
 import 'package:glibusta/features/reader/epub/epub_archive.dart';
 import 'package:glibusta/features/reader/epub/epub_book_adapter.dart';
 import 'package:glibusta/features/reader/epub/epub_html_parser.dart';
@@ -54,6 +55,85 @@ void main() {
       expect(
         paragraph.spans.where((span) => span.href != null).map((span) => span.href),
         <String?>['#12', 'chapter.xhtml#verse-3'],
+      );
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
+  test('indexes XHTML IDs so a relative cross-chapter href resolves to its block', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_anchor_index_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver(const {}),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(Archive()),
+      );
+      final target = await parser.parseChapter(
+        chapterPath: 'OEBPS/text/chapter-two.xhtml',
+        htmlText:
+            '<html><body><section id="chapter-target"><h2>Target <span id="target">heading</span></h2><p>Body</p></section></body></html>',
+      );
+      final normalized = EpubBookAdapter().toNormalizedBook(
+        EpubBook(
+          title: 'Cross chapter anchor',
+          authors: const [],
+          chapters: [
+            const EpubChapter(
+              id: 'one',
+              href: 'text/chapter-one.xhtml',
+              fullPath: 'OEBPS/text/chapter-one.xhtml',
+              title: 'One',
+              blocks: [
+                ParagraphBlock([
+                  TextSpan(text: 'Go', href: 'chapter-two.xhtml#target'),
+                ]),
+              ],
+            ),
+            EpubChapter(
+              id: 'two',
+              href: 'text/chapter-two.xhtml',
+              fullPath: 'OEBPS/text/chapter-two.xhtml',
+              title: 'Two',
+              blocks: target.blocks,
+            ),
+          ],
+          resources: const {},
+        ),
+        'cross-chapter-anchor',
+      );
+
+      expect(
+        resolveEpubAnchorTarget(
+          metadata: normalized.metadata,
+          currentChapterIndex: 0,
+          href: 'chapter-two.xhtml#target',
+        ),
+        (chapterIndex: 1, paragraphIndex: 0),
+      );
+      expect(
+        resolveEpubAnchorTarget(
+          metadata: normalized.metadata,
+          currentChapterIndex: 0,
+          href: 'chapter-two.xhtml#chapter-target',
+        ),
+        (chapterIndex: 1, paragraphIndex: 0),
+      );
+      expect(
+        resolveEpubAnchorTarget(
+          metadata: normalized.metadata,
+          currentChapterIndex: 0,
+          href: '../outside.xhtml#target',
+        ),
+        isNull,
+      );
+      expect(
+        resolveEpubAnchorTarget(
+          metadata: normalized.metadata,
+          currentChapterIndex: 0,
+          href: 'https://example.com/chapter.xhtml#target',
+        ),
+        isNull,
       );
     } finally {
       await temporaryDirectory.delete(recursive: true);

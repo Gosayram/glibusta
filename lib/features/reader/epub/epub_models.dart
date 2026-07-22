@@ -37,6 +37,7 @@ final class EpubChapter {
     this.styles,
     this.smilEntries,
     this.textDirection,
+    this.fullPath,
   });
   final String id;
   final String href;
@@ -53,6 +54,9 @@ final class EpubChapter {
   /// LW-6.1: SMIL media overlay entries for karaoke audio sync.
   final List<SmilEntry>? smilEntries;
   final String? textDirection;
+
+  /// Archive-relative XHTML path, used to resolve cross-chapter fragment links.
+  final String? fullPath;
 }
 
 final class EpubCssRule {
@@ -73,6 +77,8 @@ final class ParagraphBlock extends ReaderBlock {
     this.spans, {
     this.cssClasses = const [],
     this.inlineStyles = const {},
+    this.anchorId,
+    this.anchorIds = const [],
   });
   final List<TextSpan> spans;
 
@@ -82,12 +88,20 @@ final class ParagraphBlock extends ReaderBlock {
 
   /// Inline CSS declarations from the source paragraph.
   final Map<String, String> inlineStyles;
+
+  /// The source element ID, when this block is an EPUB link target.
+  final String? anchorId;
+
+  /// IDs on this element or its inline descendants, mapped to this block.
+  final List<String> anchorIds;
 }
 
 final class HeadingBlock extends ReaderBlock {
-  const HeadingBlock(this.text, this.level);
+  const HeadingBlock(this.text, this.level, {this.anchorId, this.anchorIds = const []});
   final String text;
   final int level;
+  final String? anchorId;
+  final List<String> anchorIds;
 }
 
 final class ImageBlock extends ReaderBlock {

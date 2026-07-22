@@ -19,7 +19,9 @@ void main() {
     expect(find.text('Файл не найден: $path'), findsOneWidget);
   });
 
-  testWidgets('image-only PDF keeps rendering but disables text search', (tester) async {
+  testWidgets('portable image-only PDF keeps the viewer rendering and disables text search', (
+    tester,
+  ) async {
     final file = File(
       '${Directory.systemTemp.path}/glibusta-image-only-${DateTime.now().microsecondsSinceEpoch}.pdf',
     );
@@ -32,6 +34,10 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: PdfReaderScreen(filePath: file.path)));
     await tester.pump(const Duration(seconds: 2));
 
+    // This is a portable widget-level contract.  Real PDFium rendering is
+    // still covered separately on Android/macOS devices, where platform
+    // graphics backends and native codecs are involved.
+    expect(find.byType(PdfViewer), findsOneWidget);
     expect(
       find.text('В PDF не найден извлекаемый текст. Поиск и копирование недоступны.'),
       findsOneWidget,

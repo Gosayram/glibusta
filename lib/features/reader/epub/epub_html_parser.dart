@@ -241,11 +241,14 @@ final class EpubHtmlParser {
           spans,
           cssClasses: _cssClasses(el),
           inlineStyles: _parseCssBody(el.getAttribute('style') ?? ''),
+          anchorId: el.getAttribute('id'),
+          anchorIds: _anchorIds(el),
         );
       case 'div':
       case 'section':
         final childBlocks = await _processChildren(el, chapterPath);
         if (childBlocks.isEmpty) return null;
+        _attachContainerAnchor(childBlocks, el.getAttribute('id'));
         if (childBlocks.length == 1) return childBlocks.first;
         return SectionBlock(childBlocks);
 
@@ -258,7 +261,12 @@ final class EpubHtmlParser {
         final level = int.parse(tag[1]);
         final text = el.innerText.trim();
         if (text.isEmpty) return null;
-        return HeadingBlock(text, level);
+        return HeadingBlock(
+          text,
+          level,
+          anchorId: el.getAttribute('id'),
+          anchorIds: _anchorIds(el),
+        );
 
       case 'figure':
         return _processFigure(el, chapterPath);
@@ -295,11 +303,16 @@ final class EpubHtmlParser {
         }
         final spans = _extractInlineSpans(el, chapterPath);
         if (spans.isEmpty) return null;
-        return ParagraphBlock(spans);
+        return ParagraphBlock(
+          spans,
+          anchorId: el.getAttribute('id'),
+          anchorIds: _anchorIds(el),
+        );
 
       default:
         final childBlocks = await _processChildren(el, chapterPath);
         if (childBlocks.isEmpty) return null;
+        _attachContainerAnchor(childBlocks, el.getAttribute('id'));
         if (childBlocks.length == 1) return childBlocks.first;
         return SectionBlock(childBlocks);
     }
@@ -309,6 +322,36 @@ final class EpubHtmlParser {
     final value = el.getAttribute('class');
     if (value == null || value.trim().isEmpty) return const [];
     return value.split(RegExp(r'\s+')).where((cssClass) => cssClass.isNotEmpty).toList();
+  }
+
+  List<String> _anchorIds(XmlElement el) {
+    final ids = <String>{};
+    for (final element in [el, ...el.descendants.whereType<XmlElement>()]) {
+      final id = element.getAttribute('id');
+      if (id != null && id.isNotEmpty) ids.add(id);
+    }
+    return ids.toList(growable: false);
+  }
+
+  void _attachContainerAnchor(List<ReaderBlock> blocks, String? anchorId) {
+    if (anchorId == null || anchorId.isEmpty) return;
+    final first = blocks.first;
+    blocks[0] = switch (first) {
+      ParagraphBlock() => ParagraphBlock(
+        first.spans,
+        cssClasses: first.cssClasses,
+        inlineStyles: first.inlineStyles,
+        anchorId: first.anchorId ?? anchorId,
+        anchorIds: {anchorId, ...first.anchorIds}.toList(growable: false),
+      ),
+      HeadingBlock() => HeadingBlock(
+        first.text,
+        first.level,
+        anchorId: first.anchorId ?? anchorId,
+        anchorIds: {anchorId, ...first.anchorIds}.toList(growable: false),
+      ),
+      _ => first,
+    };
   }
 
   List<TextSpan> _extractInlineSpans(XmlElement el, String chapterPath) {
