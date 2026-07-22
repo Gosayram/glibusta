@@ -333,7 +333,7 @@ impl DjvuEngine {
             })
             .collect();
         Ok(NormalizedBook {
-            id: String::new(),
+            id: crate::book::sha256_hex(bytes),
             title: "DjVu document".to_string(),
             authors: Vec::new(),
             description: None,

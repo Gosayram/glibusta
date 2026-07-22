@@ -2628,12 +2628,19 @@ fn test_djvu_parse_book() {
     let book = glibusta_core::book::djvu::DjvuEngine::parse_djvu(MINIMAL_DJVU).unwrap();
     assert_eq!(book.chapters.len(), 1, "should have 1 chapter");
     assert_eq!(book.book_format, BookFormat::Djvu);
+    assert_eq!(book.id.len(), 64, "DjVu ID must be a SHA-256 hex digest");
+    assert!(book.id.bytes().all(|byte| byte.is_ascii_hexdigit()));
 }
 
 #[test]
 fn test_djvu_parse_book_with_text() {
     let book = glibusta_core::book::djvu::DjvuEngine::parse_djvu(DJVU_WITH_TEXT).unwrap();
     assert_eq!(book.chapters.len(), 1);
+    let image_only_book = glibusta_core::book::djvu::DjvuEngine::parse_djvu(MINIMAL_DJVU).unwrap();
+    assert_ne!(
+        book.id, image_only_book.id,
+        "distinct DjVu bytes need distinct IDs"
+    );
     if let Some(block) = book.chapters[0].blocks.first() {
         assert!(block.text.contains("Hello"), "text should contain 'Hello'");
     } else {
