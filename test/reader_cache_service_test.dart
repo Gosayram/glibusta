@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/logging/app_logger.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
@@ -236,6 +237,45 @@ void main() {
       jsonEncode(const ReaderChapter(index: 0, title: 'Tampered', blocks: []).toJson()),
     );
 
+    expect(await service.getChapter('book', 0), isNull);
+  });
+
+  test('rejects a checksum-valid chapter stored under the wrong index', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => const CacheSourceFingerprint(
+        format: 'txt',
+        fileSize: 1,
+        fileMtime: 1,
+        contentHash: 'hash',
+      ),
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+    const book = NormalizedBook(
+      id: 'content-hash',
+      title: 'Book',
+      authors: [],
+      chapters: [ReaderChapter(index: 0, title: 'Original', blocks: [])],
+    );
+
+    await service.putBook('book', book);
+    final metadata = await service.getMetadata('book');
+    final bookDir = await service.getBookDir('book');
+    final chapterFile = File('${bookDir.path}/ch_0.json');
+    final swappedChapter = jsonEncode(
+      const ReaderChapter(index: 1, title: 'Wrong chapter', blocks: []).toJson(),
+    );
+    await chapterFile.writeAsString(swappedChapter);
+
+    final manifestFile = File('${bookDir.path}/manifest.json');
+    final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+    final checksums = manifest['chapterChecksums'] as Map<String, dynamic>;
+    checksums['0'] = sha256.convert(utf8.encode(swappedChapter)).toString();
+    await manifestFile.writeAsString(jsonEncode(manifest));
+
+    expect(await service.isCacheValid('book', metadata!), isTrue);
     expect(await service.getChapter('book', 0), isNull);
   });
 }

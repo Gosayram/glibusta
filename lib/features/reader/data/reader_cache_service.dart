@@ -154,7 +154,15 @@ final class ReaderCacheService {
         );
         return null;
       }
-      return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      final chapter = ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      if (chapter.index != index) {
+        _logger.warning(
+          'Cached chapter $index for $bookId has mismatched chapter index ${chapter.index}',
+          name: 'ReaderCache',
+        );
+        return null;
+      }
+      return chapter;
     } on Object catch (e) {
       _logger.warning(
         'Failed to load chapter $index for $bookId: $e',
