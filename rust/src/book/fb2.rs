@@ -1662,11 +1662,16 @@ fn image_media_type(path: &str) -> Option<&'static str> {
 }
 
 fn is_fb2_book_entry(name: &str) -> bool {
-    name.rsplit_once('.')
+    let normalized = name.replace('\\', "/");
+    normalized
+        .rsplit_once('.')
         .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("fb2"))
-        && !name
-            .split(['/', '\\'])
-            .any(|segment| segment == "__MACOSX" || segment.starts_with('.'))
+        && !normalized.starts_with('/')
+        && !normalized.split('/').any(|segment| {
+            segment.is_empty()
+                || matches!(segment, "." | ".." | "__MACOSX")
+                || segment.starts_with('.')
+        })
 }
 
 fn detect_fb2_encoding(bytes: &[u8]) -> String {

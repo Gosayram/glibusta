@@ -211,6 +211,32 @@ fn test_fb2_zip_skips_macos_metadata_before_the_book() {
 }
 
 #[test]
+fn test_fb2_zip_ignores_path_traversal_book_entry() {
+    let mut buffer = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut buffer);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("../untrusted.fb2", options)
+        .expect("create traversal entry");
+    zip.write_all(
+        MINIMAL_FB2
+            .replace("Туманность Андромеды", "Untrusted book")
+            .as_bytes(),
+    )
+    .expect("write traversal fixture");
+    zip.start_file("book.fb2", options)
+        .expect("create regular FB2 entry");
+    zip.write_all(MINIMAL_FB2.as_bytes())
+        .expect("write regular FB2 fixture");
+    zip.finish().expect("finish FB2.ZIP fixture");
+
+    let book = glibusta_core::book::fb2::parse_fb2(&buffer.into_inner(), None)
+        .expect("ignore unsafe archive path and parse regular FB2");
+
+    assert_eq!(book.title, "Туманность Андромеды");
+}
+
+#[test]
 fn test_fb2_zip_uses_the_first_regular_book_when_multiple_are_present() {
     let mut buffer = std::io::Cursor::new(Vec::new());
     let mut zip = zip::ZipWriter::new(&mut buffer);

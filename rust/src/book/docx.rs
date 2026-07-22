@@ -73,7 +73,14 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     }
 
     let images = extract_images(&mut zip);
-    let cover_url = if let Some(img) = images.first() {
+    // Office documents commonly contain unsupported preview/vector assets (for
+    // example EMF) before the first reader-renderable bitmap.  Do not turn
+    // those into a `data:application/octet-stream` cover when a usable image
+    // exists later in `word/media/`.
+    let cover_url = if let Some(img) = images
+        .iter()
+        .find(|img| is_cover_image_type(&img.media_type))
+    {
         let entry_name = format!("word/media/{}", img.id);
         let data = zip.read_file_limited(&entry_name, crate::api::models::MAX_IMAGE_SIZE)?;
         use base64::Engine;
@@ -423,6 +430,17 @@ fn mime_from_name(name: &str) -> String {
         "tiff" | "tif" => "image/tiff".to_string(),
         _ => "application/octet-stream".to_string(),
     }
+}
+
+/// Formats backed by Flutter's byte-image codecs on the supported platforms.
+/// SVG needs a separate vector renderer and TIFF/Office vector formats are not
+/// accepted by `Image.memory`, so they remain available as lazy assets but are
+/// not selected as the library cover.
+fn is_cover_image_type(media_type: &str) -> bool {
+    matches!(
+        media_type,
+        "image/jpeg" | "image/png" | "image/gif" | "image/bmp" | "image/webp"
+    )
 }
 
 #[cfg(test)]
@@ -1476,6 +1494,43 @@ mod tests {
         let _ = std::fs::remove_file(path);
 
         assert_eq!(image.expect("extract nested DOCX image"), b"WEBP");
+    }
+
+    #[test]
+    fn skips_unsupported_media_when_selecting_docx_cover() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(
+            br#"<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"/>"#,
+        )
+        .expect("write core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Body</w:t></w:r></w:p></w:body></w:document>"#,
+        )
+        .expect("write document XML");
+        // EMF is a valid Office media entry but cannot be rendered by the
+        // Flutter byte-image path.  Archive order deliberately puts it first.
+        zip.start_file("word/media/preview.emf", options)
+            .expect("start EMF preview");
+        zip.write_all(b"EMF").expect("write EMF preview");
+        zip.start_file("word/media/cover.png", options)
+            .expect("start PNG cover");
+        zip.write_all(b"PNG").expect("write PNG cover");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse DOCX media");
+
+        assert_eq!(book.images.len(), 2);
+        assert_eq!(
+            book.cover_url.as_deref(),
+            Some("data:image/png;base64,UE5H")
+        );
     }
 
     #[test]
