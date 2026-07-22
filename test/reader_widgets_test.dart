@@ -725,6 +725,47 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('shows a controlled placeholder for a malformed WebP data URI', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'broken-comic',
+            title: 'Broken comic',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Pages'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Pages',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: '',
+                  type: BlockType.image,
+                  imageUrl: 'data:image/webp;base64,abc!',
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.broken_image), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('keeps fixed-layout page count stable while chapters load lazily', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);
@@ -1181,6 +1222,75 @@ void main() {
     await tester.pump();
 
     expect(tester.getRect(find.text(lastCell)).left, lessThan(320));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('renders FB2-style table and illustration blocks without a narrow-layout crash', (
+    tester,
+  ) async {
+    const illustration =
+        'data:image/webp;base64,'
+        'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        SizedBox(
+          width: 320,
+          height: 480,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'fb2-table-image',
+              title: 'FB2 table and image',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: const {
+              0: ReaderChapter(
+                index: 0,
+                title: '',
+                blocks: [
+                  ReaderBlock(
+                    index: 0,
+                    text: '',
+                    type: BlockType.table,
+                    tableRows: [
+                      ['Header'],
+                      [
+                        'unbreakable-table-cell-content-for-a-narrow-reader',
+                        'Second cell',
+                      ],
+                    ],
+                  ),
+                  ReaderBlock(
+                    index: 1,
+                    text: '',
+                    type: BlockType.image,
+                    imageUrl: illustration,
+                    imageAlt: 'Illustration',
+                  ),
+                ],
+              ),
+            },
+            settings: const ReaderSettings(mode: ReaderMode.continuous),
+            scrollController: scrollController,
+            onTap: _ignoreTap,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SingleChildScrollView && widget.scrollDirection == Axis.horizontal,
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(Image), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

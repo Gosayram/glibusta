@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/formats/book_file_size_policy.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/core/storage/external_book_file.dart';
 import 'package:glibusta/core/storage/storage_bridge.dart';
@@ -181,6 +182,7 @@ void main() {
       final results = await Future.wait([firstImport, secondImport]);
       expect(results.map((result) => result.isSuccess), everyElement(isTrue));
       expect(bridge.copyCalls, 2);
+      expect(bridge.requestedMaxBytes, everyElement(maxReadableBookBytes(BookFormat.epub)));
     });
   });
 
@@ -324,9 +326,11 @@ final class _QueuedStorageBridge implements StorageBridge {
 
   final List<String> _paths;
   int copyCalls = 0;
+  final List<int?> requestedMaxBytes = [];
 
   @override
-  Future<String?> copyToCache(String fileUri) async {
+  Future<String?> copyToCache(String fileUri, {int? maxBytes}) async {
+    requestedMaxBytes.add(maxBytes);
     final path = _paths[copyCalls];
     copyCalls++;
     return path;

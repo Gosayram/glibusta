@@ -2486,6 +2486,39 @@ mod tests {
     }
 
     #[test]
+    fn preserves_complex_table_and_image_blocks_for_reader_layout() {
+        let book = parse_fb2(
+            br##"<FictionBook xmlns:l="http://www.w3.org/1999/xlink"><description/><body><section>
+                <table align="center"><tr><th colspan="2">Header</th></tr><tr><td valign="top"><p>Left cell</p></td><td><p>Right cell</p></td></tr></table>
+                <image l:href="#illustration" alt="Illustration"/>
+            </section></body><binary id="illustration" content-type="image/webp">UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=</binary></FictionBook>"##,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 table and illustration");
+
+        let blocks = &book.chapters[0].blocks;
+        assert_eq!(blocks.len(), 2, "{blocks:#?}");
+        assert_eq!(blocks[0].block_type, BlockType::Table);
+        assert_eq!(
+            blocks[0].table_rows.as_deref(),
+            Some(
+                &[
+                    vec!["Header".to_string()],
+                    vec!["Left cell".to_string(), "Right cell".to_string()],
+                ][..]
+            ),
+        );
+        assert_eq!(blocks[1].block_type, BlockType::Image);
+        assert_eq!(blocks[1].image_alt.as_deref(), Some("Illustration"));
+        assert!(
+            blocks[1]
+                .image_url
+                .as_deref()
+                .is_some_and(|url| url.starts_with("data:image/webp;base64,")),
+        );
+    }
+
+    #[test]
     fn preserves_outer_inline_formatting_after_nested_equivalent_tags() {
         let book = parse_fb2(
             br#"<FictionBook><description/><body><section><p><strong>Outer <strong>inner</strong> tail</strong></p></section></body></FictionBook>"#,

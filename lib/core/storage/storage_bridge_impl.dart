@@ -51,11 +51,14 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
-  Future<String?> copyToCache(String fileUri) async {
+  Future<String?> copyToCache(String fileUri, {int? maxBytes}) async {
     try {
       final path = await _channel.invokeMethod<String>(
         'copyToCache',
-        {'uri': fileUri},
+        {
+          'uri': fileUri,
+          'maxBytes': ?maxBytes,
+        },
       );
       return path;
     } on PlatformException {

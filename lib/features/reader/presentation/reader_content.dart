@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -841,7 +842,9 @@ Widget _readerImageWidget(
 }) {
   final colorFilter = _imageColorFilter(settings);
   final uri = Uri.tryParse(imageUrl);
-  final isDataUri = uri != null && uri.scheme == 'data';
+  // A malformed data URI must not fall through to Image.file, which would turn
+  // an invalid comic page into a bogus filesystem path instead of the fallback.
+  final isDataUri = imageUrl.toLowerCase().startsWith('data:');
   final isFileUri = uri != null && uri.scheme == 'file';
   final isPlainPath = uri == null || !uri.isAbsolute;
 
@@ -858,11 +861,17 @@ Widget _readerImageWidget(
   if (isDataUri) {
     final data = imageUrl.split(',');
     if (data.length == 2) {
+      Uint8List bytes;
+      try {
+        bytes = base64Decode(data.last);
+      } on FormatException {
+        return Icon(Icons.broken_image, size: 64, color: errorColor);
+      }
       return wrap(
         InteractiveViewer(
           maxScale: 4.0,
           child: Image.memory(
-            base64Decode(data.last),
+            bytes,
             fit: BoxFit.contain,
             errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
           ),
@@ -1029,6 +1038,11 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
 Widget _readerTableBlock(ReaderBlock block, ReaderSettings settings, TextStyle baseStyle) {
   final rows = block.tableRows;
   if (rows == null || rows.isEmpty) return const SizedBox.shrink();
+  final columnCount = rows.fold(
+    0,
+    (maxColumns, row) => row.length > maxColumns ? row.length : maxColumns,
+  );
+  if (columnCount == 0) return const SizedBox.shrink();
   final cellStyle = baseStyle.copyWith(fontSize: settings.fontSize * 0.9);
   final headerStyle = cellStyle.copyWith(fontWeight: FontWeight.bold);
   return Padding(
@@ -1041,14 +1055,16 @@ Widget _readerTableBlock(ReaderBlock block, ReaderSettings settings, TextStyle b
         children: rows.asMap().entries.map((entry) {
           final isHeader = entry.key == 0;
           return TableRow(
-            children: entry.value
-                .map(
-                  (cell) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Text(cell, style: isHeader ? headerStyle : cellStyle),
-                  ),
-                )
-                .toList(),
+            children: List.generate(
+              columnCount,
+              (columnIndex) {
+                final cell = columnIndex < entry.value.length ? entry.value[columnIndex] : '';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(cell, style: isHeader ? headerStyle : cellStyle),
+                );
+              },
+            ),
           );
         }).toList(),
       ),

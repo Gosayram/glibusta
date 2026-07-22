@@ -122,7 +122,16 @@ class MainActivity : FlutterFragmentActivity() {
                     result.error("INVALID_ARG", "URI is required", null)
                     return
                 }
-                copyToCache(Uri.parse(fileUri), result)
+                val requestedMaxBytes = call.argument<Number>("maxBytes")?.toLong()
+                if (requestedMaxBytes != null && requestedMaxBytes <= 0) {
+                    result.error("INVALID_ARG", "maxBytes must be positive", null)
+                    return
+                }
+                copyToCache(
+                    Uri.parse(fileUri),
+                    requestedMaxBytes?.coerceAtMost(maxImportFileBytes) ?: maxImportFileBytes,
+                    result,
+                )
             }
             "getPersistedUris" -> {
                 val uris = contentResolver.persistedUriPermissions
@@ -275,7 +284,7 @@ class MainActivity : FlutterFragmentActivity() {
             lower.endsWith("~")
     }
 
-    private fun copyToCache(fileUri: Uri, result: MethodChannel.Result) {
+    private fun copyToCache(fileUri: Uri, maxBytes: Long, result: MethodChannel.Result) {
         lifecycleScope.launch(Dispatchers.IO) {
             var tempFile: java.io.File? = null
             try {
@@ -290,8 +299,8 @@ class MainActivity : FlutterFragmentActivity() {
                             val read = ins.read(buffer)
                             if (read < 0) break
                             copiedBytes += read
-                            if (copiedBytes > maxImportFileBytes) {
-                                throw IllegalArgumentException("File exceeds the 500 MiB import limit")
+                            if (copiedBytes > maxBytes) {
+                                throw IllegalArgumentException("File exceeds the $maxBytes byte import limit")
                             }
                             out.write(buffer, 0, read)
                         }

@@ -491,7 +491,13 @@ class BookImportService {
 
     File? cacheFile;
     try {
-      final cachedPath = await bridge.copyToCache(external.uri);
+      // SAF providers may report an unknown or stale size. Pass the same
+      // per-format policy to Android so it stops streaming before a too-large
+      // TXT (or any other format) consumes cache storage.
+      final cachedPath = await bridge.copyToCache(
+        external.uri,
+        maxBytes: maxReadableBookBytes(format),
+      );
       if (cachedPath == null) {
         return ImportResult.failure('Не удалось прочитать файл: ${external.name}');
       }

@@ -39,4 +39,29 @@ void main() {
       throwsA(isA<PlatformException>()),
     );
   });
+
+  test('copyToCache forwards the streaming size limit to native storage', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (call) async {
+        expect(call.method, 'copyToCache');
+        expect(
+          call.arguments,
+          {'uri': 'content://books/unknown-size.txt', 'maxBytes': 10 * 1024 * 1024},
+        );
+        return '/cache/book.txt';
+      },
+    );
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+
+    final cachedPath = await StorageBridgeImpl().copyToCache(
+      'content://books/unknown-size.txt',
+      maxBytes: 10 * 1024 * 1024,
+    );
+
+    expect(cachedPath, '/cache/book.txt');
+  });
 }
