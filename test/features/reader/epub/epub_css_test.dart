@@ -135,6 +135,40 @@ void main() {
         ),
         isNull,
       );
+
+      final metadata = normalized.metadata!;
+      final staleAnchorMetadata = <String, dynamic>{
+        ...metadata,
+        'epubAnchors': {
+          ...metadata['epubAnchors'] as Map<String, dynamic>,
+          'OEBPS/text/chapter-two.xhtml#stale-chapter': {
+            'chapterIndex': 99,
+            'paragraphIndex': 0,
+          },
+          'OEBPS/text/chapter-two.xhtml#fractional': {
+            'chapterIndex': 1.5,
+            'paragraphIndex': 0,
+          },
+          'OEBPS/text/chapter-two.xhtml#negative-paragraph': {
+            'chapterIndex': 1,
+            'paragraphIndex': -1,
+          },
+        },
+      };
+      for (final fragment in <String>[
+        'stale-chapter',
+        'fractional',
+        'negative-paragraph',
+      ]) {
+        expect(
+          resolveEpubAnchorTarget(
+            metadata: staleAnchorMetadata,
+            currentChapterIndex: 0,
+            href: 'chapter-two.xhtml#$fragment',
+          ),
+          isNull,
+        );
+      }
     } finally {
       await temporaryDirectory.delete(recursive: true);
     }

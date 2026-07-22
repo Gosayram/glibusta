@@ -43,7 +43,10 @@ final class CbzParser implements BookParser {
         final file = images[i];
         final ext = file.name.split('.').last.toLowerCase();
         final mimeType = _mimeTypeFor(ext);
-        final contentBytes = file.content as List<int>;
+        final contentBytes = ArchiveSafety.readEntryBytes(
+          file,
+          maxBytes: ArchiveSafety.maxSingleEntryBytes,
+        );
         final dataUri = 'data:$mimeType;base64,${base64Encode(contentBytes)}';
         blocks.add(
           ReaderBlock(
@@ -193,7 +196,9 @@ final class CbzParser implements BookParser {
 
     try {
       final document = XmlDocument.parse(
-        _decodeComicInfoXml(file.content as List<int>),
+        _decodeComicInfoXml(
+          ArchiveSafety.readEntryBytes(file, maxBytes: _maxComicInfoBytes),
+        ),
       );
       String? value(String name) {
         final elements = document.descendants.whereType<XmlElement>().where(

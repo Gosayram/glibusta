@@ -360,12 +360,26 @@ pub fn extract_metadata(path: String) -> anyhow::Result<BookMeta> {
 
     let book = dispatch_parse(&bytes, format).map_err(|e| anyhow::anyhow!("{}", e))?;
 
+    let genres = book
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("genres"))
+        .and_then(serde_json::Value::as_array)
+        .map(|genres| {
+            genres
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+
     Ok(BookMeta {
         title: book.title,
         authors: book.authors,
         description: book.description,
         language: book.language,
-        genres: Vec::new(),
+        genres,
         cover_data: None,
         toc: book.toc,
     })
@@ -1395,5 +1409,29 @@ mod parse_api_tests {
             read_archive_asset(&mut archive, "image1.png").expect("load requested asset"),
             b"correct",
         );
+    }
+}
+
+#[cfg(test)]
+mod extract_metadata_tests {
+    use super::extract_metadata;
+
+    #[test]
+    fn metadata_extraction_preserves_raw_fb2_genre_codes() {
+        let path = std::env::temp_dir().join(format!(
+            "glibusta-fb2-metadata-genres-{}.fb2",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(
+            &path,
+            br#"<FictionBook><description><title-info><book-title>Genres</book-title><genre>sf_history</genre><genre>custom-unmapped</genre></title-info></description><body><section><p>Content</p></section></body></FictionBook>"#,
+        )
+        .expect("write FB2 metadata fixture");
+
+        let result = extract_metadata(path.to_string_lossy().into_owned());
+        let _ = std::fs::remove_file(path);
+        let metadata = result.expect("extract FB2 metadata");
+
+        assert_eq!(metadata.genres, ["sf_history", "custom-unmapped"]);
     }
 }

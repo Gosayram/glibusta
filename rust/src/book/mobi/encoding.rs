@@ -20,7 +20,14 @@ fn decode_utf16_units(bytes: &[u8], from_bytes: fn([u8; 2]) -> u16) -> String {
     String::from_utf16_lossy(&units)
 }
 
-pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {
+pub(crate) fn decode_text(
+    bytes: &[u8],
+    text_encoding: u16,
+    forced_encoding: Option<&str>,
+) -> String {
+    if let Some(decoded) = forced_encoding.and_then(|encoding| decode_forced(bytes, encoding)) {
+        return decoded;
+    }
     if text_encoding == 65001 {
         return String::from_utf8_lossy(bytes).into_owned();
     }
@@ -36,4 +43,28 @@ pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {
     }
     let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
     decoded.into_owned()
+}
+
+/// Decode a user-selected encoding when it is one supported by the reader.
+///
+/// MOBI stores an encoding in its header, but a corrupt or incorrectly
+/// converted file can declare the wrong value.  The import path exposes the
+/// same per-book override for every text format, so honour it here as well.
+/// Unknown labels deliberately fall back to the header's controlled decoder.
+fn decode_forced(bytes: &[u8], encoding: &str) -> Option<String> {
+    let label = encoding.trim();
+    if label.eq_ignore_ascii_case("utf-8") || label.eq_ignore_ascii_case("utf8") {
+        return Some(String::from_utf8_lossy(bytes).into_owned());
+    }
+    if label.eq_ignore_ascii_case("utf-16") || label.eq_ignore_ascii_case("utf-16le") {
+        return Some(decode_utf16_units(bytes, u16::from_le_bytes));
+    }
+    if label.eq_ignore_ascii_case("utf-16be") {
+        return Some(decode_utf16_units(bytes, u16::from_be_bytes));
+    }
+
+    encoding_rs::Encoding::for_label(label.as_bytes()).map(|encoding| {
+        let (decoded, _, _) = encoding.decode(bytes);
+        decoded.into_owned()
+    })
 }

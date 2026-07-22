@@ -189,6 +189,7 @@ impl MobiTextExtractor {
         palm_db: &PalmDb,
         header: &MobiHeader,
         first_text_record_index: usize,
+        forced_encoding: Option<&str>,
     ) -> Result<String> {
         if header.compression != 1 && header.compression != 2 {
             bail!("Unsupported MOBI compression: {}", header.compression);
@@ -250,7 +251,11 @@ impl MobiTextExtractor {
             chunks.extend_from_slice(&decompressed);
         }
 
-        Ok(encoding::decode_text(&chunks, header.text_encoding))
+        Ok(encoding::decode_text(
+            &chunks,
+            header.text_encoding,
+            forced_encoding,
+        ))
     }
 
     fn extract_blocks(
@@ -259,8 +264,15 @@ impl MobiTextExtractor {
         palm_db: &PalmDb,
         header: &MobiHeader,
         first_text_record_index: usize,
+        forced_encoding: Option<&str>,
     ) -> Result<Vec<ReaderBlock>> {
-        let text = self.extract_text(full_bytes, palm_db, header, first_text_record_index)?;
+        let text = self.extract_text(
+            full_bytes,
+            palm_db,
+            header,
+            first_text_record_index,
+            forced_encoding,
+        )?;
         if self.looks_like_html(&text) {
             let mut blocks = self.html_parser.parse(&text);
             resolve_inline_images(full_bytes, palm_db, header, &mut blocks);
@@ -536,7 +548,7 @@ fn consecutive_index_record_counts(
     }
 }
 
-fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
+fn full_name(record0: &[u8], header: &MobiHeader, forced_encoding: Option<&str>) -> Option<String> {
     if header.full_name_length == 0 {
         return None;
     }
@@ -545,7 +557,7 @@ fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
     if start >= record0.len() || end > record0.len() {
         return None;
     }
-    let name = encoding::decode_text(&record0[start..end], header.text_encoding)
+    let name = encoding::decode_text(&record0[start..end], header.text_encoding, forced_encoding)
         .trim()
         .to_string();
     if name.is_empty() { None } else { Some(name) }
@@ -634,6 +646,7 @@ fn kf8_section<'a>(
     full_bytes: &'a [u8],
     palm_db: &PalmDb,
     legacy_metadata: &MobiMetadata,
+    forced_encoding: Option<&str>,
 ) -> Option<(usize, &'a [u8], MobiHeader, MobiMetadata)> {
     let boundary_index = legacy_metadata.kf8_boundary_record_index? as usize;
     let boundary = record_bytes(full_bytes, palm_db, boundary_index).ok()?;
@@ -644,7 +657,7 @@ fn kf8_section<'a>(
     let header_index = boundary_index.checked_add(1)?;
     let record0 = record_bytes(full_bytes, palm_db, header_index).ok()?;
     let header = MobiHeaderParser.parse(record0).ok()?;
-    let metadata = ExthParser.parse(record0, &header).ok()?;
+    let metadata = ExthParser.parse(record0, &header, forced_encoding).ok()?;
     Some((header_index, record0, header, metadata))
 }
 
@@ -670,7 +683,7 @@ fn encode_image_data_uri(bytes: &[u8]) -> Option<String> {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+pub fn parse_mobi(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     if bytes.len() as u64 > MAX_FILE_SIZE {
         bail!(
             "MOBI file exceeds maximum size of {} MiB",
@@ -685,10 +698,10 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     let legacy_record0 = record_bytes(bytes, &palm_db, 0)?;
     let legacy_header = MobiHeaderParser.parse(legacy_record0)?;
     reject_encrypted_mobi(&legacy_header)?;
-    let legacy_metadata = ExthParser.parse(legacy_record0, &legacy_header)?;
+    let legacy_metadata = ExthParser.parse(legacy_record0, &legacy_header, forced_encoding)?;
     let (header_record_index, record0, header, metadata, using_kf8) =
         if let Some((header_index, kf8_record0, kf8_header, kf8_metadata)) =
-            kf8_section(bytes, &palm_db, &legacy_metadata)
+            kf8_section(bytes, &palm_db, &legacy_metadata, forced_encoding)
         {
             (header_index, kf8_record0, kf8_header, kf8_metadata, true)
         } else {
@@ -701,8 +714,13 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
     let first_text_record_index = header_record_index
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("MOBI text record index overflows"))?;
-    let blocks =
-        text_extractor.extract_blocks(bytes, &palm_db, &header, first_text_record_index)?;
+    let blocks = text_extractor.extract_blocks(
+        bytes,
+        &palm_db,
+        &header,
+        first_text_record_index,
+        forced_encoding,
+    )?;
     let index_record_probe = consecutive_index_record_counts(
         bytes,
         &palm_db,
@@ -712,7 +730,7 @@ pub fn parse_mobi(bytes: &[u8], _forced_encoding: Option<&str>) -> Result<Normal
 
     let title = first_non_empty(&[
         metadata.title.as_deref(),
-        full_name(record0, &header).as_deref(),
+        full_name(record0, &header, forced_encoding).as_deref(),
         Some(&palm_db.name),
         None,
     ]);

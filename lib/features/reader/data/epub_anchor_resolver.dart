@@ -34,8 +34,14 @@ import 'package:path/path.dart' as p;
   if (value is! Map) return null;
   final chapterIndex = value['chapterIndex'];
   final paragraphIndex = value['paragraphIndex'];
-  if (chapterIndex is! num || paragraphIndex is! num) return null;
-  return (chapterIndex: chapterIndex.toInt(), paragraphIndex: paragraphIndex.toInt());
+  if (chapterIndex is! int ||
+      paragraphIndex is! int ||
+      chapterIndex < 0 ||
+      chapterIndex >= chapterPaths.length ||
+      paragraphIndex < 0) {
+    return null;
+  }
+  return (chapterIndex: chapterIndex, paragraphIndex: paragraphIndex);
 }
 
 String? _resolvePath(String sourcePath, String rawPath) {

@@ -623,6 +623,37 @@ fn create_epub_with_named_container_entries(
     buf.into_inner()
 }
 
+/// Inflate only central-directory metadata for one stored entry. This models a
+/// malicious archive without allocating the claimed payload: EPUB must reject
+/// the entry from its declared size before extraction starts.
+fn set_zip_central_directory_entry_sizes(archive: &mut [u8], entry_name: &[u8], size: u32) {
+    const CENTRAL_DIRECTORY_HEADER: [u8; 4] = [0x50, 0x4b, 0x01, 0x02];
+    const CENTRAL_DIRECTORY_FIXED_SIZE: usize = 46;
+
+    for offset in 0..=archive.len().saturating_sub(CENTRAL_DIRECTORY_FIXED_SIZE) {
+        if archive[offset..offset + 4] != CENTRAL_DIRECTORY_HEADER {
+            continue;
+        }
+        let name_length = usize::from(u16::from_le_bytes([
+            archive[offset + 28],
+            archive[offset + 29],
+        ]));
+        let name_start = offset + CENTRAL_DIRECTORY_FIXED_SIZE;
+        let Some(name_end) = name_start.checked_add(name_length) else {
+            continue;
+        };
+        if archive.get(name_start..name_end) != Some(entry_name) {
+            continue;
+        }
+
+        archive[offset + 20..offset + 24].copy_from_slice(&size.to_le_bytes());
+        archive[offset + 24..offset + 28].copy_from_slice(&size.to_le_bytes());
+        return;
+    }
+
+    panic!("ZIP fixture must contain requested entry");
+}
+
 #[test]
 fn test_epub_basic_parse() {
     let epub_bytes = create_minimal_epub();
@@ -635,6 +666,24 @@ fn test_epub_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert_eq!(book.chapters[0].blocks.len(), 2);
     assert_eq!(book.book_format, BookFormat::Epub);
+}
+
+#[test]
+fn test_epub_rejects_oversized_spine_document_before_extraction() {
+    let mut epub = create_epub_with_opf_and_chapter(
+        true,
+        MINIMAL_EPUB_OPF,
+        b"<html><body><p>small physical payload</p></body></html>",
+    );
+    let oversized = u32::try_from(glibusta_core::api::models::MAX_CHAPTER_SIZE + 1)
+        .expect("chapter safety limit must fit ZIP32 metadata");
+    set_zip_central_directory_entry_sizes(&mut epub, b"chapter1.xhtml", oversized);
+
+    let error = glibusta_core::book::epub::parse_epub(&epub, None)
+        .expect_err("oversized XHTML metadata must be rejected before extraction");
+
+    assert!(error.to_string().contains("chapter1.xhtml"));
+    assert!(error.to_string().contains("exceeds maximum size"));
 }
 
 #[test]
@@ -1985,6 +2034,25 @@ fn test_mobi_decodes_utf8_and_falls_back_safely_for_unknown_code_pages() {
     .expect("an unknown code page must fall back to CP1252 for invalid UTF-8");
     assert!(cp1252_fallback.title.ends_with("café"));
     assert!(cp1252_fallback.chapters[0].blocks[0].text.ends_with("café"));
+}
+
+#[test]
+fn test_mobi_honors_manual_encoding_override_for_text_and_exth_metadata() {
+    let (text, _, _) = encoding_rs::WINDOWS_1251.encode("<p>Привет</p>");
+    let (title, _, _) = encoding_rs::WINDOWS_1251.encode("Книга");
+    let header = create_mobi_header_record(text.len() as u32, 1, &[(503, title.into_owned())]);
+
+    // The fixture deliberately lies in its MOBI header (the helper declares
+    // CP1252). Before the regression fix, parse_mobi ignored this override and
+    // returned mojibake for both the body and EXTH metadata.
+    let book = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![header, text.into_owned()]),
+        Some("windows-1251"),
+    )
+    .expect("a manual encoding override must decode MOBI text and EXTH metadata");
+
+    assert_eq!(book.title, "Книга");
+    assert_eq!(book.chapters[0].blocks[0].text, "Привет");
 }
 
 #[test]

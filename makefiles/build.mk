@@ -30,6 +30,8 @@ CARGO_CHECK := cd rust && cargo check
 ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
 CARGO_NDK := cargo ndk
 JNILIBS_DIR := android/app/src/main/jniLibs
+ANDROID_16K_RUSTFLAGS := -C link-arg=-Wl,-z,max-page-size=16384
+ANDROID_16K_CHECK := $(PYTHON) scripts/check_android_16k.py
 # Android's bionic libc has no `lutimes`.  UnRAR only reaches this call while
 # restoring a symlink's metadata; CBR pages are read into memory instead.
 UNRAR_NG_ANDROID_CXXFLAGS := -Dlutimes=utimes
@@ -50,11 +52,16 @@ rust-build-android: require-rust ## Build Rust native libraries for Android (arm
 	export CXXFLAGS="$${CXXFLAGS:+$${CXXFLAGS} }$(UNRAR_NG_ANDROID_CXXFLAGS)"; \
 	export PATH="$${HOME}/.cargo/bin:$${HOME}/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$${PATH}"; \
 	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a; \
-	cd rust && $(CARGO_NDK) -t arm64-v8a build --release && \
+	cd rust && RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS)" $(CARGO_NDK) -t arm64-v8a build --release && \
 	$(CARGO_NDK) -t armeabi-v7a build --release
 	cp rust/target/aarch64-linux-android/release/libglibusta_core.so $(JNILIBS_DIR)/arm64-v8a/
 	cp rust/target/armv7-linux-androideabi/release/libglibusta_core.so $(JNILIBS_DIR)/armeabi-v7a/
 	@$(PRINT_OK) "Android Rust libraries built and copied to $(JNILIBS_DIR)"
+
+.PHONY: check-android-16k
+check-android-16k: ## Verify arm64 native libraries in APK/AAB for 16 KiB page compatibility (ARTIFACT=path)
+	@test -n "$(ARTIFACT)" || { $(PRINT_ERROR) "Set ARTIFACT to a release APK or AAB"; exit 1; }
+	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(ARTIFACT)"
 
 .PHONY: rust-build-check
 rust-build-check: require-rust ## Verify Rust code compiles
@@ -172,6 +179,7 @@ build-android-apk: clean-build rust-build-android subset-fonts bump-build requir
 	$(FLUTTER_BUILD_APK)
 	@test -f "$(ANDROID_APK_SOURCE)" || { $(PRINT_ERROR) "APK not found: $(ANDROID_APK_SOURCE)"; exit 1; }
 	cp "$(ANDROID_APK_SOURCE)" "$(ANDROID_APK_ARTIFACT)"
+	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(ANDROID_APK_ARTIFACT)"
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
 .PHONY: build-android-apk-split
@@ -184,6 +192,7 @@ build-android-apk-split: clean-build rust-build-android subset-fonts bump-build 
 		if [ -f "$$src" ]; then cp "$$src" "$$dst"; else echo "Warning: Missing $$abi APK"; fi; \
 	done
 	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
+	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk"
 	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
 
 .PHONY: build-android-aab
@@ -192,6 +201,7 @@ build-android-aab: clean-build rust-build-android subset-fonts bump-build requir
 	$(FLUTTER_BUILD_AAB)
 	@test -f "$(ANDROID_AAB_SOURCE)" || { $(PRINT_ERROR) "AAB not found: $(ANDROID_AAB_SOURCE)"; exit 1; }
 	cp "$(ANDROID_AAB_SOURCE)" "$(ANDROID_AAB_ARTIFACT)"
+	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(ANDROID_AAB_ARTIFACT)"
 	@$(PRINT_OK) "AAB: $(ANDROID_AAB_ARTIFACT)"
 
 .PHONY: build-android

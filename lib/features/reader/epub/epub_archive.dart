@@ -34,13 +34,16 @@ final class EpubArchive {
   String readText(String path) {
     final file = findFile(path);
     if (file == null) throw StateError('EPUB file not found: $path');
-    return utf8.decode(file.content as List<int>, allowMalformed: true);
+    return utf8.decode(
+      ArchiveSafety.readEntryBytes(file, maxBytes: ArchiveSafety.maxSingleEntryBytes),
+      allowMalformed: true,
+    );
   }
 
   List<int> readBytes(String path) {
     final file = findFile(path);
     if (file == null) throw StateError('EPUB file not found: $path');
-    return List<int>.from(file.content as List<int>);
+    return ArchiveSafety.readEntryBytes(file, maxBytes: ArchiveSafety.maxSingleEntryBytes);
   }
 
   String? findFileBySuffix(String suffix) {

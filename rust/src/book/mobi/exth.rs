@@ -85,7 +85,12 @@ fn exth_record(input: &[u8]) -> IResult<&[u8], (u32, Vec<u8>)> {
 pub(crate) struct ExthParser;
 
 impl ExthParser {
-    pub fn parse(&self, record0: &[u8], header: &MobiHeader) -> Result<MobiMetadata> {
+    pub fn parse(
+        &self,
+        record0: &[u8],
+        header: &MobiHeader,
+        forced_encoding: Option<&str>,
+    ) -> Result<MobiMetadata> {
         if (header.exth_flags & 0x40) == 0 {
             return Ok(MobiMetadata::default());
         }
@@ -169,7 +174,7 @@ impl ExthParser {
         for (rec_type, data) in &records {
             match rec_type {
                 100 => {
-                    let value = encoding::decode_text(data, header.text_encoding)
+                    let value = encoding::decode_text(data, header.text_encoding, forced_encoding)
                         .trim()
                         .to_string();
                     if !value.is_empty() {
@@ -177,7 +182,7 @@ impl ExthParser {
                     }
                 }
                 101 => {
-                    let value = encoding::decode_text(data, header.text_encoding)
+                    let value = encoding::decode_text(data, header.text_encoding, forced_encoding)
                         .trim()
                         .to_string();
                     if !value.is_empty() {
@@ -186,27 +191,27 @@ impl ExthParser {
                 }
                 503 => {
                     title = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
                 }
                 524 => {
                     language = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
                 }
                 103 => {
                     description = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
                 }
                 104 => {
-                    let value = encoding::decode_text(data, header.text_encoding)
+                    let value = encoding::decode_text(data, header.text_encoding, forced_encoding)
                         .trim()
                         .to_string();
                     if !value.is_empty() {
@@ -214,7 +219,7 @@ impl ExthParser {
                     }
                 }
                 105 => {
-                    let value = encoding::decode_text(data, header.text_encoding)
+                    let value = encoding::decode_text(data, header.text_encoding, forced_encoding)
                         .trim()
                         .to_string();
                     if !value.is_empty() {
@@ -222,20 +227,21 @@ impl ExthParser {
                     }
                 }
                 122 => {
-                    fixed_layout = encoding::decode_text(data, header.text_encoding)
-                        .trim()
-                        .eq_ignore_ascii_case("true");
+                    fixed_layout =
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
+                            .trim()
+                            .eq_ignore_ascii_case("true");
                 }
                 123 => {
                     book_type = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
                 }
                 124 => {
                     orientation_lock = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
@@ -245,24 +251,26 @@ impl ExthParser {
                 }
                 126 => {
                     original_resolution = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
                 }
                 127 => {
-                    zero_gutter = encoding::decode_text(data, header.text_encoding)
-                        .trim()
-                        .eq_ignore_ascii_case("true");
+                    zero_gutter =
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
+                            .trim()
+                            .eq_ignore_ascii_case("true");
                 }
                 128 => {
-                    zero_margin = encoding::decode_text(data, header.text_encoding)
-                        .trim()
-                        .eq_ignore_ascii_case("true");
+                    zero_margin =
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
+                            .trim()
+                            .eq_ignore_ascii_case("true");
                 }
                 129 => {
                     metadata_resource_uri = Some(
-                        encoding::decode_text(data, header.text_encoding)
+                        encoding::decode_text(data, header.text_encoding, forced_encoding)
                             .trim()
                             .to_string(),
                     );
@@ -343,7 +351,7 @@ mod tests {
         record0.extend_from_slice(&4u32.to_be_bytes());
 
         let metadata = ExthParser
-            .parse(&record0, &exth_header())
+            .parse(&record0, &exth_header(), None)
             .expect("malformed optional EXTH metadata must not fail book parsing");
 
         assert!(metadata.has_exth);
@@ -361,14 +369,14 @@ mod tests {
         record0.extend_from_slice(&[0, 0, 0]);
 
         let metadata = ExthParser
-            .parse(&record0, &exth_header())
+            .parse(&record0, &exth_header(), None)
             .expect("zero EXTH alignment padding must be accepted");
         assert_eq!(metadata.title.as_deref(), Some("Title"));
 
         let last_byte = record0.len() - 1;
         record0[last_byte] = 1;
         let malformed = ExthParser
-            .parse(&record0, &exth_header())
+            .parse(&record0, &exth_header(), None)
             .expect("malformed optional EXTH metadata must not fail book parsing");
         assert!(malformed.has_exth);
         assert!(malformed.title.is_none());
@@ -383,7 +391,7 @@ mod tests {
         record0.extend_from_slice(&12u32.to_be_bytes());
 
         let metadata = ExthParser
-            .parse(&record0, &exth_header())
+            .parse(&record0, &exth_header(), None)
             .expect("malformed optional EXTH metadata must not fail book parsing");
 
         assert!(metadata.has_exth);
