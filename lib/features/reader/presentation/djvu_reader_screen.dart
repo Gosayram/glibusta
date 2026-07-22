@@ -10,11 +10,12 @@ import '../../../src/rust/api/api/api.dart' as rust_api;
 typedef DjvuPageCountLoader = Future<int> Function(String path);
 
 /// Renders one DjVu page to a bounded PNG thumbnail.
-typedef DjvuThumbnailLoader = Future<Uint8List> Function({
-  required String path,
-  required int pageIndex,
-  required int maxWidth,
-});
+typedef DjvuThumbnailLoader =
+    Future<Uint8List> Function({
+      required String path,
+      required int pageIndex,
+      required int maxWidth,
+    });
 
 class DjvuReaderScreen extends StatefulWidget {
   const DjvuReaderScreen({
@@ -106,9 +107,7 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
         pageIndex: pageNum - 1,
         maxWidth: 1080,
       );
-      if (!mounted ||
-          expectedDocumentRequest != _documentRequest ||
-          pageRequest != _pageRequest) {
+      if (!mounted || expectedDocumentRequest != _documentRequest || pageRequest != _pageRequest) {
         return;
       }
       setState(() {
@@ -117,9 +116,7 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
         _error = null;
       });
     } on Object catch (e) {
-      if (!mounted ||
-          expectedDocumentRequest != _documentRequest ||
-          pageRequest != _pageRequest) {
+      if (!mounted || expectedDocumentRequest != _documentRequest || pageRequest != _pageRequest) {
         return;
       }
       setState(() {
