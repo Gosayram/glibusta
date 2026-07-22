@@ -8,6 +8,10 @@ use nom::number::streaming::be_u32;
 
 use super::{MobiHeader, encoding};
 
+/// EXTH records are optional metadata.  Keep a corrupt record-0 from making
+/// the parser materialize an unbounded number of tiny records.
+const MAX_EXTH_RECORDS: usize = 4096;
+
 /// ARC-2.2: CompactString for stack-allocated metadata strings.
 pub(crate) struct MobiMetadata {
     pub title: Option<CompactString>,
@@ -128,7 +132,7 @@ impl ExthParser {
         // Parse records after the 12-byte header (EXTH + length + count)
         let records_data = &record0[exth_offset + 12..exth_end];
         let max_record_count = records_data.len() / 8;
-        if rec_count as usize > max_record_count {
+        if rec_count as usize > max_record_count || rec_count as usize > MAX_EXTH_RECORDS {
             return Ok(MobiMetadata {
                 has_exth: true,
                 ..MobiMetadata::default()
@@ -321,7 +325,7 @@ impl ExthParser {
 
 #[cfg(test)]
 mod tests {
-    use super::{ExthParser, MobiHeader};
+    use super::{ExthParser, MAX_EXTH_RECORDS, MobiHeader};
 
     fn exth_header() -> MobiHeader {
         MobiHeader {
@@ -396,5 +400,28 @@ mod tests {
 
         assert!(metadata.has_exth);
         assert!(metadata.authors.is_empty());
+    }
+
+    #[test]
+    fn rejects_excessive_but_in_bounds_record_count_before_materializing_records() {
+        let record_count = (MAX_EXTH_RECORDS + 1) as u32;
+        let mut record0 = Vec::from(&b"EXTH"[..]);
+        record0.extend_from_slice(&(12_u32 + record_count * 8).to_be_bytes());
+        record0.extend_from_slice(&record_count.to_be_bytes());
+        // The first entry would otherwise set a title, while the remaining
+        // zero-length entries make the declared count structurally valid.
+        record0.extend_from_slice(&503u32.to_be_bytes());
+        record0.extend_from_slice(&8u32.to_be_bytes());
+        for _ in 1..record_count {
+            record0.extend_from_slice(&0u32.to_be_bytes());
+            record0.extend_from_slice(&8u32.to_be_bytes());
+        }
+
+        let metadata = ExthParser
+            .parse(&record0, &exth_header(), None)
+            .expect("excessive optional EXTH metadata must not fail book parsing");
+
+        assert!(metadata.has_exth);
+        assert!(metadata.title.is_none());
     }
 }

@@ -90,6 +90,27 @@ void main() {
     );
   });
 
+  test('skips macOS AppleDouble files that masquerade as comic pages', () async {
+    final archive = Archive()
+      ..addFile(ArchiveFile('__MACOSX/._001.jpg', 4, <int>[0, 5, 22, 7]))
+      ..addFile(ArchiveFile('pages/002.jpg', 1, <int>[2]))
+      ..addFile(ArchiveFile('pages/001.jpg', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'macos.cbz',
+    );
+
+    expect(book.coverUrl, 'data:image/jpeg;base64,AQ==');
+    expect(
+      book.chapters.single.blocks.map((ReaderBlock block) => block.imageUrl),
+      <String>[
+        'data:image/jpeg;base64,AQ==',
+        'data:image/jpeg;base64,Ag==',
+      ],
+    );
+  });
+
   test('keeps JXL and AVIF pages so the reader can show its image fallback', () async {
     final archive = Archive()
       ..addFile(ArchiveFile('002.avif', 2, <int>[0, 1]))

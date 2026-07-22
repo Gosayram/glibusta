@@ -107,11 +107,19 @@ final class CbzParser implements BookParser {
   List<ArchiveFile> _sortedImageFiles(Archive archive) {
     const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'jxl', 'avif'};
     final files = archive.files.where((f) {
-      if (f.isFile) {
-        final ext = f.name.split('.').last.toLowerCase();
-        return imageExts.contains(ext);
+      if (!f.isFile) return false;
+
+      final pathParts = f.name.replaceAll(r'\', '/').split('/');
+      final fileName = pathParts.last;
+      // macOS adds AppleDouble resource forks to ZIP archives. Their names
+      // look like image pages (for example `__MACOSX/._001.jpg`), but their
+      // contents are metadata rather than decodable comic images.
+      if (pathParts.contains('__MACOSX') || fileName.startsWith('._')) {
+        return false;
       }
-      return false;
+
+      final ext = fileName.split('.').last.toLowerCase();
+      return imageExts.contains(ext);
     }).toList()..sort((a, b) => _naturalCompare(a.name, b.name));
     return files;
   }

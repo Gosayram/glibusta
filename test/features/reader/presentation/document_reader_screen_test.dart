@@ -51,6 +51,7 @@ void main() {
       findsOneWidget,
     );
     expect(tester.widget<IconButton>(find.byIcon(Icons.search)).onPressed, isNull);
+    expect(isPdfTextSelectionEnabled(PdfTextAvailability.unavailable), isFalse);
     expect(
       find.bySemanticsLabel('В PDF не найден извлекаемый текст. Поиск и копирование недоступны.'),
       findsOneWidget,
@@ -150,6 +151,12 @@ void main() {
         PdfTextAvailability.fromPageTexts(['', 'Глава 1']),
         PdfTextAvailability.available,
       );
+    });
+
+    test('keeps selection disabled only when text extraction is unavailable', () {
+      expect(isPdfTextSelectionEnabled(null), isTrue);
+      expect(isPdfTextSelectionEnabled(PdfTextAvailability.available), isTrue);
+      expect(isPdfTextSelectionEnabled(PdfTextAvailability.unavailable), isFalse);
     });
 
     test('samples at most the first ten pages before declaring a PDF image-only', () async {

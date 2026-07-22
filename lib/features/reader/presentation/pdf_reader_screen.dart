@@ -56,6 +56,15 @@ Future<PdfTextAvailability> detectPdfTextAvailability(
   return PdfTextAvailability.unavailable;
 }
 
+/// Whether `pdfrx` should expose text-selection actions for [availability].
+///
+/// An image-only PDF has no useful selectable text. Keeping the interaction
+/// disabled matches the unavailable-search state and the accessibility notice.
+@visibleForTesting
+bool isPdfTextSelectionEnabled(PdfTextAvailability? availability) {
+  return availability != PdfTextAvailability.unavailable;
+}
+
 class PdfReaderScreen extends StatefulWidget {
   const PdfReaderScreen({
     required this.filePath,
@@ -156,7 +165,9 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                 params: PdfViewerParams(
                   backgroundColor: colorScheme.surface,
                   margin: 4,
-                  textSelectionParams: const PdfTextSelectionParams(),
+                  textSelectionParams: PdfTextSelectionParams(
+                    enabled: isPdfTextSelectionEnabled(_textAvailability),
+                  ),
                   sizeDelegateProvider: const PdfViewerSizeDelegateProviderLegacy(
                     maxScale: 8.0,
                     minScale: 0.1,
