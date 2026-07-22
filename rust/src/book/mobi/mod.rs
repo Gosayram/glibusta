@@ -487,25 +487,34 @@ fn record_bytes<'a>(full_bytes: &'a [u8], palm_db: &PalmDb, index: usize) -> Res
 /// their producer-controlled offsets or tag bytes. Full MOBI navigation needs
 /// a validated decoder; this bounded probe keeps those records out of the text
 /// stream while retaining useful diagnostic metadata.
+struct IndexRecordProbe {
+    indx_count: usize,
+    tagx_count: usize,
+    truncated: bool,
+}
+
 fn consecutive_index_record_counts(
     full_bytes: &[u8],
     palm_db: &PalmDb,
     first_text_record_index: usize,
     text_record_count: u16,
-) -> (usize, usize) {
+) -> IndexRecordProbe {
     let Some(first_index_record) = first_text_record_index.checked_add(text_record_count as usize)
     else {
-        return (0, 0);
+        return IndexRecordProbe {
+            indx_count: 0,
+            tagx_count: 0,
+            truncated: false,
+        };
     };
 
     let mut indx_count = 0;
     let mut tagx_count = 0;
-    for record_index in first_index_record
-        ..palm_db
-            .records
-            .len()
-            .min(first_index_record.saturating_add(MAX_CONSECUTIVE_INDEX_RECORDS))
-    {
+    let probe_end = palm_db
+        .records
+        .len()
+        .min(first_index_record.saturating_add(MAX_CONSECUTIVE_INDEX_RECORDS));
+    for record_index in first_index_record..probe_end {
         let Ok(record) = record_bytes(full_bytes, palm_db, record_index) else {
             break;
         };
@@ -515,7 +524,16 @@ fn consecutive_index_record_counts(
             _ => break,
         }
     }
-    (indx_count, tagx_count)
+    let truncated = indx_count + tagx_count == MAX_CONSECUTIVE_INDEX_RECORDS
+        && record_bytes(full_bytes, palm_db, probe_end)
+            .ok()
+            .and_then(|record| record.get(..4))
+            .is_some_and(|signature| matches!(signature, b"INDX" | b"TAGX"));
+    IndexRecordProbe {
+        indx_count,
+        tagx_count,
+        truncated,
+    }
 }
 
 fn full_name(record0: &[u8], header: &MobiHeader) -> Option<String> {
