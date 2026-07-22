@@ -4,8 +4,10 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:fl_charset/fl_charset.dart';
 import 'package:xml/xml.dart';
 
+import '../../../../core/encoding/encoding_utils.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/formats/archive_safety.dart';
 import 'book_parser.dart';
@@ -221,6 +223,15 @@ final class CbzParser implements BookParser {
     if (bytes.length >= 2 && bytes[0] == 0xfe && bytes[1] == 0xff) {
       return _decodeUtf16(bytes, littleEndian: false);
     }
+
+    final declaredEncoding = detectDeclaredEncoding(Uint8List.fromList(bytes));
+    if (declaredEncoding != null) {
+      final encoding = Charset.getByName(declaredEncoding);
+      if (encoding != null) {
+        return encoding.decode(bytes);
+      }
+    }
+
     return utf8.decode(bytes, allowMalformed: true);
   }
 

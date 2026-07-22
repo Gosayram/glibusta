@@ -1967,6 +1967,57 @@ fn test_mobi_decodes_utf8_and_falls_back_safely_for_unknown_code_pages() {
     .expect("an unknown code page must use the controlled UTF-8 fallback");
     assert_eq!(fallback_book.title, "Запасной заголовок");
     assert_eq!(fallback_book.chapters[0].blocks[0].text, "Привет");
+
+    // An unknown code page must not leave a rare invalid UTF-8 byte as U+FFFD
+    // just because the surrounding ASCII text happens to be long.
+    let mut cp1252_text = format!("<p>{}caf", "plain ".repeat(24)).into_bytes();
+    cp1252_text.push(0xE9);
+    cp1252_text.extend_from_slice(b"</p>");
+    let mut cp1252_title = format!("{}caf", "plain ".repeat(24)).into_bytes();
+    cp1252_title.push(0xE9);
+    let mut cp1252_header =
+        create_mobi_header_record(cp1252_text.len() as u32, 1, &[(503, cp1252_title)]);
+    cp1252_header[28..30].copy_from_slice(&u16::MAX.to_be_bytes());
+    let cp1252_fallback = glibusta_core::book::mobi::parse_mobi(
+        &create_palm_mobi(vec![cp1252_header, cp1252_text]),
+        None,
+    )
+    .expect("an unknown code page must fall back to CP1252 for invalid UTF-8");
+    assert!(cp1252_fallback.title.ends_with("café"));
+    assert!(cp1252_fallback.chapters[0].blocks[0].text.ends_with("café"));
+}
+
+#[test]
+fn test_mobi_decodes_utf16le_and_utf16be_bom_text_and_exth_metadata() {
+    fn utf16_with_bom(text: &str, little_endian: bool) -> Vec<u8> {
+        let mut bytes = if little_endian {
+            vec![0xFF, 0xFE]
+        } else {
+            vec![0xFE, 0xFF]
+        };
+        for unit in text.encode_utf16() {
+            let encoded = if little_endian {
+                unit.to_le_bytes()
+            } else {
+                unit.to_be_bytes()
+            };
+            bytes.extend_from_slice(&encoded);
+        }
+        bytes
+    }
+
+    for little_endian in [true, false] {
+        let text = utf16_with_bom("<p>Привет 😀</p>", little_endian);
+        let title = utf16_with_bom("Книга", little_endian);
+        let mut header = create_mobi_header_record(text.len() as u32, 1, &[(503, title)]);
+        header[28..30].copy_from_slice(&65002u16.to_be_bytes());
+
+        let book =
+            glibusta_core::book::mobi::parse_mobi(&create_palm_mobi(vec![header, text]), None)
+                .expect("BOM-marked UTF-16 MOBI text and EXTH metadata must decode");
+        assert_eq!(book.title, "Книга");
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет 😀");
+    }
 }
 
 #[test]

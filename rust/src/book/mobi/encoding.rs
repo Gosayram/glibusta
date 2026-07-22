@@ -36,10 +36,8 @@ pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {
         let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
         return decoded.into_owned();
     }
-    let utf8_text = String::from_utf8_lossy(bytes).into_owned();
-    let replacement_count = utf8_text.matches('\u{FFFD}').count();
-    if (replacement_count as f64) < (bytes.len() as f64 * 0.02) {
-        return utf8_text;
+    if let Ok(utf8_text) = std::str::from_utf8(bytes) {
+        return utf8_text.to_owned();
     }
     let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
     decoded.into_owned()

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:fl_charset/fl_charset.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/errors/failures.dart';
 import 'package:glibusta/features/reader/data/parsers/cbz_parser.dart';
@@ -29,6 +30,16 @@ void main() {
       bytes
         ..add(unit & 0xff)
         ..add(unit >> 8);
+    }
+    return bytes;
+  }
+
+  List<int> utf16BeWithBom(String value) {
+    final bytes = <int>[0xfe, 0xff];
+    for (final unit in value.codeUnits) {
+      bytes
+        ..add(unit >> 8)
+        ..add(unit & 0xff);
     }
     return bytes;
   }
@@ -169,6 +180,66 @@ void main() {
     );
 
     expect(book.title, 'Комикс');
+  });
+
+  test('reads UTF-16BE ComicInfo.xml metadata', () async {
+    final comicInfo = utf16BeWithBom('<ComicInfo><Title>Комикс BE</Title></ComicInfo>');
+    final archive = Archive()
+      ..addFile(ArchiveFile('ComicInfo.xml', comicInfo.length, comicInfo))
+      ..addFile(ArchiveFile('001.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'comic.cbz',
+    );
+
+    expect(book.title, 'Комикс BE');
+  });
+
+  test('preserves Unicode ZIP page names and UTF-8 BOM ComicInfo metadata', () async {
+    final comicInfo = <int>[
+      0xef,
+      0xbb,
+      0xbf,
+      ...utf8.encode('<ComicInfo><Title>Космический комикс</Title></ComicInfo>'),
+    ];
+    final archive = Archive()
+      ..addFile(ArchiveFile('ComicInfo.xml', comicInfo.length, comicInfo))
+      ..addFile(ArchiveFile('страницы/02.png', 1, <int>[2]))
+      ..addFile(ArchiveFile('страницы/01.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'комикс.cbz',
+    );
+
+    expect(book.title, 'Космический комикс');
+    expect(
+      book.chapters.single.blocks.map((ReaderBlock block) => block.imageUrl),
+      <String>[
+        'data:image/png;base64,AQ==',
+        'data:image/png;base64,Ag==',
+      ],
+    );
+  });
+
+  test('uses the declared ComicInfo.xml Windows-1251 encoding', () async {
+    final windows1251 = Charset.getByName('windows-1251')!;
+    final comicInfo = windows1251.encode(
+      '<?xml version="1.0" encoding="windows-1251"?> '
+      '<ComicInfo><Title>Кириллический комикс</Title><Writer>Автор</Writer></ComicInfo>',
+    );
+    final archive = Archive()
+      ..addFile(ArchiveFile('ComicInfo.xml', comicInfo.length, comicInfo))
+      ..addFile(ArchiveFile('001.png', 1, <int>[1]));
+
+    final book = await parser.parse(
+      Uint8List.fromList(ZipEncoder().encode(archive)),
+      fileName: 'comic.cbz',
+    );
+
+    expect(book.title, 'Кириллический комикс');
+    expect(book.authors, <String>['Автор']);
   });
 
   test('reads namespaced ComicInfo.xml metadata', () async {

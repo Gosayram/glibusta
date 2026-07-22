@@ -13,6 +13,13 @@ static CP437_EXTENDED: LazyLock<Vec<char>> = LazyLock::new(|| {
         .collect()
 });
 
+/// Extended half of IBM PC code page 850, used by the RTF `\pca` header.
+static CP850_EXTENDED: LazyLock<Vec<char>> = LazyLock::new(|| {
+    "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»░▒▓│┤ÁÂÀ©╣║╗╝¢¥┐└┴┬├─┼ãÃ╚╔╩╦╠═╬¤ðÐÊËÈıÍÎÏ┘┌█▄¦Ì▀ÓßÔÒõÕµþÞÚÛÙýÝ¯´\u{AD}±‗¾¶§÷¸°¨·¹³²■ "
+        .chars()
+        .collect()
+});
+
 pub fn parse_rtf(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
     let encoding_name = forced_encoding.unwrap_or_else(|| detect_rtf_encoding(bytes));
     let decoded = if encoding_name.eq_ignore_ascii_case("utf-8") {
@@ -75,6 +82,9 @@ fn detect_rtf_encoding(bytes: &[u8]) -> &str {
     if has_rtf_control_word(head, b"\\pc") {
         return "ibm437";
     }
+    if has_rtf_control_word(head, b"\\pca") {
+        return "ibm850";
+    }
     "windows-1252"
 }
 
@@ -116,6 +126,9 @@ fn decode_with_encoding(bytes: &[u8], encoding: &str) -> String {
     if encoding.eq_ignore_ascii_case("ibm437") {
         return decode_cp437(bytes);
     }
+    if encoding.eq_ignore_ascii_case("ibm850") {
+        return decode_cp850(bytes);
+    }
     let (decoded, _, _) = encoding_rs::Encoding::for_label(encoding.as_bytes())
         .unwrap_or(encoding_rs::WINDOWS_1252)
         .decode(bytes);
@@ -123,13 +136,21 @@ fn decode_with_encoding(bytes: &[u8], encoding: &str) -> String {
 }
 
 fn decode_cp437(bytes: &[u8]) -> String {
+    decode_ibm_pc(bytes, &CP437_EXTENDED)
+}
+
+fn decode_cp850(bytes: &[u8]) -> String {
+    decode_ibm_pc(bytes, &CP850_EXTENDED)
+}
+
+fn decode_ibm_pc(bytes: &[u8], extended: &[char]) -> String {
     bytes
         .iter()
         .map(|&byte| {
             if byte < 0x80 {
                 char::from(byte)
             } else {
-                CP437_EXTENDED[(byte - 0x80) as usize]
+                extended[(byte - 0x80) as usize]
             }
         })
         .collect()
@@ -649,13 +670,11 @@ fn skip_unicode_fallback(body: &str, mut index: usize, count: usize) -> usize {
 /// Decode an RTF `\\'hh` escape with the document's declared ANSI code page.
 fn append_encoded_bytes(output: &mut String, bytes: &[u8], encoding_name: &str) {
     if encoding_name.eq_ignore_ascii_case("ibm437") {
-        for &byte in bytes {
-            output.push(if byte < 0x80 {
-                char::from(byte)
-            } else {
-                CP437_EXTENDED[(byte - 0x80) as usize]
-            });
-        }
+        output.push_str(&decode_cp437(bytes));
+        return;
+    }
+    if encoding_name.eq_ignore_ascii_case("ibm850") {
+        output.push_str(&decode_cp850(bytes));
         return;
     }
     let encoding = encoding_rs::Encoding::for_label(encoding_name.as_bytes())
@@ -999,6 +1018,14 @@ mod tests {
     }
 
     #[test]
+    fn decodes_windows_1252_escaped_bytes() {
+        let book = parse_rtf(br"{\rtf1\ansi\ansicpg1252 Caf\'e9}\par", None)
+            .expect("parse Windows-1252 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Café");
+    }
+
+    #[test]
     fn decodes_consecutive_utf8_escaped_bytes_as_one_sequence() {
         let book = parse_rtf(
             br"{\rtf1\ansi\ansicpg65001\'d0\'9f\'d1\'80\'d0\'b8\'d0\'b2\'d0\'b5\'d1\'82}",
@@ -1018,6 +1045,22 @@ mod tests {
     }
 
     #[test]
+    fn decodes_gb2312_escaped_bytes_as_one_sequence() {
+        let book =
+            parse_rtf(br"{\rtf1\ansi\ansicpg936\'c4\'e3\'ba\'c3}", None).expect("parse GB2312 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "你好");
+    }
+
+    #[test]
+    fn decodes_big5_escaped_bytes_as_one_sequence() {
+        let book =
+            parse_rtf(br"{\rtf1\ansi\ansicpg950\'a7\'41\'a6\'6e}", None).expect("parse Big5 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "你好");
+    }
+
+    #[test]
     fn decodes_mac_roman_documents() {
         let book = parse_rtf(b"{\\rtf1\\mac Caf\x8e}", None).expect("parse MacRoman RTF");
 
@@ -1029,6 +1072,21 @@ mod tests {
         let book = parse_rtf(br"{\rtf1\pc Caf\'82}", None).expect("parse CP437 RTF");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Café");
+    }
+
+    #[test]
+    fn decodes_pc_ansi_code_page_850_documents() {
+        let book = parse_rtf(br"{\rtf1\pca Caf\'82 / \'9b}", None).expect("parse CP850 RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "Café / ø");
+    }
+
+    #[test]
+    fn preserves_utf8_persian_text() {
+        let book = parse_rtf(r"{\rtf1\ansi فارسی}".as_bytes(), Some("utf-8"))
+            .expect("parse UTF-8 Persian RTF");
+
+        assert_eq!(book.chapters[0].blocks[0].text, "فارسی");
     }
 
     #[test]
