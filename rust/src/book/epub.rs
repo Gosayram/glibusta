@@ -414,13 +414,9 @@ fn extract_epub_toc(
     spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Vec<TocEntry>> {
     // Try EPUB 3 nav.xhtml first (preferred)
-    if let Some(toc) = try_parse_nav_xhtml(
-        zip,
-        manifest,
-        opf_dir,
-        encoding_name,
-        spine_chapter_indices,
-    )? {
+    if let Some(toc) =
+        try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name, spine_chapter_indices)?
+    {
         if !toc.is_empty() {
             return Ok(toc);
         }
@@ -813,12 +809,20 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     Ok((metadata, manifest_items, spine_ids, ncx_id))
 }
 
-/// Parse NCX (EPUB 2 table of contents).
-fn parse_ncx(text: &str) -> Vec<TocEntry> {
+#[derive(Debug, Default)]
+struct ParsedTocEntry {
+    title: String,
+    href: String,
+    children: Vec<ParsedTocEntry>,
+}
+
+/// Parse NCX (EPUB 2 table of contents), preserving the source href until it
+/// can be resolved against the rendered spine.
+fn parse_ncx(text: &str) -> Vec<ParsedTocEntry> {
     let mut reader = Reader::from_str(text);
     reader.config_mut().trim_text(true);
-    let mut entries: Vec<TocEntry> = Vec::new();
-    let mut current_title = String::new();
+    let mut entries = Vec::new();
+    let mut pending_entries: Vec<ParsedTocEntry> = Vec::new();
     let mut in_nav_label = false;
     let mut in_text = false;
 
@@ -828,14 +832,27 @@ fn parse_ncx(text: &str) -> Vec<TocEntry> {
             Ok(Event::Start(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
+                    "navPoint" => pending_entries.push(ParsedTocEntry::default()),
                     "navLabel" => in_nav_label = true,
                     "text" if in_nav_label => in_text = true,
+                    "content" => {
+                        if let Some(entry) = pending_entries.last_mut() {
+                            entry.href = get_xml_attr(e, b"src").unwrap_or_default();
+                        }
+                    }
                     _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) if e.local_name().as_ref() == b"content" => {
+                if let Some(entry) = pending_entries.last_mut() {
+                    entry.href = get_xml_attr(e, b"src").unwrap_or_default();
                 }
             }
             Ok(Event::Text(ref e)) => {
                 if in_text {
-                    current_title.push_str(&e.xml10_content().unwrap_or_default());
+                    if let Some(entry) = pending_entries.last_mut() {
+                        entry.title.push_str(&e.xml10_content().unwrap_or_default());
+                    }
                 }
             }
             Ok(Event::End(ref e)) => {
@@ -844,14 +861,16 @@ fn parse_ncx(text: &str) -> Vec<TocEntry> {
                     "text" if in_nav_label => in_text = false,
                     "navLabel" => in_nav_label = false,
                     "navPoint" => {
-                        if !current_title.trim().is_empty() {
-                            entries.push(TocEntry {
-                                title: current_title.trim().to_string(),
-                                chapter_index: -1,
-                                children: Vec::new(),
-                            });
+                        if let Some(mut entry) = pending_entries.pop() {
+                            entry.title = entry.title.trim().to_string();
+                            if !entry.title.is_empty() && !entry.href.trim().is_empty() {
+                                if let Some(parent) = pending_entries.last_mut() {
+                                    parent.children.push(entry);
+                                } else {
+                                    entries.push(entry);
+                                }
+                            }
                         }
-                        current_title.clear();
                     }
                     _ => {}
                 }
@@ -862,12 +881,12 @@ fn parse_ncx(text: &str) -> Vec<TocEntry> {
     entries
 }
 
-/// Parse EPUB 3 nav.xhtml (table of contents).
-fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
+/// Parse EPUB 3 nav.xhtml (table of contents), preserving each link target.
+fn parse_nav_xhtml(text: &str) -> Vec<ParsedTocEntry> {
     // Look for <nav epub:type="toc"> <ol> <li> <a href="...">text</a> ...
     let mut reader = Reader::from_str(text);
-    let mut entries: Vec<TocEntry> = Vec::new();
-    let mut pending_entries: Vec<TocEntry> = Vec::new();
+    let mut entries = Vec::new();
+    let mut pending_entries: Vec<ParsedTocEntry> = Vec::new();
     let mut in_toc_nav = false;
     let mut in_a = false;
 
@@ -890,13 +909,12 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
                         }
                     }
                 } else if tag == "li" {
-                    pending_entries.push(TocEntry {
-                        title: String::new(),
-                        chapter_index: -1,
-                        children: Vec::new(),
-                    });
+                    pending_entries.push(ParsedTocEntry::default());
                 } else if !pending_entries.is_empty() && tag == "a" {
                     in_a = true;
+                    if let Some(entry) = pending_entries.last_mut() {
+                        entry.href = get_xml_attr(e, b"href").unwrap_or_default();
+                    }
                 }
             }
             Ok(Event::Text(ref e)) => {
@@ -930,6 +948,32 @@ fn parse_nav_xhtml(text: &str) -> Vec<TocEntry> {
         }
     }
     entries
+}
+
+/// Converts source-relative TOC links to reader chapter indices. Unknown,
+/// external, fragment-only, or non-spine links are deliberately omitted: a
+/// `TocEntry` cannot represent a non-navigable group without an invalid index.
+fn resolve_toc_entries(
+    entries: Vec<ParsedTocEntry>,
+    toc_document_href: &str,
+    spine_chapter_indices: &HashMap<String, i32>,
+) -> Vec<TocEntry> {
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let target = resolve_epub_href(toc_document_href, &entry.href)?;
+            let chapter_index = *spine_chapter_indices.get(&target)?;
+            Some(TocEntry {
+                title: entry.title,
+                chapter_index,
+                children: resolve_toc_entries(
+                    entry.children,
+                    toc_document_href,
+                    spine_chapter_indices,
+                ),
+            })
+        })
+        .collect()
 }
 
 struct ExtractedCover {
@@ -1006,7 +1050,7 @@ fn is_single_cover_image_document(
 }
 
 fn resolve_epub_href(document_href: &str, href: &str) -> Option<String> {
-    let href = href.split('#').next()?.trim();
+    let href = href.split(['#', '?']).next()?.trim();
     if href.is_empty() || href.contains("://") || href.starts_with('/') {
         return None;
     }
@@ -2672,7 +2716,7 @@ fn extract_chapter_title(text: &str) -> String {
 mod tests {
     #[cfg(not(miri))]
     use super::extract_font_faces;
-    use super::{parse_nav_xhtml, parse_xhtml_to_blocks};
+    use super::{parse_nav_xhtml, parse_ncx, parse_xhtml_to_blocks, resolve_toc_entries};
     use crate::api::models::BlockType;
 
     #[test]
@@ -2692,6 +2736,34 @@ mod tests {
         assert_eq!(toc[0].title, "Chapter 1");
         assert_eq!(toc[0].children[0].title, "Part 1");
         assert_eq!(toc[1].title, "Chapter 2");
+    }
+
+    #[test]
+    fn resolves_ncx_entries_to_rendered_spine_chapters() {
+        let parsed = parse_ncx(
+            r#"<ncx><navMap>
+                <navPoint><navLabel><text>Chapter one</text></navLabel>
+                  <content src="../Text/chapter-1.xhtml#part-1"/>
+                  <navPoint><navLabel><text>Part one</text></navLabel>
+                    <content src="../Text/chapter-1.xhtml#part-2"/>
+                  </navPoint>
+                </navPoint>
+                <navPoint><navLabel><text>Chapter two</text></navLabel>
+                  <content src="../Text/chapter-2.xhtml?from=toc"/>
+                </navPoint>
+            </navMap></ncx>"#,
+        );
+        let chapter_indices = std::collections::HashMap::from([
+            ("OPS/Text/chapter-1.xhtml".to_owned(), 3),
+            ("OPS/Text/chapter-2.xhtml".to_owned(), 4),
+        ]);
+
+        let toc = resolve_toc_entries(parsed, "OPS/Navigation/toc.ncx", &chapter_indices);
+
+        assert_eq!(toc.len(), 2);
+        assert_eq!(toc[0].chapter_index, 3);
+        assert_eq!(toc[0].children[0].chapter_index, 3);
+        assert_eq!(toc[1].chapter_index, 4);
     }
 
     #[test]
