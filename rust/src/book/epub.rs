@@ -15,6 +15,47 @@ use std::collections::HashMap;
 const IDPF_FONT_OBFUSCATION_ALGORITHM: &str = "http://www.idpf.org/2008/embedding";
 const ADOBE_FONT_OBFUSCATION_ALGORITHM: &str = "http://ns.adobe.com/pdf/enc#RC";
 
+/// Decode an EPUB XML resource using an explicitly selected encoding, its BOM,
+/// or the XML declaration. EPUBs in the wild occasionally use UTF-16 package
+/// and content documents; treating every resource as UTF-8 makes such books
+/// fail before the XML parser can inspect them.
+fn decode_epub_xml(bytes: &[u8], forced_encoding: Option<&str>) -> String {
+    let encoding = forced_encoding.or_else(|| {
+        if bytes.starts_with(&[0xFF, 0xFE]) {
+            Some("utf-16le")
+        } else if bytes.starts_with(&[0xFE, 0xFF]) {
+            Some("utf-16be")
+        } else {
+            xml_declared_encoding(bytes)
+        }
+    });
+
+    decode_bytes(bytes, encoding.unwrap_or("utf-8"))
+}
+
+/// Extract an ASCII XML declaration encoding without scanning an unbounded
+/// resource. UTF-16 declarations are covered by their mandatory BOM above.
+fn xml_declared_encoding(bytes: &[u8]) -> Option<&str> {
+    let declaration_end = bytes
+        .get(..bytes.len().min(1024))?
+        .windows(2)
+        .position(|window| window == b"?>")?;
+    let declaration = std::str::from_utf8(&bytes[..declaration_end]).ok()?;
+    let lower = declaration.to_ascii_lowercase();
+    let encoding_start = lower.find("encoding")? + "encoding".len();
+    let value = declaration[encoding_start..]
+        .trim_start()
+        .strip_prefix('=')?
+        .trim_start();
+    let quote = value.chars().next()?;
+    if quote != '\'' && quote != '\"' {
+        return None;
+    }
+    let value = &value[quote.len_utf8()..];
+    let end = value.find(quote)?;
+    Some(&value[..end])
+}
+
 fn encryption_algorithm(e: &quick_xml::events::BytesStart<'_>) -> Option<String> {
     e.attributes().flatten().find_map(|attribute| {
         (attribute.key.local_name().as_ref() == b"Algorithm")
@@ -138,21 +179,19 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         bail!("EPUB has an invalid mimetype entry");
     }
 
-    let encoding_name = forced_encoding.unwrap_or("utf-8");
-
     let container_xml = zip
         .read_file_limited(
             "META-INF/container.xml",
             crate::api::models::MAX_CHAPTER_SIZE,
         )?
         .context("EPUB missing META-INF/container.xml")?;
-    let container_text = decode_bytes(&container_xml, encoding_name);
+    let container_text = decode_epub_xml(&container_xml, forced_encoding);
     let opf_path = parse_container_xml(&container_text)?;
 
     let opf_bytes = zip
         .read_file_limited(&opf_path, crate::api::models::MAX_CHAPTER_SIZE)?
         .with_context(|| format!("OPF file not found: {}", opf_path))?;
-    let opf_text = decode_bytes(&opf_bytes, encoding_name);
+    let opf_text = decode_epub_xml(&opf_bytes, forced_encoding);
 
     let opf_dir = opf_path.rsplit('/').nth(1).unwrap_or("");
 
@@ -208,7 +247,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
             continue;
         };
 
-        let xhtml_text = decode_bytes(&xhtml_bytes, encoding_name);
+        let xhtml_text = decode_epub_xml(&xhtml_bytes, forced_encoding);
         let css = extract_css(&xhtml_text);
         // CRT-1.14: extract @font-face declarations
         for (family, src) in extract_font_faces(&xhtml_text) {
@@ -368,7 +407,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         &manifest_items,
         &ncx_id,
         opf_dir,
-        encoding_name,
+        forced_encoding,
         &spine_chapter_indices,
     )?;
 
@@ -410,13 +449,17 @@ fn extract_epub_toc(
     manifest: &HashMap<String, ManifestItem>,
     ncx_id: &Option<String>,
     opf_dir: &str,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
     spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Vec<TocEntry>> {
     // Try EPUB 3 nav.xhtml first (preferred)
-    if let Some(toc) =
-        try_parse_nav_xhtml(zip, manifest, opf_dir, encoding_name, spine_chapter_indices)?
-    {
+    if let Some(toc) = try_parse_nav_xhtml(
+        zip,
+        manifest,
+        opf_dir,
+        forced_encoding,
+        spine_chapter_indices,
+    )? {
         if !toc.is_empty() {
             return Ok(toc);
         }
@@ -428,7 +471,7 @@ fn extract_epub_toc(
         manifest,
         ncx_id,
         opf_dir,
-        encoding_name,
+        forced_encoding,
         spine_chapter_indices,
     )? {
         return Ok(toc);
@@ -441,7 +484,7 @@ fn try_parse_nav_xhtml(
     zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     opf_dir: &str,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
     spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Option<Vec<TocEntry>>> {
     let Some(nav_item) = manifest.values().find(|item| {
@@ -458,7 +501,7 @@ fn try_parse_nav_xhtml(
     else {
         return Ok(None);
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_epub_xml(&bytes, forced_encoding);
     Ok(Some(resolve_toc_entries(
         parse_nav_xhtml(&text),
         &nav_path,
@@ -471,7 +514,7 @@ fn try_parse_ncx(
     manifest: &HashMap<String, ManifestItem>,
     ncx_id: &Option<String>,
     opf_dir: &str,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
     spine_chapter_indices: &HashMap<String, i32>,
 ) -> Result<Option<Vec<TocEntry>>> {
     // Find NCX: either by spine toc attribute or by media-type
@@ -495,7 +538,7 @@ fn try_parse_ncx(
     else {
         return Ok(None);
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_epub_xml(&bytes, forced_encoding);
     Ok(Some(resolve_toc_entries(
         parse_ncx(&text),
         &ncx_path,

@@ -138,7 +138,7 @@ pub fn parse_fb2(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         .unwrap_or_else(|| detect_fb2_encoding(&raw_bytes));
     let encoding =
         encoding_rs::Encoding::for_label(encoding_name.as_bytes()).unwrap_or(encoding_rs::UTF_8);
-    let (xml_text, _) = encoding.decode_without_bom_handling(&raw_bytes);
+    let (xml_text, _) = encoding.decode_with_bom_removal(&raw_bytes);
     let xml_text = xml_text.into_owned();
 
     parse_fb2_xml(&xml_text, &raw_bytes, archive_binaries, archive_media_types)
@@ -1698,6 +1698,14 @@ fn detect_fb2_encoding(bytes: &[u8]) -> String {
     if bytes.starts_with(b"\xfe\xff") {
         return "utf-16be".to_string();
     }
+    // XML processors must recognize UTF-16 documents from the initial markup
+    // even when a producer omitted the optional BOM.
+    if bytes.starts_with(&[b'<', 0]) {
+        return "utf-16le".to_string();
+    }
+    if bytes.starts_with(&[0, b'<']) {
+        return "utf-16be".to_string();
+    }
     let snippet = &bytes[..bytes.len().min(200)];
     if let Some(pos) = snippet
         .windows(b"encoding=".len())
@@ -2103,6 +2111,53 @@ mod tests {
             let book = parse_fb2(&bytes, None).expect("parse declared legacy FB2");
             assert_eq!(book.title, title, "{label}");
         }
+    }
+
+    #[test]
+    fn decodes_utf16_fb2_with_or_without_bom_without_leaking_it_into_content() {
+        for (label, bom, encode_unit) in [
+            (
+                "UTF-16LE",
+                &[0xff, 0xfe][..],
+                u16::to_le_bytes as fn(u16) -> [u8; 2],
+            ),
+            (
+                "UTF-16BE",
+                &[0xfe, 0xff][..],
+                u16::to_be_bytes as fn(u16) -> [u8; 2],
+            ),
+        ] {
+            let xml = format!(
+                "<?xml version=\"1.0\" encoding=\"{label}\"?><FictionBook><description><title-info><book-title>Книга 漢字</book-title></title-info></description><body><section><p>Текст 漢字.</p></section></body></FictionBook>"
+            );
+            for with_bom in [true, false] {
+                let mut bytes = if with_bom { bom } else { &[] }.to_vec();
+                for unit in xml.encode_utf16() {
+                    bytes.extend_from_slice(&encode_unit(unit));
+                }
+
+                let book = parse_fb2(&bytes, None).expect("parse UTF-16 FB2");
+
+                assert_eq!(book.title, "Книга 漢字", "{label}, with_bom={with_bom}");
+                assert_eq!(
+                    book.chapters[0].blocks[0].text, "Текст 漢字.",
+                    "{label}, with_bom={with_bom}",
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn decodes_utf8_bom_fb2_without_leaking_the_bom_into_content() {
+        let mut bytes = b"\xef\xbb\xbf".to_vec();
+        bytes.extend_from_slice(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?><FictionBook><description><title-info><book-title>Книга</book-title></title-info></description><body><section><p>Текст.</p></section></body></FictionBook>".as_bytes(),
+        );
+
+        let book = parse_fb2(&bytes, None).expect("parse BOM-marked UTF-8 FB2");
+
+        assert_eq!(book.title, "Книга");
+        assert_eq!(book.chapters[0].blocks[0].text, "Текст.");
     }
 
     #[test]

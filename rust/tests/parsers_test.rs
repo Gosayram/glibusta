@@ -560,6 +560,12 @@ fn create_epub_with_opf_and_chapter(include_mimetype: bool, opf: &[u8], chapter:
     )
 }
 
+fn utf16be_xml(xml: &str) -> Vec<u8> {
+    let mut bytes = vec![0xFE, 0xFF];
+    bytes.extend(xml.encode_utf16().flat_map(u16::to_be_bytes));
+    bytes
+}
+
 fn create_epub_with_named_container_entries(
     mimetype_entry: Option<&str>,
     container_entry: &str,
@@ -629,6 +635,102 @@ fn test_epub_basic_parse() {
     assert!(!book.chapters.is_empty(), "should have chapters");
     assert_eq!(book.chapters[0].blocks.len(), 2);
     assert_eq!(book.book_format, BookFormat::Epub);
+}
+
+#[test]
+fn test_epub_auto_decodes_utf16be_opf_and_xhtml() {
+    let opf = utf16be_xml(
+        r#"<?xml version="1.0" encoding="UTF-16"?>
+<package><metadata><title>UTF-16 package</title><creator>Test Author</creator></metadata>
+<manifest><item id="chapter" href="chapter1.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="chapter"/></spine></package>"#,
+    );
+    let chapter = utf16be_xml(
+        r#"<?xml version="1.0" encoding="UTF-16"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body><p>UTF-16 chapter text.</p></body></html>"#,
+    );
+
+    let book = glibusta_core::book::epub::parse_epub(
+        &create_epub_with_opf_and_chapter(true, &opf, &chapter),
+        None,
+    )
+    .expect("UTF-16BE EPUB XML resources must parse without a forced encoding");
+
+    assert_eq!(book.title, "UTF-16 package");
+    assert_eq!(book.chapters[0].blocks[0].text, "UTF-16 chapter text.");
+}
+
+#[test]
+fn test_epub_ignores_utf8_bom_in_content_document() {
+    let mut chapter = b"\xEF\xBB\xBF".to_vec();
+    chapter.extend_from_slice(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?><html><body><p>BOM-safe text.</p></body></html>");
+
+    let book = glibusta_core::book::epub::parse_epub(
+        &create_epub_with_opf_and_chapter(true, MINIMAL_EPUB_OPF, &chapter),
+        None,
+    )
+    .expect("UTF-8 BOM content document must parse");
+
+    assert_eq!(book.chapters[0].blocks[0].text, "BOM-safe text.");
+}
+
+#[test]
+fn test_epub_preserves_numeric_entities_and_unicode_scalars() {
+    let chapter = b"<html><body><p>&#x0100; and \xC4\x80.</p></body></html>";
+    let book = glibusta_core::book::epub::parse_epub(
+        &create_epub_with_opf_and_chapter(true, MINIMAL_EPUB_OPF, chapter),
+        None,
+    )
+    .expect("numeric entities and UTF-8 scalars must parse together");
+
+    assert_eq!(book.chapters[0].blocks[0].text, "\u{0100} and \u{0100}.");
+}
+
+#[test]
+fn test_epub_honors_iso_8859_1_xml_declaration() {
+    let chapter_xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><html><body><p>Caf\u{e9}.</p></body></html>";
+    let (chapter, _, _) = encoding_rs::WINDOWS_1252.encode(chapter_xml);
+
+    let book = glibusta_core::book::epub::parse_epub(
+        &create_epub_with_opf_and_chapter(true, MINIMAL_EPUB_OPF, &chapter),
+        None,
+    )
+    .expect("ISO-8859-1 EPUB XML declaration must be honored");
+
+    assert_eq!(book.chapters[0].blocks[0].text, "Caf\u{e9}.");
+}
+
+#[test]
+fn test_epub_decodes_mixed_xml_resource_encodings() {
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut zip = zip::ZipWriter::new(&mut bytes);
+    let options =
+        zip::write::FileOptions::<()>::default().compression_method(zip::CompressionMethod::Stored);
+    zip.start_file("mimetype", options).unwrap();
+    zip.write_all(b"application/epub+zip").unwrap();
+    zip.start_file("META-INF/container.xml", options).unwrap();
+    zip.write_all(
+        br#"<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>"#,
+    )
+    .unwrap();
+    zip.start_file("content.opf", options).unwrap();
+    zip.write_all(MINIMAL_EPUB_OPF).unwrap();
+    zip.start_file("chapter1.xhtml", options).unwrap();
+    zip.write_all(b"<html><body><p>Body text.</p></body></html>")
+        .unwrap();
+    let ncx = "<?xml version=\"1.0\" encoding=\"windows-1251\"?><ncx><navMap><navPoint><navLabel><text>\u{0413}\u{043b}\u{0430}\u{0432}\u{0430}</text></navLabel><content src=\"chapter1.xhtml\"/></navPoint></navMap></ncx>";
+    let (ncx, _, _) = encoding_rs::WINDOWS_1251.encode(ncx);
+    zip.start_file("toc.ncx", options).unwrap();
+    zip.write_all(&ncx).unwrap();
+    zip.finish().unwrap();
+
+    let book = glibusta_core::book::epub::parse_epub(&bytes.into_inner(), None)
+        .expect("each EPUB XML resource must use its own declared encoding");
+
+    assert_eq!(
+        book.toc[0].title,
+        "\u{0413}\u{043b}\u{0430}\u{0432}\u{0430}"
+    );
 }
 
 #[test]

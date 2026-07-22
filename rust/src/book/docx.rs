@@ -2,7 +2,7 @@ use crate::api::models::{
     BlockType, BookFormat, EmbeddedImage, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan,
 };
 use crate::book::archive::{self, ZipFile};
-use crate::book::encoding::decode_bytes;
+use crate::book::encoding::{decode_bytes, detect_encoding};
 use anyhow::{Context, Result};
 use quick_xml::Reader;
 use quick_xml::events::{BytesStart, Event};
@@ -26,20 +26,18 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         );
     }
 
-    let encoding_name = forced_encoding.unwrap_or("utf-8");
-
-    let (title, authors, created_date) = parse_core_properties(&mut zip, encoding_name)?;
+    let (title, authors, created_date) = parse_core_properties(&mut zip, forced_encoding)?;
 
     let document_xml = zip
         .read_file_limited("word/document.xml", crate::api::models::MAX_CHAPTER_SIZE)?
         .context("DOCX missing word/document.xml")?;
-    let doc_text = decode_bytes(&document_xml, encoding_name);
+    let doc_text = decode_docx_xml(&document_xml, forced_encoding);
 
-    let hyperlink_targets = parse_hyperlink_relationships(&mut zip, encoding_name)?;
-    let image_targets = parse_image_relationships(&mut zip, encoding_name)?;
-    let mut footnotes = parse_footnotes(&mut zip, encoding_name)?;
-    footnotes.extend(parse_endnotes(&mut zip, encoding_name)?);
-    let numbering_styles = parse_numbering_styles(&mut zip, encoding_name)?;
+    let hyperlink_targets = parse_hyperlink_relationships(&mut zip, forced_encoding)?;
+    let image_targets = parse_image_relationships(&mut zip, forced_encoding)?;
+    let mut footnotes = parse_footnotes(&mut zip, forced_encoding)?;
+    footnotes.extend(parse_endnotes(&mut zip, forced_encoding)?);
+    let numbering_styles = parse_numbering_styles(&mut zip, forced_encoding)?;
     let (blocks, chapter_title) = parse_document_xml_with_hyperlinks(
         &doc_text,
         &hyperlink_targets,
@@ -111,6 +109,16 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     })
 }
 
+/// DOCX XML parts are normally UTF-8, but OPC/XML also permits UTF-16 parts.
+/// An explicit user choice remains authoritative; otherwise detect the BOM (and
+/// retain the existing charset fallback) for every XML part independently.
+fn decode_docx_xml(bytes: &[u8], forced_encoding: Option<&str>) -> String {
+    decode_bytes(
+        bytes,
+        forced_encoding.unwrap_or_else(|| detect_encoding(bytes)),
+    )
+}
+
 #[derive(Deserialize)]
 struct CoreProps {
     #[serde(rename = "title", default)]
@@ -123,12 +131,12 @@ struct CoreProps {
 
 fn parse_core_properties(
     zip: &mut ZipFile<'_>,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
 ) -> Result<(String, Vec<String>, String)> {
     let props_bytes = zip
         .read_file_limited("docProps/core.xml", crate::api::models::MAX_CHAPTER_SIZE)?
         .context("DOCX missing docProps/core.xml")?;
-    let props_text = decode_bytes(&props_bytes, encoding_name);
+    let props_text = decode_docx_xml(&props_bytes, forced_encoding);
 
     let core: CoreProps =
         quick_xml::de::from_str(&props_text).context("Failed to parse core.xml")?;
@@ -147,7 +155,7 @@ fn parse_core_properties(
 
 fn parse_hyperlink_relationships(
     zip: &mut ZipFile<'_>,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let Some(bytes) = zip.read_file_limited(
         "word/_rels/document.xml.rels",
@@ -156,7 +164,7 @@ fn parse_hyperlink_relationships(
     else {
         return Ok(HashMap::new());
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_docx_xml(&bytes, forced_encoding);
     let mut reader = Reader::from_str(&text);
     let mut targets = HashMap::new();
 
@@ -187,7 +195,7 @@ fn parse_hyperlink_relationships(
 
 fn parse_image_relationships(
     zip: &mut ZipFile<'_>,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
 ) -> Result<HashMap<String, String>> {
     let Some(bytes) = zip.read_file_limited(
         "word/_rels/document.xml.rels",
@@ -196,7 +204,7 @@ fn parse_image_relationships(
     else {
         return Ok(HashMap::new());
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_docx_xml(&bytes, forced_encoding);
     let mut reader = Reader::from_str(&text);
     let mut targets = HashMap::new();
 
@@ -246,13 +254,19 @@ fn document_relative_path(target: &str) -> Option<String> {
     (!components.is_empty()).then(|| components.join("/"))
 }
 
-fn parse_footnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
-    parse_notes(zip, encoding_name, "word/footnotes.xml", b"footnote")
+fn parse_footnotes(
+    zip: &mut ZipFile<'_>,
+    forced_encoding: Option<&str>,
+) -> Result<HashMap<String, String>> {
+    parse_notes(zip, forced_encoding, "word/footnotes.xml", b"footnote")
 }
 
-fn parse_endnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<String, String>> {
+fn parse_endnotes(
+    zip: &mut ZipFile<'_>,
+    forced_encoding: Option<&str>,
+) -> Result<HashMap<String, String>> {
     Ok(
-        parse_notes(zip, encoding_name, "word/endnotes.xml", b"endnote")?
+        parse_notes(zip, forced_encoding, "word/endnotes.xml", b"endnote")?
             .into_iter()
             .map(|(id, text)| (format!("endnote:{id}"), text))
             .collect(),
@@ -261,7 +275,7 @@ fn parse_endnotes(zip: &mut ZipFile<'_>, encoding_name: &str) -> Result<HashMap<
 
 fn parse_notes(
     zip: &mut ZipFile<'_>,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
     entry_name: &str,
     note_element: &[u8],
 ) -> Result<HashMap<String, String>> {
@@ -269,7 +283,7 @@ fn parse_notes(
     else {
         return Ok(HashMap::new());
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_docx_xml(&bytes, forced_encoding);
     let mut reader = Reader::from_str(&text);
     reader.config_mut().trim_text(false);
     let mut footnotes = HashMap::new();
@@ -322,14 +336,14 @@ fn parse_notes(
 /// paragraphs that reference it.
 fn parse_numbering_styles(
     zip: &mut ZipFile<'_>,
-    encoding_name: &str,
+    forced_encoding: Option<&str>,
 ) -> Result<HashMap<ListNumberingKey, bool>> {
     let Some(bytes) =
         zip.read_file_limited("word/numbering.xml", crate::api::models::MAX_CHAPTER_SIZE)?
     else {
         return Ok(HashMap::new());
     };
-    let text = decode_bytes(&bytes, encoding_name);
+    let text = decode_docx_xml(&bytes, forced_encoding);
 
     let mut reader = Reader::from_str(&text);
     let mut abstract_levels = HashMap::<ListNumberingKey, bool>::new();
@@ -1009,6 +1023,14 @@ mod tests {
     use std::collections::HashMap;
     use std::io::{Cursor, Write};
 
+    fn utf16le_xml(xml: &str) -> Vec<u8> {
+        let mut bytes = vec![0xFF, 0xFE];
+        for unit in xml.encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        bytes
+    }
+
     fn malformed_docx() -> Vec<u8> {
         let mut bytes = Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(&mut bytes);
@@ -1036,6 +1058,40 @@ mod tests {
             .expect_err("malformed document XML must not produce a partial book");
 
         assert!(error.to_string().contains("DOCX XML parse error"));
+    }
+
+    #[test]
+    fn auto_detects_utf16le_docx_xml_parts() {
+        let mut bytes = Cursor::new(Vec::new());
+        let mut zip = zip::ZipWriter::new(&mut bytes);
+        let options = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("docProps/core.xml", options)
+            .expect("start core properties");
+        zip.write_all(&utf16le_xml(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+            <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                xmlns:dc="http://purl.org/dc/elements/1.1/">
+              <dc:title>UTF-16 title</dc:title><dc:creator>Автор</dc:creator>
+            </cp:coreProperties>"#,
+        ))
+        .expect("write UTF-16 core properties");
+        zip.start_file("word/document.xml", options)
+            .expect("start document XML");
+        zip.write_all(&utf16le_xml(
+            r#"<?xml version="1.0" encoding="UTF-16"?>
+            <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+              <w:body><w:p><w:r><w:t>Привет, UTF-16 DOCX.</w:t></w:r></w:p></w:body>
+            </w:document>"#,
+        ))
+        .expect("write UTF-16 document XML");
+        zip.finish().expect("finish DOCX archive");
+
+        let book = parse_docx(&bytes.into_inner(), None).expect("parse UTF-16 DOCX");
+
+        assert_eq!(book.title, "UTF-16 title");
+        assert_eq!(book.authors, ["Автор"]);
+        assert_eq!(book.chapters[0].blocks[0].text, "Привет, UTF-16 DOCX.");
     }
 
     #[test]
