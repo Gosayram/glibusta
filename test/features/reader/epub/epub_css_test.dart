@@ -230,6 +230,38 @@ void main() {
     }
   });
 
+  test('does not materialize a non-image manifest resource from an img element', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_non_image_asset_test_');
+    try {
+      final parser = EpubHtmlParser(
+        resolver: EpubResourceResolver({
+          'chapter': const EpubResource(
+            id: 'chapter',
+            href: 'chapter.xhtml',
+            fullPath: 'OEBPS/chapter.xhtml',
+            mediaType: 'application/xhtml+xml',
+            properties: {},
+            type: EpubResourceType.xhtml,
+          ),
+        }),
+        imageStore: EpubImageStore(temporaryDirectory),
+        epub: EpubArchive(
+          Archive()..addFile(ArchiveFile.string('OEBPS/chapter.xhtml', '<html/>')),
+        ),
+      );
+
+      final parsed = await parser.parseChapter(
+        chapterPath: 'OEBPS/chapter.xhtml',
+        htmlText: '<html><body><img src="chapter.xhtml"/></body></html>',
+      );
+
+      expect(parsed.blocks.whereType<ImageBlock>(), isEmpty);
+      expect(await temporaryDirectory.list().isEmpty, isTrue);
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('keeps tables and absolute-positioned text in the reflow block stream', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_reflow_table_test_');
     try {

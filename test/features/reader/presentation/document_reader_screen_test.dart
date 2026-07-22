@@ -58,6 +58,58 @@ void main() {
     expect(find.text('Файл не найден'), findsOneWidget);
   });
 
+  testWidgets('DjVu reader ignores a stale page-render failure after a newer page wins', (
+    tester,
+  ) async {
+    final file = File(
+      '${Directory.systemTemp.path}/glibusta-djvu-${DateTime.now().microsecondsSinceEpoch}.djvu',
+    );
+    await file.writeAsBytes([0]);
+    addTearDown(file.delete);
+
+    final secondPage = Completer<Uint8List>();
+    final returnToFirstPage = Completer<Uint8List>();
+    var firstPageLoads = 0;
+
+    Future<Uint8List> loadThumbnail({
+      required String path,
+      required int pageIndex,
+      required int maxWidth,
+    }) {
+      expect(path, file.path);
+      expect(maxWidth, 1080);
+      if (pageIndex == 1) return secondPage.future;
+      firstPageLoads++;
+      return firstPageLoads == 1
+          ? Future<Uint8List>.value(_transparentPng)
+          : returnToFirstPage.future;
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DjvuReaderScreen(
+          filePath: file.path,
+          pageCountLoader: (_) async => 2,
+          thumbnailLoader: loadThumbnail,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await tester.pump();
+    await tester.tap(find.byIcon(Icons.chevron_left));
+    await tester.pump();
+
+    returnToFirstPage.complete(_transparentPng);
+    await tester.pump();
+    secondPage.completeError(StateError('stale page failed'));
+    await tester.pump();
+
+    expect(find.text('stale page failed'), findsNothing);
+    expect(find.text('1 / 2'), findsWidgets);
+  });
+
   group('PDF link safety', () {
     test('allows only an in-document destination within the page range', () {
       const destination = PdfDest(2, PdfDestCommand.fit, null);
@@ -130,6 +182,13 @@ void main() {
     });
   });
 }
+
+final Uint8List _transparentPng = Uint8List.fromList(<int>[
+  137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+  8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 13, 73, 68, 65, 84, 8, 215, 99, 248, 255, 255,
+  255, 127, 0, 9, 251, 3, 253, 42, 134, 225, 56, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96,
+  130,
+]);
 
 Uint8List _imageOnlyPdfBytes() {
   final objects = <List<int>>[

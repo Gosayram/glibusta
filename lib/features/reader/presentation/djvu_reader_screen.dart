@@ -6,10 +6,27 @@ import 'package:flutter/material.dart';
 
 import '../../../src/rust/api/api/api.dart' as rust_api;
 
+/// Loads the number of pages in a DjVu document.
+typedef DjvuPageCountLoader = Future<int> Function(String path);
+
+/// Renders one DjVu page to a bounded PNG thumbnail.
+typedef DjvuThumbnailLoader = Future<Uint8List> Function({
+  required String path,
+  required int pageIndex,
+  required int maxWidth,
+});
+
 class DjvuReaderScreen extends StatefulWidget {
-  const DjvuReaderScreen({super.key, required this.filePath});
+  const DjvuReaderScreen({
+    super.key,
+    required this.filePath,
+    this.pageCountLoader = _defaultPageCountLoader,
+    this.thumbnailLoader = _defaultThumbnailLoader,
+  });
 
   final String filePath;
+  final DjvuPageCountLoader pageCountLoader;
+  final DjvuThumbnailLoader thumbnailLoader;
 
   @override
   State<DjvuReaderScreen> createState() => _DjvuReaderScreenState();
@@ -21,6 +38,8 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
   Uint8List? _currentImage;
   bool _loading = true;
   String? _error;
+  int _documentRequest = 0;
+  int _pageRequest = 0;
 
   @override
   void initState() {
@@ -28,9 +47,28 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
     unawaited(_loadDocument());
   }
 
+  @override
+  void didUpdateWidget(covariant DjvuReaderScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.filePath == widget.filePath) return;
+
+    _documentRequest++;
+    _pageRequest++;
+    setState(() {
+      _totalPages = 0;
+      _currentPage = 1;
+      _currentImage = null;
+      _loading = true;
+      _error = null;
+    });
+    unawaited(_loadDocument());
+  }
+
   Future<void> _loadDocument() async {
+    final documentRequest = ++_documentRequest;
     final file = File(widget.filePath);
     if (!file.existsSync()) {
+      if (!mounted || documentRequest != _documentRequest) return;
       setState(() {
         _error = 'Файл не найден';
         _loading = false;
@@ -38,12 +76,19 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
       return;
     }
     try {
-      final count = await rust_api.djvuPageCount(path: widget.filePath);
-      if (!mounted) return;
+      final count = await widget.pageCountLoader(widget.filePath);
+      if (!mounted || documentRequest != _documentRequest) return;
+      if (count <= 0) {
+        setState(() {
+          _error = 'В документе нет страниц';
+          _loading = false;
+        });
+        return;
+      }
       setState(() => _totalPages = count);
-      await _renderPage(_currentPage);
+      await _renderPage(_currentPage, documentRequest);
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!mounted || documentRequest != _documentRequest) return;
       setState(() {
         _error = '$e';
         _loading = false;
@@ -51,22 +96,32 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
     }
   }
 
-  Future<void> _renderPage(int pageNum) async {
+  Future<void> _renderPage(int pageNum, [int? documentRequest]) async {
+    final expectedDocumentRequest = documentRequest ?? _documentRequest;
+    final pageRequest = ++_pageRequest;
     setState(() => _loading = true);
     try {
-      final png = await rust_api.renderDjvuThumbnail(
+      final png = await widget.thumbnailLoader(
         path: widget.filePath,
-        pageIndex: BigInt.from(pageNum - 1),
-        maxWidth: BigInt.from(1080),
+        pageIndex: pageNum - 1,
+        maxWidth: 1080,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          expectedDocumentRequest != _documentRequest ||
+          pageRequest != _pageRequest) {
+        return;
+      }
       setState(() {
         _currentImage = png;
         _loading = false;
         _error = null;
       });
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!mounted ||
+          expectedDocumentRequest != _documentRequest ||
+          pageRequest != _pageRequest) {
+        return;
+      }
       setState(() {
         _error = '$e';
         _loading = false;
@@ -153,4 +208,20 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
       ],
     );
   }
+}
+
+Future<int> _defaultPageCountLoader(String path) async {
+  return rust_api.djvuPageCount(path: path);
+}
+
+Future<Uint8List> _defaultThumbnailLoader({
+  required String path,
+  required int pageIndex,
+  required int maxWidth,
+}) async {
+  return rust_api.renderDjvuThumbnail(
+    path: path,
+    pageIndex: BigInt.from(pageIndex),
+    maxWidth: BigInt.from(maxWidth),
+  );
 }

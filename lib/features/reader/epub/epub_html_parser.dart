@@ -494,7 +494,7 @@ final class EpubHtmlParser {
     final src = el.getAttribute('src');
     if (src == null || src.isEmpty) return null;
     final resource = resolver.resolveFromHref(chapterPath: chapterPath, href: src);
-    if (resource == null) return null;
+    if (resource == null || !isSupportedImage(resource.mediaType)) return null;
     final localPath = await imageStore.saveImage(epub: epub, resource: resource);
     return ImageBlock(
       resourceId: resource.id,

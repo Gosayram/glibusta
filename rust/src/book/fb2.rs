@@ -199,6 +199,7 @@ fn parse_fb2_xml(
 
     // CRT-1.13: FB2 footnotes parsing
     let mut in_notes_body = false;
+    let mut note_section_depth = 0_usize;
     let mut current_note_id: Option<String> = None;
     let mut current_note_text = String::new();
     let mut footnotes: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -350,8 +351,11 @@ fn parse_fb2_xml(
                     }
                     b"section" if in_body => {
                         if in_notes_body {
-                            current_note_id = get_xml_attr(e, b"id");
-                            current_note_text.clear();
+                            if note_section_depth == 0 {
+                                current_note_id = get_xml_attr(e, b"id");
+                                current_note_text.clear();
+                            }
+                            note_section_depth = note_section_depth.saturating_add(1);
                         } else {
                             if language.is_none() {
                                 language = get_xml_attr(e, b"xml:lang");
@@ -854,6 +858,7 @@ fn parse_fb2_xml(
                     b"body" => {
                         in_body = false;
                         in_notes_body = false;
+                        note_section_depth = 0;
                     }
                     b"td" | b"th" if in_table_cell => {
                         current_table_row.push(
@@ -899,14 +904,17 @@ fn parse_fb2_xml(
                     }
                     b"section" => {
                         if in_notes_body {
-                            if let Some(ref id) = current_note_id {
-                                let text = current_note_text.trim().to_string();
-                                if !text.is_empty() {
-                                    footnotes.insert(id.clone(), text);
+                            note_section_depth = note_section_depth.saturating_sub(1);
+                            if note_section_depth == 0 {
+                                if let Some(ref id) = current_note_id {
+                                    let text = current_note_text.trim().to_string();
+                                    if !text.is_empty() {
+                                        footnotes.insert(id.clone(), text);
+                                    }
                                 }
+                                current_note_id = None;
+                                current_note_text.clear();
                             }
-                            current_note_id = None;
-                            current_note_text.clear();
                         } else {
                             section_structure.pop();
                             if section_depth > 0 {
@@ -919,6 +927,12 @@ fn parse_fb2_xml(
                                 }
                             }
                         }
+                    }
+                    b"p" if in_body && in_notes_body => {
+                        if !current_note_text.is_empty() && !current_note_text.ends_with('\n') {
+                            current_note_text.push('\n');
+                        }
+                        in_p = false;
                     }
                     b"p" if in_body => {
                         if !current_span_text.trim().is_empty() {
@@ -2439,6 +2453,28 @@ mod tests {
                 .as_ref()
                 .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
             Some("First line\nSecond line")
+        );
+    }
+
+    #[test]
+    fn preserves_paragraph_and_nested_section_boundaries_inside_footnotes() {
+        let book = parse_fb2(
+            br#"<FictionBook><description/><body><section><p>Text</p></section></body>
+                <body name="notes"><section id="n1">
+                  <p>First paragraph.</p>
+                  <section><p>Nested section.</p></section>
+                  <p>Last paragraph.</p>
+                </section></body>
+            </FictionBook>"#,
+            Some("utf-8"),
+        )
+        .expect("parse FB2 note with nested sections");
+
+        assert_eq!(
+            book.metadata
+                .as_ref()
+                .and_then(|metadata| metadata["footnotes"]["n1"].as_str()),
+            Some("First paragraph.\nNested section.\nLast paragraph.")
         );
     }
 
