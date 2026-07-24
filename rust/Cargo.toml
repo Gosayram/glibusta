@@ -14,7 +14,7 @@ pdf = ["pdfium-render/image_latest", "image"]
 
 [dependencies]
 anyhow = "1"
-base64 = "0.22"
+base64 = "0.23"
 chardetng = "1.0"
 encoding_rs = "0.8"
 flutter_rust_bridge = "=2.12.0"
