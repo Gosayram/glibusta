@@ -120,16 +120,13 @@ class _HighlightBlockPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (textPainter.size == Size.zero) return;
 
-    final lineMetrics = textPainter.computeLineMetrics();
-    if (lineMetrics.isEmpty) return;
-
     for (final h in highlights) {
       final color = colorMap[h.color] ?? colorMap['yellow']!;
       final paint = Paint()
         ..color = color
         ..style = PaintingStyle.fill;
 
-      final rects = _computeRects(h.startOffset, h.endOffset, lineMetrics);
+      final rects = _computeRects(h.startOffset, h.endOffset);
       for (final rect in rects) {
         canvas.drawRRect(
           RRect.fromRectAndRadius(rect, const Radius.circular(2)),
@@ -142,48 +139,41 @@ class _HighlightBlockPainter extends CustomPainter {
   List<Rect> _computeRects(
     int startOffset,
     int endOffset,
-    List<LineMetrics> lineMetrics,
   ) {
-    final rects = <Rect>[];
-    var currentOffset = 0;
-
-    for (final line in lineMetrics) {
-      final lineStart = currentOffset;
-      final lineEnd = currentOffset + line.width.ceil();
-
-      if (lineEnd > startOffset && lineStart < endOffset) {
-        final s = startOffset.clamp(lineStart, lineEnd);
-        final e = endOffset.clamp(lineStart, lineEnd);
-
-        final startX = textPainter.getOffsetForCaret(TextPosition(offset: s), Rect.zero).dx;
-        final endX = textPainter.getOffsetForCaret(TextPosition(offset: e), Rect.zero).dx;
-
-        var yOffset = 0.0;
-        for (final prev in lineMetrics) {
-          if (prev == line) break;
-          yOffset += prev.height;
-        }
-
-        // ponytail: 2px vertical padding on highlights, no config needed yet
-        const padding = 2.0;
-        rects.add(
-          Rect.fromLTWH(
-            startX - 2,
-            yOffset + padding,
-            (endX - startX) + 4,
-            (line.height - padding * 2).clamp(2.0, line.height),
-          ),
-        );
-      }
-
-      currentOffset = lineEnd;
-    }
-
-    return rects;
+    return highlightRectsForSelection(textPainter, startOffset, endOffset);
   }
 
   @override
   bool shouldRepaint(covariant _HighlightBlockPainter oldDelegate) {
     return highlights != oldDelegate.highlights || textPainter != oldDelegate.textPainter;
   }
+}
+
+/// Returns paint bounds for a UTF-16 selection using the laid-out text geometry.
+@visibleForTesting
+List<Rect> highlightRectsForSelection(
+  TextPainter textPainter,
+  int startOffset,
+  int endOffset,
+) {
+  final start = startOffset.clamp(0, textPainter.plainText.length);
+  final end = endOffset.clamp(start, textPainter.plainText.length);
+  if (start == end) return const [];
+
+  // TextPainter owns the visual line breaks and bidirectional caret geometry.
+  // Estimating offsets from LineMetrics.width mixes pixels with UTF-16 offsets,
+  // which placed later wrapped highlights on the first line.
+  return textPainter
+      .getBoxesForSelection(TextSelection(baseOffset: start, extentOffset: end))
+      .map((box) {
+        const verticalPadding = 2.0;
+        final rect = box.toRect();
+        return Rect.fromLTWH(
+          rect.left - 2,
+          rect.top + verticalPadding,
+          rect.width + 4,
+          (rect.height - verticalPadding * 2).clamp(2.0, rect.height),
+        );
+      })
+      .toList(growable: false);
 }

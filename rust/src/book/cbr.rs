@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::io::Read;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
@@ -6,6 +7,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use sha2::{Digest, Sha256};
 use unrar_ng::Archive;
 use unrar_ng::error::{Code as UnrarErrorCode, UnrarError, When as UnrarErrorWhen};
 
@@ -27,6 +29,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             MAX_FILE_SIZE / 1024 / 1024
         );
     }
+    let id = cbr_content_id(path)?;
 
     let mut archive = Archive::new(path).open_for_processing().map_err(|error| {
         cbr_unrar_error(
@@ -166,7 +169,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
     let comic_metadata = comic_info.as_ref().and_then(ComicInfo::metadata);
 
     Ok(NormalizedBook {
-        id: crate::book::sha256_hex(path.as_os_str().as_encoded_bytes()),
+        id,
         title,
         authors,
         description: None,
@@ -183,6 +186,29 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
         images: Vec::new(),
         toc: Vec::new(),
     })
+}
+
+/// Hash the archive contents without materializing the complete CBR in memory.
+///
+/// Unlike the other parsers this path is handed directly to UnRAR, so its stable
+/// book ID must be derived from the file rather than from the filesystem path.
+fn cbr_content_id(path: &Path) -> Result<String> {
+    let mut file = std::fs::File::open(path)
+        .with_context(|| format!("Failed to open CBR for hashing: {}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .with_context(|| format!("Failed to read CBR for hashing: {}", path.display()))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn cbr_unrar_error(context: impl Into<String>, error: UnrarError) -> anyhow::Error {
@@ -375,8 +401,8 @@ fn trim_leading_zeroes(number: &[u8]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::{
-        cbr_unrar_error, first_image_cover, image_media_type, natural_cmp, parse_cbr_path,
-        parse_comic_info,
+        cbr_content_id, cbr_unrar_error, first_image_cover, image_media_type, natural_cmp,
+        parse_cbr_path, parse_comic_info,
     };
     use crate::api::models::{BlockType, ReaderBlock};
     use std::cmp::Ordering;
@@ -411,6 +437,27 @@ mod tests {
             natural_cmp("pages/001.jpg", "pages/1.jpg"),
             Ordering::Greater
         );
+    }
+
+    #[test]
+    fn derives_cbr_id_from_contents_instead_of_its_path() {
+        let directory =
+            std::env::temp_dir().join(format!("glibusta-cbr-id-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).expect("create CBR id test directory");
+        let first = directory.join("first.cbr");
+        let second = directory.join("second.cbr");
+        std::fs::write(&first, b"same archive contents").expect("write first CBR");
+        std::fs::write(&second, b"same archive contents").expect("write second CBR");
+
+        let first_id = cbr_content_id(&first).expect("hash first CBR");
+        let second_id = cbr_content_id(&second).expect("hash second CBR");
+        std::fs::write(&second, b"replaced archive contents").expect("replace second CBR");
+        let replaced_id = cbr_content_id(&second).expect("hash replaced CBR");
+        let _ = std::fs::remove_dir_all(directory);
+
+        assert_eq!(first_id, second_id);
+        assert_ne!(first_id, replaced_id);
+        assert_eq!(first_id.len(), 64);
     }
 
     #[test]
