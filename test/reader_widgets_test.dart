@@ -1335,6 +1335,55 @@ void main() {
     expect(linkSpan.style!.color, const Color(0xFF64B5F6));
   });
 
+  testWidgets('focus mode restores and reports its paragraph position', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final reportedPositions = <(int, int)>[];
+
+    await tester.pumpWidget(
+      wrapInApp(
+        SizedBox(
+          width: 320,
+          height: 400,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'focus-position',
+              title: 'Focus position',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: const {
+              0: ReaderChapter(
+                index: 0,
+                title: 'Chapter',
+                blocks: [
+                  ReaderBlock(index: 0, text: 'First paragraph'),
+                  ReaderBlock(index: 1, text: 'Second paragraph'),
+                ],
+              ),
+            },
+            settings: const ReaderSettings(mode: ReaderMode.focus),
+            scrollController: scrollController,
+            initialParagraph: 1,
+            onTap: _ignoreTap,
+            onFocusPositionChanged: (chapter, paragraph) {
+              reportedPositions.add((chapter, paragraph));
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Second paragraph'), findsOneWidget);
+
+    await tester.fling(find.byType(PageView), const Offset(0, 300), 1000);
+    await tester.pumpAndSettle();
+
+    expect(reportedPositions, contains((0, 0)));
+  });
+
   testWidgets('keeps a wide EPUB table horizontally reachable', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

@@ -443,6 +443,31 @@ final class ReaderController {
     });
   }
 
+  /// Records the precise block shown by focus mode so reopening and switching
+  /// layouts preserve the paragraph the reader was on.
+  void handleFocusPositionChanged(int chapterIndex, int paragraphIndex) {
+    if (_disposed || _state.chapterCount == 0) return;
+    final clampedChapter = chapterIndex.clamp(0, _state.chapterCount - 1);
+    final clampedParagraph = paragraphIndex < 0 ? 0 : paragraphIndex;
+    if (clampedChapter == _state.currentPosition.chapterIndex &&
+        clampedParagraph == _state.currentPosition.paragraphIndex) {
+      return;
+    }
+    _updateState(
+      _state.copyWith(
+        currentPosition: _state.currentPosition.copyWith(
+          chapterIndex: clampedChapter,
+          paragraphIndex: clampedParagraph,
+        ),
+      ),
+    );
+    _chapterLoadDebouncer.call(() {
+      if (_disposed) return;
+      unawaited(_ensureChaptersLoaded(clampedChapter));
+      _evictDistantChapters(clampedChapter);
+    });
+  }
+
   Future<void> _ensureChaptersLoaded(int centerIndex) async {
     final generation = ++_chapterLoadGeneration;
     if (_loaded && !_state.isLoading) {

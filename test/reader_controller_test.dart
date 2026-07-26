@@ -345,6 +345,18 @@ void main() {
       ctrl.dispose();
     });
 
+    testWidgets('focus page changes preserve the shown paragraph', (tester) async {
+      final service = _LongBookOpenService(db);
+      final ctrl = await createController(tester, 'long-book', bookOpenService: service);
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handleFocusPositionChanged(50, 3);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.currentPosition.paragraphIndex, 3);
+      ctrl.dispose();
+    });
+
     testWidgets('onBottomSheetOpen/close toggles isBottomSheetOpen', (tester) async {
       final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.isBottomSheetOpen, isFalse);

@@ -1245,6 +1245,7 @@ class ReaderContentBody extends StatefulWidget {
     this.customColors,
     this.onLinkTap,
     this.onPageChanged,
+    this.onFocusPositionChanged,
   });
 
   final NormalizedBookMetadata metadata;
@@ -1261,6 +1262,7 @@ class ReaderContentBody extends StatefulWidget {
   final ReaderColors? customColors;
   final ValueChanged<String>? onLinkTap;
   final ValueChanged<int>? onPageChanged;
+  final void Function(int chapterIndex, int paragraphIndex)? onFocusPositionChanged;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -1322,12 +1324,14 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         loadedChapters: widget.loadedChapters,
         settings: settings,
         initialChapterIndex: widget.initialPage,
+        initialParagraphIndex: widget.initialParagraph,
         highlightQuery: widget.highlightQuery,
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
         customColors: widget.customColors,
         onLinkTap: widget.onLinkTap,
         onPageChanged: widget.onPageChanged,
+        onFocusPositionChanged: widget.onFocusPositionChanged,
       );
     }
 
@@ -1599,25 +1603,28 @@ class _FocusModeBody extends StatelessWidget {
     required this.loadedChapters,
     required this.settings,
     required this.initialChapterIndex,
+    required this.initialParagraphIndex,
     this.highlightQuery,
     this.chapterHighlights,
     this.blockTransformers,
     this.customColors,
     this.onLinkTap,
     this.onPageChanged,
+    this.onFocusPositionChanged,
   });
 
   final NormalizedBookMetadata metadata;
   final Map<int, ReaderChapter> loadedChapters;
   final ReaderSettings settings;
   final int initialChapterIndex;
-  static const int initialParagraphIndex = 0;
+  final int initialParagraphIndex;
   final String? highlightQuery;
   final Map<int, List<TextHighlight>>? chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
   final ReaderColors? customColors;
   final ValueChanged<String>? onLinkTap;
   final ValueChanged<int>? onPageChanged;
+  final void Function(int chapterIndex, int paragraphIndex)? onFocusPositionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1641,7 +1648,9 @@ class _FocusModeBody extends StatelessWidget {
       itemCount: blocks.length,
       onPageChanged: (index) {
         if (index < blocks.length) {
-          onPageChanged?.call(blocks[index].chapterIndex);
+          final position = blocks[index];
+          onPageChanged?.call(position.chapterIndex);
+          onFocusPositionChanged?.call(position.chapterIndex, position.blockIndex);
         }
       },
       itemBuilder: (context, index) {
