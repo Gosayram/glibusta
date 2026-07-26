@@ -213,8 +213,45 @@ class ReaderChapter {
       }
       cleaned.add(block);
     }
-    return ReaderChapter(index: index, title: title, blocks: cleaned, smilEntries: smilEntries);
+    return ReaderChapter(
+      index: index,
+      title: _normalizedTitle(cleaned),
+      blocks: cleaned,
+      smilEntries: smilEntries,
+    );
   }
+
+  /// Repairs malformed source metadata that appends a chapter's first
+  /// paragraph to its heading. The rendered blocks remain the source of truth:
+  /// only discard the suffix when it demonstrably duplicates the paragraph
+  /// immediately following the first heading.
+  String _normalizedTitle(List<ReaderBlock> cleaned) {
+    final titleText = title.trim();
+    final headingIndex = cleaned.indexWhere((block) => block.type == BlockType.heading);
+    if (titleText.isEmpty || headingIndex < 0) return titleText;
+
+    final heading = cleaned[headingIndex].text.trim();
+    final paragraph = cleaned
+        .skip(headingIndex + 1)
+        .firstWhere(
+          (block) => block.type == BlockType.paragraph && block.text.trim().isNotEmpty,
+          orElse: () => const ReaderBlock(index: -1, text: ''),
+        );
+    final normalizedTitle = _collapseWhitespace(titleText);
+    final normalizedHeading = _collapseWhitespace(heading);
+    final normalizedParagraph = _collapseWhitespace(paragraph.text);
+    if (normalizedHeading.isEmpty || normalizedParagraph.isEmpty) return titleText;
+    if (!normalizedTitle.startsWith(normalizedHeading)) return titleText;
+
+    final suffix = normalizedTitle.substring(normalizedHeading.length).trimLeft();
+    final comparableSuffix = suffix.replaceFirst(RegExp(r'(?:\.\.\.|…)+$'), '').trimRight();
+    if (comparableSuffix.length < 24 || !normalizedParagraph.startsWith(comparableSuffix)) {
+      return titleText;
+    }
+    return heading;
+  }
+
+  static String _collapseWhitespace(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 class ReaderBlock {

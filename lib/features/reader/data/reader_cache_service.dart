@@ -42,7 +42,9 @@ final class ReaderCacheService {
   final Map<String, Map<String, String>> _chapterChecksumsByBook = {};
 
   static const int _splitCacheVersion = 2;
-  static const int _parserCacheVersion = 2;
+  // Chapter title normalization changed: invalidate stale metadata/TOC entries
+  // that may contain a chapter's first paragraph.
+  static const int _parserCacheVersion = 3;
   static int _temporaryFileSequence = 0;
 
   Future<String> get booksCacheDir async {

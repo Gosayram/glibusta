@@ -137,6 +137,43 @@ void main() {
       expect(restored.blocks.length, 1);
       expect(restored.blocks[0].type, BlockType.heading);
     });
+
+    test('removes a duplicated first paragraph from malformed chapter metadata', () {
+      const chapter = ReaderChapter(
+        index: 12,
+        title:
+            'Глава двенадцатая. Выбор пути '
+            'В крохотном окошке мастерской едва заметно посвет...',
+        blocks: [
+          ReaderBlock(
+            index: 0,
+            text: 'Глава двенадцатая. Выбор пути',
+            type: BlockType.heading,
+          ),
+          ReaderBlock(
+            index: 1,
+            text:
+                'В крохотном окошке мастерской едва заметно посветлело. '
+                'Было самое раннее утро.',
+          ),
+        ],
+      );
+
+      expect(chapter.withCleanedBlocks().title, 'Глава двенадцатая. Выбор пути');
+    });
+
+    test('keeps a title that does not duplicate the first paragraph', () {
+      const chapter = ReaderChapter(
+        index: 0,
+        title: 'Глава первая. Начало истории',
+        blocks: [
+          ReaderBlock(index: 0, text: 'Глава первая', type: BlockType.heading),
+          ReaderBlock(index: 1, text: 'Это самостоятельный первый абзац.'),
+        ],
+      );
+
+      expect(chapter.withCleanedBlocks().title, chapter.title);
+    });
   });
 
   group('ReaderBlock', () {
