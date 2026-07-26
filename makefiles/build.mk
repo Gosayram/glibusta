@@ -29,10 +29,14 @@ CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check
 ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
 ANDROID_NDK_TOOLCHAIN_BIN := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin
+ANDROID_NDK_SYSROOT_LIB := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib
 ANDROID_RUST_API_LEVEL ?= 21
 ANDROID_LINK_SHIMS := $(CURDIR)/rust/android-link-shims
 JNILIBS_DIR := android/app/src/main/jniLibs
 ANDROID_16K_RUSTFLAGS := -C link-arg=-Wl,-z,max-page-size=16384
+ANDROID_CXX_RUNTIME_RUSTFLAGS := -C link-arg=-lc++_shared
+ANDROID_ARM64_LIBCXX_SHARED := $(ANDROID_NDK_SYSROOT_LIB)/aarch64-linux-android/libc++_shared.so
+ANDROID_ARMV7_LIBCXX_SHARED := $(ANDROID_NDK_SYSROOT_LIB)/arm-linux-androideabi/libc++_shared.so
 ANDROID_16K_CHECK := $(PYTHON) scripts/check_android_16k.py
 # Android's bionic libc has no `lutimes`.  UnRAR only reaches this call while
 # restoring a symlink's metadata; CBR pages are read into memory instead.
@@ -55,13 +59,13 @@ rust-build-android: require-rust ## Build Rust native libraries for Android (arm
 	export PATH="$${HOME}/.cargo/bin:$${HOME}/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$${PATH}"; \
 	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a $(ANDROID_LINK_SHIMS); \
 	cd rust && \
-	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) $(ANDROID_CXX_RUNTIME_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
 	CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang" \
 	CC_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang" \
 	CXX_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang++" \
 	AR_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/llvm-ar" \
 	cargo build --target aarch64-linux-android --release && \
-	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) $(ANDROID_CXX_RUNTIME_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
 	CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang" \
 	CC_armv7_linux_androideabi="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang" \
 	CXX_armv7_linux_androideabi="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang++" \
@@ -69,6 +73,8 @@ rust-build-android: require-rust ## Build Rust native libraries for Android (arm
 	cargo build --target armv7-linux-androideabi --release
 	cp rust/target/aarch64-linux-android/release/libglibusta_core.so $(JNILIBS_DIR)/arm64-v8a/
 	cp rust/target/armv7-linux-androideabi/release/libglibusta_core.so $(JNILIBS_DIR)/armeabi-v7a/
+	cp $(ANDROID_ARM64_LIBCXX_SHARED) $(JNILIBS_DIR)/arm64-v8a/
+	cp $(ANDROID_ARMV7_LIBCXX_SHARED) $(JNILIBS_DIR)/armeabi-v7a/
 	@$(PRINT_OK) "Android Rust libraries built and copied to $(JNILIBS_DIR)"
 
 .PHONY: check-android-16k
