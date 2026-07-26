@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:glibusta/app/router.dart';
 import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/core/logging/app_logger.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
@@ -1541,6 +1542,76 @@ void main() {
     );
     expect(find.byType(Image), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('opens an illustration in an accessible full-screen viewer', (tester) async {
+    const illustration =
+        'data:image/webp;base64,'
+        'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
+    final scrollController = ScrollController();
+    final semantics = tester.ensureSemantics();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          home: Scaffold(
+            body: ReaderContentBody(
+              metadata: const NormalizedBookMetadata(
+                id: 'accessible-image',
+                title: 'Accessible image',
+                authors: [],
+                chapterCount: 1,
+                chapterTitles: ['Chapter'],
+              ),
+              loadedChapters: const {
+                0: ReaderChapter(
+                  index: 0,
+                  title: '',
+                  blocks: [
+                    ReaderBlock(
+                      index: 0,
+                      text: '',
+                      type: BlockType.image,
+                      imageUrl: illustration,
+                      imageAlt: 'Иллюстрация',
+                    ),
+                  ],
+                ),
+              },
+              settings: const ReaderSettings(mode: ReaderMode.continuous),
+              scrollController: scrollController,
+              onTap: _ignoreTap,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final openImage = find.bySemanticsLabel(
+      'Открыть Иллюстрация в полноэкранном режиме',
+    );
+    expect(openImage, findsOneWidget);
+
+    tester.semantics.tap(
+      find.semantics.byLabel('Открыть Иллюстрация в полноэкранном режиме'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Полноэкранный просмотр изображения'), findsOneWidget);
+    final close = find.bySemanticsLabel('Закрыть полноэкранный просмотр изображения');
+    expect(close, findsOneWidget);
+
+    tester.semantics.tap(
+      find.semantics.byLabel('Закрыть полноэкранный просмотр изображения'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Полноэкранный просмотр изображения'), findsNothing);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('keeps an oversized paginated block vertically reachable', (tester) async {

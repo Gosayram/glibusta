@@ -426,6 +426,7 @@ Widget _buildReaderBlock(
                   style.color,
                   s,
                   allImages: chapterImages,
+                  semanticLabel: block.imageAlt ?? block.imageCaption,
                 ),
               ),
             ),
@@ -559,7 +560,12 @@ Widget _buildCoverPage(String coverUrl, ReaderSettings settings, TextStyle baseS
     child: Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: _readerImageWidget(coverUrl, baseStyle.color, settings),
+        child: _readerImageWidget(
+          coverUrl,
+          baseStyle.color,
+          settings,
+          semanticLabel: 'Обложка книги',
+        ),
       ),
     ),
   );
@@ -839,6 +845,7 @@ Widget _readerImageWidget(
   Color? errorColor,
   ReaderSettings settings, {
   List<String> allImages = const [],
+  String? semanticLabel,
 }) {
   final colorFilter = _imageColorFilter(settings);
   final uri = Uri.tryParse(imageUrl);
@@ -852,9 +859,19 @@ Widget _readerImageWidget(
     final filtered = colorFilter != null
         ? ColorFiltered(colorFilter: colorFilter, child: img)
         : img;
-    return GestureDetector(
-      onTap: () => _showFullscreenImage(imageUrl, allImages: allImages),
-      child: filtered,
+    final label = semanticLabel?.trim();
+    final imageDescription = label == null || label.isEmpty ? 'изображение' : label;
+    void openFullscreen() => _showFullscreenImage(imageUrl, allImages: allImages);
+    return Semantics(
+      button: true,
+      label: 'Открыть $imageDescription в полноэкранном режиме',
+      hint: 'Двойное касание для увеличения',
+      onTap: openFullscreen,
+      child: GestureDetector(
+        excludeFromSemantics: true,
+        onTap: openFullscreen,
+        child: filtered,
+      ),
     );
   }
 
@@ -960,43 +977,66 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).pop(),
-      onDoubleTap: () => setState(() => _fillMode = !_fillMode),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          PageView.builder(
-            controller: _pageController,
-            itemCount: widget.images.length,
-            onPageChanged: (index) => setState(() => _currentIndex = index),
-            itemBuilder: (context, index) => Center(
-              child: InteractiveViewer(
-                maxScale: 5.0,
-                minScale: 0.5,
-                child: _buildImage(
-                  widget.images[index],
-                  fit: _fillMode ? BoxFit.cover : BoxFit.contain,
+    void close() => Navigator.of(context).pop();
+    return Semantics(
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: 'Полноэкранный просмотр изображения',
+      child: GestureDetector(
+        onTap: close,
+        onDoubleTap: () => setState(() => _fillMode = !_fillMode),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              itemCount: widget.images.length,
+              onPageChanged: (index) => setState(() => _currentIndex = index),
+              itemBuilder: (context, index) => Center(
+                child: InteractiveViewer(
+                  maxScale: 5.0,
+                  minScale: 0.5,
+                  child: _buildImage(
+                    widget.images[index],
+                    fit: _fillMode ? BoxFit.cover : BoxFit.contain,
+                  ),
                 ),
               ),
             ),
-          ),
-          if (widget.images.length > 1)
-            Positioned(
-              bottom: 24,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
+            if (widget.images.length > 1)
+              Positioned(
+                bottom: 24,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_currentIndex + 1} / ${widget.images.length}',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
                 ),
-                child: Text(
-                  '${_currentIndex + 1} / ${widget.images.length}',
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            PositionedDirectional(
+              top: 16,
+              end: 16,
+              child: Semantics(
+                button: true,
+                excludeSemantics: true,
+                label: 'Закрыть полноэкранный просмотр изображения',
+                onTap: close,
+                child: IconButton(
+                  icon: const Icon(Icons.close),
+                  color: Colors.white,
+                  tooltip: 'Закрыть просмотр изображения',
+                  onPressed: close,
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

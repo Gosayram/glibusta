@@ -12,6 +12,7 @@ import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
 import 'reader_providers.dart';
+import 'reading_break_reminder.dart';
 
 class _TypographyPreset {
   const _TypographyPreset(
@@ -466,6 +467,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Нижняя панель'),
         _buildBottomBarContentRow(settings, notifier),
         const SizedBox(height: 16),
+        const _SectionTitle('Забота о глазах'),
+        _buildReadingBreakReminderSettings(),
+        const SizedBox(height: 16),
         // LW-10.1: Custom CSS editor
         _buildCustomCssSection(settings, notifier),
         const SizedBox(height: 12),
@@ -483,6 +487,40 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           settings.ignoreBookIndent,
           (v) => notifier.updateIgnoreBookIndent(v),
         ),
+      ],
+    );
+  }
+
+  Widget _buildReadingBreakReminderSettings() {
+    final controller = ref.watch(readingBreakReminderControllerProvider);
+    final reminderSettings = controller.state.settings;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildToggleRow(
+          'Напомнить сделать паузу (эта сессия)',
+          Icons.visibility_outlined,
+          reminderSettings.enabled,
+          (enabled) => setState(
+            () => controller.configure(reminderSettings.copyWith(enabled: enabled)),
+          ),
+        ),
+        if (reminderSettings.enabled)
+          DropdownButton<ReadingBreakInterval>(
+            value: reminderSettings.interval,
+            isExpanded: true,
+            items: [
+              for (final interval in ReadingBreakInterval.values)
+                DropdownMenuItem(
+                  value: interval,
+                  child: Text('Каждые ${interval.duration.inMinutes} минут'),
+                ),
+            ],
+            onChanged: (interval) {
+              if (interval == null) return;
+              setState(() => controller.configure(reminderSettings.copyWith(interval: interval)));
+            },
+          ),
       ],
     );
   }
@@ -669,36 +707,48 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               itemBuilder: (context, index) {
                 final preset = presets[index];
                 final isSelected = settings.activeColorPresetId == preset.id;
-                return GestureDetector(
-                  onTap: () => notifier.updateActiveColorPresetId(preset.id),
-                  onLongPress: () => _showColorPresetEditor(
-                    context,
-                    ref,
-                    preset,
-                    notifier,
-                  ),
-                  child: Tooltip(
-                    message: preset.name,
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: preset.backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                          width: isSelected ? 2 : 1,
+                final preview = ReaderColorPreview.fromColors(
+                  background: preset.backgroundColor,
+                  text: preset.fontColor,
+                  link: ReaderColors.forTheme(settings.theme).link,
+                );
+                return Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: '${preset.name}. ${preview.semanticLabel}',
+                  hint: 'Двойное касание для выбора. Долгое нажатие для редактирования.',
+                  child: GestureDetector(
+                    excludeFromSemantics: true,
+                    onTap: () => notifier.updateActiveColorPresetId(preset.id),
+                    onLongPress: () => _showColorPresetEditor(
+                      context,
+                      ref,
+                      preset,
+                      notifier,
+                    ),
+                    child: Tooltip(
+                      message: '${preset.name}\n${preview.semanticLabel}',
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: preset.backgroundColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                            width: isSelected ? 2 : 1,
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Aa',
-                          style: TextStyle(
-                            color: preset.fontColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        child: Center(
+                          child: Text(
+                            'Aa',
+                            style: TextStyle(
+                              color: preset.fontColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),

@@ -25,6 +25,7 @@ import '../../library/data/book_delete_service.dart';
 import '../data/epub_anchor_resolver.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
+import '../data/reading_info_formatter.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
@@ -39,6 +40,7 @@ import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
+import 'reading_break_reminder.dart';
 import 'reading_info_provider.dart';
 import 'table_of_contents_sheet.dart';
 
@@ -1214,18 +1216,51 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           : 0.0;
     }
 
-    return Scaffold(
-      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: _buildReaderContentStack(
-        context,
-        readerState,
-        settings,
-        content: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: _buildGestureWrappedContent(context, readerState, settings),
+    final breakReminder = ref.watch(readingBreakReminderControllerProvider);
+    return ReadingBreakReminder(
+      controller: breakReminder,
+      onReminderDue: () => _showReadingBreakReminder(context, breakReminder),
+      child: Scaffold(
+        backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
+        body: _buildReaderContentStack(
+          context,
+          readerState,
+          settings,
+          content: Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: _buildGestureWrappedContent(context, readerState, settings),
+          ),
         ),
       ),
     );
+  }
+
+  void _showReadingBreakReminder(
+    BuildContext context,
+    ReadingBreakReminderController controller,
+  ) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Expanded(
+                child: Text('Время дать глазам отдохнуть. Посмотрите вдаль 20 секунд.'),
+              ),
+              TextButton(
+                onPressed: controller.dismiss,
+                child: const Text('Готово'),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'Через 5 мин',
+            onPressed: controller.snooze,
+          ),
+        ),
+      );
   }
 
   ThemeData _getThemeData(ReaderSettings settings) {
@@ -1264,14 +1299,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.time => _formatTime(),
         InfoSlotMode.battery => _formatBattery(),
         InfoSlotMode.batteryAndTime => '${_formatBattery()} ${_formatTime()}',
-        InfoSlotMode.remainingChapter => _formatRemaining(
-          readerState.scrollProgress,
-          readerState.chapterCount - readerState.currentPosition.chapterIndex,
+        InfoSlotMode.remainingChapter => formatCurrentChapterTimeEstimate(
+          bookMinutesLeft: readerState.estimatedMinutesLeft,
+          chaptersRemaining: readerState.chapterCount - readerState.currentPosition.chapterIndex,
         ),
-        InfoSlotMode.remainingBook => _formatRemaining(
-          readerState.currentPosition.chapterIndex / readerState.chapterCount.clamp(1, 9999),
-          readerState.chapterCount - readerState.currentPosition.chapterIndex,
-        ),
+        InfoSlotMode.remainingBook => formatReadingTimeEstimate(readerState.estimatedMinutesLeft),
         InfoSlotMode.none => '',
         InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
       };
@@ -1325,13 +1357,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String _formatBattery() {
     if (_batteryLevel < 0) return '';
     return '$_batteryLevel%';
-  }
-
-  String _formatRemaining(double progress, int chaptersLeft) {
-    final remaining = (1.0 - progress).clamp(0.0, 1.0);
-    final percent = (remaining * 100).round();
-    if (chaptersLeft <= 1) return '$percent%';
-    return '$percent% · $chaptersLeft гл.';
   }
 
   void _cycleColorPreset(int direction) {
