@@ -214,6 +214,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(verticalSwipeBrightness: enabled);
   }
 
+  void updatePageTurnHaptic(bool enabled) {
+    state = state.copyWith(pageTurnHaptic: enabled);
+  }
+
   void updateDoubleTapAction(DoubleTapAction action) {
     state = state.copyWith(doubleTapAction: action);
   }

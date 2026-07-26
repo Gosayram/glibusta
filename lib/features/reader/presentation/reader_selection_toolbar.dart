@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/utils/monotonic_id.dart';
+import '../data/dictionary_lookup_history.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -165,6 +166,14 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   widget.onDismiss();
                 },
               ),
+              _ToolbarButton(
+                icon: Icons.history,
+                label: 'История',
+                onTap: () async {
+                  await _showDictionaryHistory(context);
+                  if (mounted) widget.onDismiss();
+                },
+              ),
               // HG-7.7: Wikipedia search
               _ToolbarButton(
                 icon: Icons.language,
@@ -201,6 +210,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                     }
                   },
                 ),
+              _ToolbarButton(
+                icon: _ttsController.hasSleepTimer ? Icons.timer : Icons.timer_outlined,
+                label: _sleepTimerLabel,
+                onTap: () => unawaited(_showSleepTimerSheet()),
+              ),
               _ToolbarButton(
                 icon: Icons.bookmark_add,
                 label: 'Закладка',
@@ -424,6 +438,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   // ponytail: single Wiktionary API, no offline cache, no multi-lang picker
   Future<void> _showDictPopup(BuildContext context, String query) async {
+    unawaited(_recordDictionaryQuery(query));
     try {
       final client = HttpClient();
       final uri = Uri.https(
@@ -476,6 +491,81 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     }
   }
 
+  Future<void> _recordDictionaryQuery(String query) async {
+    try {
+      final history = await DictionaryLookupHistory.open();
+      await history.record(query);
+    } on Object catch (e) {
+      debugPrint('Dictionary history save failed: $e');
+    }
+  }
+
+  Future<void> _showDictionaryHistory(BuildContext context) async {
+    try {
+      final history = await DictionaryLookupHistory.open();
+      var entries = history.entries();
+      if (!context.mounted) return;
+
+      final selected = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('История словаря'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: entries.isEmpty
+                  ? const Text('Пока нет запросов')
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final entry = entries[index];
+                        return ListTile(
+                          title: Text(entry, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          onTap: () => Navigator.of(dialogContext).pop(entry),
+                          trailing: IconButton(
+                            tooltip: 'Удалить из истории',
+                            icon: const Icon(Icons.close),
+                            onPressed: () async {
+                              await history.remove(entry);
+                              entries = history.entries();
+                              if (context.mounted) setDialogState(() {});
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              if (entries.isNotEmpty)
+                TextButton(
+                  onPressed: () async {
+                    await history.clear();
+                    entries = history.entries();
+                    if (context.mounted) setDialogState(() {});
+                  },
+                  child: const Text('Очистить'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Закрыть'),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (selected != null && context.mounted) {
+        await _showDictPopup(context, selected);
+      }
+    } on Object catch (e) {
+      debugPrint('Dictionary history error: $e');
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Не удалось открыть историю словаря'));
+      }
+    }
+  }
+
   Future<void> _speakSelectedText(String text) async {
     try {
       await _ttsController.speak(text, lang: 'ru-RU', rate: 0.5);
@@ -484,6 +574,69 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       debugPrint('TTS error: $e');
     }
   }
+
+  String get _sleepTimerLabel {
+    final Duration? duration = _ttsController.sleepTimerDuration;
+    if (duration == null) return 'Таймер сна';
+    return 'Таймер: ${duration.inMinutes} мин';
+  }
+
+  Future<void> _showSleepTimerSheet() async {
+    final _SleepTimerAction? action = await showModalBottomSheet<_SleepTimerAction>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.timer_outlined),
+              title: Text('Таймер сна'),
+              subtitle: Text('Остановит озвучивание через выбранное время'),
+            ),
+            for (final Duration duration in _sleepTimerDurations)
+              ListTile(
+                leading: const Icon(Icons.schedule),
+                title: Text('${duration.inMinutes} минут'),
+                onTap: () => Navigator.of(sheetContext).pop(
+                  _SleepTimerAction.start(duration),
+                ),
+              ),
+            if (_ttsController.hasSleepTimer)
+              ListTile(
+                leading: const Icon(Icons.timer_off_outlined),
+                title: const Text('Отключить таймер сна'),
+                onTap: () => Navigator.of(sheetContext).pop(const _SleepTimerAction.cancel()),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case _SleepTimerAction(:final duration?):
+        _ttsController.startSleepTimer(duration);
+      case _SleepTimerAction(duration: null):
+        _ttsController.cancelSleepTimer();
+    }
+    setState(() {});
+  }
+}
+
+const List<Duration> _sleepTimerDurations = <Duration>[
+  Duration(minutes: 15),
+  Duration(minutes: 30),
+  Duration(minutes: 60),
+];
+
+@immutable
+class _SleepTimerAction {
+  const _SleepTimerAction.start(this.duration);
+  const _SleepTimerAction.cancel() : duration = null;
+
+  final Duration? duration;
 }
 
 class _ToolbarButton extends StatelessWidget {

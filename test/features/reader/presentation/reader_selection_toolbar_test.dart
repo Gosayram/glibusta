@@ -95,6 +95,7 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(find.text('Озвучить'));
     await tester.tap(find.text('Озвучить'));
     await tester.pump();
 
@@ -109,5 +110,46 @@ void main() {
 
     verify(() => tts.stop()).called(1);
     expect(find.text('Озвучить'), findsOneWidget);
+  });
+
+  testWidgets('starts and cancels a sleep timer from the selection toolbar', (tester) async {
+    final tts = _MockFlutterTts();
+    final controller = TtsController.forTesting(() => tts);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () {},
+              ttsController: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Таймер сна'));
+    await tester.tap(find.text('Таймер сна'));
+    await tester.pumpAndSettle();
+    expect(find.text('Остановит озвучивание через выбранное время'), findsOneWidget);
+
+    await tester.tap(find.text('30 минут'));
+    await tester.pumpAndSettle();
+    expect(controller.sleepTimerDuration, const Duration(minutes: 30));
+    expect(find.text('Таймер: 30 мин'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Таймер: 30 мин'));
+    await tester.tap(find.text('Таймер: 30 мин'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Отключить таймер сна'));
+    await tester.pumpAndSettle();
+
+    expect(controller.hasSleepTimer, isFalse);
+    expect(find.text('Таймер сна'), findsOneWidget);
   });
 }

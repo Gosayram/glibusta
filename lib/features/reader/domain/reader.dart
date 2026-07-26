@@ -150,6 +150,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
     @Default(true) bool verticalSwipeBrightness,
+    @Default(false) bool pageTurnHaptic,
     @Default(DoubleTapAction.toggleUI) DoubleTapAction doubleTapAction,
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
     @Default(true) bool restoreLastPosition,

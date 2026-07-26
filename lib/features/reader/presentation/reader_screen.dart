@@ -36,6 +36,7 @@ import 'reader_context_menu.dart';
 import 'reader_controller.dart';
 import 'reader_error_panel.dart';
 import 'reader_gesture_coordinator.dart';
+import 'reader_page_turn_haptic.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
@@ -327,12 +328,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _goToNextPage() {
-    unawaited(HapticFeedback.lightImpact());
+    unawaited(triggerPageTurnHaptic(enabled: ref.read(readerSettingsProvider).pageTurnHaptic));
     _ctrl.scrollToNext();
   }
 
   void _goToPreviousPage() {
-    unawaited(HapticFeedback.lightImpact());
+    unawaited(triggerPageTurnHaptic(enabled: ref.read(readerSettingsProvider).pageTurnHaptic));
     _ctrl.scrollToPrevious();
   }
 
@@ -1018,7 +1019,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             left: 16,
             child: _ReaderNavButton(
               icon: Icons.chevron_left,
-              onTap: _ctrl.scrollToPrevious,
+              onTap: _goToPreviousPage,
             ),
           ),
         if (!isFocusMode && !readerState.uiVisible)
@@ -1027,7 +1028,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             right: 16,
             child: _ReaderNavButton(
               icon: Icons.chevron_right,
-              onTap: _ctrl.scrollToNext,
+              onTap: _goToNextPage,
             ),
           ),
         // MD-6.1/15.1: sticky header — breadcrumb "Book / Chapter" persists while bars hidden

@@ -187,6 +187,7 @@ void main() {
           forcedEncoding: 'windows-1251',
           tapZoneWidth: 0.4,
           fullScreenMode: FullScreenMode.keepPanels,
+          pageTurnHaptic: true,
           customCss: 'p { color: red; }',
           scrollbarIndicator: false,
         );

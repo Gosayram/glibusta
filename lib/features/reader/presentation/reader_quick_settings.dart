@@ -383,6 +383,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
+          'Тактильный отклик при перелистывании',
+          Icons.vibration,
+          settings.pageTurnHaptic,
+          (v) => notifier.updatePageTurnHaptic(v),
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
           'Расширитель восприятия',
           Icons.view_sidebar_outlined,
           settings.perceptionExpander,
