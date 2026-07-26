@@ -35,7 +35,7 @@ class TtsController {
   late FlutterTts _tts;
   var _isTtsInitialized = false;
   bool _isPlaying = false;
-  late String _lastLang;
+  String _lastLang = 'ru-RU';
   late double _lastRate;
   var _playbackRate = _defaultPlaybackRate;
   String? _lastText;
@@ -101,6 +101,21 @@ class TtsController {
 
   /// Reader-facing speech-speed multiplier, from 0.5× to 3×.
   double get playbackRate => _playbackRate;
+
+  /// Language used for the next utterance when the caller does not override it.
+  String get language => _lastLang;
+
+  /// Selects the language for subsequent utterances without interrupting speech.
+  Future<void> setLanguage(String language) async {
+    final String normalizedLanguage = language.trim();
+    if (normalizedLanguage.isEmpty) {
+      throw ArgumentError.value(language, 'language', 'Must not be empty');
+    }
+
+    _ensureTts();
+    _lastLang = normalizedLanguage;
+    await _tts.setLanguage(_lastLang);
+  }
 
   /// Changes the speed for the next utterance without interrupting speech.
   ///

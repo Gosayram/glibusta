@@ -95,6 +95,22 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['longPressAction'],
           orElse: () => LongPressAction.selectText,
         ),
+        topLeftCornerTapAction: CornerTapAction.values.firstWhere(
+          (e) => e.name == map['topLeftCornerTapAction'],
+          orElse: () => CornerTapAction.inherit,
+        ),
+        topRightCornerTapAction: CornerTapAction.values.firstWhere(
+          (e) => e.name == map['topRightCornerTapAction'],
+          orElse: () => CornerTapAction.inherit,
+        ),
+        bottomLeftCornerTapAction: CornerTapAction.values.firstWhere(
+          (e) => e.name == map['bottomLeftCornerTapAction'],
+          orElse: () => CornerTapAction.inherit,
+        ),
+        bottomRightCornerTapAction: CornerTapAction.values.firstWhere(
+          (e) => e.name == map['bottomRightCornerTapAction'],
+          orElse: () => CornerTapAction.inherit,
+        ),
         restoreLastPosition: map['restoreLastPosition'] as bool? ?? true,
         forcedEncoding: map['forcedEncoding'] as String?,
         horizontalGesture: HorizontalGesture.values.firstWhere(
@@ -189,6 +205,10 @@ class ReaderSettingsPersistence {
         'pageTurnHaptic': settings.pageTurnHaptic,
         'doubleTapAction': settings.doubleTapAction.name,
         'longPressAction': settings.longPressAction.name,
+        'topLeftCornerTapAction': settings.topLeftCornerTapAction.name,
+        'topRightCornerTapAction': settings.topRightCornerTapAction.name,
+        'bottomLeftCornerTapAction': settings.bottomLeftCornerTapAction.name,
+        'bottomRightCornerTapAction': settings.bottomRightCornerTapAction.name,
         'restoreLastPosition': settings.restoreLastPosition,
         'forcedEncoding': settings.forcedEncoding,
         'horizontalGesture': settings.horizontalGesture.name,

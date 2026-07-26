@@ -199,4 +199,43 @@ void main() {
     expect(dismissals, 0);
     verify(() => tts.setSpeechRate(1)).called(1);
   });
+
+  testWidgets('selects the next-fragment narration language without dismissing selection', (
+    tester,
+  ) async {
+    final tts = _MockFlutterTts();
+    when(() => tts.setLanguage(any())).thenAnswer((_) async {});
+    final controller = TtsController.forTesting(() => tts);
+    var dismissals = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () => dismissals++,
+              ttsController: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Язык: Русский'));
+    await tester.tap(find.text('Язык: Русский'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Язык озвучивания'), findsOneWidget);
+    await tester.tap(find.text('English'));
+    await tester.pumpAndSettle();
+
+    expect(controller.language, 'en-US');
+    expect(find.text('Язык: English'), findsOneWidget);
+    expect(dismissals, 0);
+    verify(() => tts.setLanguage('en-US')).called(1);
+  });
 }

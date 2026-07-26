@@ -84,6 +84,20 @@ void main() {
     );
   });
 
+  test('stores the selected language for subsequent utterances', () async {
+    await controller.setLanguage('en-US');
+
+    expect(controller.language, 'en-US');
+    verify(() => tts.setLanguage('en-US')).called(1);
+
+    await controller.speak('chapter');
+    verify(() => tts.setLanguage('en-US')).called(1);
+  });
+
+  test('rejects an empty speech language', () async {
+    await expectLater(controller.setLanguage('  '), throwsArgumentError);
+  });
+
   test('sleep timer stops speech when it expires', () async {
     late _TestTimer timer;
     controller = TtsController.forTesting(

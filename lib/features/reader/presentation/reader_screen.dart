@@ -1190,7 +1190,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               settings: settings,
               scrollController: _ctrl.scrollController,
               onTap: _gestureCoordinator.canInteract
-                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
+                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context))
                   : (
                       _,
                     ) {},

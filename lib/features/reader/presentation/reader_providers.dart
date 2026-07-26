@@ -226,6 +226,24 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(longPressAction: action);
   }
 
+  void updateCornerTapAction(ReaderCorner corner, CornerTapAction action) {
+    state = switch (corner) {
+      ReaderCorner.topLeft => state.copyWith(topLeftCornerTapAction: action),
+      ReaderCorner.topRight => state.copyWith(topRightCornerTapAction: action),
+      ReaderCorner.bottomLeft => state.copyWith(bottomLeftCornerTapAction: action),
+      ReaderCorner.bottomRight => state.copyWith(bottomRightCornerTapAction: action),
+    };
+  }
+
+  void resetCornerTapActions() {
+    state = state.copyWith(
+      topLeftCornerTapAction: CornerTapAction.inherit,
+      topRightCornerTapAction: CornerTapAction.inherit,
+      bottomLeftCornerTapAction: CornerTapAction.inherit,
+      bottomRightCornerTapAction: CornerTapAction.inherit,
+    );
+  }
+
   void updateRestoreLastPosition(bool restore) {
     state = state.copyWith(restoreLastPosition: restore);
   }

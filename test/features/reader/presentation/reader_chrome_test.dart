@@ -32,4 +32,27 @@ void main() {
 
     expect(selectedMode, ReaderMode.continuous);
   });
+
+  testWidgets('mode switcher does not overflow at 200% system text scale', (tester) async {
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderBottomBar(
+              settings: const ReaderSettings(),
+              currentChapterIndex: 0,
+              totalChapters: 1,
+              scrollProgress: 0,
+              estimatedMinutesLeft: 0,
+              chapterTitle: '',
+              onModeChanged: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
 }

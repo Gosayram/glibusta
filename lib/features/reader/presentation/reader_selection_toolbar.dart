@@ -14,6 +14,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/utils/monotonic_id.dart';
 import '../data/dictionary_lookup_history.dart';
+import '../data/dictionary_lookup_source.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -152,7 +153,8 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   widget.onDismiss();
                 },
               ),
-              // MD-3.2: inline dictionary popup via Wiktionary REST API
+              // An online lookup is always explicitly confirmed before the
+              // selected text is sent to the configured source.
               _ToolbarButton(
                 icon: Icons.menu_book,
                 label: 'Словарь',
@@ -160,7 +162,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   if (_selectedText != null && _selectedText!.isNotEmpty) {
                     final query = _selectedText!.trim();
                     if (context.mounted) {
-                      unawaited(_showDictPopup(context, query));
+                      unawaited(_startDictionaryLookup(context, query));
                     }
                   }
                   widget.onDismiss();
@@ -173,6 +175,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   await _showDictionaryHistory(context);
                   if (mounted) widget.onDismiss();
                 },
+              ),
+              _ToolbarButton(
+                icon: Icons.tune,
+                label: 'Источник',
+                onTap: () => unawaited(_showDictionarySourceEditor()),
               ),
               // HG-7.7: Wikipedia search
               _ToolbarButton(
@@ -214,6 +221,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 icon: Icons.speed,
                 label: _playbackSpeedLabel,
                 onTap: () => unawaited(_showPlaybackSpeedSheet()),
+              ),
+              _ToolbarButton(
+                icon: Icons.record_voice_over_outlined,
+                label: _speechLanguageLabel,
+                onTap: () => unawaited(_showSpeechLanguageSheet()),
               ),
               _ToolbarButton(
                 icon: _ttsController.hasSleepTimer ? Icons.timer : Icons.timer_outlined,
@@ -441,9 +453,62 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     widget.onDismiss();
   }
 
-  // ponytail: single Wiktionary API, no offline cache, no multi-lang picker
-  Future<void> _showDictPopup(BuildContext context, String query) async {
+  Future<void> _startDictionaryLookup(BuildContext context, String query) async {
+    final sourceStore = await DictionaryLookupSourceStore.open();
+    final source = sourceStore.load();
+    if (!context.mounted) return;
+
+    final host = source?.resolve(query).host ?? 'en.wiktionary.org';
+    final shouldContinue = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Онлайн-словарь'),
+        content: Text(
+          'Выбранный фрагмент будет отправлен на $host для поиска. Продолжить?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Продолжить'),
+          ),
+        ],
+      ),
+    );
+    if (shouldContinue != true || !context.mounted) return;
+
     unawaited(_recordDictionaryQuery(query));
+    if (source != null) {
+      try {
+        final launched = await launchUrl(
+          source.resolve(query),
+          mode: LaunchMode.externalApplication,
+        );
+        if (!launched && context.mounted) {
+          unawaited(SmartDialog.showToast('Не удалось открыть словарь'));
+        }
+      } on FormatException catch (e) {
+        debugPrint('Dictionary source error: $e');
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Адрес словаря больше не подходит'));
+        }
+      } on Object catch (e) {
+        debugPrint('Dictionary launch error: $e');
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Не удалось открыть словарь'));
+        }
+      }
+      return;
+    }
+
+    await _showWiktionaryPopup(context, query);
+  }
+
+  // The built-in source remains useful for concise in-reader definitions.
+  Future<void> _showWiktionaryPopup(BuildContext context, String query) async {
     try {
       final client = HttpClient();
       final uri = Uri.https(
@@ -505,6 +570,109 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     }
   }
 
+  Future<void> _showDictionarySourceEditor() async {
+    final sourceStore = await DictionaryLookupSourceStore.open();
+    final currentSource = sourceStore.load();
+    if (!mounted) return;
+
+    final templateController = TextEditingController(text: currentSource?.template ?? '');
+    var language = currentSource?.language ?? 'en';
+    String? validationError;
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Источник словаря'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Пустое поле использует встроенный Wiktionary. '\
+                    'Запрос передаётся выбранному источнику только после подтверждения.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: templateController,
+                    keyboardType: TextInputType.url,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    decoration: InputDecoration(
+                      labelText: 'URL-шаблон',
+                      hintText: 'https://example.org/lookup/{word}?lang={lang}',
+                      errorText: validationError,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    initialValue: language,
+                    decoration: const InputDecoration(labelText: 'Язык словаря'),
+                    items: [
+                      for (final item in DictionaryLookupSource.supportedLanguages.toList()..sort())
+                        DropdownMenuItem(value: item, child: Text(item.toUpperCase())),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => language = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Допускаются HTTPS и локальный HTTP (localhost, 127.0.0.1, ::1). '\
+                    'Шаблон обязан содержать {word}; {lang} необязателен.',
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              if (currentSource != null)
+                TextButton(
+                  onPressed: () async {
+                    await sourceStore.clear();
+                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Сбросить'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final template = templateController.text.trim();
+                  if (template.isEmpty) {
+                    await sourceStore.clear();
+                    if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                    return;
+                  }
+
+                  final source = DictionaryLookupSource(
+                    template: template,
+                    language: language,
+                  );
+                  final error = source.validationError();
+                  if (error != null) {
+                    setDialogState(() => validationError = error);
+                    return;
+                  }
+
+                  await sourceStore.save(source);
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                },
+                child: const Text('Сохранить'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      templateController.dispose();
+    }
+  }
+
   Future<void> _showDictionaryHistory(BuildContext context) async {
     try {
       final history = await DictionaryLookupHistory.open();
@@ -561,7 +729,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       );
 
       if (selected != null && context.mounted) {
-        await _showDictPopup(context, selected);
+        await _startDictionaryLookup(context, selected);
       }
     } on Object catch (e) {
       debugPrint('Dictionary history error: $e');
@@ -573,7 +741,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   Future<void> _speakSelectedText(String text) async {
     try {
-      await _ttsController.speak(text, lang: 'ru-RU');
+      await _ttsController.speak(text);
       if (mounted) setState(() {});
     } on Object catch (e) {
       debugPrint('TTS error: $e');
@@ -581,6 +749,8 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   }
 
   String get _playbackSpeedLabel => 'Скорость: ${_formatPlaybackRate(_ttsController.playbackRate)}';
+
+  String get _speechLanguageLabel => 'Язык: ${_speechLanguageName(_ttsController.language)}';
 
   Future<void> _showPlaybackSpeedSheet() async {
     final double? rate = await showModalBottomSheet<double>(
@@ -618,6 +788,48 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       if (mounted) setState(() {});
     } on Object catch (e) {
       debugPrint('TTS playback speed error: $e');
+    }
+  }
+
+  Future<void> _showSpeechLanguageSheet() async {
+    final String? language = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: RadioGroup<String>(
+          groupValue: _ttsController.language,
+          onChanged: (String? selectedLanguage) {
+            if (selectedLanguage != null) Navigator.of(sheetContext).pop(selectedLanguage);
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(
+                leading: Icon(Icons.record_voice_over_outlined),
+                title: Text('Язык озвучивания'),
+                subtitle: Text('Применится к следующему фрагменту, не прерывая текущий'),
+              ),
+              for (final _SpeechLanguage speechLanguage in _speechLanguages)
+                RadioListTile<String>(
+                  value: speechLanguage.code,
+                  title: Text(speechLanguage.name),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || language == null) return;
+
+    try {
+      await _ttsController.setLanguage(language);
+      if (mounted) setState(() {});
+    } on Object catch (e) {
+      debugPrint('TTS language error: $e');
+      if (mounted) {
+        unawaited(SmartDialog.showToast('Этот язык озвучивания недоступен на устройстве'));
+      }
     }
   }
 
@@ -679,6 +891,17 @@ const List<Duration> _sleepTimerDurations = <Duration>[
 
 const List<double> _playbackRates = <double>[0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
+const List<_SpeechLanguage> _speechLanguages = <_SpeechLanguage>[
+  _SpeechLanguage(code: 'ru-RU', name: 'Русский'),
+  _SpeechLanguage(code: 'en-US', name: 'English'),
+];
+
+String _speechLanguageName(String code) => switch (code) {
+  'ru-RU' => 'Русский',
+  'en-US' => 'English',
+  _ => code,
+};
+
 String _formatPlaybackRate(double rate) {
   final String value = rate == rate.roundToDouble()
       ? rate.toInt().toString()
@@ -692,6 +915,14 @@ class _SleepTimerAction {
   const _SleepTimerAction.cancel() : duration = null;
 
   final Duration? duration;
+}
+
+@immutable
+class _SpeechLanguage {
+  const _SpeechLanguage({required this.code, required this.name});
+
+  final String code;
+  final String name;
 }
 
 class _ToolbarButton extends StatelessWidget {

@@ -11,6 +11,7 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'reader_corner_tap.dart';
 import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
 import 'reading_break_reminder.dart';
@@ -465,6 +466,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 12),
         const _SectionTitle('Долгое нажатие'),
         _buildLongPressActionRow(settings, notifier),
+        const SizedBox(height: 16),
+        _buildCornerTapMap(settings, notifier),
         const SizedBox(height: 16),
         const _SectionTitle('Скрытие UI (сек)'),
         _buildAutoHideRow(settings, notifier),
@@ -1453,6 +1456,58 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     },
     onChanged: (v) => notifier.updateLongPressAction(v),
   );
+
+  static Widget _buildCornerTapMap(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = <ReaderCorner, String>{
+      ReaderCorner.topLeft: 'Верхний левый',
+      ReaderCorner.topRight: 'Верхний правый',
+      ReaderCorner.bottomLeft: 'Нижний левый',
+      ReaderCorner.bottomRight: 'Нижний правый',
+    };
+    final actions = <ReaderCorner, CornerTapAction>{
+      ReaderCorner.topLeft: settings.topLeftCornerTapAction,
+      ReaderCorner.topRight: settings.topRightCornerTapAction,
+      ReaderCorner.bottomLeft: settings.bottomLeftCornerTapAction,
+      ReaderCorner.bottomRight: settings.bottomRightCornerTapAction,
+    };
+    final isDefault = actions.values.every((action) => action == CornerTapAction.inherit);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Тапы по углам')),
+            TextButton(
+              onPressed: isDefault ? null : notifier.resetCornerTapActions,
+              child: const Text('Сбросить'),
+            ),
+          ],
+        ),
+        const Text(
+          'Угловой тап имеет приоритет над перелистыванием по краю. '
+          'Долгое нажатие остаётся доступным для выделения текста.',
+        ),
+        const SizedBox(height: 8),
+        for (final corner in ReaderCorner.values)
+          DropdownButtonFormField<CornerTapAction>(
+            key: ValueKey('corner-tap-${corner.name}'),
+            initialValue: actions[corner],
+            decoration: InputDecoration(labelText: labels[corner]),
+            items: [
+              for (final action in CornerTapAction.values)
+                DropdownMenuItem(value: action, child: Text(action.displayName)),
+            ],
+            onChanged: (action) {
+              if (action != null) notifier.updateCornerTapAction(corner, action);
+            },
+          ),
+      ],
+    );
+  }
 
   static Widget _buildHorizontalGestureRow(
     ReaderSettings settings,

@@ -21,6 +21,7 @@ import '../data/parsers/normalized_book.dart';
 import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
 import 'reader_content_helper.dart';
+import 'reader_corner_tap.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 
@@ -983,8 +984,31 @@ final class ReaderController {
 
   // ── Gestures ──────────────────────────────────────────
 
-  void handleTap(TapUpDetails details, double width) {
+  void handleTap(TapUpDetails details, Size size) {
     final settings = _ref.read(readerSettingsProvider);
+    final cornerAction = cornerTapActionAt(
+      settings: settings,
+      position: details.localPosition,
+      size: size,
+    );
+    if (cornerAction != null && cornerAction != CornerTapAction.inherit) {
+      switch (cornerAction) {
+        case CornerTapAction.previousPage:
+          scrollToPrevious();
+        case CornerTapAction.nextPage:
+          scrollToNext();
+        case CornerTapAction.toggleUi:
+          toggleUi();
+        case CornerTapAction.addBookmark:
+          addBookmark();
+        case CornerTapAction.disabled:
+        case CornerTapAction.inherit:
+          break;
+      }
+      return;
+    }
+
+    final width = size.width;
     final x = details.localPosition.dx;
     final zoneWidth = (width * settings.tapZoneWidth).clamp(
       48.0,

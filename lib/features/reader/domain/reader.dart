@@ -74,6 +74,21 @@ enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
 
+/// Action assigned to a reader corner tap.
+///
+/// [inherit] keeps the regular edge-pagination or central UI-toggle behavior.
+enum CornerTapAction {
+  inherit('По умолчанию'),
+  previousPage('Предыдущая страница'),
+  nextPage('Следующая страница'),
+  toggleUi('Показать/скрыть UI'),
+  addBookmark('Добавить закладку'),
+  disabled('Ничего не делать');
+
+  const CornerTapAction(this.displayName);
+  final String displayName;
+}
+
 enum HorizontalGesture { off, on, inverse }
 
 enum HorizontalGestureScroll { half, twoThirds, threeQuarters }
@@ -153,6 +168,10 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(false) bool pageTurnHaptic,
     @Default(DoubleTapAction.toggleUI) DoubleTapAction doubleTapAction,
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
+    @Default(CornerTapAction.inherit) CornerTapAction topLeftCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction topRightCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction bottomLeftCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction bottomRightCornerTapAction,
     @Default(true) bool restoreLastPosition,
     String? forcedEncoding,
     @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,
