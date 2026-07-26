@@ -503,6 +503,30 @@ void main() {
       await tester.pumpAndSettle();
     });
 
+    testWidgets('focus mode does not leave navigation chrome on the reading surface', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            databaseProvider.overrideWithValue(db),
+            bookOpenServiceProvider.overrideWithValue(_FakeBookOpenService(db)),
+            readerSettingsProvider.overrideWith(
+              () => _TestReaderSettingsNotifier(const ReaderSettings(mode: ReaderMode.focus)),
+            ),
+          ],
+          child: const MaterialApp(home: ReaderScreen(bookId: 'book-1')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.chevron_left), findsNothing);
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('Back restores the position before an in-chapter footnote link', (tester) async {
       const chapter = ReaderChapter(
         index: 0,

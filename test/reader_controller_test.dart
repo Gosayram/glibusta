@@ -11,6 +11,7 @@ import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_content_helper.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
+import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 
 class _LongBookOpenService extends BookOpenService {
   _LongBookOpenService(AppDatabase database)
@@ -274,12 +275,14 @@ void main() {
       WidgetTester tester,
       String bookId, {
       BookOpenService? bookOpenService,
+      ReaderSettings? settings,
     }) async {
       late ReaderController ctrl;
       final container = ProviderContainer(
         overrides: [
           databaseProvider.overrideWithValue(db),
           if (bookOpenService != null) bookOpenServiceProvider.overrideWithValue(bookOpenService),
+          if (settings != null) readerSettingsProvider.overrideWithValue(settings),
         ],
       );
       addTearDown(container.dispose);
@@ -354,6 +357,22 @@ void main() {
 
       expect(ctrl.state.currentPosition.chapterIndex, 50);
       expect(ctrl.state.currentPosition.paragraphIndex, 3);
+      ctrl.dispose();
+    });
+
+    testWidgets('focus mode opens with reader chrome hidden', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+        settings: const ReaderSettings(mode: ReaderMode.focus),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+
+      expect(ctrl.state.uiVisible, isFalse);
+      ctrl.toggleUi();
+      expect(ctrl.state.uiVisible, isTrue);
       ctrl.dispose();
     });
 

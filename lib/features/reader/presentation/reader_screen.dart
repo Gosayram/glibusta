@@ -155,6 +155,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (prev.mode != next.mode && next.mode == ReaderMode.continuous) {
       _ctrl.prepareForContinuousLayout();
     }
+    if (prev.mode != next.mode && next.mode == ReaderMode.focus) {
+      _ctrl.hideUi();
+    }
     final layoutChanged =
         prev.fontSize != next.fontSize ||
         prev.lineHeight != next.lineHeight ||
@@ -796,6 +799,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings, {
     required Widget content,
   }) {
+    final isFocusMode = settings.mode == ReaderMode.focus;
     return Stack(
       children: [
         content,
@@ -842,18 +846,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             },
           ),
         ),
-        _buildReadingInfoBar(
-          context,
-          readerState,
-          settings,
-          position: _ReadingInfoPosition.header,
-        ),
-        _buildReadingInfoBar(
-          context,
-          readerState,
-          settings,
-          position: _ReadingInfoPosition.footer,
-        ),
+        if (!isFocusMode)
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.header,
+          ),
+        if (!isFocusMode)
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.footer,
+          ),
         Positioned(
           top: 0,
           left: 0,
@@ -966,7 +972,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           ),
         ),
         // MD-20.1: floating progress dot when bars hidden
-        if (!readerState.uiVisible && settings.progressBarPosition != ProgressBarPosition.hidden)
+        if (!isFocusMode &&
+            !readerState.uiVisible &&
+            settings.progressBarPosition != ProgressBarPosition.hidden)
           Positioned(
             bottom: 12,
             left: 0,
@@ -983,7 +991,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             ),
           ),
         // MD-24.5: one-handed prev/next buttons when chrome hidden
-        if (!readerState.uiVisible)
+        if (!isFocusMode && !readerState.uiVisible)
           Positioned(
             bottom: 40,
             left: 16,
@@ -992,7 +1000,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onTap: _ctrl.scrollToPrevious,
             ),
           ),
-        if (!readerState.uiVisible)
+        if (!isFocusMode && !readerState.uiVisible)
           Positioned(
             bottom: 40,
             right: 16,
@@ -1002,7 +1010,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             ),
           ),
         // MD-6.1/15.1: sticky header — breadcrumb "Book / Chapter" persists while bars hidden
-        if (!readerState.uiVisible && readerState.metadata != null)
+        if (!isFocusMode && !readerState.uiVisible && readerState.metadata != null)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 4,
             left: 0,

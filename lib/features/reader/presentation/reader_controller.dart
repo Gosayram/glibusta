@@ -345,7 +345,11 @@ final class ReaderController {
         AppDuration.autoThemeCheck,
         (_) => _checkAutoTheme(),
       );
-      _startHideTimer();
+      if (settings.mode == ReaderMode.focus) {
+        hideUi();
+      } else {
+        _startHideTimer();
+      }
       _applyWakeLock();
     } on TimeoutException {
       if (!_isActiveLoad(loadGeneration)) return;
@@ -991,6 +995,17 @@ final class ReaderController {
   void toggleUi() {
     _updateState(_state.copyWith(uiVisible: !_state.uiVisible));
     if (_state.uiVisible) _startHideTimer();
+  }
+
+  /// Removes reader chrome until the reader explicitly requests it again.
+  ///
+  /// Focus mode uses this both when a book opens and when the user switches
+  /// into the mode, so its reading surface starts without persistent controls.
+  void hideUi() {
+    _hideTimer?.cancel();
+    if (_state.uiVisible) {
+      _updateState(_state.copyWith(uiVisible: false));
+    }
   }
 
   void _startHideTimer() {
