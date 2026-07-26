@@ -591,7 +591,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Пустое поле использует встроенный Wiktionary. '\
+                    'Пустое поле использует встроенный Wiktionary. '
                     'Запрос передаётся выбранному источнику только после подтверждения.',
                   ),
                   const SizedBox(height: 16),
@@ -621,7 +621,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Допускаются HTTPS и локальный HTTP (localhost, 127.0.0.1, ::1). '\
+                    'Допускаются HTTPS и локальный HTTP (localhost, 127.0.0.1, ::1). '
                     'Шаблон обязан содержать {word}; {lang} необязателен.',
                   ),
                 ],
