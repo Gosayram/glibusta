@@ -376,7 +376,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildHorizontalGestureScrollRow(settings, notifier),
         const SizedBox(height: 16),
         _buildToggleRow(
-          'Вертикальный свайп для яркости',
+          'Вертикальный свайп: яркость и теплота',
           Icons.swipe_up,
           settings.verticalSwipeBrightness,
           (v) => notifier.updateVerticalSwipeBrightness(v),

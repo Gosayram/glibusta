@@ -40,6 +40,7 @@ import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
+import 'reader_vertical_gesture.dart';
 import 'reading_break_reminder.dart';
 import 'reading_info_provider.dart';
 import 'table_of_contents_sheet.dart';
@@ -104,7 +105,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   double _dragStartY = 0.0;
   bool _dragStartedInTopZone = false;
   bool _dragStartedInLeftHalf = false;
-  double _dragStartFontSize = 0.0;
+  double _dragStartWarmth = 0.0;
+  String? _verticalGestureFeedback;
+  Timer? _verticalGestureFeedbackTimer;
   String? _selectedText;
   int _batteryLevel = -1;
   bool _finishedDialogShown = false;
@@ -192,7 +195,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _dragStartedInLeftHalf = details.globalPosition.dx < screenSize.width / 2;
     if (!settings.verticalSwipeBrightness) return;
     _dragStartBrightness = settings.brightness;
-    _dragStartFontSize = settings.fontSize;
+    _dragStartWarmth = settings.warmth;
     _dragStartY = details.globalPosition.dy;
   }
 
@@ -201,14 +204,28 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (!settings.verticalSwipeBrightness) return;
     final deltaY = details.globalPosition.dy - _dragStartY;
     if (_dragStartedInLeftHalf) {
-      final brightnessChange = -deltaY / 500.0;
-      final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
+      final newBrightness = readerBrightnessForVerticalDrag(
+        startBrightness: _dragStartBrightness,
+        deltaY: deltaY,
+      );
       ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+      _showVerticalGestureFeedback('Яркость ${(newBrightness * 100).round()}%');
     } else {
-      final fontChange = -deltaY / 200.0;
-      final newFontSize = (_dragStartFontSize + fontChange).clamp(10.0, 32.0);
-      ref.read(readerSettingsProvider.notifier).updateFontSize(newFontSize);
+      final newWarmth = readerWarmthForVerticalDrag(
+        startWarmth: _dragStartWarmth,
+        deltaY: deltaY,
+      );
+      ref.read(readerSettingsProvider.notifier).updateWarmth(newWarmth);
+      _showVerticalGestureFeedback('Теплота ${(newWarmth * 100).round()}%');
     }
+  }
+
+  void _showVerticalGestureFeedback(String message) {
+    _verticalGestureFeedbackTimer?.cancel();
+    if (mounted) setState(() => _verticalGestureFeedback = message);
+    _verticalGestureFeedbackTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _verticalGestureFeedback = null);
+    });
   }
 
   void _handleVerticalDragEnd(DragEndDetails details) {
@@ -558,6 +575,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   @override
   void dispose() {
     _relayoutTimer?.cancel();
+    _verticalGestureFeedbackTimer?.cancel();
     _exitImmersiveMode();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
@@ -816,6 +834,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _buildWarmthOverlay(settings),
         _buildBrightnessOverlay(settings),
         _buildEdgeFadeOverlay(settings),
+        _buildVerticalGestureFeedback(settings),
         if (_shouldShowProgressBar(settings, readerState))
           Positioned(
             top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
@@ -1579,6 +1598,45 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       child: IgnorePointer(
         child: Container(
           color: Color.fromRGBO(0, 0, 0, dimAlpha),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVerticalGestureFeedback(ReaderSettings settings) {
+    final feedback = _verticalGestureFeedback;
+    if (feedback == null) return const SizedBox.shrink();
+    final colors = ReaderColors.forTheme(settings.theme);
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + 56,
+      left: 24,
+      right: 24,
+      child: IgnorePointer(
+        child: Center(
+          child: Semantics(
+            label: feedback,
+            excludeSemantics: true,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.scaffold.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(
+                  feedback,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

@@ -7,13 +7,22 @@ import 'package:flutter_tts/flutter_tts.dart';
 /// LW-11.1/11.2: TTS controller with headphone auto-pause/resume.
 /// ponytail: singleton — single TTS instance shared across app.
 class TtsController {
-  TtsController._({FlutterTts Function()? ttsFactory}) : _ttsFactory = ttsFactory ?? FlutterTts.new;
+  TtsController._({
+    FlutterTts Function()? ttsFactory,
+    Timer Function(Duration, void Function())? timerFactory,
+  }) : _ttsFactory = ttsFactory ?? FlutterTts.new,
+       _timerFactory = timerFactory ?? Timer.new;
   static final TtsController instance = TtsController._();
 
   @visibleForTesting
-  TtsController.forTesting(FlutterTts Function() ttsFactory) : _ttsFactory = ttsFactory;
+  TtsController.forTesting(
+    FlutterTts Function() ttsFactory, {
+    Timer Function(Duration, void Function())? timerFactory,
+  }) : _ttsFactory = ttsFactory,
+       _timerFactory = timerFactory ?? Timer.new;
 
   final FlutterTts Function() _ttsFactory;
+  final Timer Function(Duration, void Function()) _timerFactory;
   late FlutterTts _tts;
   var _isTtsInitialized = false;
   bool _isPlaying = false;
@@ -21,6 +30,9 @@ class TtsController {
   late double _lastRate;
   String? _lastText;
   StreamSubscription<dynamic>? _noisySub;
+  Timer? _sleepTimer;
+  Duration? _sleepTimerDuration;
+  var _sleepTimerGeneration = 0;
 
   void _ensureTts() {
     if (_isTtsInitialized) return;
@@ -77,7 +89,40 @@ class TtsController {
 
   bool get hasLastText => _lastText != null;
 
+  /// Stops speech after [duration]. Starting a new timer replaces the old one.
+  void startSleepTimer(Duration duration) {
+    if (duration <= Duration.zero) {
+      throw ArgumentError.value(duration, 'duration', 'Must be greater than zero');
+    }
+
+    cancelSleepTimer();
+    final int generation = ++_sleepTimerGeneration;
+    _sleepTimerDuration = duration;
+    _sleepTimer = _timerFactory(duration, () {
+      if (generation != _sleepTimerGeneration) return;
+
+      _sleepTimer = null;
+      _sleepTimerDuration = null;
+      stop();
+    });
+  }
+
+  /// Cancels the pending sleep timer without changing current speech.
+  void cancelSleepTimer() {
+    _sleepTimerGeneration++;
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerDuration = null;
+  }
+
+  /// Whether a timer is currently scheduled to stop speech.
+  bool get hasSleepTimer => _sleepTimer != null;
+
+  /// Initially scheduled duration for the active sleep timer.
+  Duration? get sleepTimerDuration => _sleepTimerDuration;
+
   void dispose() {
+    cancelSleepTimer();
     _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
     _lastText = null;
