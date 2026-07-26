@@ -21,6 +21,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String selectedText;
   final VoidCallback onDismiss;
   final ValueChanged<String>? onSearchInBook;
+  final TtsController? ttsController;
 
   const ReaderSelectionToolbar({
     super.key,
@@ -30,6 +31,7 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
     required this.selectedText,
     required this.onDismiss,
     this.onSearchInBook,
+    this.ttsController,
   });
 
   @override
@@ -38,6 +40,8 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
 
 class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar> {
   String? _selectedText;
+
+  TtsController get _ttsController => widget.ttsController ?? TtsController.instance;
 
   @override
   void initState() {
@@ -63,157 +67,162 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _ToolbarButton(
-              icon: Icons.copy,
-              label: 'Копировать',
-              onTap: () async {
-                if (_selectedText != null) {
-                  await Clipboard.setData(ClipboardData(text: _selectedText!));
-                  if (context.mounted) {
-                    unawaited(SmartDialog.showToast('Текст скопирован'));
-                  }
-                }
-                widget.onDismiss();
-              },
-            ),
-            _ToolbarButton(
-              icon: Icons.share,
-              label: 'Поделиться',
-              onTap: () async {
-                if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  await SharePlus.instance.share(
-                    ShareParams(text: _selectedText),
-                  );
-                }
-                widget.onDismiss();
-              },
-            ),
-            _ToolbarButton(
-              icon: Icons.search,
-              label: 'В поиске',
-              onTap: () async {
-                if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://www.google.com/search?q=$query');
-                  try {
-                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    if (!launched && context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  } on Object {
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ToolbarButton(
+                icon: Icons.copy,
+                label: 'Копировать',
+                onTap: () async {
+                  if (_selectedText != null) {
+                    await Clipboard.setData(ClipboardData(text: _selectedText!));
                     if (context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      unawaited(SmartDialog.showToast('Текст скопирован'));
                     }
                   }
-                }
-                widget.onDismiss();
-              },
-            ),
-            // HG-7.5: in-book search from context
-            if (widget.onSearchInBook != null && _selectedText != null)
+                  widget.onDismiss();
+                },
+              ),
+              _ToolbarButton(
+                icon: Icons.share,
+                label: 'Поделиться',
+                onTap: () async {
+                  if (_selectedText != null && _selectedText!.isNotEmpty) {
+                    await SharePlus.instance.share(
+                      ShareParams(text: _selectedText),
+                    );
+                  }
+                  widget.onDismiss();
+                },
+              ),
+              _ToolbarButton(
+                icon: Icons.search,
+                label: 'В поиске',
+                onTap: () async {
+                  if (_selectedText != null && _selectedText!.isNotEmpty) {
+                    final query = Uri.encodeComponent(_selectedText!);
+                    final uri = Uri.parse('https://www.google.com/search?q=$query');
+                    try {
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched && context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    } on Object {
+                      if (context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    }
+                  }
+                  widget.onDismiss();
+                },
+              ),
+              // HG-7.5: in-book search from context
+              if (widget.onSearchInBook != null && _selectedText != null)
+                _ToolbarButton(
+                  icon: Icons.menu_book,
+                  label: 'В книге',
+                  onTap: () {
+                    widget.onSearchInBook!(_selectedText!);
+                    widget.onDismiss();
+                  },
+                ),
+              _ToolbarButton(
+                icon: Icons.translate,
+                label: 'Перевод',
+                onTap: () async {
+                  if (_selectedText != null && _selectedText!.isNotEmpty) {
+                    final query = Uri.encodeComponent(_selectedText!);
+                    final uri = Uri.parse(
+                      'https://translate.google.com/?sl=auto&tl=ru&text=$query',
+                    );
+                    try {
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched && context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    } on Object {
+                      if (context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    }
+                  }
+                  widget.onDismiss();
+                },
+              ),
+              // MD-3.2: inline dictionary popup via Wiktionary REST API
               _ToolbarButton(
                 icon: Icons.menu_book,
-                label: 'В книге',
-                onTap: () {
-                  widget.onSearchInBook!(_selectedText!);
+                label: 'Словарь',
+                onTap: () async {
+                  if (_selectedText != null && _selectedText!.isNotEmpty) {
+                    final query = _selectedText!.trim();
+                    if (context.mounted) {
+                      unawaited(_showDictPopup(context, query));
+                    }
+                  }
                   widget.onDismiss();
                 },
               ),
-            _ToolbarButton(
-              icon: Icons.translate,
-              label: 'Перевод',
-              onTap: () async {
-                if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://translate.google.com/?sl=auto&tl=ru&text=$query');
-                  try {
-                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    if (!launched && context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  } on Object {
-                    if (context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  }
-                }
-                widget.onDismiss();
-              },
-            ),
-            // MD-3.2: inline dictionary popup via Wiktionary REST API
-            _ToolbarButton(
-              icon: Icons.menu_book,
-              label: 'Словарь',
-              onTap: () async {
-                if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final query = _selectedText!.trim();
-                  if (context.mounted) {
-                    unawaited(_showDictPopup(context, query));
-                  }
-                }
-                widget.onDismiss();
-              },
-            ),
-            // HG-7.7: Wikipedia search
-            _ToolbarButton(
-              icon: Icons.language,
-              label: 'Википедия',
-              onTap: () async {
-                if (_selectedText != null && _selectedText!.isNotEmpty) {
-                  final query = Uri.encodeComponent(_selectedText!);
-                  final uri = Uri.parse('https://ru.wikipedia.org/wiki/$query');
-                  try {
-                    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    if (!launched && context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  } on Object {
-                    if (context.mounted) {
-                      unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
-                    }
-                  }
-                }
-                widget.onDismiss();
-              },
-            ),
-            // HG-7.6: TTS from context; LW-11.2: resume last if available
-            if (_selectedText != null && _selectedText!.isNotEmpty)
+              // HG-7.7: Wikipedia search
               _ToolbarButton(
-                icon: Icons.volume_up,
-                label: TtsController.instance.hasLastText ? 'Возобновить' : 'Озвучить',
-                onTap: () {
-                  if (TtsController.instance.hasLastText) {
-                    unawaited(TtsController.instance.resume());
-                  } else {
-                    unawaited(_speakText(_selectedText!));
+                icon: Icons.language,
+                label: 'Википедия',
+                onTap: () async {
+                  if (_selectedText != null && _selectedText!.isNotEmpty) {
+                    final query = Uri.encodeComponent(_selectedText!);
+                    final uri = Uri.parse('https://ru.wikipedia.org/wiki/$query');
+                    try {
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched && context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    } on Object {
+                      if (context.mounted) {
+                        unawaited(SmartDialog.showToast('Не удалось открыть ссылку'));
+                      }
+                    }
                   }
                   widget.onDismiss();
                 },
               ),
-            _ToolbarButton(
-              icon: Icons.bookmark_add,
-              label: 'Закладка',
-              onTap: () => unawaited(_addBookmark(context)),
-            ),
-            _ToolbarButton(
-              icon: Icons.sticky_note_2,
-              label: 'Заметка',
-              onTap: () => unawaited(_addNote(context)),
-            ),
-            _ToolbarButton(
-              icon: Icons.format_quote,
-              label: 'Цитата',
-              onTap: () => unawaited(_addQuote(context)),
-            ),
-            _ToolbarButton(
-              icon: Icons.highlight,
-              label: 'Выделить',
-              onTap: () => unawaited(_addHighlight(context)),
-            ),
-          ],
+              // TTS-001: keep a direct stop action available while speaking.
+              if (_selectedText != null && _selectedText!.isNotEmpty)
+                _ToolbarButton(
+                  icon: _ttsController.isPlaying ? Icons.stop_circle_outlined : Icons.volume_up,
+                  label: _ttsController.isPlaying ? 'Остановить' : 'Озвучить',
+                  onTap: () {
+                    if (_ttsController.isPlaying) {
+                      _ttsController.stop();
+                      setState(() {});
+                    } else {
+                      unawaited(_speakSelectedText(_selectedText!));
+                    }
+                  },
+                ),
+              _ToolbarButton(
+                icon: Icons.bookmark_add,
+                label: 'Закладка',
+                onTap: () => unawaited(_addBookmark(context)),
+              ),
+              _ToolbarButton(
+                icon: Icons.sticky_note_2,
+                label: 'Заметка',
+                onTap: () => unawaited(_addNote(context)),
+              ),
+              _ToolbarButton(
+                icon: Icons.format_quote,
+                label: 'Цитата',
+                onTap: () => unawaited(_addQuote(context)),
+              ),
+              _ToolbarButton(
+                icon: Icons.highlight,
+                label: 'Выделить',
+                onTap: () => unawaited(_addHighlight(context)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -467,9 +476,10 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     }
   }
 
-  Future<void> _speakText(String text) async {
+  Future<void> _speakSelectedText(String text) async {
     try {
-      await TtsController.instance.speak(text, lang: 'ru-RU', rate: 0.5);
+      await _ttsController.speak(text, lang: 'ru-RU', rate: 0.5);
+      if (mounted) setState(() {});
     } on Object catch (e) {
       debugPrint('TTS error: $e');
     }

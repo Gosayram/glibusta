@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
@@ -327,27 +328,41 @@ class ReaderBottomBar extends StatelessWidget {
             button: true,
             label: entry.value,
             selected: isSelected,
-            child: GestureDetector(
-              onTap: () => onModeChanged?.call(entry.key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? colors.text.withValues(alpha: 0.15)
-                      : colors.text.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected
-                        ? colors.text.withValues(alpha: 0.3)
-                        : colors.text.withValues(alpha: 0.1),
-                  ),
+            child: FocusableActionDetector(
+              shortcuts: const {
+                SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+                SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+              },
+              actions: {
+                ActivateIntent: CallbackAction<ActivateIntent>(
+                  onInvoke: (_) {
+                    onModeChanged?.call(entry.key);
+                    return null;
+                  },
                 ),
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              },
+              child: GestureDetector(
+                onTap: () => onModeChanged?.call(entry.key),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colors.text.withValues(alpha: 0.15)
+                        : colors.text.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? colors.text.withValues(alpha: 0.3)
+                          : colors.text.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
               ),

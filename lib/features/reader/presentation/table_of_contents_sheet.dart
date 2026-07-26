@@ -87,7 +87,61 @@ class _TableOfContentsContent extends StatefulWidget {
 }
 
 class _TableOfContentsContentState extends State<_TableOfContentsContent> {
+  static const _estimatedEntryExtent = 56.0;
+  static const _maxInitialPositionAttempts = 3;
+
   final Set<int> _collapsedGroups = {};
+  final GlobalKey _currentChapterKey = GlobalKey();
+  bool _hasPositionedCurrentChapter = false;
+  int _initialPositionAttempts = 0;
+
+  void _positionCurrentChapter(List<TocEntry> visibleEntries) {
+    if (_hasPositionedCurrentChapter) {
+      return;
+    }
+
+    final currentEntryIndex = visibleEntries.indexWhere(
+      (entry) => entry.index == widget.currentChapterIndex,
+    );
+    if (currentEntryIndex < 0) {
+      return;
+    }
+
+    _hasPositionedCurrentChapter = true;
+    _scrollToCurrentChapter(currentEntryIndex);
+  }
+
+  void _scrollToCurrentChapter(int currentEntryIndex) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.scrollController.hasClients) {
+        if (mounted && _initialPositionAttempts < _maxInitialPositionAttempts) {
+          _initialPositionAttempts++;
+          _scrollToCurrentChapter(currentEntryIndex);
+        }
+        return;
+      }
+
+      final position = widget.scrollController.position;
+      if (position.maxScrollExtent == 0 &&
+          currentEntryIndex > 0 &&
+          _initialPositionAttempts < _maxInitialPositionAttempts) {
+        _initialPositionAttempts++;
+        _scrollToCurrentChapter(currentEntryIndex);
+        return;
+      }
+      final targetOffset =
+          (currentEntryIndex * _estimatedEntryExtent) -
+          (position.viewportDimension - _estimatedEntryExtent) / 2;
+      widget.scrollController.jumpTo(
+        targetOffset.clamp(0.0, position.maxScrollExtent),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final currentChapterContext = _currentChapterKey.currentContext;
+        if (currentChapterContext == null) return;
+        unawaited(Scrollable.ensureVisible(currentChapterContext, alignment: 0.5));
+      });
+    });
+  }
 
   // ponytail: shared with reader_side_panel via toc_hierarchy.dart
   List<TocEntry> _buildHierarchy() {
@@ -105,6 +159,7 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
     final visibleEntries = entries
         .where((e) => e.isGroup || !_collapsedGroups.contains(e.groupId))
         .toList();
+    _positionCurrentChapter(visibleEntries);
 
     // MD-8.1: compute max chapter size for visual bars
     final maxSize = widget.loadedChapters.values.fold<int>(
@@ -170,6 +225,7 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
               final barFraction = maxSize > 0 ? blockCount / maxSize : 0.0;
 
               return ListTile(
+                key: isActive ? _currentChapterKey : ValueKey('toc-entry-${entry.index}'),
                 contentPadding: EdgeInsets.only(
                   left: 16.0 + entry.depth * 16.0,
                 ),
