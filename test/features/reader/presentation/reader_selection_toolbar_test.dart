@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:glibusta/core/services/tts_controller.dart';
 import 'package:glibusta/features/reader/presentation/reader_selection_toolbar.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockFlutterTts extends Mock implements FlutterTts {}
 
@@ -237,5 +238,36 @@ void main() {
     expect(find.text('Язык: English'), findsOneWidget);
     expect(dismissals, 0);
     verify(() => tts.setLanguage('en-US')).called(1);
+  });
+
+  testWidgets('confirms an online dictionary lookup before sending selected text', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Словарь'));
+    await tester.tap(find.text('Словарь'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Онлайн-словарь'), findsOneWidget);
+    expect(find.textContaining('будет отправлен на en.wiktionary.org'), findsOneWidget);
+
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(find.text('Онлайн-словарь'), findsNothing);
   });
 }
