@@ -92,7 +92,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             const SizedBox(height: 12),
             _buildPageIndicator(context),
             const SizedBox(height: 8),
-            if (widget.bookId != null) _buildPerBookSection(context, ref, widget.bookId!),
+            if (widget.bookId != null) _buildPerBookSection(context, ref, widget.bookId!, settings),
             SizedBox(
               height: _estimatedPageHeight(context),
               child: PageView(
@@ -1535,12 +1535,12 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     BuildContext context,
     WidgetRef ref,
     String bookId,
+    ReaderSettings settings,
   ) {
     return FutureBuilder<bool>(
       future: ref.read(perBookSettingsServiceProvider).hasPerBookSettings(bookId),
       builder: (context, snapshot) {
         final hasPerBook = snapshot.data ?? false;
-        if (!hasPerBook) return const SizedBox.shrink();
         final theme = Theme.of(context);
         return Container(
           margin: const EdgeInsets.only(bottom: 8, left: 20, right: 20),
@@ -1552,14 +1552,14 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           child: Row(
             children: [
               Icon(
-                Icons.bookmark,
+                hasPerBook ? Icons.bookmark : Icons.bookmark_add_outlined,
                 size: 18,
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Индивидуальные настройки',
+                  hasPerBook ? 'Индивидуальные настройки' : 'Сохранить оформление для этой книги',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onPrimaryContainer,
                   ),
@@ -1567,12 +1567,17 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               ),
               TextButton(
                 onPressed: () async {
-                  await ref.read(perBookSettingsServiceProvider).resetToGlobal(bookId);
+                  final service = ref.read(perBookSettingsServiceProvider);
+                  if (hasPerBook) {
+                    await service.resetToGlobal(bookId);
+                  } else {
+                    await service.saveReadingAppearance(bookId, settings);
+                  }
                   if (context.mounted) {
                     Navigator.of(context).pop();
                   }
                 },
-                child: const Text('Сбросить'),
+                child: Text(hasPerBook ? 'Сбросить' : 'Сохранить'),
               ),
             ],
           ),

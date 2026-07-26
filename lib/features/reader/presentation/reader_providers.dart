@@ -14,12 +14,14 @@ part 'reader_providers.g.dart';
 @riverpod
 class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   Timer? _saveDebouncer;
+  bool _isApplyingTransientProfile = false;
 
   @override
   ReaderSettings build() {
     _loadFromPrefs();
     listenSelf((prev, next) {
       if (prev != next) {
+        if (_isApplyingTransientProfile) return;
         _saveDebouncer?.cancel();
         _saveDebouncer = Timer(const Duration(milliseconds: 300), () {
           unawaited(ReaderSettingsPersistence.save(next));
@@ -321,7 +323,12 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   }
 
   void applyProfile(ReaderSettings profile) {
+    // A per-book profile is the effective configuration for the current
+    // session. It must not replace the reader's global defaults in
+    // SharedPreferences.
+    _isApplyingTransientProfile = true;
     state = profile;
+    _isApplyingTransientProfile = false;
   }
 }
 

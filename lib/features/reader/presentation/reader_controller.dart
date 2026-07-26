@@ -161,6 +161,7 @@ final class ReaderController {
   final _sessionStopwatch = Stopwatch();
   int _accumulatedSeconds = 0;
   int _sessionWordsRead = 0;
+  int _estimatedTotalWords = 0;
   bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
@@ -252,6 +253,7 @@ final class ReaderController {
     _chapterLoadGeneration++;
     _loaded = false;
     _sessionWordsRead = 0;
+    _estimatedTotalWords = 0;
     _cacheMode = 'unknown';
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
@@ -322,7 +324,7 @@ final class ReaderController {
       _sessionWordsRead = loadedWords;
       final loadedCount = _state.loadedChapters.length;
       final totalCount = _state.chapterCount;
-      final estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
+      _estimatedTotalWords = loadedCount > 0 && totalCount > loadedCount
           ? (loadedWords / loadedCount * totalCount).round()
           : loadedWords;
       final totalSeconds =
@@ -333,7 +335,10 @@ final class ReaderController {
           : 200;
       _updateState(
         _state.copyWith(
-          estimatedMinutesLeft: estimatedTotalWords > 0 ? (estimatedTotalWords / wpm).ceil() : 0,
+          estimatedMinutesLeft: _estimateMinutesLeft(
+            _progressForPosition(_state.currentPosition),
+            wpm: wpm,
+          ),
           wpm: wpm,
         ),
       );
@@ -433,10 +438,16 @@ final class ReaderController {
   void handlePageChanged(int chapterIndex) {
     if (_disposed || _state.chapterCount == 0) return;
     final clamped = chapterIndex.clamp(0, _state.chapterCount - 1);
+    final progress = _chapterProgress(clamped);
     if (clamped != _state.currentPosition.chapterIndex) {
       _updateState(
         _state.copyWith(
-          currentPosition: _state.currentPosition.copyWith(chapterIndex: clamped),
+          currentPosition: _state.currentPosition.copyWith(
+            chapterIndex: clamped,
+            progressPercent: progress,
+          ),
+          scrollProgress: progress,
+          estimatedMinutesLeft: _estimateMinutesLeft(progress),
         ),
       );
     }
@@ -565,7 +576,12 @@ final class ReaderController {
       return;
     }
     final chapterChanged = position.chapterIndex != _state.currentPosition.chapterIndex;
-    _updateState(_state.copyWith(currentPosition: position));
+    _updateState(
+      _state.copyWith(
+        currentPosition: position,
+        estimatedMinutesLeft: _estimateMinutesLeft(progress),
+      ),
+    );
     _ref
         .read(readingProgressProvider.notifier)
         .updateProgress(
@@ -599,6 +615,24 @@ final class ReaderController {
       contentHash: _state.currentPosition.contentHash,
       updatedAt: DateTime.now(),
     );
+  }
+
+  double _chapterProgress(int chapterIndex) {
+    final lastChapter = _state.chapterCount - 1;
+    if (lastChapter <= 0) return 0;
+    return (chapterIndex / lastChapter).clamp(0.0, 1.0);
+  }
+
+  double _progressForPosition(ReaderPosition position) {
+    if (position.progressPercent > 0) return position.progressPercent.clamp(0.0, 1.0);
+    return _chapterProgress(position.chapterIndex);
+  }
+
+  int _estimateMinutesLeft(double progress, {int? wpm}) {
+    if (_estimatedTotalWords <= 0) return 0;
+    final remainingWords = (_estimatedTotalWords * (1 - progress.clamp(0.0, 1.0))).ceil();
+    if (remainingWords == 0) return 0;
+    return (remainingWords / (wpm ?? _state.wpm)).ceil();
   }
 
   void _restoreSavedPosition(ReaderPosition position) {
@@ -750,7 +784,12 @@ final class ReaderController {
       );
       _updateState(
         _state.copyWith(
-          currentPosition: _state.currentPosition.copyWith(chapterIndex: nextChapter),
+          currentPosition: _state.currentPosition.copyWith(
+            chapterIndex: nextChapter,
+            progressPercent: _chapterProgress(nextChapter),
+          ),
+          scrollProgress: _chapterProgress(nextChapter),
+          estimatedMinutesLeft: _estimateMinutesLeft(_chapterProgress(nextChapter)),
         ),
       );
       unawaited(_ensureChaptersLoaded(nextChapter));
@@ -827,7 +866,12 @@ final class ReaderController {
       );
       _updateState(
         _state.copyWith(
-          currentPosition: _state.currentPosition.copyWith(chapterIndex: previousChapter),
+          currentPosition: _state.currentPosition.copyWith(
+            chapterIndex: previousChapter,
+            progressPercent: _chapterProgress(previousChapter),
+          ),
+          scrollProgress: _chapterProgress(previousChapter),
+          estimatedMinutesLeft: _estimateMinutesLeft(_chapterProgress(previousChapter)),
         ),
       );
       unawaited(_ensureChaptersLoaded(previousChapter));
@@ -858,7 +902,14 @@ final class ReaderController {
     final clamped = position.clamp(chapterCount: total);
     final mode = effectiveMode;
     if (mode == ReaderMode.paginated || mode == ReaderMode.focus) {
-      _updateState(_state.copyWith(currentPosition: clamped));
+      final progress = _progressForPosition(clamped);
+      _updateState(
+        _state.copyWith(
+          currentPosition: clamped,
+          scrollProgress: progress,
+          estimatedMinutesLeft: _estimateMinutesLeft(progress),
+        ),
+      );
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
       _evictDistantChapters(clamped.chapterIndex);
       return;
@@ -1053,10 +1104,8 @@ final class ReaderController {
   Future<void> _applyPerBookSettings() async {
     try {
       final service = _ref.read(perBookSettingsServiceProvider);
-      if (await service.hasPerBookSettings(_bookId)) {
-        final effective = await service.getEffectiveSettings(_bookId);
-        _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
-      }
+      final effective = await service.getEffectiveSettings(_bookId);
+      _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
     } on Object catch (e) {
       _logger.warning('Failed to apply per-book settings: $e', name: 'Reader', error: e);
     }

@@ -45,6 +45,22 @@ class _LongBookOpenService extends BookOpenService {
   }
 }
 
+class _WordyBookOpenService extends _LongBookOpenService {
+  _WordyBookOpenService(super.database);
+
+  static final String _chapterText = List<String>.filled(1000, 'word').join(' ');
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    if (index < 0 || index >= _LongBookOpenService.chapterCount) return null;
+    return ReaderChapter(
+      index: index,
+      title: 'Chapter $index',
+      blocks: [ReaderBlock(index: 0, text: _chapterText)],
+    );
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -345,6 +361,28 @@ void main() {
 
       expect(ctrl.state.currentPosition.chapterIndex, 50);
       expect(ctrl.state.scrollProgress, closeTo(0.5, 0.001));
+      ctrl.dispose();
+    });
+
+    testWidgets('paginated chapter changes keep progress and remaining time in sync', (
+      tester,
+    ) async {
+      final ctrl = await createController(
+        tester,
+        'wordy-book',
+        bookOpenService: _WordyBookOpenService(db),
+        settings: const ReaderSettings(),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+      final initialMinutesLeft = ctrl.state.estimatedMinutesLeft;
+
+      ctrl.handlePageChanged(50);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.currentPosition.progressPercent, closeTo(50 / 99, 0.001));
+      expect(ctrl.state.scrollProgress, closeTo(50 / 99, 0.001));
+      expect(ctrl.state.estimatedMinutesLeft, lessThan(initialMinutesLeft));
       ctrl.dispose();
     });
 
