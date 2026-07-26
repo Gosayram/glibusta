@@ -27,6 +27,9 @@ FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release --obfuscate --split-de
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debug-info=$(DEBUG_INFO_MACOS)
 CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check
+# The repository default is rust/.cargo/config.toml ([build] jobs = 4).
+# CARGO_BUILD_JOBS remains an explicit per-invocation override for CI or a
+# developer who deliberately wants a different limit.
 ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
 ANDROID_NDK_TOOLCHAIN_BIN := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin
 ANDROID_NDK_SYSROOT_LIB := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib

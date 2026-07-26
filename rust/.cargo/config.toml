@@ -1,0 +1,5 @@
+# Keep local and CI Rust builds responsive. Cargo otherwise schedules one
+# compilation job per logical CPU, which can starve Flutter/Gradle and the UI.
+# Override for a one-off build with CARGO_BUILD_JOBS=<n> cargo build …
+[build]
+jobs = 4
