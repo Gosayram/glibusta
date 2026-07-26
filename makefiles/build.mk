@@ -28,7 +28,9 @@ FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debu
 CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check
 ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
-CARGO_NDK := cargo ndk
+ANDROID_NDK_TOOLCHAIN_BIN := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin
+ANDROID_RUST_API_LEVEL ?= 21
+ANDROID_LINK_SHIMS := $(CURDIR)/rust/android-link-shims
 JNILIBS_DIR := android/app/src/main/jniLibs
 ANDROID_16K_RUSTFLAGS := -C link-arg=-Wl,-z,max-page-size=16384
 ANDROID_16K_CHECK := $(PYTHON) scripts/check_android_16k.py
@@ -51,9 +53,20 @@ rust-build-android: require-rust ## Build Rust native libraries for Android (arm
 	@export ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)"; \
 	export CXXFLAGS="$${CXXFLAGS:+$${CXXFLAGS} }$(UNRAR_NG_ANDROID_CXXFLAGS)"; \
 	export PATH="$${HOME}/.cargo/bin:$${HOME}/.rustup/toolchains/stable-aarch64-apple-darwin/bin:$${PATH}"; \
-	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a; \
-	cd rust && RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS)" $(CARGO_NDK) -t arm64-v8a build --release && \
-	$(CARGO_NDK) -t armeabi-v7a build --release
+	mkdir -p $(JNILIBS_DIR)/arm64-v8a $(JNILIBS_DIR)/armeabi-v7a $(ANDROID_LINK_SHIMS); \
+	cd rust && \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
+	CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang" \
+	CC_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang" \
+	CXX_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/aarch64-linux-android$(ANDROID_RUST_API_LEVEL)-clang++" \
+	AR_aarch64_linux_android="$(ANDROID_NDK_TOOLCHAIN_BIN)/llvm-ar" \
+	cargo build --target aarch64-linux-android --release && \
+	RUSTFLAGS="$${RUSTFLAGS:+$${RUSTFLAGS} }$(ANDROID_16K_RUSTFLAGS) -Lnative=$(ANDROID_LINK_SHIMS)" \
+	CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang" \
+	CC_armv7_linux_androideabi="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang" \
+	CXX_armv7_linux_androideabi="$(ANDROID_NDK_TOOLCHAIN_BIN)/armv7a-linux-androideabi$(ANDROID_RUST_API_LEVEL)-clang++" \
+	AR_armv7_linux_androideabi="$(ANDROID_NDK_TOOLCHAIN_BIN)/llvm-ar" \
+	cargo build --target armv7-linux-androideabi --release
 	cp rust/target/aarch64-linux-android/release/libglibusta_core.so $(JNILIBS_DIR)/arm64-v8a/
 	cp rust/target/armv7-linux-androideabi/release/libglibusta_core.so $(JNILIBS_DIR)/armeabi-v7a/
 	@$(PRINT_OK) "Android Rust libraries built and copied to $(JNILIBS_DIR)"
