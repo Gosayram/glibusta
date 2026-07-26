@@ -745,7 +745,7 @@ void main() {
       ),
     );
 
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.byIcon(Icons.broken_image), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -1469,7 +1469,7 @@ void main() {
     );
     expect(tableScrollable.position.maxScrollExtent, greaterThan(0));
     tableScrollable.position.jumpTo(tableScrollable.position.maxScrollExtent);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(tester.getRect(find.text(lastCell)).left, lessThan(320));
     expect(tester.takeException(), isNull);
@@ -1542,6 +1542,71 @@ void main() {
     );
     expect(find.byType(Image), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('exposes chapter and rich block headings without duplicate semantics', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    final semantics = tester.ensureSemantics();
+    String? openedLink;
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'semantic-headings',
+            title: 'Semantic headings',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Глава доступности'],
+          ),
+          loadedChapters: const {
+            0: ReaderChapter(
+              index: 0,
+              title: 'Глава доступности',
+              blocks: [
+                ReaderBlock(
+                  index: 0,
+                  text: 'Раздел доступности',
+                  type: BlockType.heading,
+                ),
+                ReaderBlock(
+                  index: 1,
+                  text: 'Ссылка в заголовке',
+                  type: BlockType.heading,
+                  richSpans: [RichSpan(text: 'Ссылка в заголовке', href: '#note')],
+                ),
+              ],
+            ),
+          },
+          settings: const ReaderSettings(mode: ReaderMode.continuous),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+          onLinkTap: (href) => openedLink = href,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final chapterHeading = find.bySemanticsLabel('Глава доступности');
+    final blockHeading = find.bySemanticsLabel('Раздел доступности');
+    expect(chapterHeading, findsOneWidget);
+    expect(blockHeading, findsOneWidget);
+    expect(
+      tester.getSemantics(chapterHeading),
+      matchesSemantics(label: 'Глава доступности', isHeader: true),
+    );
+    expect(
+      tester.getSemantics(blockHeading),
+      matchesSemantics(label: 'Раздел доступности', isHeader: true),
+    );
+
+    await tester.tap(find.text('Ссылка в заголовке'));
+    expect(openedLink, '#note');
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('opens an illustration in an accessible full-screen viewer', (tester) async {

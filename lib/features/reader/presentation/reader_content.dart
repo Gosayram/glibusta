@@ -306,11 +306,15 @@ Widget _buildReaderBlock(
       final spacing = _headingSpacing(s.paragraphSpacing, level);
       return Padding(
         padding: EdgeInsets.only(top: spacing, bottom: s.paragraphSpacing),
-        child: _readerHighlightedText(
-          ctx,
-          block.text,
-          style.copyWith(fontSize: s.fontSize * scale, fontWeight: FontWeight.bold),
-          block.textAlign ?? TextAlign.start,
+        child: Semantics(
+          header: true,
+          child: _readerHighlightedText(
+            ctx,
+            block.text,
+            style.copyWith(fontSize: s.fontSize * scale, fontWeight: FontWeight.bold),
+            block.textAlign ?? TextAlign.start,
+            richSpans: block.richSpans,
+          ),
         ),
       );
     case BlockType.subtitle:
@@ -1536,14 +1540,17 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     final header = chapter.title.isNotEmpty
         ? Padding(
             padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: _readerHighlightedText(
-              ctx,
-              chapter.title,
-              _getReaderStyle(settings).copyWith(
-                fontSize: settings.fontSize * 1.4,
-                fontWeight: FontWeight.bold,
+            child: Semantics(
+              header: true,
+              child: _readerHighlightedText(
+                ctx,
+                chapter.title,
+                _getReaderStyle(settings).copyWith(
+                  fontSize: settings.fontSize * 1.4,
+                  fontWeight: FontWeight.bold,
+                ),
+                baseAlign,
               ),
-              baseAlign,
             ),
           )
         : const SizedBox.shrink();
@@ -2274,11 +2281,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       content.add(
         Padding(
           padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-          child: _readerHighlightedText(
-            ctx,
-            chapter.title,
-            style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
-            baseAlign,
+          child: Semantics(
+            header: true,
+            child: _readerHighlightedText(
+              ctx,
+              chapter.title,
+              style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
+              baseAlign,
+            ),
           ),
         ),
       );
@@ -2731,12 +2741,15 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
                 if (chapter.title.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
-                    child: Text(
-                      chapter.title,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        chapter.title,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                        ),
                       ),
                     ),
                   ),
@@ -2750,7 +2763,9 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
                       : TextStyle(fontSize: 14, color: textColor);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(b.text, style: style),
+                    child: b.type == BlockType.heading
+                        ? Semantics(header: true, child: Text(b.text, style: style))
+                        : Text(b.text, style: style),
                   );
                 }),
               ],
