@@ -11,6 +11,7 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
 import 'reading_break_reminder.dart';
 
@@ -478,7 +479,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildReadingBreakReminderSettings(),
         const SizedBox(height: 16),
         // LW-10.1: Custom CSS editor
-        _buildCustomCssSection(settings, notifier),
+        ReaderCustomCssEditor(css: settings.customCss, onChanged: notifier.updateCustomCss),
         const SizedBox(height: 12),
         // LW-10.3: Ignore book CSS overrides
         _buildToggleRow(
@@ -1237,48 +1238,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ),
         const Icon(Icons.wb_sunny, size: 20, color: Colors.orange),
-      ],
-    );
-  }
-
-  // LW-10.1: Custom CSS editor
-  static Widget _buildCustomCssSection(
-    ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Пользовательский CSS'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.black.withValues(alpha: 0.05),
-          ),
-          child: TextField(
-            controller: TextEditingController(text: settings.customCss)
-              ..selection = TextSelection.collapsed(offset: settings.customCss.length),
-            onChanged: notifier.updateCustomCss,
-            maxLines: 4,
-            minLines: 2,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
-            decoration: InputDecoration(
-              hintText: 'p { text-indent: 2em; }\n.epigraph { color: gray; }',
-              hintStyle: TextStyle(
-                color: Colors.black.withValues(alpha: 0.3),
-                fontSize: 12,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ),
       ],
     );
   }

@@ -13,6 +13,17 @@ import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
 import '../data/reading_stats_providers.dart' as rsp;
 
+/// Explains the next useful step for an enabled daily reading goal.
+String formatDailyGoalProgressMessage({
+  required int todayMinutes,
+  required int goalMinutes,
+}) {
+  if (todayMinutes == goalMinutes) return 'Цель выполнена точно';
+  return todayMinutes > goalMinutes
+      ? 'На ${todayMinutes - goalMinutes} мин больше цели'
+      : 'Осталось ${goalMinutes - todayMinutes} мин';
+}
+
 class ReadingStatsScreen extends ConsumerWidget {
   const ReadingStatsScreen({super.key});
 
@@ -454,6 +465,10 @@ class _GoalCard extends ConsumerWidget {
         final progress = todayMinutes / goal.dailyMinutes;
         final progressClamped = progress.clamp(0.0, 1.0);
         final isMet = progress >= 1.0;
+        final progressMessage = formatDailyGoalProgressMessage(
+          todayMinutes: todayMinutes,
+          goalMinutes: goal.dailyMinutes,
+        );
 
         return Card(
           child: InkWell(
@@ -514,7 +529,7 @@ class _GoalCard extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '$todayMinutes мин',
+                        progressMessage,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       Text(

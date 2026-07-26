@@ -7,6 +7,15 @@ import 'package:flutter_tts/flutter_tts.dart';
 /// LW-11.1/11.2: TTS controller with headphone auto-pause/resume.
 /// ponytail: singleton — single TTS instance shared across app.
 class TtsController {
+  /// Lowest playback-speed multiplier offered by the reader controls.
+  static const double minPlaybackRate = 0.5;
+
+  /// Highest playback-speed multiplier offered by the reader controls.
+  static const double maxPlaybackRate = 3;
+
+  static const double _defaultNativeRate = 0.5;
+  static const double _defaultPlaybackRate = 1;
+
   TtsController._({
     FlutterTts Function()? ttsFactory,
     Timer Function(Duration, void Function())? timerFactory,
@@ -28,6 +37,7 @@ class TtsController {
   bool _isPlaying = false;
   late String _lastLang;
   late double _lastRate;
+  var _playbackRate = _defaultPlaybackRate;
   String? _lastText;
   StreamSubscription<dynamic>? _noisySub;
   Timer? _sleepTimer;
@@ -39,7 +49,7 @@ class TtsController {
 
     _tts = _ttsFactory();
     _lastLang = 'ru-RU';
-    _lastRate = 0.5;
+    _lastRate = _defaultNativeRate;
     _isTtsInitialized = true;
   }
 
@@ -88,6 +98,28 @@ class TtsController {
   bool get isPlaying => _isPlaying;
 
   bool get hasLastText => _lastText != null;
+
+  /// Reader-facing speech-speed multiplier, from 0.5× to 3×.
+  double get playbackRate => _playbackRate;
+
+  /// Changes the speed for the next utterance without interrupting speech.
+  ///
+  /// `flutter_tts` uses a platform-native 0–1 rate. The reader presents the
+  /// more familiar multiplier range and maps it to that native scale.
+  Future<void> setPlaybackRate(double rate) async {
+    if (rate < minPlaybackRate || rate > maxPlaybackRate) {
+      throw ArgumentError.value(
+        rate,
+        'rate',
+        'Must be between $minPlaybackRate and $maxPlaybackRate',
+      );
+    }
+
+    _ensureTts();
+    _playbackRate = rate;
+    _lastRate = rate / 2;
+    await _tts.setSpeechRate(_lastRate);
+  }
 
   /// Stops speech after [duration]. Starting a new timer replaces the old one.
   void startSleepTimer(Duration duration) {

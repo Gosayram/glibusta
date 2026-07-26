@@ -19,6 +19,7 @@ import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
 import 'package:glibusta/features/reader/presentation/reader_content.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
+import 'package:glibusta/features/reader/presentation/reader_custom_css_editor.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
@@ -135,6 +136,29 @@ void main() {
   }
 
   group('ReaderQuickSettingsSheet', () {
+    testWidgets('custom CSS editor explains its safe subset and resets rules', (tester) async {
+      var currentCss = 'p { line-height: 1.7; }';
+      await tester.pumpWidget(
+        wrapInApp(
+          StatefulBuilder(
+            builder: (context, setState) => ReaderCustomCssEditor(
+              css: currentCss,
+              onChanged: (css) => setState(() => currentCss = css),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('Применяются только свойства p'), findsOneWidget);
+      expect(find.byTooltip('Сбросить пользовательский CSS'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Сбросить пользовательский CSS'));
+      await tester.pump();
+
+      expect(currentCss, isEmpty);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+    });
+
     testWidgets('renders display page sections', (tester) async {
       await tester.pumpWidget(
         wrapInApp(const ReaderQuickSettingsSheet()),

@@ -152,4 +152,51 @@ void main() {
     expect(controller.hasSleepTimer, isFalse);
     expect(find.text('Таймер сна'), findsOneWidget);
   });
+
+  testWidgets('sets an accessible playback speed without dismissing the selection', (
+    tester,
+  ) async {
+    final tts = _MockFlutterTts();
+    when(() => tts.setSpeechRate(any())).thenAnswer((_) async {});
+    final controller = TtsController.forTesting(() => tts);
+    var dismissals = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () => dismissals++,
+              ttsController: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Скорость: 1×'));
+    await tester.tap(find.text('Скорость: 1×'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Скорость озвучивания'), findsOneWidget);
+    expect(find.text('0.5×'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('2×'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('2×'), findsOneWidget);
+
+    await tester.tap(find.text('2×'));
+    await tester.pumpAndSettle();
+
+    expect(controller.playbackRate, 2);
+    expect(find.text('Скорость: 2×'), findsOneWidget);
+    expect(dismissals, 0);
+    verify(() => tts.setSpeechRate(1)).called(1);
+  });
 }

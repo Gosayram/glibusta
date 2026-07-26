@@ -63,6 +63,27 @@ void main() {
     expect(controller.stop, returnsNormally);
   });
 
+  test('maps reader playback speed to native TTS rate', () async {
+    await controller.setPlaybackRate(2);
+
+    expect(controller.playbackRate, 2);
+    verify(() => tts.setSpeechRate(1)).called(1);
+
+    await controller.speak('chapter');
+    verify(() => tts.setSpeechRate(1)).called(1);
+  });
+
+  test('rejects playback speed outside the supported range', () async {
+    await expectLater(
+      controller.setPlaybackRate(0.25),
+      throwsArgumentError,
+    );
+    await expectLater(
+      controller.setPlaybackRate(3.5),
+      throwsArgumentError,
+    );
+  });
+
   test('sleep timer stops speech when it expires', () async {
     late _TestTimer timer;
     controller = TtsController.forTesting(

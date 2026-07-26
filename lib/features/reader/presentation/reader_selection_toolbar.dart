@@ -211,6 +211,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   },
                 ),
               _ToolbarButton(
+                icon: Icons.speed,
+                label: _playbackSpeedLabel,
+                onTap: () => unawaited(_showPlaybackSpeedSheet()),
+              ),
+              _ToolbarButton(
                 icon: _ttsController.hasSleepTimer ? Icons.timer : Icons.timer_outlined,
                 label: _sleepTimerLabel,
                 onTap: () => unawaited(_showSleepTimerSheet()),
@@ -568,10 +573,51 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   Future<void> _speakSelectedText(String text) async {
     try {
-      await _ttsController.speak(text, lang: 'ru-RU', rate: 0.5);
+      await _ttsController.speak(text, lang: 'ru-RU');
       if (mounted) setState(() {});
     } on Object catch (e) {
       debugPrint('TTS error: $e');
+    }
+  }
+
+  String get _playbackSpeedLabel => 'Скорость: ${_formatPlaybackRate(_ttsController.playbackRate)}';
+
+  Future<void> _showPlaybackSpeedSheet() async {
+    final double? rate = await showModalBottomSheet<double>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: RadioGroup<double>(
+          groupValue: _ttsController.playbackRate,
+          onChanged: (double? selectedRate) {
+            if (selectedRate != null) Navigator.of(sheetContext).pop(selectedRate);
+          },
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(
+                leading: Icon(Icons.speed),
+                title: Text('Скорость озвучивания'),
+                subtitle: Text('Применится к следующему фрагменту, не прерывая текущий'),
+              ),
+              for (final double playbackRate in _playbackRates)
+                RadioListTile<double>(
+                  value: playbackRate,
+                  title: Text(_formatPlaybackRate(playbackRate)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || rate == null) return;
+
+    try {
+      await _ttsController.setPlaybackRate(rate);
+      if (mounted) setState(() {});
+    } on Object catch (e) {
+      debugPrint('TTS playback speed error: $e');
     }
   }
 
@@ -630,6 +676,15 @@ const List<Duration> _sleepTimerDurations = <Duration>[
   Duration(minutes: 30),
   Duration(minutes: 60),
 ];
+
+const List<double> _playbackRates = <double>[0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
+
+String _formatPlaybackRate(double rate) {
+  final String value = rate == rate.roundToDouble()
+      ? rate.toInt().toString()
+      : rate.toStringAsFixed(rate == 0.75 || rate == 1.25 ? 2 : 1);
+  return '$value×';
+}
 
 @immutable
 class _SleepTimerAction {

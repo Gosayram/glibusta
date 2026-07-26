@@ -85,5 +85,20 @@ void main() {
 
       expect(find.byType(Card), findsWidgets);
     });
+
+    test('formats remaining, exact, and exceeded daily-goal states', () {
+      expect(
+        formatDailyGoalProgressMessage(todayMinutes: 20, goalMinutes: 30),
+        'Осталось 10 мин',
+      );
+      expect(
+        formatDailyGoalProgressMessage(todayMinutes: 30, goalMinutes: 30),
+        'Цель выполнена точно',
+      );
+      expect(
+        formatDailyGoalProgressMessage(todayMinutes: 45, goalMinutes: 30),
+        'На 15 мин больше цели',
+      );
+    });
   });
 }
