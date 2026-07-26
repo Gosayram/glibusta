@@ -87,6 +87,29 @@ void main() {
     expect(await service.getMetadata('book'), isNull);
   });
 
+  test('invalidate removes a legacy cache even when no split cache exists', () async {
+    final root = await Directory.systemTemp.createTemp('reader_cache_');
+    addTearDown(() => root.delete(recursive: true));
+    final service = ReaderCacheService(
+      fingerprintProvider: (_) async => null,
+      storage: _TestStorage(root),
+      logger: AppLogger(),
+    );
+    const book = NormalizedBook(
+      id: 'content-hash',
+      title: 'Book',
+      authors: [],
+      chapters: [ReaderChapter(index: 0, title: 'Chapter', blocks: [])],
+    );
+
+    await service.saveToCache('book', book);
+    expect(await service.getCachedBook('book'), isNotNull);
+
+    await service.invalidate('book');
+
+    expect(await service.getCachedBook('book'), isNull);
+  });
+
   test('concurrent chapter writes do not share a temporary file', () async {
     final root = await Directory.systemTemp.createTemp('reader_cache_');
     addTearDown(() => root.delete(recursive: true));

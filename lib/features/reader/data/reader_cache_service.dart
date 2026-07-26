@@ -190,9 +190,8 @@ final class ReaderCacheService {
     bool preserveImages = false,
   }) async {
     final bookDir = await _getExistingBookDir(bookId);
-    if (!await bookDir.exists()) return;
     try {
-      if (preserveImages) {
+      if (await bookDir.exists() && preserveImages) {
         final imagesDir = Directory('${bookDir.path}/epub_images');
         final hasImages = await imagesDir.exists();
         final backupPath =
@@ -212,8 +211,15 @@ final class ReaderCacheService {
           await bookDir.create(recursive: true);
           await imagesBackup.rename('${bookDir.path}/epub_images');
         }
-      } else {
+      } else if (await bookDir.exists()) {
         await bookDir.delete(recursive: true);
+      }
+
+      // A stale split-cache manifest must not be bypassed by migrating the
+      // pre-manifest cache back into place on the next open.
+      final legacyCacheFile = await _getLegacyCacheFile(bookId);
+      if (await legacyCacheFile.exists()) {
+        await legacyCacheFile.delete();
       }
       _logger.info(
         'Reader cache invalidated for $bookId (preserveImages=$preserveImages)',
