@@ -152,6 +152,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _handleLayoutChange(ReaderSettings prev, ReaderSettings next) {
+    if (prev.mode != next.mode && next.mode == ReaderMode.continuous) {
+      _ctrl.prepareForContinuousLayout();
+    }
     final layoutChanged =
         prev.fontSize != next.fontSize ||
         prev.lineHeight != next.lineHeight ||
@@ -1163,6 +1166,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                     ) {},
               initialProgress: readerState.scrollProgress,
               initialPage: readerState.currentPosition.chapterIndex,
+              initialParagraph: readerState.currentPosition.paragraphIndex,
               highlightQuery: readerState.highlightedQuery,
               chapterHighlights: _buildChapterHighlights(),
               customColors: _resolveCustomColors(settings),

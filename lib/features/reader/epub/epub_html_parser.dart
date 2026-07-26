@@ -423,7 +423,7 @@ final class EpubHtmlParser {
             newSuperscript = true;
             break;
           case 'a':
-            newHref = node.getAttribute('href');
+            newHref = sanitizeEpubLinkHref(node.getAttribute('href'));
             break;
           case 'img':
             continue;

@@ -49,6 +49,10 @@ final class CustomEpubParser {
         chapterPath: resource.fullPath,
         htmlText: htmlText,
       );
+      // Empty spine documents are commonly used for publisher-specific
+      // navigation and must not become reader pages with no content.
+      if (result.blocks.isEmpty) continue;
+
       textDirection ??= result.textDirection;
       final title = _extractTitle(result.blocks);
 

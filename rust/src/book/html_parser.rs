@@ -135,7 +135,10 @@ fn walk_children(
                 }
             }
             "img" => {
-                let src = el.attr("src").unwrap_or("").to_string();
+                let src = el
+                    .attr("src")
+                    .and_then(crate::book::epub::sanitize_epub_asset_href)
+                    .unwrap_or_default();
                 let alt = el.attr("alt").unwrap_or("").to_string();
                 if !src.is_empty() {
                     blocks.push(ReaderBlock {

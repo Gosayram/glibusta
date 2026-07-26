@@ -844,6 +844,47 @@ void main() {
     expect(delegate.estimatedChildCount, 3);
   });
 
+  testWidgets('opens a paginated chapter at the saved paragraph', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final blocks = List<ReaderBlock>.generate(
+      4,
+      (index) => ReaderBlock(
+        index: index,
+        text: 'Paragraph $index\n${List<String>.filled(60, 'long reader line').join('\n')}',
+      ),
+    );
+
+    await tester.pumpWidget(
+      wrapInApp(
+        SizedBox(
+          width: 320,
+          height: 400,
+          child: ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'semantic-page-restore',
+              title: 'Semantic page restore',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Chapter'],
+            ),
+            loadedChapters: {
+              0: ReaderChapter(index: 0, title: 'Chapter', blocks: blocks),
+            },
+            settings: const ReaderSettings(),
+            scrollController: scrollController,
+            initialParagraph: 2,
+            onTap: _ignoreTap,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.controller?.page, closeTo(2, 0.01));
+  });
+
   testWidgets('opens a fixed-layout EPUB at its restored spine page', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

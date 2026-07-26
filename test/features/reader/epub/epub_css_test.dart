@@ -440,6 +440,45 @@ void main() {
     }
   });
 
+  test('skips empty spine documents while retaining a one-paragraph chapter', () async {
+    final temporaryDirectory = await Directory.systemTemp.createTemp('epub_empty_spine_test_');
+    try {
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'META-INF/container.xml',
+            '<container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/content.opf',
+            '''<package><metadata><title>One page</title></metadata><manifest><item id="empty" href="empty.xhtml" media-type="application/xhtml+xml"/><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="empty"/><itemref idref="chapter"/></spine></package>''',
+          ),
+        )
+        ..addFile(ArchiveFile.string('OEBPS/empty.xhtml', '<html><body></body></html>'))
+        ..addFile(
+          ArchiveFile.string(
+            'OEBPS/chapter.xhtml',
+            '<html><body><p>One-page chapter.</p></body></html>',
+          ),
+        );
+      final file = File('${temporaryDirectory.path}/empty-spine.epub');
+      await file.writeAsBytes(ZipEncoder().encode(archive));
+
+      final book = await CustomEpubParser(
+        imageStore: EpubImageStore(temporaryDirectory),
+      ).parse(file.path);
+
+      expect(book.chapters, hasLength(1));
+      expect(book.chapters.single.title, 'One-page chapter.');
+      final paragraph = book.chapters.single.blocks.single as ParagraphBlock;
+      expect(paragraph.spans.single.text, 'One-page chapter.');
+    } finally {
+      await temporaryDirectory.delete(recursive: true);
+    }
+  });
+
   test('falls back when the OPF cover id references a non-image resource', () async {
     final temporaryDirectory = await Directory.systemTemp.createTemp('epub_cover_fallback_test_');
     try {

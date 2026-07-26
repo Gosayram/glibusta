@@ -332,6 +332,19 @@ void main() {
       ctrl.dispose();
     });
 
+    testWidgets('continuous layout uses the semantic paginated position', (tester) async {
+      final service = _LongBookOpenService(db);
+      final ctrl = await createController(tester, 'long-book', bookOpenService: service);
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handlePageChanged(50);
+      ctrl.prepareForContinuousLayout();
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.scrollProgress, closeTo(0.5, 0.001));
+      ctrl.dispose();
+    });
+
     testWidgets('onBottomSheetOpen/close toggles isBottomSheetOpen', (tester) async {
       final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.isBottomSheetOpen, isFalse);

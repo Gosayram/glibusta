@@ -2,7 +2,9 @@ use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan, TocEntry,
 };
 use crate::book::archive::{self, ZipFile};
-use crate::book::encoding::{attr_eq, decode_bytes, get_class_attr_arena, get_xml_attr};
+use crate::book::encoding::{
+    attr_eq, decode_bytes, get_class_attr_arena, get_normalized_xml_attr, get_xml_attr,
+};
 use anyhow::{Context, Result, bail};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -1391,6 +1393,28 @@ fn element_discards_reader_content(tag: &[u8]) -> bool {
     )
 }
 
+/// EPUB image assets must always be archive-relative. Keeping a URI scheme
+/// here would let a later platform renderer interpret a document-controlled
+/// source as a local file or external resource.
+pub(crate) fn sanitize_epub_asset_href(href: &str) -> Option<String> {
+    let trimmed = href.trim();
+    if trimmed.is_empty() || trimmed.starts_with('/') || trimmed.starts_with('\\') {
+        return None;
+    }
+
+    if let Some(colon) = trimmed.find(':') {
+        let has_scheme = trimmed.as_bytes()[..colon]
+            .iter()
+            .copied()
+            .any(|byte| !byte.is_ascii_whitespace() && !byte.is_ascii_control());
+        if has_scheme {
+            return None;
+        }
+    }
+
+    Some(trimmed.to_string())
+}
+
 fn inline_style_hides_content(style: &str) -> bool {
     style.split(';').any(|declaration| {
         let Some((name, value)) = declaration.split_once(':') else {
@@ -1861,8 +1885,8 @@ fn parse_xhtml_to_blocks(
                             superscript,
                             &href,
                         );
-                        href =
-                            get_xml_attr(e, b"href").and_then(|h| crate::book::sanitize_href(&h));
+                        href = get_normalized_xml_attr(e, b"href")
+                            .and_then(|h| crate::book::sanitize_href(&h));
                     }
                     b"br" if hidden_depth == 0 => {
                         // The reader renders rich spans when present. Represent
@@ -2380,7 +2404,11 @@ fn parse_xhtml_to_blocks(
                     });
                     block_index += 1;
                 } else if name == b"img" && in_body && !element_is_hidden {
-                    let src = get_xml_attr(e, b"src");
+                    let raw_src = get_normalized_xml_attr(e, b"src");
+                    let src = raw_src.as_deref().and_then(sanitize_epub_asset_href);
+                    if raw_src.is_some() && src.is_none() {
+                        continue;
+                    }
                     let alt = get_xml_attr(e, b"alt");
                     blocks.push(ReaderBlock {
                         index: block_index,
@@ -2401,7 +2429,9 @@ fn parse_xhtml_to_blocks(
                     block_index += 1;
                 } else if name == b"image" && in_body && !element_is_hidden {
                     // CRT-1.15: SVG <image> tags — extract raster fallback from xlink:href or href
-                    let src = get_xml_attr(e, b"xlink:href").or_else(|| get_xml_attr(e, b"href"));
+                    let src = get_normalized_xml_attr(e, b"xlink:href")
+                        .or_else(|| get_normalized_xml_attr(e, b"href"))
+                        .and_then(|href| sanitize_epub_asset_href(&href));
                     if let Some(image_src) = src {
                         blocks.push(ReaderBlock {
                             index: block_index,
@@ -2830,6 +2860,39 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["#12", "chapter.xhtml#verse-3"],
         );
+    }
+
+    #[test]
+    fn drops_active_markup_and_non_archive_sources() {
+        let (blocks, _, _) = parse_xhtml_to_blocks(
+            r##"<html><body>
+                <p>Visible <script>alert(1)</script><iframe>frame fallback</iframe>
+                <a href="#note">Local</a><a href="https://example.test/reference">Web</a>
+                <a href="java&#x0A;script:alert(1)">Script</a><a href="file:///private/secret">File</a>.</p>
+                <img src="images/local.png"/><img src="file:///private/secret.png"/>
+                <svg><image href="https://example.test/pixel.png"/></svg>
+            </body></html>"##,
+            0,
+            &std::collections::HashMap::new(),
+        );
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].block_type, BlockType::Paragraph);
+        assert!(blocks[0].text.contains("Visible"));
+        assert!(!blocks[0].text.contains("alert(1)"));
+        assert!(!blocks[0].text.contains("frame fallback"));
+        assert_eq!(
+            blocks[0]
+                .rich_spans
+                .as_ref()
+                .expect("links retain rich spans")
+                .iter()
+                .filter_map(|span| span.href.as_deref())
+                .collect::<Vec<_>>(),
+            vec!["#note", "https://example.test/reference"],
+        );
+        assert_eq!(blocks[1].block_type, BlockType::Image);
+        assert_eq!(blocks[1].image_url.as_deref(), Some("images/local.png"));
     }
 
     #[test]

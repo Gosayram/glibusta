@@ -1238,6 +1238,7 @@ class ReaderContentBody extends StatefulWidget {
     required this.onTap,
     this.initialProgress = 0.0,
     this.initialPage = 0,
+    this.initialParagraph = 0,
     this.highlightQuery,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
@@ -1253,6 +1254,7 @@ class ReaderContentBody extends StatefulWidget {
   final GestureTapUpCallback onTap;
   final double initialProgress;
   final int initialPage;
+  final int initialParagraph;
   final String? highlightQuery;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
@@ -1276,7 +1278,9 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   @override
   void didUpdateWidget(covariant ReaderContentBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialProgress != oldWidget.initialProgress) {
+    if (widget.initialProgress != oldWidget.initialProgress ||
+        (widget.settings.mode == ReaderMode.continuous &&
+            oldWidget.settings.mode != ReaderMode.continuous)) {
       _didScrollToProgress = false;
     }
   }
@@ -1302,6 +1306,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         settings: settings,
         onTap: widget.onTap,
         initialPage: widget.initialPage,
+        initialParagraph: widget.initialParagraph,
         highlightQuery: widget.highlightQuery,
         chapterHighlights: widget.chapterHighlights,
         blockTransformers: widget.blockTransformers,
@@ -1700,6 +1705,7 @@ class _PaginatedContentBody extends StatefulWidget {
     required this.settings,
     required this.onTap,
     required this.initialPage,
+    required this.initialParagraph,
     this.highlightQuery,
     this.chapterHighlights = const <int, List<TextHighlight>>{},
     this.blockTransformers,
@@ -1713,6 +1719,7 @@ class _PaginatedContentBody extends StatefulWidget {
   final ReaderSettings settings;
   final GestureTapUpCallback onTap;
   final int initialPage;
+  final int initialParagraph;
   final String? highlightQuery;
   final Map<int, List<TextHighlight>> chapterHighlights;
   final List<BlockTransformer>? blockTransformers;
@@ -1796,34 +1803,41 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       _cacheKey = null;
       _heightCache.clear();
     }
-    if (widget.initialPage != oldWidget.initialPage) {
+    if (widget.initialPage != oldWidget.initialPage ||
+        widget.initialParagraph != oldWidget.initialParagraph) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_disposed || !_pageController.hasClients) return;
         final pageCount = _pages.length;
         if (pageCount == 0) return;
-        // Find first page matching the target chapter index
-        final targetChapter = widget.initialPage;
-        var targetPage = pageCount - 1;
-        for (var i = 0; i < _pages.length; i++) {
-          if (_pages[i].chapterIndex == targetChapter && !_pages[i].isCover) {
-            targetPage = i;
-            break;
-          }
-        }
         final useTwoPageLayout = widget.settings.twoPageEnabled && context.canUseTwoPageMode;
-        // For two-page layout, snap to the first page in its spread.
-        if (useTwoPageLayout && targetPage.isOdd) {
-          targetPage = (targetPage - 1).clamp(0, pageCount - 1);
-        }
         unawaited(
           _pageController.animateToPage(
-            useTwoPageLayout ? targetPage ~/ 2 : targetPage,
+            _pageForSemanticPosition(
+              chapterIndex: widget.initialPage,
+              paragraphIndex: widget.initialParagraph,
+              useTwoPageLayout: useTwoPageLayout,
+            ),
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
           ),
         );
       });
     }
+  }
+
+  int _pageForSemanticPosition({
+    required int chapterIndex,
+    required int paragraphIndex,
+    required bool useTwoPageLayout,
+  }) {
+    var targetPage = _pages.length - 1;
+    for (var i = 0; i < _pages.length; i++) {
+      final page = _pages[i];
+      if (page.isCover || page.chapterIndex != chapterIndex) continue;
+      targetPage = i;
+      if (paragraphIndex >= page.blockStart && paragraphIndex < page.blockEnd) break;
+    }
+    return useTwoPageLayout ? targetPage ~/ 2 : targetPage;
   }
 
   @override
@@ -2370,27 +2384,18 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (pageCount == 0) {
           return const SizedBox.shrink();
         }
-
         final effectivePageCount = useTwoPageLayout ? ((pageCount + 1) ~/ 2) : pageCount;
 
-        if (!_didRestoreInitialPage && widget.initialPage > 0) {
-          final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
-          final pageOffset = hasCover ? 1 : 0;
-          final targetPage =
-              (useTwoPageLayout
-                      ? (widget.initialPage + pageOffset) ~/ 2
-                      : widget.initialPage + pageOffset)
-                  .clamp(0, effectivePageCount - 1);
+        if (!_didRestoreInitialPage) {
+          final targetPage = _pageForSemanticPosition(
+            chapterIndex: widget.initialPage,
+            paragraphIndex: widget.initialParagraph,
+            useTwoPageLayout: useTwoPageLayout,
+          );
           _didRestoreInitialPage = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (_disposed || !_pageController.hasClients) return;
-            unawaited(
-              _pageController.animateToPage(
-                targetPage,
-                duration: Duration.zero,
-                curve: Curves.easeInOut,
-              ),
-            );
+            _pageController.jumpToPage(targetPage);
           });
         }
 

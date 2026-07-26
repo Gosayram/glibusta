@@ -695,6 +695,18 @@ final class ReaderController {
     });
   }
 
+  /// Prepares the scroll-based layout to restore the current semantic anchor.
+  ///
+  /// Paginated mode does not continuously update the visual scroll progress, so carrying
+  /// that visual value into continuous mode can reopen the book at an unrelated
+  /// location. The chapter/paragraph position remains the canonical anchor.
+  void prepareForContinuousLayout() {
+    if (!_loaded || _state.chapterCount == 0) return;
+    _updateState(
+      _state.copyWith(scrollProgress: _semanticAnchor(_state.currentPosition)),
+    );
+  }
+
   // ── Navigation ────────────────────────────────────────
 
   void scrollToNext() {

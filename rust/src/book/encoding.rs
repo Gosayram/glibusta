@@ -1,10 +1,22 @@
 use bumpalo::Bump;
 use encoding_rs::Encoding;
+use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 
 pub(crate) fn get_xml_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<String> {
     let attr = e.try_get_attribute(name).ok()??;
     Some(String::from_utf8_lossy(&attr.value).into_owned())
+}
+
+/// Resolve XML character entities before a value is used as a URI or path.
+/// Otherwise `java&#x0A;script:` can evade a scheme policy that sees only the
+/// raw attribute bytes.
+pub(crate) fn get_normalized_xml_attr(e: &BytesStart<'_>, name: &[u8]) -> Option<String> {
+    e.try_get_attribute(name)
+        .ok()??
+        .normalized_value(XmlVersion::Implicit1_0)
+        .ok()
+        .map(|value| value.into_owned())
 }
 
 /// Get an attribute value allocated in a Bump arena (no individual heap dealloc).

@@ -16,7 +16,8 @@ pub mod txt;
 
 pub(crate) use hash::sha256_hex;
 
-/// Strip dangerous schemes from href (javascript:, vbscript:, data:).
+/// Strip schemes the native reader must not navigate (javascript:, vbscript:,
+/// data:, file:). HTTP(S) links are presented for explicit user confirmation.
 pub(crate) fn sanitize_href(href: &str) -> Option<String> {
     let trimmed = href.trim();
     if trimmed.is_empty() {
@@ -29,7 +30,10 @@ pub(crate) fn sanitize_href(href: &str) -> Option<String> {
             .filter(|byte| !byte.is_ascii_whitespace() && !byte.is_ascii_control())
             .map(|byte| byte.to_ascii_lowercase())
             .collect();
-        if matches!(scheme.as_slice(), b"javascript" | b"vbscript" | b"data") {
+        if matches!(
+            scheme.as_slice(),
+            b"javascript" | b"vbscript" | b"data" | b"file"
+        ) {
             return None;
         }
     }
