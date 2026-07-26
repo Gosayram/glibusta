@@ -24,13 +24,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // Direct distribution uses `flutter build apk --split-per-abi` for
-        // these exact targets. Keep Gradle variants aligned with the Rust
-        // libraries produced by `rust-build-android`, so an APK/AAB cannot
-        // accidentally package unsupported x86 native libraries.
-        ndk {
-            abiFilters += setOf("arm64-v8a", "armeabi-v7a")
-        }
+        // `flutter build apk --split-per-abi` supplies the ABI filters for
+        // direct-distribution APKs. Do not duplicate them here: AGP rejects
+        // projects that configure both `ndk.abiFilters` and ABI splits.
+        // The checked-in Rust libraries contain only arm64-v8a and
+        // armeabi-v7a, so App Bundles remain limited to those ABIs as well.
     }
 
     dependencies {
