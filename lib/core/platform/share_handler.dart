@@ -31,7 +31,7 @@ class ShareHandler {
     _subscription = ReceiveSharingIntent.instance.getMediaStream().listen(
       (files) {
         if (_subscriptionGeneration != generation || !context.mounted) return;
-        _handleSharedFiles(files, context, importFile);
+        _handleSharedFiles(files, context, importFile, generation);
       },
       onError: (Object e, StackTrace st) {
         _logger.warning(
@@ -51,7 +51,7 @@ class ShareHandler {
           final sharedFiles = List<SharedMediaFile>.of(files);
           unawaited(_resetInitialMedia());
           if (_subscriptionGeneration != generation || !context.mounted) return;
-          _handleSharedFiles(sharedFiles, context, importFile);
+          _handleSharedFiles(sharedFiles, context, importFile, generation);
         },
         onError: (Object e, StackTrace st) {
           _logger.warning(
@@ -82,10 +82,11 @@ class ShareHandler {
     List<SharedMediaFile> files,
     BuildContext context,
     SharedBookImporter importFile,
+    int generation,
   ) {
     _logger.info('Shared ${files.length} files', name: 'Share');
     for (final file in files) {
-      unawaited(_importSharedFile(file, context, importFile));
+      unawaited(_importSharedFile(file, context, importFile, generation));
     }
   }
 
@@ -93,11 +94,14 @@ class ShareHandler {
     SharedMediaFile file,
     BuildContext context,
     SharedBookImporter importFile,
+    int generation,
   ) async {
     var filePath = file.path;
     try {
+      if (!context.mounted || _subscriptionGeneration != generation) return;
       if (filePath.startsWith('content://')) {
         final cachedPath = await _cacheSharedUri(filePath);
+        if (!context.mounted || _subscriptionGeneration != generation) return;
         if (cachedPath == null) {
           _logger.warning('Could not cache shared URI: $filePath', name: 'Share');
           if (context.mounted) {
@@ -114,8 +118,9 @@ class ShareHandler {
         return;
       }
 
+      if (!context.mounted || _subscriptionGeneration != generation) return;
       final result = await importFile(filePath);
-      if (!context.mounted) return;
+      if (!context.mounted || _subscriptionGeneration != generation) return;
       await SmartDialog.showToast(
         result.isSuccess
             ? 'Импортировано: ${result.title}'
@@ -130,7 +135,7 @@ class ShareHandler {
         error: e,
         st: st,
       );
-      if (!context.mounted) return;
+      if (!context.mounted || _subscriptionGeneration != generation) return;
       final fileName = filePath.split(RegExp(r'[\\/]')).last;
       await SmartDialog.showToast('Не удалось импортировать: $fileName');
     }

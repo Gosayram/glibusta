@@ -178,4 +178,62 @@ void main() {
     expect(firstImports, isEmpty);
     expect(secondImports, ['/cache/reopened.epub']);
   });
+
+  testWidgets('does not finish a stale Open-with import after reinitializing', (tester) async {
+    final mediaController = StreamController<List<SharedMediaFile>>.broadcast(sync: true);
+    final cacheStarted = Completer<void>();
+    final cachedPath = Completer<String?>();
+    ReceiveSharingIntent.setMockValues(
+      initialMedia: const [],
+      mediaStream: mediaController.stream,
+    );
+    final handler = ShareHandler(
+      cacheSharedUri: (_) {
+        cacheStarted.complete();
+        return cachedPath.future;
+      },
+    );
+    final firstImports = <String>[];
+    final secondImports = <String>[];
+    late BuildContext context;
+    addTearDown(() async {
+      handler.dispose();
+      await mediaController.close();
+      ReceiveSharingIntent.setMockValues(
+        initialMedia: const [],
+        mediaStream: const Stream<List<SharedMediaFile>>.empty(),
+      );
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (buildContext) {
+            context = buildContext;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    handler.init(context, (path) async {
+      firstImports.add(path);
+      return ImportResult.failure('unexpected');
+    });
+
+    mediaController.add([
+      SharedMediaFile(path: 'content://downloads/document/42', type: SharedMediaType.url),
+    ]);
+    await cacheStarted.future;
+
+    handler.init(context, (path) async {
+      secondImports.add(path);
+      return ImportResult.failure('unexpected');
+    });
+    cachedPath.complete('/cache/stale.epub');
+    await tester.pump();
+    await tester.pump();
+
+    expect(firstImports, isEmpty);
+    expect(secondImports, isEmpty);
+  });
 }
