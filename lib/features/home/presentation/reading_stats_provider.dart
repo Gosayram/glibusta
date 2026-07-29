@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../reading_stats/data/reading_streak.dart';
 
 part 'reading_stats_provider.g.dart';
 
@@ -93,31 +94,10 @@ Future<ReadingStats> readingStats(Ref ref) async {
     dailyMinutes[day] = (dailyMinutes[day] ?? 0) + minutes;
   }
 
-  int currentStreak = 0;
-  for (int i = 0; i < 365; i++) {
-    final day = todayStart.subtract(Duration(days: i));
-    if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
-      currentStreak++;
-    } else {
-      break;
-    }
-  }
-
-  int longestStreak = currentStreak;
-  int tempStreak = 0;
-
-  for (int i = 0; i < 365; i++) {
-    final day = todayStart.subtract(Duration(days: i));
-    if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
-      tempStreak++;
-    } else {
-      if (tempStreak > longestStreak) {
-        longestStreak = tempStreak;
-      }
-      tempStreak = 0;
-    }
-  }
-  if (tempStreak > longestStreak) longestStreak = tempStreak;
+  final streak = calculateReadingStreak(
+    activeDays: dailyMinutes.entries.where((entry) => entry.value > 0).map((entry) => entry.key),
+    endingAt: now,
+  );
 
   final heatmapData = <DayReading>[];
   for (int i = 111; i >= 0; i--) {
@@ -131,8 +111,8 @@ Future<ReadingStats> readingStats(Ref ref) async {
   }
 
   return ReadingStats(
-    currentStreak: currentStreak,
-    longestStreak: longestStreak,
+    currentStreak: streak.currentDays,
+    longestStreak: streak.longestDays,
     todayMinutes: todayMinutes,
     thisWeekMinutes: weekMinutes,
     thisMonthMinutes: monthMinutes,

@@ -33,23 +33,39 @@ class ReaderShortcuts extends StatefulWidget {
 
 class _ReaderShortcutsState extends State<ReaderShortcuts> {
   late Map<ShortcutActivator, Intent> _shortcuts;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode(debugLabel: 'reader_shortcuts');
     _shortcuts = {
       const SingleActivator(LogicalKeyboardKey.arrowRight): const NextPageIntent(),
       const SingleActivator(LogicalKeyboardKey.arrowLeft): const PreviousPageIntent(),
       const SingleActivator(LogicalKeyboardKey.space): const NextPageIntent(),
       const SingleActivator(LogicalKeyboardKey.add): const IncreaseFontSizeIntent(),
       const SingleActivator(LogicalKeyboardKey.equal): const IncreaseFontSizeIntent(),
+      const SingleActivator(LogicalKeyboardKey.equal, shift: true): const IncreaseFontSizeIntent(),
       const SingleActivator(LogicalKeyboardKey.minus): const DecreaseFontSizeIntent(),
       const SingleActivator(LogicalKeyboardKey.keyF, meta: true): const SearchIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyF, control: true): const SearchIntent(),
       const SingleActivator(LogicalKeyboardKey.keyB, meta: true): const BookmarksIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyB, control: true): const BookmarksIntent(),
       const SingleActivator(LogicalKeyboardKey.keyL, meta: true): const LibraryIntent(),
+      const SingleActivator(LogicalKeyboardKey.keyL, control: true): const LibraryIntent(),
       const SingleActivator(LogicalKeyboardKey.comma, meta: true): const SettingsIntent(),
+      const SingleActivator(LogicalKeyboardKey.comma, control: true): const SettingsIntent(),
       const SingleActivator(LogicalKeyboardKey.escape): const ClosePanelIntent(),
     };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,7 +102,11 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
             onInvoke: (_) => widget.onClosePanel?.call(),
           ),
         },
-        child: widget.child,
+        child: Focus(
+          autofocus: true,
+          focusNode: _focusNode,
+          child: widget.child,
+        ),
       ),
     );
   }

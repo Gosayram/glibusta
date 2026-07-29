@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../reader/domain/reader.dart';
 import '../data/annotations_providers.dart';
 
 class AnnotationsScreen extends ConsumerStatefulWidget {
@@ -176,7 +177,14 @@ class _BookmarkList extends ConsumerWidget {
               'Абзац ${bookmark.paragraphIndex + 1}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            onTap: () => context.push('/reader/${bookmark.bookId}'),
+            onTap: () => _openReaderAtPosition(
+              context,
+              bookId: bookmark.bookId,
+              chapterIndex: bookmark.chapterIndex,
+              paragraphIndex: bookmark.paragraphIndex,
+              localOffset: bookmark.localOffset,
+              updatedAt: bookmark.createdAt,
+            ),
           ),
         );
       },
@@ -258,7 +266,14 @@ class _NoteList extends ConsumerWidget {
               'Стр. ${note.chapterIndex + 1}, абзац ${note.paragraphIndex + 1}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            onTap: () => context.push('/reader/${note.bookId}'),
+            onTap: () => _openReaderAtPosition(
+              context,
+              bookId: note.bookId,
+              chapterIndex: note.chapterIndex,
+              paragraphIndex: note.paragraphIndex,
+              localOffset: note.localOffset,
+              updatedAt: note.updatedAt ?? note.createdAt,
+            ),
           ),
         );
       },
@@ -365,12 +380,41 @@ class _QuoteList extends ConsumerWidget {
                 ],
               ],
             ),
-            onTap: () => context.push('/reader/${quote.bookId}'),
+            onTap: () => _openReaderAtPosition(
+              context,
+              bookId: quote.bookId,
+              chapterIndex: quote.chapterIndex,
+              paragraphIndex: quote.paragraphIndex,
+              updatedAt: quote.createdAt,
+            ),
           ),
         );
       },
     );
   }
+}
+
+void _openReaderAtPosition(
+  BuildContext context, {
+  required String bookId,
+  required int chapterIndex,
+  required int paragraphIndex,
+  required DateTime updatedAt,
+  double localOffset = 0,
+}) {
+  unawaited(
+    context.push(
+      '/reader/$bookId',
+      extra: ReaderPosition(
+        bookId: bookId,
+        chapterIndex: chapterIndex,
+        paragraphIndex: paragraphIndex,
+        // Annotation storage uses a 0..1 fraction; reader positions use 0..100.
+        localOffset: localOffset * 100,
+        updatedAt: updatedAt,
+      ),
+    ),
+  );
 }
 
 bool _matchesQuery(String query, String? first, [String? second, String? third, String? fourth]) {

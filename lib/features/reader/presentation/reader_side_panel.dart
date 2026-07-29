@@ -47,35 +47,47 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
     _quotes = QuoteRepository(database);
   }
 
+  void _toggleGroup(int groupId) {
+    setState(() {
+      if (_collapsedGroups.contains(groupId)) {
+        _collapsedGroups.remove(groupId);
+      } else {
+        _collapsedGroups.add(groupId);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: widget.width,
+    return Material(
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: DefaultTabController(
-        length: 4,
-        child: Column(
-          children: [
-            const TabBar(
-              tabs: [
-                Tab(text: 'Содержание'),
-                Tab(text: 'Закладки'),
-                Tab(text: 'Заметки'),
-                Tab(text: 'Цитаты'),
-              ],
-              isScrollable: true,
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildTableOfContents(context),
-                  _buildBookmarks(),
-                  _buildNotes(),
-                  _buildQuotes(),
+      child: SizedBox(
+        width: widget.width,
+        child: DefaultTabController(
+          length: 4,
+          child: Column(
+            children: [
+              const TabBar(
+                tabs: [
+                  Tab(text: 'Содержание'),
+                  Tab(text: 'Закладки'),
+                  Tab(text: 'Заметки'),
+                  Tab(text: 'Цитаты'),
                 ],
+                isScrollable: true,
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildTableOfContents(context),
+                    _buildBookmarks(),
+                    _buildNotes(),
+                    _buildQuotes(),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -94,22 +106,30 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
         final isActive = item.index == widget.currentChapterIndex;
         final isGroup = item.isGroup;
         final isCollapsed = _collapsedGroups.contains(item.groupId);
+        final groupToggleLabel = isCollapsed
+            ? 'Развернуть раздел $title'
+            : 'Свернуть раздел $title';
 
         return ListTile(
           contentPadding: EdgeInsets.only(left: 12.0 + item.depth * 16.0),
           leading: isGroup
-              ? GestureDetector(
-                  onTap: () => setState(() {
-                    if (isCollapsed) {
-                      _collapsedGroups.remove(item.groupId);
-                    } else {
-                      _collapsedGroups.add(item.groupId);
-                    }
-                  }),
-                  child: Icon(
-                    isCollapsed ? Icons.chevron_right : Icons.expand_more,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              ? Semantics(
+                  key: ValueKey('side-panel-toc-group-toggle-${item.index}'),
+                  button: true,
+                  label: groupToggleLabel,
+                  expanded: !isCollapsed,
+                  onTap: () => _toggleGroup(item.groupId),
+                  child: ExcludeSemantics(
+                    child: IconButton(
+                      tooltip: groupToggleLabel,
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 20,
+                      onPressed: () => _toggleGroup(item.groupId),
+                      icon: Icon(
+                        isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
                   ),
                 )
               : null,
