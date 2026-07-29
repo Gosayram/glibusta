@@ -58,6 +58,14 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(twoPageEnabled: enabled);
   }
 
+  /// Updates the current book's layout profile without overwriting the
+  /// reader-wide default in SharedPreferences.
+  void applyPerBookTwoPageEnabled(bool enabled) {
+    _isApplyingTransientProfile = true;
+    state = state.copyWith(twoPageEnabled: enabled);
+    _isApplyingTransientProfile = false;
+  }
+
   void updateFont(ReaderFont font) {
     state = state.copyWith(font: font);
   }

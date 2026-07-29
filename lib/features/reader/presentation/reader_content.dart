@@ -2468,10 +2468,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
 
         final anim = widget.settings.pageTurnAnimation;
+        final reduceMotion = MediaQuery.disableAnimationsOf(context);
         final useSwitcher =
-            anim == PageTurnAnimation.fade ||
-            anim == PageTurnAnimation.curl ||
-            anim == PageTurnAnimation.stack;
+            !reduceMotion &&
+            (anim == PageTurnAnimation.fade ||
+                anim == PageTurnAnimation.curl ||
+                anim == PageTurnAnimation.stack);
         final switcherDuration = anim == PageTurnAnimation.curl ? 350 : 250;
         final physics = anim == PageTurnAnimation.none
             ? const NeverScrollableScrollPhysics()

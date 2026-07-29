@@ -289,7 +289,7 @@ final class ReaderController {
       if (!_isActiveLoad(loadGeneration)) return;
 
       // Apply per-book settings if available
-      await _applyPerBookSettings();
+      await _applyPerBookSettings(deviceClass: _layoutDeviceClass);
 
       // MD-11.4: auto dark theme for manga/comics
       if (!_isActiveLoad(loadGeneration)) return;
@@ -929,6 +929,17 @@ final class ReaderController {
     );
   }
 
+  /// Applies a navigation target once the book metadata and its initial
+  /// chapter window are ready. This keeps navigation from a persisted
+  /// bookmark independent of the book's ordinary last-read position.
+  Future<void> jumpToPositionWhenReady(ReaderPosition position) async {
+    if (_state.isLoading) {
+      await stateStream.firstWhere((state) => !state.isLoading);
+    }
+    if (_disposed || _state.errorMessage != null || _state.chapterCount == 0) return;
+    jumpToPosition(position);
+  }
+
   bool get hasLinkBack => _linkBackStack.isNotEmpty;
 
   void pushLinkPosition() {
@@ -1125,10 +1136,23 @@ final class ReaderController {
 
   // ── Theme / system ────────────────────────────────────
 
-  Future<void> _applyPerBookSettings() async {
+  /// Applies the per-book profile for the reader layout currently available
+  /// to the window. A later request wins, so a resize while the profile is
+  /// loading cannot restore a stale compact/expanded preference.
+  Future<void> applyPerBookSettingsForLayout(ReaderLayoutDeviceClass deviceClass) {
+    _layoutDeviceClass = deviceClass;
+    return _applyPerBookSettings(deviceClass: deviceClass);
+  }
+
+  ReaderLayoutDeviceClass? _layoutDeviceClass;
+  int _perBookSettingsRequestVersion = 0;
+
+  Future<void> _applyPerBookSettings({ReaderLayoutDeviceClass? deviceClass}) async {
+    final requestVersion = ++_perBookSettingsRequestVersion;
     try {
       final service = _ref.read(perBookSettingsServiceProvider);
-      final effective = await service.getEffectiveSettings(_bookId);
+      final effective = await service.getEffectiveSettings(_bookId, deviceClass: deviceClass);
+      if (requestVersion != _perBookSettingsRequestVersion) return;
       _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
     } on Object catch (e) {
       _logger.warning('Failed to apply per-book settings: $e', name: 'Reader', error: e);

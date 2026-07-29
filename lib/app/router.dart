@@ -18,6 +18,7 @@ import '../features/downloads/presentation/downloads_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/notes/presentation/notes_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
+import '../features/reader/domain/reader.dart';
 import '../features/reader/presentation/chapter_split_rules_screen.dart';
 import '../features/reader/presentation/reader_entry_screen.dart';
 import '../features/reader/presentation/reading_info_settings_screen.dart';
@@ -205,9 +206,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         pageBuilder: (BuildContext context, GoRouterState state) {
           final bookId = state.pathParameters['bookId'] ?? '';
+          final initialPosition = state.extra is ReaderPosition
+              ? state.extra! as ReaderPosition
+              : null;
           return CustomTransitionPage<void>(
             key: state.pageKey,
-            child: ReaderEntryScreen(bookId: bookId),
+            child: ReaderEntryScreen(bookId: bookId, initialPosition: initialPosition),
             // LW-2.3: cover animation — 3D book-opening effect
             transitionsBuilder: (_, animation, second, child) {
               return AnimatedBuilder(

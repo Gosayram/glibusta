@@ -10,6 +10,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../reader/domain/reader.dart';
 import '../data/bookmark_repository.dart';
 import '../data/bookmarks_providers.dart';
 
@@ -71,7 +72,16 @@ class BookmarksScreen extends ConsumerWidget {
               final bookmark = bookmarks[index];
               return BookmarkTile(
                 bookmark: bookmark,
-                onTap: () => context.push('/reader/${bookmark.bookId}'),
+                onTap: () => context.push(
+                  '/reader/${bookmark.bookId}',
+                  extra: ReaderPosition(
+                    bookId: bookmark.bookId,
+                    chapterIndex: bookmark.chapterIndex,
+                    paragraphIndex: bookmark.paragraphIndex,
+                    localOffset: bookmark.localOffset * 100,
+                    updatedAt: bookmark.createdAt,
+                  ),
+                ),
                 onDelete: () => _deleteBookmark(context, ref, bookmark),
               ).animate().listTileTransition(delay: (index * 50).ms);
             },

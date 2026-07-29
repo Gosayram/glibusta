@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -295,7 +296,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                 'Две колонки',
                 Icons.view_column,
                 settings.twoPageEnabled,
-                (v) => notifier.updateTwoPageEnabled(v),
+                (enabled) => unawaited(
+                  _updateTwoPagePreference(
+                    context: context,
+                    notifier: notifier,
+                    enabled: enabled,
+                  ),
+                ),
               );
             },
           ),
@@ -359,6 +366,37 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         ),
       ],
     );
+  }
+
+  Future<void> _updateTwoPagePreference({
+    required BuildContext context,
+    required ReaderSettingsNotifier notifier,
+    required bool enabled,
+  }) async {
+    final bookId = widget.bookId;
+    if (bookId == null) {
+      notifier.updateTwoPageEnabled(enabled);
+      return;
+    }
+
+    notifier.applyPerBookTwoPageEnabled(enabled);
+    try {
+      await ref
+          .read(perBookSettingsServiceProvider)
+          .saveTwoPageLayoutPreference(
+            bookId: bookId,
+            deviceClass: readerLayoutDeviceClassFor(
+              canUseTwoPageMode: context.canUseTwoPageMode,
+            ),
+            enabled: enabled,
+          );
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'Failed to save the per-book two-page preference',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   // ── Page 3: Жесты (Gestures & behavior) ──

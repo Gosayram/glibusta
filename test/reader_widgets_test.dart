@@ -9,11 +9,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/app/router.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/database/daos/per_book_settings_dao.dart';
 import 'package:glibusta/core/logging/app_logger.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/library/domain/book_file_repository.dart';
 import 'package:glibusta/features/reader/data/book_open_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
+import 'package:glibusta/features/reader/data/per_book_settings_service.dart';
 import 'package:glibusta/features/reader/data/reader_colors.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
@@ -24,6 +26,7 @@ import 'package:glibusta/features/reader/presentation/reader_providers.dart';
 import 'package:glibusta/features/reader/presentation/reader_quick_settings.dart';
 import 'package:glibusta/features/reader/presentation/reader_screen.dart';
 import 'package:glibusta/features/reader/presentation/reader_selection_toolbar.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeBookOpenService extends BookOpenService {
   _FakeBookOpenService(AppDatabase database, {ReaderChapter? chapter})
@@ -292,6 +295,53 @@ void main() {
       await scrollSettingsUntilVisible(tester, find.text('Авто-тема'));
 
       expect(find.byType(DropdownButton<int>), findsNothing);
+    });
+
+    testWidgets('saves the two-page setting in the expanded profile for this book', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.view
+        ..physicalSize = const Size(1200, 800)
+        ..devicePixelRatio = 1;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: const MaterialApp(
+            home: Scaffold(body: ReaderQuickSettingsSheet(bookId: 'book-1')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openSettingsPage(tester, 'Режим');
+      final twoColumnsRow = find.ancestor(
+        of: find.text('Две колонки'),
+        matching: find.byType(Row),
+      );
+      await tester.tap(find.descendant(of: twoColumnsRow, matching: find.byType(Switch)));
+      await tester.pumpAndSettle();
+
+      final service = PerBookSettingsService(PerBookSettingsDao(db));
+      final expanded = await service.getEffectiveSettings(
+        'book-1',
+        deviceClass: ReaderLayoutDeviceClass.expanded,
+      );
+      final compact = await service.getEffectiveSettings(
+        'book-1',
+        deviceClass: ReaderLayoutDeviceClass.compact,
+      );
+
+      expect(expanded.twoPageEnabled, isTrue);
+      expect(compact.twoPageEnabled, isFalse);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
     });
   });
 
@@ -730,6 +780,43 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('300 сл/мин  ·  0/0'), findsOneWidget);
+  });
+
+  testWidgets('honours the system reduce-motion preference for paginated turns', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: wrapInApp(
+          ReaderContentBody(
+            metadata: const NormalizedBookMetadata(
+              id: 'book-1',
+              title: 'Тестовая книга',
+              authors: [],
+              chapterCount: 1,
+              chapterTitles: ['Глава 1'],
+            ),
+            loadedChapters: const {
+              0: ReaderChapter(
+                index: 0,
+                title: 'Глава 1',
+                blocks: [ReaderBlock(index: 0, text: 'Текст книги.')],
+              ),
+            },
+            settings: const ReaderSettings(pageTurnAnimation: PageTurnAnimation.fade),
+            scrollController: scrollController,
+            onTap: _ignoreTap,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(AnimatedSwitcher), findsNothing);
   });
 
   testWidgets('shows a controlled placeholder for an unsupported comic image codec', (

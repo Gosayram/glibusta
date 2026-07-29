@@ -7,6 +7,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/formats/format_capability.dart';
 import '../data/parsers/format_detector.dart';
+import '../domain/reader.dart';
 import 'djvu_reader_screen.dart';
 import 'pdf_reader_screen.dart';
 import 'reader_screen.dart';
@@ -34,9 +35,10 @@ class _ReaderFileState {
 }
 
 class ReaderEntryScreen extends ConsumerWidget {
-  const ReaderEntryScreen({super.key, required this.bookId});
+  const ReaderEntryScreen({super.key, required this.bookId, this.initialPosition});
 
   final String bookId;
+  final ReaderPosition? initialPosition;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -62,7 +64,7 @@ class ReaderEntryScreen extends ConsumerWidget {
           return DjvuReaderScreen(filePath: path);
         }
         if (capService.canReadInApp(format)) {
-          return ReaderScreen(bookId: bookId);
+          return ReaderScreen(bookId: bookId, initialPosition: initialPosition);
         }
         return const _ReaderOpenError(message: 'Формат не поддерживается');
       },

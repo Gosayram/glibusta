@@ -22,6 +22,14 @@ enum ReaderLayoutDeviceClass {
   final String storageKey;
 }
 
+/// Maps the current reader layout capability to its persistent profile.
+///
+/// The capability, rather than a hardware model or raw screen width, is the
+/// stable distinction that matters to a reading layout: a compact surface
+/// always renders one page, while an expanded surface can render a spread.
+ReaderLayoutDeviceClass readerLayoutDeviceClassFor({required bool canUseTwoPageMode}) =>
+    canUseTwoPageMode ? ReaderLayoutDeviceClass.expanded : ReaderLayoutDeviceClass.compact;
+
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
   readingMetadata('Разбор книги...'),

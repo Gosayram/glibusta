@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/fonts/custom_font_helper.dart';
+import '../../../core/platform/adaptive_context.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
@@ -90,9 +91,10 @@ Future<void> showExternalLinkConfirmation(
 }
 
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({super.key, required this.bookId});
+  const ReaderScreen({super.key, required this.bookId, this.initialPosition});
 
   final String bookId;
+  final ReaderPosition? initialPosition;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -115,6 +117,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   // HG-6.4: spinner during layout recalculation
   Timer? _relayoutTimer;
   bool _isRelayouting = false;
+  ReaderLayoutDeviceClass? _layoutDeviceClass;
 
   @override
   void initState() {
@@ -124,6 +127,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
+    final initialPosition = widget.initialPosition;
+    if (initialPosition != null) {
+      unawaited(_ctrl.jumpToPositionWhenReady(initialPosition));
+    }
     unawaited(_fetchBatteryLevel());
     unawaited(CustomFontHelper.loadSaved());
     // FDEP-1.3: request 120Hz on Android flagships
@@ -141,6 +148,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         }
       });
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final deviceClass = readerLayoutDeviceClassFor(
+      canUseTwoPageMode: context.canUseTwoPageMode,
+    );
+    if (_layoutDeviceClass == deviceClass) return;
+
+    _layoutDeviceClass = deviceClass;
+    unawaited(_ctrl.applyPerBookSettingsForLayout(deviceClass));
   }
 
   void _syncOrientation(OrientationLock lock) {
@@ -174,6 +193,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         prev.font != next.font ||
         prev.paragraphFirstLineIndent != next.paragraphFirstLineIndent ||
         prev.readerWidth != next.readerWidth ||
+        prev.twoPageEnabled != next.twoPageEnabled ||
         prev.hyphenation != next.hyphenation;
     if (layoutChanged) {
       // HG-6.4: show spinner if relayout takes >300ms
