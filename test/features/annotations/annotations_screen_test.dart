@@ -49,6 +49,20 @@ void main() {
       expect(find.text('Аннотации'), findsOneWidget);
     });
 
+    testWidgets('offers local export only from an explicit menu action', (tester) async {
+      await tester.pumpWidget(buildTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Экспортировать аннотации'), findsOneWidget);
+      expect(find.text('Экспортировать в Markdown'), findsNothing);
+
+      await tester.tap(find.byTooltip('Экспортировать аннотации'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Экспортировать в Markdown'), findsOneWidget);
+      expect(find.text('Экспортировать в TXT'), findsOneWidget);
+    });
+
     testWidgets('shows tab bar with three tabs', (tester) async {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();

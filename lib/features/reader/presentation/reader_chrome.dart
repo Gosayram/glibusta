@@ -578,6 +578,15 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
   double _dragValue = 0;
   double _preDragValue = 0;
 
+  Future<void> _showPercentJumpDialog() async {
+    final target = await showDialog<double>(
+      context: context,
+      builder: (context) => _PercentJumpDialog(initialPercent: (widget.value * 100).round()),
+    );
+
+    if (target != null) widget.onChanged(target / 100);
+  }
+
   @override
   Widget build(BuildContext context) {
     final value = _dragging ? _dragValue : widget.value;
@@ -684,6 +693,18 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
                 ),
               ),
             ),
+            Semantics(
+              button: true,
+              label: 'Перейти к проценту',
+              child: ExcludeSemantics(
+                child: IconButton(
+                  icon: const Icon(Icons.pin_drop_outlined),
+                  tooltip: 'Перейти к проценту',
+                  color: widget.colors.text.withValues(alpha: 0.7),
+                  onPressed: _showPercentJumpDialog,
+                ),
+              ),
+            ),
             if (widget.onCheckpointForward != null)
               _CheckpointButton(
                 label: 'Перейти к следующей закладке',
@@ -704,6 +725,67 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
               ),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _PercentJumpDialog extends StatefulWidget {
+  const _PercentJumpDialog({required this.initialPercent});
+
+  final int initialPercent;
+
+  @override
+  State<_PercentJumpDialog> createState() => _PercentJumpDialogState();
+}
+
+class _PercentJumpDialogState extends State<_PercentJumpDialog> {
+  String? _error;
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialPercent.toString(),
+  );
+
+  void _submit() {
+    final parsed = double.tryParse(_controller.text.trim().replaceAll(',', '.'));
+    if (parsed == null || parsed < 0 || parsed > 100) {
+      setState(() => _error = 'Введите число от 0 до 100');
+      return;
+    }
+    Navigator.of(context).pop(parsed);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Перейти к проценту'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(
+          labelText: 'Процент чтения',
+          hintText: '0–100',
+          suffixText: '%',
+          errorText: _error,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Перейти'),
+        ),
       ],
     );
   }

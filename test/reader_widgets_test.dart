@@ -1977,6 +1977,63 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('opens explicit image actions after a long press', (tester) async {
+    const illustration =
+        'data:image/webp;base64,'
+        'UklGRh4AAABXRUJQVlA4TBEAAAAvAUAAEA8Q8x/zH4wRiOh/CAA=';
+    final scrollController = ScrollController();
+    final semantics = tester.ensureSemantics();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          home: Scaffold(
+            body: ReaderContentBody(
+              metadata: const NormalizedBookMetadata(
+                id: 'long-press-image',
+                title: 'Long press image',
+                authors: [],
+                chapterCount: 1,
+                chapterTitles: ['Chapter'],
+              ),
+              loadedChapters: const {
+                0: ReaderChapter(
+                  index: 0,
+                  title: '',
+                  blocks: [
+                    ReaderBlock(
+                      index: 0,
+                      text: '',
+                      type: BlockType.image,
+                      imageUrl: illustration,
+                      imageAlt: 'Иллюстрация',
+                    ),
+                  ],
+                ),
+              },
+              settings: const ReaderSettings(mode: ReaderMode.continuous),
+              scrollController: scrollController,
+              onTap: _ignoreTap,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    tester.semantics.longPress(
+      find.semantics.byLabel('Открыть Иллюстрация в полноэкранном режиме'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Действия с изображением'), findsOneWidget);
+    expect(find.text('Поделиться изображением'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
+  });
+
   testWidgets('keeps an oversized paginated block vertically reachable', (tester) async {
     final scrollController = ScrollController();
     addTearDown(scrollController.dispose);

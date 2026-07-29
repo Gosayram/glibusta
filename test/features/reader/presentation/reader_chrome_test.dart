@@ -190,6 +190,66 @@ void main() {
 
     semantics.dispose();
   });
+
+  testWidgets('jumps to a valid percentage through an accessible dialog', (tester) async {
+    double? jumpedTo;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 3,
+            scrollProgress: 0.25,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (value) => jumpedTo = value,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    expect(find.text('Перейти к проценту'), findsOneWidget);
+    expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, '25');
+
+    await tester.enterText(find.byType(TextField), '37.5');
+    await tester.tap(find.text('Перейти'));
+    await tester.pumpAndSettle();
+
+    expect(jumpedTo, 0.375);
+  });
+
+  testWidgets('does not jump when entered percentage is out of bounds', (tester) async {
+    var jumps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 1,
+            scrollProgress: 0,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) => jumps++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '101');
+    await tester.tap(find.text('Перейти'));
+    await tester.pump();
+
+    expect(find.text('Введите число от 0 до 100'), findsOneWidget);
+    expect(jumps, 0);
+  });
 }
 
 void _noOp() {}

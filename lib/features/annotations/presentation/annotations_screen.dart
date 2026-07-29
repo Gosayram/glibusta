@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../reader/domain/reader.dart';
+import '../data/annotation_export.dart';
 import '../data/annotations_providers.dart';
 
 class AnnotationsScreen extends ConsumerStatefulWidget {
@@ -45,6 +50,35 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     });
   }
 
+  Future<void> _exportAnnotations(
+    AnnotationData annotations,
+    AnnotationExportFormat format,
+  ) async {
+    try {
+      final book = widget.bookId == null
+          ? null
+          : await ref.read(databaseProvider).bookDao.getBookById(widget.bookId!);
+      final export = AnnotationExportFormatter.build(
+        annotations: annotations,
+        format: format,
+        bookTitle: book?.title ?? 'Мои аннотации',
+      );
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File(p.join(directory.path, 'glibusta', 'exports', export.filename));
+      await file.parent.create(recursive: true);
+      await file.writeAsString(export.content);
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Экспорт аннотаций: ${book?.title ?? 'Мои аннотации'}',
+        ),
+      );
+    } on Object {
+      if (mounted) unawaited(SmartDialog.showToast('Не удалось экспортировать аннотации'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final annotationsAsync = ref.watch(allAnnotationsProvider(widget.bookId));
@@ -63,6 +97,24 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
               )
             : const Text('Аннотации'),
         actions: [
+          if (annotationsAsync.hasValue)
+            PopupMenuButton<AnnotationExportFormat>(
+              tooltip: 'Экспортировать аннотации',
+              icon: const Icon(Icons.ios_share),
+              onSelected: (format) => unawaited(
+                _exportAnnotations(annotationsAsync.requireValue, format),
+              ),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: AnnotationExportFormat.markdown,
+                  child: Text('Экспортировать в Markdown'),
+                ),
+                PopupMenuItem(
+                  value: AnnotationExportFormat.plainText,
+                  child: Text('Экспортировать в TXT'),
+                ),
+              ],
+            ),
           IconButton(
             tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск аннотаций',
             icon: Icon(_isSearching ? Icons.close : Icons.search),

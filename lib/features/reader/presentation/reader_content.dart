@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/router.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/platform/adaptive_context.dart';
@@ -867,14 +868,17 @@ Widget _readerImageWidget(
     final label = semanticLabel?.trim();
     final imageDescription = label == null || label.isEmpty ? 'изображение' : label;
     void openFullscreen() => _showFullscreenImage(imageUrl, allImages: allImages);
+    void showActions() => _showImageActions(imageUrl, imageDescription);
     return Semantics(
       button: true,
       label: 'Открыть $imageDescription в полноэкранном режиме',
-      hint: 'Двойное касание для увеличения',
+      hint: 'Двойное касание для увеличения; удерживайте для действий с изображением',
       onTap: openFullscreen,
+      onLongPress: showActions,
       child: GestureDetector(
         excludeFromSemantics: true,
         onTap: openFullscreen,
+        onLongPress: showActions,
         child: filtered,
       ),
     );
@@ -951,6 +955,99 @@ void _showFullscreenImage(String imageUrl, {List<String> allImages = const []}) 
       ),
     ),
   );
+}
+
+void _showImageActions(String imageUrl, String imageDescription) {
+  final context = rootNavigatorKey.currentContext;
+  if (context == null) return;
+  unawaited(
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => _ImageActionsSheet(
+        imageUrl: imageUrl,
+        imageDescription: imageDescription,
+      ),
+    ),
+  );
+}
+
+class _ImageActionsSheet extends StatelessWidget {
+  const _ImageActionsSheet({required this.imageUrl, required this.imageDescription});
+
+  final String imageUrl;
+  final String imageDescription;
+
+  Future<void> _share(BuildContext context) async {
+    File? temporaryFile;
+    try {
+      final file = await _shareableImageFile(imageUrl);
+      if (file == null) return;
+      temporaryFile = file.$2 ? file.$1 : null;
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(file.$1.path)], text: imageDescription),
+      );
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось подготовить изображение для отправки')),
+        );
+      }
+    } finally {
+      if (temporaryFile != null) {
+        try {
+          await temporaryFile.delete();
+        } on FileSystemException {
+          // The share target may still be reading the cache file.
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Semantics(
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: 'Действия с изображением',
+        child: ListTile(
+          leading: const Icon(Icons.ios_share),
+          title: const Text('Поделиться изображением'),
+          subtitle: Text(imageDescription, maxLines: 1, overflow: TextOverflow.ellipsis),
+          onTap: () async {
+            Navigator.of(context).pop();
+            await _share(context);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+Future<(File, bool)?> _shareableImageFile(String imageUrl) async {
+  final uri = Uri.tryParse(imageUrl);
+  final isDataUri = imageUrl.toLowerCase().startsWith('data:');
+  if (!isDataUri) {
+    if (uri?.scheme == 'file') return (File(uri!.path), false);
+    if (uri == null || !uri.isAbsolute) return (File(imageUrl), false);
+    return null;
+  }
+
+  final data = imageUrl.split(',');
+  if (data.length != 2) return null;
+  try {
+    final bytes = base64Decode(data.last);
+    final mime = RegExp(r'^data:image/([^;,]+)', caseSensitive: false).firstMatch(data.first);
+    final extension = mime?.group(1)?.toLowerCase() ?? 'img';
+    final file = File(
+      '${Directory.systemTemp.path}/glibusta-image-${DateTime.now().microsecondsSinceEpoch}.$extension',
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    return (file, true);
+  } on FormatException {
+    return null;
+  }
 }
 
 class _FullscreenImageViewer extends StatefulWidget {
