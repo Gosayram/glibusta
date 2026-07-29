@@ -45,6 +45,7 @@ void main() {
     when(() => tts.setLanguage(any())).thenAnswer((_) async {});
     when(() => tts.setSpeechRate(any())).thenAnswer((_) async {});
     when(() => tts.speak(any())).thenAnswer((_) async {});
+    when(() => tts.pause()).thenAnswer((_) async {});
     when(() => tts.stop()).thenAnswer((_) async {});
     controller = TtsController.forTesting(() {
       createdPlayers++;
@@ -61,6 +62,21 @@ void main() {
 
   test('can stop before the first utterance', () {
     expect(controller.stop, returnsNormally);
+  });
+
+  test('pauses and resumes the same utterance through the native TTS engine', () async {
+    await controller.speak('chapter');
+    await controller.pause();
+
+    expect(controller.isPlaying, isFalse);
+    expect(controller.isPaused, isTrue);
+    verify(() => tts.pause()).called(1);
+
+    await controller.resume();
+
+    expect(controller.isPlaying, isTrue);
+    expect(controller.isPaused, isFalse);
+    verify(() => tts.speak('chapter')).called(2);
   });
 
   test('maps reader playback speed to native TTS rate', () async {

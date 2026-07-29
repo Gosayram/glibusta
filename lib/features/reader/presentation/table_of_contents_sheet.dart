@@ -111,6 +111,16 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
     _scrollToCurrentChapter(currentEntryIndex);
   }
 
+  void _toggleGroup(int groupId) {
+    setState(() {
+      if (_collapsedGroups.contains(groupId)) {
+        _collapsedGroups.remove(groupId);
+      } else {
+        _collapsedGroups.add(groupId);
+      }
+    });
+  }
+
   void _scrollToCurrentChapter(int currentEntryIndex) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !widget.scrollController.hasClients) {
@@ -218,6 +228,9 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
               final isCollapsed = _collapsedGroups.contains(entry.groupId);
               final isLoaded = widget.loadedChapters.containsKey(entry.index);
               final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
+              final groupToggleLabel = isCollapsed
+                  ? 'Развернуть раздел $title'
+                  : 'Свернуть раздел $title';
 
               // MD-8.1: chapter size bar
               final ch = widget.loadedChapters[entry.index];
@@ -230,18 +243,25 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                   left: 16.0 + entry.depth * 16.0,
                 ),
                 leading: isGroup
-                    ? GestureDetector(
-                        onTap: () => setState(() {
-                          if (isCollapsed) {
-                            _collapsedGroups.remove(entry.groupId);
-                          } else {
-                            _collapsedGroups.add(entry.groupId);
-                          }
-                        }),
-                        child: Icon(
-                          isCollapsed ? Icons.chevron_right : Icons.expand_more,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ? Semantics(
+                        key: ValueKey('toc-group-toggle-${entry.index}'),
+                        button: true,
+                        label: groupToggleLabel,
+                        expanded: !isCollapsed,
+                        onTap: () => _toggleGroup(entry.groupId),
+                        child: ExcludeSemantics(
+                          child: IconButton(
+                            tooltip: groupToggleLabel,
+                            visualDensity: VisualDensity.compact,
+                            iconSize: 20,
+                            onPressed: () => _toggleGroup(entry.groupId),
+                            icon: Icon(
+                              isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
                         ),
                       )
                     : CircleAvatar(

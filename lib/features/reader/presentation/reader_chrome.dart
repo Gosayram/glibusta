@@ -97,6 +97,9 @@ class ReaderTopBar extends StatelessWidget {
     final colors = ReaderColors.forTheme(settings.theme);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final showTitle = screenWidth > 400; // ponytail: hide title on small screens
+    final bookLabel = bookAuthor?.isNotEmpty == true
+        ? 'Книга: $bookTitle. Автор: $bookAuthor'
+        : 'Книга: $bookTitle';
     return SafeArea(
       bottom: false,
       child: Container(
@@ -127,29 +130,33 @@ class ReaderTopBar extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: showTitle
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bookTitle,
-                          style: TextStyle(color: colors.text, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                          semanticsLabel: 'Книга: $bookTitle',
-                        ),
-                        if (bookAuthor != null && bookAuthor!.isNotEmpty)
-                          Text(
-                            bookAuthor!,
-                            style: TextStyle(
-                              color: colors.text.withValues(alpha: 0.6),
-                              fontSize: 11,
+              child: Semantics(
+                label: bookLabel,
+                child: ExcludeSemantics(
+                  child: showTitle
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              bookTitle,
+                              style: TextStyle(color: colors.text, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
+                            if (bookAuthor != null && bookAuthor!.isNotEmpty)
+                              Text(
+                                bookAuthor!,
+                                style: TextStyle(
+                                  color: colors.text.withValues(alpha: 0.6),
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
             ),
             if (onSearch != null)
               Semantics(

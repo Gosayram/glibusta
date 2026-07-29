@@ -39,6 +39,7 @@ class TtsController {
   late double _lastRate;
   var _playbackRate = _defaultPlaybackRate;
   String? _lastText;
+  var _isPaused = false;
   StreamSubscription<dynamic>? _noisySub;
   Timer? _sleepTimer;
   Duration? _sleepTimerDuration;
@@ -78,24 +79,39 @@ class TtsController {
     await _tts.setLanguage(_lastLang);
     await _tts.setSpeechRate(_lastRate);
     _isPlaying = true;
+    _isPaused = false;
     await _tts.speak(text);
   }
 
-  /// Resume speaking last text.
+  /// Pauses the current utterance when the platform supports it.
+  ///
+  /// The `flutter_tts` Android implementation resumes through its own tracked
+  /// range offset when [resume] speaks the same text again.
+  Future<void> pause() async {
+    if (!_isTtsInitialized || !_isPlaying) return;
+    await _tts.pause();
+    _isPlaying = false;
+    _isPaused = true;
+  }
+
+  /// Resumes the last paused utterance through the platform TTS engine.
   Future<void> resume() async {
-    if (_lastText != null) {
+    if (_isPaused && _lastText != null) {
       await speak(_lastText!, lang: _lastLang, rate: _lastRate);
     }
   }
 
   void stop() {
     _isPlaying = false;
+    _isPaused = false;
     if (_isTtsInitialized) {
       _tts.stop(); // ignore: discarded_futures
     }
   }
 
   bool get isPlaying => _isPlaying;
+
+  bool get isPaused => _isPaused;
 
   bool get hasLastText => _lastText != null;
 
@@ -177,5 +193,6 @@ class TtsController {
       _tts.stop(); // ignore: discarded_futures
     }
     _isPlaying = false;
+    _isPaused = false;
   }
 }

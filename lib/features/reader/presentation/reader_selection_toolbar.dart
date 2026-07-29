@@ -203,18 +203,39 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                   widget.onDismiss();
                 },
               ),
-              // TTS-001: keep a direct stop action available while speaking.
+              // TTS: pause/resume keeps the platform's native progress, while
+              // stop remains available as an explicit reset action.
               if (_selectedText != null && _selectedText!.isNotEmpty)
                 _ToolbarButton(
-                  icon: _ttsController.isPlaying ? Icons.stop_circle_outlined : Icons.volume_up,
-                  label: _ttsController.isPlaying ? 'Остановить' : 'Озвучить',
+                  icon: _ttsController.isPlaying
+                      ? Icons.pause_circle_outline
+                      : _ttsController.isPaused
+                      ? Icons.play_circle_outline
+                      : Icons.volume_up,
+                  label: _ttsController.isPlaying
+                      ? 'Пауза'
+                      : _ttsController.isPaused
+                      ? 'Продолжить'
+                      : 'Озвучить',
                   onTap: () {
                     if (_ttsController.isPlaying) {
-                      _ttsController.stop();
-                      setState(() {});
+                      unawaited(_pauseSelectedText());
+                    } else if (_ttsController.isPaused) {
+                      unawaited(_resumeSelectedText());
                     } else {
                       unawaited(_speakSelectedText(_selectedText!));
                     }
+                  },
+                ),
+              if (_selectedText != null &&
+                  _selectedText!.isNotEmpty &&
+                  (_ttsController.isPlaying || _ttsController.isPaused))
+                _ToolbarButton(
+                  icon: Icons.stop_circle_outlined,
+                  label: 'Остановить',
+                  onTap: () {
+                    _ttsController.stop();
+                    setState(() {});
                   },
                 ),
               _ToolbarButton(
@@ -777,6 +798,26 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       if (mounted) setState(() {});
     } on Object catch (e) {
       debugPrint('TTS error: $e');
+    }
+  }
+
+  Future<void> _pauseSelectedText() async {
+    try {
+      await _ttsController.pause();
+      if (mounted) setState(() {});
+    } on Object catch (e) {
+      debugPrint('TTS pause error: $e');
+      if (mounted) unawaited(SmartDialog.showToast('Не удалось поставить озвучивание на паузу'));
+    }
+  }
+
+  Future<void> _resumeSelectedText() async {
+    try {
+      await _ttsController.resume();
+      if (mounted) setState(() {});
+    } on Object catch (e) {
+      debugPrint('TTS resume error: $e');
+      if (mounted) unawaited(SmartDialog.showToast('Не удалось продолжить озвучивание'));
     }
   }
 

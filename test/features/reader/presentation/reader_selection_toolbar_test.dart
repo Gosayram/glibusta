@@ -113,6 +113,52 @@ void main() {
     expect(find.text('Озвучить'), findsOneWidget);
   });
 
+  testWidgets('pauses and resumes selected-text narration without dismissing the toolbar', (
+    tester,
+  ) async {
+    final tts = _MockFlutterTts();
+    when(() => tts.setLanguage(any())).thenAnswer((_) async {});
+    when(() => tts.setSpeechRate(any())).thenAnswer((_) async {});
+    when(() => tts.speak(any())).thenAnswer((_) async {});
+    when(() => tts.pause()).thenAnswer((_) async {});
+    final controller = TtsController.forTesting(() => tts);
+    var dismissals = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () => dismissals++,
+              ttsController: controller,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Озвучить'));
+    await tester.tap(find.text('Озвучить'));
+    await tester.pump();
+    await tester.tap(find.text('Пауза'));
+    await tester.pump();
+
+    expect(find.text('Продолжить'), findsOneWidget);
+    expect(find.text('Остановить'), findsOneWidget);
+    verify(() => tts.pause()).called(1);
+
+    await tester.tap(find.text('Продолжить'));
+    await tester.pump();
+
+    expect(find.text('Пауза'), findsOneWidget);
+    expect(dismissals, 0);
+    verify(() => tts.speak('Selected text')).called(2);
+  });
+
   testWidgets('starts and cancels a sleep timer from the selection toolbar', (tester) async {
     final tts = _MockFlutterTts();
     final controller = TtsController.forTesting(() => tts);

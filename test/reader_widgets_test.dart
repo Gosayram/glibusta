@@ -429,6 +429,34 @@ void main() {
 
       expect(find.byIcon(Icons.settings), findsOneWidget);
     });
+
+    testWidgets('keeps book metadata available to screen readers on compact widths', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        wrapInApp(
+          const MediaQuery(
+            data: MediaQueryData(size: Size(390, 800)),
+            child: ReaderTopBar(
+              settings: ReaderSettings(),
+              bookTitle: 'Компактная книга',
+              bookAuthor: 'Автор',
+              onBack: SizedBox.new,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Компактная книга'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Книга: Компактная книга. Автор: Автор'),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
   });
 
   group('ReaderBottomBar', () {
