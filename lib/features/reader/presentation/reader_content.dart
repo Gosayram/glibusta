@@ -2493,122 +2493,129 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             ? const NeverScrollableScrollPhysics()
             : const BouncingScrollPhysics();
 
-        final Widget pageContent = GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTapUp: widget.onTap,
-          child: PageView.builder(
-            controller: _pageController,
-            physics: physics,
-            padEnds: false,
-            itemCount: effectivePageCount,
-            onPageChanged: (index) {
-              final pageIndex = useTwoPageLayout ? index * 2 : index;
-              if (_pages.isNotEmpty && pageIndex < _pages.length) {
-                widget.onPageChanged?.call(_pages[pageIndex].chapterIndex);
-              }
-            },
-            itemBuilder: useSwitcher
-                ? (context, index) {
-                    final child = itemBuilder(context, index);
-                    // LW-2.1: 3D page curl with shadow gradient
-                    if (anim == PageTurnAnimation.curl) {
-                      return AnimatedSwitcher(
-                        duration: Duration(milliseconds: switcherDuration),
-                        switchInCurve: Curves.easeOut,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) {
-                          return AnimatedBuilder(
-                            animation: animation,
-                            child: child,
-                            builder: (context, child) {
-                              final t = animation.value;
-                              final rotation = (1 - t) * 0.4;
-                              final opacity = t.clamp(0.0, 1.0);
-                              // Shadow peaks mid-animation
-                              final shadowAlpha = (0.3 * (t * (1 - t)) * 4).clamp(0.0, 0.3);
-                              return Stack(
-                                children: [
-                                  Transform(
-                                    alignment: Alignment.centerRight,
-                                    transform: Matrix4.identity()
-                                      ..setEntry(3, 2, 0.002)
-                                      ..rotateY(-rotation),
-                                    child: Opacity(
-                                      opacity: opacity,
-                                      child: child,
+        final Widget pageContent = Directionality(
+          textDirection: _readerTextDirection(
+            s.textDirection,
+            context,
+            bookTextDirection: _bookTextDirection(widget.metadata),
+          ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTapUp: widget.onTap,
+            child: PageView.builder(
+              controller: _pageController,
+              physics: physics,
+              padEnds: false,
+              itemCount: effectivePageCount,
+              onPageChanged: (index) {
+                final pageIndex = useTwoPageLayout ? index * 2 : index;
+                if (_pages.isNotEmpty && pageIndex < _pages.length) {
+                  widget.onPageChanged?.call(_pages[pageIndex].chapterIndex);
+                }
+              },
+              itemBuilder: useSwitcher
+                  ? (context, index) {
+                      final child = itemBuilder(context, index);
+                      // LW-2.1: 3D page curl with shadow gradient
+                      if (anim == PageTurnAnimation.curl) {
+                        return AnimatedSwitcher(
+                          duration: Duration(milliseconds: switcherDuration),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) {
+                            return AnimatedBuilder(
+                              animation: animation,
+                              child: child,
+                              builder: (context, child) {
+                                final t = animation.value;
+                                final rotation = (1 - t) * 0.4;
+                                final opacity = t.clamp(0.0, 1.0);
+                                // Shadow peaks mid-animation
+                                final shadowAlpha = (0.3 * (t * (1 - t)) * 4).clamp(0.0, 0.3);
+                                return Stack(
+                                  children: [
+                                    Transform(
+                                      alignment: Alignment.centerRight,
+                                      transform: Matrix4.identity()
+                                        ..setEntry(3, 2, 0.002)
+                                        ..rotateY(-rotation),
+                                      child: Opacity(
+                                        opacity: opacity,
+                                        child: child,
+                                      ),
                                     ),
-                                  ),
-                                  // Shadow gradient on curling page leading edge
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            end: Alignment.center,
-                                            colors: [
-                                              Colors.black.withValues(alpha: shadowAlpha),
-                                              Colors.transparent,
-                                            ],
+                                    // Shadow gradient on curling page leading edge
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              end: Alignment.center,
+                                              colors: [
+                                                Colors.black.withValues(alpha: shadowAlpha),
+                                                Colors.transparent,
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                        child: child,
-                      );
-                    }
-                    // LW-2.2: Stack animation — new page slides over from right with shadow
-                    if (anim == PageTurnAnimation.stack) {
-                      return AnimatedSwitcher(
-                        duration: Duration(milliseconds: switcherDuration),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeIn,
-                        transitionBuilder: (child, animation) {
-                          return AnimatedBuilder(
-                            animation: animation,
-                            child: child,
-                            builder: (context, child) {
-                              final t = animation.value;
-                              return Stack(
-                                children: [
-                                  child!,
-                                  // Shadow gradient on leading edge of incoming page
-                                  Positioned.fill(
-                                    child: IgnorePointer(
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            end: Alignment.center,
-                                            colors: [
-                                              Colors.black.withValues(alpha: 0.25 * (1 - t)),
-                                              Colors.transparent,
-                                            ],
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                          child: child,
+                        );
+                      }
+                      // LW-2.2: Stack animation — new page slides over from right with shadow
+                      if (anim == PageTurnAnimation.stack) {
+                        return AnimatedSwitcher(
+                          duration: Duration(milliseconds: switcherDuration),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) {
+                            return AnimatedBuilder(
+                              animation: animation,
+                              child: child,
+                              builder: (context, child) {
+                                final t = animation.value;
+                                return Stack(
+                                  children: [
+                                    child!,
+                                    // Shadow gradient on leading edge of incoming page
+                                    Positioned.fill(
+                                      child: IgnorePointer(
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              end: Alignment.center,
+                                              colors: [
+                                                Colors.black.withValues(alpha: 0.25 * (1 - t)),
+                                                Colors.transparent,
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                          child: child,
+                        );
+                      }
+                      return AnimatedSwitcher(
+                        duration: Duration(milliseconds: switcherDuration),
+                        switchInCurve: Curves.easeInOut,
+                        switchOutCurve: Curves.easeInOut,
                         child: child,
                       );
                     }
-                    return AnimatedSwitcher(
-                      duration: Duration(milliseconds: switcherDuration),
-                      switchInCurve: Curves.easeInOut,
-                      switchOutCurve: Curves.easeInOut,
-                      child: child,
-                    );
-                  }
-                : itemBuilder,
+                  : itemBuilder,
+            ),
           ),
         );
 
@@ -2712,22 +2719,29 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return PageView.builder(
-      controller: _pageController,
-      onPageChanged: widget.onPageChanged,
-      itemCount: widget.metadata.chapterCount,
-      itemBuilder: (_, index) {
-        final chapter = widget.loadedChapters[index];
-        if (chapter == null) return const SizedBox.shrink();
+    return Directionality(
+      textDirection: _readerTextDirection(
+        widget.settings.textDirection,
+        context,
+        bookTextDirection: _bookTextDirection(widget.metadata),
+      ),
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: widget.onPageChanged,
+        itemCount: widget.metadata.chapterCount,
+        itemBuilder: (_, index) {
+          final chapter = widget.loadedChapters[index];
+          if (chapter == null) return const SizedBox.shrink();
 
-        final imgBlocks = chapter.blocks
-            .where((b) => b.type == BlockType.image && b.imageUrl != null)
-            .toList();
-        if (imgBlocks.isNotEmpty) {
-          return _imagePage(imgBlocks.first.imageUrl!, context);
-        }
-        return _textPage(chapter, theme, context);
-      },
+          final imgBlocks = chapter.blocks
+              .where((b) => b.type == BlockType.image && b.imageUrl != null)
+              .toList();
+          if (imgBlocks.isNotEmpty) {
+            return _imagePage(imgBlocks.first.imageUrl!, context);
+          }
+          return _textPage(chapter, theme, context);
+        },
+      ),
     );
   }
 

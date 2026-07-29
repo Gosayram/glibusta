@@ -517,6 +517,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 16),
         _buildCornerTapMap(settings, notifier),
         const SizedBox(height: 16),
+        _buildCornerLongPressMap(settings, notifier),
+        const SizedBox(height: 16),
         const _SectionTitle('Скрытие UI (сек)'),
         _buildAutoHideRow(settings, notifier),
         const SizedBox(height: 12),
@@ -1567,6 +1569,59 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             ],
             onChanged: (action) {
               if (action != null) notifier.updateCornerTapAction(corner, action);
+            },
+          ),
+      ],
+    );
+  }
+
+  static Widget _buildCornerLongPressMap(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = <ReaderCorner, String>{
+      ReaderCorner.topLeft: 'Верхний левый',
+      ReaderCorner.topRight: 'Верхний правый',
+      ReaderCorner.bottomLeft: 'Нижний левый',
+      ReaderCorner.bottomRight: 'Нижний правый',
+    };
+    final actions = <ReaderCorner, CornerLongPressAction>{
+      ReaderCorner.topLeft: settings.topLeftCornerLongPressAction,
+      ReaderCorner.topRight: settings.topRightCornerLongPressAction,
+      ReaderCorner.bottomLeft: settings.bottomLeftCornerLongPressAction,
+      ReaderCorner.bottomRight: settings.bottomRightCornerLongPressAction,
+    };
+    final isDefault = actions.values.every((action) => action == CornerLongPressAction.inherit);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Долгое нажатие по углам')),
+            TextButton(
+              key: const ValueKey('reset-corner-long-press-actions'),
+              onPressed: isDefault ? null : notifier.resetCornerLongPressActions,
+              child: const Text('Сбросить'),
+            ),
+          ],
+        ),
+        const Text(
+          'Настроенное действие срабатывает только в этом углу; '
+          'в остальном тексте долгое нажатие сохраняет выделение.',
+        ),
+        const SizedBox(height: 8),
+        for (final corner in ReaderCorner.values)
+          DropdownButtonFormField<CornerLongPressAction>(
+            key: ValueKey('corner-long-press-${corner.name}'),
+            initialValue: actions[corner],
+            decoration: InputDecoration(labelText: labels[corner]),
+            items: [
+              for (final action in CornerLongPressAction.values)
+                DropdownMenuItem(value: action, child: Text(action.displayName)),
+            ],
+            onChanged: (action) {
+              if (action != null) notifier.updateCornerLongPressAction(corner, action);
             },
           ),
       ],

@@ -40,6 +40,12 @@ void main() {
         bookStatsListProvider.overrideWithValue(
           const AsyncData({}),
         ),
+        favoriteGenresProvider.overrideWithValue(
+          const AsyncData<List<MapEntry<String, int>>>([]),
+        ),
+        readingHoursProvider.overrideWithValue(
+          AsyncData(List<int>.filled(24, 0)),
+        ),
       ],
       child: const MaterialApp(
         home: ReadingStatsScreen(),
@@ -84,6 +90,36 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(Card), findsWidgets);
+    });
+
+    testWidgets('shows transparent local achievement progress', (tester) async {
+      await tester.pumpWidget(
+        buildTestWidget(
+          stats: const ReadingStats(
+            currentStreak: 2,
+            longestStreak: 2,
+            todayMinutes: 45,
+            thisWeekMinutes: 45,
+            thisMonthMinutes: 45,
+            totalMinutes: 45,
+            totalSessions: 3,
+            heatmapData: [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Локальные достижения'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.text('Считаются только по сохранённым данным на этом устройстве'),
+        findsOneWidget,
+      );
+      expect(find.text('45 из 60 мин'), findsOneWidget);
+      expect(find.text('2 из 7 дней'), findsOneWidget);
     });
 
     testWidgets('shows a derived seven-day target for an enabled goal', (tester) async {

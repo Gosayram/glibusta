@@ -1122,6 +1122,22 @@ final class ReaderController {
     }
   }
 
+  void handleCornerLongPress(CornerLongPressAction action) {
+    switch (action) {
+      case CornerLongPressAction.previousPage:
+        scrollToPrevious();
+      case CornerLongPressAction.nextPage:
+        scrollToNext();
+      case CornerLongPressAction.toggleUi:
+        toggleUi();
+      case CornerLongPressAction.addBookmark:
+        addBookmark();
+      case CornerLongPressAction.disabled:
+      case CornerLongPressAction.inherit:
+        break;
+    }
+  }
+
   // ── UI state ──────────────────────────────────────────
 
   void toggleUi() {

@@ -112,6 +112,22 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['bottomRightCornerTapAction'],
           orElse: () => CornerTapAction.inherit,
         ),
+        topLeftCornerLongPressAction: CornerLongPressAction.values.firstWhere(
+          (e) => e.name == map['topLeftCornerLongPressAction'],
+          orElse: () => CornerLongPressAction.inherit,
+        ),
+        topRightCornerLongPressAction: CornerLongPressAction.values.firstWhere(
+          (e) => e.name == map['topRightCornerLongPressAction'],
+          orElse: () => CornerLongPressAction.inherit,
+        ),
+        bottomLeftCornerLongPressAction: CornerLongPressAction.values.firstWhere(
+          (e) => e.name == map['bottomLeftCornerLongPressAction'],
+          orElse: () => CornerLongPressAction.inherit,
+        ),
+        bottomRightCornerLongPressAction: CornerLongPressAction.values.firstWhere(
+          (e) => e.name == map['bottomRightCornerLongPressAction'],
+          orElse: () => CornerLongPressAction.inherit,
+        ),
         restoreLastPosition: map['restoreLastPosition'] as bool? ?? true,
         forcedEncoding: map['forcedEncoding'] as String?,
         horizontalGesture: HorizontalGesture.values.firstWhere(
@@ -211,6 +227,10 @@ class ReaderSettingsPersistence {
         'topRightCornerTapAction': settings.topRightCornerTapAction.name,
         'bottomLeftCornerTapAction': settings.bottomLeftCornerTapAction.name,
         'bottomRightCornerTapAction': settings.bottomRightCornerTapAction.name,
+        'topLeftCornerLongPressAction': settings.topLeftCornerLongPressAction.name,
+        'topRightCornerLongPressAction': settings.topRightCornerLongPressAction.name,
+        'bottomLeftCornerLongPressAction': settings.bottomLeftCornerLongPressAction.name,
+        'bottomRightCornerLongPressAction': settings.bottomRightCornerLongPressAction.name,
         'restoreLastPosition': settings.restoreLastPosition,
         'forcedEncoding': settings.forcedEncoding,
         'horizontalGesture': settings.horizontalGesture.name,

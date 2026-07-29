@@ -35,6 +35,7 @@ import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
 import 'reader_controller.dart';
+import 'reader_corner_long_press.dart';
 import 'reader_error_panel.dart';
 import 'reader_gesture_coordinator.dart';
 import 'reader_link_back_pinch_gesture.dart';
@@ -1269,25 +1270,29 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               : null,
           behavior: HitTestBehavior.translucent,
           child: RepaintBoundary(
-            child: ReaderContentBody(
-              metadata: readerState.metadata!,
-              loadedChapters: readerState.loadedChapters,
+            child: ReaderCornerLongPressOverlay(
               settings: settings,
-              scrollController: _ctrl.scrollController,
-              onTap: _gestureCoordinator.canInteract
-                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context))
-                  : (
-                      _,
-                    ) {},
-              initialProgress: readerState.scrollProgress,
-              initialPage: readerState.currentPosition.chapterIndex,
-              initialParagraph: readerState.currentPosition.paragraphIndex,
-              highlightQuery: readerState.highlightedQuery,
-              chapterHighlights: _buildChapterHighlights(),
-              customColors: _resolveCustomColors(settings),
-              onLinkTap: (href) => _handleLinkTap(href, readerState),
-              onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
-              onFocusPositionChanged: _ctrl.handleFocusPositionChanged,
+              onAction: _gestureCoordinator.canInteract ? _ctrl.handleCornerLongPress : (_) {},
+              child: ReaderContentBody(
+                metadata: readerState.metadata!,
+                loadedChapters: readerState.loadedChapters,
+                settings: settings,
+                scrollController: _ctrl.scrollController,
+                onTap: _gestureCoordinator.canInteract
+                    ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context))
+                    : (
+                        _,
+                      ) {},
+                initialProgress: readerState.scrollProgress,
+                initialPage: readerState.currentPosition.chapterIndex,
+                initialParagraph: readerState.currentPosition.paragraphIndex,
+                highlightQuery: readerState.highlightedQuery,
+                chapterHighlights: _buildChapterHighlights(),
+                customColors: _resolveCustomColors(settings),
+                onLinkTap: (href) => _handleLinkTap(href, readerState),
+                onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
+                onFocusPositionChanged: _ctrl.handleFocusPositionChanged,
+              ),
             ),
           ),
         ),

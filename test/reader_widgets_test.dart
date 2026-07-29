@@ -258,6 +258,47 @@ void main() {
       );
     });
 
+    testWidgets('resetting corner long presses updates every configured selector', (tester) async {
+      await tester.pumpWidget(
+        wrapInApp(
+          const ReaderQuickSettingsSheet(),
+          initialSettings: const ReaderSettings(
+            topLeftCornerLongPressAction: CornerLongPressAction.previousPage,
+            topRightCornerLongPressAction: CornerLongPressAction.nextPage,
+            bottomLeftCornerLongPressAction: CornerLongPressAction.addBookmark,
+            bottomRightCornerLongPressAction: CornerLongPressAction.toggleUi,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openSettingsPage(tester, 'Жесты');
+      await scrollSettingsUntilVisible(tester, find.text('Долгое нажатие по углам'));
+
+      final topLeft = find.byKey(const ValueKey('corner-long-press-topLeft'));
+      expect(
+        tester.widget<DropdownButtonFormField<CornerLongPressAction>>(topLeft).initialValue,
+        CornerLongPressAction.previousPage,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('reset-corner-long-press-actions')));
+      await tester.pump();
+
+      for (final corner in ReaderCorner.values) {
+        final selector = find.byKey(ValueKey('corner-long-press-${corner.name}'));
+        expect(
+          tester.widget<DropdownButtonFormField<CornerLongPressAction>>(selector).initialValue,
+          CornerLongPressAction.inherit,
+        );
+      }
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const ValueKey('reset-corner-long-press-actions')))
+            .onPressed,
+        isNull,
+      );
+    });
+
     testWidgets('default font size shows 18', (tester) async {
       await tester.pumpWidget(
         wrapInApp(const ReaderQuickSettingsSheet()),

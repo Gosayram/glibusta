@@ -132,6 +132,22 @@ enum CornerTapAction {
   final String displayName;
 }
 
+/// Action assigned to a reader corner long press.
+///
+/// This is deliberately distinct from [CornerTapAction] so a persisted
+/// long-press map cannot accidentally be interpreted as a tap preference.
+enum CornerLongPressAction {
+  inherit('По умолчанию'),
+  previousPage('Предыдущая страница'),
+  nextPage('Следующая страница'),
+  toggleUi('Показать/скрыть UI'),
+  addBookmark('Добавить закладку'),
+  disabled('Ничего не делать');
+
+  const CornerLongPressAction(this.displayName);
+  final String displayName;
+}
+
 enum HorizontalGesture { off, on, inverse }
 
 enum HorizontalGestureScroll { half, twoThirds, threeQuarters }
@@ -216,6 +232,10 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(CornerTapAction.inherit) CornerTapAction topRightCornerTapAction,
     @Default(CornerTapAction.inherit) CornerTapAction bottomLeftCornerTapAction,
     @Default(CornerTapAction.inherit) CornerTapAction bottomRightCornerTapAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction topLeftCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction topRightCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction bottomLeftCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction bottomRightCornerLongPressAction,
     @Default(true) bool restoreLastPosition,
     String? forcedEncoding,
     @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,

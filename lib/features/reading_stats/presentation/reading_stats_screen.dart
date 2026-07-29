@@ -12,6 +12,7 @@ import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/data/weekly_reading_goal_progress.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
+import '../data/reading_milestones.dart';
 import '../data/reading_stats_providers.dart' as rsp;
 import '../data/reading_trend.dart';
 import '../data/reading_trend_settings.dart';
@@ -84,6 +85,8 @@ class ReadingStatsScreen extends ConsumerWidget {
                 todayMinutes: stats.todayMinutes,
                 thisWeekMinutes: stats.thisWeekMinutes,
               ),
+              const SizedBox(height: 24),
+              _LocalMilestonesCard(stats: stats),
               const SizedBox(height: 24),
               Text(
                 'Активность',
@@ -419,6 +422,104 @@ class _StatCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LocalMilestonesCard extends StatelessWidget {
+  const _LocalMilestonesCard({required this.stats});
+
+  final ReadingStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final milestones = buildLocalReadingMilestones(
+      totalMinutes: stats.totalMinutes,
+      totalSessions: stats.totalSessions,
+      longestStreak: stats.longestStreak,
+    );
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Локальные достижения',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text(
+                  'Считаются только по сохранённым данным на этом устройстве',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final milestone in milestones) ...[
+                  Semantics(
+                    label: milestone.title,
+                    value:
+                        '${milestone.progressLabel}. '
+                        '${milestone.isUnlocked ? 'Достигнуто' : 'В процессе'}',
+                    child: _MilestoneRow(milestone: milestone),
+                  ),
+                  if (milestone != milestones.last) const SizedBox(height: 12),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MilestoneRow extends StatelessWidget {
+  const _MilestoneRow({required this.milestone});
+
+  final ReadingMilestone milestone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final unlocked = milestone.isUnlocked;
+    final color = unlocked ? colorScheme.primary : colorScheme.onSurfaceVariant;
+
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          Icon(unlocked ? Icons.workspace_premium_outlined : Icons.flag_outlined, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(milestone.title, style: Theme.of(context).textTheme.titleSmall),
+                Text(
+                  milestone.description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(value: milestone.progress),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            milestone.progressLabel,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+          ),
+        ],
       ),
     );
   }
