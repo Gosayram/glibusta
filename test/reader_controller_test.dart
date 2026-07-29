@@ -425,6 +425,25 @@ void main() {
       await tester.pump(const Duration(seconds: 60));
     });
 
+    testWidgets('suspends chrome auto-hide for accessibility navigation', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'book1',
+        settings: const ReaderSettings(autoHideDelay: 1),
+      );
+
+      ctrl.hideUi();
+      ctrl.setAutoHideSuspended(true);
+      ctrl.toggleUi();
+      await tester.pump(const Duration(seconds: 2));
+      expect(ctrl.state.uiVisible, isTrue);
+
+      ctrl.setAutoHideSuspended(false);
+      await tester.pump(const Duration(seconds: 2));
+      expect(ctrl.state.uiVisible, isFalse);
+      ctrl.dispose();
+    });
+
     testWidgets('buildDiagnostics contains book ID', (tester) async {
       final ctrl = await createController(tester, 'test-book-123');
       final diagnostics = ctrl.buildDiagnostics();

@@ -1096,6 +1096,7 @@ final class ReaderController {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
+    if (_autoHideSuspended) return;
     final delay = _ref.read(readerSettingsProvider).autoHideDelay;
     if (delay <= 0) return;
     _hideTimer = Timer(Duration(seconds: delay), () {
@@ -1114,6 +1115,21 @@ final class ReaderController {
     _updateState(_state.copyWith(isBottomSheetOpen: false));
     _startHideTimer();
   }
+
+  /// Keeps reader chrome visible while a system accessibility service is
+  /// navigating it. The caller resumes the ordinary timeout when that service
+  /// no longer requests accessible navigation.
+  void setAutoHideSuspended(bool suspended) {
+    if (_autoHideSuspended == suspended) return;
+    _autoHideSuspended = suspended;
+    if (suspended) {
+      _hideTimer?.cancel();
+    } else if (_state.uiVisible && !_state.isBottomSheetOpen) {
+      _startHideTimer();
+    }
+  }
+
+  bool _autoHideSuspended = false;
 
   void toggleSearch() {
     final shouldOpen = !_state.isSearchOpen;

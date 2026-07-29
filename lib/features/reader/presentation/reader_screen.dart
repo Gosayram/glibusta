@@ -118,6 +118,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Timer? _relayoutTimer;
   bool _isRelayouting = false;
   ReaderLayoutDeviceClass? _layoutDeviceClass;
+  bool? _autoHideSuspendedByAccessibility;
 
   @override
   void initState() {
@@ -156,10 +157,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final deviceClass = readerLayoutDeviceClassFor(
       canUseTwoPageMode: context.canUseTwoPageMode,
     );
-    if (_layoutDeviceClass == deviceClass) return;
+    if (_layoutDeviceClass != deviceClass) {
+      _layoutDeviceClass = deviceClass;
+      unawaited(_ctrl.applyPerBookSettingsForLayout(deviceClass));
+    }
 
-    _layoutDeviceClass = deviceClass;
-    unawaited(_ctrl.applyPerBookSettingsForLayout(deviceClass));
+    final suspendAutoHide = MediaQuery.accessibleNavigationOf(context);
+    if (_autoHideSuspendedByAccessibility != suspendAutoHide) {
+      _autoHideSuspendedByAccessibility = suspendAutoHide;
+      _ctrl.setAutoHideSuspended(suspendAutoHide);
+    }
   }
 
   void _syncOrientation(OrientationLock lock) {
