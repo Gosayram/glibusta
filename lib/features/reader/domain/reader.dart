@@ -196,6 +196,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(820.0) double readerWidth,
     @Default(true) bool verticalSwipeBrightness,
     @Default(false) bool pageTurnHaptic,
+    @Default(false) bool twoFingerChapterNavigation,
     @Default(DoubleTapAction.toggleUI) DoubleTapAction doubleTapAction,
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
     @Default(CornerTapAction.inherit) CornerTapAction topLeftCornerTapAction,

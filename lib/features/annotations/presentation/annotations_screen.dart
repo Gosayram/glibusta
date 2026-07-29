@@ -21,6 +21,8 @@ class AnnotationsScreen extends ConsumerStatefulWidget {
 class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -31,7 +33,15 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) _searchController.clear();
+    });
   }
 
   @override
@@ -40,7 +50,24 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Аннотации'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск аннотаций',
+                  border: InputBorder.none,
+                ),
+                onChanged: (_) => setState(() {}),
+              )
+            : const Text('Аннотации'),
+        actions: [
+          IconButton(
+            tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск аннотаций',
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: _toggleSearch,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -55,9 +82,13 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
           return TabBarView(
             controller: _tabController,
             children: [
-              _BookmarkList(bookmarks: data.bookmarks, bookId: widget.bookId),
-              _NoteList(notes: data.notes, bookId: widget.bookId),
-              _QuoteList(quotes: data.quotes, bookId: widget.bookId),
+              _BookmarkList(
+                bookmarks: data.bookmarks,
+                bookId: widget.bookId,
+                query: _searchController.text,
+              ),
+              _NoteList(notes: data.notes, bookId: widget.bookId, query: _searchController.text),
+              _QuoteList(quotes: data.quotes, bookId: widget.bookId, query: _searchController.text),
             ],
           );
         },
@@ -75,12 +106,17 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
 class _BookmarkList extends ConsumerWidget {
   final List<Bookmark> bookmarks;
   final String? bookId;
+  final String query;
 
-  const _BookmarkList({required this.bookmarks, this.bookId});
+  const _BookmarkList({required this.bookmarks, this.bookId, this.query = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (bookmarks.isEmpty) {
+    final filteredBookmarks = bookmarks
+        .where((bookmark) => _matchesQuery(query, bookmark.selectedText, bookmark.note))
+        .toList(growable: false);
+    if (filteredBookmarks.isEmpty) {
+      if (bookmarks.isNotEmpty && query.trim().isNotEmpty) return const _SearchEmptyState();
       return const _EmptyState(
         icon: Icons.bookmark_border,
         message: 'Нет закладок',
@@ -90,9 +126,9 @@ class _BookmarkList extends ConsumerWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: bookmarks.length,
+      itemCount: filteredBookmarks.length,
       itemBuilder: (context, index) {
-        final bookmark = bookmarks[index];
+        final bookmark = filteredBookmarks[index];
         return Dismissible(
           key: Key(bookmark.id),
           direction: DismissDirection.endToStart,
@@ -151,12 +187,17 @@ class _BookmarkList extends ConsumerWidget {
 class _NoteList extends ConsumerWidget {
   final List<Note> notes;
   final String? bookId;
+  final String query;
 
-  const _NoteList({required this.notes, this.bookId});
+  const _NoteList({required this.notes, this.bookId, this.query = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (notes.isEmpty) {
+    final filteredNotes = notes
+        .where((note) => _matchesQuery(query, note.content))
+        .toList(growable: false);
+    if (filteredNotes.isEmpty) {
+      if (notes.isNotEmpty && query.trim().isNotEmpty) return const _SearchEmptyState();
       return const _EmptyState(
         icon: Icons.note_alt_outlined,
         message: 'Нет заметок',
@@ -166,9 +207,9 @@ class _NoteList extends ConsumerWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: notes.length,
+      itemCount: filteredNotes.length,
       itemBuilder: (context, index) {
-        final note = notes[index];
+        final note = filteredNotes[index];
         return Dismissible(
           key: Key(note.id),
           direction: DismissDirection.endToStart,
@@ -228,12 +269,25 @@ class _NoteList extends ConsumerWidget {
 class _QuoteList extends ConsumerWidget {
   final List<Quote> quotes;
   final String? bookId;
+  final String query;
 
-  const _QuoteList({required this.quotes, this.bookId});
+  const _QuoteList({required this.quotes, this.bookId, this.query = ''});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (quotes.isEmpty) {
+    final filteredQuotes = quotes
+        .where(
+          (quote) => _matchesQuery(
+            query,
+            quote.selectedText,
+            quote.note,
+            quote.beforeContext,
+            quote.afterContext,
+          ),
+        )
+        .toList(growable: false);
+    if (filteredQuotes.isEmpty) {
+      if (quotes.isNotEmpty && query.trim().isNotEmpty) return const _SearchEmptyState();
       return const _EmptyState(
         icon: Icons.format_quote,
         message: 'Нет цитат',
@@ -243,9 +297,9 @@ class _QuoteList extends ConsumerWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: quotes.length,
+      itemCount: filteredQuotes.length,
       itemBuilder: (context, index) {
-        final quote = quotes[index];
+        final quote = filteredQuotes[index];
         return Dismissible(
           key: Key(quote.id),
           direction: DismissDirection.endToStart,
@@ -319,6 +373,14 @@ class _QuoteList extends ConsumerWidget {
   }
 }
 
+bool _matchesQuery(String query, String? first, [String? second, String? third, String? fourth]) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) return true;
+  return [first, second, third, fourth].any(
+    (value) => value?.toLowerCase().contains(normalizedQuery) ?? false,
+  );
+}
+
 Color _parseColor(String? hexString) {
   if (hexString == null || hexString.isEmpty) return Colors.amber;
   final cleaned = hexString.startsWith('#') ? hexString.substring(1) : hexString;
@@ -368,6 +430,19 @@ class _EmptyState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SearchEmptyState extends StatelessWidget {
+  const _SearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _EmptyState(
+      icon: Icons.search_off,
+      message: 'Ничего не найдено',
+      hint: 'Измените запрос или очистите поиск',
     );
   }
 }

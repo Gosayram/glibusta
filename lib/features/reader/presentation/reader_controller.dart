@@ -24,6 +24,7 @@ import 'reader_content_helper.dart';
 import 'reader_corner_tap.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
+import 'reader_two_finger_chapter_gesture.dart';
 
 enum ReaderErrorKind {
   bookMissing('Книга не найдена', Icons.search_off),
@@ -772,6 +773,42 @@ final class ReaderController {
   }
 
   // ── Navigation ────────────────────────────────────────
+
+  /// Moves to the adjacent chapter without treating a reflow chapter as a page.
+  ///
+  /// This is deliberately independent from [scrollToNext] and
+  /// [scrollToPrevious], whose continuous-mode behavior is viewport scrolling.
+  void navigateToAdjacentChapter({required TwoFingerChapterDirection direction}) {
+    if (_disposed || _state.chapterCount == 0) return;
+
+    final current = _state.currentPosition.chapterIndex;
+    final delta = switch (direction) {
+      TwoFingerChapterDirection.previous => -1,
+      TwoFingerChapterDirection.next => 1,
+    };
+    final target = (current + delta).clamp(0, _state.chapterCount - 1);
+    if (target == current) return;
+
+    final progress = _chapterProgress(target);
+    _updateState(
+      _state.copyWith(
+        currentPosition: _state.currentPosition.copyWith(
+          chapterIndex: target,
+          paragraphIndex: 0,
+          localOffset: 0,
+          progressPercent: progress,
+        ),
+        scrollProgress: progress,
+        estimatedMinutesLeft: _estimateMinutesLeft(progress),
+      ),
+    );
+    unawaited(_ensureChaptersLoaded(target));
+    _evictDistantChapters(target);
+
+    if (effectiveMode == ReaderMode.continuous) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => reanchorAfterLayoutChange());
+    }
+  }
 
   void scrollToNext() {
     if (_disposed || _state.chapterCount == 0) return;

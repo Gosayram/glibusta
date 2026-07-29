@@ -505,6 +505,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Двойной тап'),
         _buildDoubleTapActionRow(settings, notifier),
         const SizedBox(height: 12),
+        _buildToggleRow(
+          'Двумя пальцами: глава',
+          Icons.swipe_vertical,
+          settings.twoFingerChapterNavigation,
+          (enabled) => notifier.updateTwoFingerChapterNavigation(enabled),
+        ),
+        const SizedBox(height: 12),
         const _SectionTitle('Долгое нажатие'),
         _buildLongPressActionRow(settings, notifier),
         const SizedBox(height: 16),

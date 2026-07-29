@@ -69,6 +69,63 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('Ничего не найдено'), findsNothing);
   });
+
+  testWidgets('shows bounded neighbouring context in an accessible search result', (tester) async {
+    final service = _ControlledSearchService();
+    final semantics = tester.ensureSemantics();
+    final before = 'a' * 120;
+    final after = 'b' * 120;
+    ReaderPosition? jumpedPosition;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (position, _) => jumpedPosition = position,
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'match');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'match',
+      [
+        _SearchResult(
+          'Matching paragraph',
+          beforeContext: before,
+          afterContext: after,
+        ),
+      ],
+    );
+    await tester.pump();
+
+    final beforeExcerpt = '…${before.substring(before.length - 96)}';
+    final afterExcerpt = '${after.substring(0, 96)}…';
+    final semanticsLabel =
+        'Результат поиска. Chapter. Matching paragraph Перед: $beforeExcerpt. После: '
+        '$afterExcerpt.';
+    expect(find.text(beforeExcerpt), findsOneWidget);
+    expect(find.text('Matching paragraph'), findsOneWidget);
+    expect(find.text(afterExcerpt), findsOneWidget);
+    expect(
+      tester.getSemantics(find.text('Matching paragraph')),
+      matchesSemantics(
+        label: semanticsLabel,
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    tester.semantics.tap(find.semantics.byLabel(semanticsLabel));
+    expect(jumpedPosition?.chapterIndex, 0);
+    expect(jumpedPosition?.paragraphIndex, 0);
+
+    semantics.dispose();
+  });
 }
 
 const _emptyBook = NormalizedBook(id: 'test', title: 'Test', authors: []);
@@ -99,13 +156,14 @@ class _ControlledSearchService extends BookSearchService {
 }
 
 class _SearchResult extends BookSearchResult {
-  const _SearchResult(String text)
-    : super(
-        chapterIndex: 0,
-        paragraphIndex: 0,
-        chapterTitle: 'Chapter',
-        matchText: text,
-        beforeContext: '',
-        afterContext: '',
-      );
+  const _SearchResult(
+    String text, {
+    super.beforeContext = '',
+    super.afterContext = '',
+  }) : super(
+         chapterIndex: 0,
+         paragraphIndex: 0,
+         chapterTitle: 'Chapter',
+         matchText: text,
+       );
 }

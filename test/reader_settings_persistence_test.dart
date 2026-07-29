@@ -192,6 +192,7 @@ void main() {
           bottomRightCornerTapAction: CornerTapAction.disabled,
           fullScreenMode: FullScreenMode.keepPanels,
           pageTurnHaptic: true,
+          twoFingerChapterNavigation: true,
           customCss: 'p { color: red; }',
           scrollbarIndicator: false,
         );

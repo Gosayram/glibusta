@@ -28,6 +28,8 @@ class BookSearchOverlay extends StatefulWidget {
 }
 
 class _BookSearchOverlayState extends State<BookSearchOverlay> {
+  static const _contextExcerptLength = 96;
+
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final _debounce = _SearchDebounce();
@@ -251,49 +253,117 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
     Color textColor,
     Color hintColor,
   ) {
-    return InkWell(
-      onTap: () {
-        widget.onJumpToResult(
-          ReaderPosition(
-            bookId: '',
-            chapterIndex: result.chapterIndex,
-            paragraphIndex: result.paragraphIndex,
-            updatedAt: DateTime.now(),
+    final chapterTitle = result.chapterTitle.isNotEmpty
+        ? result.chapterTitle
+        : 'Глава ${result.chapterIndex + 1}';
+    final beforeContext = _contextExcerpt(result.beforeContext, keepEnd: true);
+    final afterContext = _contextExcerpt(result.afterContext);
+
+    return Semantics(
+      button: true,
+      label: _semanticsLabel(
+        chapterTitle: chapterTitle,
+        result: result,
+        beforeContext: beforeContext,
+        afterContext: afterContext,
+      ),
+      onTap: () => _jumpToResult(result),
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: () => _jumpToResult(result),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  chapterTitle,
+                  style: TextStyle(
+                    color: textColor.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                if (beforeContext.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    beforeContext,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hintColor,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  result.matchText,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                if (afterContext.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    afterContext,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: hintColor,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Divider(height: 1, color: textColor.withValues(alpha: 0.1)),
+              ],
+            ),
           ),
-          _controller.text.trim(),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              result.chapterTitle.isNotEmpty
-                  ? result.chapterTitle
-                  : 'Глава ${result.chapterIndex + 1}',
-              style: TextStyle(
-                color: textColor.withValues(alpha: 0.6),
-                fontSize: 12,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              result.matchText,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Divider(height: 1, color: textColor.withValues(alpha: 0.1)),
-          ],
         ),
       ),
     );
+  }
+
+  void _jumpToResult(BookSearchResult result) {
+    widget.onJumpToResult(
+      ReaderPosition(
+        bookId: '',
+        chapterIndex: result.chapterIndex,
+        paragraphIndex: result.paragraphIndex,
+        updatedAt: DateTime.now(),
+      ),
+      _controller.text.trim(),
+    );
+  }
+
+  String _contextExcerpt(String text, {bool keepEnd = false}) {
+    final normalized = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.length <= _contextExcerptLength) return normalized;
+    if (keepEnd) {
+      return '…${normalized.substring(normalized.length - _contextExcerptLength)}';
+    }
+    return '${normalized.substring(0, _contextExcerptLength)}…';
+  }
+
+  String _semanticsLabel({
+    required String chapterTitle,
+    required BookSearchResult result,
+    required String beforeContext,
+    required String afterContext,
+  }) {
+    final parts = <String>[
+      'Результат поиска. $chapterTitle.',
+      result.matchText,
+      if (beforeContext.isNotEmpty) 'Перед: $beforeContext.',
+      if (afterContext.isNotEmpty) 'После: $afterContext.',
+    ];
+    return parts.join(' ');
   }
 }
 

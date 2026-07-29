@@ -12,6 +12,7 @@ import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_content_helper.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
 import 'package:glibusta/features/reader/presentation/reader_providers.dart';
+import 'package:glibusta/features/reader/presentation/reader_two_finger_chapter_gesture.dart';
 
 class _LongBookOpenService extends BookOpenService {
   _LongBookOpenService(AppDatabase database)
@@ -383,6 +384,29 @@ void main() {
       expect(ctrl.state.currentPosition.progressPercent, closeTo(50 / 99, 0.001));
       expect(ctrl.state.scrollProgress, closeTo(50 / 99, 0.001));
       expect(ctrl.state.estimatedMinutesLeft, lessThan(initialMinutesLeft));
+      ctrl.dispose();
+    });
+
+    testWidgets('adjacent-chapter navigation preserves semantic chapter boundaries', (
+      tester,
+    ) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+        settings: const ReaderSettings(),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handlePageChanged(50);
+      ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.next);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 51);
+      expect(ctrl.state.currentPosition.paragraphIndex, 0);
+      expect(ctrl.state.scrollProgress, closeTo(51 / 99, 0.001));
+
+      ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.previous);
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
       ctrl.dispose();
     });
 

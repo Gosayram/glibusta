@@ -42,6 +42,7 @@ import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
+import 'reader_two_finger_chapter_gesture.dart';
 import 'reader_vertical_gesture.dart';
 import 'reading_break_reminder.dart';
 import 'reading_info_provider.dart';
@@ -103,6 +104,7 @@ class ReaderScreen extends ConsumerStatefulWidget {
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
+  final _twoFingerChapterGesture = ReaderTwoFingerChapterGesture();
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
@@ -261,6 +263,20 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         details.primaryVelocity != null &&
         details.primaryVelocity! > 300) {
       Navigator.of(context).pop();
+    }
+  }
+
+  void _handleTwoFingerChapterScaleUpdate(ScaleUpdateDetails details) {
+    final direction = _twoFingerChapterGesture.update(details);
+    if (direction == null) return;
+
+    switch (direction) {
+      case TwoFingerChapterDirection.previous:
+        _ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.previous);
+        _showVerticalGestureFeedback('Предыдущая глава');
+      case TwoFingerChapterDirection.next:
+        _ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.next);
+        _showVerticalGestureFeedback('Следующая глава');
     }
   }
 
@@ -1190,6 +1206,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               _gestureCoordinator.canInteract &&
                   settings.doubleTapAction != DoubleTapAction.disabled
               ? _ctrl.handleDoubleTap
+              : null,
+          onScaleStart:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _twoFingerChapterGesture.start
+              : null,
+          onScaleUpdate:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _handleTwoFingerChapterScaleUpdate
+              : null,
+          onScaleEnd:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _twoFingerChapterGesture.end
               : null,
           onHorizontalDragStart:
               _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off
