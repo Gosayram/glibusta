@@ -208,6 +208,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(0.0) double fontWeightDelta,
     @Default(ReaderTextAlign.justify) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,
+    @Default(ReaderTheme.dark) ReaderTheme nightTheme,
     @Default(7) int customDayHour,
     @Default(20) int customNightHour,
     @Default(1.0) double brightness,

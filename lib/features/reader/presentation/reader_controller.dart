@@ -1297,6 +1297,9 @@ final class ReaderController {
     final resolved = _autoThemeService.resolveTheme(
       settings.autoThemeMode,
       settings.theme,
+      customDayHour: settings.customDayHour,
+      customNightHour: settings.customNightHour,
+      nightTheme: settings.nightTheme,
     );
     final autoWarmth = _autoThemeService.resolveWarmth(
       settings.autoThemeMode,

@@ -80,7 +80,7 @@ final class StorageModeNotifierProvider
   }
 }
 
-String _$storageModeNotifierHash() => r'736844511256b98081d243ba965d1fb45f9c0c19';
+String _$storageModeNotifierHash() => r'c255ad10714c91e63034bb2b78b0bffdf197c9ff';
 
 abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
   StorageMode build();
@@ -134,7 +134,7 @@ final class ExternalFolderNotifierProvider
   }
 }
 
-String _$externalFolderNotifierHash() => r'8a2e0785cf897996070bad6b382dd4c4c9603d90';
+String _$externalFolderNotifierHash() => r'8a42b62b242793ef65924768e0380d727ac0bd74';
 
 abstract class _$ExternalFolderNotifier extends $Notifier<({String? name, String? uri})> {
   ({String? name, String? uri}) build();
@@ -185,7 +185,7 @@ final class DirectReadNotifierProvider extends $NotifierProvider<DirectReadNotif
   }
 }
 
-String _$directReadNotifierHash() => r'd30624bfff0142a53b34af8c65cc418768dc1184';
+String _$directReadNotifierHash() => r'fdd2d274ecdd4b0b09872fadb22a640e4b8bc64e';
 
 abstract class _$DirectReadNotifier extends $Notifier<bool> {
   bool build();

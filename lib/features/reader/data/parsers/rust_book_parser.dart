@@ -98,12 +98,16 @@ class RustBookParser implements BookParser {
   }
 
   static local.NormalizedBook _toNormalizedBook(rust_models.NormalizedBook r) {
+    final meta = <String, dynamic>{
+      if (r.language != null) 'language': r.language,
+    };
     return local.NormalizedBook(
       id: r.id,
       title: r.title,
       authors: r.authors,
       description: r.description,
       coverUrl: r.coverUrl,
+      metadata: meta.isEmpty ? null : meta,
       chapters: r.chapters
           .map(
             (rc) => local.ReaderChapter(

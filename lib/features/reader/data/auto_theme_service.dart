@@ -7,26 +7,33 @@ import '../domain/reader.dart';
 final autoThemeServiceProvider = Provider<AutoThemeService>((ref) => AutoThemeService());
 
 final class AutoThemeService {
-  ReaderTheme resolveTheme(AutoThemeMode mode, ReaderTheme manualTheme, {DateTime? now}) {
+  ReaderTheme resolveTheme(
+    AutoThemeMode mode,
+    ReaderTheme manualTheme, {
+    DateTime? now,
+    int customDayHour = 7,
+    int customNightHour = 20,
+    ReaderTheme nightTheme = ReaderTheme.dark,
+  }) {
     if (mode == AutoThemeMode.off) return manualTheme;
     final dt = now ?? DateTime.now();
-    final isNight = _isNight(mode, dt);
-    return isNight ? ReaderTheme.dark : ReaderTheme.light;
+    final isNight = _isNight(mode, dt, customDayHour, customNightHour);
+    return isNight ? nightTheme : ReaderTheme.light;
   }
 
   double resolveWarmth(AutoThemeMode mode, ReaderTheme resolvedTheme, {DateTime? now}) {
     if (mode == AutoThemeMode.off) return 0.0;
     if (resolvedTheme == ReaderTheme.bedtime) return 0.6;
-    if (resolvedTheme == ReaderTheme.dark) return 0.15;
+    if (resolvedTheme == ReaderTheme.dark || resolvedTheme == ReaderTheme.oled) return 0.15;
     return 0.0;
   }
 
-  bool _isNight(AutoThemeMode mode, DateTime dt) {
+  bool _isNight(AutoThemeMode mode, DateTime dt, int customDayHour, int customNightHour) {
     return switch (mode) {
       AutoThemeMode.off => false,
       AutoThemeMode.system => _isSystemDark(dt),
       AutoThemeMode.sunset => _isAfterSunset(dt),
-      AutoThemeMode.custom => _isInCustomNight(dt, 7, 20),
+      AutoThemeMode.custom => _isInCustomNight(dt, customDayHour, customNightHour),
     };
   }
 

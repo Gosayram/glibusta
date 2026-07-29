@@ -174,6 +174,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(autoThemeMode: mode);
   }
 
+  void updateNightTheme(ReaderTheme theme) {
+    state = state.copyWith(nightTheme: theme);
+  }
+
   void updateCustomDayHour(int hour) {
     state = state.copyWith(customDayHour: hour);
   }

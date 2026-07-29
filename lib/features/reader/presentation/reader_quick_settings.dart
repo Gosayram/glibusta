@@ -231,6 +231,15 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ],
         const SizedBox(height: 12),
+        const _SectionTitle('Интервал между абзацами'),
+        _buildSliderRow(
+          'px',
+          settings.paragraphSpacing / 64.0,
+          0.0,
+          1.0,
+          (v) => notifier.updateParagraphSpacing(v * 64.0),
+        ),
+        const SizedBox(height: 12),
         const _SectionTitle('Отступы'),
         _buildMarginRow(settings, notifier),
         const SizedBox(height: 16),
@@ -1188,21 +1197,66 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
-  static Widget _buildMarginRow(
+  Widget _buildMarginRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
   ) {
     const values = [8.0, 12.0, 16.0, 20.0, 24.0, 32.0];
-    return Wrap(
-      spacing: 8,
-      children: values.map((v) {
-        final isSelected = (settings.margin - v).abs() < 0.5;
-        return ChoiceChip(
-          label: Text('${v.round()}'),
-          selected: isSelected,
-          onSelected: (_) => notifier.updateMargin(v),
-        );
-      }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!settings.separateMargins)
+          Wrap(
+            spacing: 8,
+            children: values.map((v) {
+              final isSelected = (settings.margin - v).abs() < 0.5;
+              return ChoiceChip(
+                label: Text('${v.round()}'),
+                selected: isSelected,
+                onSelected: (_) => notifier.updateMargin(v),
+              );
+            }).toList(),
+          )
+        else
+          _buildSeparateMargins(settings, notifier),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Switch.adaptive(
+              value: settings.separateMargins,
+              onChanged: notifier.updateSeparateMargins,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                settings.separateMargins ? 'Раздельные отступы' : 'Раздельные отступы',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeparateMargins(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    Widget marginSlider(String label, double value, ValueChanged<double> onChanged) {
+      return _buildSliderRow(label, value / 48.0, 0.0, 1.0, (v) => onChanged(v * 48.0));
+    }
+
+    return Column(
+      children: [
+        marginSlider('Сверху', settings.marginTop, notifier.updateMarginTop),
+        marginSlider('Снизу', settings.marginBottom, notifier.updateMarginBottom),
+        marginSlider('Слева', settings.marginLeft, notifier.updateMarginLeft),
+        marginSlider('Справа', settings.marginRight, notifier.updateMarginRight),
+      ],
     );
   }
 
@@ -1255,6 +1309,28 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                 },
               ),
             ],
+          ),
+        ],
+        if (settings.autoThemeMode != AutoThemeMode.off) ...[
+          const SizedBox(height: 12),
+          const Text('Ночная тема:', style: TextStyle(fontSize: 13)),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                const [
+                  ReaderTheme.dark,
+                  ReaderTheme.oled,
+                  ReaderTheme.bedtime,
+                ].map((theme) {
+                  final isSelected = settings.nightTheme == theme;
+                  return ChoiceChip(
+                    label: Text(theme.displayName),
+                    selected: isSelected,
+                    onSelected: (_) => notifier.updateNightTheme(theme),
+                  );
+                }).toList(),
           ),
         ],
       ],

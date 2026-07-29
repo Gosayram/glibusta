@@ -109,6 +109,12 @@ ReaderSettings mergeReaderSettings(ReaderSettings global, Map<String, dynamic> o
       AutoThemeMode.values,
       global.autoThemeMode,
     ),
+    nightTheme: _enumOverride(
+      overrides,
+      'nightTheme',
+      ReaderTheme.values,
+      global.nightTheme,
+    ),
     customDayHour: _intOverride(overrides, 'customDayHour', global.customDayHour),
     customNightHour: _intOverride(overrides, 'customNightHour', global.customNightHour),
     brightness: _doubleOverride(overrides, 'brightness', global.brightness),

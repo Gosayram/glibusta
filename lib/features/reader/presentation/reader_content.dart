@@ -158,6 +158,7 @@ class ReaderCtx {
   final Color linkColor;
   final Brightness brightness;
   final ValueChanged<String>? onLinkTap;
+  final Locale? hyphenationLocale;
 
   const ReaderCtx({
     required this.settings,
@@ -166,6 +167,7 @@ class ReaderCtx {
     required this.linkColor,
     required this.brightness,
     this.onLinkTap,
+    this.hyphenationLocale,
   });
 
   ReaderColors get colors =>
@@ -586,7 +588,7 @@ Widget _readerHighlightedText(
   double firstLineIndent = 0,
   bool softWrap = true,
 }) {
-  final locale = ctx.settings.hyphenation ? const Locale('ru') : null;
+  final locale = ctx.hyphenationLocale ?? _hyphenationLocale(ctx.settings.hyphenation, null);
   final query = ctx.highlightQuery?.trim();
   if (query == null || query.isEmpty) {
     if (richSpans != null && richSpans.isNotEmpty) {
@@ -1261,6 +1263,21 @@ String? _bookTextDirection(NormalizedBookMetadata metadata) {
   return value is String && (value == 'ltr' || value == 'rtl') ? value : null;
 }
 
+/// Returns the hyphenation [Locale] for the book's declared language, or null
+/// if hyphenation is disabled.
+///
+/// Falls back to Russian when the book language is unknown, since the primary
+/// audience reads Russian-language books.
+Locale? _hyphenationLocale(bool hyphenation, NormalizedBookMetadata? metadata) {
+  if (!hyphenation) return null;
+  final lang = metadata?.metadata?['language'];
+  if (lang is String && lang.isNotEmpty) {
+    final code = lang.split('-').first.split('_').first.toLowerCase();
+    if (code.length == 2 || code.length == 3) return Locale(code);
+  }
+  return const Locale('ru');
+}
+
 TextDirection _readerTextDirection(
   ReaderTextDirection td,
   BuildContext context, {
@@ -1727,6 +1744,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       linkColor: c.link,
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
+      hyphenationLocale: _hyphenationLocale(settings.hyphenation, widget.metadata),
     );
   }
 
@@ -2271,7 +2289,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     double firstLineIndent = 0,
     double? fontScale,
   }) {
-    final locale = s.hyphenation ? const Locale('ru') : null;
+    final locale = _hyphenationLocale(s.hyphenation, widget.metadata);
     final dir = switch (s.textDirection) {
       ReaderTextDirection.rtl => TextDirection.rtl,
       ReaderTextDirection.auto when _bookTextDirection(widget.metadata) == 'rtl' =>
@@ -2464,6 +2482,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       linkColor: c.link,
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
+      hyphenationLocale: _hyphenationLocale(settings.hyphenation, widget.metadata),
     );
   }
 

@@ -47,6 +47,10 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['autoThemeMode'],
           orElse: () => AutoThemeMode.off,
         ),
+        nightTheme: ReaderTheme.values.firstWhere(
+          (e) => e.name == map['nightTheme'],
+          orElse: () => ReaderTheme.dark,
+        ),
         customDayHour: (map['customDayHour'] as num?)?.toInt() ?? 7,
         customNightHour: (map['customNightHour'] as num?)?.toInt() ?? 20,
         brightness: (map['brightness'] as num?)?.toDouble() ?? 1.0,
@@ -198,6 +202,7 @@ class ReaderSettingsPersistence {
         'fontWeightDelta': settings.fontWeightDelta,
         'textAlign': settings.textAlign.name,
         'autoThemeMode': settings.autoThemeMode.name,
+        'nightTheme': settings.nightTheme.name,
         'customDayHour': settings.customDayHour,
         'customNightHour': settings.customNightHour,
         'brightness': settings.brightness,
