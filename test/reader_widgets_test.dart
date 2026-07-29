@@ -186,6 +186,21 @@ void main() {
       expect(find.text('Пресеты'), findsOneWidget);
     });
 
+    testWidgets('exposes a typography reset action and the font-size value to semantics', (
+      tester,
+    ) async {
+      await tester.pumpWidget(wrapInApp(const ReaderQuickSettingsSheet()));
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Сбросить настройки типографики'), findsOneWidget);
+      await scrollSettingsUntilVisible(tester, find.text('Размер шрифта'));
+      final fontSizeSlider = tester.widget<Slider>(find.byType(Slider).first);
+      expect(
+        fontSizeSlider.semanticFormatterCallback?.call(18),
+        'Размер шрифта 18 пунктов, от 10 до 40 пунктов',
+      );
+    });
+
     testWidgets('renders all 7 theme swatches', (tester) async {
       await tester.pumpWidget(
         wrapInApp(const ReaderQuickSettingsSheet()),

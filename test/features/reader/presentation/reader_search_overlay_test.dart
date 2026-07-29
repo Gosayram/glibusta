@@ -6,8 +6,13 @@ import 'package:glibusta/features/reader/data/book_search_service.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_search_overlay.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('ignores a stale search response after a newer query starts', (tester) async {
     final service = _ControlledSearchService();
 
@@ -125,6 +130,67 @@ void main() {
     expect(jumpedPosition?.paragraphIndex, 0);
 
     semantics.dispose();
+  });
+
+  testWidgets('shows, deletes and clears local explicit history', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'reader_search_history/test': <String>['recent query', 'older query'],
+    });
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Недавние запросы'), findsOneWidget);
+    expect(find.text('recent query'), findsOneWidget);
+    expect(find.text('older query'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Удалить запрос').first);
+    await tester.pump();
+    expect(find.text('recent query'), findsNothing);
+    expect(find.text('older query'), findsOneWidget);
+
+    await tester.tap(find.text('Очистить'));
+    await tester.pump();
+    expect(find.text('Недавние запросы'), findsNothing);
+  });
+
+  testWidgets('reuses a recent query without saving while typing', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'reader_search_history/test': <String>['recent query'],
+    });
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('recent query'));
+    await tester.pump();
+
+    expect(service.queries, ['recent query']);
+    expect((tester.widget<TextField>(find.byType(TextField))).controller!.text, 'recent query');
   });
 }
 

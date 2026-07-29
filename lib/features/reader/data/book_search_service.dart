@@ -47,6 +47,9 @@ class BookSearchService {
 
   int get totalParagraphs => _paragraphs.length;
 
+  /// Stable identifier used to scope device-local reader search history.
+  String get bookId => _book.id;
+
   Future<List<BookSearchResult>> search(
     String query, {
     int maxResults = 50,

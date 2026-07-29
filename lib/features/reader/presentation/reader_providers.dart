@@ -138,6 +138,34 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     }
   }
 
+  /// Restores only the settings that affect text readability.
+  ///
+  /// Theme, reading mode, gestures, and language-specific hyphenation remain
+  /// untouched so this is safe to use as a quick recovery from an unsuitable
+  /// font or spacing configuration.
+  void resetTypography() {
+    state = state.copyWith(
+      fontSize: 18,
+      lineHeight: 1.6,
+      margin: 20,
+      marginTop: 20,
+      marginBottom: 20,
+      marginLeft: 20,
+      marginRight: 20,
+      separateMargins: false,
+      font: ReaderFont.literata,
+      paragraphSpacing: 20,
+      letterSpacing: 0,
+      wordSpacing: 0,
+      fontWeightDelta: 0,
+      textAlign: ReaderTextAlign.justify,
+      paragraphFirstLineIndent: 16,
+      paragraphIndentMode: ParagraphIndentMode.firstLine,
+      oldStyleFigures: false,
+      smallCaps: false,
+    );
+  }
+
   void updateTextAlign(ReaderTextAlign align) {
     state = state.copyWith(textAlign: align);
   }

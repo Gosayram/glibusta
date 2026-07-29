@@ -27,6 +27,7 @@ import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 import '../data/inspectors/book_inspection_provider.dart';
 import '../data/inspectors/book_inspection_result.dart';
+import 'library_sort.dart';
 import 'library_view_mode_provider.dart';
 import 'pinned_books_provider.dart';
 
@@ -48,6 +49,7 @@ class LibraryScreen extends ConsumerStatefulWidget {
 class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _isSearchOpen = false;
   String _searchQuery = '';
+  LibrarySort _sort = LibrarySort.recentlyAdded;
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
 
@@ -108,6 +110,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             tooltip: 'Вид',
             onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
           ),
+          PopupMenuButton<LibrarySort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Сортировка: ${_sort.label}',
+            initialValue: _sort,
+            onSelected: (sort) => setState(() => _sort = sort),
+            itemBuilder: (context) => [
+              for (final sort in LibrarySort.values)
+                CheckedPopupMenuItem(
+                  value: sort,
+                  checked: sort == _sort,
+                  child: Text(sort.label),
+                ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Добавить книги',
@@ -157,7 +173,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                     b.description?.toLowerCase().contains(query) ?? false;
                                 return titleMatch || authorMatch || descMatch;
                               }).toList();
-                        return _buildBooksGrid(context, ref, filtered);
+                        return _buildBooksGrid(context, ref, sortLibraryBooks(filtered, _sort));
                       },
                       loading: () => Skeletonizer.zone(
                         child: GridView.builder(

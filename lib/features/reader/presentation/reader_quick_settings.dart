@@ -169,7 +169,17 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        const _SectionTitle('Пресеты'),
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Пресеты')),
+            IconButton(
+              key: const ValueKey('reset-typography-settings'),
+              icon: const Icon(Icons.restart_alt),
+              tooltip: 'Сбросить настройки типографики',
+              onPressed: notifier.resetTypography,
+            ),
+          ],
+        ),
         _buildPresetRow(settings, notifier),
         const SizedBox(height: 16),
         const _SectionTitle('Тема'),
@@ -1113,6 +1123,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             max: 40,
             divisions: 30,
             label: '${settings.fontSize.round()}px',
+            semanticFormatterCallback: (value) =>
+                'Размер шрифта ${value.round()} пунктов, от 10 до 40 пунктов',
             onChanged: (v) => notifier.updateFontSize(v),
           ),
         ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../data/book_search_service.dart';
+import '../data/reader_search_history.dart';
 import '../domain/reader.dart';
 
 class BookSearchOverlay extends StatefulWidget {
@@ -38,6 +39,8 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   bool _isSearching = false;
   bool _searchCurrentChapter = false;
   bool _matchCase = false;
+  ReaderSearchHistory? _history;
+  List<String> _historyEntries = const [];
   var _searchRequestId = 0;
 
   @override
@@ -46,12 +49,82 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
     if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
       _controller.text = widget.initialQuery!;
     }
+    unawaited(_loadHistory());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
       if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
         _onQueryChanged(widget.initialQuery!);
       }
     });
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final history = await ReaderSearchHistory.open(widget.searchService.bookId);
+      if (!mounted) return;
+      setState(() {
+        _history = history;
+        _historyEntries = history.entries();
+      });
+    } on Object catch (error) {
+      debugPrint('Reader search history load failed: $error');
+    }
+  }
+
+  Future<void> _recordQuery(String query) async {
+    final history = _history;
+    if (history == null) return;
+
+    try {
+      await history.record(query);
+      if (!mounted) return;
+      setState(() => _historyEntries = history.entries());
+    } on Object catch (error) {
+      debugPrint('Reader search history save failed: $error');
+    }
+  }
+
+  void _submitQuery(String query) {
+    _debounce.cancel();
+    unawaited(_recordQuery(query));
+    unawaited(_performSearch(query));
+  }
+
+  void _selectHistoryQuery(String query) {
+    _debounce.cancel();
+    _controller.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    setState(() {});
+    _focusNode.requestFocus();
+    unawaited(_performSearch(query));
+  }
+
+  Future<void> _removeHistoryQuery(String query) async {
+    final history = _history;
+    if (history == null) return;
+
+    try {
+      await history.remove(query);
+      if (!mounted) return;
+      setState(() => _historyEntries = history.entries());
+    } on Object catch (error) {
+      debugPrint('Reader search history remove failed: $error');
+    }
+  }
+
+  Future<void> _clearHistory() async {
+    final history = _history;
+    if (history == null) return;
+
+    try {
+      await history.clear();
+      if (!mounted) return;
+      setState(() => _historyEntries = const []);
+    } on Object catch (error) {
+      debugPrint('Reader search history clear failed: $error');
+    }
   }
 
   @override
@@ -140,7 +213,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                         border: InputBorder.none,
                       ),
                       onChanged: _onQueryChanged,
-                      onSubmitted: _performSearch,
+                      onSubmitted: _submitQuery,
                     ),
                   ),
                   if (_controller.text.isNotEmpty)
@@ -227,6 +300,20 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       final result = _results[index];
                       return _buildResultTile(result, textColor, hintColor);
                     },
+                  ),
+                ),
+              )
+            else if (_historyEntries.isNotEmpty)
+              Expanded(
+                child: Material(
+                  color: bgColor,
+                  child: _SearchHistoryList(
+                    entries: _historyEntries,
+                    textColor: textColor,
+                    hintColor: hintColor,
+                    onSelect: _selectHistoryQuery,
+                    onRemove: (query) => unawaited(_removeHistoryQuery(query)),
+                    onClear: () => unawaited(_clearHistory()),
                   ),
                 ),
               )
@@ -331,6 +418,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   }
 
   void _jumpToResult(BookSearchResult result) {
+    unawaited(_recordQuery(_controller.text));
     widget.onJumpToResult(
       ReaderPosition(
         bookId: '',
@@ -364,6 +452,63 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       if (afterContext.isNotEmpty) 'После: $afterContext.',
     ];
     return parts.join(' ');
+  }
+}
+
+class _SearchHistoryList extends StatelessWidget {
+  const _SearchHistoryList({
+    required this.entries,
+    required this.textColor,
+    required this.hintColor,
+    required this.onSelect,
+    required this.onRemove,
+    required this.onClear,
+  });
+
+  final List<String> entries;
+  final Color textColor;
+  final Color hintColor;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<String> onRemove;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 16),
+      itemCount: entries.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Недавние запросы',
+                    style: TextStyle(color: hintColor, fontSize: 13),
+                  ),
+                ),
+                TextButton(onPressed: onClear, child: const Text('Очистить')),
+              ],
+            ),
+          );
+        }
+
+        final query = entries[index - 1];
+        return ListTile(
+          leading: Icon(Icons.history, color: hintColor),
+          title: Text(query, style: TextStyle(color: textColor)),
+          onTap: () => onSelect(query),
+          trailing: IconButton(
+            tooltip: 'Удалить запрос',
+            icon: const Icon(Icons.close),
+            color: hintColor,
+            onPressed: () => onRemove(query),
+          ),
+        );
+      },
+    );
   }
 }
 
