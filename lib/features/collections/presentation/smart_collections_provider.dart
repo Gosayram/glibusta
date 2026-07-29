@@ -71,7 +71,13 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
   collections.add(SmartCollection(type: SmartCollectionType.recentlyOpened, books: recentlyOpened));
 
   // No cover
-  final noCover = allBooks.where((b) => b.coverUrl == null || b.coverUrl!.isEmpty).toList();
+  final noCover = allBooks
+      .where(
+        (b) =>
+            (b.coverUrl == null || b.coverUrl!.isEmpty) &&
+            (b.coverPath == null || b.coverPath!.isEmpty),
+      )
+      .toList();
   collections.add(SmartCollection(type: SmartCollectionType.noCover, books: noCover));
 
   // No author

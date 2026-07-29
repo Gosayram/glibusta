@@ -426,7 +426,10 @@ Widget _buildReaderBlock(
               ImageAlignment.end => AlignmentDirectional.centerEnd,
             },
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 600 * s.imageWidth),
+              constraints: BoxConstraints(
+                maxWidth: 600 * s.imageWidth,
+                maxHeight: 800 * s.imageWidth,
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(s.imageCornerRadius),
                 child: _readerImageWidget(
