@@ -1591,7 +1591,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     labels: const {
       DoubleTapAction.toggleUI: 'Скрыть/показать UI',
       DoubleTapAction.addBookmark: 'Закладка',
-      DoubleTapAction.translate: 'Перевести абзац',
+      DoubleTapAction.searchInBook: 'Поиск',
       DoubleTapAction.disabled: 'Выкл',
     },
     onChanged: (v) => notifier.updateDoubleTapAction(v),

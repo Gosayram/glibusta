@@ -39,6 +39,8 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   bool _isSearching = false;
   bool _searchCurrentChapter = false;
   bool _matchCase = false;
+  bool _useRegex = false;
+  bool _wholeWord = false;
   ReaderSearchHistory? _history;
   List<String> _historyEntries = const [];
   var _searchRequestId = 0;
@@ -168,6 +170,8 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       query,
       chapterIndex: _searchCurrentChapter ? widget.currentChapterIndex : null,
       matchCase: _matchCase,
+      useRegex: _useRegex,
+      wholeWord: _wholeWord,
     );
     if (!mounted || requestId != _searchRequestId) return;
     setState(() {
@@ -208,7 +212,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       focusNode: _focusNode,
                       style: TextStyle(color: textColor, fontSize: 16),
                       decoration: InputDecoration(
-                        hintText: 'Поиск по книге…',
+                        hintText: _useRegex ? 'Regex поиск…' : 'Поиск по книге…',
                         hintStyle: TextStyle(color: hintColor),
                         border: InputBorder.none,
                       ),
@@ -253,6 +257,40 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                     tooltip: _matchCase ? 'С учётом регистра' : 'Без регистра',
                     onPressed: () {
                       setState(() => _matchCase = !_matchCase);
+                      if (_controller.text.isNotEmpty) {
+                        unawaited(_performSearch(_controller.text));
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.code,
+                      size: 20,
+                      color: _useRegex ? Colors.blue : textColor,
+                    ),
+                    tooltip: _useRegex ? 'Regex вкл' : 'Regex выкл',
+                    onPressed: () {
+                      setState(() {
+                        _useRegex = !_useRegex;
+                        if (_useRegex) _wholeWord = false;
+                      });
+                      if (_controller.text.isNotEmpty) {
+                        unawaited(_performSearch(_controller.text));
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.font_download_outlined,
+                      size: 20,
+                      color: _wholeWord ? Colors.blue : textColor,
+                    ),
+                    tooltip: _wholeWord ? 'Слова целиком' : 'Часть слова',
+                    onPressed: () {
+                      setState(() {
+                        _wholeWord = !_wholeWord;
+                        if (_wholeWord) _useRegex = false;
+                      });
                       if (_controller.text.isNotEmpty) {
                         unawaited(_performSearch(_controller.text));
                       }

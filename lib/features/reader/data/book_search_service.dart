@@ -55,9 +55,26 @@ class BookSearchService {
     int maxResults = 50,
     int? chapterIndex,
     bool matchCase = false,
+    bool useRegex = false,
+    bool wholeWord = false,
   }) async {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
+
+    RegExp? regex;
+    if (useRegex) {
+      try {
+        regex = RegExp(query, caseSensitive: matchCase);
+      } on Object catch (_) {
+        return const [];
+      }
+    } else if (wholeWord) {
+      regex = RegExp(
+        r'\b' + RegExp.escape(query) + r'\b',
+        caseSensitive: matchCase,
+      );
+    }
+
     final lowerQuery = matchCase ? query : query.toLowerCase();
     final results = <BookSearchResult>[];
 
@@ -68,8 +85,10 @@ class BookSearchService {
         if (gen != _searchGeneration) return const [];
       }
       final paragraph = _paragraphs[i];
-      final haystack = matchCase ? paragraph : paragraph.toLowerCase();
-      if (!haystack.contains(lowerQuery)) continue;
+      final isMatch = regex != null
+          ? regex.hasMatch(paragraph)
+          : (matchCase ? paragraph.contains(query) : paragraph.toLowerCase().contains(lowerQuery));
+      if (!isMatch) continue;
 
       final before = i > 0 ? _paragraphs[i - 1] : '';
       final after = i < _paragraphs.length - 1 ? _paragraphs[i + 1] : '';

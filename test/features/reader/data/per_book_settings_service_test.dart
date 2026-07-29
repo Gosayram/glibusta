@@ -40,7 +40,7 @@ void main() {
         textDirection: ReaderTextDirection.rtl,
         readerWidth: 640,
         verticalSwipeBrightness: false,
-        doubleTapAction: DoubleTapAction.translate,
+        doubleTapAction: DoubleTapAction.searchInBook,
         longPressAction: LongPressAction.openMenu,
         restoreLastPosition: false,
         forcedEncoding: 'windows-1251',

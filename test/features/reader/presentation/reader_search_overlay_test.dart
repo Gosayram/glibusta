@@ -208,6 +208,8 @@ class _ControlledSearchService extends BookSearchService {
     int maxResults = 50,
     int? chapterIndex,
     bool matchCase = false,
+    bool useRegex = false,
+    bool wholeWord = false,
   }) {
     queries.add(query);
     return (_pending[query] ??= Completer<List<BookSearchResult>>()).future;

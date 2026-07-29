@@ -1099,8 +1099,8 @@ final class ReaderController {
       case DoubleTapAction.addBookmark:
         addBookmark();
         break;
-      case DoubleTapAction.translate:
-        break;
+      case DoubleTapAction.searchInBook:
+        toggleSearch();
       case DoubleTapAction.disabled:
         break;
     }

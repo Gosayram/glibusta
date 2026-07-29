@@ -107,7 +107,7 @@ enum PageTurnAnimation { none, slide, fade, curl, stack }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 
-enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
+enum DoubleTapAction { toggleUI, addBookmark, searchInBook, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
 
