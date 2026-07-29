@@ -14,18 +14,56 @@ import '../../reader/domain/reader.dart';
 import '../data/bookmark_repository.dart';
 import '../data/bookmarks_providers.dart';
 
-class BookmarksScreen extends ConsumerWidget {
+class BookmarksScreen extends ConsumerStatefulWidget {
   final String bookId;
 
   const BookmarksScreen({super.key, required this.bookId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarksAsync = ref.watch(bookmarksStreamProvider(bookId));
+  ConsumerState<BookmarksScreen> createState() => _BookmarksScreenState();
+}
+
+class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) _searchController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bookmarksAsync = ref.watch(bookmarksStreamProvider(widget.bookId));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Закладки'),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск закладок',
+                  border: InputBorder.none,
+                ),
+                onChanged: (_) => setState(() {}),
+              )
+            : const Text('Закладки'),
+        actions: [
+          IconButton(
+            tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск закладок',
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: _toggleSearch,
+          ),
+        ],
       ),
       body: bookmarksAsync.when(
         data: (bookmarks) {
@@ -65,11 +103,18 @@ class BookmarksScreen extends ConsumerWidget {
             );
           }
 
+          final filteredBookmarks = bookmarks
+              .where((bookmark) => _matchesBookmarkQuery(bookmark, _searchController.text))
+              .toList(growable: false);
+          if (filteredBookmarks.isEmpty) {
+            return const _BookmarksSearchEmptyState();
+          }
+
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: bookmarks.length,
+            itemCount: filteredBookmarks.length,
             itemBuilder: (context, index) {
-              final bookmark = bookmarks[index];
+              final bookmark = filteredBookmarks[index];
               return BookmarkTile(
                 bookmark: bookmark,
                 onTap: () => context.push(
@@ -104,7 +149,7 @@ class BookmarksScreen extends ConsumerWidget {
         error: (e, _) => ErrorStateWidget(
           message: 'Не удалось загрузить закладки',
           details: e.toString(),
-          onRetry: () => ref.invalidate(bookmarksStreamProvider(bookId)),
+          onRetry: () => ref.invalidate(bookmarksStreamProvider(widget.bookId)),
         ),
       ),
     );
@@ -116,6 +161,34 @@ class BookmarksScreen extends ConsumerWidget {
     await repository.deleteBookmark(bookmark.id);
     if (!context.mounted) return;
     unawaited(SmartDialog.showToast('Закладка удалена'));
+  }
+}
+
+bool _matchesBookmarkQuery(Bookmark bookmark, String query) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) return true;
+  return [bookmark.selectedText, bookmark.note].any(
+    (value) => value?.toLowerCase().contains(normalizedQuery) ?? false,
+  );
+}
+
+class _BookmarksSearchEmptyState extends StatelessWidget {
+  const _BookmarksSearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off, size: 64),
+          SizedBox(height: 16),
+          Text('Ничего не найдено'),
+          SizedBox(height: 8),
+          Text('Измените запрос или очистите поиск'),
+        ],
+      ),
+    );
   }
 }
 
@@ -133,6 +206,7 @@ class BookmarkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final note = bookmark.note;
     return RepaintBoundary(
       child: Dismissible(
         key: Key(bookmark.id),
@@ -172,9 +246,23 @@ class BookmarkTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 )
               : Text('Стр. ${bookmark.chapterIndex + 1}'),
-          subtitle: Text(
-            'Абзац ${bookmark.paragraphIndex + 1}',
-            style: Theme.of(context).textTheme.bodySmall,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Абзац ${bookmark.paragraphIndex + 1}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (note case final nonEmptyNote? when nonEmptyNote.isNotEmpty)
+                Text(
+                  nonEmptyNote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ),
           onTap: onTap,
         ),

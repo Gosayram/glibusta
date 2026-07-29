@@ -116,4 +116,42 @@ void main() {
 
     semantics.dispose();
   });
+
+  testWidgets('exposes checkpoint navigation as labelled keyboard actions', (tester) async {
+    var movedBack = 0;
+    var movedForward = 0;
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 1,
+            totalChapters: 3,
+            scrollProgress: 0.5,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) {},
+            onCheckpointBack: () => movedBack++,
+            onCheckpointForward: () => movedForward++,
+          ),
+        ),
+      ),
+    );
+
+    final previous = find.bySemanticsLabel('Перейти к предыдущей закладке');
+    final next = find.bySemanticsLabel('Перейти к следующей закладке');
+    expect(previous, findsOneWidget);
+    expect(next, findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    expect(movedBack, 1);
+    await tester.tap(next);
+    expect(movedForward, 1);
+
+    semantics.dispose();
+  });
 }

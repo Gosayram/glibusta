@@ -9,6 +9,7 @@ import '../../../core/services/stats_export_service.dart';
 import '../../../core/telemetry/reader_telemetry.dart' as telemetry;
 import '../../home/presentation/reading_heatmap.dart';
 import '../../home/presentation/reading_stats_provider.dart';
+import '../../reading_goals/data/weekly_reading_goal_progress.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
 import '../data/reading_stats_providers.dart' as rsp;
@@ -79,7 +80,10 @@ class ReadingStatsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              _GoalCard(todayMinutes: stats.todayMinutes),
+              _GoalCard(
+                todayMinutes: stats.todayMinutes,
+                thisWeekMinutes: stats.thisWeekMinutes,
+              ),
               const SizedBox(height: 24),
               Text(
                 'Активность',
@@ -509,9 +513,13 @@ class _ReadingTrendCard extends ConsumerWidget {
 }
 
 class _GoalCard extends ConsumerWidget {
-  const _GoalCard({required this.todayMinutes});
+  const _GoalCard({
+    required this.todayMinutes,
+    required this.thisWeekMinutes,
+  });
 
   final int todayMinutes;
+  final int thisWeekMinutes;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -569,6 +577,11 @@ class _GoalCard extends ConsumerWidget {
           todayMinutes: todayMinutes,
           goalMinutes: goal.dailyMinutes,
         );
+        final weeklyProgress = calculateWeeklyReadingGoalProgress(
+          dailyGoalMinutes: goal.dailyMinutes,
+          weekMinutes: thisWeekMinutes,
+        );
+        final weeklyMessage = formatWeeklyGoalProgressMessage(weeklyProgress);
 
         return Card(
           child: InkWell(
@@ -639,6 +652,52 @@ class _GoalCard extends ConsumerWidget {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        weeklyProgress.isComplete
+                            ? Icons.calendar_month
+                            : Icons.calendar_month_outlined,
+                        color: weeklyProgress.isComplete
+                            ? Colors.green
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Ритм за неделю',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${weeklyProgress.completedMinutes} из ${weeklyProgress.targetMinutes} мин',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: weeklyProgress.completion,
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(3),
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      weeklyProgress.isComplete
+                          ? Colors.green
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    weeklyMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),

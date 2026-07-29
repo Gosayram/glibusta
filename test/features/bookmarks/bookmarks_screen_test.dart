@@ -8,11 +8,11 @@ import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
-  Widget buildTestWidget({String bookId = 'test-book-id'}) {
+  Widget buildTestWidget({String bookId = 'test-book-id', List<Bookmark> bookmarks = const []}) {
     return ProviderScope(
       overrides: [
         bookmarksStreamProvider(bookId).overrideWithValue(
-          const AsyncData([]),
+          AsyncData(bookmarks),
         ),
       ],
       child: MaterialApp(
@@ -42,6 +42,47 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Открыть библиотеку'), findsOneWidget);
+    });
+
+    testWidgets('filters saved bookmarks by selected text or note without changing them', (
+      tester,
+    ) async {
+      final bookmarks = [
+        Bookmark(
+          id: 'bookmark-quote',
+          bookId: 'test-book-id',
+          chapterIndex: 0,
+          paragraphIndex: 0,
+          localOffset: 0,
+          selectedText: 'Старый фрагмент',
+          createdAt: DateTime(2026),
+        ),
+        Bookmark(
+          id: 'bookmark-note',
+          bookId: 'test-book-id',
+          chapterIndex: 1,
+          paragraphIndex: 2,
+          localOffset: 0,
+          selectedText: 'Другой фрагмент',
+          note: 'Важная мысль',
+          createdAt: DateTime(2026),
+        ),
+      ];
+      await tester.pumpWidget(buildTestWidget(bookmarks: bookmarks));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Поиск закладок'));
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'ВАЖНАЯ');
+      await tester.pump();
+
+      expect(find.text('Другой фрагмент'), findsOneWidget);
+      expect(find.text('Важная мысль'), findsOneWidget);
+      expect(find.text('Старый фрагмент'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'нет совпадений');
+      await tester.pump();
+      expect(find.text('Ничего не найдено'), findsOneWidget);
     });
 
     testWidgets('opens a bookmark at its saved semantic position', (tester) async {

@@ -55,76 +55,92 @@ class ReaderContextMenu extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+      child: Semantics(
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: 'Действия с выделенным текстом',
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    selectedText.length > 200
+                        ? '${selectedText.substring(0, 200)}...'
+                        : selectedText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontStyle: FontStyle.italic,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                child: Text(
-                  selectedText.length > 200 ? '${selectedText.substring(0, 200)}...' : selectedText,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 8),
+                _ActionRow(
+                  actions: const [
+                    _ActionItem(
+                      icon: Icons.copy,
+                      label: 'Копировать',
+                      action: ContextMenuAction.copy,
+                    ),
+                    _ActionItem(
+                      icon: Icons.highlight,
+                      label: 'Подсветка',
+                      action: ContextMenuAction.highlight,
+                    ),
+                    _ActionItem(
+                      icon: Icons.format_underlined,
+                      label: 'Подчёркивание',
+                      action: ContextMenuAction.underline,
+                    ),
+                    _ActionItem(
+                      icon: Icons.translate,
+                      label: 'Перевод',
+                      action: ContextMenuAction.translate,
+                    ),
+                    _ActionItem(
+                      icon: Icons.volume_up,
+                      label: 'Озвучить',
+                      action: ContextMenuAction.narrate,
+                    ),
+                    _ActionItem(
+                      icon: Icons.share,
+                      label: 'Поделиться',
+                      action: ContextMenuAction.share,
+                    ),
+                    _ActionItem(
+                      icon: Icons.search,
+                      label: 'Поиск',
+                      action: ContextMenuAction.search,
+                    ),
+                    _ActionItem(
+                      icon: Icons.smart_toy,
+                      label: 'AI',
+                      action: ContextMenuAction.ai,
+                    ),
+                  ],
+                  onAction: onAction ?? (_) {},
                 ),
-              ),
-              const SizedBox(height: 8),
-              _ActionRow(
-                actions: const [
-                  _ActionItem(
-                    icon: Icons.copy,
-                    label: 'Копировать',
-                    action: ContextMenuAction.copy,
-                  ),
-                  _ActionItem(
-                    icon: Icons.highlight,
-                    label: 'Подсветка',
-                    action: ContextMenuAction.highlight,
-                  ),
-                  _ActionItem(
-                    icon: Icons.format_underlined,
-                    label: 'Подчёркивание',
-                    action: ContextMenuAction.underline,
-                  ),
-                  _ActionItem(
-                    icon: Icons.translate,
-                    label: 'Перевод',
-                    action: ContextMenuAction.translate,
-                  ),
-                  _ActionItem(
-                    icon: Icons.volume_up,
-                    label: 'Озвучить',
-                    action: ContextMenuAction.narrate,
-                  ),
-                  _ActionItem(
-                    icon: Icons.share,
-                    label: 'Поделиться',
-                    action: ContextMenuAction.share,
-                  ),
-                  _ActionItem(icon: Icons.search, label: 'Поиск', action: ContextMenuAction.search),
-                  _ActionItem(icon: Icons.smart_toy, label: 'AI', action: ContextMenuAction.ai),
-                ],
-                onAction: onAction ?? (_) {},
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -153,6 +169,11 @@ class _ActionRow extends StatelessWidget {
   final List<_ActionItem> actions;
   final void Function(ContextMenuAction action) onAction;
 
+  void _activate(_ActionItem item) {
+    unawaited(HapticFeedback.selectionClick());
+    onAction(item.action);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -163,26 +184,30 @@ class _ActionRow extends StatelessWidget {
         spacing: 4,
         runSpacing: 4,
         children: actions.map((item) {
-          return InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              unawaited(HapticFeedback.selectionClick());
-              onAction(item.action);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(item.icon, size: 22, color: theme.colorScheme.primary),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.label,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                    ),
+          return Semantics(
+            button: true,
+            label: item.label,
+            onTap: () => _activate(item),
+            child: ExcludeSemantics(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => _activate(item),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(item.icon, size: 22, color: theme.colorScheme.primary),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           );

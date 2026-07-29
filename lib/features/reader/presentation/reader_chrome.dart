@@ -632,15 +632,10 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
         Row(
           children: [
             if (widget.onCheckpointBack != null)
-              GestureDetector(
-                onTap: widget.onCheckpointBack,
-                child: Icon(
-                  Icons.bookmark,
-                  size: 16,
-                  color: widget.checkpoints.any((c) => c < widget.value - 0.02)
-                      ? widget.colors.text.withValues(alpha: 0.6)
-                      : widget.colors.text.withValues(alpha: 0.15),
-                ),
+              _CheckpointButton(
+                label: 'Перейти к предыдущей закладке',
+                onActivate: widget.onCheckpointBack!,
+                color: widget.colors.text.withValues(alpha: 0.6),
               ),
             Expanded(
               child: SliderTheme(
@@ -668,15 +663,10 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
               ),
             ),
             if (widget.onCheckpointForward != null)
-              GestureDetector(
-                onTap: widget.onCheckpointForward,
-                child: Icon(
-                  Icons.bookmark,
-                  size: 16,
-                  color: widget.checkpoints.any((c) => c > widget.value + 0.02)
-                      ? widget.colors.text.withValues(alpha: 0.6)
-                      : widget.colors.text.withValues(alpha: 0.15),
-                ),
+              _CheckpointButton(
+                label: 'Перейти к следующей закладке',
+                onActivate: widget.onCheckpointForward!,
+                color: widget.colors.text.withValues(alpha: 0.6),
               ),
           ],
         ),
@@ -693,6 +683,36 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _CheckpointButton extends StatelessWidget {
+  const _CheckpointButton({
+    required this.label,
+    required this.onActivate,
+    required this.color,
+  });
+
+  final String label;
+  final VoidCallback onActivate;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: ExcludeSemantics(
+        child: IconButton(
+          tooltip: label,
+          onPressed: onActivate,
+          icon: Icon(Icons.bookmark, size: 16, color: color),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
     );
   }
 }

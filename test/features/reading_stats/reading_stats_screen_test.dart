@@ -86,6 +86,34 @@ void main() {
       expect(find.byType(Card), findsWidgets);
     });
 
+    testWidgets('shows a derived seven-day target for an enabled goal', (tester) async {
+      await tester.pumpWidget(
+        buildTestWidget(
+          stats: const ReadingStats(
+            currentStreak: 0,
+            longestStreak: 0,
+            todayMinutes: 15,
+            thisWeekMinutes: 125,
+            thisMonthMinutes: 125,
+            totalMinutes: 125,
+            totalSessions: 1,
+            heatmapData: [],
+          ),
+          goal: const ReadingGoal(isEnabled: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        find.text('Ритм за неделю'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Ритм за неделю'), findsOneWidget);
+      expect(find.text('125 из 210 мин'), findsOneWidget);
+      expect(find.text('Осталось 85 мин'), findsOneWidget);
+    });
+
     test('formats remaining, exact, and exceeded daily-goal states', () {
       expect(
         formatDailyGoalProgressMessage(todayMinutes: 20, goalMinutes: 30),
