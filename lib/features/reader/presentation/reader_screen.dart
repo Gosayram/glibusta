@@ -1152,9 +1152,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 _pendingSearchQuery = null;
                 return BookSearchOverlay(
                   searchService: searchService,
-                  onJumpToResult: (position, query) {
+                  onJumpToResult: (position, query, matches, matchIndex) {
                     _ctrl.closeSearch();
                     _ctrl.highlightSearchQuery(query);
+                    _ctrl.setSearchMatches(matches, matchIndex);
                     _ctrl.jumpToPosition(
                       position.copyWith(bookId: widget.bookId),
                     );
@@ -1170,26 +1171,41 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               },
             ),
           ),
-        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
+        if (readerState.highlightedQuery != null &&
+            !readerState.isSearchOpen &&
+            readerState.searchMatchCount > 0)
           Positioned(
-            bottom: MediaQuery.paddingOf(context).bottom + 80,
-            left: 24,
-            right: 24,
-            child: ReaderSelectionToolbar(
-              bookId: widget.bookId,
-              chapterIndex: readerState.currentPosition.chapterIndex,
-              paragraphIndex: readerState.currentPosition.paragraphIndex,
-              selectedText: _selectedText!,
-              onDismiss: () => setState(() => _selectedText = null),
-              onSearchInBook: (query) {
-                setState(() {
-                  _pendingSearchQuery = query;
-                  _selectedText = null;
-                });
-                _ctrl.toggleSearch();
-              },
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 16,
+            right: 16,
+            child: _SearchFindBar(
+              query: readerState.highlightedQuery!,
+              matchIndex: readerState.searchMatchIndex,
+              matchCount: readerState.searchMatchCount,
+              onPrev: () => _ctrl.prevSearchMatch(),
+              onNext: () => _ctrl.nextSearchMatch(),
+              onClose: () => _ctrl.clearSearchHighlight(),
             ),
           ),
+        Positioned(
+          bottom: MediaQuery.paddingOf(context).bottom + 80,
+          left: 24,
+          right: 24,
+          child: ReaderSelectionToolbar(
+            bookId: widget.bookId,
+            chapterIndex: readerState.currentPosition.chapterIndex,
+            paragraphIndex: readerState.currentPosition.paragraphIndex,
+            selectedText: _selectedText!,
+            onDismiss: () => setState(() => _selectedText = null),
+            onSearchInBook: (query) {
+              setState(() {
+                _pendingSearchQuery = query;
+                _selectedText = null;
+              });
+              _ctrl.toggleSearch();
+            },
+          ),
+        ),
       ],
     );
   }
@@ -1856,6 +1872,78 @@ class _ReaderNavButton extends StatelessWidget {
           height: 56,
           alignment: Alignment.center,
           child: Icon(icon, color: theme.colorScheme.onSurface, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchFindBar extends StatelessWidget {
+  const _SearchFindBar({
+    required this.query,
+    required this.matchIndex,
+    required this.matchCount,
+    required this.onPrev,
+    required this.onNext,
+    required this.onClose,
+  });
+
+  final String query;
+  final int matchIndex;
+  final int matchCount;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.search, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                query,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              '${matchIndex + 1} / $matchCount',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+              onPressed: onPrev,
+              tooltip: 'Предыдущее',
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+              onPressed: onNext,
+              tooltip: 'Следующее',
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: onClose,
+              tooltip: 'Закрыть',
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
       ),
     );

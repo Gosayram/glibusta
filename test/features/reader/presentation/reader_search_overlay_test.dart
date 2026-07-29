@@ -21,7 +21,7 @@ void main() {
         home: Scaffold(
           body: BookSearchOverlay(
             searchService: service,
-            onJumpToResult: (_, _) {},
+            onJumpToResult: (_, _, _, _) {},
             onDismiss: () {},
             theme: ReaderTheme.light,
           ),
@@ -55,7 +55,7 @@ void main() {
         home: Scaffold(
           body: BookSearchOverlay(
             searchService: service,
-            onJumpToResult: (_, _) {},
+            onJumpToResult: (_, _, _, _) {},
             onDismiss: () {},
             theme: ReaderTheme.light,
           ),
@@ -87,7 +87,7 @@ void main() {
         home: Scaffold(
           body: BookSearchOverlay(
             searchService: service,
-            onJumpToResult: (position, _) => jumpedPosition = position,
+            onJumpToResult: (position, _, _, _) => jumpedPosition = position,
             onDismiss: () {},
             theme: ReaderTheme.light,
           ),
@@ -143,7 +143,7 @@ void main() {
         home: Scaffold(
           body: BookSearchOverlay(
             searchService: service,
-            onJumpToResult: (_, _) {},
+            onJumpToResult: (_, _, _, _) {},
             onDismiss: () {},
             theme: ReaderTheme.light,
           ),
@@ -177,7 +177,7 @@ void main() {
         home: Scaffold(
           body: BookSearchOverlay(
             searchService: service,
-            onJumpToResult: (_, _) {},
+            onJumpToResult: (_, _, _, _) {},
             onDismiss: () {},
             theme: ReaderTheme.light,
           ),

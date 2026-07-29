@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -142,6 +143,8 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA synchronous = NORMAL');
       await customStatement('PRAGMA foreign_keys = ON');
       await customStatement('PRAGMA cache_size = -8000');
+      await customStatement('PRAGMA busy_timeout = 5000');
+      await customStatement('PRAGMA temp_store = MEMORY');
     },
   );
 
@@ -317,6 +320,9 @@ QueryExecutor _openConnection() {
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  ref.onDispose(() => db.close());
+  ref.onDispose(() {
+    unawaited(db.checkpointWal());
+    unawaited(db.close());
+  });
   return db;
 });

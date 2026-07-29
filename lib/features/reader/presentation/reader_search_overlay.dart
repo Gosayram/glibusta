@@ -18,7 +18,13 @@ class BookSearchOverlay extends StatefulWidget {
   });
 
   final BookSearchService searchService;
-  final void Function(ReaderPosition position, String query) onJumpToResult;
+  final void Function(
+    ReaderPosition position,
+    String query,
+    List<BookSearchResult> matches,
+    int matchIndex,
+  )
+  onJumpToResult;
   final VoidCallback onDismiss;
   final ReaderTheme theme;
   final int? currentChapterIndex;
@@ -457,6 +463,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
 
   void _jumpToResult(BookSearchResult result) {
     unawaited(_recordQuery(_controller.text));
+    final matchIndex = _results.indexOf(result);
     widget.onJumpToResult(
       ReaderPosition(
         bookId: '',
@@ -465,6 +472,8 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
         updatedAt: DateTime.now(),
       ),
       _controller.text.trim(),
+      _results,
+      matchIndex >= 0 ? matchIndex : 0,
     );
   }
 

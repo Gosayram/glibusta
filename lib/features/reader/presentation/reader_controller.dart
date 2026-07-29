@@ -57,6 +57,8 @@ class ReaderState {
   final int estimatedMinutesLeft;
   final bool isSearchOpen;
   final String? highlightedQuery;
+  final int searchMatchCount;
+  final int searchMatchIndex;
   final bool isDynamicallyLoading;
   final List<double> checkpoints;
   final int wpm;
@@ -78,6 +80,8 @@ class ReaderState {
     this.estimatedMinutesLeft = 0,
     this.isSearchOpen = false,
     this.highlightedQuery,
+    this.searchMatchCount = 0,
+    this.searchMatchIndex = 0,
     this.isDynamicallyLoading = false,
     List<double> checkpoints = const [],
     this.wpm = 200,
@@ -121,6 +125,9 @@ class ReaderState {
     bool? isSearchOpen,
     String? highlightedQuery,
     bool clearHighlight = false,
+    int? searchMatchCount,
+    int? searchMatchIndex,
+    bool clearSearchMatches = false,
     bool clearLoadingMessage = false,
     bool? isDynamicallyLoading,
     List<double>? checkpoints,
@@ -142,6 +149,8 @@ class ReaderState {
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
+      searchMatchCount: clearSearchMatches ? 0 : (searchMatchCount ?? this.searchMatchCount),
+      searchMatchIndex: clearSearchMatches ? 0 : (searchMatchIndex ?? this.searchMatchIndex),
       isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
       checkpoints: checkpoints ?? this.checkpoints,
       wpm: wpm ?? this.wpm,
@@ -173,6 +182,8 @@ final class ReaderController {
   final _stateController = StreamController<ReaderState>.broadcast();
   bool _disposed = false;
   bool _loaded = false;
+  List<BookSearchResult> _searchMatches = const [];
+  int _searchMatchIndex = 0;
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
@@ -1199,7 +1210,11 @@ final class ReaderController {
   }
 
   void closeSearch() {
-    _updateState(_state.copyWith(isSearchOpen: false, clearHighlight: true));
+    _updateState(
+      _state.copyWith(isSearchOpen: false, clearHighlight: true, clearSearchMatches: true),
+    );
+    _searchMatches = const [];
+    _searchMatchIndex = 0;
   }
 
   void highlightSearchQuery(String query) {
@@ -1208,6 +1223,49 @@ final class ReaderController {
       _state.copyWith(
         highlightedQuery: trimmed.isEmpty ? null : trimmed,
         clearHighlight: trimmed.isEmpty,
+      ),
+    );
+  }
+
+  void setSearchMatches(List<BookSearchResult> matches, int currentIndex) {
+    _searchMatches = List.unmodifiable(matches);
+    _searchMatchIndex = currentIndex.clamp(0, matches.length - 1);
+    _updateState(
+      _state.copyWith(
+        searchMatchCount: matches.length,
+        searchMatchIndex: _searchMatchIndex,
+      ),
+    );
+  }
+
+  void nextSearchMatch() {
+    if (_searchMatches.isEmpty) return;
+    _searchMatchIndex = (_searchMatchIndex + 1) % _searchMatches.length;
+    _jumpToSearchMatch();
+  }
+
+  void prevSearchMatch() {
+    if (_searchMatches.isEmpty) return;
+    _searchMatchIndex = (_searchMatchIndex - 1 + _searchMatches.length) % _searchMatches.length;
+    _jumpToSearchMatch();
+  }
+
+  void clearSearchHighlight() {
+    _searchMatches = const [];
+    _searchMatchIndex = 0;
+    _updateState(_state.copyWith(clearHighlight: true, clearSearchMatches: true));
+  }
+
+  void _jumpToSearchMatch() {
+    if (_searchMatches.isEmpty || _searchMatchIndex >= _searchMatches.length) return;
+    final match = _searchMatches[_searchMatchIndex];
+    _updateState(_state.copyWith(searchMatchIndex: _searchMatchIndex));
+    jumpToPosition(
+      ReaderPosition(
+        bookId: _bookId,
+        chapterIndex: match.chapterIndex,
+        paragraphIndex: match.paragraphIndex,
+        updatedAt: DateTime.now(),
       ),
     );
   }

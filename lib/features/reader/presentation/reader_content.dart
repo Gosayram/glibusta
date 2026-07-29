@@ -566,6 +566,46 @@ Widget _buildReaderBlock(
   }
 }
 
+/// Builds a chapter title in a visually distinct block with subtle background
+/// and accent border, matching the Lithium-style "separate block" presentation.
+Widget _buildChapterTitle(
+  ReaderCtx ctx,
+  String title,
+  TextStyle baseStyle,
+  TextAlign align,
+  double paragraphSpacing,
+) {
+  return Container(
+    margin: EdgeInsets.only(bottom: paragraphSpacing * 2),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: ctx.colors.text.withValues(alpha: 0.06),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(4),
+        bottomLeft: Radius.circular(4),
+      ),
+      border: Border(
+        left: BorderSide(
+          color: ctx.colors.text.withValues(alpha: 0.25),
+          width: 3,
+        ),
+      ),
+    ),
+    child: Semantics(
+      header: true,
+      child: _readerHighlightedText(
+        ctx,
+        title,
+        baseStyle.copyWith(
+          fontSize: baseStyle.fontSize! * 1.4,
+          fontWeight: FontWeight.bold,
+        ),
+        align,
+      ),
+    ),
+  );
+}
+
 Widget _buildCoverPage(String coverUrl, ReaderSettings settings, TextStyle baseStyle) {
   return SizedBox.expand(
     child: Center(
@@ -1656,20 +1696,12 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
         .toList();
 
     final header = chapter.title.isNotEmpty
-        ? Padding(
-            padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-            child: Semantics(
-              header: true,
-              child: _readerHighlightedText(
-                ctx,
-                chapter.title,
-                _getReaderStyle(settings).copyWith(
-                  fontSize: settings.fontSize * 1.4,
-                  fontWeight: FontWeight.bold,
-                ),
-                baseAlign,
-              ),
-            ),
+        ? _buildChapterTitle(
+            ctx,
+            chapter.title,
+            _getReaderStyle(settings),
+            baseAlign,
+            settings.paragraphSpacing,
           )
         : const SizedBox.shrink();
 
@@ -2404,17 +2436,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
     if (page.showChapterTitle && chapter.title.isNotEmpty) {
       content.add(
-        Padding(
-          padding: EdgeInsets.only(bottom: settings.paragraphSpacing * 2),
-          child: Semantics(
-            header: true,
-            child: _readerHighlightedText(
-              ctx,
-              chapter.title,
-              style.copyWith(fontSize: settings.fontSize * 1.4, fontWeight: FontWeight.bold),
-              baseAlign,
-            ),
-          ),
+        _buildChapterTitle(
+          ctx,
+          chapter.title,
+          style,
+          baseAlign,
+          settings.paragraphSpacing,
         ),
       );
     }
