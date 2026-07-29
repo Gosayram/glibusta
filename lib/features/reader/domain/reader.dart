@@ -74,6 +74,12 @@ enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
 
+/// Physical corner whose tap action may be configured per reader settings.
+///
+/// This belongs to the domain model because both settings UI and the provider
+/// persist it; the presentation helper only resolves a pointer position.
+enum ReaderCorner { topLeft, topRight, bottomLeft, bottomRight }
+
 /// Action assigned to a reader corner tap.
 ///
 /// [inherit] keeps the regular edge-pagination or central UI-toggle behavior.

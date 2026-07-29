@@ -2,9 +2,6 @@ import 'package:flutter/widgets.dart';
 
 import '../domain/reader.dart';
 
-/// The four physical corners that can be assigned a tap action.
-enum ReaderCorner { topLeft, topRight, bottomLeft, bottomRight }
-
 /// Keeps corner controls comfortably away from selectable book text while
 /// remaining large enough for touch input on phones and tablets.
 const readerCornerTapExtent = 72.0;

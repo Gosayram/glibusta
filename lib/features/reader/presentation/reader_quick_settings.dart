@@ -11,7 +11,6 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
-import 'reader_corner_tap.dart';
 import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
 import 'reading_break_reminder.dart';

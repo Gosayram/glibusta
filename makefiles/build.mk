@@ -21,9 +21,14 @@ MACOS_CODESIGN_IDENTITY ?= -
 DEBUG_INFO_ANDROID ?= $(BUILD_DIR)/symbols/android
 DEBUG_INFO_MACOS ?= $(BUILD_DIR)/symbols/macos
 
-FLUTTER_BUILD_APK := $(FLUTTER) build apk --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
-FLUTTER_BUILD_APK_SPLIT := $(FLUTTER) build apk --release --split-per-abi --target-platform android-arm,android-arm64 --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
-FLUTTER_BUILD_AAB := $(FLUTTER) build appbundle --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+# Gradle's launcher loads its native platform support before it reads
+# gradle.properties. Pass the Java 21 native-access flag through Flutter to
+# the wrapper as well, so a clean Android build does not emit the warning.
+GRADLE_NATIVE_ACCESS_OPTS := --enable-native-access=ALL-UNNAMED
+FLUTTER_WITH_GRADLE_NATIVE_ACCESS := GRADLE_OPTS="$${GRADLE_OPTS:+$${GRADLE_OPTS} }$(GRADLE_NATIVE_ACCESS_OPTS)" $(FLUTTER)
+FLUTTER_BUILD_APK := $(FLUTTER_WITH_GRADLE_NATIVE_ACCESS) build apk --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_APK_SPLIT := $(FLUTTER_WITH_GRADLE_NATIVE_ACCESS) build apk --release --split-per-abi --target-platform android-arm,android-arm64 --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
+FLUTTER_BUILD_AAB := $(FLUTTER_WITH_GRADLE_NATIVE_ACCESS) build appbundle --release --obfuscate --split-debug-info=$(DEBUG_INFO_ANDROID)
 FLUTTER_BUILD_MACOS := $(FLUTTER) build macos --release --obfuscate --split-debug-info=$(DEBUG_INFO_MACOS)
 CARGO_BUILD_RELEASE := cd rust && cargo build --release
 CARGO_CHECK := cd rust && cargo check

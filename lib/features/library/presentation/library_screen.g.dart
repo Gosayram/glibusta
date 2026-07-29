@@ -13,12 +13,7 @@ part of 'library_screen.dart';
 final libraryBooksProvider = LibraryBooksProvider._();
 
 final class LibraryBooksProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Book>>,
-          List<Book>,
-          FutureOr<List<Book>>
-        >
+    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   LibraryBooksProvider._()
     : super(

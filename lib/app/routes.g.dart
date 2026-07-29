@@ -20,8 +20,7 @@ RouteBase get $collectionsRoute => GoRouteData.$route(
 );
 
 mixin $CollectionsRoute on GoRouteData {
-  static CollectionsRoute _fromState(GoRouterState state) =>
-      const CollectionsRoute();
+  static CollectionsRoute _fromState(GoRouterState state) => const CollectionsRoute();
 
   @override
   String get location => GoRouteData.$location('/collections');
@@ -33,8 +32,7 @@ mixin $CollectionsRoute on GoRouteData {
   Future<T?> push<T>(BuildContext context) => context.push<T>(location);
 
   @override
-  void pushReplacement(BuildContext context) =>
-      context.pushReplacement(location);
+  void pushReplacement(BuildContext context) => context.pushReplacement(location);
 
   @override
   void replace(BuildContext context) => context.replace(location);
@@ -47,8 +45,7 @@ RouteBase get $annotationsRoute => GoRouteData.$route(
 );
 
 mixin $AnnotationsRoute on GoRouteData {
-  static AnnotationsRoute _fromState(GoRouterState state) =>
-      const AnnotationsRoute();
+  static AnnotationsRoute _fromState(GoRouterState state) => const AnnotationsRoute();
 
   @override
   String get location => GoRouteData.$location('/annotations');
@@ -60,8 +57,7 @@ mixin $AnnotationsRoute on GoRouteData {
   Future<T?> push<T>(BuildContext context) => context.push<T>(location);
 
   @override
-  void pushReplacement(BuildContext context) =>
-      context.pushReplacement(location);
+  void pushReplacement(BuildContext context) => context.pushReplacement(location);
 
   @override
   void replace(BuildContext context) => context.replace(location);
@@ -86,8 +82,7 @@ mixin $StatsRoute on GoRouteData {
   Future<T?> push<T>(BuildContext context) => context.push<T>(location);
 
   @override
-  void pushReplacement(BuildContext context) =>
-      context.pushReplacement(location);
+  void pushReplacement(BuildContext context) => context.pushReplacement(location);
 
   @override
   void replace(BuildContext context) => context.replace(location);
@@ -106,8 +101,7 @@ mixin $HighlightsRoute on GoRouteData {
   HighlightsRoute get _self => this as HighlightsRoute;
 
   @override
-  String get location =>
-      GoRouteData.$location('/highlights/${Uri.encodeComponent(_self.bookId)}');
+  String get location => GoRouteData.$location('/highlights/${Uri.encodeComponent(_self.bookId)}');
 
   @override
   void go(BuildContext context) => context.go(location);
@@ -116,8 +110,7 @@ mixin $HighlightsRoute on GoRouteData {
   Future<T?> push<T>(BuildContext context) => context.push<T>(location);
 
   @override
-  void pushReplacement(BuildContext context) =>
-      context.pushReplacement(location);
+  void pushReplacement(BuildContext context) => context.pushReplacement(location);
 
   @override
   void replace(BuildContext context) => context.replace(location);
