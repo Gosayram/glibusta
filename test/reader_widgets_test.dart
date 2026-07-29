@@ -140,6 +140,7 @@ void main() {
 
   group('ReaderQuickSettingsSheet', () {
     testWidgets('custom CSS editor explains its safe subset and resets rules', (tester) async {
+      final semantics = tester.ensureSemantics();
       var currentCss = 'p { line-height: 1.7; }';
       await tester.pumpWidget(
         wrapInApp(
@@ -153,6 +154,15 @@ void main() {
       );
 
       expect(find.textContaining('Применяются только свойства p'), findsOneWidget);
+      expect(find.text('Пользовательский CSS применяется к текущей книге.'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Пользовательский CSS применяется к текущей книге.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).decoration?.labelText,
+        'Правила CSS для абзацев',
+      );
       expect(find.byTooltip('Сбросить пользовательский CSS'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Сбросить пользовательский CSS'));
@@ -160,6 +170,8 @@ void main() {
 
       expect(currentCss, isEmpty);
       expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, isEmpty);
+      expect(find.text('Пользовательский CSS отключён.'), findsOneWidget);
+      semantics.dispose();
     });
 
     testWidgets('renders display page sections', (tester) async {

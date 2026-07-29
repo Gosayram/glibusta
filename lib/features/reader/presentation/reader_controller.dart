@@ -22,6 +22,7 @@ import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
 import 'reader_content_helper.dart';
 import 'reader_corner_tap.dart';
+import 'reader_link_history.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 import 'reader_two_finger_chapter_gesture.dart';
@@ -176,7 +177,7 @@ final class ReaderController {
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
   double _lastScrollOffset = 0;
-  final List<ReaderPosition> _linkBackStack = [];
+  final _linkHistory = ReaderLinkHistory();
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -186,7 +187,7 @@ final class ReaderController {
 
   void dispose() {
     _loadGeneration++;
-    _linkBackStack.clear();
+    _linkHistory.clear();
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
     _hideTimer?.cancel();
@@ -977,20 +978,28 @@ final class ReaderController {
     jumpToPosition(position);
   }
 
-  bool get hasLinkBack => _linkBackStack.isNotEmpty;
+  bool get hasLinkBack => _linkHistory.canGoBack;
+  bool get hasLinkForward => _linkHistory.canGoForward;
 
   void pushLinkPosition() {
-    _linkBackStack.add(_state.currentPosition);
+    _linkHistory.pushOrigin(_state.currentPosition);
   }
 
   bool popLinkPosition() {
-    if (_linkBackStack.isEmpty) return false;
-    final position = _linkBackStack.removeLast();
+    final position = _linkHistory.goBack(_state.currentPosition);
+    if (position == null) return false;
     jumpToPosition(position);
     return true;
   }
 
-  void clearLinkBackStack() => _linkBackStack.clear();
+  bool forwardLinkPosition() {
+    final position = _linkHistory.goForward(_state.currentPosition);
+    if (position == null) return false;
+    jumpToPosition(position);
+    return true;
+  }
+
+  void clearLinkBackStack() => _linkHistory.clear();
 
   void jumpToProgress(double progress) {
     final bounded = progress.clamp(0.0, 1.0);

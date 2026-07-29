@@ -47,6 +47,9 @@ class _ReaderCustomCssEditorState extends State<ReaderCustomCssEditor> {
   @override
   Widget build(BuildContext context) {
     final hasCss = _controller.text.trim().isNotEmpty;
+    final status = hasCss
+        ? 'Пользовательский CSS применяется к текущей книге.'
+        : 'Пользовательский CSS отключён.';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -74,6 +77,7 @@ class _ReaderCustomCssEditorState extends State<ReaderCustomCssEditor> {
             minLines: 2,
             style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             decoration: InputDecoration(
+              labelText: 'Правила CSS для абзацев',
               hintText: 'p { line-height: 1.7; }',
               border: InputBorder.none,
               isDense: true,
@@ -89,6 +93,14 @@ class _ReaderCustomCssEditorState extends State<ReaderCustomCssEditor> {
                     )
                   : null,
             ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Semantics(
+          liveRegion: true,
+          label: status,
+          child: ExcludeSemantics(
+            child: Text(status, style: Theme.of(context).textTheme.bodySmall),
           ),
         ),
       ],

@@ -75,6 +75,8 @@ class ReaderTopBar extends StatelessWidget {
     this.onMore,
     this.isBookmarked = false,
     this.hasLinkBack = false,
+    this.hasLinkForward = false,
+    this.onLinkForward,
     this.onBookInfo,
     this.onKaraoke,
   });
@@ -89,6 +91,8 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback? onMore;
   final bool isBookmarked;
   final bool hasLinkBack;
+  final bool hasLinkForward;
+  final VoidCallback? onLinkForward;
   final VoidCallback? onBookInfo;
   final VoidCallback? onKaraoke;
 
@@ -129,6 +133,17 @@ class ReaderTopBar extends StatelessWidget {
                 onPressed: onBack,
               ),
             ),
+            if (hasLinkForward)
+              Semantics(
+                button: true,
+                label: 'Вперёд по ссылке',
+                child: IconButton(
+                  icon: const Icon(Icons.subdirectory_arrow_right),
+                  color: colors.text,
+                  tooltip: 'Вперёд по ссылке',
+                  onPressed: onLinkForward,
+                ),
+              ),
             Expanded(
               child: Semantics(
                 label: bookLabel,

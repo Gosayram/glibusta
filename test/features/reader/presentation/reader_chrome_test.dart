@@ -29,6 +29,42 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('shows link forward only while link history can advance', (tester) async {
+    var forwardCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: const ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: () {},
+            hasLinkForward: true,
+            onLinkForward: () => forwardCalls++,
+          ),
+        ),
+      ),
+    );
+
+    final forward = find.byTooltip('Вперёд по ссылке');
+    expect(forward, findsOneWidget);
+    await tester.tap(forward);
+    expect(forwardCalls, 1);
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: _noOp,
+          ),
+        ),
+      ),
+    );
+    expect(find.byTooltip('Вперёд по ссылке'), findsNothing);
+  });
+
   testWidgets('mode switcher supports keyboard focus and activation', (tester) async {
     ReaderMode? selectedMode;
 
@@ -155,3 +191,5 @@ void main() {
     semantics.dispose();
   });
 }
+
+void _noOp() {}

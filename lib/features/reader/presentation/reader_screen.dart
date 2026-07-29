@@ -971,10 +971,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       (c) => (c - readerState.scrollProgress).abs() < 0.02,
                     ),
                     hasLinkBack: _ctrl.hasLinkBack,
+                    hasLinkForward: _ctrl.hasLinkForward,
                     onBack: () {
                       if (_ctrl.popLinkPosition()) return;
                       Navigator.of(context).pop();
                     },
+                    onLinkForward: _ctrl.forwardLinkPosition,
                     onSearch: () {
                       _ctrl.toggleSearch();
                       if (_ctrl.state.isSearchOpen) {

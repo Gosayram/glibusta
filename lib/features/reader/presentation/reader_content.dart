@@ -16,6 +16,7 @@ import '../domain/reader.dart';
 import 'fillable_field_widget.dart';
 import 'highlighted_text.dart';
 import 'quiz_widget.dart';
+import 'reader_spread_layout.dart';
 
 List<InlineSpan> _bionicReadingSpans(String text, TextStyle style) {
   final spans = <InlineSpan>[];
@@ -1807,6 +1808,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
   bool _didRestoreInitialPage = false;
   bool _disposed = false;
+  bool? _usesTwoPageLayout;
   List<_PageContent> _pages = const [];
   // HG-6.1: layout cache — avoid recomputing pages when settings haven't changed
   String? _cacheKey;
@@ -1865,7 +1867,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (_disposed || !_pageController.hasClients) return;
         final pageCount = _pages.length;
         if (pageCount == 0) return;
-        final useTwoPageLayout = widget.settings.twoPageEnabled && context.canUseTwoPageMode;
+        final useTwoPageLayout =
+            _usesTwoPageLayout ?? (widget.settings.twoPageEnabled && context.canUseTwoPageMode);
         unawaited(
           _pageController.animateToPage(
             _pageForSemanticPosition(
@@ -2421,13 +2424,19 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final safeContentWidth = contentWidth > 1.0 ? contentWidth : 1.0;
         // HG-6.1: check layout cache
         final s = widget.settings;
-        final useTwoPageLayout = s.twoPageEnabled && context.canUseTwoPageMode;
+        final textScaler = MediaQuery.textScalerOf(context);
+        final useTwoPageLayout = shouldUseTwoPageReaderLayout(
+          preferenceEnabled: s.twoPageEnabled,
+          deviceSupportsTwoPageMode: context.canUseTwoPageMode,
+          contentWidth: safeContentWidth,
+          scaledFontSize: textScaler.scale(s.fontSize),
+        );
+        _usesTwoPageLayout = useTwoPageLayout;
         // Each spread page is rendered in half the available width, after the
         // divider is reserved, so paginate using that actual child width.
         final pageContentWidth = useTwoPageLayout
             ? ((safeContentWidth - 1) / 2).clamp(1.0, safeContentWidth)
             : safeContentWidth;
-        final textScaler = MediaQuery.textScalerOf(context);
         final key =
             '${s.fontSize}_${s.lineHeight}_${layoutMargin.top}_${layoutMargin.bottom}_'
             '${layoutMargin.left}_${layoutMargin.right}_${s.paragraphSpacing}_'
