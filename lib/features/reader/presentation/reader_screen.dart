@@ -37,6 +37,7 @@ import 'reader_context_menu.dart';
 import 'reader_controller.dart';
 import 'reader_error_panel.dart';
 import 'reader_gesture_coordinator.dart';
+import 'reader_link_back_pinch_gesture.dart';
 import 'reader_page_turn_haptic.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
@@ -105,6 +106,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
   final _twoFingerChapterGesture = ReaderTwoFingerChapterGesture();
+  final _linkBackPinchGesture = ReaderLinkBackPinchGesture();
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
@@ -266,7 +268,27 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
   }
 
+  void _handleTwoFingerScaleStart(ScaleStartDetails details) {
+    _twoFingerChapterGesture.start(details);
+    _linkBackPinchGesture.start(details);
+  }
+
+  void _handleTwoFingerScaleEnd(ScaleEndDetails details) {
+    _twoFingerChapterGesture.end(details);
+    _linkBackPinchGesture.end(details);
+  }
+
   void _handleTwoFingerChapterScaleUpdate(ScaleUpdateDetails details) {
+    if (_linkBackPinchGesture.update(details)) {
+      if (_scaleStartFontSize > 0) {
+        ref.read(readerSettingsProvider.notifier).updateFontSize(_scaleStartFontSize);
+      }
+      _showVerticalGestureFeedback(
+        _ctrl.popLinkPosition() ? 'Назад к ссылке' : 'Нет перехода назад',
+      );
+      return;
+    }
+
     final direction = _twoFingerChapterGesture.update(details);
     if (direction == null) return;
 
@@ -1211,7 +1233,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               _gestureCoordinator.canInteract &&
                   settings.twoFingerChapterNavigation &&
                   _selectedText == null
-              ? _twoFingerChapterGesture.start
+              ? _handleTwoFingerScaleStart
               : null,
           onScaleUpdate:
               _gestureCoordinator.canInteract &&
@@ -1223,7 +1245,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               _gestureCoordinator.canInteract &&
                   settings.twoFingerChapterNavigation &&
                   _selectedText == null
-              ? _twoFingerChapterGesture.end
+              ? _handleTwoFingerScaleEnd
               : null,
           onHorizontalDragStart:
               _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off

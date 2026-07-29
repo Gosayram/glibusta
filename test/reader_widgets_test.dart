@@ -566,6 +566,26 @@ void main() {
       );
       expect(indicator.value, 0.75);
     });
+
+    testWidgets('exposes a single bounded reading-progress value to screen readers', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await tester.pumpWidget(
+        wrapInApp(
+          const ReaderProgressBar(
+            scrollProgress: 1.2,
+            theme: ReaderTheme.sepia,
+          ),
+        ),
+      );
+
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Прогресс чтения')),
+        matchesSemantics(label: 'Прогресс чтения', value: '100%'),
+      );
+      semantics.dispose();
+    });
   });
 
   group('ReaderScreen', () {

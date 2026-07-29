@@ -506,7 +506,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildDoubleTapActionRow(settings, notifier),
         const SizedBox(height: 12),
         _buildToggleRow(
-          'Двумя пальцами: глава',
+          'Два пальца: главы и назад',
           Icons.swipe_vertical,
           settings.twoFingerChapterNavigation,
           (enabled) => notifier.updateTwoFingerChapterNavigation(enabled),

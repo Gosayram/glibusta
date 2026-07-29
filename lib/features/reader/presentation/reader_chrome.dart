@@ -463,16 +463,23 @@ class ReaderProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progress = scrollProgress.clamp(0.0, 1.0);
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: LinearProgressIndicator(
-          value: scrollProgress,
-          minHeight: 2,
-          backgroundColor: Colors.transparent,
-          valueColor: AlwaysStoppedAnimation<Color>(
-            ReaderColors.progressColor(theme),
+      child: Semantics(
+        label: 'Прогресс чтения',
+        value: '${(progress * 100).round()}%',
+        child: ExcludeSemantics(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 2,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                ReaderColors.progressColor(theme),
+              ),
+            ),
           ),
         ),
       ),
