@@ -6,6 +6,22 @@ enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
 
 enum ReaderMode { paginated, continuous, focus, rsvp }
 
+/// Stable layout capability used to scope per-book layout preferences.
+///
+/// This deliberately describes the available reading layout instead of a
+/// device model, orientation, or pixel size. A fold/unfold or window resize can
+/// therefore select the appropriate profile without replacing the book's
+/// semantic [ReaderPosition].
+enum ReaderLayoutDeviceClass {
+  compact('compact'),
+  expanded('expanded');
+
+  const ReaderLayoutDeviceClass(this.storageKey);
+
+  /// Persisted key. Keep this stable when display breakpoints evolve.
+  final String storageKey;
+}
+
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
   readingMetadata('Разбор книги...'),

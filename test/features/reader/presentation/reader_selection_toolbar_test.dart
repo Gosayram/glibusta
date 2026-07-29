@@ -270,4 +270,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Онлайн-словарь'), findsNothing);
   });
+
+  testWidgets('offers an accessible highlight color palette before saving', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: ReaderSelectionToolbar(
+              bookId: 'book-1',
+              chapterIndex: 0,
+              paragraphIndex: 0,
+              selectedText: 'Selected text',
+              onDismiss: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Выделить'));
+    await tester.tap(find.text('Выделить'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Цвет выделения'), findsOneWidget);
+    expect(find.text('Жёлтый'), findsOneWidget);
+    expect(find.text('Зелёный'), findsOneWidget);
+    await tester.ensureVisible(find.text('Синий'));
+    expect(find.bySemanticsLabel('Цвет выделения: Синий'), findsOneWidget);
+    semantics.dispose();
+  });
 }

@@ -21,11 +21,16 @@ class PerBookSettingsService {
 
   final PerBookSettingsDao _dao;
 
-  Future<ReaderSettings> getEffectiveSettings(String bookId) async {
+  Future<ReaderSettings> getEffectiveSettings(
+    String bookId, {
+    ReaderLayoutDeviceClass? deviceClass,
+  }) async {
     final global = await ReaderSettingsPersistence.load();
     final perBook = await _dao.getSettings(bookId);
     if (perBook == null) return global;
-    return mergeReaderSettings(global, perBook);
+    return deviceClass == null
+        ? mergeReaderSettings(global, perBook)
+        : mergeReaderSettingsForDeviceClass(global, perBook, deviceClass);
   }
 
   Future<void> saveBookSetting({
@@ -43,6 +48,23 @@ class PerBookSettingsService {
   Future<void> saveReadingAppearance(String bookId, ReaderSettings settings) async {
     final existing = await _dao.getSettings(bookId) ?? {};
     existing.addAll(readingAppearanceOverrides(settings));
+    await _dao.saveSettings(bookId, existing);
+  }
+
+  /// Saves the two-page preference separately for a stable layout capability.
+  ///
+  /// A compact phone and an expanded tablet can consequently keep different
+  /// values for one book. Only the layout option is stored here: semantic
+  /// reading position remains owned by the reading-progress store.
+  Future<void> saveTwoPageLayoutPreference({
+    required String bookId,
+    required ReaderLayoutDeviceClass deviceClass,
+    required bool enabled,
+  }) async {
+    final existing = await _dao.getSettings(bookId) ?? {};
+    final profiles = _layoutProfiles(existing);
+    profiles[deviceClass.storageKey] = {'twoPageEnabled': enabled};
+    existing[_layoutProfilesKey] = profiles;
     await _dao.saveSettings(bookId, existing);
   }
 
@@ -250,6 +272,52 @@ ReaderSettings mergeReaderSettings(ReaderSettings global, Map<String, dynamic> o
     ),
     ignoreBookIndent: _boolOverride(overrides, 'ignoreBookIndent', global.ignoreBookIndent),
   );
+}
+
+const _layoutProfilesKey = 'layoutProfiles';
+
+/// Resolves shared per-book preferences followed by the profile for the
+/// currently available layout capability.
+///
+/// The profile intentionally contains only visual layout choices. It never
+/// serializes or remaps a visual page number, so callers retain their existing
+/// chapter/block/text semantic anchor while the window changes size.
+@visibleForTesting
+ReaderSettings mergeReaderSettingsForDeviceClass(
+  ReaderSettings global,
+  Map<String, dynamic> overrides,
+  ReaderLayoutDeviceClass deviceClass,
+) {
+  final sharedSettings = mergeReaderSettings(global, overrides);
+  final layoutOverrides = _layoutOverridesForDeviceClass(overrides, deviceClass);
+  return mergeReaderSettings(sharedSettings, layoutOverrides);
+}
+
+Map<String, Map<String, dynamic>> _layoutProfiles(Map<String, dynamic> overrides) {
+  final rawProfiles = overrides[_layoutProfilesKey];
+  if (rawProfiles is! Map) return {};
+
+  final profiles = <String, Map<String, dynamic>>{};
+  for (final entry in rawProfiles.entries) {
+    if (entry.key is! String || entry.value is! Map) continue;
+    final profile = <String, dynamic>{};
+    for (final setting in (entry.value as Map).entries) {
+      if (setting.key is String) profile[setting.key as String] = setting.value;
+    }
+    profiles[entry.key as String] = profile;
+  }
+  return profiles;
+}
+
+Map<String, dynamic> _layoutOverridesForDeviceClass(
+  Map<String, dynamic> overrides,
+  ReaderLayoutDeviceClass deviceClass,
+) {
+  final profile = _layoutProfiles(overrides)[deviceClass.storageKey];
+  if (profile == null) return const {};
+
+  final twoPageEnabled = profile['twoPageEnabled'];
+  return twoPageEnabled is bool ? {'twoPageEnabled': twoPageEnabled} : const {};
 }
 
 @visibleForTesting

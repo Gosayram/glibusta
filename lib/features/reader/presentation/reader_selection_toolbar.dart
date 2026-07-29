@@ -250,7 +250,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
               _ToolbarButton(
                 icon: Icons.highlight,
                 label: 'Выделить',
-                onTap: () => unawaited(_addHighlight(context)),
+                onTap: () => unawaited(_pickHighlightColor(context)),
               ),
             ],
           ),
@@ -426,9 +426,41 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     widget.onDismiss();
   }
 
-  // MD-21.2: highlight immediately with yellow, no menu
-  // ponytail: color picker removed; add if per-color quick-highlight setting is needed
-  Future<void> _addHighlight(BuildContext context) async {
+  Future<void> _pickHighlightColor(BuildContext context) async {
+    final _HighlightColor? selectedColor = await showModalBottomSheet<_HighlightColor>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.highlight),
+              title: Text('Цвет выделения'),
+              subtitle: Text('Выберите цвет для сохранения фрагмента'),
+            ),
+            for (final _HighlightColor color in _highlightColors)
+              Semantics(
+                label: 'Цвет выделения: ${color.name}',
+                button: true,
+                child: ExcludeSemantics(
+                  child: ListTile(
+                    leading: CircleAvatar(backgroundColor: color.value),
+                    title: Text(color.name),
+                    onTap: () => Navigator.of(sheetContext).pop(color),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || selectedColor == null) return;
+    await _addHighlight(selectedColor.id);
+  }
+
+  Future<void> _addHighlight(String color) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
 
     final db = ref.read(databaseProvider);
@@ -444,10 +476,10 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
             startOffset: 0,
             endOffset: _selectedText!.length,
             selectedText: _selectedText!,
-            color: const Value('yellow'),
+            color: Value(color),
           ),
         );
-    if (context.mounted) {
+    if (mounted) {
       unawaited(SmartDialog.showToast('Текст выделен'));
     }
     widget.onDismiss();
@@ -891,6 +923,13 @@ const List<Duration> _sleepTimerDurations = <Duration>[
 
 const List<double> _playbackRates = <double>[0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
+const List<_HighlightColor> _highlightColors = <_HighlightColor>[
+  _HighlightColor(id: 'yellow', name: 'Жёлтый', value: Color(0xFFFFEB3B)),
+  _HighlightColor(id: 'green', name: 'Зелёный', value: Color(0xFF81C784)),
+  _HighlightColor(id: 'blue', name: 'Синий', value: Color(0xFF90CAF9)),
+  _HighlightColor(id: 'pink', name: 'Розовый', value: Color(0xFFF48FB1)),
+];
+
 const List<_SpeechLanguage> _speechLanguages = <_SpeechLanguage>[
   _SpeechLanguage(code: 'ru-RU', name: 'Русский'),
   _SpeechLanguage(code: 'en-US', name: 'English'),
@@ -923,6 +962,15 @@ class _SpeechLanguage {
 
   final String code;
   final String name;
+}
+
+@immutable
+class _HighlightColor {
+  const _HighlightColor({required this.id, required this.name, required this.value});
+
+  final String id;
+  final String name;
+  final Color value;
 }
 
 class _ToolbarButton extends StatelessWidget {

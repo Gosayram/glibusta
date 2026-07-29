@@ -88,6 +88,51 @@ void main() {
       expect(settings.showImages, isFalse);
       expect(settings.orientationLock, OrientationLock.portrait);
     });
+
+    test('keeps compact and expanded two-page preferences isolated for one book', () {
+      const global = ReaderSettings(
+        fontSize: 19,
+      );
+      const savedBookSettings = {
+        'fontSize': 21,
+        'layoutProfiles': {
+          'compact': {'twoPageEnabled': false},
+          'expanded': {'twoPageEnabled': true},
+        },
+      };
+
+      final compact = mergeReaderSettingsForDeviceClass(
+        global,
+        savedBookSettings,
+        ReaderLayoutDeviceClass.compact,
+      );
+      final expanded = mergeReaderSettingsForDeviceClass(
+        global,
+        savedBookSettings,
+        ReaderLayoutDeviceClass.expanded,
+      );
+
+      expect(compact.fontSize, 21);
+      expect(compact.twoPageEnabled, isFalse);
+      expect(expanded.fontSize, 21);
+      expect(expanded.twoPageEnabled, isTrue);
+    });
+
+    test('ignores a malformed layout profile without changing shared settings', () {
+      const global = ReaderSettings(twoPageEnabled: true);
+
+      final settings = mergeReaderSettingsForDeviceClass(
+        global,
+        const {
+          'layoutProfiles': {
+            'expanded': {'twoPageEnabled': 'yes'},
+          },
+        },
+        ReaderLayoutDeviceClass.expanded,
+      );
+
+      expect(settings.twoPageEnabled, isTrue);
+    });
   });
 
   test('captures only appearance fields for a per-book profile', () {

@@ -11,6 +11,7 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'reader_chrome.dart';
 import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
 import 'reading_break_reminder.dart';
@@ -370,6 +371,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
+        const _SectionTitle('Панели чтения'),
+        const ReaderChromeVisibilityGuide(),
+        const SizedBox(height: 16),
         const _SectionTitle('Горизонтальный жест'),
         _buildHorizontalGestureRow(settings, notifier),
         const SizedBox(height: 12),

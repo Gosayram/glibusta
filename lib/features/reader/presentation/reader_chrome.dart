@@ -4,6 +4,64 @@ import 'package:flutter/services.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 
+/// Explains the reader controls that are temporarily revealed by a central tap.
+///
+/// This intentionally documents the current shared chrome behavior instead of
+/// introducing separate visibility preferences before their interaction and
+/// accessibility policy is defined.
+class ReaderChromeVisibilityGuide extends StatelessWidget {
+  const ReaderChromeVisibilityGuide({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      key: const Key('reader_chrome_visibility_guide'),
+      container: true,
+      label:
+          'Панели чтения. Центральное касание показывает или скрывает верхнюю и '
+          'нижнюю панель. Верхняя панель содержит содержание, поиск и настройки. '
+          'Нижняя показывает прогресс и режим чтения. Время автоскрытия настраивается '
+          'ниже. Строки информации на странице настраиваются в настройках приложения.',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.touch_app_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Панели чтения', style: TextStyle(fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Коснитесь центра страницы, чтобы показать или скрыть обе панели. '
+                      'Верхняя открывает содержание, поиск и настройки; нижняя — прогресс '
+                      'и режим чтения.',
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Время автоскрытия меняется ниже. Строки информации сверху и снизу '
+                      'настраиваются в настройках приложения.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class ReaderTopBar extends StatelessWidget {
   const ReaderTopBar({
     super.key,

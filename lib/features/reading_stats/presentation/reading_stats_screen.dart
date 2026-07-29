@@ -12,6 +12,9 @@ import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/presentation/reading_goal_dialog.dart';
 import '../../reading_goals/presentation/reading_goal_provider.dart';
 import '../data/reading_stats_providers.dart' as rsp;
+import '../data/reading_trend.dart';
+import '../data/reading_trend_settings.dart';
+import 'reading_trend_card.dart';
 
 /// Explains the next useful step for an enabled daily reading goal.
 String formatDailyGoalProgressMessage({
@@ -91,6 +94,15 @@ class ReadingStatsScreen extends ConsumerWidget {
                   child: ReadingHeatmap(data: stats.heatmapData),
                 ),
               ),
+              const SizedBox(height: 24),
+              Text(
+                'Ритм чтения',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _ReadingTrendCard(readings: stats.heatmapData),
               const SizedBox(height: 24),
               Text(
                 'Время чтения',
@@ -404,6 +416,94 @@ class _StatCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReadingTrendCard extends ConsumerWidget {
+  const _ReadingTrendCard({required this.readings});
+
+  final List<DayReading> readings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(readingTrendSettingsProvider);
+
+    return settingsAsync.when(
+      loading: () => const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (settings) {
+        final notifier = ref.read(readingTrendSettingsProvider.notifier);
+        if (!settings.isEnabled) {
+          return Card(
+            child: SwitchListTile(
+              secondary: const Icon(Icons.insights_outlined),
+              title: const Text('Локальный тренд'),
+              subtitle: const Text('Показывать ритм чтения только на этом устройстве'),
+              value: false,
+              onChanged: (enabled) => notifier.saveSettings(settings.copyWith(isEnabled: enabled)),
+            ),
+          );
+        }
+
+        final trend = buildReadingMinutesTrend(
+          readings: readings,
+          endingAt: DateTime.now(),
+          period: settings.period,
+        );
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.insights_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Локальный тренд',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    Switch(
+                      value: true,
+                      onChanged: (enabled) =>
+                          notifier.saveSettings(settings.copyWith(isEnabled: enabled)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<ReadingTrendPeriod>(
+                  segments: ReadingTrendPeriod.values
+                      .map(
+                        (period) => ButtonSegment<ReadingTrendPeriod>(
+                          value: period,
+                          label: Text(period.label),
+                        ),
+                      )
+                      .toList(),
+                  selected: {settings.period},
+                  onSelectionChanged: (selection) {
+                    final period = selection.firstOrNull;
+                    if (period != null) {
+                      unawaited(notifier.saveSettings(settings.copyWith(period: period)));
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                ReadingTrendChart(trend: trend),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

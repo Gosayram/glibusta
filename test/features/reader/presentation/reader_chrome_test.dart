@@ -5,6 +5,30 @@ import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_chrome.dart';
 
 void main() {
+  testWidgets('chrome guide explains central tap and keeps a single semantic node', (tester) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: ReaderChromeVisibilityGuide()),
+      ),
+    );
+
+    expect(find.byKey(const Key('reader_chrome_visibility_guide')), findsOneWidget);
+    expect(find.text('Панели чтения'), findsOneWidget);
+    expect(
+      tester.getSemantics(find.byKey(const Key('reader_chrome_visibility_guide'))),
+      matchesSemantics(
+        label:
+            'Панели чтения. Центральное касание показывает или скрывает верхнюю и '
+            'нижнюю панель. Верхняя панель содержит содержание, поиск и настройки. '
+            'Нижняя показывает прогресс и режим чтения. Время автоскрытия настраивается '
+            'ниже. Строки информации на странице настраиваются в настройках приложения.',
+      ),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('mode switcher supports keyboard focus and activation', (tester) async {
     ReaderMode? selectedMode;
 
