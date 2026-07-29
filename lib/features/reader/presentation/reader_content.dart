@@ -2015,6 +2015,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       settings.showImages,
       settings.imageWidth,
       contentWidth,
+      MediaQuery.textScalerOf(context),
     ]);
   }
 
@@ -2028,6 +2029,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
     final settings = widget.settings;
     final pages = <_PageContent>[];
+    final textScaler = MediaQuery.textScalerOf(context);
 
     // MD-2.3: per-chapter settings key for cache
     final chKey =
@@ -2037,7 +2039,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         '${settings.paragraphIndentMode.name}_${settings.ignoreBookIndent}_'
         '${settings.wordSpacing}_${settings.fontWeightDelta}_${settings.textDirection.name}_'
         '${settings.customCss}_${settings.showImages}_${settings.imageWidth}_'
-        '${availableHeight.toStringAsFixed(1)}_${contentWidth.toStringAsFixed(1)}';
+        '${availableHeight.toStringAsFixed(1)}_${contentWidth.toStringAsFixed(1)}_'
+        '$textScaler';
 
     final hasCover = widget.metadata.coverUrl != null && widget.metadata.coverUrl!.isNotEmpty;
     if (hasCover) {
@@ -2204,6 +2207,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       text: textSpan,
       textDirection: dir,
       locale: locale,
+      textScaler: MediaQuery.textScalerOf(context),
     );
     // A WidgetSpan gives the first rendered line its indentation, but it
     // cannot be used in a standalone TextPainter. Measuring against the
@@ -2423,6 +2427,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final pageContentWidth = useTwoPageLayout
             ? ((safeContentWidth - 1) / 2).clamp(1.0, safeContentWidth)
             : safeContentWidth;
+        final textScaler = MediaQuery.textScalerOf(context);
         final key =
             '${s.fontSize}_${s.lineHeight}_${layoutMargin.top}_${layoutMargin.bottom}_'
             '${layoutMargin.left}_${layoutMargin.right}_${s.paragraphSpacing}_'
@@ -2431,7 +2436,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             '${s.ignoreBookIndent}_${s.wordSpacing}_${s.fontWeightDelta}_${s.textDirection.name}_'
             '${s.customCss}_${s.showImages}_${s.imageWidth}_${useTwoPageLayout}_'
             '${safeAvailableHeight.toStringAsFixed(1)}_${pageContentWidth.toStringAsFixed(1)}_'
-            '${widget.loadedChapters.length}';
+            '${widget.loadedChapters.length}_$textScaler';
         if (key == _cacheKey && _cachedPages.isNotEmpty) {
           _pages = _cachedPages;
         } else {

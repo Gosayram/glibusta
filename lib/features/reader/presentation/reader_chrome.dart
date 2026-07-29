@@ -264,7 +264,9 @@ class ReaderBottomBar extends StatelessWidget {
     }
 
     final percent = (scrollProgress * 100).round();
-    final page = (scrollProgress * totalChapters).ceil().clamp(1, totalChapters);
+    final safeTotalChapters = totalChapters > 0 ? totalChapters : 1;
+    final currentChapter = currentChapterIndex.clamp(0, safeTotalChapters - 1) + 1;
+    final chapterPosition = 'Глава $currentChapter из $safeTotalChapters';
 
     return SafeArea(
       top: false,
@@ -286,26 +288,37 @@ class ReaderBottomBar extends StatelessWidget {
             if (chapterTitle.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  chapterTitle,
-                  style: TextStyle(
-                    color: colors.text.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                child: Semantics(
+                  header: true,
+                  label: 'Текущая глава: $chapterTitle',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      chapterTitle,
+                      style: TextStyle(
+                        color: colors.text.withValues(alpha: 0.8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _leftLabel(settings, page, totalChapters, percent),
-                  style: TextStyle(color: colors.text, fontSize: 12),
+                Semantics(
+                  label: 'Позиция чтения: $chapterPosition',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      _leftLabel(settings, chapterPosition, percent),
+                      style: TextStyle(color: colors.text, fontSize: 12),
+                    ),
+                  ),
                 ),
                 Text(
-                  _rightLabel(settings, page, totalChapters, percent, estimatedMinutesLeft),
+                  _rightLabel(settings, chapterPosition, percent, estimatedMinutesLeft),
                   style: TextStyle(color: colors.text, fontSize: 12),
                 ),
               ],
@@ -332,16 +345,16 @@ class ReaderBottomBar extends StatelessWidget {
     );
   }
 
-  String _leftLabel(ReaderSettings settings, int page, int totalChapters, int percent) {
+  String _leftLabel(ReaderSettings settings, String chapterPosition, int percent) {
     switch (settings.bottomBarContent) {
       case BottomBarContent.page:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.percent:
         return '$percent%';
       case BottomBarContent.chapter:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.time:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.none:
         return '';
     }
@@ -349,8 +362,7 @@ class ReaderBottomBar extends StatelessWidget {
 
   String _rightLabel(
     ReaderSettings settings,
-    int page,
-    int totalChapters,
+    String chapterPosition,
     int percent,
     int minutesLeft,
   ) {
@@ -358,7 +370,7 @@ class ReaderBottomBar extends StatelessWidget {
       case BottomBarContent.page:
         return '$percent%';
       case BottomBarContent.percent:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.chapter:
         return '$percent%';
       case BottomBarContent.time:

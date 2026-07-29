@@ -207,6 +207,45 @@ void main() {
       expect(find.text('RSVP'), findsOneWidget);
     });
 
+    testWidgets('resetting corner taps updates every configured selector', (tester) async {
+      await tester.pumpWidget(
+        wrapInApp(
+          const ReaderQuickSettingsSheet(),
+          initialSettings: const ReaderSettings(
+            topLeftCornerTapAction: CornerTapAction.previousPage,
+            topRightCornerTapAction: CornerTapAction.nextPage,
+            bottomLeftCornerTapAction: CornerTapAction.addBookmark,
+            bottomRightCornerTapAction: CornerTapAction.toggleUi,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await openSettingsPage(tester, 'Жесты');
+      await scrollSettingsUntilVisible(tester, find.text('Тапы по углам'));
+
+      final topLeft = find.byKey(const ValueKey('corner-tap-topLeft'));
+      expect(
+        tester.widget<DropdownButtonFormField<CornerTapAction>>(topLeft).initialValue,
+        CornerTapAction.previousPage,
+      );
+
+      await tester.tap(find.widgetWithText(TextButton, 'Сбросить'));
+      await tester.pump();
+
+      for (final corner in ReaderCorner.values) {
+        final selector = find.byKey(ValueKey('corner-tap-${corner.name}'));
+        expect(
+          tester.widget<DropdownButtonFormField<CornerTapAction>>(selector).initialValue,
+          CornerTapAction.inherit,
+        );
+      }
+      expect(
+        tester.widget<TextButton>(find.widgetWithText(TextButton, 'Сбросить')).onPressed,
+        isNull,
+      );
+    });
+
     testWidgets('default font size shows 18', (tester) async {
       await tester.pumpWidget(
         wrapInApp(const ReaderQuickSettingsSheet()),
@@ -409,7 +448,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Глава 3'), findsOneWidget);
-      expect(find.text('3 / 10'), findsOneWidget);
+      expect(find.text('Глава 3 из 10'), findsOneWidget);
     });
 
     testWidgets('displays percentage and time', (tester) async {
@@ -445,7 +484,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('1 / 5'), findsOneWidget);
+      expect(find.text('Глава 1 из 5'), findsOneWidget);
       expect(find.text('~150 мин'), findsOneWidget);
     });
 
@@ -817,6 +856,53 @@ void main() {
     await tester.pump();
 
     expect(find.byType(AnimatedSwitcher), findsNothing);
+  });
+
+  testWidgets('repaginates when the system text scale changes', (tester) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+    final chapter = ReaderChapter(
+      index: 0,
+      title: 'Глава 1',
+      blocks: List<ReaderBlock>.generate(
+        24,
+        (index) => ReaderBlock(
+          index: index,
+          text: 'Длинный абзац для проверки системного масштаба текста. ' * 3,
+        ),
+      ),
+    );
+
+    Widget buildAtScale(double scale) => MediaQuery(
+      data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+      child: wrapInApp(
+        ReaderContentBody(
+          metadata: const NormalizedBookMetadata(
+            id: 'book-1',
+            title: 'Тестовая книга',
+            authors: [],
+            chapterCount: 1,
+            chapterTitles: ['Глава 1'],
+          ),
+          loadedChapters: {0: chapter},
+          settings: const ReaderSettings(),
+          scrollController: scrollController,
+          onTap: _ignoreTap,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(buildAtScale(1));
+    await tester.pump();
+    final normalPageCount =
+        (tester.widget<PageView>(find.byType(PageView)).childrenDelegate.estimatedChildCount ?? 0);
+
+    await tester.pumpWidget(buildAtScale(2));
+    await tester.pump();
+    final enlargedPageCount =
+        (tester.widget<PageView>(find.byType(PageView)).childrenDelegate.estimatedChildCount ?? 0);
+
+    expect(enlargedPageCount, greaterThan(normalPageCount));
   });
 
   testWidgets('shows a controlled placeholder for an unsupported comic image codec', (

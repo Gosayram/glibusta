@@ -79,4 +79,41 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('uses the actual chapter instead of inferring one from scroll progress', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.chapter),
+            currentChapterIndex: 1,
+            totalChapters: 10,
+            scrollProgress: 0.9,
+            estimatedMinutesLeft: 10,
+            chapterTitle: 'Настоящая глава',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Глава 2 из 10'), findsOneWidget);
+    expect(find.text('Глава 9 из 10'), findsNothing);
+    expect(
+      tester.getSemantics(find.text('Глава 2 из 10')),
+      matchesSemantics(label: 'Позиция чтения: Глава 2 из 10'),
+    );
+    expect(
+      tester.getSemantics(find.text('Настоящая глава')),
+      matchesSemantics(
+        label: 'Текущая глава: Настоящая глава',
+        isHeader: true,
+      ),
+    );
+
+    semantics.dispose();
+  });
 }
