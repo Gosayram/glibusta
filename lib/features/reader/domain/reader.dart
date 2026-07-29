@@ -2,7 +2,20 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reader.freezed.dart';
 
-enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
+enum ReaderTheme {
+  system('Системная'),
+  light('Светлая'),
+  paper('Бумага'),
+  sepia('Сепия'),
+  dark('Тёмная'),
+  oled('OLED'),
+  bedtime('Перед сном');
+
+  const ReaderTheme(this.displayName);
+
+  /// Localized name used by reader appearance controls.
+  final String displayName;
+}
 
 enum ReaderMode { paginated, continuous, focus, rsvp }
 

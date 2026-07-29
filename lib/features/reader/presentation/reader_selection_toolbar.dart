@@ -14,6 +14,7 @@ import '../../../core/database/app_database.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/utils/monotonic_id.dart';
 import '../data/dictionary_lookup_history.dart';
+import '../data/dictionary_lookup_preview.dart';
 import '../data/dictionary_lookup_source.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
@@ -517,7 +518,10 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       builder: (dialogContext) => AlertDialog(
         title: const Text('Онлайн-словарь'),
         content: Text(
-          'Выбранный фрагмент будет отправлен на $host для поиска. Продолжить?',
+          DictionaryLookupPreview.confirmationMessage(
+            host: host,
+            query: query,
+          ),
         ),
         actions: [
           TextButton(

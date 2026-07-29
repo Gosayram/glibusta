@@ -709,34 +709,50 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
   ) {
+    final brightness = MediaQuery.platformBrightnessOf(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: ReaderTheme.values.map((theme) {
         final isSelected = settings.theme == theme;
-        final colors = ReaderColors.forTheme(theme);
-        return GestureDetector(
-          onTap: () => notifier.updateTheme(theme),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colors.scaffold,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                'Aa',
-                style: TextStyle(
-                  color: colors.text,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+        final colors = ReaderColors.forThemeWithContext(theme, brightness);
+        final preview = colors.preview;
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: '${theme.displayName}. ${preview.semanticLabel}',
+          hint: 'Двойное касание для выбора темы.',
+          excludeSemantics: true,
+          child: Tooltip(
+            message: '${theme.displayName}\n${preview.semanticLabel}',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => notifier.updateTheme(theme),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: colors.scaffold,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Aa',
+                      style: TextStyle(
+                        color: colors.text,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

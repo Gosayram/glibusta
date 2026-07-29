@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../src/rust/api/api/api.dart' as rust_api;
+import 'djvu_zoom.dart';
 
 /// Loads the number of pages in a DjVu document.
 typedef DjvuPageCountLoader = Future<int> Function(String path);
@@ -41,10 +42,20 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
   String? _error;
   int _documentRequest = 0;
   int _pageRequest = 0;
+  final TransformationController _zoomController = TransformationController();
+  double _reportedZoom = DjvuZoom.min;
+
+  @override
+  void dispose() {
+    _zoomController.removeListener(_onZoomChanged);
+    _zoomController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
+    _zoomController.addListener(_onZoomChanged);
     unawaited(_loadDocument());
   }
 
@@ -55,6 +66,7 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
 
     _documentRequest++;
     _pageRequest++;
+    _resetZoom();
     setState(() {
       _totalPages = 0;
       _currentPage = 1;
@@ -128,9 +140,27 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
 
   void _goToPage(int page) {
     if (page < 1 || page > _totalPages) return;
+    _resetZoom();
     setState(() => _currentPage = page);
     unawaited(_renderPage(page));
   }
+
+  double get _zoom => _zoomController.value.getMaxScaleOnAxis();
+
+  void _onZoomChanged() {
+    final zoom = _zoom;
+    if ((zoom - _reportedZoom).abs() < 0.001) return;
+    _reportedZoom = zoom;
+    if (mounted) setState(() {});
+  }
+
+  void _setZoom(double zoom) {
+    final boundedZoom = zoom.clamp(DjvuZoom.min, DjvuZoom.max);
+    _zoomController.value = Matrix4.identity()
+      ..scaleByDouble(boundedZoom, boundedZoom, boundedZoom, 1);
+  }
+
+  void _resetZoom() => _setZoom(DjvuZoom.reset());
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +169,23 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         title: Text(_totalPages > 0 ? 'Стр. $_currentPage / $_totalPages' : 'DjVu'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.zoom_out),
+            tooltip: 'Уменьшить масштаб',
+            onPressed: _zoom > DjvuZoom.min ? () => _setZoom(DjvuZoom.zoomOut(_zoom)) : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_in),
+            tooltip: 'Увеличить масштаб',
+            onPressed: _zoom < DjvuZoom.max ? () => _setZoom(DjvuZoom.zoomIn(_zoom)) : null,
+          ),
+          IconButton(
+            icon: const Icon(Icons.fit_screen),
+            tooltip: 'Сбросить масштаб',
+            onPressed: _zoom > DjvuZoom.min ? _resetZoom : null,
+          ),
+        ],
       ),
       body: _buildBody(colorScheme),
     );
@@ -168,16 +215,25 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
     return Column(
       children: [
         Expanded(
-          child: InteractiveViewer(
-            child: _currentImage != null
-                ? Image.memory(
-                    _currentImage!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Text('Ошибка рендеринга страницы'),
-                    ),
-                  )
-                : const Center(child: CircularProgressIndicator()),
+          child: Semantics(
+            image: true,
+            label: _totalPages > 0
+                ? 'Страница $_currentPage из $_totalPages. Масштаб ${(100 * _zoom).round()}%.'
+                : 'Страница DjVu.',
+            child: InteractiveViewer(
+              transformationController: _zoomController,
+              minScale: DjvuZoom.min,
+              maxScale: DjvuZoom.max,
+              child: _currentImage != null
+                  ? Image.memory(
+                      _currentImage!,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Center(
+                        child: Text('Ошибка рендеринга страницы'),
+                      ),
+                    )
+                  : const Center(child: CircularProgressIndicator()),
+            ),
           ),
         ),
         if (_totalPages > 1)
