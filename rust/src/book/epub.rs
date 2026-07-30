@@ -714,7 +714,10 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                         }
                         if in_spine && tag == "itemref" {
                             if let Some(idref) = get_xml_attr(e, b"idref") {
-                                spine_ids.push(idref);
+                                let linear = get_xml_attr(e, b"linear");
+                                if linear.as_deref() != Some("no") {
+                                    spine_ids.push(idref);
+                                }
                             }
                         }
                     }
@@ -821,7 +824,10 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
                 }
                 if in_spine && tag == "itemref" {
                     if let Some(idref) = get_xml_attr(e, b"idref") {
-                        spine_ids.push(idref);
+                        let linear = get_xml_attr(e, b"linear");
+                        if linear.as_deref() != Some("no") {
+                            spine_ids.push(idref);
+                        }
                     }
                 }
                 if in_metadata && tag == "meta" {
@@ -2747,7 +2753,16 @@ fn extract_chapter_title(text: &str) -> String {
                             }
                         }
                     }
+                    "br" if in_heading => {
+                        heading_title.push(' ');
+                    }
                     _ => {}
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "br" && in_heading {
+                    heading_title.push(' ');
                 }
             }
             Ok(Event::Text(ref e)) => {
@@ -2755,6 +2770,13 @@ fn extract_chapter_title(text: &str) -> String {
                     title.push_str(&e.xml10_content().unwrap_or_default());
                 } else if in_heading {
                     heading_title.push_str(&e.xml10_content().unwrap_or_default());
+                }
+            }
+            Ok(Event::CData(ref e)) => {
+                if in_title {
+                    title.push_str(&e.decode().unwrap_or_default());
+                } else if in_heading {
+                    heading_title.push_str(&e.decode().unwrap_or_default());
                 }
             }
             Ok(Event::GeneralRef(ref e)) => {
@@ -2782,15 +2804,69 @@ fn extract_chapter_title(text: &str) -> String {
     } else {
         title
     };
-    result.trim().to_string()
+    let trimmed = result.trim().to_string();
+    // ponytail: 150-char sanity cap prevents paragraph text leaking as title
+    if trimmed.chars().count() > 150 {
+        let truncated: String = trimmed.chars().take(150).collect();
+        if let Some(pos) = truncated.rfind(' ') {
+            format!("{}…", &trimmed[..pos])
+        } else {
+            format!("{truncated}…")
+        }
+    } else {
+        trimmed
+    }
 }
 
 #[cfg(test)]
 mod tests {
     #[cfg(not(miri))]
     use super::extract_font_faces;
-    use super::{parse_nav_xhtml, parse_ncx, parse_xhtml_to_blocks, resolve_toc_entries};
+    use super::{
+        extract_chapter_title, parse_nav_xhtml, parse_ncx, parse_xhtml_to_blocks,
+        resolve_toc_entries,
+    };
     use crate::api::models::BlockType;
+
+    #[test]
+    fn extract_title_handles_br_in_heading() {
+        let html = r#"<html><head><title>X</title></head><body><h1>Chapter 1<br/>The Beginning</h1><p>Text</p></body></html>"#;
+        assert_eq!(extract_chapter_title(html), "Chapter 1 The Beginning");
+    }
+
+    #[test]
+    fn extract_title_caps_long_text() {
+        let long = "A".repeat(200);
+        let html = format!(r#"<html><body><h1>{long}</h1></body></html>"#);
+        let title = extract_chapter_title(&html);
+        assert!(title.ends_with('…'));
+        assert!(title.chars().count() <= 152);
+    }
+
+    #[test]
+    fn extract_title_prefers_h1_over_title_tag() {
+        let html = r#"<html><head><title>Old Title</title></head><body><h1>Real Chapter</h1></body></html>"#;
+        assert_eq!(extract_chapter_title(html), "Real Chapter");
+    }
+
+    #[test]
+    fn extract_title_falls_back_to_title_tag() {
+        let html =
+            r#"<html><head><title>From Head</title></head><body><p>No heading</p></body></html>"#;
+        assert_eq!(extract_chapter_title(html), "From Head");
+    }
+
+    #[test]
+    fn extract_title_skips_empty_h1_uses_h2() {
+        let html = r#"<html><body><h1></h1><h2>Subtitle</h2></body></html>"#;
+        assert_eq!(extract_chapter_title(html), "Subtitle");
+    }
+
+    #[test]
+    fn extract_title_handles_cdata() {
+        let html = r#"<html><body><h1><![CDATA[CDATA Title]]></h1></body></html>"#;
+        assert_eq!(extract_chapter_title(html), "CDATA Title");
+    }
 
     #[test]
     fn parses_epub3_nav_toc_with_nested_entries() {
