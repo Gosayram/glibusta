@@ -170,20 +170,7 @@ final class ReaderContentHelper {
   static List<ReaderChapter> buildSearchChapters(
     NormalizedBookMetadata meta,
     Map<int, ReaderChapter> loadedChapters,
-  ) {
-    final chapters = <ReaderChapter>[];
-    for (var i = 0; i < meta.chapterCount; i++) {
-      chapters.add(
-        loadedChapters[i] ??
-            ReaderChapter(
-              index: i,
-              title: i < meta.chapterTitles.length ? meta.chapterTitles[i] : 'Глава ${i + 1}',
-              blocks: const [],
-            ),
-      );
-    }
-    return chapters;
-  }
+  ) => meta.buildChapters(loadedChapters);
 
   NormalizedBook buildBookForSearch(
     NormalizedBookMetadata meta,

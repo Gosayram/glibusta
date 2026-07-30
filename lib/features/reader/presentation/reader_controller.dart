@@ -85,8 +85,10 @@ class ReaderState {
     this.isDynamicallyLoading = false,
     List<double> checkpoints = const [],
     this.wpm = 200,
-  }) : loadedChapters = Map.unmodifiable(loadedChapters),
-       checkpoints = List.unmodifiable(checkpoints),
+  }) : loadedChapters = identical(loadedChapters, _emptyMap) || loadedChapters is UnmodifiableMapView
+          ? loadedChapters
+          : Map.unmodifiable(loadedChapters),
+       checkpoints = checkpoints.isEmpty ? checkpoints : List.unmodifiable(checkpoints),
        currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;

@@ -53,20 +53,39 @@ attestation_path="${TMP_DIR}/pdfium-attestation.json"
 curl -fsSL -o "${attestation_path}" "${attestation_url}" \
     || print_error "Failed to download attestation from ${attestation_url}"
 
-eval "$(python3 -c "
-import json, base64
+# Verify attestation integrity via cosign before trusting digest values
+if command -v cosign >/dev/null 2>&1; then
+    cosign verify-blob-attestation \
+        --bundle "${attestation_path}" \
+        --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+        --certificate-authorities f52c1016e33b09435c50a24b52a28a24f0405d8eddde5040304ad354a466f3d3 \
+        "${attestation_path}" >/dev/null 2>&1 || print_error "Attestation signature verification failed"
+elif command -v gh >/dev/null 2>&1; then
+    gh attestation verify "${attestation_path}" \
+        --owner bblanchon \
+        --repo pdfium-binaries 2>/dev/null || print_error "Attestation verification failed"
+fi
+
+# ─── Parse attestation digests into associative array ────────────────────────
+declare -A ATTESTED_SHA256
+while IFS=$'\t' read -r archive_name digest; do
+    if [[ ! "${digest}" =~ ^[a-f0-9]{64}$ ]]; then
+        print_error "Invalid SHA-256 digest for ${archive_name}: ${digest}"
+    fi
+    ATTESTED_SHA256["${archive_name}"]="${digest}"
+done < <(python3 -c "
+import json, base64, sys
 data = json.load(open('${attestation_path}'))
 payload = json.loads(base64.b64decode(data['dsseEnvelope']['payload']))
 for subj in payload['subject']:
     n = subj['name']
     if n in ('pdfium-android-arm64.tgz','pdfium-android-arm.tgz','pdfium-mac-arm64.tgz'):
-        print(f'_attested_{n.replace(\".\",\"_\")}() {{ echo \"{subj[\"digest\"][\"sha256\"]}\"; }}')
-" 2>/dev/null)"
+        print(f'{n}\t{subj[\"digest\"][\"sha256\"]}')
+")
 
-# Verify we have all 3 functions
+# Verify we have all 3 archives
 for name in pdfium-android-arm64.tgz pdfium-android-arm.tgz pdfium-mac-arm64.tgz; do
-    func="_attested_${name//./_}"
-    type -t "${func}" >/dev/null || print_error "Missing ${name} in attestation!"
+    [[ -v ATTESTED_SHA256["${name}"] ]] || print_error "Missing ${name} in attestation!"
 done
 
 # ─── Targets ─────────────────────────────────────────────────────────────────
@@ -96,8 +115,7 @@ for target in "${TARGETS[@]}"; do
 
     # Verify TGZ checksum against Sigstore attestation
     actual_tgz="$(sha256 "${tgz_path}")"
-    func="_attested_${archive//./_}"
-    expected_tgz="$(${func})"
+    expected_tgz="${ATTESTED_SHA256[${archive}]}"
     if [[ "${actual_tgz}" != "${expected_tgz}" ]]; then
         print_error "TGZ checksum mismatch for ${archive}!
   Expected (attestation): ${expected_tgz}

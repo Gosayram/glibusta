@@ -109,6 +109,33 @@ class SyncService {
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     AppLogger().info('Background sync task: $task', name: 'Sync');
-    return true;
+    try {
+      final connector = GlibustaSyncConnector();
+      final adapter = PowerSyncAdapter(connector: connector);
+      final bridge = SyncBridge(adapter: adapter);
+      final service = SyncService(
+        powersyncAdapter: adapter,
+        connector: connector,
+        bridge: bridge,
+      );
+      if (!connector.isConfigured) {
+        AppLogger().warning(
+          'Background sync: connector not configured',
+          name: 'Sync',
+        );
+        return false;
+      }
+      await service.connect();
+      AppLogger().info('Background sync completed', name: 'Sync');
+      return true;
+    } on Object catch (e, st) {
+      AppLogger().severe(
+        'Background sync failed: $e',
+        name: 'Sync',
+        error: e,
+        st: st,
+      );
+      return false;
+    }
   });
 }

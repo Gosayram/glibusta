@@ -47,7 +47,7 @@ class GlibustaSyncConnector extends PowerSyncBackendConnector {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_token',
-        'X-User-Id': ?_userId,
+        if (_userId != null) 'X-User-Id': _userId!,
       },
       body: jsonEncode({'changes': batch.crud.map((e) => e.toJson()).toList()}),
     );

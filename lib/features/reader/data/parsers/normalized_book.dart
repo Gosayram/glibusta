@@ -140,6 +140,20 @@ class NormalizedBookMetadata {
     chapterTitles: (json['chapterTitles'] as List<dynamic>?)?.cast<String>() ?? [],
     metadata: json['metadata'] as Map<String, dynamic>?,
   );
+
+  /// Builds a chapter list from metadata, preferring [loadedChapters] when
+  /// available and falling back to empty blocks with title-derived names.
+  List<ReaderChapter> buildChapters([Map<int, ReaderChapter>? loadedChapters]) {
+    return List.generate(chapterCount, (i) {
+      final loaded = loadedChapters?[i];
+      if (loaded != null) return loaded;
+      return ReaderChapter(
+        index: i,
+        title: i < chapterTitles.length ? chapterTitles[i] : 'Глава ${i + 1}',
+        blocks: const [],
+      );
+    });
+  }
 }
 
 class ReaderChapter {

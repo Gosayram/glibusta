@@ -28,7 +28,7 @@ subprojects {
                 val manifestFile = project.projectDir.resolve("src/main/AndroidManifest.xml")
                 if (manifestFile.exists()) {
                     val text = manifestFile.readText()
-                    val pkg = Regex("""package\s*=\s*"([^"]+)"""").find(text)?.groupValues?.getOrNull(1)
+                    val pkg = Regex("package\\s*=\\s*\"([^\"]+)\"").find(text)?.groupValues?.getOrNull(1)
                     if (pkg != null) {
                         android.namespace = pkg
                     }

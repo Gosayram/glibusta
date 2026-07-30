@@ -334,14 +334,7 @@ class BookOpenService {
       authors: metadata.authors,
       description: metadata.description,
       coverUrl: metadata.coverUrl,
-      chapters: [
-        for (var i = 0; i < metadata.chapterCount; i++)
-          ReaderChapter(
-            index: i,
-            title: i < metadata.chapterTitles.length ? metadata.chapterTitles[i] : 'Глава ${i + 1}',
-            blocks: const [],
-          ),
-      ],
+      chapters: metadata.buildChapters(),
       metadata: metadata.metadata,
     );
   }
