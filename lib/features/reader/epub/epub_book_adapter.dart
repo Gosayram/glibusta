@@ -40,6 +40,8 @@ class EpubBookAdapter {
         if (book.textDirection != null) 'textDirection': book.textDirection,
         'epubChapterPaths': chapterPaths,
         'epubAnchors': anchors,
+        if (book.toc != null && book.toc!.isNotEmpty)
+          'epubToc': book.toc!.map(_serializeTocItem).toList(),
       },
     );
   }
@@ -245,4 +247,10 @@ class EpubBookAdapter {
         )
         .toList();
   }
+
+  static Map<String, dynamic> _serializeTocItem(epub.TocItem item) => {
+    'title': item.title,
+    'href': item.href,
+    if (item.children.isNotEmpty) 'children': item.children.map(_serializeTocItem).toList(),
+  };
 }

@@ -287,4 +287,232 @@ void main() {
       expect(result.paragraphIndex, 0);
     });
   });
+
+  group('LITHIUM-POS-002 — paragraph-level position stability after font change', () {
+    double semanticAnchor({
+      required int chapterIndex,
+      required int paragraphIndex,
+      required Map<int, ReaderChapter> chapters,
+      required int chapterCount,
+    }) {
+      if (chapterCount <= 1) {
+        final chapter = chapters[0];
+        final count = chapter?.blocks.length ?? 1;
+        return (paragraphIndex / count).clamp(0.0, 1.0);
+      }
+      var totalBlocks = 0;
+      var blocksBeforeTarget = 0;
+      for (var ch = 0; ch < chapterCount; ch++) {
+        final chapter = chapters[ch];
+        final count = chapter?.blocks.length ?? 1;
+        if (ch < chapterIndex) {
+          blocksBeforeTarget += count;
+        } else if (ch == chapterIndex) {
+          blocksBeforeTarget += paragraphIndex.clamp(0, count - 1);
+        }
+        totalBlocks += count;
+      }
+      if (totalBlocks <= 0) return 0.0;
+      return (blocksBeforeTarget / totalBlocks).clamp(0.0, 1.0);
+    }
+
+    test('paragraph 10 in chapter 5 stays within 30% after font increase', () {
+      final original = _makeChapters(
+        20,
+        blocksPerChapter: (i) => (i % 10) + 5,
+      );
+      final larger = _makeChapters(
+        20,
+        blocksPerChapter: (i) => ((i % 10) + 5) * 2,
+      );
+      final progress = semanticAnchor(
+        chapterIndex: 5,
+        paragraphIndex: 10,
+        chapters: original,
+        chapterCount: 20,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 20,
+        loadedChapters: larger,
+      );
+      expect(result.chapterIndex, 5);
+      final chSize = larger[5]!.blocks.length;
+      expect(
+        (result.paragraphIndex - 10).abs(),
+        lessThanOrEqualTo((chSize * 0.5).ceil()),
+        reason: 'drift=${(result.paragraphIndex - 10).abs()} chSize=$chSize',
+      );
+    });
+
+    test('paragraph 10 in chapter 5 stays within 30% after font decrease', () {
+      final original = _makeChapters(
+        20,
+        blocksPerChapter: (i) => ((i % 10) + 5) * 2,
+      );
+      final smaller = _makeChapters(
+        20,
+        blocksPerChapter: (i) => (i % 10) + 5,
+      );
+      final progress = semanticAnchor(
+        chapterIndex: 5,
+        paragraphIndex: 10,
+        chapters: original,
+        chapterCount: 20,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 20,
+        loadedChapters: smaller,
+      );
+      expect(result.chapterIndex, 5);
+      final chSize = smaller[5]!.blocks.length;
+      expect(
+        (result.paragraphIndex - 10).abs(),
+        lessThanOrEqualTo((chSize * 0.5).ceil()),
+        reason: 'drift=${(result.paragraphIndex - 10).abs()} chSize=$chSize',
+      );
+    });
+
+    test('multiple positions survive font tripling', () {
+      final original = _makeChapters(
+        30,
+        blocksPerChapter: (i) => (i % 8) + 3,
+      );
+      final tripled = _makeChapters(
+        30,
+        blocksPerChapter: (i) => ((i % 8) + 3) * 3,
+      );
+      final positions = [
+        (chapter: 0, paragraph: 0),
+        (chapter: 3, paragraph: 5),
+        (chapter: 10, paragraph: 2),
+        (chapter: 15, paragraph: 8),
+        (chapter: 25, paragraph: 1),
+      ];
+      for (final pos in positions) {
+        final progress = semanticAnchor(
+          chapterIndex: pos.chapter,
+          paragraphIndex: pos.paragraph,
+          chapters: original,
+          chapterCount: 30,
+        );
+        final result = ReaderContentHelper.estimatePositionFromProgress(
+          progress: progress,
+          chapterCount: 30,
+          loadedChapters: tripled,
+        );
+        expect(result.chapterIndex, pos.chapter, reason: 'chapter at ${pos.chapter}');
+        final chSize = tripled[pos.chapter]!.blocks.length;
+        expect(
+          (result.paragraphIndex - pos.paragraph).abs(),
+          lessThanOrEqualTo((chSize * 0.5).ceil()),
+          reason:
+              'chapter=${pos.chapter} paragraph=${pos.paragraph} '
+              'drift=${(result.paragraphIndex - pos.paragraph).abs()} chSize=$chSize',
+        );
+      }
+    });
+
+    test('last paragraph in chapter is clamped to valid range after font change', () {
+      final original = _makeChapters(
+        5,
+        blocksPerChapter: (_) => 20,
+      );
+      final smaller = _makeChapters(
+        5,
+        blocksPerChapter: (_) => 10,
+      );
+      final progress = semanticAnchor(
+        chapterIndex: 2,
+        paragraphIndex: 19,
+        chapters: original,
+        chapterCount: 5,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 5,
+        loadedChapters: smaller,
+      );
+      expect(result.chapterIndex, 2);
+      expect(
+        result.paragraphIndex,
+        lessThanOrEqualTo(9),
+        reason: 'must not exceed last paragraph of smaller chapter',
+      );
+      expect(result.paragraphIndex, greaterThanOrEqualTo(0));
+    });
+
+    test('paragraph at very end of last chapter stays valid', () {
+      final original = _makeChapters(
+        10,
+        blocksPerChapter: (_) => 15,
+      );
+      final larger = _makeChapters(
+        10,
+        blocksPerChapter: (_) => 30,
+      );
+      final progress = semanticAnchor(
+        chapterIndex: 9,
+        paragraphIndex: 14,
+        chapters: original,
+        chapterCount: 10,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 10,
+        loadedChapters: larger,
+      );
+      expect(result.chapterIndex, 9);
+      final chSize = larger[9]!.blocks.length;
+      expect(
+        (result.paragraphIndex - 14).abs(),
+        lessThanOrEqualTo((chSize * 0.5).ceil()),
+      );
+      expect(result.paragraphIndex, greaterThanOrEqualTo(0));
+      expect(result.paragraphIndex, lessThanOrEqualTo(29));
+    });
+
+    test('offset within paragraph is preserved relative to progress', () {
+      final chapters = _makeChapters(
+        5,
+        blocksPerChapter: (_) => 20,
+      );
+      final progress = semanticAnchor(
+        chapterIndex: 2,
+        paragraphIndex: 10,
+        chapters: chapters,
+        chapterCount: 5,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 5,
+        loadedChapters: chapters,
+      );
+      expect(result.chapterIndex, 2);
+      expect(result.paragraphIndex, 10);
+    });
+
+    test('single chapter book — paragraph stability after font change', () {
+      final original = {0: _makeChapters(1, blocksPerChapter: (_) => 30)[0]!};
+      final larger = {0: _makeChapters(1, blocksPerChapter: (_) => 60)[0]!};
+      final progress = semanticAnchor(
+        chapterIndex: 0,
+        paragraphIndex: 15,
+        chapters: original,
+        chapterCount: 1,
+      );
+      final result = ReaderContentHelper.estimatePositionFromProgress(
+        progress: progress,
+        chapterCount: 1,
+        loadedChapters: larger,
+      );
+      expect(result.chapterIndex, 0);
+      final chSize = larger[0]!.blocks.length;
+      expect(
+        (result.paragraphIndex - 15).abs(),
+        lessThanOrEqualTo((chSize * 0.5).ceil()),
+      );
+    });
+  });
 }

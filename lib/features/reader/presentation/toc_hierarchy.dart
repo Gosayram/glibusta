@@ -6,6 +6,7 @@ class TocEntry {
   final int depth;
   final bool isGroup;
   final int groupId;
+  final String? anchor;
 
   const TocEntry({
     required this.index,
@@ -13,6 +14,7 @@ class TocEntry {
     required this.depth,
     required this.isGroup,
     required this.groupId,
+    this.anchor,
   });
 }
 
@@ -78,6 +80,64 @@ String _chapterFallbackTitle(List<String> chapterTitles, int chapterIndex) {
     if (t.isNotEmpty) return _truncateTitle(t);
   }
   return 'Глава ${chapterIndex + 1}';
+}
+
+({int chapterIndex, int paragraphIndex})? resolveTocAnchor({
+  required Map<String, dynamic>? metadata,
+  required String? anchor,
+  required int chapterIndex,
+}) {
+  if (anchor == null || anchor.isEmpty) return null;
+  final anchors = metadata?['epubAnchors'];
+  final chapterPaths = metadata?['epubChapterPaths'];
+  if (anchors is! Map || chapterPaths is! List) return null;
+  if (chapterIndex < 0 || chapterIndex >= chapterPaths.length) return null;
+  final sourcePath = chapterPaths[chapterIndex];
+  if (sourcePath is! String || sourcePath.isEmpty) return null;
+  final key = '$sourcePath#$anchor';
+  final value = anchors[key];
+  if (value is! Map) return null;
+  final resolvedChapter = value['chapterIndex'];
+  final resolvedParagraph = value['paragraphIndex'];
+  if (resolvedChapter is! int ||
+      resolvedParagraph is! int ||
+      resolvedChapter < 0 ||
+      resolvedParagraph < 0) {
+    return null;
+  }
+  return (chapterIndex: resolvedChapter, paragraphIndex: resolvedParagraph);
+}
+
+List<TocEntry> buildTocFromEpubToc(
+  List<Map<String, dynamic>> epubTocItems,
+) {
+  final result = <TocEntry>[];
+  void visit(List<Map<String, dynamic>> items, int depth) {
+    for (final item in items) {
+      final title = (item['title'] as String?) ?? '';
+      final href = (item['href'] as String?) ?? '';
+      final hashIndex = href.indexOf('#');
+      final anchor = hashIndex >= 0 ? href.substring(hashIndex + 1) : null;
+      if (title.isEmpty) continue;
+      result.add(
+        TocEntry(
+          index: result.length,
+          title: title,
+          depth: depth,
+          isGroup: false,
+          groupId: result.length,
+          anchor: anchor,
+        ),
+      );
+      final children = item['children'];
+      if (children is List && children.isNotEmpty) {
+        visit(children.cast<Map<String, dynamic>>(), depth + 1);
+      }
+    }
+  }
+
+  visit(epubTocItems, 0);
+  return result;
 }
 
 List<TocEntry> buildTocFromHeadings(

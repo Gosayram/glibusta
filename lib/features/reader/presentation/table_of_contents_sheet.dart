@@ -155,6 +155,10 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
 
   // ponytail: shared with reader_side_panel via toc_hierarchy.dart
   List<TocEntry> _buildHierarchy() {
+    final epubToc = widget.metadata.metadata?['epubToc'];
+    if (epubToc is List && epubToc.isNotEmpty) {
+      return buildTocFromEpubToc(epubToc.cast<Map<String, dynamic>>());
+    }
     final defaultHierarchy = buildTocHierarchy(widget.metadata.chapterTitles);
     final allFlat = defaultHierarchy.every((e) => e.depth == 0 && !e.isGroup);
     if (allFlat && widget.loadedChapters.isNotEmpty) {
@@ -367,14 +371,21 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                 dense: true,
                 onTap: () {
                   Navigator.of(context).pop();
+                  final resolved = resolveTocAnchor(
+                    metadata: widget.metadata.metadata,
+                    anchor: entry.anchor,
+                    chapterIndex: entry.index,
+                  );
+                  final targetChapter = resolved?.chapterIndex ?? entry.index;
+                  final targetParagraph = resolved?.paragraphIndex ?? 0;
                   final progress = widget.metadata.chapterCount <= 1
                       ? 0.0
-                      : entry.index / (widget.metadata.chapterCount - 1);
+                      : targetChapter / (widget.metadata.chapterCount - 1);
                   widget.onJumpToPosition(
                     ReaderPosition(
                       bookId: widget.metadata.id,
-                      chapterIndex: entry.index,
-                      paragraphIndex: 0,
+                      chapterIndex: targetChapter,
+                      paragraphIndex: targetParagraph,
                       progressPercent: progress,
                       updatedAt: DateTime.now(),
                     ),
