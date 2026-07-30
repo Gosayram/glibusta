@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,9 +8,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/background_task_provider.dart';
@@ -22,6 +27,7 @@ import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../../reader/data/per_book_settings_service.dart';
+import '../data/book_data_export.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
@@ -749,6 +755,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.upload_file),
+                title: const Text('Экспорт данных'),
+                subtitle: const Text('Закладки, заметки, выделения'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_exportBookData(context, ref, book));
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.tune),
                 title: const Text('Сбросить настройки чтения'),
                 onTap: () async {
@@ -792,6 +807,55 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   void _shareBook(BuildContext context, Book book) {
     if (book.source.sourceUrl.isNotEmpty) {
       unawaited(SmartDialog.showToast('Поделиться «${book.title}»'));
+    }
+  }
+
+  Future<void> _exportBookData(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+  ) async {
+    try {
+      final db = ref.read(databaseProvider);
+      final highlights = await db.highlightDao.getHighlightsForBook(book.id);
+      final bookmarks = await (db.select(
+        db.bookmarks,
+      )..where((b) => b.bookId.equals(book.id))).get();
+      final notes = await (db.select(db.notes)..where((n) => n.bookId.equals(book.id))).get();
+
+      if (bookmarks.isEmpty && notes.isEmpty && highlights.isEmpty) {
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Нет данных для экспорта'));
+        }
+        return;
+      }
+
+      final jsonMap = buildBookExportJson(
+        bookId: book.id,
+        title: book.title,
+        highlights: highlights,
+        bookmarks: bookmarks,
+        notes: notes,
+      );
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(jsonMap);
+
+      final tmpDir = await getTemporaryDirectory();
+      final filename = buildBookExportFilename(book.id);
+      final file = File('${tmpDir.path}/$filename');
+      await file.writeAsString(jsonStr);
+
+      if (!context.mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Экспорт данных: ${book.title}',
+        ),
+      );
+    } on Object catch (e) {
+      AppLogger().warning('Export failed: $e', name: 'Library', error: e);
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Не удалось экспортировать данные'));
+      }
     }
   }
 
