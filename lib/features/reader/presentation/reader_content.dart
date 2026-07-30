@@ -303,6 +303,7 @@ bool _blockNeedsExtraGap(BlockType prev, BlockType next) {
 }
 
 Widget _buildReaderBlock(
+  BuildContext context,
   ReaderCtx ctx,
   ReaderBlock block,
   TextAlign textAlign, {
@@ -425,6 +426,7 @@ Widget _buildReaderBlock(
       if (!s.showImages) return const SizedBox.shrink();
       if (block.imageUrl != null && block.imageUrl!.isNotEmpty) {
         final caption = block.imageCaption;
+        final viewportSize = MediaQuery.sizeOf(context);
         final imgWidget = Padding(
           padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing),
           child: Align(
@@ -433,19 +435,21 @@ Widget _buildReaderBlock(
               ImageAlignment.center => Alignment.center,
               ImageAlignment.end => AlignmentDirectional.centerEnd,
             },
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: 600 * s.imageWidth,
-                maxHeight: 800 * s.imageWidth,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(s.imageCornerRadius),
-                child: _readerImageWidget(
-                  block.imageUrl!,
-                  style.color,
-                  s,
-                  allImages: chapterImages,
-                  semanticLabel: block.imageAlt ?? block.imageCaption,
+            child: ClipRect(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: viewportSize.width * s.imageWidth,
+                  maxHeight: viewportSize.height * 0.7 * s.imageWidth,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(s.imageCornerRadius),
+                  child: _readerImageWidget(
+                    block.imageUrl!,
+                    style.color,
+                    s,
+                    allImages: chapterImages,
+                    semanticLabel: block.imageAlt ?? block.imageCaption,
+                  ),
                 ),
               ),
             ),
@@ -584,21 +588,16 @@ Widget _buildChapterTitle(
   TextAlign align,
   double paragraphSpacing,
 ) {
+  final isDark = ctx.brightness == Brightness.dark;
+  final bannerBg = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade100;
+  final borderColor = isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.shade300;
   return Container(
     margin: EdgeInsets.only(bottom: paragraphSpacing * 2),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     decoration: BoxDecoration(
-      color: ctx.colors.text.withValues(alpha: 0.06),
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(4),
-        bottomLeft: Radius.circular(4),
-      ),
-      border: Border(
-        left: BorderSide(
-          color: ctx.colors.text.withValues(alpha: 0.25),
-          width: 3,
-        ),
-      ),
+      color: bannerBg,
+      borderRadius: BorderRadius.circular(8),
+      border: Border(bottom: BorderSide(color: borderColor)),
     ),
     child: Semantics(
       header: true,
@@ -609,7 +608,7 @@ Widget _buildChapterTitle(
           fontSize: baseStyle.fontSize! * 1.4,
           fontWeight: FontWeight.bold,
         ),
-        align,
+        TextAlign.center,
       ),
     ),
   );
@@ -1834,6 +1833,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       }
       builtWidgets.add(
         _buildReaderBlock(
+          context,
           ctx,
           block,
           isAsInBook
@@ -1970,6 +1970,7 @@ class _FocusModeBody extends StatelessWidget {
           child: Center(
             child: SingleChildScrollView(
               child: _buildReaderBlock(
+                context,
                 readerCtx,
                 block,
                 block.textAlign ?? TextAlign.center,
@@ -2341,8 +2342,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (block.imageUrl == null || block.imageUrl!.isEmpty) {
           return _measureBlockHeight(block, settings, colors, width, fontScale: 0.85) + ps;
         }
-        final imgWidth = (width * settings.imageWidth).clamp(50.0, 600.0 * settings.imageWidth);
-        final imgHeight = (imgWidth / 1.4).clamp(80.0, 400.0) + ps;
+        final imgWidth = (width * settings.imageWidth).clamp(50.0, width);
+        final imgHeight = (imgWidth / 1.4).clamp(80.0, width * 0.7) + ps;
         if (block.imageCaption != null && block.imageCaption!.isNotEmpty) {
           final capBlock = ReaderBlock(
             text: block.imageCaption!,
@@ -2557,6 +2558,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       }
       content.add(
         _buildReaderBlock(
+          context,
           ctx,
           block,
           isAsInBook
