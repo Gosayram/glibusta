@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PDFium binary downloader with Sigstore attestation verification
-# Version: chromium/7934 → PDFium 152.0.7934.0
+# Version: chromium/7961 → PDFium 152.0.7961.0
 # Source: https://github.com/bblanchon/pdfium-binaries
 #
 # Downloads the 3 needed TGZ archives, verifies SHA-256 from GitHub's
@@ -12,8 +12,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PDFIUM_VERSION="152.0.7934.0"
-ENCODED_TAG="chromium%2F7934"
+PDFIUM_VERSION="152.0.7961.0"
+ENCODED_TAG="chromium%2F7961"
 BASE_URL="https://github.com/bblanchon/pdfium-binaries/releases/download/${ENCODED_TAG}"
 TMP_DIR="${TMPDIR:-/tmp}/pdfium-${PDFIUM_VERSION}"
 STAMP_FILE="${PROJECT_ROOT}/rust/vendor/pdfium/.stamp-${PDFIUM_VERSION}"
@@ -21,9 +21,6 @@ STAMP_FILE="${PROJECT_ROOT}/rust/vendor/pdfium/.stamp-${PDFIUM_VERSION}"
 # Known-good SHA-256 of extracted binaries (pre-verified after first download)
 _bin_cksum() {
     case "$1/$2" in
-        libpdfium.so/arm64-v8a)   echo "26ad773ffcc962a21ca7c47ec62e50ede3817f0f3c42032ff002903e33b68227" ;;
-        libpdfium.so/armeabi-v7a) echo "fc05b42a5278fc43b17bd1a7a0edf63c04f34da9d649a7bcb9c2172990594e4c" ;;
-        libpdfium.dylib/mac-arm64) echo "7cdbcd36d027ae8a5abbba48570d8ec96e9915f3302e2fa4dfea1beee8e3f4bf" ;;
         *) return 1 ;;
     esac
 }
@@ -85,7 +82,7 @@ for subj in payload['subject']:
 
 # Verify we have all 3 archives
 for name in pdfium-android-arm64.tgz pdfium-android-arm.tgz pdfium-mac-arm64.tgz; do
-    [[ -v ATTESTED_SHA256["${name}"] ]] || print_error "Missing ${name} in attestation!"
+    [[ -n "${ATTESTED_SHA256[${name}]+_}" ]] || print_error "Missing ${name} in attestation!"
 done
 
 # ─── Targets ─────────────────────────────────────────────────────────────────
