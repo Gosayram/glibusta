@@ -895,7 +895,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         if (_isRelayouting)
           Positioned.fill(
             child: ColoredBox(
-              color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.5),
+              color: ReaderColors.forTheme(
+                settings.effectiveUiTheme,
+              ).scaffold.withValues(alpha: 0.5),
               child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
           ),
@@ -911,7 +913,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             right: 0,
             child: ReaderProgressBar(
               scrollProgress: readerState.scrollProgress,
-              theme: settings.theme,
+              theme: settings.effectiveUiTheme,
             ),
           ),
         if (settings.scrollbarIndicator && settings.mode == ReaderMode.continuous)
@@ -1076,7 +1078,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: ReaderColors.progressColor(settings.theme).withValues(alpha: 0.5),
+                  color: ReaderColors.progressColor(
+                    settings.effectiveUiTheme,
+                  ).withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -1124,14 +1128,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   constraints: const BoxConstraints(maxWidth: 360),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.7),
+                    color: ReaderColors.forTheme(
+                      settings.effectiveUiTheme,
+                    ).scaffold.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     // MD-15.1: breadcrumb path "Book › Chapter"
                     '${readerState.metadata!.title}  ›  ${readerState.chapterTitle(readerState.currentPosition.chapterIndex)}',
                     style: TextStyle(
-                      color: ReaderColors.forTheme(settings.theme).text.withValues(alpha: 0.6),
+                      color: ReaderColors.forTheme(
+                        settings.effectiveUiTheme,
+                      ).text.withValues(alpha: 0.6),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1393,11 +1401,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   ThemeData _getThemeData(ReaderSettings settings) {
     final base = Theme.of(context);
-    final custom = _resolveCustomColors(settings);
-    final colors = custom ?? ReaderColors.forTheme(settings.theme);
+    final chromeColors = ReaderColors.forTheme(settings.effectiveUiTheme);
     return base.copyWith(
-      scaffoldBackgroundColor: colors.scaffold,
-      textTheme: base.textTheme.apply(bodyColor: colors.text),
+      scaffoldBackgroundColor: chromeColors.scaffold,
+      textTheme: base.textTheme.apply(bodyColor: chromeColors.text),
     );
   }
 
@@ -1715,7 +1722,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Widget _buildVerticalGestureFeedback(ReaderSettings settings) {
     final feedback = _verticalGestureFeedback;
     if (feedback == null) return const SizedBox.shrink();
-    final colors = ReaderColors.forTheme(settings.theme);
+    final colors = ReaderColors.forTheme(settings.effectiveUiTheme);
     return Positioned(
       top: MediaQuery.paddingOf(context).top + 56,
       left: 24,
@@ -1753,7 +1760,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   // ponytail: subtle fade gradient on top/bottom edges for immersion
   Widget _buildEdgeFadeOverlay(ReaderSettings settings) {
-    final scaffoldColor = ReaderColors.forTheme(settings.theme).scaffold;
+    final scaffoldColor = ReaderColors.forTheme(settings.effectiveUiTheme).scaffold;
     return Positioned.fill(
       child: IgnorePointer(
         child: Column(

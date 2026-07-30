@@ -16,6 +16,7 @@ import '../../../core/utils/monotonic_id.dart';
 import '../data/dictionary_lookup_history.dart';
 import '../data/dictionary_lookup_preview.dart';
 import '../data/dictionary_lookup_source.dart';
+import '../data/highlight_decoration.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -449,40 +450,17 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   }
 
   Future<void> _pickHighlightColor(BuildContext context) async {
-    final _HighlightColor? selectedColor = await showModalBottomSheet<_HighlightColor>(
+    final result = await showModalBottomSheet<(_HighlightColor, HighlightDecoration)>(
       context: context,
       showDragHandle: true,
-      builder: (BuildContext sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(
-              leading: Icon(Icons.highlight),
-              title: Text('Цвет выделения'),
-              subtitle: Text('Выберите цвет для сохранения фрагмента'),
-            ),
-            for (final _HighlightColor color in _highlightColors)
-              Semantics(
-                label: 'Цвет выделения: ${color.name}',
-                button: true,
-                child: ExcludeSemantics(
-                  child: ListTile(
-                    leading: CircleAvatar(backgroundColor: color.value),
-                    title: Text(color.name),
-                    onTap: () => Navigator.of(sheetContext).pop(color),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
+      builder: (BuildContext sheetContext) => _HighlightPickerSheet(),
     );
 
-    if (!mounted || selectedColor == null) return;
-    await _addHighlight(selectedColor.id);
+    if (!mounted || result == null) return;
+    await _addHighlight(result.$1.id, result.$2);
   }
 
-  Future<void> _addHighlight(String color) async {
+  Future<void> _addHighlight(String color, HighlightDecoration decoration) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
 
     final db = ref.read(databaseProvider);
@@ -499,6 +477,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
             endOffset: _selectedText!.length,
             selectedText: _selectedText!,
             color: Value(color),
+            decoration: Value(decoration.toDbValue()),
           ),
         );
     if (mounted) {
@@ -974,6 +953,72 @@ const List<_HighlightColor> _highlightColors = <_HighlightColor>[
   _HighlightColor(id: 'blue', name: 'Синий', value: Color(0xFF90CAF9)),
   _HighlightColor(id: 'pink', name: 'Розовый', value: Color(0xFFF48FB1)),
 ];
+
+const List<(HighlightDecoration, String)> _highlightDecorations =
+    <
+      (
+        HighlightDecoration,
+        String,
+      )
+    >[
+      (HighlightDecoration.none, 'Без стиля'),
+      (HighlightDecoration.underline, 'Подчёркивание'),
+      (HighlightDecoration.strikethrough, 'Зачёркивание'),
+    ];
+
+class _HighlightPickerSheet extends StatefulWidget {
+  @override
+  State<_HighlightPickerSheet> createState() => _HighlightPickerSheetState();
+}
+
+class _HighlightPickerSheetState extends State<_HighlightPickerSheet> {
+  HighlightDecoration _selectedDecoration = HighlightDecoration.none;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const ListTile(
+            leading: Icon(Icons.highlight),
+            title: Text('Цвет выделения'),
+            subtitle: Text('Выберите цвет и стиль для сохранения фрагмента'),
+          ),
+          for (final _HighlightColor color in _highlightColors)
+            Semantics(
+              label: 'Цвет выделения: ${color.name}',
+              button: true,
+              child: ExcludeSemantics(
+                child: ListTile(
+                  leading: CircleAvatar(backgroundColor: color.value),
+                  title: Text(color.name),
+                  onTap: () => Navigator.of(context).pop(
+                    (color, _selectedDecoration),
+                  ),
+                ),
+              ),
+            ),
+          const Divider(),
+          const ListTile(
+            leading: Icon(Icons.format_underline),
+            title: Text('Стиль выделения'),
+          ),
+          for (final (decoration, label) in _highlightDecorations)
+            ListTile(
+              leading: Icon(
+                _selectedDecoration == decoration
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_unchecked,
+              ),
+              title: Text(label),
+              onTap: () => setState(() => _selectedDecoration = decoration),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 const List<_SpeechLanguage> _speechLanguages = <_SpeechLanguage>[
   _SpeechLanguage(code: 'ru-RU', name: 'Русский'),

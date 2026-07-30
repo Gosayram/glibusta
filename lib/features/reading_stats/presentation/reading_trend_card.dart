@@ -20,6 +20,11 @@ class ReadingTrendChart extends StatelessWidget {
     final total = trend.fold<int>(0, (current, day) => current + day.minutes);
     final activeDays = trend.where((day) => day.minutes > 0).length;
     final activeDaysLabel = activeDays == 1 ? '1 активный день' : '$activeDays активных дней';
+    final totalHours = total ~/ 60;
+    final totalMins = total % 60;
+    final totalLabel = totalHours > 0
+        ? (totalMins > 0 ? '$totalHours ч $totalMins мин' : '$totalHours ч')
+        : '$total мин';
 
     return Semantics(
       label: 'Ритм чтения: $activeDaysLabel, $total минут за выбранный период',
@@ -27,12 +32,31 @@ class ReadingTrendChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Text(
+                  totalLabel,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '· $activeDays из ${trend.length} дней с чтением',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               height: 80,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: trend.map((day) {
                   final ratio = maximum == 0 ? 0.0 : day.minutes / maximum;
+                  final hasReading = day.minutes > 0;
                   return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -43,8 +67,12 @@ class ReadingTrendChart extends StatelessWidget {
                           widthFactor: 1,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(2)),
-                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(2),
+                              ),
+                              color: hasReading
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.surfaceContainerHighest,
                             ),
                           ),
                         ),
@@ -52,15 +80,6 @@ class ReadingTrendChart extends StatelessWidget {
                     ),
                   );
                 }).toList(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              activeDays == 0
-                  ? 'Пока нет чтения в выбранный период'
-                  : '$activeDays из ${trend.length} дней с чтением',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],

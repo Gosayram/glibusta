@@ -46,6 +46,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(theme: theme);
   }
 
+  void updateUiTheme(ReaderTheme? uiTheme) {
+    state = state.copyWith(uiTheme: uiTheme);
+  }
+
   void updateFontSize(double fontSize) {
     state = state.copyWith(fontSize: fontSize);
   }

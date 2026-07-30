@@ -182,8 +182,11 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         ),
         _buildPresetRow(settings, notifier),
         const SizedBox(height: 16),
-        const _SectionTitle('Тема'),
+        const _SectionTitle('Тема контента'),
         _buildThemeRow(context, settings, notifier),
+        const SizedBox(height: 8),
+        const _SectionTitle('Тема интерфейса'),
+        _buildUiThemeRow(context, settings, notifier),
         const SizedBox(height: 8),
         _buildColorPresetRow(context, ref, settings, notifier),
         const SizedBox(height: 12),
@@ -793,6 +796,99 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         );
       }).toList(),
+    );
+  }
+
+  static Widget _buildUiThemeRow(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isSynced = settings.uiTheme == null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              isSynced ? Icons.link : Icons.link_off,
+              size: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => notifier.updateUiTheme(isSynced ? settings.theme : null),
+              child: Text(
+                isSynced ? 'Синхронизировано с контентом' : 'Настроить отдельно',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Opacity(
+          opacity: isSynced ? 0.4 : 1.0,
+          child: IgnorePointer(
+            ignoring: isSynced,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ReaderTheme.values.map((theme) {
+                final current = settings.effectiveUiTheme;
+                final isSelected = current == theme;
+                final colors = ReaderColors.forThemeWithContext(theme, brightness);
+                final preview = colors.preview;
+                return Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: '${theme.displayName}. ${preview.semanticLabel}',
+                  hint: 'Двойное касание для выбора темы интерфейса.',
+                  excludeSemantics: true,
+                  child: Tooltip(
+                    message: '${theme.displayName}\n${preview.semanticLabel}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => notifier.updateUiTheme(theme),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: colors.scaffold,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Aa',
+                              style: TextStyle(
+                                color: colors.text,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

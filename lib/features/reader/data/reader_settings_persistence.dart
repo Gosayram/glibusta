@@ -174,6 +174,12 @@ class ReaderSettingsPersistence {
           orElse: () => ImageColorEffect.off,
         ),
         activeColorPresetId: map['activeColorPresetId'] as String? ?? 'blue_light',
+        uiTheme: map['uiTheme'] != null
+            ? ReaderTheme.values.firstWhere(
+                (e) => e.name == map['uiTheme'],
+                orElse: () => ReaderTheme.system,
+              )
+            : null,
       );
     } on Object catch (_) {
       return const ReaderSettings();
@@ -261,6 +267,7 @@ class ReaderSettingsPersistence {
         'imageWidth': settings.imageWidth,
         'imageColorEffect': settings.imageColorEffect.name,
         'activeColorPresetId': settings.activeColorPresetId,
+        if (settings.uiTheme != null) 'uiTheme': settings.uiTheme!.name,
       }),
     );
   }

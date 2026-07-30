@@ -246,6 +246,7 @@ class TextHighlights extends Table {
   IntColumn get endOffset => integer()();
   TextColumn get selectedText => text()();
   TextColumn get color => text().withDefault(const Constant('yellow'))();
+  TextColumn get decoration => text().withDefault(const Constant('none'))();
   TextColumn get noteText => text().nullable()();
   BoolColumn get isOrphaned => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();

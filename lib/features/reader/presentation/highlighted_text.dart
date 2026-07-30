@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
+import '../data/highlight_decoration.dart';
 
 /// A text widget that renders highlight overlays behind the text.
 ///
@@ -81,9 +82,39 @@ class _HighlightedTextState extends State<HighlightedText> {
   }
 
   Widget _buildText() {
-    return Text(
-      widget.text,
-      style: widget.style,
+    if (widget.highlights.isEmpty) {
+      return Text(
+        widget.text,
+        style: widget.style,
+        textAlign: widget.textAlign,
+      );
+    }
+
+    final spans = <TextSpan>[];
+    final sorted = List<TextHighlight>.of(widget.highlights)
+      ..sort((a, b) => a.startOffset.compareTo(b.startOffset));
+    var current = 0;
+    for (final h in sorted) {
+      final start = h.startOffset.clamp(0, widget.text.length);
+      final end = h.endOffset.clamp(start, widget.text.length);
+      if (start > current) {
+        spans.add(TextSpan(text: widget.text.substring(current, start), style: widget.style));
+      }
+      final deco = HighlightDecoration.fromDbValue(h.decoration);
+      spans.add(
+        TextSpan(
+          text: widget.text.substring(start, end),
+          style: widget.style.copyWith(decoration: deco.toTextDecoration()),
+        ),
+      );
+      current = end;
+    }
+    if (current < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(current), style: widget.style));
+    }
+
+    return Text.rich(
+      TextSpan(children: spans),
       textAlign: widget.textAlign,
     );
   }

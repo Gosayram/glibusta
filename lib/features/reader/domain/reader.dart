@@ -268,7 +268,12 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(false) bool ignoreBookAlignment,
     @Default(false) bool ignoreBookIndent,
     @Default(false) bool eink,
+    ReaderTheme? uiTheme,
   }) = _ReaderSettings;
+
+  const ReaderSettings._();
+
+  ReaderTheme get effectiveUiTheme => uiTheme ?? theme;
 }
 
 @freezed

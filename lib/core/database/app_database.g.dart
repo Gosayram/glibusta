@@ -7819,6 +7819,18 @@ class $TextHighlightsTable extends TextHighlights
     requiredDuringInsert: false,
     defaultValue: const Constant('yellow'),
   );
+  static const VerificationMeta _decorationMeta = const VerificationMeta(
+    'decoration',
+  );
+  @override
+  late final GeneratedColumn<String> decoration = GeneratedColumn<String>(
+    'decoration',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('none'),
+  );
   static const VerificationMeta _noteTextMeta = const VerificationMeta(
     'noteText',
   );
@@ -7879,6 +7891,7 @@ class $TextHighlightsTable extends TextHighlights
     endOffset,
     selectedText,
     color,
+    decoration,
     noteText,
     isOrphaned,
     createdAt,
@@ -7972,6 +7985,12 @@ class $TextHighlightsTable extends TextHighlights
         color.isAcceptableOrUnknown(data['color']!, _colorMeta),
       );
     }
+    if (data.containsKey('decoration')) {
+      context.handle(
+        _decorationMeta,
+        decoration.isAcceptableOrUnknown(data['decoration']!, _decorationMeta),
+      );
+    }
     if (data.containsKey('note_text')) {
       context.handle(
         _noteTextMeta,
@@ -8041,6 +8060,10 @@ class $TextHighlightsTable extends TextHighlights
         DriftSqlType.string,
         data['${effectivePrefix}color'],
       )!,
+      decoration: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}decoration'],
+      )!,
       noteText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note_text'],
@@ -8076,6 +8099,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
   final int endOffset;
   final String selectedText;
   final String color;
+  final String decoration;
   final String? noteText;
   final bool isOrphaned;
   final DateTime createdAt;
@@ -8090,6 +8114,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     required this.endOffset,
     required this.selectedText,
     required this.color,
+    required this.decoration,
     this.noteText,
     required this.isOrphaned,
     required this.createdAt,
@@ -8107,6 +8132,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     map['end_offset'] = Variable<int>(endOffset);
     map['selected_text'] = Variable<String>(selectedText);
     map['color'] = Variable<String>(color);
+    map['decoration'] = Variable<String>(decoration);
     if (!nullToAbsent || noteText != null) {
       map['note_text'] = Variable<String>(noteText);
     }
@@ -8129,6 +8155,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: Value(endOffset),
       selectedText: Value(selectedText),
       color: Value(color),
+      decoration: Value(decoration),
       noteText: noteText == null && nullToAbsent ? const Value.absent() : Value(noteText),
       isOrphaned: Value(isOrphaned),
       createdAt: Value(createdAt),
@@ -8151,6 +8178,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: serializer.fromJson<int>(json['endOffset']),
       selectedText: serializer.fromJson<String>(json['selectedText']),
       color: serializer.fromJson<String>(json['color']),
+      decoration: serializer.fromJson<String>(json['decoration']),
       noteText: serializer.fromJson<String?>(json['noteText']),
       isOrphaned: serializer.fromJson<bool>(json['isOrphaned']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -8170,6 +8198,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       'endOffset': serializer.toJson<int>(endOffset),
       'selectedText': serializer.toJson<String>(selectedText),
       'color': serializer.toJson<String>(color),
+      'decoration': serializer.toJson<String>(decoration),
       'noteText': serializer.toJson<String?>(noteText),
       'isOrphaned': serializer.toJson<bool>(isOrphaned),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -8187,6 +8216,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     int? endOffset,
     String? selectedText,
     String? color,
+    String? decoration,
     Value<String?> noteText = const Value.absent(),
     bool? isOrphaned,
     DateTime? createdAt,
@@ -8201,6 +8231,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     endOffset: endOffset ?? this.endOffset,
     selectedText: selectedText ?? this.selectedText,
     color: color ?? this.color,
+    decoration: decoration ?? this.decoration,
     noteText: noteText.present ? noteText.value : this.noteText,
     isOrphaned: isOrphaned ?? this.isOrphaned,
     createdAt: createdAt ?? this.createdAt,
@@ -8217,6 +8248,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: data.endOffset.present ? data.endOffset.value : this.endOffset,
       selectedText: data.selectedText.present ? data.selectedText.value : this.selectedText,
       color: data.color.present ? data.color.value : this.color,
+      decoration: data.decoration.present ? data.decoration.value : this.decoration,
       noteText: data.noteText.present ? data.noteText.value : this.noteText,
       isOrphaned: data.isOrphaned.present ? data.isOrphaned.value : this.isOrphaned,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -8236,6 +8268,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
           ..write('endOffset: $endOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('color: $color, ')
+          ..write('decoration: $decoration, ')
           ..write('noteText: $noteText, ')
           ..write('isOrphaned: $isOrphaned, ')
           ..write('createdAt: $createdAt, ')
@@ -8255,6 +8288,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     endOffset,
     selectedText,
     color,
+    decoration,
     noteText,
     isOrphaned,
     createdAt,
@@ -8273,6 +8307,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
           other.endOffset == this.endOffset &&
           other.selectedText == this.selectedText &&
           other.color == this.color &&
+          other.decoration == this.decoration &&
           other.noteText == this.noteText &&
           other.isOrphaned == this.isOrphaned &&
           other.createdAt == this.createdAt &&
@@ -8289,6 +8324,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
   final Value<int> endOffset;
   final Value<String> selectedText;
   final Value<String> color;
+  final Value<String> decoration;
   final Value<String?> noteText;
   final Value<bool> isOrphaned;
   final Value<DateTime> createdAt;
@@ -8304,6 +8340,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     this.endOffset = const Value.absent(),
     this.selectedText = const Value.absent(),
     this.color = const Value.absent(),
+    this.decoration = const Value.absent(),
     this.noteText = const Value.absent(),
     this.isOrphaned = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8320,6 +8357,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     required int endOffset,
     required String selectedText,
     this.color = const Value.absent(),
+    this.decoration = const Value.absent(),
     this.noteText = const Value.absent(),
     this.isOrphaned = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8343,6 +8381,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     Expression<int>? endOffset,
     Expression<String>? selectedText,
     Expression<String>? color,
+    Expression<String>? decoration,
     Expression<String>? noteText,
     Expression<bool>? isOrphaned,
     Expression<DateTime>? createdAt,
@@ -8359,6 +8398,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
       if (endOffset != null) 'end_offset': endOffset,
       if (selectedText != null) 'selected_text': selectedText,
       if (color != null) 'color': color,
+      if (decoration != null) 'decoration': decoration,
       if (noteText != null) 'note_text': noteText,
       if (isOrphaned != null) 'is_orphaned': isOrphaned,
       if (createdAt != null) 'created_at': createdAt,
@@ -8377,6 +8417,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     Value<int>? endOffset,
     Value<String>? selectedText,
     Value<String>? color,
+    Value<String>? decoration,
     Value<String?>? noteText,
     Value<bool>? isOrphaned,
     Value<DateTime>? createdAt,
@@ -8393,6 +8434,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
       endOffset: endOffset ?? this.endOffset,
       selectedText: selectedText ?? this.selectedText,
       color: color ?? this.color,
+      decoration: decoration ?? this.decoration,
       noteText: noteText ?? this.noteText,
       isOrphaned: isOrphaned ?? this.isOrphaned,
       createdAt: createdAt ?? this.createdAt,
@@ -8431,6 +8473,9 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
+    if (decoration.present) {
+      map['decoration'] = Variable<String>(decoration.value);
+    }
     if (noteText.present) {
       map['note_text'] = Variable<String>(noteText.value);
     }
@@ -8461,6 +8506,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
           ..write('endOffset: $endOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('color: $color, ')
+          ..write('decoration: $decoration, ')
           ..write('noteText: $noteText, ')
           ..write('isOrphaned: $isOrphaned, ')
           ..write('createdAt: $createdAt, ')
@@ -12609,6 +12655,7 @@ typedef $$TextHighlightsTableCreateCompanionBuilder =
       required int endOffset,
       required String selectedText,
       Value<String> color,
+      Value<String> decoration,
       Value<String?> noteText,
       Value<bool> isOrphaned,
       Value<DateTime> createdAt,
@@ -12626,6 +12673,7 @@ typedef $$TextHighlightsTableUpdateCompanionBuilder =
       Value<int> endOffset,
       Value<String> selectedText,
       Value<String> color,
+      Value<String> decoration,
       Value<String?> noteText,
       Value<bool> isOrphaned,
       Value<DateTime> createdAt,
@@ -12683,6 +12731,11 @@ class $$TextHighlightsTableFilterComposer extends Composer<_$AppDatabase, $TextH
 
   ColumnFilters<String> get color => $composableBuilder(
     column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get decoration => $composableBuilder(
+    column: $table.decoration,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12760,6 +12813,11 @@ class $$TextHighlightsTableOrderingComposer extends Composer<_$AppDatabase, $Tex
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get decoration => $composableBuilder(
+    column: $table.decoration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get noteText => $composableBuilder(
     column: $table.noteText,
     builder: (column) => ColumnOrderings(column),
@@ -12825,6 +12883,11 @@ class $$TextHighlightsTableAnnotationComposer
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
 
+  GeneratedColumn<String> get decoration => $composableBuilder(
+    column: $table.decoration,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get noteText =>
       $composableBuilder(column: $table.noteText, builder: (column) => column);
 
@@ -12882,6 +12945,7 @@ class $$TextHighlightsTableTableManager
                 Value<int> endOffset = const Value.absent(),
                 Value<String> selectedText = const Value.absent(),
                 Value<String> color = const Value.absent(),
+                Value<String> decoration = const Value.absent(),
                 Value<String?> noteText = const Value.absent(),
                 Value<bool> isOrphaned = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12897,6 +12961,7 @@ class $$TextHighlightsTableTableManager
                 endOffset: endOffset,
                 selectedText: selectedText,
                 color: color,
+                decoration: decoration,
                 noteText: noteText,
                 isOrphaned: isOrphaned,
                 createdAt: createdAt,
@@ -12914,6 +12979,7 @@ class $$TextHighlightsTableTableManager
                 required int endOffset,
                 required String selectedText,
                 Value<String> color = const Value.absent(),
+                Value<String> decoration = const Value.absent(),
                 Value<String?> noteText = const Value.absent(),
                 Value<bool> isOrphaned = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12929,6 +12995,7 @@ class $$TextHighlightsTableTableManager
                 endOffset: endOffset,
                 selectedText: selectedText,
                 color: color,
+                decoration: decoration,
                 noteText: noteText,
                 isOrphaned: isOrphaned,
                 createdAt: createdAt,

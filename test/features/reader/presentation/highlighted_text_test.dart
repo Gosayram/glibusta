@@ -15,6 +15,7 @@ void main() {
       endOffset: 5,
       selectedText: 'فارسی',
       color: 'yellow',
+      decoration: 'none',
       isOrphaned: false,
       createdAt: DateTime.utc(2026),
     );
@@ -65,6 +66,7 @@ void main() {
       endOffset: start + 'نه'.length,
       selectedText: 'نه',
       color: 'yellow',
+      decoration: 'none',
       isOrphaned: false,
       createdAt: DateTime.utc(2026),
     );
