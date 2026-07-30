@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -85,10 +86,12 @@ class ReaderState {
     this.isDynamicallyLoading = false,
     List<double> checkpoints = const [],
     this.wpm = 200,
-  }) : loadedChapters = identical(loadedChapters, _emptyMap) || loadedChapters is UnmodifiableMapView
-          ? loadedChapters
-          : Map.unmodifiable(loadedChapters),
-       checkpoints = checkpoints.isEmpty ? checkpoints : List.unmodifiable(checkpoints),
+  }) : loadedChapters = loadedChapters is UnmodifiableMapView
+           ? loadedChapters
+           : Map.unmodifiable(loadedChapters),
+       checkpoints = checkpoints is UnmodifiableListView
+           ? checkpoints
+           : List.unmodifiable(checkpoints),
        currentPosition = currentPosition ?? ReaderPosition.initial;
 
   bool get isLoading => loadingStage != null;

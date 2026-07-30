@@ -945,7 +945,7 @@ pub fn parse_mobi(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         description: metadata
             .description
             .map(|s| s.to_string())
-            .or(Some(description_for(&header))),
+            .or_else(|| Some(description_for(&header))),
         cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),

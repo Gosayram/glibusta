@@ -111,8 +111,8 @@ void callbackDispatcher() {
     AppLogger().info('Background sync task: $task', name: 'Sync');
     try {
       final connector = GlibustaSyncConnector();
-      final adapter = PowerSyncAdapter(connector: connector);
-      final bridge = SyncBridge(adapter: adapter);
+      final adapter = PowerSyncAdapter();
+      final bridge = SyncBridge(adapter);
       final service = SyncService(
         powersyncAdapter: adapter,
         connector: connector,
