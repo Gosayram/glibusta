@@ -170,6 +170,7 @@ final class ReaderController {
   final AppLogger _logger;
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
+  final _scrollDebouncer = Debouncer(delay: const Duration(milliseconds: 50));
   final _sessionStopwatch = Stopwatch();
   int _accumulatedSeconds = 0;
   int _sessionWordsRead = 0;
@@ -201,6 +202,7 @@ final class ReaderController {
     _linkHistory.clear();
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
+    _scrollDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
@@ -553,8 +555,10 @@ final class ReaderController {
     if (maxScroll > 0) {
       final progress = _scrollController!.offset / maxScroll;
       final boundedProgress = progress.clamp(0.0, 1.0);
-      _updateState(_state.copyWith(scrollProgress: boundedProgress));
-      _updatePositionFromScroll(boundedProgress);
+      _scrollDebouncer.call(() {
+        _updateState(_state.copyWith(scrollProgress: boundedProgress));
+        _updatePositionFromScroll(boundedProgress);
+      });
       _progressDebouncer.call(saveProgress);
 
       // Hide bars on fast scroll

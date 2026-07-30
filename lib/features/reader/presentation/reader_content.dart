@@ -614,7 +614,12 @@ Widget _buildChapterTitle(
   );
 }
 
-Widget _buildCoverPage(String coverUrl, ReaderSettings settings, TextStyle baseStyle) {
+Widget _buildCoverPage(
+  String coverUrl,
+  ReaderSettings settings,
+  TextStyle baseStyle,
+  BuildContext context,
+) {
   return SizedBox.expand(
     child: Center(
       child: Padding(
@@ -624,6 +629,7 @@ Widget _buildCoverPage(String coverUrl, ReaderSettings settings, TextStyle baseS
           baseStyle.color,
           settings,
           semanticLabel: 'Обложка книги',
+          context: context,
         ),
       ),
     ),
@@ -905,14 +911,19 @@ Widget _readerImageWidget(
   ReaderSettings settings, {
   List<String> allImages = const [],
   String? semanticLabel,
+  BuildContext? context,
 }) {
   final colorFilter = _imageColorFilter(settings);
   final uri = Uri.tryParse(imageUrl);
-  // A malformed data URI must not fall through to Image.file, which would turn
-  // an invalid comic page into a bogus filesystem path instead of the fallback.
   final isDataUri = imageUrl.toLowerCase().startsWith('data:');
   final isFileUri = uri != null && uri.scheme == 'file';
   final isPlainPath = uri == null || !uri.isAbsolute;
+
+  int? cacheDimension(double maxDisplaySize) {
+    final ctx = context;
+    if (ctx == null) return null;
+    return (maxDisplaySize * MediaQuery.devicePixelRatioOf(ctx)).round();
+  }
 
   Widget wrap(Widget img) {
     final filtered = colorFilter != null
@@ -952,6 +963,8 @@ Widget _readerImageWidget(
           child: Image.memory(
             bytes,
             fit: BoxFit.contain,
+            cacheWidth: cacheDimension(600),
+            cacheHeight: cacheDimension(800),
             errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
           ),
         ),
@@ -981,6 +994,8 @@ Widget _readerImageWidget(
             : Image.file(
                 File(path),
                 fit: BoxFit.contain,
+                cacheWidth: cacheDimension(600),
+                cacheHeight: cacheDimension(800),
                 errorBuilder: (ctx, e, s) => Icon(Icons.broken_image, size: 64, color: errorColor),
               ),
       ),
@@ -1209,6 +1224,8 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
           return Image.memory(
             base64Decode(data.last),
             fit: fit,
+            cacheWidth: (600 * MediaQuery.devicePixelRatioOf(context)).round(),
+            cacheHeight: (800 * MediaQuery.devicePixelRatioOf(context)).round(),
             errorBuilder: (_, _, _) => const Icon(
               Icons.broken_image,
               size: 64,
@@ -1224,6 +1241,8 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
       return Image.file(
         File(isFileUri ? uri.path : imageUrl),
         fit: fit,
+        cacheWidth: (600 * MediaQuery.devicePixelRatioOf(context)).round(),
+        cacheHeight: (800 * MediaQuery.devicePixelRatioOf(context)).round(),
         errorBuilder: (_, _, _) => const Icon(
           Icons.broken_image,
           size: 64,
@@ -1636,6 +1655,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                             widget.metadata.coverUrl!,
                             settings,
                             _getReaderStyle(settings),
+                            context,
                           );
                         }
                         final chapterIndex = index - (hasCover ? 1 : 0);
@@ -2424,7 +2444,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             context,
             bookTextDirection: _bookTextDirection(widget.metadata),
           ),
-          child: _buildCoverPage(widget.metadata.coverUrl!, settings, style),
+          child: _buildCoverPage(widget.metadata.coverUrl!, settings, style, context),
         ),
       );
     }
@@ -2973,6 +2993,7 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
   }
 
   Widget _loadImage(String url, BoxFit fit) {
+    final dims = _imageDimensions;
     final uri = Uri.tryParse(url);
     if (uri != null && uri.scheme == 'data') {
       final separator = url.indexOf(',');
@@ -2981,6 +3002,8 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
           return Image.memory(
             base64Decode(url.substring(separator + 1)),
             fit: fit,
+            cacheWidth: dims.width,
+            cacheHeight: dims.height,
             errorBuilder: (_, _, _) => const Icon(
               Icons.broken_image,
               size: 64,
@@ -2996,6 +3019,8 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
       return Image.file(
         File(uri.path),
         fit: fit,
+        cacheWidth: dims.width,
+        cacheHeight: dims.height,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 64, color: Colors.white),
       );
     }
@@ -3003,14 +3028,30 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
       return Image.file(
         File(url),
         fit: fit,
+        cacheWidth: dims.width,
+        cacheHeight: dims.height,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 64, color: Colors.white),
       );
     }
     return const Icon(Icons.broken_image, size: 64, color: Colors.white);
   }
+
+  _ImageDimensions get _imageDimensions {
+    final width = MediaQuery.sizeOf(context).width;
+    return _ImageDimensions(
+      width: (width * MediaQuery.devicePixelRatioOf(context)).round(),
+      height: (width * MediaQuery.devicePixelRatioOf(context) * 1.5).round(),
+    );
+  }
 }
 
-// LW-3.1/3.2: RSVP speed-reading mode — one word at a time
+class _ImageDimensions {
+  final int width;
+  final int height;
+  const _ImageDimensions({required this.width, required this.height});
+}
+
+// LW-3.1: speed-reading mode — one word at a time
 class _RsvpModeBody extends StatefulWidget {
   const _RsvpModeBody({
     required this.metadata,
