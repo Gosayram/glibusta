@@ -263,7 +263,7 @@ class FlibustaApiClient {
       }
     }
 
-    // Description: find h2 "Аннотация:" and collect only <p> siblings
+    // Description: find h2 "Аннотация:" and collect <p> and <div> siblings
     String description = '';
     for (final h2 in doc.querySelectorAll('h2')) {
       if (h2.text.contains('Аннотация')) {
@@ -271,7 +271,7 @@ class FlibustaApiClient {
         Element? sibling = h2.nextElementSibling;
         while (sibling != null) {
           if (sibling.localName == 'h2') break;
-          if (sibling.localName == 'p') {
+          if (sibling.localName == 'p' || sibling.localName == 'div') {
             final text = sibling.text.trim();
             if (text.isNotEmpty) parts.add(text);
           }
@@ -366,7 +366,7 @@ class FlibustaApiClient {
     final seenFormats = <String>{};
     for (final a in doc.querySelectorAll('a[href^="/b/$bookId/"]')) {
       final href = a.attributes['href'] ?? '';
-      final fmtMatch = RegExp(r'/b/\d+/(\w+)$').firstMatch(href);
+      final fmtMatch = RegExp(r'/b/\d+/(\w+)').firstMatch(href);
       if (fmtMatch != null) {
         final fmt = fmtMatch.group(1)!;
         if (fmt == 'read' || fmt == 'download' || fmt == 'mail' || fmt == 'complain') continue;

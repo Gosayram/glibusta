@@ -261,10 +261,14 @@ class FlibustaHtmlSource extends BookSource {
     for (final h2 in document.querySelectorAll('h2')) {
       if (h2.text.contains('Аннотация')) {
         final parts = <String>[];
-        Element? sibling = h2.nextElementSibling;
-        while (sibling != null && sibling.localName != 'h2') {
-          parts.add(sibling.text.trim());
-          sibling = sibling.nextElementSibling;
+        for (
+          var sibling = h2.nextElementSibling;
+          sibling != null && sibling.localName != 'h2';
+          sibling = sibling.nextElementSibling
+        ) {
+          if (sibling.localName == 'p' || sibling.localName == 'div') {
+            parts.add(sibling.text.trim());
+          }
         }
         description = parts.join(' ');
         break;
