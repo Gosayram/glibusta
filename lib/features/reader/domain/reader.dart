@@ -194,6 +194,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderMode.paginated) ReaderMode mode,
     @Default(false) bool twoPageEnabled,
     @Default(18.0) double fontSize,
+    double? noteFontSize,
     @Default(1.6) double lineHeight,
     @Default(20.0) double margin,
     @Default(20.0) double marginTop,

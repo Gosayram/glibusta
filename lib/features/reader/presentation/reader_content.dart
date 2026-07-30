@@ -490,13 +490,14 @@ Widget _buildReaderBlock(
     case BlockType.footnote:
       // RCE-9.4: footnote with tappable style — context unavailable here,
       // bottom sheet requires plumbing BuildContext through _buildReaderBlock.
+      final noteFontSize = s.noteFontSize ?? s.fontSize;
       return Padding(
         padding: EdgeInsets.symmetric(vertical: s.paragraphSpacing / 2),
         child: _readerHighlightedText(
           ctx,
           block.text,
           style.copyWith(
-            fontSize: s.fontSize * 0.85,
+            fontSize: noteFontSize * 0.85,
             color: ctx.colors.footnote,
             decoration: TextDecoration.underline,
           ),
@@ -1475,6 +1476,7 @@ class ReaderContentBody extends StatefulWidget {
     this.onLinkTap,
     this.onPageChanged,
     this.onFocusPositionChanged,
+    this.onChapterPositionsChanged,
   });
 
   final NormalizedBookMetadata metadata;
@@ -1492,6 +1494,7 @@ class ReaderContentBody extends StatefulWidget {
   final ValueChanged<String>? onLinkTap;
   final ValueChanged<int>? onPageChanged;
   final void Function(int chapterIndex, int paragraphIndex)? onFocusPositionChanged;
+  final ValueChanged<List<double>>? onChapterPositionsChanged;
 
   @override
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
@@ -1499,11 +1502,55 @@ class ReaderContentBody extends StatefulWidget {
 
 class _ReaderContentBodyState extends State<ReaderContentBody> {
   bool _didScrollToProgress = false;
+  // LITHIUM-READ-005: chapter position measurement for viewport-based detection
+  List<GlobalKey> _chapterKeys = const [];
+  bool _scheduledMeasurement = false;
 
   bool _isFixedLayout() {
     final meta = widget.metadata.metadata;
     if (meta == null) return false;
     return meta['isFixedLayout'] == true || meta['rendition:layout'] == 'pre-paginated';
+  }
+
+  // LITHIUM-READ-005: chapter position measurement for viewport-based detection
+  void _ensureChapterKeys(int itemCount) {
+    if (_chapterKeys.length != itemCount) {
+      _chapterKeys = List<GlobalKey>.generate(itemCount, (_) => GlobalKey());
+    }
+  }
+
+  void _scheduleMeasurement() {
+    if (_scheduledMeasurement) return;
+    _scheduledMeasurement = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scheduledMeasurement = false;
+      _measureAndReportPositions();
+    });
+  }
+
+  void _measureAndReportPositions() {
+    if (!mounted || widget.settings.mode != ReaderMode.continuous) return;
+    final knownHeights = <int, double>{};
+    for (var i = 0; i < _chapterKeys.length; i++) {
+      final key = _chapterKeys[i];
+      final renderObject = key.currentContext?.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        knownHeights[i] = renderObject.size.height;
+      }
+    }
+    if (knownHeights.isEmpty) return;
+    var averageHeight = 0.0;
+    for (final h in knownHeights.values) {
+      averageHeight += h;
+    }
+    averageHeight /= knownHeights.length;
+    final positions = <double>[];
+    var cumulative = 0.0;
+    for (var i = 0; i < _chapterKeys.length; i++) {
+      positions.add(cumulative);
+      cumulative += knownHeights[i] ?? averageHeight;
+    }
+    widget.onChapterPositionsChanged?.call(positions);
   }
 
   @override
@@ -1605,6 +1652,10 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
 
     final itemCount = widget.metadata.chapterCount + (hasCover ? 1 : 0);
 
+    // LITHIUM-READ-005: prepare keys and schedule position measurement
+    _ensureChapterKeys(itemCount);
+    _scheduleMeasurement();
+
     return SafeArea(
       top: false,
       bottom: false,
@@ -1666,7 +1717,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                             : '';
                         final dividerStyle = _getReaderStyle(settings);
                         return Column(
-                          key: ValueKey('chapter-$chapterIndex'),
+                          key: _chapterKeys[index],
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (chapter != null)
@@ -2309,7 +2360,15 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         }
         return imgHeight;
       case BlockType.footnote:
-        return _measureBlockHeight(block, settings, colors, width) + ps;
+        final noteFs = settings.noteFontSize ?? settings.fontSize;
+        return _measureBlockHeight(
+              block,
+              settings,
+              colors,
+              width,
+              fontScale: noteFs / settings.fontSize,
+            ) +
+            ps;
       case BlockType.table:
         final rows = block.tableRows?.length ?? 0;
         return (rows * settings.fontSize * settings.lineHeight * 1.3) + ps * 2 + 16;
@@ -2419,6 +2478,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       return 0.95;
     }
     if (block.type == BlockType.footnote) return 0.85;
+
     if (block.type == BlockType.textAuthor) return 0.9;
     if (block.type == BlockType.preformatted) {
       return 0.9;

@@ -192,6 +192,171 @@ void main() {
     expect(service.queries, ['recent query']);
     expect((tester.widget<TextField>(find.byType(TextField))).controller!.text, 'recent query');
   });
+
+  testWidgets('prev/next buttons hidden when no results', (tester) async {
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byTooltip('Предыдущее совпадение'), findsNothing);
+    expect(find.byTooltip('Следующее совпадение'), findsNothing);
+  });
+
+  testWidgets('prev/next buttons appear with match counter after search', (tester) async {
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'hello',
+      const [
+        _SearchResult('match one'),
+        _SearchResult('match two'),
+        _SearchResult('match three'),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('Предыдущее совпадение'), findsOneWidget);
+    expect(find.byTooltip('Следующее совпадение'), findsOneWidget);
+    expect(find.text('1/3'), findsOneWidget);
+  });
+
+  testWidgets('next button advances match index and calls onJumpToResult', (tester) async {
+    final service = _ControlledSearchService();
+    final jumped = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, matchIndex) => jumped.add(matchIndex),
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'word');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'word',
+      const [
+        _SearchResult('first', paragraphIndex: 10),
+        _SearchResult('second', chapterIndex: 1, paragraphIndex: 5),
+        _SearchResult('third', chapterIndex: 2),
+      ],
+    );
+    await tester.pump();
+
+    expect(find.text('1/3'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Следующее совпадение'));
+    await tester.pump();
+    expect(find.text('2/3'), findsOneWidget);
+    expect(jumped, [1]);
+
+    await tester.tap(find.byTooltip('Следующее совпадение'));
+    await tester.pump();
+    expect(find.text('3/3'), findsOneWidget);
+    expect(jumped, [1, 2]);
+  });
+
+  testWidgets('prev button decrements match index', (tester) async {
+    final service = _ControlledSearchService();
+    final jumped = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, matchIndex) => jumped.add(matchIndex),
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'word');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'word',
+      const [
+        _SearchResult('first'),
+        _SearchResult('second'),
+        _SearchResult('third'),
+      ],
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Предыдущее совпадение'));
+    await tester.pump();
+    expect(find.text('3/3'), findsOneWidget);
+    expect(jumped, [2]);
+  });
+
+  testWidgets('next wraps around from last to first', (tester) async {
+    final service = _ControlledSearchService();
+    final jumped = <int>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, matchIndex) => jumped.add(matchIndex),
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'x');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'x',
+      const [_SearchResult('a'), _SearchResult('b')],
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Следующее совпадение'));
+    await tester.pump();
+    expect(find.text('2/2'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Следующее совпадение'));
+    await tester.pump();
+    expect(find.text('1/2'), findsOneWidget);
+    expect(jumped, [1, 0]);
+  });
 }
 
 const _emptyBook = NormalizedBook(id: 'test', title: 'Test', authors: []);
@@ -228,9 +393,9 @@ class _SearchResult extends BookSearchResult {
     String text, {
     super.beforeContext = '',
     super.afterContext = '',
+    super.chapterIndex = 0,
+    super.paragraphIndex = 0,
   }) : super(
-         chapterIndex: 0,
-         paragraphIndex: 0,
          chapterTitle: 'Chapter',
          matchText: text,
        );

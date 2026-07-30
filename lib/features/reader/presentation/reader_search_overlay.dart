@@ -41,6 +41,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   final _focusNode = FocusNode();
   final _debounce = _SearchDebounce();
   List<BookSearchResult> _results = [];
+  int _selectedMatchIndex = 0;
   bool _hasSearched = false;
   bool _isSearching = false;
   bool _searchCurrentChapter = false;
@@ -182,8 +183,25 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
     if (!mounted || requestId != _searchRequestId) return;
     setState(() {
       _results = results;
+      _selectedMatchIndex = 0;
       _isSearching = false;
     });
+  }
+
+  void _goToNextMatch() {
+    if (_results.isEmpty) return;
+    setState(() {
+      _selectedMatchIndex = (_selectedMatchIndex + 1) % _results.length;
+    });
+    _jumpToResult(_results[_selectedMatchIndex]);
+  }
+
+  void _goToPrevMatch() {
+    if (_results.isEmpty) return;
+    setState(() {
+      _selectedMatchIndex = (_selectedMatchIndex - 1 + _results.length) % _results.length;
+    });
+    _jumpToResult(_results[_selectedMatchIndex]);
   }
 
   @override
@@ -226,6 +244,25 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                       onSubmitted: _submitQuery,
                     ),
                   ),
+                  if (_results.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+                      color: textColor,
+                      tooltip: 'Предыдущее совпадение',
+                      onPressed: _goToPrevMatch,
+                    ),
+                  if (_results.isNotEmpty)
+                    Text(
+                      '${_selectedMatchIndex + 1}/${_results.length}',
+                      style: TextStyle(color: textColor, fontSize: 12),
+                    ),
+                  if (_results.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+                      color: textColor,
+                      tooltip: 'Следующее совпадение',
+                      onPressed: _goToNextMatch,
+                    ),
                   if (_controller.text.isNotEmpty)
                     IconButton(
                       icon: const Icon(Icons.clear),

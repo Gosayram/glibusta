@@ -50,6 +50,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(fontSize: fontSize);
   }
 
+  void updateNoteFontSize(double? fontSize) {
+    state = state.copyWith(noteFontSize: fontSize);
+  }
+
   void updateMode(ReaderMode mode) {
     state = state.copyWith(mode: mode);
   }
@@ -150,6 +154,7 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   void resetTypography() {
     state = state.copyWith(
       fontSize: 18,
+      noteFontSize: null,
       lineHeight: 1.6,
       margin: 20,
       marginTop: 20,

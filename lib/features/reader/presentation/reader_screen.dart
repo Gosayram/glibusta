@@ -1308,6 +1308,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 onLinkTap: (href) => _handleLinkTap(href, readerState),
                 onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
                 onFocusPositionChanged: _ctrl.handleFocusPositionChanged,
+                onChapterPositionsChanged: (positions) => _ctrl.setChapterPositions(positions),
               ),
             ),
           ),

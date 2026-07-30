@@ -194,6 +194,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Размер шрифта'),
         _buildFontSizeRow(settings, notifier),
         const SizedBox(height: 12),
+        const _SectionTitle('Размер шрифта заметок'),
+        _buildNoteFontSizeRow(settings, notifier),
+        const SizedBox(height: 12),
         const _SectionTitle('Толщина шрифта'),
         _buildFontWeightRow(settings, notifier),
         const SizedBox(height: 12),
@@ -1153,6 +1156,54 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildNoteFontSizeRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final effectiveNoteFontSize = settings.noteFontSize ?? settings.fontSize;
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.remove, size: 20),
+          onPressed: effectiveNoteFontSize > 10
+              ? () => notifier.updateNoteFontSize(effectiveNoteFontSize - 1)
+              : null,
+        ),
+        Expanded(
+          child: Slider(
+            value: effectiveNoteFontSize,
+            min: 10,
+            max: 40,
+            divisions: 30,
+            label: '${effectiveNoteFontSize.round()}px',
+            semanticFormatterCallback: (value) =>
+                'Размер шрифта заметок ${value.round()} пунктов, от 10 до 40 пунктов',
+            onChanged: (v) => notifier.updateNoteFontSize(v),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add, size: 20),
+          onPressed: effectiveNoteFontSize < 40
+              ? () => notifier.updateNoteFontSize(effectiveNoteFontSize + 1)
+              : null,
+        ),
+        SizedBox(
+          width: 40,
+          child: Text(
+            settings.noteFontSize != null ? '${effectiveNoteFontSize.round()}' : 'Авто',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.restart_alt, size: 18),
+          tooltip: 'Сбросить к размеру основного шрифта',
+          onPressed: settings.noteFontSize != null ? () => notifier.updateNoteFontSize(null) : null,
         ),
       ],
     );

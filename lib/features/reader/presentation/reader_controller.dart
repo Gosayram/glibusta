@@ -195,6 +195,7 @@ final class ReaderController {
   String _cacheMode = 'unknown';
   double _lastScrollOffset = 0;
   final _linkHistory = ReaderLinkHistory();
+  List<double> _chapterPositions = const [];
 
   late final ReaderContentHelper _content;
   late final ReaderProgressHelper _progress;
@@ -205,6 +206,7 @@ final class ReaderController {
   void dispose() {
     _loadGeneration++;
     _linkHistory.clear();
+    _chapterPositions = const [];
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
     _scrollDebouncer.dispose();
@@ -276,6 +278,7 @@ final class ReaderController {
     _sessionWordsRead = 0;
     _estimatedTotalWords = 0;
     _cacheMode = 'unknown';
+    _chapterPositions = const [];
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _autoThemeTimer = null;
@@ -554,6 +557,32 @@ final class ReaderController {
     return _scrollController!;
   }
 
+  /// LITHIUM-READ-005: update cached chapter positions from the content body.
+  void setChapterPositions(List<double> positions) {
+    _chapterPositions = positions;
+  }
+
+  /// LITHIUM-READ-005: resolves the chapter at the top of the viewport using
+  /// cumulative chapter offsets reported by the content body during build.
+  static int resolveChapterAtViewportTop({
+    required double scrollOffset,
+    required List<double> chapterPositions,
+    required int totalChapters,
+  }) {
+    if (chapterPositions.isEmpty || totalChapters <= 0) return 0;
+    var low = 0;
+    var high = chapterPositions.length - 1;
+    while (low < high) {
+      final mid = (low + high + 1) ~/ 2;
+      if (chapterPositions[mid] <= scrollOffset) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return low.clamp(0, totalChapters - 1);
+  }
+
   void _onScroll() {
     if (_scrollController == null || !_scrollController!.hasClients) return;
     final maxScroll = _scrollController!.position.maxScrollExtent;
@@ -579,7 +608,14 @@ final class ReaderController {
 
       if (!_state.isLoading && _state.chapterCount > 0) {
         final total = _state.chapterCount;
-        final chapterIndex = (boundedProgress * (total - 1)).round();
+        // LITHIUM-READ-005: viewport-based chapter detection when positions available
+        final chapterIndex = _chapterPositions.isNotEmpty
+            ? resolveChapterAtViewportTop(
+                scrollOffset: _scrollController!.offset,
+                chapterPositions: _chapterPositions,
+                totalChapters: total,
+              )
+            : (boundedProgress * (total - 1)).round();
         _chapterLoadDebouncer.call(() {
           if (_disposed) return;
           unawaited(_ensureChaptersLoaded(chapterIndex));
@@ -629,9 +665,21 @@ final class ReaderController {
       chapterCount: total,
       loadedChapters: _state.loadedChapters,
     );
+    // LITHIUM-READ-005: viewport-based chapter detection in continuous mode
+    var chapterIndex = estimate.chapterIndex;
+    if (effectiveMode == ReaderMode.continuous &&
+        _chapterPositions.isNotEmpty &&
+        _scrollController != null &&
+        _scrollController!.hasClients) {
+      chapterIndex = resolveChapterAtViewportTop(
+        scrollOffset: _scrollController!.offset,
+        chapterPositions: _chapterPositions,
+        totalChapters: total,
+      );
+    }
     return ReaderPosition(
       bookId: _bookId,
-      chapterIndex: estimate.chapterIndex,
+      chapterIndex: chapterIndex,
       paragraphIndex: estimate.paragraphIndex,
       localOffset: progress * 100.0,
       progressPercent: progress,
