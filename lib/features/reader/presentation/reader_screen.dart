@@ -888,8 +888,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     required Widget content,
   }) {
     final isFocusMode = settings.mode == ReaderMode.focus;
+    final gradient = _backgroundStyleGradient(settings);
     return Stack(
       children: [
+        if (gradient != null)
+          Positioned.fill(
+            child: DecoratedBox(decoration: BoxDecoration(gradient: gradient)),
+          ),
         content,
         // HG-6.4: spinner overlay during layout recalculation
         if (_isRelayouting)
@@ -1406,6 +1411,32 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       scaffoldBackgroundColor: chromeColors.scaffold,
       textTheme: base.textTheme.apply(bodyColor: chromeColors.text),
     );
+  }
+
+  Gradient? _backgroundStyleGradient(ReaderSettings settings) {
+    return switch (settings.backgroundStyle) {
+      BackgroundStyle.solid => null,
+      BackgroundStyle.paper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x0AF5F0E6), Color(0x12F0EBE0)],
+      ),
+      BackgroundStyle.parchment => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x15D4BC94), Color(0x1AE8D5B7)],
+      ),
+      BackgroundStyle.darkPaper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x082A2725), Color(0x0C1E1C1A)],
+      ),
+      BackgroundStyle.warmSepia => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x12E0D0A8), Color(0x18F0E0C0)],
+      ),
+    };
   }
 
   Widget _buildReadingInfoBar(

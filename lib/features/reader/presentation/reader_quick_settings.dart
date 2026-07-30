@@ -190,6 +190,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const SizedBox(height: 8),
         _buildColorPresetRow(context, ref, settings, notifier),
         const SizedBox(height: 12),
+        const _SectionTitle('Текстура фона'),
+        _buildBackgroundStyleRow(context, settings, notifier),
+        const SizedBox(height: 12),
         _buildToggleRow(
           'E-ink режим',
           Icons.auto_awesome,
@@ -797,6 +800,93 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         );
       }).toList(),
     );
+  }
+
+  static Widget _buildBackgroundStyleRow(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: BackgroundStyle.values.map((style) {
+        final isSelected = settings.backgroundStyle == style;
+        final preview = _backgroundStylePreview(style);
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: style.displayName,
+          hint: 'Двойное касание для выбора текстуры фона.',
+          excludeSemantics: true,
+          child: Tooltip(
+            message: style.displayName,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => notifier.updateBackgroundStyle(style),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: preview,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Aa',
+                      style: TextStyle(
+                        color:
+                            settings.theme == ReaderTheme.dark ||
+                                settings.theme == ReaderTheme.oled ||
+                                settings.theme == ReaderTheme.bedtime
+                            ? Colors.white70
+                            : Colors.black54,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  static Gradient? _backgroundStylePreview(BackgroundStyle style) {
+    return switch (style) {
+      BackgroundStyle.solid => null,
+      BackgroundStyle.paper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF8F4EC), Color(0xFFF0EBE0)],
+      ),
+      BackgroundStyle.parchment => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFE8D5B7), Color(0xFFD4BC94)],
+      ),
+      BackgroundStyle.darkPaper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF2A2725), Color(0xFF1E1C1A)],
+      ),
+      BackgroundStyle.warmSepia => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF0E0C0), Color(0xFFE0D0A8)],
+      ),
+    };
   }
 
   static Widget _buildUiThemeRow(

@@ -431,6 +431,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     }
   }
 
+  void updateBackgroundStyle(BackgroundStyle value) {
+    state = state.copyWith(backgroundStyle: value);
+  }
+
   void applyProfile(ReaderSettings profile) {
     // A per-book profile is the effective configuration for the current
     // session. It must not replace the reader's global defaults in

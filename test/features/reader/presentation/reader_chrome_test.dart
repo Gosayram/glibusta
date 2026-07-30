@@ -250,6 +250,175 @@ void main() {
     expect(find.text('Введите число от 0 до 100'), findsOneWidget);
     expect(jumps, 0);
   });
+
+  testWidgets('jumps to boundary value 0', (tester) async {
+    double? jumpedTo;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 3,
+            scrollProgress: 0.5,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (value) => jumpedTo = value,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '0');
+    await tester.tap(find.text('Перейти'));
+    await tester.pumpAndSettle();
+
+    expect(jumpedTo, 0.0);
+  });
+
+  testWidgets('jumps to boundary value 100', (tester) async {
+    double? jumpedTo;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 3,
+            scrollProgress: 0.5,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (value) => jumpedTo = value,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '100');
+    await tester.tap(find.text('Перейти'));
+    await tester.pumpAndSettle();
+
+    expect(jumpedTo, 1.0);
+  });
+
+  testWidgets('does not jump on non-numeric input', (tester) async {
+    var jumps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 1,
+            scrollProgress: 0,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) => jumps++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'abc');
+    await tester.tap(find.text('Перейти'));
+    await tester.pump();
+
+    expect(find.text('Введите число от 0 до 100'), findsOneWidget);
+    expect(jumps, 0);
+  });
+
+  testWidgets('cancel dismisses dialog without jumping', (tester) async {
+    var jumps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 1,
+            scrollProgress: 0.5,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) => jumps++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    expect(find.text('Отмена'), findsOneWidget);
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsNothing);
+    expect(jumps, 0);
+  });
+
+  testWidgets('dialog shows current percentage as initial value', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 3,
+            scrollProgress: 0.73,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller?.text,
+      '73',
+    );
+  });
+
+  testWidgets('negative value is rejected', (tester) async {
+    var jumps = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: const ReaderSettings(),
+            currentChapterIndex: 0,
+            totalChapters: 1,
+            scrollProgress: 0,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+            onJumpToProgress: (_) => jumps++,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Перейти к проценту'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '-5');
+    await tester.tap(find.text('Перейти'));
+    await tester.pump();
+
+    expect(find.text('Введите число от 0 до 100'), findsOneWidget);
+    expect(jumps, 0);
+  });
 }
 
 void _noOp() {}

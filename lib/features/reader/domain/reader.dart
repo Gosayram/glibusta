@@ -158,6 +158,17 @@ enum ImageAlignment { start, center, end }
 
 enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
 
+enum BackgroundStyle {
+  solid('Плоский'),
+  paper('Бумага'),
+  parchment('Пергамент'),
+  darkPaper('Тёмная бумага'),
+  warmSepia('Тёплая сепия');
+
+  const BackgroundStyle(this.displayName);
+  final String displayName;
+}
+
 enum ParagraphIndentMode {
   asInBook('Как в книге'),
   firstLine('Первая строка'),
@@ -268,6 +279,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(false) bool ignoreBookAlignment,
     @Default(false) bool ignoreBookIndent,
     @Default(false) bool eink,
+    @Default(BackgroundStyle.solid) BackgroundStyle backgroundStyle,
     ReaderTheme? uiTheme,
   }) = _ReaderSettings;
 
