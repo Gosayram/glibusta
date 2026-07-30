@@ -31,6 +31,7 @@ class ReaderSettingsPersistence {
         marginLeft: (map['marginLeft'] as num?)?.toDouble() ?? 20.0,
         marginRight: (map['marginRight'] as num?)?.toDouble() ?? 20.0,
         separateMargins: map['separateMargins'] as bool? ?? false,
+        marginAsPercent: map['marginAsPercent'] as bool? ?? false,
         font: ReaderFont.values.firstWhere(
           (e) => e.name == map['font'],
           orElse: () => ReaderFont.literata,
@@ -195,6 +196,7 @@ class ReaderSettingsPersistence {
         'marginLeft': settings.marginLeft,
         'marginRight': settings.marginRight,
         'separateMargins': settings.separateMargins,
+        'marginAsPercent': settings.marginAsPercent,
         'font': settings.font.name,
         'paragraphSpacing': settings.paragraphSpacing,
         'letterSpacing': settings.letterSpacing,

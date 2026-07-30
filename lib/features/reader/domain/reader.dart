@@ -201,6 +201,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(20.0) double marginLeft,
     @Default(20.0) double marginRight,
     @Default(false) bool separateMargins,
+    @Default(false) bool marginAsPercent,
     @Default(ReaderFont.literata) ReaderFont font,
     @Default(20.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,

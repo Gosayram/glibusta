@@ -139,16 +139,24 @@ double _headingSpacing(double ps, int level) => switch (level) {
   _ => ps * 1.5,
 };
 
-EdgeInsets _effectiveMargin(ReaderSettings s, ReaderMode mode) {
+/// Converts a stored margin value to px. When [marginAsPercent] is true,
+/// the value is interpreted as a percentage of [screenWidth].
+double _resolveMargin(double value, bool marginAsPercent, double screenWidth) {
+  if (marginAsPercent && screenWidth > 0) return screenWidth * (value / 100);
+  return value;
+}
+
+EdgeInsets _effectiveMargin(ReaderSettings s, ReaderMode mode, {double screenWidth = 0}) {
+  final pct = s.marginAsPercent;
   if (s.separateMargins) {
     return EdgeInsets.only(
-      top: s.marginTop,
-      bottom: s.marginBottom,
-      left: s.marginLeft,
-      right: s.marginRight,
+      top: _resolveMargin(s.marginTop, pct, screenWidth),
+      bottom: _resolveMargin(s.marginBottom, pct, screenWidth),
+      left: _resolveMargin(s.marginLeft, pct, screenWidth),
+      right: _resolveMargin(s.marginRight, pct, screenWidth),
     );
   }
-  return EdgeInsets.all(s.margin);
+  return EdgeInsets.all(_resolveMargin(s.margin, pct, screenWidth));
 }
 
 class ReaderCtx {
@@ -1547,7 +1555,11 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       );
     }
 
-    final effectiveMargin = _effectiveMargin(settings, settings.mode);
+    final effectiveMargin = _effectiveMargin(
+      settings,
+      settings.mode,
+      screenWidth: MediaQuery.sizeOf(context).width,
+    );
     final textDirection = _readerTextDirection(
       settings.textDirection,
       context,
@@ -2486,7 +2498,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
           bookTextDirection: _bookTextDirection(widget.metadata),
         ),
         child: Padding(
-          padding: _effectiveMargin(settings, settings.mode),
+          padding: _effectiveMargin(
+            settings,
+            settings.mode,
+            screenWidth: MediaQuery.sizeOf(context).width,
+          ),
           // Blocks are deliberately kept intact by the paginator. When one
           // exceeds a small viewport, retain the page boundary and make its
           // remainder reachable instead of overflowing the PageView.
@@ -2561,7 +2577,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final layoutMargin = _effectiveMargin(widget.settings, widget.settings.mode);
+        final layoutMargin = _effectiveMargin(
+          widget.settings,
+          widget.settings.mode,
+          screenWidth: constraints.maxWidth,
+        );
         // The page body applies this Padding at render time, so pagination
         // must measure the child constraints after the same inset.
         final availableHeight = constraints.maxHeight - layoutMargin.vertical;

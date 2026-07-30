@@ -97,6 +97,7 @@ ReaderSettings mergeReaderSettings(ReaderSettings global, Map<String, dynamic> o
     marginLeft: _doubleOverride(overrides, 'marginLeft', global.marginLeft),
     marginRight: _doubleOverride(overrides, 'marginRight', global.marginRight),
     separateMargins: _boolOverride(overrides, 'separateMargins', global.separateMargins),
+    marginAsPercent: _boolOverride(overrides, 'marginAsPercent', global.marginAsPercent),
     font: _enumOverride(overrides, 'font', ReaderFont.values, global.font),
     paragraphSpacing: _doubleOverride(overrides, 'paragraphSpacing', global.paragraphSpacing),
     letterSpacing: _doubleOverride(overrides, 'letterSpacing', global.letterSpacing),

@@ -82,6 +82,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(separateMargins: enabled);
   }
 
+  void updateMarginAsPercent(bool enabled) {
+    state = state.copyWith(marginAsPercent: enabled);
+  }
+
   void updateMarginTop(double value) {
     state = state.copyWith(marginTop: value);
   }

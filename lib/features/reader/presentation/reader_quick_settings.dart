@@ -200,6 +200,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Межстрочный'),
         _buildLineHeightRow(settings, notifier),
         const SizedBox(height: 12),
+        const _SectionTitle('Выравнивание'),
+        _buildTextAlignRow(settings, notifier),
+        const SizedBox(height: 12),
         const _SectionTitle('Межбуквенный интервал'),
         _buildSliderRow(
           'Шаг',
@@ -1197,11 +1200,40 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
+  Widget _buildTextAlignRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const aligns = ReaderTextAlign.values;
+    const labels = {
+      ReaderTextAlign.left: 'Слева',
+      ReaderTextAlign.justify: 'По ширине',
+      ReaderTextAlign.center: 'Центр',
+      ReaderTextAlign.right: 'Справа',
+      ReaderTextAlign.asInBook: 'Как в книге',
+    };
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: aligns.map((align) {
+        return ChoiceChip(
+          label: Text(labels[align] ?? align.name),
+          selected: settings.textAlign == align,
+          onSelected: (_) => notifier.updateTextAlign(align),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildMarginRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
   ) {
-    const values = [8.0, 12.0, 16.0, 20.0, 24.0, 32.0];
+    final pct = settings.marginAsPercent;
+    const pxValues = [8.0, 12.0, 16.0, 20.0, 24.0, 32.0];
+    const pctValues = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0];
+    final values = pct ? pctValues : pxValues;
+    final unit = pct ? '%' : '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1211,7 +1243,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             children: values.map((v) {
               final isSelected = (settings.margin - v).abs() < 0.5;
               return ChoiceChip(
-                label: Text('${v.round()}'),
+                label: Text('${v.round()}$unit'),
                 selected: isSelected,
                 onSelected: (_) => notifier.updateMargin(v),
               );
@@ -1229,11 +1261,23 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                settings.separateMargins ? 'Раздельные отступы' : 'Раздельные отступы',
+                'Раздельные отступы',
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                 ),
+              ),
+            ),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('px')),
+                ButtonSegment(value: true, label: Text('%')),
+              ],
+              selected: {pct},
+              onSelectionChanged: (s) => notifier.updateMarginAsPercent(s.first),
+              style: const ButtonStyle(
+                visualDensity: VisualDensity(horizontal: -3, vertical: -3),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ],
