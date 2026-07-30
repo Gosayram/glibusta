@@ -316,7 +316,10 @@ final class ReaderController {
 
       // MD-11.4: auto dark theme for manga/comics
       if (!_isActiveLoad(loadGeneration)) return;
-      _autoMangaTheme(meta);
+      final settings = _ref.read(readerSettingsProvider);
+      if (!settings.eink) {
+        _autoMangaTheme(meta);
+      }
 
       // MD-11.3: auto font by genre
       unawaited(_autoGenreFont(_bookId));
@@ -343,7 +346,6 @@ final class ReaderController {
       _sessionStopwatch.start();
       _updateState(_state.copyWith(clearLoadingStage: true, clearError: true));
 
-      final settings = _ref.read(readerSettingsProvider);
       final loadedWords = _content.computeTotalWords(_state.loadedChapters);
       _sessionWordsRead = loadedWords;
       final loadedCount = _state.loadedChapters.length;
@@ -370,10 +372,12 @@ final class ReaderController {
       if (settings.restoreLastPosition && savedPosition.progressPercent > 0) {
         _restoreSavedPosition(savedPosition);
       }
-      _autoThemeTimer = Timer.periodic(
-        AppDuration.autoThemeCheck,
-        (_) => _checkAutoTheme(),
-      );
+      if (!settings.eink) {
+        _autoThemeTimer = Timer.periodic(
+          AppDuration.autoThemeCheck,
+          (_) => _checkAutoTheme(),
+        );
+      }
       if (settings.mode == ReaderMode.focus) {
         hideUi();
       } else {
@@ -597,7 +601,7 @@ final class ReaderController {
 
       // Hide bars on fast scroll
       final settings = _ref.read(readerSettingsProvider);
-      if (settings.hideBarsOnFastScroll && _state.uiVisible) {
+      if (settings.hideBarsOnFastScroll && !settings.eink && _state.uiVisible) {
         final currentOffset = _scrollController!.offset;
         final delta = (currentOffset - _lastScrollOffset).abs();
         _lastScrollOffset = currentOffset;

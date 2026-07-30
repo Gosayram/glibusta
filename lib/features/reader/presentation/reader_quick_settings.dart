@@ -186,6 +186,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildThemeRow(context, settings, notifier),
         const SizedBox(height: 8),
         _buildColorPresetRow(context, ref, settings, notifier),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'E-ink режим',
+          Icons.auto_awesome,
+          settings.eink,
+          (v) => notifier.updateEink(v),
+        ),
         const SizedBox(height: 16),
         const _SectionTitle('Шрифт'),
         _buildFontRow(settings, notifier),

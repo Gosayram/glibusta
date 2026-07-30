@@ -65,6 +65,21 @@ List<TocEntry> buildTocHierarchy(List<String> titles) {
   }).toList();
 }
 
+const _maxTitleLength = 80;
+
+String _truncateTitle(String title) {
+  if (title.length <= _maxTitleLength) return title;
+  return '${title.substring(0, _maxTitleLength - 1)}\u2026';
+}
+
+String _chapterFallbackTitle(List<String> chapterTitles, int chapterIndex) {
+  if (chapterIndex < chapterTitles.length) {
+    final t = chapterTitles[chapterIndex].trim();
+    if (t.isNotEmpty) return _truncateTitle(t);
+  }
+  return 'Глава ${chapterIndex + 1}';
+}
+
 List<TocEntry> buildTocFromHeadings(
   List<String> chapterTitles,
   Map<int, ReaderChapter> loadedChapters,
@@ -86,6 +101,8 @@ List<TocEntry> buildTocFromHeadings(
   }
   if (allHeadings.isEmpty) return buildTocHierarchy(chapterTitles);
 
+  final minLevel = allHeadings.map((h) => h.level).reduce((a, b) => a < b ? a : b);
+
   final items = <TocEntry>[];
   var currentChapter = -1;
 
@@ -93,9 +110,7 @@ List<TocEntry> buildTocFromHeadings(
     final h = allHeadings[i];
     if (h.chapterIndex != currentChapter) {
       currentChapter = h.chapterIndex;
-      final chTitle = currentChapter < chapterTitles.length
-          ? chapterTitles[currentChapter]
-          : 'Глава ${currentChapter + 1}';
+      final chTitle = _chapterFallbackTitle(chapterTitles, currentChapter);
       items.add(
         TocEntry(
           index: currentChapter,
@@ -109,8 +124,8 @@ List<TocEntry> buildTocFromHeadings(
     items.add(
       TocEntry(
         index: currentChapter,
-        title: h.title,
-        depth: h.level,
+        title: _truncateTitle(h.title),
+        depth: h.level - minLevel + 1,
         isGroup: false,
         groupId: currentChapter,
       ),

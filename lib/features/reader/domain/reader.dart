@@ -267,6 +267,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(300) int rsvpWpm,
     @Default(false) bool ignoreBookAlignment,
     @Default(false) bool ignoreBookIndent,
+    @Default(false) bool eink,
   }) = _ReaderSettings;
 }
 

@@ -743,11 +743,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Widget _buildForState(BuildContext context, ReaderState readerState) {
     final settings = ref.watch(readerSettingsProvider);
     final theme = _getThemeData(settings);
+    final themeTransition = settings.eink ? Duration.zero : AppDuration.readerThemeTransition;
 
     if (readerState.isLoading) {
       return AnimatedTheme(
         data: theme,
-        duration: AppDuration.readerThemeTransition,
+        duration: themeTransition,
         curve: Curves.easeOutCubic,
         child: Scaffold(
           body: Center(
@@ -795,7 +796,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (!readerState.isLoading && readerState.metadata != null && readerState.chapterCount == 0) {
       return AnimatedTheme(
         data: theme,
-        duration: AppDuration.readerThemeTransition,
+        duration: themeTransition,
         curve: Curves.easeOutCubic,
         child: Scaffold(
           appBar: AppBar(title: const Text('Читалка')),
@@ -831,7 +832,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _checkBookFinished(readerState);
     return AnimatedTheme(
       data: theme,
-      duration: AppDuration.readerThemeTransition,
+      duration: themeTransition,
       curve: Curves.easeOutCubic,
       child: PopScope(
         canPop: false,

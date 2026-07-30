@@ -415,6 +415,18 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(activeColorPresetId: value);
   }
 
+  void updateEink(bool value) {
+    state = state.copyWith(eink: value);
+    if (value) {
+      state = state.copyWith(
+        theme: ReaderTheme.light,
+        autoThemeMode: AutoThemeMode.off,
+        hideBarsOnFastScroll: false,
+        pageTurnAnimation: PageTurnAnimation.none,
+      );
+    }
+  }
+
   void applyProfile(ReaderSettings profile) {
     // A per-book profile is the effective configuration for the current
     // session. It must not replace the reader's global defaults in
