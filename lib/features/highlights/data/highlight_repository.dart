@@ -8,6 +8,14 @@ import '../../../core/database/daos/highlight_dao.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/utils/monotonic_id.dart';
 
+class HighlightValidationException implements Exception {
+  HighlightValidationException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'HighlightValidationException: $message';
+}
+
 class HighlightRepository {
   HighlightRepository(this._db);
   final AppDatabase _db;
@@ -17,6 +25,34 @@ class HighlightRepository {
   String computeChapterId(String title) {
     final bytes = utf8.encode(title.trim().toLowerCase());
     return sha256.convert(bytes).toString().substring(0, 16);
+  }
+
+  static void validateHighlight({
+    required String bookId,
+    required String selectedText,
+    required int chapterIndex,
+    required int blockIndex,
+    required int startOffset,
+    required int endOffset,
+  }) {
+    if (bookId.isEmpty) {
+      throw HighlightValidationException('bookId must not be empty');
+    }
+    if (selectedText.trim().isEmpty) {
+      throw HighlightValidationException('selectedText must not be empty');
+    }
+    if (chapterIndex < 0) {
+      throw HighlightValidationException('chapterIndex must be >= 0');
+    }
+    if (blockIndex < 0) {
+      throw HighlightValidationException('blockIndex must be >= 0');
+    }
+    if (startOffset < 0) {
+      throw HighlightValidationException('startOffset must be >= 0');
+    }
+    if (endOffset < startOffset) {
+      throw HighlightValidationException('endOffset must be >= startOffset');
+    }
   }
 
   Future<int> saveHighlight({
@@ -29,22 +65,34 @@ class HighlightRepository {
     required String selectedText,
     required String color,
     String? noteText,
+    String? decoration,
   }) async {
-    final id = '$bookId-${newMonotonicId()}';
-    return _dao.insertHighlight(
-      TextHighlightsCompanion.insert(
-        id: id,
-        bookId: bookId,
-        chapterId: chapterId,
-        chapterIndex: chapterIndex,
-        blockIndex: blockIndex,
-        startOffset: startOffset,
-        endOffset: endOffset,
-        selectedText: selectedText,
-        color: Value(color),
-        noteText: Value(noteText),
-      ),
+    validateHighlight(
+      bookId: bookId,
+      selectedText: selectedText,
+      chapterIndex: chapterIndex,
+      blockIndex: blockIndex,
+      startOffset: startOffset,
+      endOffset: endOffset,
     );
+    final id = '$bookId-${newMonotonicId()}';
+    return _db.transaction(() async {
+      return _dao.insertHighlight(
+        TextHighlightsCompanion.insert(
+          id: id,
+          bookId: bookId,
+          chapterId: chapterId,
+          chapterIndex: chapterIndex,
+          blockIndex: blockIndex,
+          startOffset: startOffset,
+          endOffset: endOffset,
+          selectedText: selectedText,
+          color: Value(color),
+          noteText: Value(noteText),
+          decoration: Value(decoration ?? 'none'),
+        ),
+      );
+    });
   }
 
   Future<void> updateNote(String highlightId, String noteText) async {

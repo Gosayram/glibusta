@@ -732,6 +732,7 @@ fn push_rtf_paragraph(
             note_id: pending_note_id.take(),
             page_break_before: false,
             page_break_inside_avoid: false,
+            has_drop_cap: false,
         });
         *block_index += 1;
     }
@@ -787,6 +788,7 @@ fn flush_rtf_table(
         note_id: None,
         page_break_before: false,
         page_break_inside_avoid: false,
+        has_drop_cap: false,
     });
     *block_index += 1;
 }
@@ -833,6 +835,7 @@ fn push_rtf_picture(blocks: &mut Vec<ReaderBlock>, block_index: &mut i32, pictur
         note_id: None,
         page_break_before: false,
         page_break_inside_avoid: false,
+        has_drop_cap: false,
     });
     *block_index += 1;
 }

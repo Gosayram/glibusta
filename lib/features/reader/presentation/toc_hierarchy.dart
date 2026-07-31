@@ -7,6 +7,7 @@ class TocEntry {
   final bool isGroup;
   final int groupId;
   final String? anchor;
+  final int blockIndex;
 
   const TocEntry({
     required this.index,
@@ -15,6 +16,7 @@ class TocEntry {
     required this.isGroup,
     required this.groupId,
     this.anchor,
+    this.blockIndex = 0,
   });
 }
 
@@ -181,6 +183,19 @@ List<TocEntry> buildTocFromHeadings(
         ),
       );
     }
+    final chapter = loadedChapters[currentChapter];
+    var blockIdx = 0;
+    if (chapter != null) {
+      for (var b = 0; b < chapter.blocks.length; b++) {
+        final block = chapter.blocks[b];
+        if (block.type == BlockType.heading &&
+            block.headingLevel == h.level &&
+            block.text.trim() == h.title) {
+          blockIdx = b;
+          break;
+        }
+      }
+    }
     items.add(
       TocEntry(
         index: currentChapter,
@@ -188,6 +203,7 @@ List<TocEntry> buildTocFromHeadings(
         depth: h.level - minLevel + 1,
         isGroup: false,
         groupId: currentChapter,
+        blockIndex: blockIdx,
       ),
     );
   }

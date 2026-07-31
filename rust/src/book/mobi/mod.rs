@@ -326,6 +326,7 @@ impl MobiTextExtractor {
                 note_id: None,
                 page_break_before: false,
                 page_break_inside_avoid: false,
+                has_drop_cap: false,
             });
             idx += 1;
         }
@@ -347,6 +348,7 @@ impl MobiTextExtractor {
                 note_id: None,
                 page_break_before: false,
                 page_break_inside_avoid: false,
+                has_drop_cap: false,
             });
         }
         blocks

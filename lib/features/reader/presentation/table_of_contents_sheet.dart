@@ -377,7 +377,7 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
                     chapterIndex: entry.index,
                   );
                   final targetChapter = resolved?.chapterIndex ?? entry.index;
-                  final targetParagraph = resolved?.paragraphIndex ?? 0;
+                  final targetParagraph = resolved?.paragraphIndex ?? entry.blockIndex;
                   final progress = widget.metadata.chapterCount <= 1
                       ? 0.0
                       : targetChapter / (widget.metadata.chapterCount - 1);

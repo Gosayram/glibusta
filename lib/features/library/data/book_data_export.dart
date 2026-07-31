@@ -69,6 +69,128 @@ String buildBookExportHtmlFilename(String bookId) {
   return 'glibusta_export_${bookId}_$ts.html';
 }
 
+String buildBookExportTxtFilename(String bookId) {
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  return 'glibusta_export_${bookId}_$ts.txt';
+}
+
+String buildBookExportMdFilename(String bookId) {
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  return 'glibusta_export_${bookId}_$ts.md';
+}
+
+String buildBookExportTxt({
+  required String bookTitle,
+  required List<TextHighlight> highlights,
+  required List<Bookmark> bookmarks,
+  required List<Note> notes,
+}) {
+  final buf = StringBuffer()
+    ..writeln('Экспорт данных: $bookTitle')
+    ..writeln('=' * 32)
+    ..writeln();
+
+  if (highlights.isNotEmpty) {
+    buf
+      ..writeln('ВЫДЕЛЕНИЯ')
+      ..writeln('-' * 9);
+    for (final h in highlights) {
+      buf
+        ..writeln('${h.color} | Стр. ${h.chapterIndex + 1} | ${h.createdAt.toIso8601String()}')
+        ..writeln('"${h.selectedText}"');
+      if (h.noteText != null && h.noteText!.trim().isNotEmpty) {
+        buf.writeln('Заметка: ${h.noteText}');
+      }
+      buf.writeln();
+    }
+  }
+
+  if (bookmarks.isNotEmpty) {
+    buf
+      ..writeln('ЗАКЛАДКИ')
+      ..writeln('-' * 9);
+    for (final b in bookmarks) {
+      buf.writeln('Стр. ${b.chapterIndex + 1} | ${b.createdAt.toIso8601String()}');
+      if (b.selectedText != null && b.selectedText!.trim().isNotEmpty) {
+        buf.writeln('Текст: ${b.selectedText}');
+      }
+      buf.writeln();
+    }
+  }
+
+  if (notes.isNotEmpty) {
+    buf
+      ..writeln('ЗАМЕТКИ')
+      ..writeln('-' * 8);
+    for (final n in notes) {
+      buf
+        ..writeln('Стр. ${n.chapterIndex + 1} | ${n.createdAt.toIso8601String()}')
+        ..writeln(n.content)
+        ..writeln();
+    }
+  }
+
+  return buf.toString();
+}
+
+String buildBookExportMarkdown({
+  required String bookTitle,
+  required List<TextHighlight> highlights,
+  required List<Bookmark> bookmarks,
+  required List<Note> notes,
+}) {
+  final buf = StringBuffer()
+    ..writeln('# Экспорт данных: $bookTitle')
+    ..writeln();
+
+  if (highlights.isNotEmpty) {
+    buf.writeln('## Выделения');
+    for (final h in highlights) {
+      buf
+        ..writeln()
+        ..writeln(
+          '- **${h.color}** | Стр. ${h.chapterIndex + 1} | '
+          '${h.createdAt.toIso8601String()}',
+        )
+        ..writeln('> "${h.selectedText}"');
+      if (h.noteText != null && h.noteText!.trim().isNotEmpty) {
+        buf.writeln('*Заметка: ${h.noteText}*');
+      }
+    }
+    buf.writeln();
+  }
+
+  if (bookmarks.isNotEmpty) {
+    buf.writeln('## Закладки');
+    for (final b in bookmarks) {
+      buf
+        ..writeln()
+        ..writeln(
+          '- Стр. ${b.chapterIndex + 1} | ${b.createdAt.toIso8601String()}',
+        );
+      if (b.selectedText != null && b.selectedText!.trim().isNotEmpty) {
+        buf.writeln('> ${b.selectedText}');
+      }
+    }
+    buf.writeln();
+  }
+
+  if (notes.isNotEmpty) {
+    buf.writeln('## Заметки');
+    for (final n in notes) {
+      buf
+        ..writeln()
+        ..writeln(
+          '- Стр. ${n.chapterIndex + 1} | ${n.createdAt.toIso8601String()}',
+        )
+        ..writeln(n.content);
+    }
+    buf.writeln();
+  }
+
+  return buf.toString();
+}
+
 String buildBookExportHtml({
   required String bookTitle,
   required List<TextHighlight> highlights,

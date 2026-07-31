@@ -394,6 +394,8 @@ pub struct ReaderBlock {
     pub page_break_before: bool,
     #[serde(default)]
     pub page_break_inside_avoid: bool,
+    #[serde(default)]
+    pub has_drop_cap: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -829,6 +831,7 @@ mod book_diff_tests {
                     note_id: None,
                     page_break_before: false,
                     page_break_inside_avoid: false,
+                    has_drop_cap: false,
                 }],
             }],
             metadata: None,
@@ -909,6 +912,7 @@ mod book_diff_tests {
             note_id: None,
             page_break_before: false,
             page_break_inside_avoid: false,
+            has_drop_cap: false,
         });
 
         let diff = BookDiff::compute(&old, &new);

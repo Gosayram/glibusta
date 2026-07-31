@@ -87,6 +87,37 @@ final class ReaderProgressHelper {
     );
   }
 
+  void savePosition(ReaderPosition position) {
+    final pos = position.copyWith(bookId: _bookId, updatedAt: DateTime.now());
+    unawaited(
+      _database.bookDao
+          .upsertReadingProgress(
+            ReadingProgressCompanion.insert(
+              bookId: _bookId,
+              currentPosition: Value(pos.chapterIndex),
+              chapterIndex: Value(pos.chapterIndex),
+              paragraphIndex: Value(pos.paragraphIndex),
+              localOffset: Value(pos.localOffset),
+              progressPercent: Value(pos.progressPercent),
+              chapterId: Value(pos.chapterId),
+              textOffset: Value(pos.textOffset),
+              lastRead: Value(pos.updatedAt),
+              updatedAt: Value(pos.updatedAt),
+            ),
+          )
+          .then(
+            (_) {},
+            onError: (Object e) {
+              _logger.warning(
+                'Failed to save reading position for $_bookId: $e',
+                name: 'Reader',
+                error: e,
+              );
+            },
+          ),
+    );
+  }
+
   Future<void> deleteProgress() async {
     await (_database.delete(
       _database.readingProgress,

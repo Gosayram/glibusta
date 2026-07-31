@@ -13,6 +13,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/utils/monotonic_id.dart';
+import '../../highlights/data/highlight_repository.dart';
+import '../../highlights/presentation/highlight_providers.dart';
 import '../data/dictionary_lookup_history.dart';
 import '../data/dictionary_lookup_preview.dart';
 import '../data/dictionary_lookup_source.dart';
@@ -502,23 +504,22 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   Future<void> _addHighlight(String color, HighlightDecoration decoration) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
 
-    final db = ref.read(databaseProvider);
-    await db
-        .into(db.textHighlights)
-        .insert(
-          TextHighlightsCompanion.insert(
-            id: '${widget.bookId}-${newMonotonicId()}',
-            bookId: widget.bookId,
-            chapterId: widget.chapterIndex.toString(),
-            chapterIndex: widget.chapterIndex,
-            blockIndex: widget.paragraphIndex,
-            startOffset: 0,
-            endOffset: _selectedText!.length,
-            selectedText: _selectedText!,
-            color: Value(color),
-            decoration: Value(decoration.toDbValue()),
-          ),
-        );
+    final repo = ref.read(highlightRepositoryProvider);
+    try {
+      await repo.saveHighlight(
+        bookId: widget.bookId,
+        chapterId: widget.chapterIndex.toString(),
+        chapterIndex: widget.chapterIndex,
+        blockIndex: widget.paragraphIndex,
+        startOffset: 0,
+        endOffset: _selectedText!.length,
+        selectedText: _selectedText!,
+        color: color,
+        decoration: decoration.toDbValue(),
+      );
+    } on HighlightValidationException {
+      return;
+    }
     if (mounted) {
       unawaited(SmartDialog.showToast('Текст выделен'));
     }

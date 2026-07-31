@@ -14,6 +14,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../core/utils/debouncer.dart';
 import '../../../core/utils/monotonic_id.dart';
+import '../../highlights/data/highlight_repository.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
@@ -36,6 +37,9 @@ enum ReaderErrorKind {
   parserTimeout('Превышено время ожидания', Icons.hourglass_empty),
   cacheCorrupted('Повреждённый кеш', Icons.broken_image_outlined),
   invalidEncoding('Ошибка кодировки', Icons.text_fields),
+  corruptFile('Файл повреждён', Icons.broken_image_outlined),
+  missingContent('Отсутствует содержимое', Icons.article_outlined),
+  emptyBook('Пустая книга', Icons.menu_book_outlined),
   unknown('Ошибка открытия книги', Icons.error_outline);
 
   const ReaderErrorKind(this.defaultTitle, this.icon);
@@ -218,12 +222,13 @@ final class ReaderController {
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
+  bool _isLoadingNextChapter = false;
   double _lastScrollOffset = 0;
   final _linkHistory = ReaderLinkHistory();
   List<double> _chapterPositions = const [];
 
   late final ReaderContentHelper _content;
-  late final ReaderProgressHelper _progress;
+  ReaderProgressHelper? _progress;
 
   ReaderState get state => _state;
   Stream<ReaderState> get stateStream => _stateController.stream;
@@ -240,7 +245,7 @@ final class ReaderController {
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _flushSessionTime();
-    saveProgress();
+    savePosition();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
     _disposed = true;
@@ -350,7 +355,7 @@ final class ReaderController {
       unawaited(_autoGenreFont(_bookId));
 
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
-      final savedPosition = await _progress.loadSavedPosition(meta.chapterCount);
+      final savedPosition = await _progress!.loadSavedPosition(meta.chapterCount);
       if (!_isActiveLoad(loadGeneration)) return;
 
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.loadingChapters));
@@ -361,6 +366,19 @@ final class ReaderController {
           clearHighlight: true,
         ),
       );
+
+      if (meta.chapterCount == 0) {
+        if (!_isActiveLoad(loadGeneration)) return;
+        _updateState(
+          _state.copyWith(
+            clearLoadingStage: true,
+            errorKind: ReaderErrorKind.emptyBook,
+            errorMessage: BookOpenError.emptyBook.userMessage,
+          ),
+        );
+        return;
+      }
+
       _scrollController?.removeListener(_onScroll);
       _scrollController?.dispose();
       _scrollController = ScrollController()..addListener(_onScroll);
@@ -439,9 +457,19 @@ final class ReaderController {
     ParserTimeoutFailure() => ReaderErrorKind.parserTimeout,
     CacheCorruptedFailure() => ReaderErrorKind.cacheCorrupted,
     InvalidEncodingFailure() => ReaderErrorKind.invalidEncoding,
+    CorruptFileFailure() => ReaderErrorKind.corruptFile,
+    MissingContentFailure() => ReaderErrorKind.missingContent,
     TimeoutException() => ReaderErrorKind.parserTimeout,
     _ => ReaderErrorKind.unknown,
   };
+
+  static String _userFriendlyMessage(Object error, ReaderErrorKind kind) {
+    return switch (error) {
+      CorruptFileFailure() => BookOpenError.corruptFile.userMessage,
+      MissingContentFailure() => BookOpenError.missingContent.userMessage,
+      _ => error.toString(),
+    };
+  }
 
   Future<void> _handleLoadError(Object e, {required int loadGeneration}) async {
     final errorKind = _classifyError(e);
@@ -476,7 +504,7 @@ final class ReaderController {
       _state.copyWith(
         clearLoadingStage: true,
         errorKind: errorKind,
-        errorMessage: e.toString(),
+        errorMessage: _userFriendlyMessage(e, errorKind),
         errorFilePath: filePath,
         errorFormat: format,
         errorFileSize: fileSize,
@@ -568,9 +596,44 @@ final class ReaderController {
   }
 
   void _evictDistantChapters(int centerIndex) {
-    final updated = _content.evictDistantChapters(centerIndex, _state.loadedChapters);
+    final isContinuous = effectiveMode == ReaderMode.continuous;
+    final updated = _content.evictDistantChapters(
+      centerIndex,
+      _state.loadedChapters,
+      keepFrom: isContinuous ? 0 : null,
+      keepAllBefore: isContinuous,
+    );
     if (updated.length != _state.loadedChapters.length) {
       _updateState(_state.copyWith(loadedChapters: updated));
+    }
+  }
+
+  Future<void> _loadNextChapter() async {
+    if (_disposed || _isLoadingNextChapter || _state.chapterCount == 0) return;
+    final loaded = _state.loadedChapters;
+    if (loaded.isEmpty) return;
+    final lastLoadedIndex = loaded.keys.reduce((a, b) => a > b ? a : b);
+    final nextIndex = lastLoadedIndex + 1;
+    if (nextIndex >= _state.chapterCount) return;
+    if (loaded.containsKey(nextIndex)) return;
+
+    _isLoadingNextChapter = true;
+    try {
+      final service = _ref.read(bookOpenServiceProvider);
+      final chapter = await service.loadChapter(_bookId, nextIndex);
+      if (_disposed || chapter == null) return;
+      final merged = Map<int, ReaderChapter>.from(_state.loadedChapters);
+      merged[nextIndex] = chapter;
+      _updateState(_state.copyWith(loadedChapters: merged));
+    } on Object catch (e) {
+      if (_disposed) return;
+      _logger.warning(
+        'Seamless scroll: failed to load chapter $nextIndex',
+        name: 'Reader',
+        error: e,
+      );
+    } finally {
+      _isLoadingNextChapter = false;
     }
   }
 
@@ -650,6 +713,13 @@ final class ReaderController {
           unawaited(_ensureChaptersLoaded(chapterIndex));
           _evictDistantChapters(chapterIndex);
         });
+
+        // LITHIUM-READ-010: seamless scroll — proactively load next chapter near bottom
+        if (effectiveMode == ReaderMode.continuous && !_isLoadingNextChapter) {
+          if (_scrollController!.offset > maxScroll * 0.8) {
+            unawaited(_loadNextChapter());
+          }
+        }
       }
     }
   }
@@ -791,7 +861,12 @@ final class ReaderController {
     for (final chapter in _state.loadedChapters.values) {
       totalBlocks += chapter.blocks.length;
     }
-    _progress.saveProgress(_state.currentPosition, totalBlocks);
+    _progress?.saveProgress(_state.currentPosition, totalBlocks);
+  }
+
+  void savePosition() {
+    if (_state.currentPosition == ReaderPosition.initial) return;
+    _progress?.savePosition(_state.currentPosition);
   }
 
   void saveCheckpoint() {
@@ -1505,8 +1580,8 @@ final class ReaderController {
         await file.delete();
       }
       if (_loaded) {
-        await _progress.deleteDownload();
-        await _progress.deleteProgress();
+        await _progress?.deleteDownload();
+        await _progress?.deleteProgress();
       }
     } on Object catch (e) {
       _logger.warning('Error during file deletion: $e', name: 'Reader', error: e);
@@ -1638,22 +1713,22 @@ final class ReaderController {
     final startParagraph = _state.multiHighlightStartParagraph;
     final startText = _state.multiHighlightStartText;
     if (startChapter == null || startParagraph == null || startText == null) return;
-    final db = _ref.read(databaseProvider);
     final combinedText = '$startText\n\n$endSelectedText';
-    await db
-        .into(db.textHighlights)
-        .insert(
-          TextHighlightsCompanion.insert(
-            id: '$bookId-${newMonotonicId()}',
-            bookId: bookId,
-            chapterId: startChapter.toString(),
-            chapterIndex: startChapter,
-            blockIndex: startParagraph,
-            startOffset: 0,
-            endOffset: combinedText.length,
-            selectedText: combinedText,
-          ),
-        );
+    final repo = _ref.read(highlightRepositoryProvider);
+    try {
+      await repo.saveHighlight(
+        bookId: bookId,
+        chapterId: startChapter.toString(),
+        chapterIndex: startChapter,
+        blockIndex: startParagraph,
+        startOffset: 0,
+        endOffset: combinedText.length,
+        selectedText: combinedText,
+        color: 'yellow',
+      );
+    } on HighlightValidationException {
+      return;
+    }
     cancelMultiHighlight();
   }
 }

@@ -78,9 +78,11 @@ final class ReaderContentHelper {
     int centerIndex,
     Map<int, ReaderChapter> loaded, {
     int? windowSize,
+    int? keepFrom,
+    bool keepAllBefore = false,
   }) {
     final win = (windowSize ?? chapterWindowSize + 1);
-    final minKeep = (centerIndex - win).clamp(0, centerIndex + win);
+    final minKeep = keepFrom ?? (centerIndex - win).clamp(0, centerIndex + win);
     final maxKeep = centerIndex + win;
 
     final updated = Map<int, ReaderChapter>.from(loaded);
@@ -96,11 +98,19 @@ final class ReaderContentHelper {
 
     // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
     if (updated.length > maxLoadedChapters) {
-      final sortedKeys = updated.keys.toList()
-        ..sort((a, b) => (a - centerIndex).abs().compareTo((b - centerIndex).abs()));
-      while (updated.length > maxLoadedChapters) {
-        final farthest = sortedKeys.removeLast();
-        updated.remove(farthest);
+      if (keepAllBefore) {
+        final toEvict = updated.keys.where((k) => k > centerIndex).toList()..sort();
+        for (final key in toEvict) {
+          if (updated.length <= maxLoadedChapters) break;
+          updated.remove(key);
+        }
+      } else {
+        final sortedKeys = updated.keys.toList()
+          ..sort((a, b) => (a - centerIndex).abs().compareTo((b - centerIndex).abs()));
+        while (updated.length > maxLoadedChapters) {
+          final farthest = sortedKeys.removeLast();
+          updated.remove(farthest);
+        }
       }
     }
 

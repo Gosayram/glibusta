@@ -73,6 +73,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
             note_id: None,
             page_break_before: false,
             page_break_inside_avoid: false,
+            has_drop_cap: false,
         });
     }
 
@@ -256,6 +257,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
                 note_id: None,
                 page_break_before: false,
                 page_break_inside_avoid: false,
+                has_drop_cap: false,
             })
             .collect();
         if !preamble_blocks.is_empty() {
@@ -294,6 +296,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
                 note_id: None,
                 page_break_before: false,
                 page_break_inside_avoid: false,
+                has_drop_cap: false,
             })
             .collect();
 

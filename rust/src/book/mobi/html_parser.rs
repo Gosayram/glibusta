@@ -115,6 +115,7 @@ impl MobiHtmlParser {
                         note_id: None,
                         page_break_before: false,
                         page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     idx += 1;
                     continue;
@@ -146,6 +147,7 @@ impl MobiHtmlParser {
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         idx += 1;
                     }
@@ -168,6 +170,7 @@ impl MobiHtmlParser {
                         note_id: None,
                         page_break_before: false,
                         page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     idx += 1;
                 } else if self.is_blockquote(&lower) {
@@ -190,6 +193,7 @@ impl MobiHtmlParser {
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         idx += 1;
                     }
@@ -215,6 +219,7 @@ impl MobiHtmlParser {
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         idx += 1;
                     }
@@ -244,6 +249,7 @@ impl MobiHtmlParser {
                     note_id: None,
                     page_break_before: false,
                     page_break_inside_avoid: false,
+                    has_drop_cap: false,
                 });
             }
         }

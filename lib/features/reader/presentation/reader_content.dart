@@ -167,6 +167,7 @@ class ReaderCtx {
   final Brightness brightness;
   final ValueChanged<String>? onLinkTap;
   final Locale? hyphenationLocale;
+  final String? embeddedFontFamily;
 
   const ReaderCtx({
     required this.settings,
@@ -176,11 +177,16 @@ class ReaderCtx {
     required this.brightness,
     this.onLinkTap,
     this.hyphenationLocale,
+    this.embeddedFontFamily,
   });
 
   ReaderColors get colors =>
       customColors ?? ReaderColors.forThemeWithContext(settings.theme, brightness);
-  TextStyle get style => _readerTextStyle(settings, colors);
+  TextStyle get style => _readerTextStyle(
+    settings,
+    colors,
+    embeddedFontFamily: embeddedFontFamily,
+  );
 }
 
 // HG-1.2: hanging punctuation — returns negative offset for paragraphs starting with quotes/brackets
@@ -214,7 +220,17 @@ double _hangingPunctuationOffset(String text, double fontSize) {
 // LW-10.2: current chapter for per-chapter CSS override
 int? _currentChapterForCss;
 
-TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
+String? _embeddedFontFamily(NormalizedBookMetadata metadata) {
+  final fonts = metadata.metadata?['fonts'];
+  if (fonts is Map && fonts.isNotEmpty) return fonts.keys.first.toString();
+  return null;
+}
+
+TextStyle _readerTextStyle(
+  ReaderSettings s,
+  ReaderColors colors, {
+  String? embeddedFontFamily,
+}) {
   final fw = (s.fontWeightDelta > 0.33)
       ? FontWeight.w600
       : (s.fontWeightDelta > 0)
@@ -222,10 +238,12 @@ TextStyle _readerTextStyle(ReaderSettings s, ReaderColors colors) {
       : (s.fontWeightDelta < -0.33)
       ? FontWeight.w300
       : FontWeight.w400;
-  // LW-10.1: apply custom CSS overrides from user
   final css = _parseCustomCss(s.customCss, chapterIndex: _currentChapterForCss);
+  final userFont = s.font.fontFamily;
+  final isDefaultFont = s.font == ReaderFont.literata && userFont == 'Literata';
+  final fontFamily = (embeddedFontFamily != null && isDefaultFont) ? embeddedFontFamily : userFont;
   return TextStyle(
-    fontFamily: s.font.fontFamily,
+    fontFamily: fontFamily,
     fontSize: css['font-size'] ?? s.fontSize,
     height: css['line-height'] ?? s.lineHeight,
     color: colors.text,
@@ -355,13 +373,14 @@ Widget _buildReaderBlock(
     case BlockType.poem:
       return Container(
         margin: EdgeInsets.symmetric(vertical: s.paragraphSpacing * 2),
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: EdgeInsetsDirectional.only(start: s.margin * 0.6, end: s.margin * 0.4),
         child: _readerHighlightedText(
           ctx,
           block.text,
           style.copyWith(fontStyle: FontStyle.italic),
-          TextAlign.center,
+          block.textAlign ?? TextAlign.center,
           softWrap: false,
+          richSpans: block.richSpans,
         ),
       );
     case BlockType.cite:
@@ -527,7 +546,8 @@ Widget _buildReaderBlock(
             fontFamily: 'monospace',
             fontSize: s.fontSize * 0.9,
           ),
-          textAlign,
+          TextAlign.left,
+          softWrap: false,
           richSpans: block.richSpans,
         ),
       );
@@ -555,6 +575,36 @@ Widget _buildReaderBlock(
       final effectiveAlign = wsMode != null
           ? textAlign
           : (s.ignoreBookAlignment ? textAlign : (block.textAlign ?? textAlign));
+      if (block.hasDropCap && block.text.trim().isNotEmpty) {
+        final trimmedText = block.text.trim();
+        final firstLetter = trimmedText.substring(0, 1);
+        final rest = trimmedText.substring(1);
+        final dropCapSize = s.fontSize * 3;
+        final dropCapStyle = effectiveStyle.copyWith(
+          fontSize: dropCapSize,
+          height: 1,
+          color: (effectiveStyle.color ?? Colors.black).withValues(alpha: 0.85),
+        );
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.top,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 4),
+                    child: Text(firstLetter, style: dropCapStyle),
+                  ),
+                ),
+                TextSpan(text: rest, style: effectiveStyle),
+              ],
+            ),
+            textAlign: effectiveAlign,
+            locale: ctx.hyphenationLocale,
+          ),
+        );
+      }
       return Padding(
         padding: EdgeInsets.only(bottom: bottomPadding),
         child: blockHighlights != null && blockHighlights.isNotEmpty
@@ -1728,23 +1778,39 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
                                 widget.metadata.chapterTitles,
                                 _getReaderStyle(settings),
                               ),
-                            if (!isLast &&
-                                chapter != null &&
-                                widget.loadedChapters[chapterIndex + 1] != null)
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: settings.paragraphSpacing * 3,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${chapterIndex + 2}"} —',
-                                    style: dividerStyle.copyWith(
-                                      color: dividerStyle.color?.withValues(alpha: 0.4),
+                            if (!isLast && chapter != null) ...[
+                              if (widget.loadedChapters[chapterIndex + 1] != null)
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: settings.paragraphSpacing * 3,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '— ${nextTitle.isNotEmpty ? nextTitle : "Глава ${chapterIndex + 2}"} —',
+                                      style: dividerStyle.copyWith(
+                                        color: dividerStyle.color?.withValues(alpha: 0.4),
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              else
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: settings.paragraphSpacing * 2,
+                                  ),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: settings.fontSize * 1.2,
+                                      height: settings.fontSize * 1.2,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: dividerStyle.color?.withValues(alpha: 0.3),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                            ],
                           ],
                         );
                       },
@@ -1863,6 +1929,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
       hyphenationLocale: _hyphenationLocale(settings.hyphenation, widget.metadata),
+      embeddedFontFamily: _embeddedFontFamily(widget.metadata),
     );
   }
 
@@ -1874,6 +1941,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             settings.theme,
             MediaQuery.platformBrightnessOf(context),
           ),
+      embeddedFontFamily: _embeddedFontFamily(widget.metadata),
     );
   }
 }
@@ -1963,6 +2031,7 @@ class _FocusModeBody extends StatelessWidget {
           linkColor: colors.link,
           brightness: MediaQuery.platformBrightnessOf(context),
           onLinkTap: onLinkTap,
+          embeddedFontFamily: _embeddedFontFamily(metadata),
         );
 
         return Padding(
@@ -2052,6 +2121,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   static const int _maxCachedChapters = 30;
   // ARC-11.2: block height cache — avoid recomputing _measureTextHeight
   final Map<int, double> _heightCache = {};
+  bool _isRepaginating = false;
+  int _repaginationGeneration = 0;
 
   @override
   void initState() {
@@ -2094,6 +2165,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       _chapterPageCache.clear();
       _cacheKey = null;
       _heightCache.clear();
+      _repaginationGeneration++;
+      _isRepaginating = true;
+      unawaited(_scheduleBackgroundRepagination(_repaginationGeneration));
     }
     if (widget.initialPage != oldWidget.initialPage ||
         widget.initialParagraph != oldWidget.initialParagraph) {
@@ -2273,6 +2347,49 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     }
   }
 
+  static const int _backgroundBatchSize = 5;
+
+  Future<void> _scheduleBackgroundRepagination(int generation) async {
+    final chKey = _currentSettingsKey();
+    final totalChapters = widget.metadata.chapterCount;
+    final currentChapter = widget.initialPage.clamp(0, totalChapters - 1);
+
+    _paginateSingleChapter(currentChapter, _lastAvailableHeight, _lastContentWidth, chKey);
+
+    for (var start = 0; start < totalChapters; start += _backgroundBatchSize) {
+      await Future<void>.delayed(Duration.zero);
+      if (_disposed || generation != _repaginationGeneration) return;
+      final end = (start + _backgroundBatchSize).clamp(0, totalChapters);
+      for (var i = start; i < end; i++) {
+        if (i == currentChapter) continue;
+        _paginateSingleChapter(i, _lastAvailableHeight, _lastContentWidth, chKey);
+      }
+      if (_disposed || generation != _repaginationGeneration) return;
+      if (mounted) setState(() {});
+    }
+
+    if (_disposed || generation != _repaginationGeneration) return;
+    _isRepaginating = false;
+    _cacheKey = null;
+    if (mounted) setState(() {});
+  }
+
+  String _currentSettingsKey() {
+    final s = widget.settings;
+    final textScaler = MediaQuery.textScalerOf(context);
+    return '${s.fontSize}_${s.lineHeight}_${s.margin}_'
+        '${s.paragraphSpacing}_${s.letterSpacing}_${s.paragraphFirstLineIndent}_'
+        '${s.font}_${s.hyphenation}_${s.textAlign.name}_'
+        '${s.paragraphIndentMode.name}_${s.ignoreBookIndent}_'
+        '${s.wordSpacing}_${s.fontWeightDelta}_${s.textDirection.name}_'
+        '${s.customCss}_${s.showImages}_${s.imageWidth}_'
+        '${_lastAvailableHeight.toStringAsFixed(1)}_${_lastContentWidth.toStringAsFixed(1)}_'
+        '$textScaler';
+  }
+
+  double _lastAvailableHeight = 1.0;
+  double _lastContentWidth = 1.0;
+
   List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
     final settings = widget.settings;
     final pages = <_PageContent>[];
@@ -2297,9 +2414,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     // MD-2.3: use per-chapter cache for each chapter
     var lastChIdx = -1;
     for (int chIdx = 0; chIdx < widget.metadata.chapterCount; chIdx++) {
+      final cacheKey = '${chIdx}_$chKey';
+      final isCached = _chapterPageCache.containsKey(cacheKey);
+      if (_isRepaginating && !isCached) continue;
       final chapterPages = _paginateSingleChapter(chIdx, availableHeight, contentWidth, chKey);
       for (final p in chapterPages) {
-        // Fix showChapterTitle: true for first page of each chapter
         final showTitle = chIdx != lastChIdx;
         pages.add(
           _PageContent(
@@ -2436,8 +2555,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     TextSpan textSpan;
 
     final effectiveFontScale = fontScale ?? _blockFontScale(block);
+    final embFont = _embeddedFontFamily(widget.metadata);
     if (block.richSpans != null && block.richSpans!.isNotEmpty) {
-      final baseStyle = _readerTextStyle(s, colors).copyWith(
+      final baseStyle = _readerTextStyle(s, colors, embeddedFontFamily: embFont).copyWith(
         fontSize: s.fontSize * effectiveFontScale,
         height: s.lineHeight,
       );
@@ -2451,7 +2571,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       textSpan = TextSpan(children: spans);
     } else {
       final fontSize = block.fontSize ?? s.fontSize * effectiveFontScale;
-      final textStyle = _readerTextStyle(s, colors).copyWith(
+      final textStyle = _readerTextStyle(s, colors, embeddedFontFamily: embFont).copyWith(
         fontSize: fontSize,
         height: s.lineHeight,
       );
@@ -2621,6 +2741,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       brightness: MediaQuery.platformBrightnessOf(context),
       onLinkTap: widget.onLinkTap,
       hyphenationLocale: _hyphenationLocale(settings.hyphenation, widget.metadata),
+      embeddedFontFamily: _embeddedFontFamily(widget.metadata),
     );
   }
 
@@ -2632,6 +2753,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             settings.theme,
             MediaQuery.platformBrightnessOf(context),
           ),
+      embeddedFontFamily: _embeddedFontFamily(widget.metadata),
     );
   }
 
@@ -2680,6 +2802,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         final contentWidth = constraints.maxWidth - layoutMargin.horizontal;
         final safeAvailableHeight = availableHeight > 1.0 ? availableHeight : 1.0;
         final safeContentWidth = contentWidth > 1.0 ? contentWidth : 1.0;
+        _lastAvailableHeight = safeAvailableHeight;
+        _lastContentWidth = safeContentWidth;
         // HG-6.1: check layout cache
         final s = widget.settings;
         final textScaler = MediaQuery.textScalerOf(context);
@@ -2704,7 +2828,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             '${s.customCss}_${s.showImages}_${s.imageWidth}_${useTwoPageLayout}_'
             '${safeAvailableHeight.toStringAsFixed(1)}_${pageContentWidth.toStringAsFixed(1)}_'
             '${widget.loadedChapters.length}_$textScaler';
-        if (key == _cacheKey && _cachedPages.isNotEmpty) {
+        if (_isRepaginating) {
+          _pages = _paginateContent(safeAvailableHeight, pageContentWidth);
+        } else if (key == _cacheKey && _cachedPages.isNotEmpty) {
           _pages = _cachedPages;
         } else {
           _pages = _paginateContent(safeAvailableHeight, pageContentWidth);
@@ -2885,6 +3011,32 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                 widget.settings,
                 _getReaderStyle(widget.settings).color ?? Colors.black,
                 MediaQuery.sizeOf(context).height,
+              ),
+              if (_isRepaginating)
+                const Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    minHeight: 2,
+                    backgroundColor: Colors.transparent,
+                  ),
+                ),
+            ],
+          );
+        }
+        if (_isRepaginating) {
+          return Stack(
+            children: [
+              pageContent,
+              const Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: LinearProgressIndicator(
+                  minHeight: 2,
+                  backgroundColor: Colors.transparent,
+                ),
               ),
             ],
           );

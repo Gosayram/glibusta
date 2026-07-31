@@ -897,6 +897,7 @@ fn parse_fb2_xml(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -996,6 +997,7 @@ fn parse_fb2_xml(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -1039,6 +1041,7 @@ fn parse_fb2_xml(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -1065,6 +1068,7 @@ fn parse_fb2_xml(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -1091,6 +1095,7 @@ fn parse_fb2_xml(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -1203,6 +1208,7 @@ fn parse_fb2_xml(
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         block_index += 1;
                         in_empty_line = false;
@@ -1230,6 +1236,7 @@ fn parse_fb2_xml(
                             note_id: current_image_id.take(),
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         block_index += 1;
                         in_image = false;
@@ -1406,6 +1413,7 @@ fn parse_fb2_xml(
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         block_index += 1;
                     }
@@ -1434,6 +1442,7 @@ fn parse_fb2_xml(
                             note_id: get_xml_attr(e, b"id"),
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         block_index += 1;
                     }
@@ -1774,6 +1783,7 @@ fn default_block() -> ReaderBlock {
         note_id: None,
         page_break_before: false,
         page_break_inside_avoid: false,
+        has_drop_cap: false,
     }
 }
 
@@ -1854,6 +1864,7 @@ fn flush_fb2_block(
             note_id: None,
             page_break_before: false,
             page_break_inside_avoid: false,
+            has_drop_cap: false,
         });
         *block_index += 1;
     }

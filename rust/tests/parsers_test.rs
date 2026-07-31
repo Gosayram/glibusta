@@ -1231,6 +1231,7 @@ fn test_normalized_book_json_roundtrip() {
                 note_id: None,
                 page_break_before: false,
                 page_break_inside_avoid: false,
+                has_drop_cap: false,
             }],
         }],
         metadata: None,

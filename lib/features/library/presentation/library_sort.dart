@@ -1,4 +1,5 @@
 import '../../../shared/models/book.dart';
+import '../../../shared/utils/author_utils.dart';
 
 /// Sort options that apply only to the current local library view.
 enum LibrarySort {
@@ -31,30 +32,5 @@ DateTime _addedAt(Book book) => book.dateAdded ?? DateTime.fromMillisecondsSince
 
 int _compareText(String left, String right) => left.toLowerCase().compareTo(right.toLowerCase());
 
-/// Normalizes an author name for deterministic sorting.
-///
-/// Handles "Lastname, Firstname" vs "Firstname Lastname" by detecting the
-/// comma pattern and swapping to "Lastname Firstname". Strips leading
-/// articles and normalizes ё→е for Russian locale collation.
 int _compareAuthor(String left, String right) =>
-    _normalizeAuthor(left).compareTo(_normalizeAuthor(right));
-
-String _normalizeAuthor(String author) {
-  var name = author.trim().toLowerCase();
-
-  // "Lastname, Firstname" → "lastname firstname" (remove comma, keep order)
-  name = name.replaceAll(RegExp(r',\s*'), ' ');
-
-  // ё → е for stable Russian collation
-  name = name.replaceAll('ё', 'е');
-
-  // Strip leading articles
-  for (final article in const ['the ', 'a ', 'an ', 'der ', 'die ', 'das ', 'le ', 'la ', 'el ']) {
-    if (name.startsWith(article)) {
-      name = name.substring(article.length);
-      break;
-    }
-  }
-
-  return name;
-}
+    normalizeAuthorForSort(left).compareTo(normalizeAuthorForSort(right));

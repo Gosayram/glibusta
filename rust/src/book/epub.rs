@@ -1365,6 +1365,43 @@ fn apply_css_props(
     }
 }
 
+fn inline_style_has_drop_cap(style: &str) -> bool {
+    let lower = style.to_ascii_lowercase();
+    lower.contains("first-letter") || lower.contains("float:left") || lower.contains("float: left")
+}
+
+fn css_has_drop_cap(
+    css: &HashMap<String, HashMap<String, String>>,
+    tag: &str,
+    class: Option<&str>,
+) -> bool {
+    if let Some(cls) = class {
+        for cls_part in cls.split_whitespace() {
+            let class_sel = format!(".{}", cls_part);
+            if let Some(props) = css.get(&class_sel) {
+                if props.contains_key("float") || props.contains_key("initial-letter") {
+                    return true;
+                }
+            }
+            let compound = format!("{}.{}", tag, cls_part);
+            if let Some(props) = css.get(&compound) {
+                if props.contains_key("float") || props.contains_key("initial-letter") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn class_matches_verse(class: Option<&str>) -> bool {
+    let Some(cls) = class else { return false };
+    cls.split_whitespace().any(|c| {
+        let lower = c.to_ascii_lowercase();
+        lower == "verse" || lower == "poem" || lower == "stanza" || lower == "poetry"
+    })
+}
+
 fn css_hides_element(
     element: &quick_xml::events::BytesStart<'_>,
     tag: &[u8],
@@ -1646,10 +1683,12 @@ fn parse_xhtml_to_blocks(
     let mut in_body = false;
     let mut in_block = false; // inside p, h1-h6, blockquote
     let mut in_pre = false;
+    let mut verse_depth: i32 = 0;
     let mut block_type = BlockType::Paragraph;
     let mut heading_level: Option<i32> = None;
     let mut blockquote_depth: i32 = 0;
     let mut block_class: Option<&str> = None;
+    let mut block_inline_style: Option<String> = None;
     let mut hidden_elements: Vec<bool> = Vec::new();
     let mut hidden_depth = 0usize;
     let mut pending_page_break_before = false;
@@ -1766,6 +1805,7 @@ fn parse_xhtml_to_blocks(
                         in_block = true;
                         in_pre = name == b"pre";
                         block_class = get_class_attr_arena(e, &arena);
+                        block_inline_style = get_xml_attr(e, b"style");
                         block_type = if blockquote_depth > 0 {
                             BlockType::Quote
                         } else {
@@ -1800,6 +1840,7 @@ fn parse_xhtml_to_blocks(
                             block_type = BlockType::Heading;
                             heading_level = Some(digit as i32 - b'0' as i32);
                             block_class = get_class_attr_arena(e, &arena);
+                            block_inline_style = get_xml_attr(e, b"style");
                         }
                     }
                     b"blockquote" if in_body => {
@@ -1827,7 +1868,18 @@ fn parse_xhtml_to_blocks(
                         block_type = BlockType::Quote;
                         heading_level = None;
                         block_class = get_class_attr_arena(e, &arena);
+                        block_inline_style = get_xml_attr(e, b"style");
                         blockquote_depth += 1;
+                    }
+                    b"div" | b"section" if in_body => {
+                        if attr_eq(e, b"epub:type", b"verse") || attr_eq(e, b"type", b"verse") {
+                            verse_depth += 1;
+                        } else {
+                            let cls = get_class_attr_arena(e, &arena);
+                            if class_matches_verse(cls) {
+                                verse_depth += 1;
+                            }
+                        }
                     }
                     b"table" if in_body => {
                         flush_rich_span(
@@ -2055,6 +2107,7 @@ fn parse_xhtml_to_blocks(
                 }
                 match name {
                     b"body" => in_body = false,
+                    b"div" | b"section" if verse_depth > 0 => verse_depth -= 1,
                     b"aside" if in_block && block_type == BlockType::Footnote => {
                         flush_rich_span(
                             &mut rich_spans,
@@ -2102,10 +2155,16 @@ fn parse_xhtml_to_blocks(
                         if !t.is_empty() || rich.is_some() {
                             let has_pb = pending_page_break_before;
                             pending_page_break_before = false;
+                            let effective_type =
+                                if verse_depth > 0 || class_matches_verse(block_class) {
+                                    BlockType::Poem
+                                } else {
+                                    BlockType::Paragraph
+                                };
                             blocks.push(ReaderBlock {
                                 index: block_index,
                                 text: t,
-                                block_type: BlockType::Paragraph,
+                                block_type: effective_type,
                                 image_url: None,
                                 note_ref: None,
                                 rich_spans: rich,
@@ -2123,11 +2182,24 @@ fn parse_xhtml_to_blocks(
                                 note_id: None,
                                 page_break_before: has_pb,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
                                     apply_css_props(last, "p", Some(cls), css);
                                     apply_css_props(last, "pre", Some(cls), css);
+                                }
+                                if css_has_drop_cap(css, "p", Some(cls)) {
+                                    if let Some(last) = blocks.last_mut() {
+                                        last.has_drop_cap = true;
+                                    }
+                                }
+                                if let Some(ref style) = block_inline_style {
+                                    if inline_style_has_drop_cap(style) {
+                                        if let Some(last) = blocks.last_mut() {
+                                            last.has_drop_cap = true;
+                                        }
+                                    }
                                 }
                                 // MD-1.4: track page-break-before
                                 if css_has_page_break(css, "p", Some(cls))
@@ -2171,6 +2243,13 @@ fn parse_xhtml_to_blocks(
                                         last.page_break_inside_avoid = true;
                                     }
                                 }
+                                if let Some(ref style) = block_inline_style {
+                                    if inline_style_has_drop_cap(style) {
+                                        if let Some(last) = blocks.last_mut() {
+                                            last.has_drop_cap = true;
+                                        }
+                                    }
+                                }
                             }
                             block_index += 1;
                         }
@@ -2183,6 +2262,7 @@ fn parse_xhtml_to_blocks(
                         superscript = false;
                         href = None;
                         block_class = None;
+                        block_inline_style = None;
                     }
                     b if b.starts_with(b"h")
                         && b.len() == 2
@@ -2226,6 +2306,7 @@ fn parse_xhtml_to_blocks(
                                         note_id: None,
                                         page_break_before: has_pb,
                                         page_break_inside_avoid: false,
+                                        has_drop_cap: false,
                                     });
                                     let htag = match heading_level {
                                         Some(lv @ 1..=6) => H_TAGS[(lv - 1) as usize],
@@ -2278,6 +2359,7 @@ fn parse_xhtml_to_blocks(
                                 superscript = false;
                                 href = None;
                                 block_class = None;
+                                block_inline_style = None;
                                 blockquote_depth = (blockquote_depth - 1).max(0);
                             }
                         }
@@ -2314,6 +2396,7 @@ fn parse_xhtml_to_blocks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
@@ -2331,6 +2414,7 @@ fn parse_xhtml_to_blocks(
                         superscript = false;
                         href = None;
                         block_class = None;
+                        block_inline_style = None;
                     }
                     b"td" | b"th" if in_table => {
                         let t = span_text.trim().to_string();
@@ -2368,6 +2452,7 @@ fn parse_xhtml_to_blocks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                             table_rows.clear();
@@ -2404,6 +2489,7 @@ fn parse_xhtml_to_blocks(
                                     note_id: None,
                                     page_break_before: false,
                                     page_break_inside_avoid: false,
+                                    has_drop_cap: false,
                                 })
                                 .collect();
                             blocks.push(ReaderBlock {
@@ -2423,6 +2509,7 @@ fn parse_xhtml_to_blocks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                             list_items.clear();
@@ -2452,6 +2539,7 @@ fn parse_xhtml_to_blocks(
                                     note_id: None,
                                     page_break_before: false,
                                     page_break_inside_avoid: false,
+                                    has_drop_cap: false,
                                 })
                                 .collect();
                             blocks.push(ReaderBlock {
@@ -2471,6 +2559,7 @@ fn parse_xhtml_to_blocks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                             list_items.clear();
@@ -2549,6 +2638,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                         page_break_before: false,
                         page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     block_index += 1;
                 } else if name == b"img" && in_body && !element_is_hidden {
@@ -2575,6 +2665,7 @@ fn parse_xhtml_to_blocks(
                         note_id: None,
                         page_break_before: false,
                         page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     block_index += 1;
                 } else if name == b"image" && in_body && !element_is_hidden {
@@ -2600,6 +2691,7 @@ fn parse_xhtml_to_blocks(
                             note_id: None,
                             page_break_before: false,
                             page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         });
                         block_index += 1;
                     }
@@ -2823,6 +2915,7 @@ fn push_block(
         note_id,
         page_break_before: false,
         page_break_inside_avoid: false,
+        has_drop_cap: false,
     };
     apply_css_props(&mut block, tag, class, css);
     blocks.push(block);
@@ -2863,6 +2956,7 @@ fn flush_block(
             note_id,
             page_break_before: false,
             page_break_inside_avoid: false,
+            has_drop_cap: false,
         });
         *index += 1;
     }
@@ -3285,5 +3379,28 @@ mod tests {
                 "data:font/woff2;charset=utf-8;base64,AAEC".to_string(),
             )]
         );
+    }
+
+    #[test]
+    fn drop_cap_detected_from_inline_style_first_letter() {
+        let html = r#"<html><body><p style="font-variant:small-caps; ::first-letter { font-size: 3em }">Once upon a time there was a story.</p></body></html>"#;
+        let (blocks, _, _) = parse_xhtml_to_blocks(html, 0, &std::collections::HashMap::new());
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].has_drop_cap);
+    }
+
+    #[test]
+    fn drop_cap_detected_from_inline_style_float_left() {
+        let html = r#"<html><body><p style="float: left; font-size: 2em">A</p><p>Once upon a time.</p></body></html>"#;
+        let (blocks, _, _) = parse_xhtml_to_blocks(html, 0, &std::collections::HashMap::new());
+        assert!(blocks.iter().any(|b| b.has_drop_cap));
+    }
+
+    #[test]
+    fn no_drop_cap_without_style() {
+        let html = r#"<html><body><p>Normal paragraph without drop cap.</p></body></html>"#;
+        let (blocks, _, _) = parse_xhtml_to_blocks(html, 0, &std::collections::HashMap::new());
+        assert_eq!(blocks.len(), 1);
+        assert!(!blocks[0].has_drop_cap);
     }
 }

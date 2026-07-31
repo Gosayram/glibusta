@@ -161,7 +161,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
                 )
               : null,
           dense: true,
-          onTap: () => _jumpToChapter(item.index),
+          onTap: () => _jumpToChapter(item.index, blockIndex: item.blockIndex),
         );
       },
     );
@@ -357,7 +357,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
     );
   }
 
-  void _jumpToChapter(int chapterIndex) {
+  void _jumpToChapter(int chapterIndex, {int blockIndex = 0}) {
     final progress = widget.metadata.chapterCount <= 1
         ? 0.0
         : chapterIndex / (widget.metadata.chapterCount - 1);
@@ -365,7 +365,7 @@ class _ReaderSidePanelState extends ConsumerState<ReaderSidePanel> {
       ReaderPosition(
         bookId: widget.metadata.id,
         chapterIndex: chapterIndex,
-        paragraphIndex: 0,
+        paragraphIndex: blockIndex,
         progressPercent: progress,
         updatedAt: DateTime.now(),
       ),

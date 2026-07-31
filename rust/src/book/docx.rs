@@ -805,6 +805,7 @@ fn parse_document_xml_with_hyperlinks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             };
                             if paragraph_is_numbered {
                                 let numbering_key =
@@ -878,6 +879,7 @@ fn parse_document_xml_with_hyperlinks(
                                     note_id: None,
                                     page_break_before: false,
                                     page_break_inside_avoid: false,
+                                    has_drop_cap: false,
                                 });
                                 block_index += 1;
                             }
@@ -926,6 +928,7 @@ fn parse_document_xml_with_hyperlinks(
                                 note_id: None,
                                 page_break_before: false,
                                 page_break_inside_avoid: false,
+                                has_drop_cap: false,
                             });
                             block_index += 1;
                         }
@@ -1066,6 +1069,7 @@ fn flush_docx_list(
         note_id: None,
         page_break_before: false,
         page_break_inside_avoid: false,
+        has_drop_cap: false,
     });
     *block_index += 1;
 }

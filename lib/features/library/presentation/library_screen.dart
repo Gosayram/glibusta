@@ -23,10 +23,8 @@ import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
-import '../../../shared/widgets/delete_book_dialog.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
-import '../../reader/data/per_book_settings_service.dart';
 import '../data/book_data_export.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
@@ -58,6 +56,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   LibrarySort _sort = LibrarySort.recentlyAdded;
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
+  final Set<String> _selectedBookIds = {};
+
+  bool get _selectionMode => _selectedBookIds.isNotEmpty;
 
   @override
   void dispose() {
@@ -72,71 +73,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
 
     return Scaffold(
-      appBar: AppBar(
-        title: _isSearchOpen
-            ? TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Поиск в библиотеке...',
-                  border: InputBorder.none,
-                ),
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                },
-              )
-            : const Text('Библиотека'),
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-            tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
-            onPressed: () {
-              setState(() {
-                _isSearchOpen = !_isSearchOpen;
-                if (!_isSearchOpen) {
-                  _searchController.clear();
-                  _searchQuery = '';
-                } else {
-                  _searchFocusNode.requestFocus();
-                }
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(
-              _viewModeIcon(
-                switch (ref.watch(libraryViewModeProvider)) {
-                  AsyncData(:final value) => value,
-                  _ => LibraryViewMode.grid,
-                },
-              ),
-            ),
-            tooltip: 'Вид',
-            onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
-          ),
-          PopupMenuButton<LibrarySort>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Сортировка: ${_sort.label}',
-            initialValue: _sort,
-            onSelected: (sort) => setState(() => _sort = sort),
-            itemBuilder: (context) => [
-              for (final sort in LibrarySort.values)
-                CheckedPopupMenuItem(
-                  value: sort,
-                  checked: sort == _sort,
-                  child: Text(sort.label),
-                ),
-            ],
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Добавить книги',
-            onPressed: () => _showImportSheet(context, ref),
-          ),
-        ],
-      ),
+      appBar: _selectionMode ? _buildSelectionAppBar(ref) : _buildNormalAppBar(ref),
       body: Column(
         children: [
           if (runningTasks.isNotEmpty)
@@ -216,6 +153,102 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
+  PreferredSizeWidget _buildNormalAppBar(WidgetRef ref) {
+    return AppBar(
+      title: _isSearchOpen
+          ? TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Поиск в библиотеке...',
+                border: InputBorder.none,
+              ),
+              onChanged: (value) {
+                setState(() => _searchQuery = value);
+              },
+            )
+          : const Text('Библиотека'),
+      automaticallyImplyLeading: false,
+      actions: [
+        IconButton(
+          icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
+          tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
+          onPressed: () {
+            setState(() {
+              _isSearchOpen = !_isSearchOpen;
+              if (!_isSearchOpen) {
+                _searchController.clear();
+                _searchQuery = '';
+              } else {
+                _searchFocusNode.requestFocus();
+              }
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(
+            _viewModeIcon(
+              switch (ref.watch(libraryViewModeProvider)) {
+                AsyncData(:final value) => value,
+                _ => LibraryViewMode.grid,
+              },
+            ),
+          ),
+          tooltip: 'Вид',
+          onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
+        ),
+        PopupMenuButton<LibrarySort>(
+          icon: const Icon(Icons.sort),
+          tooltip: 'Сортировка: ${_sort.label}',
+          initialValue: _sort,
+          onSelected: (sort) => setState(() => _sort = sort),
+          itemBuilder: (context) => [
+            for (final sort in LibrarySort.values)
+              CheckedPopupMenuItem(
+                value: sort,
+                checked: sort == _sort,
+                child: Text(sort.label),
+              ),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.add),
+          tooltip: 'Добавить книги',
+          onPressed: () => _showImportSheet(context, ref),
+        ),
+      ],
+    );
+  }
+
+  AppBar _buildSelectionAppBar(WidgetRef ref) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: 'Отмена',
+        onPressed: _exitSelectionMode,
+      ),
+      title: Text('${_selectedBookIds.length} выбрано'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.select_all),
+          tooltip: 'Выбрать все',
+          onPressed: _selectAllBooks,
+        ),
+        IconButton(
+          icon: const Icon(Icons.upload_file),
+          tooltip: 'Экспорт данных',
+          onPressed: () => _batchExport(context, ref),
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: 'Удалить',
+          onPressed: () => _batchDelete(context, ref),
+        ),
+      ],
+    );
+  }
+
   IconData _viewModeIcon(LibraryViewMode mode) {
     switch (mode) {
       case LibraryViewMode.grid:
@@ -225,6 +258,214 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       case LibraryViewMode.compact:
         return Icons.view_compact;
     }
+  }
+
+  void _enterSelectionMode(String bookId) {
+    unawaited(HapticFeedback.mediumImpact());
+    setState(() => _selectedBookIds.add(bookId));
+  }
+
+  void _toggleSelection(String bookId) {
+    setState(() {
+      if (_selectedBookIds.contains(bookId)) {
+        _selectedBookIds.remove(bookId);
+      } else {
+        _selectedBookIds.add(bookId);
+      }
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() => _selectedBookIds.clear());
+  }
+
+  void _selectAllBooks() {
+    final booksAsync = ref.read(libraryBooksProvider);
+    final books = switch (booksAsync) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
+    if (books == null) return;
+    setState(() {
+      _selectedBookIds
+        ..clear()
+        ..addAll(books.map((Book b) => b.id));
+    });
+  }
+
+  Future<void> _batchDelete(BuildContext context, WidgetRef ref) async {
+    final count = _selectedBookIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Удалить $count ${_pluralBooks(count)}?'),
+        content: const Text('Книги будут удалены из библиотеки'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final service = ref.read(bookDeleteServiceProvider);
+    final ids = _selectedBookIds.toList();
+    _exitSelectionMode();
+    for (final id in ids) {
+      await service.removeFromLibrary(id);
+    }
+    ref.invalidate(libraryBooksProvider);
+    if (context.mounted) {
+      unawaited(SmartDialog.showToast('$count ${_pluralBooks(count)} удалено'));
+    }
+  }
+
+  Future<void> _batchExport(BuildContext context, WidgetRef ref) async {
+    final format = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Формат экспорта'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'json'),
+            child: const Text('JSON'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'txt'),
+            child: const Text('TXT'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'md'),
+            child: const Text('Markdown'),
+          ),
+        ],
+      ),
+    );
+    if (format == null || !context.mounted) return;
+
+    final db = ref.read(databaseProvider);
+    final booksAsync = ref.read(libraryBooksProvider);
+    final allBooks = switch (booksAsync) {
+      AsyncData(:final value) => value,
+      _ => <Book>[],
+    };
+    final selectedBooks = allBooks.where((Book b) => _selectedBookIds.contains(b.id)).toList();
+
+    final allHighlights = <TextHighlight>[];
+    final allBookmarks = <Bookmark>[];
+    final allNotes = <Note>[];
+
+    for (final book in selectedBooks) {
+      final highlights = await db.highlightDao.getHighlightsForBook(book.id);
+      final bookmarks = await (db.select(
+        db.bookmarks,
+      )..where((b) => b.bookId.equals(book.id))).get();
+      final notes = await (db.select(
+        db.notes,
+      )..where((n) => n.bookId.equals(book.id))).get();
+      allHighlights.addAll(highlights);
+      allBookmarks.addAll(bookmarks);
+      allNotes.addAll(notes);
+    }
+
+    if (allHighlights.isEmpty && allBookmarks.isEmpty && allNotes.isEmpty) {
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Нет данных для экспорта'));
+      }
+      return;
+    }
+
+    final tmpDir = await getTemporaryDirectory();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    late final File file;
+
+    if (format == 'txt') {
+      final content = buildBookExportTxt(
+        bookTitle: selectedBooks.map((b) => b.title).join(', '),
+        highlights: allHighlights,
+        bookmarks: allBookmarks,
+        notes: allNotes,
+      );
+      file = File('${tmpDir.path}/glibusta_batch_export_$ts.txt');
+      await file.writeAsString(content);
+    } else if (format == 'md') {
+      final content = buildBookExportMarkdown(
+        bookTitle: selectedBooks.map((b) => b.title).join(', '),
+        highlights: allHighlights,
+        bookmarks: allBookmarks,
+        notes: allNotes,
+      );
+      file = File('${tmpDir.path}/glibusta_batch_export_$ts.md');
+      await file.writeAsString(content);
+    } else {
+      final jsonMap = {
+        'books': selectedBooks.map((b) => b.title).toList(),
+        'exported_at': DateTime.now().toIso8601String(),
+        'highlights_count': allHighlights.length,
+        'bookmarks_count': allBookmarks.length,
+        'notes_count': allNotes.length,
+        'highlights': allHighlights
+            .map(
+              (h) => {
+                'book_id': h.bookId,
+                'selected_text': h.selectedText,
+                'color': h.color,
+                'note': h.noteText,
+                'created_at': h.createdAt.toIso8601String(),
+              },
+            )
+            .toList(),
+        'bookmarks': allBookmarks
+            .map(
+              (b) => {
+                'book_id': b.bookId,
+                'chapter_index': b.chapterIndex,
+                'selected_text': b.selectedText,
+                'note': b.note,
+                'created_at': b.createdAt.toIso8601String(),
+              },
+            )
+            .toList(),
+        'notes': allNotes
+            .map(
+              (n) => {
+                'book_id': n.bookId,
+                'content': n.content,
+                'created_at': n.createdAt.toIso8601String(),
+              },
+            )
+            .toList(),
+      };
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(jsonMap);
+      file = File('${tmpDir.path}/glibusta_batch_export_$ts.json');
+      await file.writeAsString(jsonStr);
+    }
+
+    if (!context.mounted) return;
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: 'Экспорт данных: ${selectedBooks.length} книг',
+      ),
+    );
+    _exitSelectionMode();
+  }
+
+  String _pluralBooks(int count) {
+    if (count % 10 == 1 && count % 100 != 11) return 'книга';
+    if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) {
+      return 'книги';
+    }
+    return 'книг';
   }
 
   void _handleBooksDropped(WidgetRef ref, List<String> paths) {
@@ -592,11 +833,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) {
                   final book = pinnedBooksList[index];
-                  return BookCard(
-                    key: ValueKey(book.id),
-                    book: book,
-                    onTap: () => unawaited(context.push('/reader/${book.id}')),
-                    onLongPress: () => _showBookMenu(context, ref, book),
+                  return _wrapWithSelection(
+                    context,
+                    ref,
+                    book,
+                    BookCard(
+                      key: ValueKey(book.id),
+                      book: book,
+                      onTap: _selectionMode
+                          ? () => _toggleSelection(book.id)
+                          : () => unawaited(context.push('/reader/${book.id}')),
+                      onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
+                    ),
                   );
                 },
                 childCount: pinnedBooksList.length,
@@ -640,11 +888,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             childAspectRatio: 0.62,
           ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) => BookCard(
-              key: ValueKey(books[index].id),
-              book: books[index],
-              onTap: () => unawaited(context.push('/reader/${books[index].id}')),
-              onLongPress: () => _showBookMenu(context, ref, books[index]),
+            (context, index) => _wrapWithSelection(
+              context,
+              ref,
+              books[index],
+              BookCard(
+                key: ValueKey(books[index].id),
+                book: books[index],
+                onTap: _selectionMode
+                    ? () => _toggleSelection(books[index].id)
+                    : () => unawaited(context.push('/reader/${books[index].id}')),
+                onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
+              ),
             ),
             childCount: books.length,
           ),
@@ -654,18 +909,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           delegate: SliverChildBuilderDelegate(
             (context, index) {
               final book = books[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: SizedBox(
-                    width: 48,
-                    height: 68,
-                    child: BookCoverImage(book: book),
+              return _wrapWithSelection(
+                context,
+                ref,
+                book,
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: SizedBox(
+                      width: 48,
+                      height: 68,
+                      child: BookCoverImage(book: book),
+                    ),
+                    title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: book.authorNames.isNotEmpty
+                        ? Text(book.authorNames.join(', '))
+                        : null,
+                    onTap: _selectionMode
+                        ? () => _toggleSelection(book.id)
+                        : () => unawaited(context.push('/reader/${book.id}')),
+                    onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
                   ),
-                  title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  subtitle: book.authorNames.isNotEmpty ? Text(book.authorNames.join(', ')) : null,
-                  onTap: () => unawaited(context.push('/reader/${book.id}')),
-                  onLongPress: () => _showBookMenu(context, ref, book),
                 ),
               );
             },
@@ -681,11 +945,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             childAspectRatio: 0.55,
           ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) => BookCard(
-              key: ValueKey(books[index].id),
-              book: books[index],
-              onTap: () => unawaited(context.push('/reader/${books[index].id}')),
-              onLongPress: () => _showBookMenu(context, ref, books[index]),
+            (context, index) => _wrapWithSelection(
+              context,
+              ref,
+              books[index],
+              BookCard(
+                key: ValueKey(books[index].id),
+                book: books[index],
+                onTap: _selectionMode
+                    ? () => _toggleSelection(books[index].id)
+                    : () => unawaited(context.push('/reader/${books[index].id}')),
+                onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
+              ),
             ),
             childCount: books.length,
           ),
@@ -693,250 +964,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
-  void _showBookMenu(BuildContext context, WidgetRef ref, Book book) {
-    unawaited(HapticFeedback.mediumImpact());
-    final pinnedState = ref.read(pinnedBooksProvider.notifier);
-    final isPinned = pinnedState.isPinned(book.id);
-
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        builder: (ctx) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.menu_book),
-                title: const Text('Читать'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(context.push('/reader/${book.id}'));
-                },
+  Widget _wrapWithSelection(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+    Widget child,
+  ) {
+    if (!_selectionMode) return child;
+    final selected = _selectedBookIds.contains(book.id);
+    return Stack(
+      children: [
+        child,
+        Positioned(
+          top: 4,
+          right: 4,
+          child: AnimatedOpacity(
+            opacity: selected ? 1 : 0.5,
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              decoration: BoxDecoration(
+                color: selected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+                shape: BoxShape.circle,
               ),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('Подробности'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(context.push('/book/${book.id}'));
-                },
+              padding: const EdgeInsets.all(2),
+              child: Icon(
+                selected ? Icons.check : Icons.circle_outlined,
+                size: 20,
+                color: selected
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              ListTile(
-                leading: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
-                title: Text(isPinned ? 'Открепить' : 'Закрепить'),
-                subtitle: isPinned ? null : const Text('Максимум 5 книг'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(pinnedState.toggle(book.id));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.label_outline),
-                title: const Text('Теги'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showTagPicker(context, ref, book);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.folder_open),
-                title: const Text('Переместить в папку'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showFolderPicker(context, ref, book);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.share),
-                title: const Text('Поделиться'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _shareBook(context, book);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.upload_file),
-                title: const Text('Экспорт данных'),
-                subtitle: const Text('Закладки, заметки, выделения'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(_exportBookData(context, ref, book));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.html),
-                title: const Text('Экспорт HTML'),
-                subtitle: const Text('Закладки, заметки, выделения'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(_exportBookDataHtml(context, ref, book));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.tune),
-                title: const Text('Сбросить настройки чтения'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final svc = ref.read(perBookSettingsServiceProvider);
-                  await svc.resetToGlobal(book.id);
-                  if (context.mounted) {
-                    unawaited(SmartDialog.showToast('Настройки сброшены'));
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete),
-                title: const Text('Удалить'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(_confirmDelete(context, ref, book));
-                },
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
-  }
-
-  void _showTagPicker(BuildContext context, WidgetRef ref, Book book) {
-    unawaited(
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        builder: (ctx) => _TagPickerSheet(book: book),
-      ),
-    );
-  }
-
-  void _showFolderPicker(BuildContext context, WidgetRef ref, Book book) {
-    unawaited(SmartDialog.showToast('Выбор папки将在 реализован'));
-  }
-
-  void _shareBook(BuildContext context, Book book) {
-    if (book.source.sourceUrl.isNotEmpty) {
-      unawaited(SmartDialog.showToast('Поделиться «${book.title}»'));
-    }
-  }
-
-  Future<void> _exportBookData(
-    BuildContext context,
-    WidgetRef ref,
-    Book book,
-  ) async {
-    try {
-      final db = ref.read(databaseProvider);
-      final highlights = await db.highlightDao.getHighlightsForBook(book.id);
-      final bookmarks = await (db.select(
-        db.bookmarks,
-      )..where((b) => b.bookId.equals(book.id))).get();
-      final notes = await (db.select(db.notes)..where((n) => n.bookId.equals(book.id))).get();
-
-      if (bookmarks.isEmpty && notes.isEmpty && highlights.isEmpty) {
-        if (context.mounted) {
-          unawaited(SmartDialog.showToast('Нет данных для экспорта'));
-        }
-        return;
-      }
-
-      final jsonMap = buildBookExportJson(
-        bookId: book.id,
-        title: book.title,
-        highlights: highlights,
-        bookmarks: bookmarks,
-        notes: notes,
-      );
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(jsonMap);
-
-      final tmpDir = await getTemporaryDirectory();
-      final filename = buildBookExportFilename(book.id);
-      final file = File('${tmpDir.path}/$filename');
-      await file.writeAsString(jsonStr);
-
-      if (!context.mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          text: 'Экспорт данных: ${book.title}',
-        ),
-      );
-    } on Object catch (e) {
-      AppLogger().warning('Export failed: $e', name: 'Library', error: e);
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Не удалось экспортировать данные'));
-      }
-    }
-  }
-
-  Future<void> _exportBookDataHtml(
-    BuildContext context,
-    WidgetRef ref,
-    Book book,
-  ) async {
-    try {
-      final db = ref.read(databaseProvider);
-      final highlights = await db.highlightDao.getHighlightsForBook(book.id);
-      final bookmarks = await (db.select(
-        db.bookmarks,
-      )..where((b) => b.bookId.equals(book.id))).get();
-      final notes = await (db.select(db.notes)..where((n) => n.bookId.equals(book.id))).get();
-
-      if (bookmarks.isEmpty && notes.isEmpty && highlights.isEmpty) {
-        if (context.mounted) {
-          unawaited(SmartDialog.showToast('Нет данных для экспорта'));
-        }
-        return;
-      }
-
-      final html = buildBookExportHtml(
-        bookTitle: book.title,
-        highlights: highlights,
-        bookmarks: bookmarks,
-        notes: notes,
-      );
-
-      final tmpDir = await getTemporaryDirectory();
-      final filename = buildBookExportHtmlFilename(book.id);
-      final file = File('${tmpDir.path}/$filename');
-      await file.writeAsString(html);
-
-      if (!context.mounted) return;
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          text: 'Экспорт данных: ${book.title}',
-        ),
-      );
-    } on Object catch (e) {
-      AppLogger().warning('HTML export failed: $e', name: 'Library', error: e);
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Не удалось экспортировать данные'));
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Book book) async {
-    final result = await DeleteBookDialog.show(context, bookTitle: book.title);
-    if (result == null || !context.mounted) return;
-
-    unawaited(HapticFeedback.heavyImpact());
-
-    final service = ref.read(bookDeleteServiceProvider);
-    if (result.deleteFile) {
-      await service.deleteBookCompletely(book.id);
-    } else {
-      await service.removeFromLibrary(book.id);
-    }
-    ref.invalidate(libraryBooksProvider);
-    if (context.mounted) {
-      unawaited(
-        SmartDialog.showToast(
-          result.deleteFile
-              ? '«${book.title}» удалена с диска'
-              : '«${book.title}» удалена из списка',
-        ),
-      );
-    }
   }
 }
 

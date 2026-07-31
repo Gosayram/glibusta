@@ -84,6 +84,7 @@ final class CustomEpubParser {
     }
 
     final coverPath = await _extractCover(epub: epub, opf: opf);
+    final fonts = _extractFonts(epub, opf);
 
     return EpubBook(
       title: opf.title,
@@ -96,6 +97,7 @@ final class CustomEpubParser {
       coverImagePath: coverPath,
       isFixedLayout: opf.isFixedLayout,
       textDirection: textDirection,
+      fonts: fonts,
     );
   }
 
@@ -202,5 +204,56 @@ final class CustomEpubParser {
     return candidates.whereType<EpubResource>().firstWhereOrNull(
       (EpubResource resource) => isSupportedImage(resource.mediaType),
     );
+  }
+
+  Map<String, String> _extractFonts(EpubArchive epub, EpubOpfData opf) {
+    final fonts = <String, String>{};
+    for (final resource in opf.resources.values) {
+      if (resource.type != EpubResourceType.css) continue;
+      try {
+        final css = epub.readText(resource.fullPath);
+        _parseFontFaces(css, resource.fullPath, fonts);
+      } on Object catch (_) {}
+    }
+    return fonts;
+  }
+
+  static final _fontFaceRe = RegExp(r'@font-face\s*\{');
+  static final _fontFamilyRe = RegExp(r'font-family\s*:\s*["\x27]?([^"\x27;}]+)');
+  static final _srcRe = RegExp(r'src\s*:.*?url\s*\(\s*["\x27]?([^"\x27)]+)');
+
+  void _parseFontFaces(String css, String cssPath, Map<String, String> fonts) {
+    var pos = 0;
+    while (pos < css.length) {
+      final match = _fontFaceRe.firstMatch(css.substring(pos));
+      if (match == null) break;
+      final blockStart = pos + match.end;
+      var depth = 1;
+      var j = blockStart;
+      while (j < css.length && depth > 0) {
+        if (css[j] == '{') depth++;
+        if (css[j] == '}') depth--;
+        j++;
+      }
+      final block = css.substring(blockStart, j - 1);
+      final familyMatch = _fontFamilyRe.firstMatch(block);
+      final srcMatch = _srcRe.firstMatch(block);
+      if (familyMatch != null && srcMatch != null) {
+        final family = familyMatch.group(1)!.trim();
+        final src = srcMatch.group(1)!.trim();
+        if (family.isNotEmpty && src.isNotEmpty) {
+          final resolved = _resolveCssHref(cssPath, src);
+          fonts.putIfAbsent(family, () => resolved);
+        }
+      }
+      pos = j;
+    }
+  }
+
+  String _resolveCssHref(String cssPath, String href) {
+    if (href.startsWith('/') || href.contains('://')) return href;
+    final lastSlash = cssPath.lastIndexOf('/');
+    if (lastSlash < 0) return href;
+    return '${cssPath.substring(0, lastSlash)}/$href';
   }
 }

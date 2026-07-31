@@ -14,6 +14,7 @@ final class EpubBook {
     this.coverImagePath,
     this.isFixedLayout = false,
     this.textDirection,
+    this.fonts = const {},
   });
   final String title;
   final List<String> authors;
@@ -25,6 +26,7 @@ final class EpubBook {
   final String? coverImagePath;
   final bool isFixedLayout;
   final String? textDirection;
+  final Map<String, String> fonts;
 }
 
 final class EpubChapter {

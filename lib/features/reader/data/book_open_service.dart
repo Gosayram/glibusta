@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/full_text_search.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/fonts/epub_font_loader.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -19,6 +21,56 @@ import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
 import 'parsers/parser_registry.dart';
 import 'reader_cache_service.dart';
+
+enum BookOpenError {
+  corruptFile('Файл повреждён. Попробуйте загрузить заново.'),
+  unsupportedFormat('Формат не поддерживается.'),
+  missingContent('Содержимое книги отсутствует или повреждено.'),
+  emptyBook('Книга не содержит текста.');
+
+  const BookOpenError(this.userMessage);
+  final String userMessage;
+}
+
+BookOpenError _classifyBookOpenError(Object error) {
+  final message = error.toString().toLowerCase();
+  if (message.contains('zip') ||
+      message.contains('archive') ||
+      message.contains('corrupt') ||
+      message.contains('mimetype') ||
+      message.contains('unexpected end') ||
+      message.contains('invalid header') ||
+      message.contains('bad zip') ||
+      message.contains('загру') ||
+      error is ArchiveException) {
+    return BookOpenError.corruptFile;
+  }
+  if (message.contains('opf') ||
+      message.contains('container.xml') ||
+      message.contains('rootfile') ||
+      message.contains('package document') ||
+      message.contains('not found') && message.contains('epub')) {
+    return BookOpenError.missingContent;
+  }
+  if (message.contains('unsupported') || message.contains('не поддерживается')) {
+    return BookOpenError.unsupportedFormat;
+  }
+  return BookOpenError.corruptFile;
+}
+
+BookOpenFailure _toBookOpenFailure(Object error) {
+  final classified = _classifyBookOpenError(error);
+  switch (classified) {
+    case BookOpenError.corruptFile:
+      return CorruptFileFailure(error.toString());
+    case BookOpenError.missingContent:
+      return MissingContentFailure(error.toString());
+    case BookOpenError.unsupportedFormat:
+      return UnsupportedFormatFailure(error.toString());
+    case BookOpenError.emptyBook:
+      return const CacheCorruptedFailure('Книга не содержит текста');
+  }
+}
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final storage = ref.watch(appFileStorageProvider);
@@ -127,12 +179,20 @@ class BookOpenService {
           'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
           name: 'Reader',
         );
-        return normalized.withCleanedBlocks();
+        final cleaned = normalized.withCleanedBlocks();
+        final fontMap = cleaned.metadata?['fonts'];
+        if (fontMap is Map && fontMap.isNotEmpty) {
+          await EpubFontLoader.loadFonts(
+            epubPath: filePath,
+            fontMap: Map<String, dynamic>.from(fontMap),
+          );
+        }
+        return cleaned;
       } on TimeoutException {
         rethrow;
       } on Object catch (e, st) {
         _logger.severe('EPUB parser failed: $e', name: 'Reader', error: e, st: st);
-        rethrow;
+        throw _toBookOpenFailure(e);
       }
     }
 
@@ -152,10 +212,13 @@ class BookOpenService {
     NormalizedBook book;
     try {
       book = await parseWithTimeout(parser);
-    } on ParserFailure catch (_) {
-      if (!filePath.toLowerCase().endsWith('.zip')) rethrow;
-      final cbzParser = _registry.parserFor(BookFormat.cbz);
-      book = await parseWithTimeout(cbzParser);
+    } on ParserFailure catch (e) {
+      if (filePath.toLowerCase().endsWith('.zip')) {
+        final cbzParser = _registry.parserFor(BookFormat.cbz);
+        book = await parseWithTimeout(cbzParser);
+      } else {
+        throw _toBookOpenFailure(e);
+      }
     }
     final cleaned = book.withCleanedBlocks();
     if (bookFormat != BookFormat.docx || bookId == null) return cleaned;
@@ -273,7 +336,9 @@ class BookOpenService {
           cid: cid,
         );
         if (!loadChapters) {
-          return _bookFromMetadata(cachedMeta);
+          final book = _bookFromMetadata(cachedMeta);
+          await _loadEmbeddedFonts(book, bookId);
+          return book;
         }
         final chapters = <ReaderChapter>[];
         for (var i = 0; i < cachedMeta.chapterCount; i++) {
@@ -283,7 +348,7 @@ class BookOpenService {
           }
         }
         if (chapters.length == cachedMeta.chapterCount) {
-          return NormalizedBook(
+          final book = NormalizedBook(
             id: cachedMeta.id,
             title: cachedMeta.title,
             authors: cachedMeta.authors,
@@ -292,6 +357,8 @@ class BookOpenService {
             chapters: chapters,
             metadata: cachedMeta.metadata,
           );
+          await _loadEmbeddedFonts(book, bookId);
+          return book;
         }
         _logger.warning(
           'Split cache lost chapters while loading $bookId; reparsing source',
@@ -309,6 +376,7 @@ class BookOpenService {
         cid: cid,
       );
       unawaited(cache.migrateLegacyCache(bookId, cached));
+      await _loadEmbeddedFonts(cached, bookId);
       return cached;
     }
 
@@ -325,6 +393,17 @@ class BookOpenService {
       await cache.invalidate(bookId, preserveImages: true);
       rethrow;
     }
+  }
+
+  Future<void> _loadEmbeddedFonts(NormalizedBook book, String bookId) async {
+    final fontMap = book.metadata?['fonts'];
+    if (fontMap is! Map || fontMap.isEmpty) return;
+    final filePath = await _fileRepo.getFilePath(bookId);
+    if (filePath == null) return;
+    await EpubFontLoader.loadFonts(
+      epubPath: filePath,
+      fontMap: Map<String, dynamic>.from(fontMap),
+    );
   }
 
   NormalizedBook _bookFromMetadata(NormalizedBookMetadata metadata) {

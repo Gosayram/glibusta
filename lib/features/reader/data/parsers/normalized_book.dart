@@ -305,6 +305,7 @@ class ReaderBlock {
   final String? whiteSpaceMode; // MD-1.7: 'pre', 'pre-wrap', 'nowrap'
   final bool pageBreakBefore;
   final bool pageBreakInsideAvoid;
+  final bool hasDropCap;
 
   const ReaderBlock({
     required this.index,
@@ -326,6 +327,7 @@ class ReaderBlock {
     this.whiteSpaceMode,
     this.pageBreakBefore = false,
     this.pageBreakInsideAvoid = false,
+    this.hasDropCap = false,
   });
 
   ReaderBlock withImageUrl(String value) => ReaderBlock(
@@ -348,6 +350,7 @@ class ReaderBlock {
     whiteSpaceMode: whiteSpaceMode,
     pageBreakBefore: pageBreakBefore,
     pageBreakInsideAvoid: pageBreakInsideAvoid,
+    hasDropCap: hasDropCap,
   );
 
   Map<String, dynamic> toJson() => {
@@ -375,6 +378,7 @@ class ReaderBlock {
     if (noteId != null) 'noteId': noteId,
     if (pageBreakBefore) 'pageBreakBefore': true,
     if (pageBreakInsideAvoid) 'pageBreakInsideAvoid': true,
+    if (hasDropCap) 'hasDropCap': true,
   };
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
@@ -406,6 +410,7 @@ class ReaderBlock {
     whiteSpaceMode: _parseWhiteSpaceMode(json['textAlign']),
     pageBreakBefore: json['pageBreakBefore'] as bool? ?? false,
     pageBreakInsideAvoid: json['pageBreakInsideAvoid'] as bool? ?? false,
+    hasDropCap: json['hasDropCap'] as bool? ?? false,
   );
 }
 

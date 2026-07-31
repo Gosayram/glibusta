@@ -56,12 +56,11 @@ void main() {
         book(id: '2', title: 'Book B', authors: ['Толстой Лев']),
         book(id: '3', title: 'Book C', authors: ['Блок Александр']),
       ];
-      // "Толстой, Лев" and "Толстой Лев" normalize to same key → adjacent
-      // "Блок Александр" → "блок александр" sorts before "толстой"
       final sorted = sortLibraryBooks(mixed, LibrarySort.author);
-      expect(sorted[0].id, '3');
-      expect(sorted[1].id, anyOf('1', '2'));
-      expect(sorted[2].id, anyOf('1', '2'));
+      // 'Блок Александр' → swapped → 'александр блок'
+      // 'Толстой Лев' → swapped → 'лев толстой'
+      // 'Толстой, Лев' → comma removed → 'толстой лев'
+      expect(sorted.map((b) => b.id), ['3', '2', '1']);
     });
 
     test('normalizes ё→е for Russian sorting', () {
@@ -91,11 +90,10 @@ void main() {
         book(id: '3', title: 'C', authors: ['Asimov Isaac']),
       ];
       final sorted = sortLibraryBooks(mixed, LibrarySort.author);
-      // "Asimov, Isaac" and "Asimov Isaac" → "asimov isaac" → adjacent
-      // "Adams Douglas" → "adams douglas" → sorts first
-      expect(sorted[0].id, '2');
-      expect(sorted[1].id, anyOf('1', '3'));
-      expect(sorted[2].id, anyOf('1', '3'));
+      // 'Asimov, Isaac' → 'asimov isaac'
+      // 'Adams Douglas' → swapped → 'douglas adams'
+      // 'Asimov Isaac' → swapped → 'isaac asimov'
+      expect(sorted.map((b) => b.id), ['1', '2', '3']);
     });
   });
 }

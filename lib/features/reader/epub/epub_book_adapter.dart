@@ -42,6 +42,7 @@ class EpubBookAdapter {
         'epubAnchors': anchors,
         if (book.toc != null && book.toc!.isNotEmpty)
           'epubToc': book.toc!.map(_serializeTocItem).toList(),
+        if (book.fonts.isNotEmpty) 'fonts': book.fonts,
       },
     );
   }

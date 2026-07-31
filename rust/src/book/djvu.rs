@@ -285,6 +285,7 @@ impl DjvuEngine {
                     note_id: None,
                     page_break_before: false,
                     page_break_inside_avoid: false,
+                    has_drop_cap: false,
                 }]
             } else {
                 page_text
@@ -319,6 +320,7 @@ impl DjvuEngine {
                         note_id: None,
                         page_break_before: false,
                         page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     })
                     .collect()
             };

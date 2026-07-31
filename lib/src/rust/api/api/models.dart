@@ -507,6 +507,7 @@ class ReaderBlock {
   final String? noteId;
   final bool pageBreakBefore;
   final bool pageBreakInsideAvoid;
+  final bool hasDropCap;
 
   const ReaderBlock({
     required this.index,
@@ -525,6 +526,7 @@ class ReaderBlock {
     this.noteId,
     required this.pageBreakBefore,
     required this.pageBreakInsideAvoid,
+    required this.hasDropCap,
   });
 
   @override
@@ -544,7 +546,8 @@ class ReaderBlock {
       textAlign.hashCode ^
       noteId.hashCode ^
       pageBreakBefore.hashCode ^
-      pageBreakInsideAvoid.hashCode;
+      pageBreakInsideAvoid.hashCode ^
+      hasDropCap.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -566,7 +569,8 @@ class ReaderBlock {
           textAlign == other.textAlign &&
           noteId == other.noteId &&
           pageBreakBefore == other.pageBreakBefore &&
-          pageBreakInsideAvoid == other.pageBreakInsideAvoid;
+          pageBreakInsideAvoid == other.pageBreakInsideAvoid &&
+          hasDropCap == other.hasDropCap;
 }
 
 class ReaderChapter {
