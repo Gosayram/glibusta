@@ -9,7 +9,8 @@ part 'book_dao.g.dart';
 class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   BookDao(super.attachedDatabase);
 
-  Future<List<SavedBook>> getAllBooks() async => select(savedBooks).get();
+  Future<List<SavedBook>> getAllBooks() async =>
+      (select(savedBooks)..where((t) => t.deletedAt.isNull())).get();
 
   Future<List<SavedBook>> searchBooks(String query) async {
     final lower = '%$query%';
@@ -40,10 +41,39 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
 
   Future<int> deleteBook(String id) => (delete(savedBooks)..where((t) => t.id.equals(id))).go();
 
+  Future<int> softDeleteBook(String id) =>
+      (update(savedBooks)..where((t) => t.id.equals(id))).write(
+        SavedBooksCompanion(deletedAt: Value(DateTime.now())),
+      );
+
+  Future<int> restoreBook(String id) => (update(savedBooks)..where((t) => t.id.equals(id))).write(
+    const SavedBooksCompanion(deletedAt: Value(null)),
+  );
+
+  Future<List<SavedBook>> getDeletedBooks() =>
+      (select(savedBooks)..where((t) => t.deletedAt.isNotNull())).get();
+
+  Future<int> purgeDeletedBooks() =>
+      (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
+
   Future<int> updateReadingStatus(String bookId, String status) =>
       (update(savedBooks)..where((t) => t.id.equals(bookId))).write(
         SavedBooksCompanion(readingStatus: Value(status)),
       );
+
+  Future<int> updateBook({
+    required String bookId,
+    String? title,
+    List<String>? authorIds,
+    String? description,
+  }) {
+    final companion = SavedBooksCompanion(
+      title: title != null ? Value(title) : const Value.absent(),
+      authorIds: authorIds != null ? Value(authorIds) : const Value.absent(),
+      description: description != null ? Value(description) : const Value.absent(),
+    );
+    return (update(savedBooks)..where((t) => t.id.equals(bookId))).write(companion);
+  }
 
   Future<ReadingProgressData?> getReadingProgress(String bookId) async =>
       (select(readingProgress)..where((t) => t.bookId.equals(bookId))).getSingleOrNull();

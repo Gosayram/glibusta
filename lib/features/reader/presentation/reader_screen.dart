@@ -691,13 +691,16 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      _goToPreviousPage();
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      _goToNextPage();
-      return true;
+    final settings = ref.read(readerSettingsProvider);
+    if (settings.volumeButtonsEnabled) {
+      if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+        _goToPreviousPage();
+        return true;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+        _goToNextPage();
+        return true;
+      }
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
         event.logicalKey == LogicalKeyboardKey.arrowUp) {

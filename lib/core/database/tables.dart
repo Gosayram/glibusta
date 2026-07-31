@@ -28,6 +28,7 @@ class SavedBooks extends Table {
   TextColumn get userForcedEncoding => text().nullable()();
   TextColumn get storageMode => text().withDefault(const Constant('internal'))();
   TextColumn get externalUri => text().nullable()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};

@@ -17,6 +17,8 @@ class BookCard extends StatefulWidget {
   final double? progress;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onEditMetadata;
+  final VoidCallback? onAddToCollection;
 
   const BookCard({
     super.key,
@@ -25,6 +27,8 @@ class BookCard extends StatefulWidget {
     this.progress,
     this.onTap,
     this.onLongPress,
+    this.onEditMetadata,
+    this.onAddToCollection,
   });
 
   @override
@@ -240,6 +244,26 @@ class _BookCardState extends State<BookCard> {
           contentPadding: EdgeInsets.zero,
         ),
       ),
+      if (widget.onEditMetadata != null)
+        PopupMenuItem<VoidCallback>(
+          value: widget.onEditMetadata,
+          child: const ListTile(
+            leading: Icon(Icons.edit),
+            title: Text('Редактировать'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      if (widget.onAddToCollection != null)
+        PopupMenuItem<VoidCallback>(
+          value: widget.onAddToCollection,
+          child: const ListTile(
+            leading: Icon(Icons.collections_bookmark_outlined),
+            title: Text('Добавить в коллекцию'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
     ];
 
     unawaited(

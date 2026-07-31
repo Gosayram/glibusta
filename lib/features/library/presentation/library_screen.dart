@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
@@ -25,6 +26,7 @@ import '../../../shared/widgets/book_cover_image.dart';
 import '../../../shared/widgets/book_drop_zone.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
+import '../../collections/presentation/user_collections_provider.dart';
 import '../data/book_data_export.dart';
 import '../data/book_delete_service.dart';
 import '../data/book_import_service.dart';
@@ -54,9 +56,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _isSearchOpen = false;
   String _searchQuery = '';
   LibrarySort _sort = LibrarySort.recentlyAdded;
+  String? _selectedCollectionId;
+  String? _selectedCollectionName;
+  Set<String> _collectionBookIds = {};
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   final Set<String> _selectedBookIds = {};
+  bool _showTrash = false;
 
   bool get _selectionMode => _selectedBookIds.isNotEmpty;
 
@@ -71,6 +77,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Widget build(BuildContext context) {
     final booksAsync = ref.watch(libraryBooksProvider);
     final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
+    final selectedCollectionId = _selectedCollectionId;
 
     return Scaffold(
       appBar: _selectionMode ? _buildSelectionAppBar(ref) : _buildNormalAppBar(ref),
@@ -87,66 +94,116 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
               ),
             ),
-          Expanded(
-            child: BookDropZone(
-              onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  ref.invalidate(libraryBooksProvider);
-                },
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: KeyedSubtree(
-                    key: ValueKey(
-                      booksAsync.isLoading
-                          ? 'loading'
-                          : booksAsync.hasError
-                          ? 'error'
-                          : 'data_${booksAsync.value?.length ?? 0}',
+          if (selectedCollectionId != null)
+            Material(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.collections_bookmark_outlined,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    child: booksAsync.when(
-                      data: (List<Book> books) {
-                        final query = _searchQuery.toLowerCase();
-                        final filtered = query.isEmpty
-                            ? books
-                            : books.where((b) {
-                                final titleMatch = b.title.toLowerCase().contains(query);
-                                final authorMatch = b.displayAuthor.toLowerCase().contains(query);
-                                final descMatch =
-                                    b.description?.toLowerCase().contains(query) ?? false;
-                                return titleMatch || authorMatch || descMatch;
-                              }).toList();
-                        return _buildBooksGrid(context, ref, sortLibraryBooks(filtered, _sort));
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _selectedCollectionName ?? 'Коллекция',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () {
+                        setState(() {
+                          _selectedCollectionId = null;
+                          _selectedCollectionName = null;
+                        });
                       },
-                      loading: () => Skeletonizer.zone(
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.75,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Expanded(
+            child: _showTrash
+                ? _buildTrashView(context, ref)
+                : BookDropZone(
+                    onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        ref.invalidate(libraryBooksProvider);
+                      },
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: KeyedSubtree(
+                          key: ValueKey(
+                            booksAsync.isLoading
+                                ? 'loading'
+                                : booksAsync.hasError
+                                ? 'error'
+                                : 'data_${booksAsync.value?.length ?? 0}',
                           ),
-                          itemCount: 6,
-                          itemBuilder: (_, _) => Card(
-                            child: ListTile(
-                              leading: const Bone.circle(size: 48),
-                              title: Text(BoneMock.name),
-                              subtitle: Text(BoneMock.subtitle),
+                          child: booksAsync.when(
+                            data: (List<Book> books) {
+                              final query = _searchQuery.toLowerCase();
+                              var filtered = books;
+                              if (_selectedCollectionId != null) {
+                                filtered = filtered
+                                    .where((b) => _collectionBookIds.contains(b.id))
+                                    .toList();
+                              }
+                              if (query.isNotEmpty) {
+                                filtered = filtered.where((b) {
+                                  final titleMatch = b.title.toLowerCase().contains(query);
+                                  final authorMatch = b.displayAuthor.toLowerCase().contains(query);
+                                  final descMatch =
+                                      b.description?.toLowerCase().contains(query) ?? false;
+                                  return titleMatch || authorMatch || descMatch;
+                                }).toList();
+                              }
+                              return _buildBooksGrid(
+                                context,
+                                ref,
+                                sortLibraryBooks(filtered, _sort),
+                              );
+                            },
+                            loading: () => Skeletonizer.zone(
+                              child: GridView.builder(
+                                padding: const EdgeInsets.all(16),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 0.75,
+                                ),
+                                itemCount: 6,
+                                itemBuilder: (_, _) => Card(
+                                  child: ListTile(
+                                    leading: const Bone.circle(size: 48),
+                                    title: Text(BoneMock.name),
+                                    subtitle: Text(BoneMock.subtitle),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            error: (Object e, _) => ErrorStateWidget(
+                              message: 'Не удалось загрузить библиотеку',
+                              details: e.toString(),
+                              onRetry: () => ref.invalidate(libraryBooksProvider),
                             ),
                           ),
                         ),
                       ),
-                      error: (Object e, _) => ErrorStateWidget(
-                        message: 'Не удалось загрузить библиотеку',
-                        details: e.toString(),
-                        onRetry: () => ref.invalidate(libraryBooksProvider),
-                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -155,7 +212,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   PreferredSizeWidget _buildNormalAppBar(WidgetRef ref) {
     return AppBar(
-      title: _isSearchOpen
+      title: _showTrash
+          ? const Text('Корзина')
+          : _isSearchOpen
           ? TextField(
               controller: _searchController,
               focusNode: _searchFocusNode,
@@ -170,48 +229,77 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             )
           : const Text('Библиотека'),
       automaticallyImplyLeading: false,
+      leading: _showTrash
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Назад',
+              onPressed: () => setState(() => _showTrash = false),
+            )
+          : null,
       actions: [
-        IconButton(
-          icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-          tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
-          onPressed: () {
-            setState(() {
-              _isSearchOpen = !_isSearchOpen;
-              if (!_isSearchOpen) {
-                _searchController.clear();
-                _searchQuery = '';
-              } else {
-                _searchFocusNode.requestFocus();
-              }
-            });
-          },
-        ),
-        IconButton(
-          icon: Icon(
-            _viewModeIcon(
-              switch (ref.watch(libraryViewModeProvider)) {
-                AsyncData(:final value) => value,
-                _ => LibraryViewMode.grid,
-              },
-            ),
+        if (!_showTrash) ...[
+          IconButton(
+            icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
+            tooltip: _isSearchOpen ? 'Закрыть поиск' : 'Поиск',
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = !_isSearchOpen;
+                if (!_isSearchOpen) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                } else {
+                  _searchFocusNode.requestFocus();
+                }
+              });
+            },
           ),
-          tooltip: 'Вид',
-          onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
-        ),
-        PopupMenuButton<LibrarySort>(
-          icon: const Icon(Icons.sort),
-          tooltip: 'Сортировка: ${_sort.label}',
-          initialValue: _sort,
-          onSelected: (sort) => setState(() => _sort = sort),
-          itemBuilder: (context) => [
-            for (final sort in LibrarySort.values)
-              CheckedPopupMenuItem(
-                value: sort,
-                checked: sort == _sort,
-                child: Text(sort.label),
+          IconButton(
+            icon: Icon(
+              _viewModeIcon(
+                switch (ref.watch(libraryViewModeProvider)) {
+                  AsyncData(:final value) => value,
+                  _ => LibraryViewMode.grid,
+                },
               ),
-          ],
-        ),
+            ),
+            tooltip: 'Вид',
+            onPressed: () => ref.read(libraryViewModeProvider.notifier).cycle(),
+          ),
+          PopupMenuButton<LibrarySort>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Сортировка: ${_sort.label}',
+            initialValue: _sort,
+            onSelected: (sort) => setState(() => _sort = sort),
+            itemBuilder: (context) => [
+              for (final sort in LibrarySort.values)
+                CheckedPopupMenuItem(
+                  value: sort,
+                  checked: sort == _sort,
+                  child: Text(sort.label),
+                ),
+            ],
+          ),
+          IconButton(
+            icon: Icon(
+              _selectedCollectionId != null
+                  ? Icons.collections_bookmark
+                  : Icons.collections_bookmark_outlined,
+            ),
+            tooltip: 'Коллекция',
+            onPressed: () => _showCollectionFilterSheet(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Корзина',
+            onPressed: () => setState(() => _showTrash = true),
+          ),
+        ],
+        if (_showTrash)
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Очистить корзину',
+            onPressed: () => _purgeTrash(context, ref),
+          ),
         IconButton(
           icon: const Icon(Icons.add),
           tooltip: 'Добавить книги',
@@ -279,6 +367,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     setState(() => _selectedBookIds.clear());
   }
 
+  Future<void> _selectCollection(String? collectionId, String? collectionName) async {
+    if (collectionId == null) {
+      setState(() {
+        _selectedCollectionId = null;
+        _selectedCollectionName = null;
+        _collectionBookIds = {};
+      });
+      return;
+    }
+    final db = ref.read(databaseProvider);
+    final books = await db.collectionDao.getBooksInCollection(collectionId);
+    if (mounted) {
+      setState(() {
+        _selectedCollectionId = collectionId;
+        _selectedCollectionName = collectionName;
+        _collectionBookIds = books.map((b) => b.id).toSet();
+      });
+    }
+  }
+
   void _selectAllBooks() {
     final booksAsync = ref.read(libraryBooksProvider);
     final books = switch (booksAsync) {
@@ -299,7 +407,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Удалить $count ${_pluralBooks(count)}?'),
-        content: const Text('Книги будут удалены из библиотеки'),
+        content: const Text('Книги будут перемещены в корзину'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -325,8 +433,35 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     ref.invalidate(libraryBooksProvider);
     if (context.mounted) {
-      unawaited(SmartDialog.showToast('$count ${_pluralBooks(count)} удалено'));
+      _showUndoSnackBar(context, ref, ids, count);
     }
+  }
+
+  void _showUndoSnackBar(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> bookIds,
+    int count,
+  ) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('$count ${_pluralBooks(count)} удалено'),
+          action: SnackBarAction(
+            label: 'Отменить',
+            onPressed: () async {
+              final service = ref.read(bookDeleteServiceProvider);
+              for (final id in bookIds) {
+                await service.restoreFromTrash(id);
+              }
+              ref.invalidate(libraryBooksProvider);
+            },
+          ),
+          duration: const Duration(seconds: 10),
+        ),
+      );
   }
 
   Future<void> _batchExport(BuildContext context, WidgetRef ref) async {
@@ -346,6 +481,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, 'md'),
             child: const Text('Markdown'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'csv'),
+            child: const Text('CSV'),
           ),
         ],
       ),
@@ -405,6 +544,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         notes: allNotes,
       );
       file = File('${tmpDir.path}/glibusta_batch_export_$ts.md');
+      await file.writeAsString(content);
+    } else if (format == 'csv') {
+      final content = buildBookExportCsv(
+        bookTitle: selectedBooks.map((b) => b.title).join(', '),
+        highlights: allHighlights,
+        bookmarks: allBookmarks,
+        notes: allNotes,
+      );
+      file = File('${tmpDir.path}/glibusta_batch_export_$ts.csv');
       await file.writeAsString(content);
     } else {
       final jsonMap = {
@@ -700,6 +848,111 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     );
   }
 
+  Widget _buildTrashView(BuildContext context, WidgetRef ref) {
+    final service = ref.read(bookDeleteServiceProvider);
+    return FutureBuilder<List<SavedBook>>(
+      future: service.getTrashBooks(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final books = snapshot.data ?? [];
+        if (books.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.delete_outline,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Корзина пуста',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: books.length,
+          itemBuilder: (_, index) {
+            final book = books[index];
+            return ListTile(
+              leading: const Icon(Icons.book_outlined),
+              title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.restore),
+                    tooltip: 'Восстановить',
+                    onPressed: () async {
+                      await service.restoreFromTrash(book.id);
+                      if (context.mounted) {
+                        setState(() {});
+                        ref.invalidate(libraryBooksProvider);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_forever,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    tooltip: 'Удалить навсегда',
+                    onPressed: () async {
+                      await service.deleteBookCompletely(book.id);
+                      if (context.mounted) {
+                        setState(() {});
+                      }
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _purgeTrash(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Очистить корзину?'),
+        content: const Text('Все книги в корзине будут удалены навсегда'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Очистить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final service = ref.read(bookDeleteServiceProvider);
+    await service.purgeTrash();
+    if (context.mounted) {
+      setState(() {});
+      unawaited(SmartDialog.showToast('Корзина очищена'));
+    }
+  }
+
   void _showImportSheet(BuildContext context, WidgetRef ref) {
     unawaited(
       showModalBottomSheet<void>(
@@ -737,6 +990,41 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showCollectionFilterSheet(BuildContext context, WidgetRef ref) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => _CollectionFilterSheet(
+          selectedCollectionId: _selectedCollectionId,
+          onSelect: (id, name) {
+            Navigator.pop(ctx);
+            unawaited(_selectCollection(id, name));
+          },
+        ),
+      ),
+    );
+  }
+
+  void _showCollectionPicker(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => _CollectionPickerSheet(book: book),
+      ),
+    );
+  }
+
+  void _showEditMetadata(BuildContext context, WidgetRef ref, Book book) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => EditMetadataSheet(book: book),
       ),
     );
   }
@@ -844,6 +1132,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           ? () => _toggleSelection(book.id)
                           : () => unawaited(context.push('/reader/${book.id}')),
                       onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
+                      onEditMetadata: () => _showEditMetadata(context, ref, book),
+                      onAddToCollection: () => _showCollectionPicker(context, ref, book),
                     ),
                   );
                 },
@@ -899,6 +1189,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ? () => _toggleSelection(books[index].id)
                     : () => unawaited(context.push('/reader/${books[index].id}')),
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
+                onEditMetadata: () => _showEditMetadata(context, ref, books[index]),
+                onAddToCollection: () => _showCollectionPicker(context, ref, books[index]),
               ),
             ),
             childCount: books.length,
@@ -956,6 +1248,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ? () => _toggleSelection(books[index].id)
                     : () => unawaited(context.push('/reader/${books[index].id}')),
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
+                onEditMetadata: () => _showEditMetadata(context, ref, books[index]),
+                onAddToCollection: () => _showCollectionPicker(context, ref, books[index]),
               ),
             ),
             childCount: books.length,
@@ -1147,5 +1441,445 @@ class _TagPickerSheetState extends ConsumerState<_TagPickerSheet> {
     final parsed = int.tryParse(clean, radix: 16);
     if (parsed == null) return const Color(0xFFFFEB3B);
     return Color(0xFF000000 | parsed);
+  }
+}
+
+class EditMetadataSheet extends ConsumerStatefulWidget {
+  const EditMetadataSheet({required this.book, super.key});
+
+  final Book book;
+
+  @override
+  ConsumerState<EditMetadataSheet> createState() => _EditMetadataSheetState();
+}
+
+class _EditMetadataSheetState extends ConsumerState<EditMetadataSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  late final TextEditingController _authorController;
+  late final TextEditingController _descriptionController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.book.title);
+    _authorController = TextEditingController(text: widget.book.authorNames.join(', '));
+    _descriptionController = TextEditingController(text: widget.book.description ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _authorController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Редактировать метаданные',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Название',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Введите название';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _authorController,
+                  decoration: const InputDecoration(
+                    labelText: 'Автор',
+                    hintText: 'Иванов, Петров',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Описание',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Сохранить'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+    try {
+      final authorNames = _authorController.text
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      final updated = widget.book.copyWith(
+        title: _titleController.text.trim(),
+        authorIds: authorNames,
+        authorNames: authorNames,
+        description: _descriptionController.text.trim(),
+      );
+
+      final repository = ref.read(bookRepositoryProvider);
+      await repository.updateBook(updated);
+      ref.invalidate(libraryBooksProvider);
+
+      if (mounted) {
+        Navigator.pop(context);
+        unawaited(SmartDialog.showToast('Метаданные сохранены'));
+      }
+    } on Object catch (e) {
+      if (mounted) {
+        unawaited(SmartDialog.showToast('Ошибка сохранения: $e'));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+}
+
+class _CollectionFilterSheet extends ConsumerWidget {
+  const _CollectionFilterSheet({
+    required this.selectedCollectionId,
+    required this.onSelect,
+  });
+
+  final String? selectedCollectionId;
+  final void Function(String? id, String? name) onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final collectionsAsync = ref.watch(userCollectionsProvider);
+
+    return DraggableScrollableSheet(
+      minChildSize: 0.3,
+      maxChildSize: 0.7,
+      expand: false,
+      builder: (ctx, scrollController) => SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Фильтр по коллекции',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: collectionsAsync.when(
+                data: (collections) {
+                  return ListView(
+                    controller: scrollController,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.library_books_outlined),
+                        title: const Text('Все книги'),
+                        trailing: selectedCollectionId == null
+                            ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                            : null,
+                        onTap: () => onSelect(null, null),
+                      ),
+                      if (collections.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Нет коллекций. Создайте их на экране «Коллекции».',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      for (final col in collections)
+                        ListTile(
+                          leading: Icon(
+                            Icons.folder,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          title: Text(col.name),
+                          trailing: selectedCollectionId == col.id
+                              ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                              : null,
+                          onTap: () => onSelect(col.id, col.name),
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Ошибка: $e')),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CollectionPickerSheet extends ConsumerStatefulWidget {
+  const _CollectionPickerSheet({required this.book});
+
+  final Book book;
+
+  @override
+  ConsumerState<_CollectionPickerSheet> createState() => _CollectionPickerSheetState();
+}
+
+class _CollectionPickerSheetState extends ConsumerState<_CollectionPickerSheet> {
+  late Set<String> _selectedCollectionIds;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCollectionIds = {};
+    unawaited(_loadCollections());
+  }
+
+  Future<void> _loadCollections() async {
+    final db = ref.read(databaseProvider);
+    final bookCollections = await db.collectionDao.getCollectionsForBook(widget.book.id);
+    if (mounted) {
+      setState(() {
+        _selectedCollectionIds = bookCollections.map((c) => c.id).toSet();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final collectionsAsync = ref.watch(userCollectionsProvider);
+
+    return DraggableScrollableSheet(
+      minChildSize: 0.3,
+      maxChildSize: 0.8,
+      expand: false,
+      builder: (ctx, scrollController) => SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Добавить в коллекцию',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: collectionsAsync.when(
+                data: (collections) {
+                  if (collections.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.collections_bookmark_outlined,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text('Нет коллекций'),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              unawaited(_createCollectionFromPicker());
+                            },
+                            child: const Text('Создать коллекцию'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: collections.length,
+                    itemBuilder: (_, index) {
+                      final col = collections[index];
+                      final isSelected = _selectedCollectionIds.contains(col.id);
+                      return CheckboxListTile(
+                        secondary: Icon(
+                          Icons.folder,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: Text(col.name),
+                        value: isSelected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedCollectionIds.add(col.id);
+                            } else {
+                              _selectedCollectionIds.remove(col.id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Ошибка: $e')),
+              ),
+            ),
+            if (!_isLoading)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        unawaited(_createCollectionFromPicker());
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Новая'),
+                    ),
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: () => _saveCollections(ctx),
+                      child: const Text('Сохранить'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createCollectionFromPicker() async {
+    final controller = TextEditingController();
+    if (!mounted) return;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Новая коллекция'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Название коллекции',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Создать'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty && mounted) {
+      final db = ref.read(databaseProvider);
+      await db.collectionDao.insertCollection(
+        CollectionsCompanion.insert(id: const Uuid().v4(), name: result),
+      );
+      ref.invalidate(userCollectionsProvider);
+      if (mounted) {
+        unawaited(SmartDialog.showToast('Коллекция «$result» создана'));
+      }
+    }
+  }
+
+  Future<void> _saveCollections(BuildContext ctx) async {
+    final db = ref.read(databaseProvider);
+    final existing = await db.collectionDao.getCollectionsForBook(widget.book.id);
+    final existingIds = existing.map((c) => c.id).toSet();
+
+    for (final id in _selectedCollectionIds.difference(existingIds)) {
+      await db.collectionDao.addBookToCollection(widget.book.id, id);
+    }
+    for (final id in existingIds.difference(_selectedCollectionIds)) {
+      await db.collectionDao.removeBookFromCollection(widget.book.id, id);
+    }
+
+    if (ctx.mounted) {
+      Navigator.pop(ctx);
+      unawaited(SmartDialog.showToast('Коллекции обновлены'));
+    }
   }
 }

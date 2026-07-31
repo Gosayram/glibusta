@@ -59,6 +59,29 @@ class Book {
       ? authorIds.first
       : '';
 
+  Book copyWith({
+    String? title,
+    List<String>? authorIds,
+    List<String>? authorNames,
+    String? description,
+  }) {
+    return Book(
+      id: id,
+      title: title ?? this.title,
+      authorIds: authorIds ?? this.authorIds,
+      authorNames: authorNames ?? this.authorNames,
+      genreIds: genreIds,
+      description: description ?? this.description,
+      coverUrl: coverUrl,
+      coverPath: coverPath,
+      publishDate: publishDate,
+      dateAdded: dateAdded,
+      availableFormats: availableFormats,
+      source: source,
+      readingStatus: readingStatus,
+    );
+  }
+
   String get readingStatusLabel => readingStatus.readingStatusLabel;
 }
 

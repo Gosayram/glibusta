@@ -9,11 +9,9 @@ import 'package:uuid/uuid.dart';
 import '../../../core/database/app_database.dart';
 import '../../../shared/widgets/book_card.dart';
 import 'smart_collections_provider.dart';
+import 'user_collections_provider.dart';
 
-final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.collectionDao.getAllCollections();
-});
+export 'user_collections_provider.dart';
 
 class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});

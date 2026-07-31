@@ -249,6 +249,17 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -273,6 +284,7 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     userForcedEncoding,
     storageMode,
     externalUri,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -440,6 +452,12 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         ),
       );
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -541,6 +559,10 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}external_uri'],
       ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -576,6 +598,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final String? userForcedEncoding;
   final String storageMode;
   final String? externalUri;
+  final DateTime? deletedAt;
   const SavedBook({
     required this.id,
     required this.title,
@@ -599,6 +622,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     this.userForcedEncoding,
     required this.storageMode,
     this.externalUri,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -659,6 +683,9 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || externalUri != null) {
       map['external_uri'] = Variable<String>(externalUri);
     }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -694,6 +721,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           : Value(userForcedEncoding),
       storageMode: Value(storageMode),
       externalUri: externalUri == null && nullToAbsent ? const Value.absent() : Value(externalUri),
+      deletedAt: deletedAt == null && nullToAbsent ? const Value.absent() : Value(deletedAt),
     );
   }
 
@@ -729,6 +757,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       ),
       storageMode: serializer.fromJson<String>(json['storageMode']),
       externalUri: serializer.fromJson<String?>(json['externalUri']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -757,6 +786,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'userForcedEncoding': serializer.toJson<String?>(userForcedEncoding),
       'storageMode': serializer.toJson<String>(storageMode),
       'externalUri': serializer.toJson<String?>(externalUri),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -783,6 +813,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     Value<String?> userForcedEncoding = const Value.absent(),
     String? storageMode,
     Value<String?> externalUri = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => SavedBook(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -810,6 +841,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
         : this.userForcedEncoding,
     storageMode: storageMode ?? this.storageMode,
     externalUri: externalUri.present ? externalUri.value : this.externalUri,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
     return SavedBook(
@@ -841,6 +873,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           : this.userForcedEncoding,
       storageMode: data.storageMode.present ? data.storageMode.value : this.storageMode,
       externalUri: data.externalUri.present ? data.externalUri.value : this.externalUri,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -868,7 +901,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('encodingSource: $encodingSource, ')
           ..write('userForcedEncoding: $userForcedEncoding, ')
           ..write('storageMode: $storageMode, ')
-          ..write('externalUri: $externalUri')
+          ..write('externalUri: $externalUri, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -897,6 +931,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     userForcedEncoding,
     storageMode,
     externalUri,
+    deletedAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -923,7 +958,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.encodingSource == this.encodingSource &&
           other.userForcedEncoding == this.userForcedEncoding &&
           other.storageMode == this.storageMode &&
-          other.externalUri == this.externalUri);
+          other.externalUri == this.externalUri &&
+          other.deletedAt == this.deletedAt);
 }
 
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
@@ -949,6 +985,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<String?> userForcedEncoding;
   final Value<String> storageMode;
   final Value<String?> externalUri;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const SavedBooksCompanion({
     this.id = const Value.absent(),
@@ -973,6 +1010,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.userForcedEncoding = const Value.absent(),
     this.storageMode = const Value.absent(),
     this.externalUri = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedBooksCompanion.insert({
@@ -998,6 +1036,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.userForcedEncoding = const Value.absent(),
     this.storageMode = const Value.absent(),
     this.externalUri = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -1024,6 +1063,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<String>? userForcedEncoding,
     Expression<String>? storageMode,
     Expression<String>? externalUri,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1049,6 +1089,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (userForcedEncoding != null) 'user_forced_encoding': userForcedEncoding,
       if (storageMode != null) 'storage_mode': storageMode,
       if (externalUri != null) 'external_uri': externalUri,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1076,6 +1117,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<String?>? userForcedEncoding,
     Value<String>? storageMode,
     Value<String?>? externalUri,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return SavedBooksCompanion(
@@ -1101,6 +1143,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       userForcedEncoding: userForcedEncoding ?? this.userForcedEncoding,
       storageMode: storageMode ?? this.storageMode,
       externalUri: externalUri ?? this.externalUri,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1178,6 +1221,9 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     if (externalUri.present) {
       map['external_uri'] = Variable<String>(externalUri.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1209,6 +1255,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('userForcedEncoding: $userForcedEncoding, ')
           ..write('storageMode: $storageMode, ')
           ..write('externalUri: $externalUri, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8663,6 +8710,7 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<String?> userForcedEncoding,
       Value<String> storageMode,
       Value<String?> externalUri,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$SavedBooksTableUpdateCompanionBuilder =
@@ -8689,6 +8737,7 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<String?> userForcedEncoding,
       Value<String> storageMode,
       Value<String?> externalUri,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -8811,6 +8860,11 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     column: $table.externalUri,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -8930,6 +8984,11 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     column: $table.externalUri,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -9027,6 +9086,9 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
     column: $table.externalUri,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 }
 
 class $$SavedBooksTableTableManager
@@ -9080,6 +9142,7 @@ class $$SavedBooksTableTableManager
                 Value<String?> userForcedEncoding = const Value.absent(),
                 Value<String> storageMode = const Value.absent(),
                 Value<String?> externalUri = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
                 id: id,
@@ -9104,6 +9167,7 @@ class $$SavedBooksTableTableManager
                 userForcedEncoding: userForcedEncoding,
                 storageMode: storageMode,
                 externalUri: externalUri,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9130,6 +9194,7 @@ class $$SavedBooksTableTableManager
                 Value<String?> userForcedEncoding = const Value.absent(),
                 Value<String> storageMode = const Value.absent(),
                 Value<String?> externalUri = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(
                 id: id,
@@ -9154,6 +9219,7 @@ class $$SavedBooksTableTableManager
                 userForcedEncoding: userForcedEncoding,
                 storageMode: storageMode,
                 externalUri: externalUri,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>

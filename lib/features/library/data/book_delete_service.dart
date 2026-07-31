@@ -20,9 +20,24 @@ class BookDeleteService {
   BookDeleteService(this._db, this._storage);
 
   Future<void> removeFromLibrary(String bookId) async {
-    await _db.bookDao.deleteBook(bookId);
-    _logger.info('Removed from library: $bookId', name: 'BookDelete');
+    await _db.bookDao.softDeleteBook(bookId);
+    _logger.info('Soft-deleted from library: $bookId', name: 'BookDelete');
   }
+
+  Future<void> restoreFromTrash(String bookId) async {
+    await _db.bookDao.restoreBook(bookId);
+    _logger.info('Restored from trash: $bookId', name: 'BookDelete');
+  }
+
+  Future<void> purgeTrash() async {
+    final deletedBooks = await _db.bookDao.getDeletedBooks();
+    for (final book in deletedBooks) {
+      await deleteBookCompletely(book.id);
+    }
+    _logger.info('Purged ${deletedBooks.length} books from trash', name: 'BookDelete');
+  }
+
+  Future<List<SavedBook>> getTrashBooks() => _db.bookDao.getDeletedBooks();
 
   Future<void> deleteBookCompletely(String bookId) async {
     String? targetPath;

@@ -93,6 +93,7 @@ class ReaderSettingsPersistence {
         verticalSwipeBrightness: map['verticalSwipeBrightness'] as bool? ?? true,
         pageTurnHaptic: map['pageTurnHaptic'] as bool? ?? false,
         twoFingerChapterNavigation: map['twoFingerChapterNavigation'] as bool? ?? false,
+        volumeButtonsEnabled: map['volumeButtonsEnabled'] as bool? ?? false,
         doubleTapAction: DoubleTapAction.values.firstWhere(
           (e) => e.name == map['doubleTapAction'],
           orElse: () => DoubleTapAction.toggleUI,
@@ -234,6 +235,7 @@ class ReaderSettingsPersistence {
         'verticalSwipeBrightness': settings.verticalSwipeBrightness,
         'pageTurnHaptic': settings.pageTurnHaptic,
         'twoFingerChapterNavigation': settings.twoFingerChapterNavigation,
+        'volumeButtonsEnabled': settings.volumeButtonsEnabled,
         'doubleTapAction': settings.doubleTapAction.name,
         'longPressAction': settings.longPressAction.name,
         'topLeftCornerTapAction': settings.topLeftCornerTapAction.name,

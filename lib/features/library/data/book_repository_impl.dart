@@ -65,6 +65,16 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<void> updateBook(Book book) async {
+    await _db.bookDao.updateBook(
+      bookId: book.id,
+      title: book.title,
+      authorIds: book.authorIds,
+      description: book.description,
+    );
+  }
+
+  @override
   Future<void> deleteBook(String id) async {
     await _db.bookDao.deleteBook(id);
   }

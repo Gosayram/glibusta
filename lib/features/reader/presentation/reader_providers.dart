@@ -275,6 +275,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(twoFingerChapterNavigation: enabled);
   }
 
+  void updateVolumeButtonsEnabled(bool enabled) {
+    state = state.copyWith(volumeButtonsEnabled: enabled);
+  }
+
   void updateDoubleTapAction(DoubleTapAction action) {
     state = state.copyWith(doubleTapAction: action);
   }

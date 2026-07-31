@@ -79,6 +79,11 @@ String buildBookExportMdFilename(String bookId) {
   return 'glibusta_export_${bookId}_$ts.md';
 }
 
+String buildBookExportCsvFilename(String bookId) {
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  return 'glibusta_export_${bookId}_$ts.csv';
+}
+
 String buildBookExportTxt({
   required String bookTitle,
   required List<TextHighlight> highlights,
@@ -128,6 +133,61 @@ String buildBookExportTxt({
         ..writeln(n.content)
         ..writeln();
     }
+  }
+
+  return buf.toString();
+}
+
+String _csvEscape(String? value) {
+  if (value == null || value.isEmpty) return '';
+  if (value.contains(';') || value.contains('"') || value.contains('\n')) {
+    return '"${value.replaceAll('"', '""')}"';
+  }
+  return value;
+}
+
+String buildBookExportCsv({
+  required String bookTitle,
+  required List<TextHighlight> highlights,
+  required List<Bookmark> bookmarks,
+  required List<Note> notes,
+}) {
+  final buf = StringBuffer()..writeln('Type;Text;Note;Color;Page;Chapter;Date');
+
+  for (final h in highlights) {
+    buf.writeln(
+      'Highlight;'
+      '${_csvEscape(h.selectedText)};'
+      '${_csvEscape(h.noteText)};'
+      '${_csvEscape(h.color)};'
+      '${h.chapterIndex + 1};'
+      '${_csvEscape(h.chapterId)};'
+      '${h.createdAt.toIso8601String()}',
+    );
+  }
+
+  for (final b in bookmarks) {
+    buf.writeln(
+      'Bookmark;'
+      '${_csvEscape(b.selectedText)};'
+      '${_csvEscape(b.note)};'
+      ';'
+      '${b.chapterIndex + 1};'
+      ';'
+      '${b.createdAt.toIso8601String()}',
+    );
+  }
+
+  for (final n in notes) {
+    buf.writeln(
+      'Note;'
+      '${_csvEscape(n.content)};'
+      ';'
+      '${_csvEscape(n.highlightColor)};'
+      '${n.chapterIndex + 1};'
+      ';'
+      '${n.createdAt.toIso8601String()}',
+    );
   }
 
   return buf.toString();

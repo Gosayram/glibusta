@@ -29,6 +29,7 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
   late TabController _tabController;
   final _searchController = TextEditingController();
   bool _isSearching = false;
+  String? _selectedColor;
 
   @override
   void initState() {
@@ -132,16 +133,46 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
       ),
       body: annotationsAsync.when(
         data: (data) {
-          return TabBarView(
-            controller: _tabController,
+          final usedColors = data.notes
+              .map((n) => n.highlightColor)
+              .where((c) => c.isNotEmpty)
+              .toSet()
+              .toList(growable: false);
+          return Column(
             children: [
-              _BookmarkList(
-                bookmarks: data.bookmarks,
-                bookId: widget.bookId,
-                query: _searchController.text,
+              if (usedColors.length > 1)
+                _ColorFilterRow(
+                  colors: usedColors,
+                  selectedColor: _selectedColor,
+                  onColorTap: (color) {
+                    setState(() {
+                      _selectedColor = _selectedColor == color ? null : color;
+                    });
+                  },
+                ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _BookmarkList(
+                      bookmarks: data.bookmarks,
+                      bookId: widget.bookId,
+                      query: _searchController.text,
+                    ),
+                    _NoteList(
+                      notes: data.notes,
+                      bookId: widget.bookId,
+                      query: _searchController.text,
+                      colorFilter: _selectedColor,
+                    ),
+                    _QuoteList(
+                      quotes: data.quotes,
+                      bookId: widget.bookId,
+                      query: _searchController.text,
+                    ),
+                  ],
+                ),
               ),
-              _NoteList(notes: data.notes, bookId: widget.bookId, query: _searchController.text),
-              _QuoteList(quotes: data.quotes, bookId: widget.bookId, query: _searchController.text),
             ],
           );
         },
@@ -248,16 +279,23 @@ class _NoteList extends ConsumerWidget {
   final List<Note> notes;
   final String? bookId;
   final String query;
+  final String? colorFilter;
 
-  const _NoteList({required this.notes, this.bookId, this.query = ''});
+  const _NoteList({required this.notes, this.bookId, this.query = '', this.colorFilter});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filteredNotes = notes
-        .where((note) => _matchesQuery(query, note.content))
+        .where(
+          (note) =>
+              _matchesQuery(query, note.content) &&
+              (colorFilter == null || note.highlightColor == colorFilter),
+        )
         .toList(growable: false);
     if (filteredNotes.isEmpty) {
-      if (notes.isNotEmpty && query.trim().isNotEmpty) return const _SearchEmptyState();
+      if (notes.isNotEmpty && (query.trim().isNotEmpty || colorFilter != null)) {
+        return const _SearchEmptyState();
+      }
       return const _EmptyState(
         icon: Icons.note_alt_outlined,
         message: 'Нет заметок',
@@ -484,6 +522,49 @@ Color _parseColor(String? hexString) {
   final parsed = int.tryParse('0xFF$cleaned');
   if (parsed == null) return Colors.amber;
   return Color(parsed);
+}
+
+class _ColorFilterRow extends StatelessWidget {
+  final List<String> colors;
+  final String? selectedColor;
+  final ValueChanged<String> onColorTap;
+
+  const _ColorFilterRow({
+    required this.colors,
+    required this.selectedColor,
+    required this.onColorTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          for (final hex in colors) ...[
+            GestureDetector(
+              onTap: () => onColorTap(hex),
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: _parseColor(hex),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: selectedColor == hex
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Colors.transparent,
+                    width: 2.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
