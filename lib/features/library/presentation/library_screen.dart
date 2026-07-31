@@ -764,6 +764,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.html),
+                title: const Text('Экспорт HTML'),
+                subtitle: const Text('Закладки, заметки, выделения'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_exportBookDataHtml(context, ref, book));
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.tune),
                 title: const Text('Сбросить настройки чтения'),
                 onTap: () async {
@@ -853,6 +862,53 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       );
     } on Object catch (e) {
       AppLogger().warning('Export failed: $e', name: 'Library', error: e);
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Не удалось экспортировать данные'));
+      }
+    }
+  }
+
+  Future<void> _exportBookDataHtml(
+    BuildContext context,
+    WidgetRef ref,
+    Book book,
+  ) async {
+    try {
+      final db = ref.read(databaseProvider);
+      final highlights = await db.highlightDao.getHighlightsForBook(book.id);
+      final bookmarks = await (db.select(
+        db.bookmarks,
+      )..where((b) => b.bookId.equals(book.id))).get();
+      final notes = await (db.select(db.notes)..where((n) => n.bookId.equals(book.id))).get();
+
+      if (bookmarks.isEmpty && notes.isEmpty && highlights.isEmpty) {
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Нет данных для экспорта'));
+        }
+        return;
+      }
+
+      final html = buildBookExportHtml(
+        bookTitle: book.title,
+        highlights: highlights,
+        bookmarks: bookmarks,
+        notes: notes,
+      );
+
+      final tmpDir = await getTemporaryDirectory();
+      final filename = buildBookExportHtmlFilename(book.id);
+      final file = File('${tmpDir.path}/$filename');
+      await file.writeAsString(html);
+
+      if (!context.mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Экспорт данных: ${book.title}',
+        ),
+      );
+    } on Object catch (e) {
+      AppLogger().warning('HTML export failed: $e', name: 'Library', error: e);
       if (context.mounted) {
         unawaited(SmartDialog.showToast('Не удалось экспортировать данные'));
       }

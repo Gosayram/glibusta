@@ -12,7 +12,6 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
-import 'reader_chrome.dart';
 import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
 import 'reading_break_reminder.dart';
@@ -448,7 +447,26 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
         const _SectionTitle('Панели чтения'),
-        const ReaderChromeVisibilityGuide(),
+        _buildToggleRow(
+          'Информация сверху',
+          Icons.info_outline,
+          settings.showTopInfoBar,
+          (v) => notifier.updateShowTopInfoBar(v),
+        ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Панель инструментов',
+          Icons.tune,
+          settings.showTopToolbar,
+          (v) => notifier.updateShowTopToolbar(v),
+        ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Нижняя панель',
+          Icons.vertical_align_bottom,
+          settings.showBottomBar,
+          (v) => notifier.updateShowBottomBar(v),
+        ),
         const SizedBox(height: 16),
         const _SectionTitle('Горизонтальный жест'),
         _buildHorizontalGestureRow(settings, notifier),

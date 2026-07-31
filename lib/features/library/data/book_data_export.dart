@@ -63,3 +63,115 @@ String buildBookExportFilename(String bookId) {
   final ts = DateTime.now().millisecondsSinceEpoch;
   return 'glibusta_export_${bookId}_$ts.json';
 }
+
+String buildBookExportHtmlFilename(String bookId) {
+  final ts = DateTime.now().millisecondsSinceEpoch;
+  return 'glibusta_export_${bookId}_$ts.html';
+}
+
+String buildBookExportHtml({
+  required String bookTitle,
+  required List<TextHighlight> highlights,
+  required List<Bookmark> bookmarks,
+  required List<Note> notes,
+}) {
+  final buf = StringBuffer()
+    ..write('<!DOCTYPE html>')
+    ..write('<html lang="ru"><head><meta charset="utf-8">')
+    ..write('<title>${_esc(bookTitle)}</title>')
+    ..write(_css())
+    ..write('</head><body>')
+    ..write('<h1>${_esc(bookTitle)}</h1>');
+
+  if (highlights.isNotEmpty) {
+    buf
+      ..write('<section><h2>Выделения</h2>')
+      ..write('<ul class="items">');
+    for (final h in highlights) {
+      buf
+        ..write('<li>')
+        ..write(
+          '<span class="hl" style="background-color:${_esc(h.color)}">'
+          '${_esc(h.selectedText)}</span>',
+        );
+      if (h.noteText != null && h.noteText!.trim().isNotEmpty) {
+        buf.write('<div class="note">${_esc(h.noteText!)}</div>');
+      }
+      buf
+        ..write('<time>${_esc(h.createdAt.toIso8601String())}</time>')
+        ..write('</li>');
+    }
+    buf.write('</ul></section>');
+  }
+
+  if (bookmarks.isNotEmpty) {
+    buf
+      ..write('<section><h2>Закладки</h2>')
+      ..write('<ul class="items">');
+    for (final b in bookmarks) {
+      buf
+        ..write('<li>')
+        ..write(
+          '<span class="anchor">Глава ${b.chapterIndex + 1}, '
+          'абзац ${b.paragraphIndex + 1}</span>',
+        );
+      if (b.selectedText != null && b.selectedText!.trim().isNotEmpty) {
+        buf.write('<blockquote>${_esc(b.selectedText!)}</blockquote>');
+      }
+      if (b.note != null && b.note!.trim().isNotEmpty) {
+        buf.write('<div class="note">${_esc(b.note!)}</div>');
+      }
+      buf
+        ..write('<time>${_esc(b.createdAt.toIso8601String())}</time>')
+        ..write('</li>');
+    }
+    buf.write('</ul></section>');
+  }
+
+  if (notes.isNotEmpty) {
+    buf
+      ..write('<section><h2>Заметки</h2>')
+      ..write('<ul class="items">');
+    for (final n in notes) {
+      buf
+        ..write('<li>')
+        ..write(
+          '<span class="anchor">Глава ${n.chapterIndex + 1}, '
+          'абзац ${n.paragraphIndex + 1}</span>',
+        )
+        ..write('<div class="content">${_esc(n.content)}</div>')
+        ..write(
+          '<time>${_esc(n.createdAt.toIso8601String())}</time>',
+        )
+        ..write('</li>');
+    }
+    buf.write('</ul></section>');
+  }
+
+  buf.write('</body></html>');
+  return buf.toString();
+}
+
+String _esc(String s) => s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+String _css() =>
+    '<style>'
+    'body{font-family:Georgia,serif;max-width:800px;margin:0 auto; '
+    'padding:20px;line-height:1.6;color:#222} '
+    'h1{border-bottom:2px solid #444;padding-bottom:8px} '
+    'h2{color:#555;margin-top:32px} '
+    '.items{list-style:none;padding:0} '
+    '.items li{margin-bottom:16px;padding:12px;border:1px solid #ddd; '
+    'border-radius:4px} '
+    '.hl{padding:2px 4px;border-radius:2px} '
+    'blockquote{margin:8px 0 0;padding:8px 12px;border-left:3px solid #ccc; '
+    'color:#555;font-style:italic} '
+    '.note{margin-top:6px;color:#666;font-size:0.95em} '
+    '.anchor{font-size:0.85em;color:#888} '
+    '.content{margin-top:4px} '
+    'time{display:block;font-size:0.8em;color:#999;margin-top:4px} '
+    '</style>';

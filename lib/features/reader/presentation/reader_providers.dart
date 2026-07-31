@@ -363,6 +363,18 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(hideBarsOnFastScroll: enabled);
   }
 
+  void updateShowTopInfoBar(bool value) {
+    state = state.copyWith(showTopInfoBar: value);
+  }
+
+  void updateShowTopToolbar(bool value) {
+    state = state.copyWith(showTopToolbar: value);
+  }
+
+  void updateShowBottomBar(bool value) {
+    state = state.copyWith(showBottomBar: value);
+  }
+
   void updateOrientationLock(OrientationLock lock) {
     state = state.copyWith(orientationLock: lock);
   }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart' show TextAlign;
 
 import 'smil_parser.dart';
@@ -10,6 +12,7 @@ class NormalizedBook {
   final String? coverUrl;
   final List<ReaderChapter> chapters;
   final Map<String, dynamic>? metadata;
+  final Map<String, Uint8List> fonts;
 
   const NormalizedBook({
     required this.id,
@@ -19,6 +22,7 @@ class NormalizedBook {
     this.coverUrl,
     this.chapters = const [],
     this.metadata,
+    this.fonts = const {},
   });
 
   NormalizedBookMetadata toMetadata() => NormalizedBookMetadata(
@@ -30,6 +34,7 @@ class NormalizedBook {
     chapterCount: chapters.length,
     chapterTitles: chapters.map((c) => c.title).toList(),
     metadata: metadata,
+    fonts: fonts,
   );
 
   Map<String, dynamic> toJson() => {
@@ -40,6 +45,7 @@ class NormalizedBook {
     'coverUrl': coverUrl,
     'chapters': chapters.map((c) => c.toJson()).toList(),
     'metadata': metadata,
+    if (fonts.isNotEmpty) 'fonts': fonts.map((k, v) => MapEntry(k, v)),
   };
 
   factory NormalizedBook.fromJson(Map<String, dynamic> json) => NormalizedBook(
@@ -54,6 +60,9 @@ class NormalizedBook {
             .toList() ??
         [],
     metadata: json['metadata'] as Map<String, dynamic>?,
+    fonts:
+        (json['fonts'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as Uint8List)) ??
+        const {},
   );
 
   NormalizedBook withCleanedBlocks() {
@@ -65,6 +74,7 @@ class NormalizedBook {
       coverUrl: coverUrl,
       chapters: chapters.map((ch) => ch.withCleanedBlocks()).toList(),
       metadata: metadata,
+      fonts: fonts,
     );
   }
 
@@ -94,6 +104,7 @@ class NormalizedBook {
           )
           .toList(),
       metadata: metadata,
+      fonts: fonts,
     );
   }
 }
@@ -107,6 +118,7 @@ class NormalizedBookMetadata {
   final int chapterCount;
   final List<String> chapterTitles;
   final Map<String, dynamic>? metadata;
+  final Map<String, Uint8List> fonts;
 
   const NormalizedBookMetadata({
     required this.id,
@@ -117,6 +129,7 @@ class NormalizedBookMetadata {
     required this.chapterCount,
     required this.chapterTitles,
     this.metadata,
+    this.fonts = const {},
   });
 
   Map<String, dynamic> toJson() => {
@@ -128,6 +141,7 @@ class NormalizedBookMetadata {
     'chapterCount': chapterCount,
     'chapterTitles': chapterTitles,
     'metadata': metadata,
+    if (fonts.isNotEmpty) 'fonts': fonts.map((k, v) => MapEntry(k, v)),
   };
 
   factory NormalizedBookMetadata.fromJson(Map<String, dynamic> json) => NormalizedBookMetadata(
@@ -139,6 +153,9 @@ class NormalizedBookMetadata {
     chapterCount: json['chapterCount'] as int,
     chapterTitles: (json['chapterTitles'] as List<dynamic>?)?.cast<String>() ?? [],
     metadata: json['metadata'] as Map<String, dynamic>?,
+    fonts:
+        (json['fonts'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as Uint8List)) ??
+        const {},
   );
 
   /// Builds a chapter list from metadata, preferring [loadedChapters] when

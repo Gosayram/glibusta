@@ -942,133 +942,135 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             },
           ),
         ),
-        if (!isFocusMode)
+        if (!isFocusMode && settings.showTopInfoBar)
           _buildReadingInfoBar(
             context,
             readerState,
             settings,
             position: _ReadingInfoPosition.header,
           ),
-        if (!isFocusMode)
+        if (!isFocusMode && settings.showTopInfoBar)
           _buildReadingInfoBar(
             context,
             readerState,
             settings,
             position: _ReadingInfoPosition.footer,
           ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Builder(
-            builder: (context) {
-              final dur = MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : AppDuration.fast;
-              return AnimatedSlide(
-                offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
-                duration: dur,
-                curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: readerState.uiVisible ? 1.0 : 0.0,
+        if (settings.showTopToolbar)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Builder(
+              builder: (context) {
+                final dur = MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : AppDuration.fast;
+                return AnimatedSlide(
+                  offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
                   duration: dur,
-                  child: ReaderTopBar(
-                    settings: settings,
-                    bookTitle: readerState.metadata?.title ?? '',
-                    bookAuthor: readerState.metadata?.authors.join(', '),
-                    isBookmarked: readerState.checkpoints.any(
-                      (c) => (c - readerState.scrollProgress).abs() < 0.02,
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: readerState.uiVisible ? 1.0 : 0.0,
+                    duration: dur,
+                    child: ReaderTopBar(
+                      settings: settings,
+                      bookTitle: readerState.metadata?.title ?? '',
+                      bookAuthor: readerState.metadata?.authors.join(', '),
+                      isBookmarked: readerState.checkpoints.any(
+                        (c) => (c - readerState.scrollProgress).abs() < 0.02,
+                      ),
+                      hasLinkBack: _ctrl.hasLinkBack,
+                      hasLinkForward: _ctrl.hasLinkForward,
+                      onBack: () {
+                        if (_ctrl.popLinkPosition()) return;
+                        Navigator.of(context).pop();
+                      },
+                      onLinkForward: _ctrl.forwardLinkPosition,
+                      onSearch: () {
+                        _ctrl.toggleSearch();
+                        if (_ctrl.state.isSearchOpen) {
+                          _gestureCoordinator.onSearchOpened();
+                        } else {
+                          _gestureCoordinator.onSearchClosed();
+                        }
+                      },
+                      onToc: readerState.metadata != null
+                          ? () {
+                              _ctrl.saveCheckpoint();
+                              TableOfContentsSheet.show(
+                                context,
+                                metadata: readerState.metadata!,
+                                currentChapterIndex: readerState.currentPosition.chapterIndex,
+                                currentChapterProgress: readerState.scrollProgress,
+                                onJumpToPosition: _ctrl.jumpToPosition,
+                                loadedChapters: readerState.loadedChapters,
+                                isDynamicallyLoading: readerState.isDynamicallyLoading,
+                              );
+                            }
+                          : null,
+                      onBookmark: () => _ctrl.addBookmark(),
+                      onMore: () => _showQuickSettings(context),
+                      onBookInfo: () => _showBookStats(context, readerState),
+                      onKaraoke: () {
+                        final chapter =
+                            readerState.loadedChapters[readerState.currentPosition.chapterIndex];
+                        if (chapter?.smilEntries != null && chapter!.smilEntries!.isNotEmpty) {
+                          unawaited(_startKaraoke(context, readerState, chapter));
+                        } else {
+                          _showKaraokeUnavailable(context);
+                        }
+                      },
                     ),
-                    hasLinkBack: _ctrl.hasLinkBack,
-                    hasLinkForward: _ctrl.hasLinkForward,
-                    onBack: () {
-                      if (_ctrl.popLinkPosition()) return;
-                      Navigator.of(context).pop();
-                    },
-                    onLinkForward: _ctrl.forwardLinkPosition,
-                    onSearch: () {
-                      _ctrl.toggleSearch();
-                      if (_ctrl.state.isSearchOpen) {
-                        _gestureCoordinator.onSearchOpened();
-                      } else {
-                        _gestureCoordinator.onSearchClosed();
-                      }
-                    },
-                    onToc: readerState.metadata != null
-                        ? () {
-                            _ctrl.saveCheckpoint();
-                            TableOfContentsSheet.show(
-                              context,
-                              metadata: readerState.metadata!,
-                              currentChapterIndex: readerState.currentPosition.chapterIndex,
-                              currentChapterProgress: readerState.scrollProgress,
-                              onJumpToPosition: _ctrl.jumpToPosition,
-                              loadedChapters: readerState.loadedChapters,
-                              isDynamicallyLoading: readerState.isDynamicallyLoading,
-                            );
-                          }
-                        : null,
-                    onBookmark: () => _ctrl.addBookmark(),
-                    onMore: () => _showQuickSettings(context),
-                    onBookInfo: () => _showBookStats(context, readerState),
-                    onKaraoke: () {
-                      final chapter =
-                          readerState.loadedChapters[readerState.currentPosition.chapterIndex];
-                      if (chapter?.smilEntries != null && chapter!.smilEntries!.isNotEmpty) {
-                        unawaited(_startKaraoke(context, readerState, chapter));
-                      } else {
-                        _showKaraokeUnavailable(context);
-                      }
-                    },
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Builder(
-            builder: (context) {
-              final dur = MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : AppDuration.fast;
-              return AnimatedSlide(
-                offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
-                duration: dur,
-                curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: readerState.uiVisible ? 1.0 : 0.0,
+        if (settings.showBottomBar || readerState.uiVisible)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Builder(
+              builder: (context) {
+                final dur = MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : AppDuration.fast;
+                return AnimatedSlide(
+                  offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
                   duration: dur,
-                  child: ReaderBottomBar(
-                    settings: settings,
-                    currentChapterIndex: readerState.currentPosition.chapterIndex,
-                    totalChapters: readerState.chapterCount,
-                    scrollProgress: readerState.scrollProgress,
-                    estimatedMinutesLeft: readerState.estimatedMinutesLeft,
-                    chapterTitle: readerState.chapterTitle(
-                      readerState.currentPosition.chapterIndex,
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: readerState.uiVisible ? 1.0 : 0.0,
+                    duration: dur,
+                    child: ReaderBottomBar(
+                      settings: settings,
+                      currentChapterIndex: readerState.currentPosition.chapterIndex,
+                      totalChapters: readerState.chapterCount,
+                      scrollProgress: readerState.scrollProgress,
+                      estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                      chapterTitle: readerState.chapterTitle(
+                        readerState.currentPosition.chapterIndex,
+                      ),
+                      chapterTitleAt: readerState.chapterTitle,
+                      onJumpToProgress: _ctrl.jumpToProgress,
+                      onModeChanged: (mode) {
+                        ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                      },
+                      checkpoints: readerState.checkpoints,
+                      onCheckpointForward: _ctrl.hasCheckpointAhead
+                          ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
+                          : null,
+                      onCheckpointBack: _ctrl.hasCheckpointBehind
+                          ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                          : null,
                     ),
-                    chapterTitleAt: readerState.chapterTitle,
-                    onJumpToProgress: _ctrl.jumpToProgress,
-                    onModeChanged: (mode) {
-                      ref.read(readerSettingsProvider.notifier).updateMode(mode);
-                    },
-                    checkpoints: readerState.checkpoints,
-                    onCheckpointForward: _ctrl.hasCheckpointAhead
-                        ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
-                        : null,
-                    onCheckpointBack: _ctrl.hasCheckpointBehind
-                        ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
-                        : null,
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
         // MD-20.1: floating progress dot when bars hidden
         if (!isFocusMode &&
             !readerState.uiVisible &&
