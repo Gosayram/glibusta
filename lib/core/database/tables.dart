@@ -3,6 +3,8 @@ import 'package:drift/drift.dart';
 import 'converters.dart';
 
 @TableIndex(name: 'idx_saved_books_content_hash', columns: {#contentHash})
+@TableIndex(name: 'idx_saved_books_added_at', columns: {#addedAt})
+@TableIndex(name: 'idx_saved_books_title', columns: {#title})
 class SavedBooks extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -230,6 +232,8 @@ class ReadingTime extends Table {
   DateTimeColumn get date => dateTime()();
   IntColumn get readingTimeSeconds => integer().withDefault(const Constant(0))();
   IntColumn get pagesRead => integer().withDefault(const Constant(0))();
+  RealColumn get wpm => real().withDefault(const Constant(0))();
+  IntColumn get wpmSessionCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
 
   @override

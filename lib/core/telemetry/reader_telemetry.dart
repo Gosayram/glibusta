@@ -57,6 +57,8 @@ class ReaderTelemetry {
 
   ReadingSession? _currentSession;
 
+  DateTime? get currentSessionStartTime => _currentSession?.startedAt;
+
   void startSession(String bookId, {String mode = 'paginated'}) {
     _currentSession = ReadingSession(
       bookId: bookId,

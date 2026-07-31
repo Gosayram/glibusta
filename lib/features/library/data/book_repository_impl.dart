@@ -22,6 +22,37 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<List<Book>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    BookSortField sortField = BookSortField.addedAt,
+    bool ascending = false,
+  }) async {
+    final rows = await _db.bookDao.getPagedBooks(
+      limit: limit,
+      offset: offset,
+      orderBy: [(t) => _mapSortField(t, sortField, ascending)],
+    );
+    return _resolveAuthors(rows);
+  }
+
+  @override
+  Future<List<Book>> searchBooksPaged(String query, {required int limit, int offset = 0}) async {
+    final rows = await _db.bookDao.searchBooksPaged(query, limit: limit, offset: offset);
+    return _resolveAuthors(rows);
+  }
+
+  OrderingTerm _mapSortField($SavedBooksTable t, BookSortField field, bool ascending) {
+    final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
+    switch (field) {
+      case BookSortField.addedAt:
+        return OrderingTerm(expression: t.addedAt, mode: direction);
+      case BookSortField.title:
+        return OrderingTerm(expression: t.title, mode: direction);
+    }
+  }
+
+  @override
   Future<List<Book>> getBooksByIds(List<String> ids) async {
     final rows = await _db.bookDao.getBooksByIds(ids);
     return _resolveAuthors(rows);

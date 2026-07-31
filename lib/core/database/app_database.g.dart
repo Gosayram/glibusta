@@ -7497,6 +7497,28 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _wpmMeta = const VerificationMeta('wpm');
+  @override
+  late final GeneratedColumn<double> wpm = GeneratedColumn<double>(
+    'wpm',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _wpmSessionCountMeta = const VerificationMeta(
+    'wpmSessionCount',
+  );
+  @override
+  late final GeneratedColumn<int> wpmSessionCount = GeneratedColumn<int>(
+    'wpm_session_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -7515,6 +7537,8 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     date,
     readingTimeSeconds,
     pagesRead,
+    wpm,
+    wpmSessionCount,
     updatedAt,
   ];
   @override
@@ -7560,6 +7584,21 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         pagesRead.isAcceptableOrUnknown(data['pages_read']!, _pagesReadMeta),
       );
     }
+    if (data.containsKey('wpm')) {
+      context.handle(
+        _wpmMeta,
+        wpm.isAcceptableOrUnknown(data['wpm']!, _wpmMeta),
+      );
+    }
+    if (data.containsKey('wpm_session_count')) {
+      context.handle(
+        _wpmSessionCountMeta,
+        wpmSessionCount.isAcceptableOrUnknown(
+          data['wpm_session_count']!,
+          _wpmSessionCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -7591,6 +7630,14 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         DriftSqlType.int,
         data['${effectivePrefix}pages_read'],
       )!,
+      wpm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}wpm'],
+      )!,
+      wpmSessionCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}wpm_session_count'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -7609,12 +7656,16 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
   final DateTime date;
   final int readingTimeSeconds;
   final int pagesRead;
+  final double wpm;
+  final int wpmSessionCount;
   final DateTime updatedAt;
   const ReadingTimeData({
     required this.bookId,
     required this.date,
     required this.readingTimeSeconds,
     required this.pagesRead,
+    required this.wpm,
+    required this.wpmSessionCount,
     required this.updatedAt,
   });
   @override
@@ -7624,6 +7675,8 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     map['date'] = Variable<DateTime>(date);
     map['reading_time_seconds'] = Variable<int>(readingTimeSeconds);
     map['pages_read'] = Variable<int>(pagesRead);
+    map['wpm'] = Variable<double>(wpm);
+    map['wpm_session_count'] = Variable<int>(wpmSessionCount);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -7634,6 +7687,8 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       date: Value(date),
       readingTimeSeconds: Value(readingTimeSeconds),
       pagesRead: Value(pagesRead),
+      wpm: Value(wpm),
+      wpmSessionCount: Value(wpmSessionCount),
       updatedAt: Value(updatedAt),
     );
   }
@@ -7648,6 +7703,8 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       date: serializer.fromJson<DateTime>(json['date']),
       readingTimeSeconds: serializer.fromJson<int>(json['readingTimeSeconds']),
       pagesRead: serializer.fromJson<int>(json['pagesRead']),
+      wpm: serializer.fromJson<double>(json['wpm']),
+      wpmSessionCount: serializer.fromJson<int>(json['wpmSessionCount']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -7659,6 +7716,8 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       'date': serializer.toJson<DateTime>(date),
       'readingTimeSeconds': serializer.toJson<int>(readingTimeSeconds),
       'pagesRead': serializer.toJson<int>(pagesRead),
+      'wpm': serializer.toJson<double>(wpm),
+      'wpmSessionCount': serializer.toJson<int>(wpmSessionCount),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -7668,12 +7727,16 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     DateTime? date,
     int? readingTimeSeconds,
     int? pagesRead,
+    double? wpm,
+    int? wpmSessionCount,
     DateTime? updatedAt,
   }) => ReadingTimeData(
     bookId: bookId ?? this.bookId,
     date: date ?? this.date,
     readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
     pagesRead: pagesRead ?? this.pagesRead,
+    wpm: wpm ?? this.wpm,
+    wpmSessionCount: wpmSessionCount ?? this.wpmSessionCount,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   ReadingTimeData copyWithCompanion(ReadingTimeCompanion data) {
@@ -7684,6 +7747,10 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           ? data.readingTimeSeconds.value
           : this.readingTimeSeconds,
       pagesRead: data.pagesRead.present ? data.pagesRead.value : this.pagesRead,
+      wpm: data.wpm.present ? data.wpm.value : this.wpm,
+      wpmSessionCount: data.wpmSessionCount.present
+          ? data.wpmSessionCount.value
+          : this.wpmSessionCount,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -7695,13 +7762,23 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
           ..write('pagesRead: $pagesRead, ')
+          ..write('wpm: $wpm, ')
+          ..write('wpmSessionCount: $wpmSessionCount, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(bookId, date, readingTimeSeconds, pagesRead, updatedAt);
+  int get hashCode => Object.hash(
+    bookId,
+    date,
+    readingTimeSeconds,
+    pagesRead,
+    wpm,
+    wpmSessionCount,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7710,6 +7787,8 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           other.date == this.date &&
           other.readingTimeSeconds == this.readingTimeSeconds &&
           other.pagesRead == this.pagesRead &&
+          other.wpm == this.wpm &&
+          other.wpmSessionCount == this.wpmSessionCount &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -7718,6 +7797,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
   final Value<DateTime> date;
   final Value<int> readingTimeSeconds;
   final Value<int> pagesRead;
+  final Value<double> wpm;
+  final Value<int> wpmSessionCount;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ReadingTimeCompanion({
@@ -7725,6 +7806,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     this.date = const Value.absent(),
     this.readingTimeSeconds = const Value.absent(),
     this.pagesRead = const Value.absent(),
+    this.wpm = const Value.absent(),
+    this.wpmSessionCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -7733,6 +7816,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     required DateTime date,
     this.readingTimeSeconds = const Value.absent(),
     this.pagesRead = const Value.absent(),
+    this.wpm = const Value.absent(),
+    this.wpmSessionCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId),
@@ -7742,6 +7827,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Expression<DateTime>? date,
     Expression<int>? readingTimeSeconds,
     Expression<int>? pagesRead,
+    Expression<double>? wpm,
+    Expression<int>? wpmSessionCount,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -7750,6 +7837,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       if (date != null) 'date': date,
       if (readingTimeSeconds != null) 'reading_time_seconds': readingTimeSeconds,
       if (pagesRead != null) 'pages_read': pagesRead,
+      if (wpm != null) 'wpm': wpm,
+      if (wpmSessionCount != null) 'wpm_session_count': wpmSessionCount,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -7760,6 +7849,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Value<DateTime>? date,
     Value<int>? readingTimeSeconds,
     Value<int>? pagesRead,
+    Value<double>? wpm,
+    Value<int>? wpmSessionCount,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -7768,6 +7859,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       date: date ?? this.date,
       readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
       pagesRead: pagesRead ?? this.pagesRead,
+      wpm: wpm ?? this.wpm,
+      wpmSessionCount: wpmSessionCount ?? this.wpmSessionCount,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -7788,6 +7881,12 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     if (pagesRead.present) {
       map['pages_read'] = Variable<int>(pagesRead.value);
     }
+    if (wpm.present) {
+      map['wpm'] = Variable<double>(wpm.value);
+    }
+    if (wpmSessionCount.present) {
+      map['wpm_session_count'] = Variable<int>(wpmSessionCount.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -7804,6 +7903,8 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
           ..write('pagesRead: $pagesRead, ')
+          ..write('wpm: $wpm, ')
+          ..write('wpmSessionCount: $wpmSessionCount, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -8643,6 +8744,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_saved_books_content_hash',
     'CREATE INDEX idx_saved_books_content_hash ON saved_books (content_hash)',
   );
+  late final Index idxSavedBooksAddedAt = Index(
+    'idx_saved_books_added_at',
+    'CREATE INDEX idx_saved_books_added_at ON saved_books (added_at)',
+  );
+  late final Index idxSavedBooksTitle = Index(
+    'idx_saved_books_title',
+    'CREATE INDEX idx_saved_books_title ON saved_books (title)',
+  );
   late final Index idxDownloadsBookId = Index(
     'idx_downloads_bookId',
     'CREATE INDEX idx_downloads_bookId ON downloads (book_id)',
@@ -8719,6 +8828,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     readingTime,
     textHighlights,
     idxSavedBooksContentHash,
+    idxSavedBooksAddedAt,
+    idxSavedBooksTitle,
     idxDownloadsBookId,
     idxBookmarksBookId,
     idxNotesBookId,
@@ -12584,6 +12695,8 @@ typedef $$ReadingTimeTableCreateCompanionBuilder =
       required DateTime date,
       Value<int> readingTimeSeconds,
       Value<int> pagesRead,
+      Value<double> wpm,
+      Value<int> wpmSessionCount,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12593,6 +12706,8 @@ typedef $$ReadingTimeTableUpdateCompanionBuilder =
       Value<DateTime> date,
       Value<int> readingTimeSeconds,
       Value<int> pagesRead,
+      Value<double> wpm,
+      Value<int> wpmSessionCount,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12622,6 +12737,16 @@ class $$ReadingTimeTableFilterComposer extends Composer<_$AppDatabase, $ReadingT
 
   ColumnFilters<int> get pagesRead => $composableBuilder(
     column: $table.pagesRead,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get wpm => $composableBuilder(
+    column: $table.wpm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12659,6 +12784,16 @@ class $$ReadingTimeTableOrderingComposer extends Composer<_$AppDatabase, $Readin
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get wpm => $composableBuilder(
+    column: $table.wpm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12686,6 +12821,14 @@ class $$ReadingTimeTableAnnotationComposer extends Composer<_$AppDatabase, $Read
 
   GeneratedColumn<int> get pagesRead =>
       $composableBuilder(column: $table.pagesRead, builder: (column) => column);
+
+  GeneratedColumn<double> get wpm =>
+      $composableBuilder(column: $table.wpm, builder: (column) => column);
+
+  GeneratedColumn<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -12724,6 +12867,8 @@ class $$ReadingTimeTableTableManager
                 Value<DateTime> date = const Value.absent(),
                 Value<int> readingTimeSeconds = const Value.absent(),
                 Value<int> pagesRead = const Value.absent(),
+                Value<double> wpm = const Value.absent(),
+                Value<int> wpmSessionCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion(
@@ -12731,6 +12876,8 @@ class $$ReadingTimeTableTableManager
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
                 pagesRead: pagesRead,
+                wpm: wpm,
+                wpmSessionCount: wpmSessionCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12740,6 +12887,8 @@ class $$ReadingTimeTableTableManager
                 required DateTime date,
                 Value<int> readingTimeSeconds = const Value.absent(),
                 Value<int> pagesRead = const Value.absent(),
+                Value<double> wpm = const Value.absent(),
+                Value<int> wpmSessionCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion.insert(
@@ -12747,6 +12896,8 @@ class $$ReadingTimeTableTableManager
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
                 pagesRead: pagesRead,
+                wpm: wpm,
+                wpmSessionCount: wpmSessionCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

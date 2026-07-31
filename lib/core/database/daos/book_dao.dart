@@ -12,6 +12,22 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<List<SavedBook>> getAllBooks() async =>
       (select(savedBooks)..where((t) => t.deletedAt.isNull())).get();
 
+  Future<List<SavedBook>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    List<OrderingTerm Function($SavedBooksTable t)>? orderBy,
+  }) async {
+    final query = select(savedBooks)
+      ..where((t) => t.deletedAt.isNull())
+      ..limit(limit, offset: offset);
+    if (orderBy != null) {
+      query.orderBy(orderBy);
+    } else {
+      query.orderBy([(t) => OrderingTerm.desc(t.addedAt)]);
+    }
+    return query.get();
+  }
+
   Future<List<SavedBook>> searchBooks(String query) async {
     final lower = '%$query%';
     return (select(savedBooks)
@@ -19,6 +35,21 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
             (t) => t.title.like(lower) | t.description.like(lower),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)]))
+        .get();
+  }
+
+  Future<List<SavedBook>> searchBooksPaged(
+    String query, {
+    required int limit,
+    int offset = 0,
+  }) async {
+    final lower = '%$query%';
+    return (select(savedBooks)
+          ..where(
+            (t) => t.title.like(lower) | t.description.like(lower),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.title)])
+          ..limit(limit, offset: offset))
         .get();
   }
 

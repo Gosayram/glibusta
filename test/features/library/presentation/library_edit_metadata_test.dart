@@ -15,6 +15,21 @@ class FakeBookRepository implements BookRepository {
   Future<List<Book>> getAllBooks() async => [];
 
   @override
+  Future<List<Book>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    BookSortField sortField = BookSortField.addedAt,
+    bool ascending = false,
+  }) async => [];
+
+  @override
+  Future<List<Book>> searchBooksPaged(
+    String query, {
+    required int limit,
+    int offset = 0,
+  }) async => [];
+
+  @override
   Future<List<Book>> getBooksByIds(List<String> ids) async => [];
 
   @override

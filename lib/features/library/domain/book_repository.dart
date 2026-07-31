@@ -1,7 +1,16 @@
 import '../../../shared/models/book.dart';
 
+enum BookSortField { addedAt, title }
+
 abstract class BookRepository {
   Future<List<Book>> getAllBooks();
+  Future<List<Book>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    BookSortField sortField = BookSortField.addedAt,
+    bool ascending = false,
+  });
+  Future<List<Book>> searchBooksPaged(String query, {required int limit, int offset = 0});
   Future<List<Book>> getBooksByIds(List<String> ids);
   Future<List<Book>> searchBooks(String query);
   Future<List<Book>> getBooksWithProgress();

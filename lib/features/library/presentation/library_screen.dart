@@ -33,11 +33,14 @@ import '../data/book_import_service.dart';
 import '../data/book_repository_impl.dart';
 import '../data/inspectors/book_inspection_provider.dart';
 import '../data/inspectors/book_inspection_result.dart';
+import '../domain/book_repository.dart';
 import 'library_sort.dart';
 import 'library_view_mode_provider.dart';
 import 'pinned_books_provider.dart';
 
 part 'library_screen.g.dart';
+
+const _pageSize = 50;
 
 @riverpod
 Future<List<Book>> libraryBooks(Ref ref) async {
@@ -64,6 +67,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final Set<String> _selectedBookIds = {};
   bool _showTrash = false;
 
+  final List<Book> _loadedBooks = [];
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String? _paginationError;
+
   bool get _selectionMode => _selectedBookIds.isNotEmpty;
 
   @override
@@ -73,11 +81,77 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     super.dispose();
   }
 
+  BookSortField get _sortField {
+    switch (_sort) {
+      case LibrarySort.recentlyAdded:
+        return BookSortField.addedAt;
+      case LibrarySort.title:
+        return BookSortField.title;
+      case LibrarySort.author:
+        return BookSortField.addedAt;
+    }
+  }
+
+  bool get _sortAscending => _sort == LibrarySort.title;
+
+  void _resetPagination() {
+    _loadedBooks.clear();
+    _hasMore = true;
+    _isLoadingMore = false;
+    _paginationError = null;
+  }
+
+  Future<void> _loadNextPage() async {
+    if (_isLoadingMore || !_hasMore) return;
+    _isLoadingMore = true;
+    try {
+      final repository = ref.read(bookRepositoryProvider);
+      final query = _searchQuery.trim();
+      final List<Book> newBooks;
+      if (query.isNotEmpty) {
+        newBooks = await repository.searchBooksPaged(
+          query,
+          limit: _pageSize,
+          offset: _loadedBooks.length,
+        );
+      } else {
+        newBooks = await repository.getPagedBooks(
+          limit: _pageSize,
+          offset: _loadedBooks.length,
+          sortField: _sortField,
+          ascending: _sortAscending,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        if (newBooks.length < _pageSize) {
+          _hasMore = false;
+        }
+        _loadedBooks.addAll(newBooks);
+        _isLoadingMore = false;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+        _paginationError = e.toString();
+      });
+    }
+  }
+
+  void _invalidateAndReload(WidgetRef ref) {
+    ref.invalidate(libraryBooksProvider);
+    _resetPagination();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final booksAsync = ref.watch(libraryBooksProvider);
     final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
     final selectedCollectionId = _selectedCollectionId;
+
+    if (_loadedBooks.isEmpty && !_isLoadingMore && _paginationError == null) {
+      unawaited(_loadNextPage());
+    }
 
     return Scaffold(
       appBar: _selectionMode ? _buildSelectionAppBar(ref) : _buildNormalAppBar(ref),
@@ -139,75 +213,61 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     onBooksDropped: (paths) => _handleBooksDropped(ref, paths),
                     child: RefreshIndicator(
                       onRefresh: () async {
+                        _resetPagination();
                         ref.invalidate(libraryBooksProvider);
+                        await _loadNextPage();
                       },
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: KeyedSubtree(
-                          key: ValueKey(
-                            booksAsync.isLoading
-                                ? 'loading'
-                                : booksAsync.hasError
-                                ? 'error'
-                                : 'data_${booksAsync.value?.length ?? 0}',
-                          ),
-                          child: booksAsync.when(
-                            data: (List<Book> books) {
-                              final query = _searchQuery.toLowerCase();
-                              var filtered = books;
-                              if (_selectedCollectionId != null) {
-                                filtered = filtered
-                                    .where((b) => _collectionBookIds.contains(b.id))
-                                    .toList();
-                              }
-                              if (query.isNotEmpty) {
-                                filtered = filtered.where((b) {
-                                  final titleMatch = b.title.toLowerCase().contains(query);
-                                  final authorMatch = b.displayAuthor.toLowerCase().contains(query);
-                                  final descMatch =
-                                      b.description?.toLowerCase().contains(query) ?? false;
-                                  return titleMatch || authorMatch || descMatch;
-                                }).toList();
-                              }
-                              return _buildBooksGrid(
-                                context,
-                                ref,
-                                sortLibraryBooks(filtered, _sort),
-                              );
-                            },
-                            loading: () => Skeletonizer.zone(
-                              child: GridView.builder(
-                                padding: const EdgeInsets.all(16),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: 16,
-                                  crossAxisSpacing: 16,
-                                  childAspectRatio: 0.75,
-                                ),
-                                itemCount: 6,
-                                itemBuilder: (_, _) => Card(
-                                  child: ListTile(
-                                    leading: const Bone.circle(size: 48),
-                                    title: Text(BoneMock.name),
-                                    subtitle: Text(BoneMock.subtitle),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            error: (Object e, _) => ErrorStateWidget(
-                              message: 'Не удалось загрузить библиотеку',
-                              details: e.toString(),
-                              onRetry: () => ref.invalidate(libraryBooksProvider),
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: _buildPagedContent(context, ref),
                     ),
                   ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPagedContent(BuildContext context, WidgetRef ref) {
+    if (_paginationError != null && _loadedBooks.isEmpty) {
+      return ErrorStateWidget(
+        message: 'Не удалось загрузить библиотеку',
+        details: _paginationError,
+        onRetry: () {
+          _resetPagination();
+        },
+      );
+    }
+
+    if (_loadedBooks.isEmpty && _isLoadingMore) {
+      return Skeletonizer.zone(
+        child: GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: 6,
+          itemBuilder: (_, _) => Card(
+            child: ListTile(
+              leading: const Bone.circle(size: 48),
+              title: Text(BoneMock.name),
+              subtitle: Text(BoneMock.subtitle),
+            ),
+          ),
+        ),
+      );
+    }
+
+    var filtered = _loadedBooks;
+    if (_selectedCollectionId != null) {
+      filtered = filtered.where((b) => _collectionBookIds.contains(b.id)).toList();
+    }
+    if (_sort == LibrarySort.author) {
+      filtered = sortLibraryBooks(filtered, _sort);
+    }
+
+    return _buildBooksGrid(context, ref, filtered);
   }
 
   PreferredSizeWidget _buildNormalAppBar(WidgetRef ref) {
@@ -224,7 +284,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 border: InputBorder.none,
               ),
               onChanged: (value) {
-                setState(() => _searchQuery = value);
+                setState(() {
+                  _searchQuery = value;
+                  _resetPagination();
+                });
+                unawaited(_loadNextPage());
               },
             )
           : const Text('Библиотека'),
@@ -247,6 +311,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 if (!_isSearchOpen) {
                   _searchController.clear();
                   _searchQuery = '';
+                  _resetPagination();
+                  unawaited(_loadNextPage());
                 } else {
                   _searchFocusNode.requestFocus();
                 }
@@ -269,7 +335,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             icon: const Icon(Icons.sort),
             tooltip: 'Сортировка: ${_sort.label}',
             initialValue: _sort,
-            onSelected: (sort) => setState(() => _sort = sort),
+            onSelected: (sort) {
+              setState(() {
+                _sort = sort;
+                _resetPagination();
+              });
+              unawaited(_loadNextPage());
+            },
             itemBuilder: (context) => [
               for (final sort in LibrarySort.values)
                 CheckedPopupMenuItem(
@@ -388,16 +460,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _selectAllBooks() {
-    final booksAsync = ref.read(libraryBooksProvider);
-    final books = switch (booksAsync) {
-      AsyncData(:final value) => value,
-      _ => null,
-    };
-    if (books == null) return;
     setState(() {
       _selectedBookIds
         ..clear()
-        ..addAll(books.map((Book b) => b.id));
+        ..addAll(_loadedBooks.map((Book b) => b.id));
     });
   }
 
@@ -431,7 +497,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     for (final id in ids) {
       await service.removeFromLibrary(id);
     }
-    ref.invalidate(libraryBooksProvider);
+    _invalidateAndReload(ref);
     if (context.mounted) {
       _showUndoSnackBar(context, ref, ids, count);
     }
@@ -456,7 +522,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               for (final id in bookIds) {
                 await service.restoreFromTrash(id);
               }
-              ref.invalidate(libraryBooksProvider);
+              _invalidateAndReload(ref);
             },
           ),
           duration: const Duration(seconds: 10),
@@ -642,7 +708,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             task: () => service.importFromInspection(inspection),
           );
       if (result.isSuccess || result.needsEncodingSelection) {
-        ref.invalidate(libraryBooksProvider);
+        _invalidateAndReload(ref);
       }
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
@@ -697,7 +763,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
         );
       }
-      ref.invalidate(libraryBooksProvider);
+      _invalidateAndReload(ref);
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
@@ -720,7 +786,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       if (context.mounted) {
         _showImportSummaryDialog(context, batchResult);
       }
-      ref.invalidate(libraryBooksProvider);
+      _invalidateAndReload(ref);
     } on Object catch (e) {
       AppLogger().warning('Import failed: $e', name: 'Library', error: e);
     }
@@ -897,7 +963,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       await service.restoreFromTrash(book.id);
                       if (context.mounted) {
                         setState(() {});
-                        ref.invalidate(libraryBooksProvider);
+                        _invalidateAndReload(ref);
                       }
                     },
                   ),
@@ -1025,12 +1091,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         context: context,
         isScrollControlled: true,
         builder: (ctx) => EditMetadataSheet(book: book),
-      ),
+      ).then((_) {
+        if (mounted) {
+          setState(() => _resetPagination());
+        }
+      }),
     );
   }
 
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
-    if (books.isEmpty) {
+    if (books.isEmpty && !_isLoadingMore) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1085,7 +1155,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return RestorableCustomScrollView(
       restorationId: 'library-books-scroll',
       slivers: [
-        // Pinned section
         if (pinnedBooksList.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -1143,7 +1212,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           ),
           const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
         ],
-        // All books section
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           sliver: SliverToBoxAdapter(
@@ -1159,6 +1227,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           sliver: _buildBookSliver(context, ref, unpinnedBooks),
         ),
+        if (_hasMore)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: _isLoadingMore
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Builder(
+                        builder: (context) {
+                          unawaited(_loadNextPage());
+                          return const SizedBox.shrink();
+                        },
+                      ),
+              ),
+            ),
+          ),
       ],
     );
   }

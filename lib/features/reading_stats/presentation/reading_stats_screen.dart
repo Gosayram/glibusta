@@ -18,6 +18,14 @@ import '../data/reading_trend.dart';
 import '../data/reading_trend_settings.dart';
 import 'reading_trend_card.dart';
 
+String _formatSessionDuration(int minutes) {
+  if (minutes < 1) return '< 1 мин';
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '$m мин';
+  return m > 0 ? '$h ч $m мин' : '$h ч';
+}
+
 /// Explains the next useful step for an enabled daily reading goal.
 String formatDailyGoalProgressMessage({
   required int todayMinutes,
@@ -58,6 +66,8 @@ class ReadingStatsScreen extends ConsumerWidget {
             children: [
               _SummaryCards(stats: stats),
               const SizedBox(height: 16),
+              _WpmCard(averageWpm: stats.averageWpm, trend: stats.wpmTrend),
+              const SizedBox(height: 16),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -79,6 +89,11 @@ class ReadingStatsScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              _TimeTrackingCards(
+                todayMinutes: stats.todayMinutes,
+                weekMinutes: stats.thisWeekMinutes,
               ),
               const SizedBox(height: 16),
               _GoalCard(
@@ -355,6 +370,141 @@ class _SummaryCards extends StatelessWidget {
           value: _formatMinutes(stats.thisMonthMinutes),
           subtitle: stats.monthText,
           color: Colors.purple,
+        ),
+      ],
+    );
+  }
+}
+
+class _TimeTrackingCards extends ConsumerWidget {
+  const _TimeTrackingCards({required this.todayMinutes, required this.weekMinutes});
+
+  final int todayMinutes;
+  final int weekMinutes;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessionStart = ref.watch(rsp.currentSessionStartProvider);
+    ref.watch(rsp.sessionTimerProvider);
+
+    final sessionMinutes = sessionStart != null
+        ? DateTime.now().difference(sessionStart).inMinutes
+        : 0;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.access_time,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Время сегодня',
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        todayMinutes == 0 ? '—' : _formatSessionDuration(todayMinutes),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.date_range,
+                            size: 16,
+                            color: Colors.purple,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Время за неделю',
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        weekMinutes == 0 ? '—' : _formatSessionDuration(weekMinutes),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.play_circle_outline,
+                  size: 20,
+                  color: sessionStart != null ? Colors.green : Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Текущая сессия',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (sessionStart != null)
+                      Text(
+                        'начата в ${sessionStart.hour.toString().padLeft(2, '0')}:${sessionStart.minute.toString().padLeft(2, '0')}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  sessionStart != null ? _formatSessionDuration(sessionMinutes) : 'Нет сессии',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: sessionStart != null ? Colors.green : Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -893,6 +1043,81 @@ class _ReadingHoursChart extends ConsumerWidget {
             height: 60,
             child: Center(child: Text('Ошибка')),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WpmCard extends StatelessWidget {
+  const _WpmCard({required this.averageWpm, required this.trend});
+
+  final double averageWpm;
+  final WpmTrend trend;
+
+  @override
+  Widget build(BuildContext context) {
+    if (averageWpm <= 0) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.speed, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                'Средняя скорость',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const Spacer(),
+              Text(
+                '—',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final trendIcon = switch (trend) {
+      WpmTrend.up => Icons.trending_up,
+      WpmTrend.down => Icons.trending_down,
+      WpmTrend.stable => Icons.trending_flat,
+      WpmTrend.unknown => null,
+    };
+    final trendColor = switch (trend) {
+      WpmTrend.up => Colors.green,
+      WpmTrend.down => Colors.red,
+      WpmTrend.stable => Colors.grey,
+      WpmTrend.unknown => null,
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.speed, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              'Средняя скорость',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const Spacer(),
+            if (trendIcon != null) ...[
+              Icon(trendIcon, size: 18, color: trendColor),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              '${averageWpm.round()} WPM',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       ),
     );

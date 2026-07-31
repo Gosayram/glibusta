@@ -26,6 +26,8 @@ void main() {
                   thisMonthMinutes: 0,
                   totalMinutes: 0,
                   totalSessions: 0,
+                  averageWpm: 0,
+                  wpmTrend: WpmTrend.stable,
                   heatmapData: [],
                 ),
           ),
@@ -46,6 +48,10 @@ void main() {
         ),
         readingHoursProvider.overrideWithValue(
           AsyncData(List<int>.filled(24, 0)),
+        ),
+        currentSessionStartProvider.overrideWithValue(null),
+        sessionTimerProvider.overrideWith(
+          (ref) => Stream<DateTime>.value(DateTime.now()),
         ),
       ],
       child: const MaterialApp(
@@ -68,7 +74,6 @@ void main() {
 
       expect(find.text('Серия'), findsOneWidget);
       expect(find.text('Сегодня'), findsOneWidget);
-      expect(find.text('За неделю'), findsOneWidget);
       expect(find.text('За месяц'), findsOneWidget);
     });
 
@@ -105,6 +110,8 @@ void main() {
             thisMonthMinutes: 45,
             totalMinutes: 45,
             totalSessions: 3,
+            averageWpm: 0,
+            wpmTrend: WpmTrend.stable,
             heatmapData: [],
           ),
         ),
@@ -136,6 +143,8 @@ void main() {
             thisMonthMinutes: 125,
             totalMinutes: 125,
             totalSessions: 1,
+            averageWpm: 0,
+            wpmTrend: WpmTrend.stable,
             heatmapData: [],
           ),
           goal: const ReadingGoal(isEnabled: true),

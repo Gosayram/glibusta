@@ -12,6 +12,13 @@ class DayReading {
   const DayReading({required this.date, required this.minutes});
 }
 
+enum WpmTrend {
+  up,
+  down,
+  stable,
+  unknown,
+}
+
 class ReadingStats {
   final int currentStreak;
   final int longestStreak;
@@ -22,6 +29,8 @@ class ReadingStats {
   final int totalSessions;
   final int todayPages;
   final List<DayReading> heatmapData;
+  final double averageWpm;
+  final WpmTrend wpmTrend;
 
   const ReadingStats({
     required this.currentStreak,
@@ -33,6 +42,8 @@ class ReadingStats {
     required this.totalSessions,
     required this.todayPages,
     required this.heatmapData,
+    required this.averageWpm,
+    required this.wpmTrend,
   });
 
   double get avgSessionMinutes =>
@@ -103,6 +114,10 @@ Future<ReadingStats> readingStats(Ref ref) async {
 
   final todayPages = await db.readingTimeDao.getTodayPages();
 
+  final averageWpm = await db.readingTimeDao.getAverageWpmLast7Days();
+  final dailyWpm = await db.readingTimeDao.getDailyWpmLast7Days();
+  final wpmTrend = computeWpmTrend(dailyWpm);
+
   final heatmapData = <DayReading>[];
   for (int i = 111; i >= 0; i--) {
     final day = todayStart.subtract(Duration(days: i));
@@ -124,5 +139,18 @@ Future<ReadingStats> readingStats(Ref ref) async {
     totalSessions: allSessions.length,
     todayPages: todayPages,
     heatmapData: heatmapData,
+    averageWpm: averageWpm,
+    wpmTrend: wpmTrend,
   );
+}
+
+WpmTrend computeWpmTrend(Map<DateTime, double> dailyWpm) {
+  if (dailyWpm.length < 2) return WpmTrend.unknown;
+  final sorted = dailyWpm.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  final recent = sorted.last.value;
+  final earlier = sorted[sorted.length - 2].value;
+  final diff = recent - earlier;
+  if (diff > 10) return WpmTrend.up;
+  if (diff < -10) return WpmTrend.down;
+  return WpmTrend.stable;
 }

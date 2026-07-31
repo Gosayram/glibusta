@@ -67,6 +67,74 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
     });
   }
 
+  Future<void> addWpm(String bookId, DateTime date, double wpm) async {
+    if (wpm <= 0) return;
+    final day = DateTime(date.year, date.month, date.day);
+    await transaction(() async {
+      final existing = await (select(
+        readingTime,
+      )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).getSingleOrNull();
+
+      if (existing != null) {
+        final count = existing.wpmSessionCount;
+        final newAvg = (existing.wpm * count + wpm) / (count + 1);
+        await (update(
+          readingTime,
+        )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).write(
+          ReadingTimeCompanion(
+            wpm: Value(newAvg),
+            wpmSessionCount: Value(count + 1),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      } else {
+        await into(readingTime).insert(
+          ReadingTimeCompanion.insert(
+            bookId: bookId,
+            date: day,
+            wpm: Value(wpm),
+            wpmSessionCount: const Value(1),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<double> getAverageWpmLast7Days() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.isBiggerOrEqualValue(start) & t.wpm.isBiggerThanValue(0))).get();
+    if (results.isEmpty) return 0;
+    var totalWpm = 0.0;
+    var totalSessions = 0;
+    for (final row in results) {
+      totalWpm += row.wpm * row.wpmSessionCount;
+      totalSessions += row.wpmSessionCount;
+    }
+    return totalSessions > 0 ? totalWpm / totalSessions : 0;
+  }
+
+  Future<Map<DateTime, double>> getDailyWpmLast7Days() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.isBiggerOrEqualValue(start) & t.wpm.isBiggerThanValue(0))).get();
+    final dailyWpm = <DateTime, double>{};
+    for (final row in results) {
+      final day = DateTime(row.date.year, row.date.month, row.date.day);
+      final existing = dailyWpm[day];
+      if (existing == null || existing == 0) {
+        dailyWpm[day] = row.wpm;
+      } else {
+        dailyWpm[day] = (existing + row.wpm) / 2;
+      }
+    }
+    return dailyWpm;
+  }
+
   Future<int> getTotalReadingSeconds(String bookId) async {
     final query = readingTime.readingTimeSeconds;
     final result =

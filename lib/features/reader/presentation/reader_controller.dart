@@ -264,9 +264,12 @@ final class ReaderController {
     _sessionStopwatch.reset();
     if (totalSeconds > 0 && !_disposed) {
       final db = _ref.read(databaseProvider);
-      unawaited(
-        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), totalSeconds),
-      );
+      final now = DateTime.now();
+      unawaited(db.readingTimeDao.addReadingTime(_bookId, now, totalSeconds));
+      if (totalSeconds > 60 && _sessionWordsRead > 0) {
+        final wpm = (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800).toDouble();
+        unawaited(db.readingTimeDao.addWpm(_bookId, now, wpm));
+      }
     }
   }
 
