@@ -270,6 +270,14 @@ Map<String, double> parseCustomCssForTest(String css, {int? chapterIndex}) =>
 
 final Map<int, List<String>> _chapterImagesCache = {};
 
+void evictChapterImages(Iterable<int> chapterIndices) {
+  for (final index in chapterIndices) {
+    _chapterImagesCache.remove(index);
+  }
+}
+
+void disposeChapterImagesCache() => _chapterImagesCache.clear();
+
 @visibleForTesting
 void clearChapterImagesCache() => _chapterImagesCache.clear();
 
@@ -1575,6 +1583,72 @@ class ReaderContentBody extends StatefulWidget {
   State<ReaderContentBody> createState() => _ReaderContentBodyState();
 }
 
+sealed class _ChapterRenderItem {}
+
+class _BlockRenderItem extends _ChapterRenderItem {
+  _BlockRenderItem(this.blockIndex, this.block);
+  final int blockIndex;
+  final ReaderBlock block;
+}
+
+class _QuizRenderItem extends _ChapterRenderItem {
+  _QuizRenderItem(this.blocks, this.startIndex);
+  final List<QuizBlock> blocks;
+  final int startIndex;
+}
+
+class _FillableRenderItem extends _ChapterRenderItem {
+  _FillableRenderItem(this.blocks, this.startIndex);
+  final List<FillableBlock> blocks;
+  final int startIndex;
+}
+
+List<_ChapterRenderItem> _computeChapterRenderItems(
+  ReaderChapter chapter,
+  List<BlockTransformer>? blockTransformers,
+) {
+  final items = <_ChapterRenderItem>[];
+  var skipUntil = -1;
+  for (var i = 0; i < chapter.blocks.length; i++) {
+    if (i <= skipUntil) continue;
+    var block = chapter.blocks[i];
+    var blockSkipped = false;
+    if (blockTransformers != null) {
+      for (final t in blockTransformers) {
+        final transformed = t(block);
+        if (transformed == null) {
+          blockSkipped = true;
+          break;
+        }
+        block = transformed;
+      }
+    }
+    if (blockSkipped) continue;
+    if (block.text.length > 10 && block.text.contains('?')) {
+      final endIdx = (i + 8).clamp(0, chapter.blocks.length);
+      final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
+      final quiz = QuizParser.tryParse(texts);
+      if (quiz != null && quiz.isNotEmpty) {
+        items.add(_QuizRenderItem(quiz, i));
+        skipUntil = i + texts.length - 1;
+        continue;
+      }
+    }
+    if (block.text.contains('___') || block.text.contains('[') || block.text.contains('{')) {
+      final endIdx = (i + 4).clamp(0, chapter.blocks.length);
+      final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
+      final fillable = QuizParser.tryParseFillable(texts);
+      if (fillable != null && fillable.isNotEmpty) {
+        items.add(_FillableRenderItem(fillable, i));
+        skipUntil = i + texts.length - 1;
+        continue;
+      }
+    }
+    items.add(_BlockRenderItem(i, block));
+  }
+  return items;
+}
+
 class _ReaderContentBodyState extends State<ReaderContentBody> {
   bool _didScrollToProgress = false;
   // LITHIUM-READ-005: chapter position measurement for viewport-based detection
@@ -1858,7 +1932,6 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 
   Widget _buildChapterContent(ReaderChapter chapter, ReaderSettings settings, int chapterIndex) {
-    // LW-10.2: set current chapter for per-chapter CSS override
     _currentChapterForCss = chapterIndex;
     final baseAlign = _resolveTextAlign(settings.textAlign);
     final isAsInBook = settings.textAlign == ReaderTextAlign.asInBook;
@@ -1883,67 +1956,53 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           )
         : const SizedBox.shrink();
 
-    // LW-9.1: detect quiz groups and replace with QuizWidget
-    final builtWidgets = <Widget>[];
-    var skipUntil = -1;
-    for (var i = 0; i < chapter.blocks.length; i++) {
-      if (i <= skipUntil) continue;
-      var block = chapter.blocks[i];
-      var blockSkipped = false;
-      if (widget.blockTransformers != null) {
-        for (final t in widget.blockTransformers!) {
-          final transformed = t(block);
-          if (transformed == null) {
-            blockSkipped = true;
-            break;
-          }
-          block = transformed;
-        }
-      }
-      if (blockSkipped) continue;
-      // LW-9.1: Check if this block starts a quiz sequence
-      if (block.text.length > 10 && block.text.contains('?')) {
-        final endIdx = (i + 8).clamp(0, chapter.blocks.length);
-        final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
-        final quiz = QuizParser.tryParse(texts);
-        if (quiz != null && quiz.isNotEmpty) {
-          builtWidgets.add(QuizWidget(blocks: quiz, key: ValueKey('quiz-$chapterIndex-$i')));
-          skipUntil = i + texts.length - 1;
-          continue;
-        }
-      }
-      // LW-9.2: Check for fillable fields (___, [answer])
-      if (block.text.contains('___') || block.text.contains('[') || block.text.contains('{')) {
-        final endIdx = (i + 4).clamp(0, chapter.blocks.length);
-        final texts = chapter.blocks.sublist(i, endIdx).map((b) => b.text).toList();
-        final fillable = QuizParser.tryParseFillable(texts);
-        if (fillable != null && fillable.isNotEmpty) {
-          for (var fi = 0; fi < fillable.length; fi++) {
-            builtWidgets.add(
-              FillableFieldWidget(block: fillable[fi], key: ValueKey('fill-$chapterIndex-$i-$fi')),
-            );
-          }
-          skipUntil = i + texts.length - 1;
-          continue;
-        }
-      }
-      builtWidgets.add(
-        _buildReaderBlock(
-          context,
-          ctx,
-          block,
-          isAsInBook
-              ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
-              : baseAlign,
-          blockHighlights: chapterHighlights?.where((h) => h.blockIndex == i).toList(),
-          chapterImages: chapterImages,
-        ),
-      );
-    }
+    final renderItems = _computeChapterRenderItems(chapter, widget.blockTransformers);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [header, ...builtWidgets],
+      children: [
+        header,
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          addAutomaticKeepAlives: false,
+          itemCount: renderItems.length,
+          itemBuilder: (context, index) {
+            final item = renderItems[index];
+            switch (item) {
+              case _BlockRenderItem(:final blockIndex, :final block):
+                return _buildReaderBlock(
+                  context,
+                  ctx,
+                  block,
+                  isAsInBook
+                      ? _resolveTextAlign(settings.textAlign, blockAlign: block.textAlign)
+                      : baseAlign,
+                  blockHighlights: chapterHighlights
+                      ?.where((h) => h.blockIndex == blockIndex)
+                      .toList(),
+                  chapterImages: chapterImages,
+                );
+              case _QuizRenderItem(:final blocks, :final startIndex):
+                return QuizWidget(
+                  blocks: blocks,
+                  key: ValueKey('quiz-$chapterIndex-$startIndex'),
+                );
+              case _FillableRenderItem(:final blocks, :final startIndex):
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var fi = 0; fi < blocks.length; fi++)
+                      FillableFieldWidget(
+                        block: blocks[fi],
+                        key: ValueKey('fill-$chapterIndex-$startIndex-$fi'),
+                      ),
+                  ],
+                );
+            }
+          },
+        ),
+      ],
     );
   }
 

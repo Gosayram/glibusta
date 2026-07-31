@@ -150,20 +150,23 @@ final class ReaderContentHelper {
           loadedChapters.length;
     }
 
-    final weights = List<double>.generate(chapterCount, (index) {
-      final blockCount = loadedChapters[index]?.blocks.length;
-      return blockCount == null || blockCount <= 0 ? averageBlocks : blockCount.toDouble();
-    });
-    final totalWeight = weights.fold<double>(0, (sum, weight) => sum + weight);
-    final targetWeight = progress.clamp(0.0, 1.0) * totalWeight;
+    var totalWeight = 0.0;
+    for (var i = 0; i < chapterCount; i++) {
+      final blockCount = loadedChapters[i]?.blocks.length;
+      totalWeight += blockCount == null || blockCount <= 0 ? averageBlocks : blockCount.toDouble();
+    }
 
+    final targetWeight = progress.clamp(0.0, 1.0) * totalWeight;
     var precedingWeight = 0.0;
-    for (var index = 0; index < weights.length; index++) {
-      final chapterWeight = weights[index];
+    for (var index = 0; index < chapterCount; index++) {
+      final blockCount = loadedChapters[index]?.blocks.length;
+      final chapterWeight = blockCount == null || blockCount <= 0
+          ? averageBlocks
+          : blockCount.toDouble();
       final cumulativeWeight = precedingWeight + chapterWeight;
-      if (targetWeight <= cumulativeWeight || index == weights.length - 1) {
-        final blockCount = loadedChapters[index]?.blocks.length ?? 0;
-        final lastParagraph = blockCount > 0 ? blockCount - 1 : 0;
+      if (targetWeight <= cumulativeWeight || index == chapterCount - 1) {
+        final loaded = loadedChapters[index]?.blocks.length ?? 0;
+        final lastParagraph = loaded > 0 ? loaded - 1 : 0;
         final localProgress = ((targetWeight - precedingWeight) / chapterWeight).clamp(0.0, 1.0);
         return (
           chapterIndex: index,

@@ -22,6 +22,7 @@ import '../data/book_search_service.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
+import 'reader_content.dart' show disposeChapterImagesCache, evictChapterImages;
 import 'reader_content_helper.dart';
 import 'reader_corner_tap.dart';
 import 'reader_link_history.dart';
@@ -195,13 +196,30 @@ class ReaderState {
 final class ReaderController {
   ReaderController(this._bookId, this._ref)
     : _autoThemeService = _ref.read(autoThemeServiceProvider),
-      _logger = _ref.read(appLoggerProvider);
+      _logger = _ref.read(appLoggerProvider) {
+    final initial = _ref.read(readerSettingsProvider);
+    _mode = initial.mode;
+    _eink = initial.eink;
+    _hideBarsOnFastScroll = initial.hideBarsOnFastScroll;
+    _twoPageEnabled = initial.twoPageEnabled;
+    _settingsSub = _ref.listen(readerSettingsProvider, (_, next) {
+      _mode = next.mode;
+      _eink = next.eink;
+      _hideBarsOnFastScroll = next.hideBarsOnFastScroll;
+      _twoPageEnabled = next.twoPageEnabled;
+    });
+  }
 
   final String _bookId;
   final Ref _ref;
 
   final AutoThemeService _autoThemeService;
   final AppLogger _logger;
+  ProviderSubscription<ReaderSettings>? _settingsSub;
+  ReaderMode _mode = ReaderMode.paginated;
+  bool _eink = false;
+  bool _hideBarsOnFastScroll = false;
+  bool _twoPageEnabled = false;
   final _progressDebouncer = Debouncer(delay: AppDuration.readerProgressSave);
   final _chapterLoadDebouncer = Debouncer(delay: const Duration(milliseconds: 200));
   final _scrollDebouncer = Debouncer(delay: const Duration(milliseconds: 50));
@@ -237,6 +255,7 @@ final class ReaderController {
 
   void dispose() {
     _loadGeneration++;
+    _settingsSub?.close();
     _linkHistory.clear();
     _chapterPositions = const [];
     _progressDebouncer.dispose();
@@ -250,6 +269,7 @@ final class ReaderController {
     _flushSessionTime();
     _flushPages();
     savePosition();
+    disposeChapterImagesCache();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
     _disposed = true;
@@ -464,7 +484,7 @@ final class ReaderController {
     return !_disposed && loadGeneration == _loadGeneration;
   }
 
-  ReaderMode get effectiveMode => _ref.read(readerSettingsProvider).mode;
+  ReaderMode get effectiveMode => _mode;
 
   static ReaderErrorKind _classifyError(Object error) => switch (error) {
     BookMissingFailure() => ReaderErrorKind.bookMissing,
@@ -622,6 +642,8 @@ final class ReaderController {
       keepAllBefore: isContinuous,
     );
     if (updated.length != _state.loadedChapters.length) {
+      final evictedKeys = _state.loadedChapters.keys.where((k) => !updated.containsKey(k));
+      evictChapterImages(evictedKeys);
       _updateState(_state.copyWith(loadedChapters: updated));
     }
   }
@@ -700,14 +722,11 @@ final class ReaderController {
       final progress = _scrollController!.offset / maxScroll;
       final boundedProgress = progress.clamp(0.0, 1.0);
       _scrollDebouncer.call(() {
-        _updateState(_state.copyWith(scrollProgress: boundedProgress));
-        _updatePositionFromScroll(boundedProgress);
+        _updateScrollState(boundedProgress);
       });
       _progressDebouncer.call(saveProgress);
 
-      // Hide bars on fast scroll
-      final settings = _ref.read(readerSettingsProvider);
-      if (settings.hideBarsOnFastScroll && !settings.eink && _state.uiVisible) {
+      if (_hideBarsOnFastScroll && !_eink && _state.uiVisible) {
         final currentOffset = _scrollController!.offset;
         final delta = (currentOffset - _lastScrollOffset).abs();
         _lastScrollOffset = currentOffset;
@@ -742,18 +761,25 @@ final class ReaderController {
     }
   }
 
-  void _updatePositionFromScroll(double progress) {
+  void _updateScrollState(double progress) {
     final total = _state.chapterCount;
-    if (total == 0) return;
+    if (total == 0) {
+      _updateState(_state.copyWith(scrollProgress: progress));
+      return;
+    }
     final position = _positionFromProgress(progress);
-    if (position.chapterIndex == _state.currentPosition.chapterIndex &&
+    final positionUnchanged =
+        position.chapterIndex == _state.currentPosition.chapterIndex &&
         position.paragraphIndex == _state.currentPosition.paragraphIndex &&
-        (position.localOffset - _state.currentPosition.localOffset).abs() < 0.5) {
+        (position.localOffset - _state.currentPosition.localOffset).abs() < 0.5;
+    if (positionUnchanged) {
+      _updateState(_state.copyWith(scrollProgress: progress));
       return;
     }
     final chapterChanged = position.chapterIndex != _state.currentPosition.chapterIndex;
     _updateState(
       _state.copyWith(
+        scrollProgress: progress,
         currentPosition: position,
         estimatedMinutesLeft: _estimateMinutesLeft(progress),
       ),
@@ -1009,8 +1035,7 @@ final class ReaderController {
     if (_disposed || _state.chapterCount == 0) return;
     final mode = effectiveMode;
     if (mode == ReaderMode.paginated) {
-      final settings = _ref.read(readerSettingsProvider);
-      final step = settings.twoPageEnabled ? 2 : 1;
+      final step = _twoPageEnabled ? 2 : 1;
       final nextChapter = (_state.currentPosition.chapterIndex + step).clamp(
         0,
         _state.chapterCount - 1,
@@ -1091,8 +1116,7 @@ final class ReaderController {
     if (_disposed || _state.chapterCount == 0) return;
     final mode = effectiveMode;
     if (mode == ReaderMode.paginated) {
-      final settings = _ref.read(readerSettingsProvider);
-      final step = settings.twoPageEnabled ? 2 : 1;
+      final step = _twoPageEnabled ? 2 : 1;
       final previousChapter = (_state.currentPosition.chapterIndex - step).clamp(
         0,
         _state.chapterCount - 1,
