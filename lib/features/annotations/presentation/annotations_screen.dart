@@ -15,6 +15,8 @@ import '../../reader/domain/reader.dart';
 import '../data/annotation_export.dart';
 import '../data/annotations_providers.dart';
 
+const _pageSize = 50;
+
 class AnnotationsScreen extends ConsumerStatefulWidget {
   final String? bookId;
 
@@ -31,10 +33,19 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
   bool _isSearching = false;
   String? _selectedColor;
 
+  final List<Bookmark> _bookmarks = [];
+  final List<Note> _notes = [];
+  final List<Quote> _quotes = [];
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  bool _initialLoading = true;
+  Object? _initialError;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    unawaited(_loadPage(offset: 0));
   }
 
   @override
@@ -44,6 +55,40 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     super.dispose();
   }
 
+  Future<void> _loadPage({required int offset}) async {
+    final notifier = ref.read(
+      annotationPageProvider(
+        AnnotationPageParams(bookId: widget.bookId, limit: _pageSize, offset: offset),
+      ).future,
+    );
+    try {
+      final page = await notifier;
+      if (!mounted) return;
+      setState(() {
+        _bookmarks.addAll(page.bookmarks);
+        _notes.addAll(page.notes);
+        _quotes.addAll(page.quotes);
+        final pageSize = page.bookmarks.length + page.notes.length + page.quotes.length;
+        if (pageSize < _pageSize) _hasMore = false;
+        _initialLoading = false;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _initialError = e;
+        _initialLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    final offset = _bookmarks.length + _notes.length + _quotes.length;
+    await _loadPage(offset: offset);
+    if (mounted) setState(() => _isLoadingMore = false);
+  }
+
   void _toggleSearch() {
     setState(() {
       _isSearching = !_isSearching;
@@ -51,17 +96,19 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     });
   }
 
-  Future<void> _exportAnnotations(
-    AnnotationData annotations,
-    AnnotationExportFormat format,
-  ) async {
+  Future<void> _exportAnnotations() async {
+    final data = AnnotationData(
+      bookmarks: _bookmarks,
+      notes: _notes,
+      quotes: _quotes,
+    );
     try {
       final book = widget.bookId == null
           ? null
           : await ref.read(databaseProvider).bookDao.getBookById(widget.bookId!);
       final export = AnnotationExportFormatter.build(
-        annotations: annotations,
-        format: format,
+        annotations: data,
+        format: AnnotationExportFormat.markdown,
         bookTitle: book?.title ?? 'Мои аннотации',
       );
       final directory = await getApplicationDocumentsDirectory();
@@ -82,7 +129,33 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final annotationsAsync = ref.watch(allAnnotationsProvider(widget.bookId));
+    if (_initialLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Аннотации')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_initialError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Аннотации')),
+        body: ErrorStateWidget(
+          message: 'Не удалось загрузить аннотации',
+          details: _initialError.toString(),
+          onRetry: () {
+            setState(() {
+              _initialLoading = true;
+              _initialError = null;
+              _bookmarks.clear();
+              _notes.clear();
+              _quotes.clear();
+              _hasMore = true;
+            });
+            unawaited(_loadPage(offset: 0));
+          },
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -98,24 +171,21 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
               )
             : const Text('Аннотации'),
         actions: [
-          if (annotationsAsync.hasValue)
-            PopupMenuButton<AnnotationExportFormat>(
-              tooltip: 'Экспортировать аннотации',
-              icon: const Icon(Icons.ios_share),
-              onSelected: (format) => unawaited(
-                _exportAnnotations(annotationsAsync.requireValue, format),
+          PopupMenuButton<AnnotationExportFormat>(
+            tooltip: 'Экспортировать аннотации',
+            icon: const Icon(Icons.ios_share),
+            onSelected: (_) => unawaited(_exportAnnotations()),
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: AnnotationExportFormat.markdown,
+                child: Text('Экспортировать в Markdown'),
               ),
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: AnnotationExportFormat.markdown,
-                  child: Text('Экспортировать в Markdown'),
-                ),
-                PopupMenuItem(
-                  value: AnnotationExportFormat.plainText,
-                  child: Text('Экспортировать в TXT'),
-                ),
-              ],
-            ),
+              PopupMenuItem(
+                value: AnnotationExportFormat.plainText,
+                child: Text('Экспортировать в TXT'),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск аннотаций',
             icon: Icon(_isSearching ? Icons.close : Icons.search),
@@ -131,58 +201,61 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
           ],
         ),
       ),
-      body: annotationsAsync.when(
-        data: (data) {
-          final usedColors = data.notes
-              .map((n) => n.highlightColor)
-              .where((c) => c.isNotEmpty)
-              .toSet()
-              .toList(growable: false);
-          return Column(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    final usedColors = _notes
+        .map((n) => n.highlightColor)
+        .where((c) => c.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    return Column(
+      children: [
+        if (usedColors.length > 1)
+          _ColorFilterRow(
+            colors: usedColors,
+            selectedColor: _selectedColor,
+            onColorTap: (color) {
+              setState(() {
+                _selectedColor = _selectedColor == color ? null : color;
+              });
+            },
+          ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
             children: [
-              if (usedColors.length > 1)
-                _ColorFilterRow(
-                  colors: usedColors,
-                  selectedColor: _selectedColor,
-                  onColorTap: (color) {
-                    setState(() {
-                      _selectedColor = _selectedColor == color ? null : color;
-                    });
-                  },
-                ),
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _BookmarkList(
-                      bookmarks: data.bookmarks,
-                      bookId: widget.bookId,
-                      query: _searchController.text,
-                    ),
-                    _NoteList(
-                      notes: data.notes,
-                      bookId: widget.bookId,
-                      query: _searchController.text,
-                      colorFilter: _selectedColor,
-                    ),
-                    _QuoteList(
-                      quotes: data.quotes,
-                      bookId: widget.bookId,
-                      query: _searchController.text,
-                    ),
-                  ],
-                ),
+              _BookmarkList(
+                bookmarks: _bookmarks,
+                bookId: widget.bookId,
+                query: _searchController.text,
+                hasMore: _hasMore,
+                isLoadingMore: _isLoadingMore,
+                onLoadMore: _loadMore,
+              ),
+              _NoteList(
+                notes: _notes,
+                bookId: widget.bookId,
+                query: _searchController.text,
+                colorFilter: _selectedColor,
+                hasMore: _hasMore,
+                isLoadingMore: _isLoadingMore,
+                onLoadMore: _loadMore,
+              ),
+              _QuoteList(
+                quotes: _quotes,
+                bookId: widget.bookId,
+                query: _searchController.text,
+                hasMore: _hasMore,
+                isLoadingMore: _isLoadingMore,
+                onLoadMore: _loadMore,
               ),
             ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => ErrorStateWidget(
-          message: 'Не удалось загрузить аннотации',
-          details: e.toString(),
-          onRetry: () => ref.invalidate(allAnnotationsProvider(widget.bookId)),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -191,8 +264,18 @@ class _BookmarkList extends ConsumerWidget {
   final List<Bookmark> bookmarks;
   final String? bookId;
   final String query;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final VoidCallback onLoadMore;
 
-  const _BookmarkList({required this.bookmarks, this.bookId, this.query = ''});
+  const _BookmarkList({
+    required this.bookmarks,
+    this.bookId,
+    this.query = '',
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.onLoadMore,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -208,10 +291,20 @@ class _BookmarkList extends ConsumerWidget {
       );
     }
 
+    final itemCount = filteredBookmarks.length + (hasMore ? 1 : 0);
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: filteredBookmarks.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index >= filteredBookmarks.length) {
+          if (!isLoadingMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onLoadMore());
+          }
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
         final bookmark = filteredBookmarks[index];
         return Dismissible(
           key: Key(bookmark.id),
@@ -280,8 +373,19 @@ class _NoteList extends ConsumerWidget {
   final String? bookId;
   final String query;
   final String? colorFilter;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final VoidCallback onLoadMore;
 
-  const _NoteList({required this.notes, this.bookId, this.query = '', this.colorFilter});
+  const _NoteList({
+    required this.notes,
+    this.bookId,
+    this.query = '',
+    this.colorFilter,
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.onLoadMore,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -303,10 +407,20 @@ class _NoteList extends ConsumerWidget {
       );
     }
 
+    final itemCount = filteredNotes.length + (hasMore ? 1 : 0);
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: filteredNotes.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index >= filteredNotes.length) {
+          if (!isLoadingMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onLoadMore());
+          }
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
         final note = filteredNotes[index];
         return Dismissible(
           key: Key(note.id),
@@ -375,8 +489,18 @@ class _QuoteList extends ConsumerWidget {
   final List<Quote> quotes;
   final String? bookId;
   final String query;
+  final bool hasMore;
+  final bool isLoadingMore;
+  final VoidCallback onLoadMore;
 
-  const _QuoteList({required this.quotes, this.bookId, this.query = ''});
+  const _QuoteList({
+    required this.quotes,
+    this.bookId,
+    this.query = '',
+    required this.hasMore,
+    required this.isLoadingMore,
+    required this.onLoadMore,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -400,10 +524,20 @@ class _QuoteList extends ConsumerWidget {
       );
     }
 
+    final itemCount = filteredQuotes.length + (hasMore ? 1 : 0);
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: filteredQuotes.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        if (index >= filteredQuotes.length) {
+          if (!isLoadingMore) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onLoadMore());
+          }
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
         final quote = filteredQuotes[index];
         return Dismissible(
           key: Key(quote.id),
@@ -499,7 +633,6 @@ void _openReaderAtPosition(
         bookId: bookId,
         chapterIndex: chapterIndex,
         paragraphIndex: paragraphIndex,
-        // Annotation storage uses a 0..1 fraction; reader positions use 0..100.
         localOffset: localOffset * 100,
         updatedAt: updatedAt,
       ),

@@ -20,6 +20,7 @@ class ReadingStats {
   final int thisMonthMinutes;
   final int totalMinutes;
   final int totalSessions;
+  final int todayPages;
   final List<DayReading> heatmapData;
 
   const ReadingStats({
@@ -30,6 +31,7 @@ class ReadingStats {
     required this.thisMonthMinutes,
     required this.totalMinutes,
     required this.totalSessions,
+    required this.todayPages,
     required this.heatmapData,
   });
 
@@ -99,6 +101,8 @@ Future<ReadingStats> readingStats(Ref ref) async {
     endingAt: now,
   );
 
+  final todayPages = await db.readingTimeDao.getTodayPages();
+
   final heatmapData = <DayReading>[];
   for (int i = 111; i >= 0; i--) {
     final day = todayStart.subtract(Duration(days: i));
@@ -118,6 +122,7 @@ Future<ReadingStats> readingStats(Ref ref) async {
     thisMonthMinutes: monthMinutes,
     totalMinutes: totalMinutes,
     totalSessions: allSessions.length,
+    todayPages: todayPages,
     heatmapData: heatmapData,
   );
 }

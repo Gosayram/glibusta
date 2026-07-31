@@ -212,6 +212,7 @@ final class ReaderController {
   bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
+  Timer? _pageFlushTimer;
   ScrollController? _scrollController;
   ReaderState _state = ReaderState();
   final _stateController = StreamController<ReaderState>.broadcast();
@@ -226,6 +227,7 @@ final class ReaderController {
   double _lastScrollOffset = 0;
   final _linkHistory = ReaderLinkHistory();
   List<double> _chapterPositions = const [];
+  int _accumulatedPages = 0;
 
   late final ReaderContentHelper _content;
   ReaderProgressHelper? _progress;
@@ -242,9 +244,11 @@ final class ReaderController {
     _scrollDebouncer.dispose();
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
+    _pageFlushTimer?.cancel();
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _flushSessionTime();
+    _flushPages();
     savePosition();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
@@ -264,6 +268,14 @@ final class ReaderController {
         db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), totalSeconds),
       );
     }
+  }
+
+  void _flushPages() {
+    if (_accumulatedPages <= 0 || _disposed) return;
+    final pages = _accumulatedPages;
+    _accumulatedPages = 0;
+    final db = _ref.read(databaseProvider);
+    unawaited(db.readingTimeDao.addPagesRead(_bookId, DateTime.now(), pages));
   }
 
   void pauseSession() {
@@ -521,6 +533,7 @@ final class ReaderController {
     final clamped = chapterIndex.clamp(0, _state.chapterCount - 1);
     final progress = _chapterProgress(clamped);
     if (clamped != _state.currentPosition.chapterIndex) {
+      _accumulatedPages++;
       _updateState(
         _state.copyWith(
           currentPosition: _state.currentPosition.copyWith(
@@ -531,6 +544,8 @@ final class ReaderController {
           estimatedMinutesLeft: _estimateMinutesLeft(progress),
         ),
       );
+      _pageFlushTimer?.cancel();
+      _pageFlushTimer = Timer(const Duration(seconds: 30), _flushPages);
     }
     _chapterLoadDebouncer.call(() {
       if (_disposed) return;
@@ -745,8 +760,12 @@ final class ReaderController {
         .updateProgress(
           ReadingProgress.fromPosition(position, totalPages: total),
         );
-    // Checkpoint: save immediately on chapter boundary crossing
-    if (chapterChanged) saveProgress();
+    if (chapterChanged) {
+      _accumulatedPages++;
+      _pageFlushTimer?.cancel();
+      _pageFlushTimer = Timer(const Duration(seconds: 30), _flushPages);
+      saveProgress();
+    }
   }
 
   ReaderPosition _positionFromProgress(double progress) {

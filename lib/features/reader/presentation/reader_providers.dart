@@ -411,6 +411,10 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
     state = state.copyWith(scrollbarIndicator: value);
   }
 
+  void updateScrollSnap(bool value) {
+    state = state.copyWith(scrollSnap: value);
+  }
+
   void updateShowImages(bool value) {
     state = state.copyWith(showImages: value);
   }

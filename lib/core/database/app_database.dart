@@ -66,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -138,6 +138,9 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 16) {
             await m.addColumn(savedBooks, savedBooks.deletedAt);
+          }
+          if (from < 17) {
+            await m.addColumn(readingTime, readingTime.pagesRead);
           }
         });
       } finally {

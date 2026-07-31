@@ -15,6 +15,30 @@ class QuoteRepository {
         .get();
   }
 
+  Future<List<Quote>> getQuotesPage({
+    String? bookId,
+    required int limit,
+    required int offset,
+  }) {
+    final query = _db.select(_db.quotes)
+      ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+      ..limit(limit, offset: offset);
+    if (bookId != null) {
+      query.where((q) => q.bookId.equals(bookId));
+    }
+    return query.get();
+  }
+
+  Future<int> countQuotes({String? bookId}) async {
+    final countExp = _db.quotes.id.count();
+    final query = _db.selectOnly(_db.quotes)..addColumns([countExp]);
+    if (bookId != null) {
+      query.where(_db.quotes.bookId.equals(bookId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExp)!;
+  }
+
   Future<Quote?> getQuote(String id) async {
     return (_db.select(_db.quotes)..where((q) => q.id.equals(id))).getSingleOrNull();
   }

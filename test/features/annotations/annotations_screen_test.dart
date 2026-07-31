@@ -13,6 +13,7 @@ void main() {
     AnnotationData? data,
     void Function(ReaderPosition position)? onReaderPosition,
   }) {
+    final effectiveData = data ?? const AnnotationData(bookmarks: [], notes: [], quotes: []);
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -31,9 +32,9 @@ void main() {
     );
     return ProviderScope(
       overrides: [
-        allAnnotationsProvider(bookId).overrideWithValue(
-          AsyncData(data ?? const AnnotationData(bookmarks: [], notes: [], quotes: [])),
-        ),
+        annotationPageProvider(
+          AnnotationPageParams(bookId: bookId, limit: 50, offset: 0),
+        ).overrideWithValue(AsyncData(effectiveData)),
       ],
       child: MaterialApp.router(
         routerConfig: router,

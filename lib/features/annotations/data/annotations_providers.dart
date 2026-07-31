@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -17,6 +18,26 @@ class AnnotationData {
     required this.notes,
     required this.quotes,
   });
+}
+
+@immutable
+class AnnotationPageParams {
+  final String? bookId;
+  final int limit;
+  final int offset;
+
+  const AnnotationPageParams({this.bookId, required this.limit, required this.offset});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AnnotationPageParams &&
+          bookId == other.bookId &&
+          limit == other.limit &&
+          offset == other.offset;
+
+  @override
+  int get hashCode => Object.hash(bookId, limit, offset);
 }
 
 final bookmarkRepoProvider = Provider<BookmarkRepository>((ref) {
@@ -56,4 +77,51 @@ final allAnnotationsProvider = FutureProvider.family<AnnotationData, String?>((r
     notes: notes,
     quotes: quotes,
   );
+});
+
+final annotationPageProvider = FutureProvider.family<AnnotationData, AnnotationPageParams>((
+  ref,
+  params,
+) async {
+  final bookmarkRepo = ref.watch(bookmarkRepoProvider);
+  final noteRepo = ref.watch(noteRepoProvider);
+  final quoteRepo = ref.watch(quoteRepoProvider);
+
+  final results = await Future.wait([
+    bookmarkRepo.getBookmarksPage(
+      bookId: params.bookId,
+      limit: params.limit,
+      offset: params.offset,
+    ),
+    noteRepo.getNotesPage(
+      bookId: params.bookId,
+      limit: params.limit,
+      offset: params.offset,
+    ),
+    quoteRepo.getQuotesPage(
+      bookId: params.bookId,
+      limit: params.limit,
+      offset: params.offset,
+    ),
+  ]);
+
+  return AnnotationData(
+    bookmarks: results[0] as List<Bookmark>,
+    notes: results[1] as List<Note>,
+    quotes: results[2] as List<Quote>,
+  );
+});
+
+final annotationCountProvider = FutureProvider.family<int, String?>((ref, bookId) async {
+  final bookmarkRepo = ref.watch(bookmarkRepoProvider);
+  final noteRepo = ref.watch(noteRepoProvider);
+  final quoteRepo = ref.watch(quoteRepoProvider);
+
+  final counts = await Future.wait([
+    bookmarkRepo.countBookmarks(bookId: bookId),
+    noteRepo.countNotes(bookId: bookId),
+    quoteRepo.countQuotes(bookId: bookId),
+  ]);
+
+  return counts[0] + counts[1] + counts[2];
 });

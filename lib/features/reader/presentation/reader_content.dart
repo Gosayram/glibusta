@@ -1717,6 +1717,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
             children: [
               NotificationListener<ScrollEndNotification>(
                 onNotification: (notification) {
+                  if (!settings.scrollSnap) return false;
                   if (settings.mode != ReaderMode.continuous) return false;
                   if (itemCount == 0) return false;
                   final pos = notification.metrics;

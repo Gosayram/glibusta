@@ -247,6 +247,7 @@ ReaderSettings mergeReaderSettings(ReaderSettings global, Map<String, dynamic> o
       global.horizontalLimiterLines,
     ),
     scrollbarIndicator: _boolOverride(overrides, 'scrollbarIndicator', global.scrollbarIndicator),
+    scrollSnap: _boolOverride(overrides, 'scrollSnap', global.scrollSnap),
     showImages: _boolOverride(overrides, 'showImages', global.showImages),
     imageCornerRadius: _doubleOverride(
       overrides,

@@ -343,11 +343,11 @@ class _SummaryCards extends StatelessWidget {
           color: Colors.blue,
         ),
         _StatCard(
-          icon: Icons.calendar_view_week,
-          label: 'За неделю',
-          value: _formatMinutes(stats.thisWeekMinutes),
-          subtitle: '${stats.thisWeekMinutes} мин',
-          color: Colors.green,
+          icon: Icons.auto_stories,
+          label: 'Страниц сегодня',
+          value: stats.todayPages == 0 ? '—' : '${stats.todayPages}',
+          subtitle: '${stats.todayPages} стр.',
+          color: Colors.teal,
         ),
         _StatCard(
           icon: Icons.calendar_month,

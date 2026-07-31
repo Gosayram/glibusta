@@ -25,7 +25,9 @@ void main() {
     );
     return ProviderScope(
       overrides: [
-        allAnnotationsProvider(bookId).overrideWithValue(
+        annotationPageProvider(
+          AnnotationPageParams(bookId: bookId, limit: 50, offset: 0),
+        ).overrideWithValue(
           AsyncData(data ?? const AnnotationData(bookmarks: [], notes: [], quotes: [])),
         ),
       ],

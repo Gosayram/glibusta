@@ -15,6 +15,30 @@ class NoteRepository {
         .get();
   }
 
+  Future<List<Note>> getNotesPage({
+    String? bookId,
+    required int limit,
+    required int offset,
+  }) {
+    final query = _db.select(_db.notes)
+      ..orderBy([(n) => OrderingTerm.desc(n.createdAt)])
+      ..limit(limit, offset: offset);
+    if (bookId != null) {
+      query.where((n) => n.bookId.equals(bookId));
+    }
+    return query.get();
+  }
+
+  Future<int> countNotes({String? bookId}) async {
+    final countExp = _db.notes.id.count();
+    final query = _db.selectOnly(_db.notes)..addColumns([countExp]);
+    if (bookId != null) {
+      query.where(_db.notes.bookId.equals(bookId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExp)!;
+  }
+
   Future<Note?> getNote(String id) async {
     return (_db.select(_db.notes)..where((n) => n.id.equals(id))).getSingleOrNull();
   }

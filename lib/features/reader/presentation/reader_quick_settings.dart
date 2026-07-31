@@ -585,6 +585,16 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           (v) => notifier.updateScrollbarIndicator(v),
           isEink: isEink,
         ),
+        if (settings.mode == ReaderMode.continuous) ...[
+          const SizedBox(height: 12),
+          _buildToggleRow(
+            'Привязка к границам глав',
+            Icons.swap_vert,
+            settings.scrollSnap,
+            (v) => notifier.updateScrollSnap(v),
+            isEink: isEink,
+          ),
+        ],
         const SizedBox(height: 12),
         _buildToggleRow(
           'Скрытие панелей при прокрутке',

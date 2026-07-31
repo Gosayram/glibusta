@@ -7485,6 +7485,18 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _pagesReadMeta = const VerificationMeta(
+    'pagesRead',
+  );
+  @override
+  late final GeneratedColumn<int> pagesRead = GeneratedColumn<int>(
+    'pages_read',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -7502,6 +7514,7 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     bookId,
     date,
     readingTimeSeconds,
+    pagesRead,
     updatedAt,
   ];
   @override
@@ -7541,6 +7554,12 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         ),
       );
     }
+    if (data.containsKey('pages_read')) {
+      context.handle(
+        _pagesReadMeta,
+        pagesRead.isAcceptableOrUnknown(data['pages_read']!, _pagesReadMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -7568,6 +7587,10 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         DriftSqlType.int,
         data['${effectivePrefix}reading_time_seconds'],
       )!,
+      pagesRead: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pages_read'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -7585,11 +7608,13 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
   final String bookId;
   final DateTime date;
   final int readingTimeSeconds;
+  final int pagesRead;
   final DateTime updatedAt;
   const ReadingTimeData({
     required this.bookId,
     required this.date,
     required this.readingTimeSeconds,
+    required this.pagesRead,
     required this.updatedAt,
   });
   @override
@@ -7598,6 +7623,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     map['book_id'] = Variable<String>(bookId);
     map['date'] = Variable<DateTime>(date);
     map['reading_time_seconds'] = Variable<int>(readingTimeSeconds);
+    map['pages_read'] = Variable<int>(pagesRead);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -7607,6 +7633,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       bookId: Value(bookId),
       date: Value(date),
       readingTimeSeconds: Value(readingTimeSeconds),
+      pagesRead: Value(pagesRead),
       updatedAt: Value(updatedAt),
     );
   }
@@ -7620,6 +7647,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       bookId: serializer.fromJson<String>(json['bookId']),
       date: serializer.fromJson<DateTime>(json['date']),
       readingTimeSeconds: serializer.fromJson<int>(json['readingTimeSeconds']),
+      pagesRead: serializer.fromJson<int>(json['pagesRead']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -7630,6 +7658,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       'bookId': serializer.toJson<String>(bookId),
       'date': serializer.toJson<DateTime>(date),
       'readingTimeSeconds': serializer.toJson<int>(readingTimeSeconds),
+      'pagesRead': serializer.toJson<int>(pagesRead),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -7638,11 +7667,13 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     String? bookId,
     DateTime? date,
     int? readingTimeSeconds,
+    int? pagesRead,
     DateTime? updatedAt,
   }) => ReadingTimeData(
     bookId: bookId ?? this.bookId,
     date: date ?? this.date,
     readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
+    pagesRead: pagesRead ?? this.pagesRead,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   ReadingTimeData copyWithCompanion(ReadingTimeCompanion data) {
@@ -7652,6 +7683,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       readingTimeSeconds: data.readingTimeSeconds.present
           ? data.readingTimeSeconds.value
           : this.readingTimeSeconds,
+      pagesRead: data.pagesRead.present ? data.pagesRead.value : this.pagesRead,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -7662,13 +7694,14 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           ..write('bookId: $bookId, ')
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
+          ..write('pagesRead: $pagesRead, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(bookId, date, readingTimeSeconds, updatedAt);
+  int get hashCode => Object.hash(bookId, date, readingTimeSeconds, pagesRead, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7676,6 +7709,7 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           other.bookId == this.bookId &&
           other.date == this.date &&
           other.readingTimeSeconds == this.readingTimeSeconds &&
+          other.pagesRead == this.pagesRead &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -7683,12 +7717,14 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
   final Value<String> bookId;
   final Value<DateTime> date;
   final Value<int> readingTimeSeconds;
+  final Value<int> pagesRead;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ReadingTimeCompanion({
     this.bookId = const Value.absent(),
     this.date = const Value.absent(),
     this.readingTimeSeconds = const Value.absent(),
+    this.pagesRead = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -7696,6 +7732,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     required String bookId,
     required DateTime date,
     this.readingTimeSeconds = const Value.absent(),
+    this.pagesRead = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId),
@@ -7704,6 +7741,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Expression<String>? bookId,
     Expression<DateTime>? date,
     Expression<int>? readingTimeSeconds,
+    Expression<int>? pagesRead,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -7711,6 +7749,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       if (bookId != null) 'book_id': bookId,
       if (date != null) 'date': date,
       if (readingTimeSeconds != null) 'reading_time_seconds': readingTimeSeconds,
+      if (pagesRead != null) 'pages_read': pagesRead,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -7720,6 +7759,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Value<String>? bookId,
     Value<DateTime>? date,
     Value<int>? readingTimeSeconds,
+    Value<int>? pagesRead,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -7727,6 +7767,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       bookId: bookId ?? this.bookId,
       date: date ?? this.date,
       readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
+      pagesRead: pagesRead ?? this.pagesRead,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -7744,6 +7785,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     if (readingTimeSeconds.present) {
       map['reading_time_seconds'] = Variable<int>(readingTimeSeconds.value);
     }
+    if (pagesRead.present) {
+      map['pages_read'] = Variable<int>(pagesRead.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -7759,6 +7803,7 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
           ..write('bookId: $bookId, ')
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
+          ..write('pagesRead: $pagesRead, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -12538,6 +12583,7 @@ typedef $$ReadingTimeTableCreateCompanionBuilder =
       required String bookId,
       required DateTime date,
       Value<int> readingTimeSeconds,
+      Value<int> pagesRead,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12546,6 +12592,7 @@ typedef $$ReadingTimeTableUpdateCompanionBuilder =
       Value<String> bookId,
       Value<DateTime> date,
       Value<int> readingTimeSeconds,
+      Value<int> pagesRead,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12570,6 +12617,11 @@ class $$ReadingTimeTableFilterComposer extends Composer<_$AppDatabase, $ReadingT
 
   ColumnFilters<int> get readingTimeSeconds => $composableBuilder(
     column: $table.readingTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pagesRead => $composableBuilder(
+    column: $table.pagesRead,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12602,6 +12654,11 @@ class $$ReadingTimeTableOrderingComposer extends Composer<_$AppDatabase, $Readin
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get pagesRead => $composableBuilder(
+    column: $table.pagesRead,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12626,6 +12683,9 @@ class $$ReadingTimeTableAnnotationComposer extends Composer<_$AppDatabase, $Read
     column: $table.readingTimeSeconds,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get pagesRead =>
+      $composableBuilder(column: $table.pagesRead, builder: (column) => column);
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
@@ -12663,12 +12723,14 @@ class $$ReadingTimeTableTableManager
                 Value<String> bookId = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<int> readingTimeSeconds = const Value.absent(),
+                Value<int> pagesRead = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion(
                 bookId: bookId,
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
+                pagesRead: pagesRead,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12677,12 +12739,14 @@ class $$ReadingTimeTableTableManager
                 required String bookId,
                 required DateTime date,
                 Value<int> readingTimeSeconds = const Value.absent(),
+                Value<int> pagesRead = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion.insert(
                 bookId: bookId,
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
+                pagesRead: pagesRead,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

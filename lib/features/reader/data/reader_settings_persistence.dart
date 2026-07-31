@@ -163,6 +163,7 @@ class ReaderSettingsPersistence {
         horizontalLimiterDimming: (map['horizontalLimiterDimming'] as num?)?.toDouble() ?? 0.15,
         horizontalLimiterLines: map['horizontalLimiterLines'] as bool? ?? true,
         scrollbarIndicator: map['scrollbarIndicator'] as bool? ?? true,
+        scrollSnap: map['scrollSnap'] as bool? ?? false,
         showImages: map['showImages'] as bool? ?? true,
         imageCornerRadius: (map['imageCornerRadius'] as num?)?.toDouble() ?? 0.0,
         imageAlignment: ImageAlignment.values.firstWhere(
@@ -263,6 +264,7 @@ class ReaderSettingsPersistence {
         'horizontalLimiterDimming': settings.horizontalLimiterDimming,
         'horizontalLimiterLines': settings.horizontalLimiterLines,
         'scrollbarIndicator': settings.scrollbarIndicator,
+        'scrollSnap': settings.scrollSnap,
         'showImages': settings.showImages,
         'imageCornerRadius': settings.imageCornerRadius,
         'imageAlignment': settings.imageAlignment.name,

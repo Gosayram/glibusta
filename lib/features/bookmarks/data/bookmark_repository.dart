@@ -15,6 +15,30 @@ class BookmarkRepository {
         .get();
   }
 
+  Future<List<Bookmark>> getBookmarksPage({
+    String? bookId,
+    required int limit,
+    required int offset,
+  }) {
+    final query = _db.select(_db.bookmarks)
+      ..orderBy([(b) => OrderingTerm.desc(b.createdAt)])
+      ..limit(limit, offset: offset);
+    if (bookId != null) {
+      query.where((b) => b.bookId.equals(bookId));
+    }
+    return query.get();
+  }
+
+  Future<int> countBookmarks({String? bookId}) async {
+    final countExp = _db.bookmarks.id.count();
+    final query = _db.selectOnly(_db.bookmarks)..addColumns([countExp]);
+    if (bookId != null) {
+      query.where(_db.bookmarks.bookId.equals(bookId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExp)!;
+  }
+
   Future<Bookmark?> getBookmark(String id) async {
     return (_db.select(_db.bookmarks)..where((b) => b.id.equals(id))).getSingleOrNull();
   }

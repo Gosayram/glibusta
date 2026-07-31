@@ -38,6 +38,35 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
     });
   }
 
+  Future<void> addPagesRead(String bookId, DateTime date, int pages) async {
+    if (pages <= 0) return;
+    final day = DateTime(date.year, date.month, date.day);
+    await transaction(() async {
+      final existing = await (select(
+        readingTime,
+      )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).getSingleOrNull();
+
+      if (existing != null) {
+        await (update(
+          readingTime,
+        )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).write(
+          ReadingTimeCompanion(
+            pagesRead: Value(existing.pagesRead + pages),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+      } else {
+        await into(readingTime).insert(
+          ReadingTimeCompanion.insert(
+            bookId: bookId,
+            date: day,
+            pagesRead: Value(pages),
+          ),
+        );
+      }
+    });
+  }
+
   Future<int> getTotalReadingSeconds(String bookId) async {
     final query = readingTime.readingTimeSeconds;
     final result =
@@ -54,6 +83,33 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
       readingTime,
     )..where((t) => t.bookId.equals(bookId) & t.date.equals(day))).getSingleOrNull();
     return result?.readingTimeSeconds ?? 0;
+  }
+
+  Future<int> getTodayPages() async {
+    final now = DateTime.now();
+    final day = DateTime(now.year, now.month, now.day);
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.equals(day))).get();
+    var total = 0;
+    for (final row in results) {
+      total += row.pagesRead;
+    }
+    return total;
+  }
+
+  Future<Map<DateTime, int>> getDailyPages(int days) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    final results = await (select(
+      readingTime,
+    )..where((t) => t.date.isBiggerOrEqualValue(start))).get();
+    final dailyPages = <DateTime, int>{};
+    for (final row in results) {
+      final day = DateTime(row.date.year, row.date.month, row.date.day);
+      dailyPages[day] = (dailyPages[day] ?? 0) + row.pagesRead;
+    }
+    return dailyPages;
   }
 
   Future<Map<DateTime, int>> getReadingTimeByDay(int days) async {

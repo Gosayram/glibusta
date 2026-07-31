@@ -229,6 +229,7 @@ class ReadingTime extends Table {
   TextColumn get bookId => text()();
   DateTimeColumn get date => dateTime()();
   IntColumn get readingTimeSeconds => integer().withDefault(const Constant(0))();
+  IntColumn get pagesRead => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
 
   @override

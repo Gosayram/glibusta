@@ -283,6 +283,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(false) bool ignoreBookAlignment,
     @Default(false) bool ignoreBookIndent,
     @Default(false) bool eink,
+    @Default(false) bool scrollSnap,
     @Default(BackgroundStyle.solid) BackgroundStyle backgroundStyle,
     ReaderTheme? uiTheme,
   }) = _ReaderSettings;
