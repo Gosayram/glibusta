@@ -2683,7 +2683,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ReaderBlock dco_decode_reader_block(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 14) throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    if (arr.length != 16) throw Exception('unexpected arr length: expect 16 but see ${arr.length}');
     return ReaderBlock(
       index: dco_decode_i_32(arr[0]),
       text: dco_decode_String(arr[1]),
@@ -2699,6 +2699,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       textIndent: dco_decode_opt_box_autoadd_f_64(arr[11]),
       textAlign: dco_decode_opt_String(arr[12]),
       noteId: dco_decode_opt_String(arr[13]),
+      pageBreakBefore: dco_decode_bool(arr[14]),
+      pageBreakInsideAvoid: dco_decode_bool(arr[15]),
     );
   }
 
@@ -3481,6 +3483,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     final var_textIndent = sse_decode_opt_box_autoadd_f_64(deserializer);
     final var_textAlign = sse_decode_opt_String(deserializer);
     final var_noteId = sse_decode_opt_String(deserializer);
+    final var_pageBreakBefore = sse_decode_bool(deserializer);
+    final var_pageBreakInsideAvoid = sse_decode_bool(deserializer);
     return ReaderBlock(
       index: var_index,
       text: var_text,
@@ -3496,6 +3500,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       textIndent: var_textIndent,
       textAlign: var_textAlign,
       noteId: var_noteId,
+      pageBreakBefore: var_pageBreakBefore,
+      pageBreakInsideAvoid: var_pageBreakInsideAvoid,
     );
   }
 
@@ -4237,6 +4243,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_f_64(self.textIndent, serializer);
     sse_encode_opt_String(self.textAlign, serializer);
     sse_encode_opt_String(self.noteId, serializer);
+    sse_encode_bool(self.pageBreakBefore, serializer);
+    sse_encode_bool(self.pageBreakInsideAvoid, serializer);
   }
 
   @protected

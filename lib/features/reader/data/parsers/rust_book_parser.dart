@@ -154,6 +154,8 @@ class RustBookParser implements BookParser {
                       textAlign: _parseTextAlignFromRust(rb.textAlign),
                       whiteSpaceMode: _extractProp(rb.textAlign, 'ws'),
                       noteId: rb.noteId,
+                      pageBreakBefore: rb.pageBreakBefore,
+                      pageBreakInsideAvoid: rb.pageBreakInsideAvoid,
                     ),
                   )
                   .toList(),

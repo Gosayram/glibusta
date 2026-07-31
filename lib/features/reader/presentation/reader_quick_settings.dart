@@ -70,46 +70,58 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    final isEink = settings.eink;
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        color: isEink ? Colors.white : theme.colorScheme.surface,
+        borderRadius: isEink ? null : const BorderRadius.vertical(top: Radius.circular(16)),
+        border: isEink ? const Border(top: BorderSide()) : null,
       ),
       padding: const EdgeInsets.only(top: 12),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+        child: DefaultTextStyle(
+          style: TextStyle(
+            color: isEink ? Colors.black : theme.textTheme.bodyMedium?.color,
+            fontSize: theme.textTheme.bodyMedium?.fontSize,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isEink
+                        ? Colors.black54
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildPageIndicator(context),
-            const SizedBox(height: 8),
-            if (widget.bookId != null) _buildPerBookSection(context, ref, widget.bookId!, settings),
-            SizedBox(
-              height: _estimatedPageHeight(context),
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _buildPage1(context, settings, notifier),
-                  _buildPage2(context, settings, notifier),
-                  _buildPage3(context, settings, notifier),
-                ],
+              const SizedBox(height: 12),
+              _buildPageIndicator(context, isEink: isEink),
+              const SizedBox(height: 8),
+              if (widget.bookId != null)
+                _buildPerBookSection(context, ref, widget.bookId!, settings),
+              SizedBox(
+                height: _estimatedPageHeight(context),
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  children: [
+                    _buildPage1(context, settings, notifier, isEink: isEink),
+                    _buildPage2(context, settings, notifier, isEink: isEink),
+                    _buildPage3(context, settings, notifier, isEink: isEink),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -120,7 +132,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     return screenH * 0.5;
   }
 
-  Widget _buildPageIndicator(BuildContext context) {
+  Widget _buildPageIndicator(BuildContext context, {bool isEink = false}) {
     final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -137,19 +149,24 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             margin: const EdgeInsets.symmetric(horizontal: 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isActive
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
+              color: isEink
+                  ? (isActive ? Colors.black : Colors.white)
+                  : (isActive
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(isEink ? 0 : 16),
+              border: isEink ? Border.all() : null,
             ),
             child: Text(
               _pageLabels[i],
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                color: isEink
+                    ? (isActive ? Colors.white : Colors.black)
+                    : (isActive
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
             ),
           ),
@@ -163,8 +180,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage1(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
@@ -179,24 +197,25 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             ),
           ],
         ),
-        _buildPresetRow(settings, notifier),
+        _buildPresetRow(settings, notifier, isEink: isEink),
         const SizedBox(height: 16),
         const _SectionTitle('Тема контента'),
-        _buildThemeRow(context, settings, notifier),
+        _buildThemeRow(context, settings, notifier, isEink: isEink),
         const SizedBox(height: 8),
         const _SectionTitle('Тема интерфейса'),
-        _buildUiThemeRow(context, settings, notifier),
+        _buildUiThemeRow(context, settings, notifier, isEink: isEink),
         const SizedBox(height: 8),
-        _buildColorPresetRow(context, ref, settings, notifier),
+        _buildColorPresetRow(context, ref, settings, notifier, isEink: isEink),
         const SizedBox(height: 12),
         const _SectionTitle('Текстура фона'),
-        _buildBackgroundStyleRow(context, settings, notifier),
+        _buildBackgroundStyleRow(context, settings, notifier, isEink: isEink),
         const SizedBox(height: 12),
         _buildToggleRow(
           'E-ink режим',
           Icons.auto_awesome,
           settings.eink,
           (v) => notifier.updateEink(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Шрифт'),
@@ -275,6 +294,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.image,
           settings.showImages,
           (v) => notifier.updateShowImages(v),
+          isEink: isEink,
         ),
         if (settings.showImages) ...[
           const SizedBox(height: 8),
@@ -307,8 +327,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage2(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
@@ -340,6 +361,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     enabled: enabled,
                   ),
                 ),
+                isEink: isEink,
               );
             },
           ),
@@ -363,6 +385,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_textdirection_l_to_r,
           settings.hyphenation,
           (v) => notifier.updateHyphenation(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -370,6 +393,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.numbers,
           settings.oldStyleFigures,
           (v) => notifier.updateOldStyleFigures(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -377,6 +401,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.text_fields,
           settings.smallCaps,
           (v) => notifier.updateSmallCaps(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Анимация страниц'),
@@ -390,6 +415,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.screen_lock_portrait,
           settings.keepScreenAwake,
           (v) => notifier.updateKeepScreenAwake(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         const _SectionTitle('Кодировка'),
@@ -400,6 +426,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.restore,
           settings.restoreLastPosition,
           (v) => notifier.updateRestoreLastPosition(v),
+          isEink: isEink,
         ),
       ],
     );
@@ -441,8 +468,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage3(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
@@ -452,6 +480,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.info_outline,
           settings.showTopInfoBar,
           (v) => notifier.updateShowTopInfoBar(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -459,6 +488,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.tune,
           settings.showTopToolbar,
           (v) => notifier.updateShowTopToolbar(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -466,6 +496,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.vertical_align_bottom,
           settings.showBottomBar,
           (v) => notifier.updateShowBottomBar(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Горизонтальный жест'),
@@ -479,6 +510,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.swipe_up,
           settings.verticalSwipeBrightness,
           (v) => notifier.updateVerticalSwipeBrightness(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -486,6 +518,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.vibration,
           settings.pageTurnHaptic,
           (v) => notifier.updatePageTurnHaptic(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -493,6 +526,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.view_sidebar_outlined,
           settings.perceptionExpander,
           (v) => notifier.updatePerceptionExpander(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
 
@@ -501,6 +535,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.center_focus_strong,
           settings.horizontalLimiter,
           (v) => notifier.updateHorizontalLimiter(v),
+          isEink: isEink,
         ),
         if (settings.horizontalLimiter) ...[
           const SizedBox(height: 8),
@@ -530,6 +565,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             Icons.horizontal_rule,
             settings.horizontalLimiterLines,
             (v) => notifier.updateHorizontalLimiterLines(v),
+            isEink: isEink,
           ),
         ],
         const SizedBox(height: 12),
@@ -539,6 +575,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.speed,
           settings.bionicReading,
           (v) => notifier.updateBionicReading(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -546,6 +583,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.view_sidebar_outlined,
           settings.scrollbarIndicator,
           (v) => notifier.updateScrollbarIndicator(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -553,6 +591,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.speed,
           settings.hideBarsOnFastScroll,
           (v) => notifier.updateHideBarsOnFastScroll(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Ориентация экрана'),
@@ -566,6 +605,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.swipe_vertical,
           settings.twoFingerChapterNavigation,
           (enabled) => notifier.updateTwoFingerChapterNavigation(enabled),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         const _SectionTitle('Долгое нажатие'),
@@ -585,7 +625,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildBottomBarContentRow(settings, notifier),
         const SizedBox(height: 16),
         const _SectionTitle('Забота о глазах'),
-        _buildReadingBreakReminderSettings(),
+        _buildReadingBreakReminderSettings(isEink: isEink),
         const SizedBox(height: 16),
         // LW-10.1: Custom CSS editor
         ReaderCustomCssEditor(css: settings.customCss, onChanged: notifier.updateCustomCss),
@@ -596,6 +636,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_align_left,
           settings.ignoreBookAlignment,
           (v) => notifier.updateIgnoreBookAlignment(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -603,12 +644,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_indent_increase,
           settings.ignoreBookIndent,
           (v) => notifier.updateIgnoreBookIndent(v),
+          isEink: isEink,
         ),
       ],
     );
   }
 
-  Widget _buildReadingBreakReminderSettings() {
+  Widget _buildReadingBreakReminderSettings({bool isEink = false}) {
     final controller = ref.watch(readingBreakReminderControllerProvider);
     final reminderSettings = controller.state.settings;
     return Column(
@@ -621,6 +663,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           (enabled) => setState(
             () => controller.configure(reminderSettings.copyWith(enabled: enabled)),
           ),
+          isEink: isEink,
         ),
         if (reminderSettings.enabled)
           DropdownButton<ReadingBreakInterval>(
@@ -644,7 +687,11 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
 
   // ── Typography presets ──
 
-  static Widget _buildPresetRow(ReaderSettings settings, ReaderSettingsNotifier notifier) {
+  static Widget _buildPresetRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     const presets = <_TypographyPreset>[
       _TypographyPreset(
         'Классика',
@@ -720,14 +767,18 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               width: 100,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: active
-                    ? Colors.blue.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                color: isEink
+                    ? (active ? Colors.black : Colors.white)
+                    : (active
+                          ? Colors.blue.withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.08)),
+                borderRadius: BorderRadius.circular(isEink ? 0 : 12),
                 border: Border.all(
-                  color: active
-                      ? Colors.blue.withValues(alpha: 0.5)
-                      : Colors.white.withValues(alpha: 0.15),
+                  color: isEink
+                      ? Colors.black
+                      : (active
+                            ? Colors.blue.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.15)),
                 ),
               ),
               child: Column(
@@ -739,7 +790,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: active ? Colors.blue : Colors.white,
+                      color: isEink
+                          ? (active ? Colors.white : Colors.black)
+                          : (active ? Colors.blue : Colors.white),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -748,7 +801,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     style: TextStyle(
                       fontSize: 11,
                       fontFamily: p.font.fontFamily,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isEink
+                          ? (active ? Colors.white70 : Colors.black54)
+                          : Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -765,8 +820,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildThemeRow(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     final brightness = MediaQuery.platformBrightnessOf(context);
     return Wrap(
       spacing: 8,
@@ -793,11 +849,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                   height: 48,
                   decoration: BoxDecoration(
                     color: colors.scaffold,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 8),
                     border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      color: isEink
+                          ? Colors.black
+                          : (isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -805,7 +863,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     child: Text(
                       'Aa',
                       style: TextStyle(
-                        color: colors.text,
+                        color: isEink ? Colors.black : colors.text,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -823,8 +881,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildBackgroundStyleRow(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -849,11 +908,13 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                   height: 48,
                   decoration: BoxDecoration(
                     gradient: preview,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 8),
                     border: Border.all(
-                      color: isSelected
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                      color: isEink
+                          ? Colors.black
+                          : (isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
                       width: isSelected ? 2 : 1,
                     ),
                   ),
@@ -910,8 +971,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildUiThemeRow(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     final brightness = MediaQuery.platformBrightnessOf(context);
     final isSynced = settings.uiTheme == null;
     return Column(
@@ -969,11 +1031,15 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                           height: 48,
                           decoration: BoxDecoration(
                             color: colors.scaffold,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(isEink ? 0 : 8),
                             border: Border.all(
-                              color: isSelected
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                              color: isEink
+                                  ? Colors.black
+                                  : (isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.outline.withValues(alpha: 0.3)),
                               width: isSelected ? 2 : 1,
                             ),
                           ),
@@ -981,7 +1047,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                             child: Text(
                               'Aa',
                               style: TextStyle(
-                                color: colors.text,
+                                color: isEink ? Colors.black : colors.text,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
@@ -1004,8 +1070,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     BuildContext context,
     WidgetRef ref,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     final presetsAsync = ref.watch(colorPresetListProvider);
     return presetsAsync.when(
       data: (presets) => Column(
@@ -1046,11 +1113,15 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                         height: 48,
                         decoration: BoxDecoration(
                           color: preset.backgroundColor,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(isEink ? 0 : 8),
                           border: Border.all(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+                            color: isEink
+                                ? Colors.black
+                                : (isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.outline.withValues(alpha: 0.3)),
                             width: isSelected ? 2 : 1,
                           ),
                         ),
@@ -1774,14 +1845,26 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     String label,
     IconData icon,
     bool value,
-    ValueChanged<bool> onChanged,
-  ) {
+    ValueChanged<bool> onChanged, {
+    bool isEink = false,
+  }) {
     return Row(
       children: [
-        Icon(icon, size: 20),
+        Icon(icon, size: 20, color: isEink ? Colors.black : null),
         const SizedBox(width: 12),
-        Expanded(child: Text(label)),
-        Switch.adaptive(value: value, onChanged: onChanged),
+        Expanded(
+          child: Text(
+            label,
+            style: isEink ? const TextStyle(color: Colors.black) : null,
+          ),
+        ),
+        Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: isEink ? Colors.black : null,
+          activeTrackColor: isEink ? Colors.black26 : null,
+          inactiveTrackColor: isEink ? Colors.grey.shade300 : null,
+        ),
       ],
     );
   }

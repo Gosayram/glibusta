@@ -149,6 +149,8 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             text_indent: None,
             text_align: None,
             note_id: None,
+            page_break_before: false,
+            page_break_inside_avoid: false,
         })
         .collect::<Vec<_>>();
     let cover_url = first_image_cover(&blocks);
@@ -560,6 +562,8 @@ mod tests {
             text_indent: None,
             text_align: None,
             note_id: None,
+            page_break_before: false,
+            page_break_inside_avoid: false,
         }];
 
         assert_eq!(

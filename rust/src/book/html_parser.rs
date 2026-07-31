@@ -47,6 +47,8 @@ fn emit_block(
         text_indent: None,
         text_align,
         note_id: None,
+        page_break_before: false,
+        page_break_inside_avoid: false,
     });
     *index += 1;
 }
@@ -113,6 +115,8 @@ fn walk_children(
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         })
                         .collect();
                     blocks.push(ReaderBlock {
@@ -130,6 +134,8 @@ fn walk_children(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     *index += 1;
                 }
@@ -156,6 +162,8 @@ fn walk_children(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     *index += 1;
                 }

@@ -2894,6 +2894,8 @@ impl SseDecode for crate::api::models::ReaderBlock {
         let mut var_textIndent = <Option<f64>>::sse_decode(deserializer);
         let mut var_textAlign = <Option<String>>::sse_decode(deserializer);
         let mut var_noteId = <Option<String>>::sse_decode(deserializer);
+        let mut var_pageBreakBefore = <bool>::sse_decode(deserializer);
+        let mut var_pageBreakInsideAvoid = <bool>::sse_decode(deserializer);
         return crate::api::models::ReaderBlock {
             index: var_index,
             text: var_text,
@@ -2909,6 +2911,8 @@ impl SseDecode for crate::api::models::ReaderBlock {
             text_indent: var_textIndent,
             text_align: var_textAlign,
             note_id: var_noteId,
+            page_break_before: var_pageBreakBefore,
+            page_break_inside_avoid: var_pageBreakInsideAvoid,
         };
     }
 }
@@ -3531,6 +3535,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::ReaderBlock {
             self.text_indent.into_into_dart().into_dart(),
             self.text_align.into_into_dart().into_dart(),
             self.note_id.into_into_dart().into_dart(),
+            self.page_break_before.into_into_dart().into_dart(),
+            self.page_break_inside_avoid.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -4162,6 +4168,8 @@ impl SseEncode for crate::api::models::ReaderBlock {
         <Option<f64>>::sse_encode(self.text_indent, serializer);
         <Option<String>>::sse_encode(self.text_align, serializer);
         <Option<String>>::sse_encode(self.note_id, serializer);
+        <bool>::sse_encode(self.page_break_before, serializer);
+        <bool>::sse_encode(self.page_break_inside_avoid, serializer);
     }
 }
 

@@ -1220,8 +1220,75 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               });
               _ctrl.toggleSearch();
             },
+            highlightMode: readerState.highlightMode,
+            onSetHighlightStart: () {
+              _ctrl.setMultiHighlightStart(
+                readerState.currentPosition.chapterIndex,
+                readerState.currentPosition.paragraphIndex,
+                _selectedText ?? '',
+              );
+              setState(() => _selectedText = null);
+            },
+            onFinishHighlight: () {
+              unawaited(
+                _ctrl.finishMultiHighlight(
+                  bookId: widget.bookId,
+                  endChapterIndex: readerState.currentPosition.chapterIndex,
+                  endParagraphIndex: readerState.currentPosition.paragraphIndex,
+                  endSelectedText: _selectedText ?? '',
+                ),
+              );
+              setState(() => _selectedText = null);
+            },
+            onCancelHighlight: () {
+              _ctrl.cancelMultiHighlight();
+              setState(() => _selectedText = null);
+            },
           ),
         ),
+        if (readerState.highlightMode == HighlightSelectionMode.startSet && _selectedText == null)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 24,
+            right: 24,
+            child: Material(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Начало выделения установлено. Выделите текст в конечной точке.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        _ctrl.cancelMultiHighlight();
+                        setState(() {});
+                      },
+                      child: Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1542,9 +1609,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl.saveCheckpoint();
     _ctrl.onBottomSheetOpen();
     _gestureCoordinator.onBottomSheetOpened();
+    final settings = ref.read(readerSettingsProvider);
+    final isEink = settings.eink;
     unawaited(
       showAdaptivePanel<void>(
         context: context,
+        backgroundColor: isEink ? Colors.white : null,
+        barrierColor: isEink ? Colors.black54 : null,
         child: ReaderQuickSettingsSheet(bookId: widget.bookId),
       ).then((_) {
         _ctrl.onBottomSheetClose();

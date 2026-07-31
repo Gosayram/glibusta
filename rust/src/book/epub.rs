@@ -1546,6 +1546,69 @@ fn has_page_break_prop(props: &HashMap<String, String>) -> bool {
     false
 }
 
+fn css_has_page_break_after(
+    css: &HashMap<String, HashMap<String, String>>,
+    tag: &str,
+    class: Option<&str>,
+) -> bool {
+    if let Some(props) = css.get(tag) {
+        if has_page_break_after_prop(props) {
+            return true;
+        }
+    }
+    if let Some(cls) = class {
+        let class_sel = format!(".{}", cls);
+        if css.get(&class_sel).is_some_and(has_page_break_after_prop) {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_page_break_after_prop(props: &HashMap<String, String>) -> bool {
+    if let Some(val) = props
+        .get("page-break-after")
+        .or_else(|| props.get("break-after"))
+    {
+        let v = val.trim();
+        return v == "always" || v == "page";
+    }
+    false
+}
+
+fn css_has_page_break_inside_avoid(
+    css: &HashMap<String, HashMap<String, String>>,
+    tag: &str,
+    class: Option<&str>,
+) -> bool {
+    if let Some(props) = css.get(tag) {
+        if has_page_break_inside_avoid_prop(props) {
+            return true;
+        }
+    }
+    if let Some(cls) = class {
+        let class_sel = format!(".{}", cls);
+        if css
+            .get(&class_sel)
+            .is_some_and(has_page_break_inside_avoid_prop)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_page_break_inside_avoid_prop(props: &HashMap<String, String>) -> bool {
+    if let Some(val) = props
+        .get("page-break-inside")
+        .or_else(|| props.get("break-inside"))
+    {
+        let v = val.trim();
+        return v == "avoid";
+    }
+    false
+}
+
 /// MD-1.2: convert CSS length units to pixels. Default base = 16px (browser standard).
 fn parse_css_length(value: &str) -> Option<f64> {
     let v = value.trim();
@@ -1589,6 +1652,7 @@ fn parse_xhtml_to_blocks(
     let mut block_class: Option<&str> = None;
     let mut hidden_elements: Vec<bool> = Vec::new();
     let mut hidden_depth = 0usize;
+    let mut pending_page_break_before = false;
 
     // Rich span tracking
     let mut rich_spans: Vec<RichSpan> = Vec::new();
@@ -2036,6 +2100,8 @@ fn parse_xhtml_to_blocks(
                             }
                         };
                         if !t.is_empty() || rich.is_some() {
+                            let has_pb = pending_page_break_before;
+                            pending_page_break_before = false;
                             blocks.push(ReaderBlock {
                                 index: block_index,
                                 text: t,
@@ -2055,6 +2121,8 @@ fn parse_xhtml_to_blocks(
                                     None
                                 },
                                 note_id: None,
+                                page_break_before: has_pb,
+                                page_break_inside_avoid: false,
                             });
                             if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
@@ -2065,12 +2133,44 @@ fn parse_xhtml_to_blocks(
                                 if css_has_page_break(css, "p", Some(cls))
                                     || css_has_page_break(css, "pre", Some(cls))
                                 {
+                                    if let Some(last) = blocks.last_mut() {
+                                        last.page_break_before = true;
+                                    }
                                     page_breaks.push(blocks.len());
                                 }
-                            } else if css_has_page_break(css, "p", None)
-                                || css_has_page_break(css, "pre", None)
-                            {
-                                page_breaks.push(blocks.len());
+                                if css_has_page_break_after(css, "p", Some(cls))
+                                    || css_has_page_break_after(css, "pre", Some(cls))
+                                {
+                                    pending_page_break_before = true;
+                                }
+                                if css_has_page_break_inside_avoid(css, "p", Some(cls))
+                                    || css_has_page_break_inside_avoid(css, "pre", Some(cls))
+                                {
+                                    if let Some(last) = blocks.last_mut() {
+                                        last.page_break_inside_avoid = true;
+                                    }
+                                }
+                            } else {
+                                if css_has_page_break(css, "p", None)
+                                    || css_has_page_break(css, "pre", None)
+                                {
+                                    if let Some(last) = blocks.last_mut() {
+                                        last.page_break_before = true;
+                                    }
+                                    page_breaks.push(blocks.len());
+                                }
+                                if css_has_page_break_after(css, "p", None)
+                                    || css_has_page_break_after(css, "pre", None)
+                                {
+                                    pending_page_break_before = true;
+                                }
+                                if css_has_page_break_inside_avoid(css, "p", None)
+                                    || css_has_page_break_inside_avoid(css, "pre", None)
+                                {
+                                    if let Some(last) = blocks.last_mut() {
+                                        last.page_break_inside_avoid = true;
+                                    }
+                                }
                             }
                             block_index += 1;
                         }
@@ -2103,6 +2203,8 @@ fn parse_xhtml_to_blocks(
                                 );
                                 let t_text = current_text.trim().to_string();
                                 if !t_text.is_empty() {
+                                    let has_pb = pending_page_break_before;
+                                    pending_page_break_before = false;
                                     blocks.push(ReaderBlock {
                                         index: block_index,
                                         text: t_text,
@@ -2122,6 +2224,8 @@ fn parse_xhtml_to_blocks(
                                         text_indent: None,
                                         text_align: None,
                                         note_id: None,
+                                        page_break_before: has_pb,
+                                        page_break_inside_avoid: false,
                                     });
                                     let htag = match heading_level {
                                         Some(lv @ 1..=6) => H_TAGS[(lv - 1) as usize],
@@ -2133,10 +2237,34 @@ fn parse_xhtml_to_blocks(
                                         }
                                         // MD-1.4: track page-break-before on headings
                                         if css_has_page_break(css, htag, Some(cls)) {
+                                            if let Some(last) = blocks.last_mut() {
+                                                last.page_break_before = true;
+                                            }
                                             page_breaks.push(blocks.len());
                                         }
-                                    } else if css_has_page_break(css, htag, None) {
-                                        page_breaks.push(blocks.len());
+                                        if css_has_page_break_after(css, htag, Some(cls)) {
+                                            pending_page_break_before = true;
+                                        }
+                                        if css_has_page_break_inside_avoid(css, htag, Some(cls)) {
+                                            if let Some(last) = blocks.last_mut() {
+                                                last.page_break_inside_avoid = true;
+                                            }
+                                        }
+                                    } else {
+                                        if css_has_page_break(css, htag, None) {
+                                            if let Some(last) = blocks.last_mut() {
+                                                last.page_break_before = true;
+                                            }
+                                            page_breaks.push(blocks.len());
+                                        }
+                                        if css_has_page_break_after(css, htag, None) {
+                                            pending_page_break_before = true;
+                                        }
+                                        if css_has_page_break_inside_avoid(css, htag, None) {
+                                            if let Some(last) = blocks.last_mut() {
+                                                last.page_break_inside_avoid = true;
+                                            }
+                                        }
                                     }
                                     block_index += 1;
                                 }
@@ -2184,6 +2312,8 @@ fn parse_xhtml_to_blocks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             if let Some(cls) = block_class {
                                 if let Some(last) = blocks.last_mut() {
@@ -2236,6 +2366,8 @@ fn parse_xhtml_to_blocks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                             table_rows.clear();
@@ -2270,6 +2402,8 @@ fn parse_xhtml_to_blocks(
                                     text_indent: None,
                                     text_align: None,
                                     note_id: None,
+                                    page_break_before: false,
+                                    page_break_inside_avoid: false,
                                 })
                                 .collect();
                             blocks.push(ReaderBlock {
@@ -2287,6 +2421,8 @@ fn parse_xhtml_to_blocks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                             list_items.clear();
@@ -2314,6 +2450,8 @@ fn parse_xhtml_to_blocks(
                                     text_indent: None,
                                     text_align: None,
                                     note_id: None,
+                                    page_break_before: false,
+                                    page_break_inside_avoid: false,
                                 })
                                 .collect();
                             blocks.push(ReaderBlock {
@@ -2331,6 +2469,8 @@ fn parse_xhtml_to_blocks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                             list_items.clear();
@@ -2407,6 +2547,8 @@ fn parse_xhtml_to_blocks(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     block_index += 1;
                 } else if name == b"img" && in_body && !element_is_hidden {
@@ -2431,6 +2573,8 @@ fn parse_xhtml_to_blocks(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     block_index += 1;
                 } else if name == b"image" && in_body && !element_is_hidden {
@@ -2454,6 +2598,8 @@ fn parse_xhtml_to_blocks(
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         block_index += 1;
                     }
@@ -2675,6 +2821,8 @@ fn push_block(
         text_indent: None,
         text_align: None,
         note_id,
+        page_break_before: false,
+        page_break_inside_avoid: false,
     };
     apply_css_props(&mut block, tag, class, css);
     blocks.push(block);
@@ -2713,6 +2861,8 @@ fn flush_block(
             text_indent: None,
             text_align: None,
             note_id,
+            page_break_before: false,
+            page_break_inside_avoid: false,
         });
         *index += 1;
     }

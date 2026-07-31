@@ -28,6 +28,8 @@ import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 import 'reader_two_finger_chapter_gesture.dart';
 
+enum HighlightSelectionMode { idle, startSet }
+
 enum ReaderErrorKind {
   bookMissing('Книга не найдена', Icons.search_off),
   unsupportedFormat('Формат не поддерживается', Icons.block),
@@ -63,6 +65,10 @@ class ReaderState {
   final bool isDynamicallyLoading;
   final List<double> checkpoints;
   final int wpm;
+  final HighlightSelectionMode highlightMode;
+  final int? multiHighlightStartChapter;
+  final int? multiHighlightStartParagraph;
+  final String? multiHighlightStartText;
 
   // ignore: prefer_const_constructors_in_immutables
   ReaderState({
@@ -86,6 +92,10 @@ class ReaderState {
     this.isDynamicallyLoading = false,
     List<double> checkpoints = const [],
     this.wpm = 200,
+    this.highlightMode = HighlightSelectionMode.idle,
+    this.multiHighlightStartChapter,
+    this.multiHighlightStartParagraph,
+    this.multiHighlightStartText,
   }) : loadedChapters = loadedChapters is UnmodifiableMapView
            ? loadedChapters
            : Map.unmodifiable(loadedChapters),
@@ -137,6 +147,11 @@ class ReaderState {
     bool? isDynamicallyLoading,
     List<double>? checkpoints,
     int? wpm,
+    HighlightSelectionMode? highlightMode,
+    int? multiHighlightStartChapter,
+    bool clearMultiHighlightStart = false,
+    int? multiHighlightStartParagraph,
+    String? multiHighlightStartText,
   }) {
     return ReaderState(
       metadata: clearMetadata ? null : (metadata ?? this.metadata),
@@ -159,6 +174,16 @@ class ReaderState {
       isDynamicallyLoading: isDynamicallyLoading ?? this.isDynamicallyLoading,
       checkpoints: checkpoints ?? this.checkpoints,
       wpm: wpm ?? this.wpm,
+      highlightMode: highlightMode ?? this.highlightMode,
+      multiHighlightStartChapter: clearMultiHighlightStart
+          ? null
+          : (multiHighlightStartChapter ?? this.multiHighlightStartChapter),
+      multiHighlightStartParagraph: clearMultiHighlightStart
+          ? null
+          : (multiHighlightStartParagraph ?? this.multiHighlightStartParagraph),
+      multiHighlightStartText: clearMultiHighlightStart
+          ? null
+          : (multiHighlightStartText ?? this.multiHighlightStartText),
     );
   }
 }
@@ -1577,6 +1602,59 @@ final class ReaderController {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  void setMultiHighlightStart(
+    int chapterIndex,
+    int paragraphIndex,
+    String selectedText,
+  ) {
+    _updateState(
+      _state.copyWith(
+        highlightMode: HighlightSelectionMode.startSet,
+        multiHighlightStartChapter: chapterIndex,
+        multiHighlightStartParagraph: paragraphIndex,
+        multiHighlightStartText: selectedText,
+      ),
+    );
+  }
+
+  void cancelMultiHighlight() {
+    _updateState(
+      _state.copyWith(
+        highlightMode: HighlightSelectionMode.idle,
+        clearMultiHighlightStart: true,
+      ),
+    );
+  }
+
+  Future<void> finishMultiHighlight({
+    required String bookId,
+    required int endChapterIndex,
+    required int endParagraphIndex,
+    required String endSelectedText,
+  }) async {
+    final startChapter = _state.multiHighlightStartChapter;
+    final startParagraph = _state.multiHighlightStartParagraph;
+    final startText = _state.multiHighlightStartText;
+    if (startChapter == null || startParagraph == null || startText == null) return;
+    final db = _ref.read(databaseProvider);
+    final combinedText = '$startText\n\n$endSelectedText';
+    await db
+        .into(db.textHighlights)
+        .insert(
+          TextHighlightsCompanion.insert(
+            id: '$bookId-${newMonotonicId()}',
+            bookId: bookId,
+            chapterId: startChapter.toString(),
+            chapterIndex: startChapter,
+            blockIndex: startParagraph,
+            startOffset: 0,
+            endOffset: combinedText.length,
+            selectedText: combinedText,
+          ),
+        );
+    cancelMultiHighlight();
   }
 }
 

@@ -16,12 +16,16 @@ Future<T?> showAdaptivePanel<T>({
   required Widget child,
   bool isScrollControlled = true,
   bool useSafeArea = true,
+  Color? backgroundColor,
+  Color? barrierColor,
 }) {
   if (context.isCompact) {
     return showModalBottomSheet<T>(
       context: context,
       useSafeArea: useSafeArea,
       isScrollControlled: isScrollControlled,
+      backgroundColor: backgroundColor,
+      barrierColor: barrierColor,
       builder: (_) => child,
     );
   }

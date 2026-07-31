@@ -390,6 +390,10 @@ pub struct ReaderBlock {
     pub text_align: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note_id: Option<String>,
+    #[serde(default)]
+    pub page_break_before: bool,
+    #[serde(default)]
+    pub page_break_inside_avoid: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -823,6 +827,8 @@ mod book_diff_tests {
                     text_indent: None,
                     text_align: None,
                     note_id: None,
+                    page_break_before: false,
+                    page_break_inside_avoid: false,
                 }],
             }],
             metadata: None,
@@ -901,6 +907,8 @@ mod book_diff_tests {
             text_indent: None,
             text_align: None,
             note_id: None,
+            page_break_before: false,
+            page_break_inside_avoid: false,
         });
 
         let diff = BookDiff::compute(&old, &new);

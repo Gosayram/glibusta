@@ -46,6 +46,8 @@ impl MobiChapterSplitter {
                     text_indent: None,
                     text_align: None,
                     note_id: None,
+                    page_break_before: false,
+                    page_break_inside_avoid: false,
                 }],
             }];
         }

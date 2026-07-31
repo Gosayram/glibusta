@@ -100,6 +100,8 @@ class EpubBookAdapter {
           fontSize: fontSize ?? mapped.fontSize,
           textAlign: align,
           noteId: mapped.noteId,
+          pageBreakBefore: mapped.pageBreakBefore,
+          pageBreakInsideAvoid: mapped.pageBreakInsideAvoid,
         );
       }
       return mapped;

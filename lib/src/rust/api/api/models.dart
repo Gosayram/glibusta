@@ -505,6 +505,8 @@ class ReaderBlock {
   final double? textIndent;
   final String? textAlign;
   final String? noteId;
+  final bool pageBreakBefore;
+  final bool pageBreakInsideAvoid;
 
   const ReaderBlock({
     required this.index,
@@ -521,6 +523,8 @@ class ReaderBlock {
     this.textIndent,
     this.textAlign,
     this.noteId,
+    required this.pageBreakBefore,
+    required this.pageBreakInsideAvoid,
   });
 
   @override
@@ -538,7 +542,9 @@ class ReaderBlock {
       imageAlt.hashCode ^
       textIndent.hashCode ^
       textAlign.hashCode ^
-      noteId.hashCode;
+      noteId.hashCode ^
+      pageBreakBefore.hashCode ^
+      pageBreakInsideAvoid.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -558,7 +564,9 @@ class ReaderBlock {
           imageAlt == other.imageAlt &&
           textIndent == other.textIndent &&
           textAlign == other.textAlign &&
-          noteId == other.noteId;
+          noteId == other.noteId &&
+          pageBreakBefore == other.pageBreakBefore &&
+          pageBreakInsideAvoid == other.pageBreakInsideAvoid;
 }
 
 class ReaderChapter {

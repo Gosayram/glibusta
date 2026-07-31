@@ -113,6 +113,8 @@ impl MobiHtmlParser {
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     idx += 1;
                     continue;
@@ -142,6 +144,8 @@ impl MobiHtmlParser {
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         idx += 1;
                     }
@@ -162,6 +166,8 @@ impl MobiHtmlParser {
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
                     });
                     idx += 1;
                 } else if self.is_blockquote(&lower) {
@@ -182,6 +188,8 @@ impl MobiHtmlParser {
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         idx += 1;
                     }
@@ -205,6 +213,8 @@ impl MobiHtmlParser {
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         idx += 1;
                     }
@@ -232,6 +242,8 @@ impl MobiHtmlParser {
                     text_indent: None,
                     text_align: None,
                     note_id: None,
+                    page_break_before: false,
+                    page_break_inside_avoid: false,
                 });
             }
         }

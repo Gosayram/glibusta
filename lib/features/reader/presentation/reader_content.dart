@@ -2176,7 +2176,16 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         return _estimateBlockHeight(block, settings, contentWidth);
       });
 
+      if (block.pageBreakBefore && i > pageStart) {
+        pages.add(_PageContent(chapterIndex: chIdx, blockStart: pageStart, blockEnd: i));
+        pageStart = i;
+        currentHeight = blockHeight;
+        continue;
+      }
+
       if (currentHeight + blockHeight > availableHeight && i > pageStart) {
+        final prevBlock = i > 0 ? chapter.blocks[i - 1] : null;
+        final avoidBreak = prevBlock != null && prevBlock.pageBreakInsideAvoid;
         final remainingBlocks = chapter.blocks.length - i;
         final remainingHeight = remainingBlocks > 0
             ? chapter.blocks.skip(i).fold<double>(
@@ -2191,7 +2200,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               )
             : 0.0;
         final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
-        if (currentHeight > availableHeight * minFillRatio && !isOrphanPage) {
+        final canBreak = currentHeight > availableHeight * minFillRatio && !isOrphanPage;
+        if (canBreak && !(avoidBreak && currentHeight < availableHeight * 0.6)) {
           pages.add(_PageContent(chapterIndex: chIdx, blockStart: pageStart, blockEnd: i));
           pageStart = i;
           currentHeight = blockHeight;

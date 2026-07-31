@@ -17,6 +17,7 @@ import '../data/dictionary_lookup_history.dart';
 import '../data/dictionary_lookup_preview.dart';
 import '../data/dictionary_lookup_source.dart';
 import '../data/highlight_decoration.dart';
+import 'reader_controller.dart';
 
 class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final String bookId;
@@ -26,6 +27,10 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
   final VoidCallback onDismiss;
   final ValueChanged<String>? onSearchInBook;
   final TtsController? ttsController;
+  final HighlightSelectionMode highlightMode;
+  final VoidCallback? onSetHighlightStart;
+  final VoidCallback? onFinishHighlight;
+  final VoidCallback? onCancelHighlight;
 
   const ReaderSelectionToolbar({
     super.key,
@@ -36,6 +41,10 @@ class ReaderSelectionToolbar extends ConsumerStatefulWidget {
     required this.onDismiss,
     this.onSearchInBook,
     this.ttsController,
+    this.highlightMode = HighlightSelectionMode.idle,
+    this.onSetHighlightStart,
+    this.onFinishHighlight,
+    this.onCancelHighlight,
   });
 
   @override
@@ -275,6 +284,36 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 label: 'Выделить',
                 onTap: () => unawaited(_pickHighlightColor(context)),
               ),
+              if (widget.highlightMode == HighlightSelectionMode.idle &&
+                  widget.onSetHighlightStart != null)
+                _ToolbarButton(
+                  icon: Icons.vertical_align_top,
+                  label: 'Отсюда',
+                  onTap: () {
+                    widget.onSetHighlightStart!();
+                    widget.onDismiss();
+                  },
+                ),
+              if (widget.highlightMode == HighlightSelectionMode.startSet &&
+                  widget.onFinishHighlight != null)
+                _ToolbarButton(
+                  icon: Icons.check_circle,
+                  label: 'Завершить',
+                  onTap: () {
+                    widget.onFinishHighlight!();
+                    widget.onDismiss();
+                  },
+                ),
+              if (widget.highlightMode == HighlightSelectionMode.startSet &&
+                  widget.onCancelHighlight != null)
+                _ToolbarButton(
+                  icon: Icons.cancel,
+                  label: 'Отменить',
+                  onTap: () {
+                    widget.onCancelHighlight!();
+                    widget.onDismiss();
+                  },
+                ),
             ],
           ),
         ),

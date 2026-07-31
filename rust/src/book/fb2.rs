@@ -895,6 +895,8 @@ fn parse_fb2_xml(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -992,6 +994,8 @@ fn parse_fb2_xml(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -1033,6 +1037,8 @@ fn parse_fb2_xml(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -1057,6 +1063,8 @@ fn parse_fb2_xml(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -1081,6 +1089,8 @@ fn parse_fb2_xml(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -1191,6 +1201,8 @@ fn parse_fb2_xml(
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         block_index += 1;
                         in_empty_line = false;
@@ -1216,6 +1228,8 @@ fn parse_fb2_xml(
                             text_indent: None,
                             text_align: None,
                             note_id: current_image_id.take(),
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         block_index += 1;
                         in_image = false;
@@ -1390,6 +1404,8 @@ fn parse_fb2_xml(
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         block_index += 1;
                     }
@@ -1416,6 +1432,8 @@ fn parse_fb2_xml(
                             text_indent: None,
                             text_align: None,
                             note_id: get_xml_attr(e, b"id"),
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
                         });
                         block_index += 1;
                     }
@@ -1754,6 +1772,8 @@ fn default_block() -> ReaderBlock {
         text_indent: None,
         text_align: None,
         note_id: None,
+        page_break_before: false,
+        page_break_inside_avoid: false,
     }
 }
 
@@ -1832,6 +1852,8 @@ fn flush_fb2_block(
             text_indent: None,
             text_align: None,
             note_id: None,
+            page_break_before: false,
+            page_break_inside_avoid: false,
         });
         *block_index += 1;
     }

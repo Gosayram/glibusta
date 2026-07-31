@@ -803,6 +803,8 @@ fn parse_document_xml_with_hyperlinks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             };
                             if paragraph_is_numbered {
                                 let numbering_key =
@@ -874,6 +876,8 @@ fn parse_document_xml_with_hyperlinks(
                                     text_indent: None,
                                     text_align: None,
                                     note_id: None,
+                                    page_break_before: false,
+                                    page_break_inside_avoid: false,
                                 });
                                 block_index += 1;
                             }
@@ -920,6 +924,8 @@ fn parse_document_xml_with_hyperlinks(
                                 text_indent: None,
                                 text_align: None,
                                 note_id: None,
+                                page_break_before: false,
+                                page_break_inside_avoid: false,
                             });
                             block_index += 1;
                         }
@@ -1058,6 +1064,8 @@ fn flush_docx_list(
         text_indent: None,
         text_align: None,
         note_id: None,
+        page_break_before: false,
+        page_break_inside_avoid: false,
     });
     *block_index += 1;
 }
