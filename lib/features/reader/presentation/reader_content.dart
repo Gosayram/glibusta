@@ -259,10 +259,35 @@ TextStyle _readerTextStyle(
   );
 }
 
+final Map<String, Map<String, double>> _cssCache = {};
+
+@visibleForTesting
+void clearCssCache() => _cssCache.clear();
+
+@visibleForTesting
+Map<String, double> parseCustomCssForTest(String css, {int? chapterIndex}) =>
+    _parseCustomCss(css, chapterIndex: chapterIndex);
+
+final Map<int, List<String>> _chapterImagesCache = {};
+
+@visibleForTesting
+void clearChapterImagesCache() => _chapterImagesCache.clear();
+
+@visibleForTesting
+List<String>? chapterImagesForTest(int chapterIndex) => _chapterImagesCache[chapterIndex];
+
+@visibleForTesting
+List<String> putIfAbsentChapterImages(int chapterIndex, List<String> Function() ifAbsent) =>
+    _chapterImagesCache.putIfAbsent(chapterIndex, ifAbsent);
+
 /// LW-10.1/10.2: parse basic CSS properties from user's customCss text.
 /// Supports `/* chapter:N */` markers for per-chapter overrides.
 Map<String, double> _parseCustomCss(String css, {int? chapterIndex}) {
   if (css.isEmpty) return {};
+
+  final cacheKey = chapterIndex != null ? '$css||$chapterIndex' : css;
+  final cached = _cssCache[cacheKey];
+  if (cached != null) return cached;
 
   // LW-10.2: split CSS into global + chapter-specific blocks
   final result = <String, double>{};
@@ -283,6 +308,7 @@ Map<String, double> _parseCustomCss(String css, {int? chapterIndex}) {
     }
   }
 
+  _cssCache[cacheKey] = result;
   return result;
 }
 
@@ -1839,10 +1865,13 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
     final ctx = _ctx(settings);
     final chapterHighlights = widget.chapterHighlights[chapterIndex];
 
-    final chapterImages = chapter.blocks
-        .where((b) => b.type == BlockType.image && b.imageUrl != null && b.imageUrl!.isNotEmpty)
-        .map((b) => b.imageUrl!)
-        .toList();
+    final chapterImages = _chapterImagesCache.putIfAbsent(
+      chapterIndex,
+      () => chapter.blocks
+          .where((b) => b.type == BlockType.image && b.imageUrl != null && b.imageUrl!.isNotEmpty)
+          .map((b) => b.imageUrl!)
+          .toList(),
+    );
 
     final header = chapter.title.isNotEmpty
         ? _buildChapterTitle(
@@ -2059,6 +2088,14 @@ class _FocusBlock {
   final int blockIndex;
 }
 
+int _hashListItems(List<ReaderBlock>? items) {
+  if (items == null || items.isEmpty) return 0;
+  return Object.hashAll(items.map((item) => Object.hash(item.text, item.type)));
+}
+
+@visibleForTesting
+int hashListItemsForTest(List<ReaderBlock>? items) => _hashListItems(items);
+
 class _PaginatedContentBody extends StatefulWidget {
   const _PaginatedContentBody({
     required this.metadata,
@@ -2110,6 +2147,7 @@ class _PageContent {
 
 class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   late final PageController _pageController;
+  late final TextPainter _reusablePainter;
   bool _didRestoreInitialPage = false;
   bool _disposed = false;
   bool? _usesTwoPageLayout;
@@ -2129,6 +2167,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    _reusablePainter = TextPainter(textDirection: TextDirection.ltr);
   }
 
   @override
@@ -2137,8 +2176,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (widget.loadedChapters != oldWidget.loadedChapters) {
       _cacheKey = null;
       _cachedPages = const [];
-      _chapterPageCache.clear();
-      _heightCache.clear();
     }
     // MD-2.3: clear per-chapter cache when settings affect layout
     if (widget.settings.fontSize != oldWidget.settings.fontSize ||
@@ -2211,6 +2248,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   @override
   void dispose() {
     _disposed = true;
+    _reusablePainter.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -2244,7 +2282,19 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     var currentHeight = titleHeight;
     var pageStart = 0;
 
-    for (int i = 0; i < chapter.blocks.length; i++) {
+    final blockCount = chapter.blocks.length;
+    final suffixSums = List<double>.filled(blockCount + 1, 0);
+    for (int j = blockCount - 1; j >= 0; j--) {
+      final b = chapter.blocks[j];
+      final k = _blockHeightCacheKey(b, settings, contentWidth);
+      suffixSums[j] =
+          suffixSums[j + 1] +
+          _heightCache.putIfAbsent(k, () {
+            return _estimateBlockHeight(b, settings, contentWidth);
+          });
+    }
+
+    for (int i = 0; i < blockCount; i++) {
       final block = chapter.blocks[i];
       final cacheKey = _blockHeightCacheKey(block, settings, contentWidth);
       final blockHeight = _heightCache.putIfAbsent(cacheKey, () {
@@ -2261,19 +2311,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       if (currentHeight + blockHeight > availableHeight && i > pageStart) {
         final prevBlock = i > 0 ? chapter.blocks[i - 1] : null;
         final avoidBreak = prevBlock != null && prevBlock.pageBreakInsideAvoid;
-        final remainingBlocks = chapter.blocks.length - i;
-        final remainingHeight = remainingBlocks > 0
-            ? chapter.blocks.skip(i).fold<double>(
-                0,
-                (sum, b) {
-                  final k = _blockHeightCacheKey(b, settings, contentWidth);
-                  return sum +
-                      _heightCache.putIfAbsent(k, () {
-                        return _estimateBlockHeight(b, settings, contentWidth);
-                      });
-                },
-              )
-            : 0.0;
+        final remainingBlocks = blockCount - i;
+        final remainingHeight = suffixSums[i];
         final isOrphanPage = remainingBlocks <= 1 && remainingHeight < availableHeight * 0.25;
         final canBreak = currentHeight > availableHeight * minFillRatio && !isOrphanPage;
         if (canBreak && !(avoidBreak && currentHeight < availableHeight * 0.6)) {
@@ -2318,7 +2357,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       block.textIndent,
       block.fontSize,
       block.richSpans,
-      block.listItems,
+      _hashListItems(block.listItems),
       block.tableRows,
       block.imageCaption,
       settings.fontSize,
@@ -2365,8 +2404,6 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
         if (i == currentChapter) continue;
         _paginateSingleChapter(i, _lastAvailableHeight, _lastContentWidth, chKey);
       }
-      if (_disposed || generation != _repaginationGeneration) return;
-      if (mounted) setState(() {});
     }
 
     if (_disposed || generation != _repaginationGeneration) return;
@@ -2579,12 +2616,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       textSpan = TextSpan(text: block.text, style: textStyle);
     }
 
-    final painter = TextPainter(
-      text: textSpan,
-      textDirection: dir,
-      locale: locale,
-      textScaler: MediaQuery.textScalerOf(context),
-    );
+    _reusablePainter
+      ..text = textSpan
+      ..textDirection = dir
+      ..locale = locale
+      ..textScaler = MediaQuery.textScalerOf(context);
     // A WidgetSpan gives the first rendered line its indentation, but it
     // cannot be used in a standalone TextPainter. Measuring against the
     // first-line content width is conservative: it may put a page break a
@@ -2592,10 +2628,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final measurementWidth = firstLineIndent > 0
         ? (maxWidth - firstLineIndent).clamp(1.0, maxWidth)
         : maxWidth;
-    painter.layout(maxWidth: measurementWidth);
-    final height = painter.height;
-    painter.dispose();
-    return height;
+    _reusablePainter.layout(maxWidth: measurementWidth);
+    return _reusablePainter.height;
   }
 
   double _blockFontScale(ReaderBlock block) {
