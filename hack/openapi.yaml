@@ -12,19 +12,18 @@ info:
     when the origin's `robots.txt` disallows crawling. Do not use this document
     to probe endpoints, submit forms, authenticate, or download content.
 
-    ## Content Types
-    - HTML endpoints return `text/html` — requires client-side parsing
-    - OPDS endpoints return `application/atom+xml` — standard Atom XML
+    ## Parser expectations (unverified)
+    - HTML routes are expected to return `text/html` for client-side parsing.
+    - OPDS routes are expected to return Atom XML.
 
     ## Authentication
     - Session-based via form POST to `/user/login`
     - Returns session cookie (`SESS*` / `SSESS*`)
     - Some endpoints require auth (marked with `🔒`)
 
-    ## Pagination
-    - HTML pages use `?page=N` (0-indexed)
-    - OPDS uses `os:startIndex` / `os:itemsPerPage`
-    - Pagination info in `div.item-list .pager`
+    ## Pagination expectations (unverified)
+    - Historical parsers use `?page=N`, OpenSearch fields, and
+      `div.item-list .pager`; validate against authorised fixtures before use.
 
     ## Parsing Notes
     - Search results: `<ul>` inside `#main` with `<a href="/b/...">` links

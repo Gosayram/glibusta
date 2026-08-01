@@ -4,10 +4,10 @@
 > not an official API contract and not evidence that an endpoint currently works.
 > The configured origin comes from `.env`; never add it to this file.
 
-The origin currently disallows automated crawling in `robots.txt`. The shared
-client therefore fails closed, including for legacy scripts such as `probe.py`
-and `test_endpoints.py`. Run only `make flibusta-audit`; it first checks the
-policy and records metadata without saving HTML or downloading content.
+The origin currently disallows automated crawling in `robots.txt`. Scripts
+using `FlibustaClient`, including `probe.py` and `test_endpoints.py`, fail
+closed. Run only `make flibusta-audit`; it first checks the policy and records
+metadata without saving HTML or downloading content.
 
 `openapi.yaml` mirrors this inventory for design/reference only. Its response
 schemas describe parser expectations, not JSON emitted by the origin.
@@ -22,7 +22,7 @@ schemas describe parser expectations, not JSON emitted by the origin.
 | `/b/{id}/download` | GET    | No   | Download page (all formats) |
 | `/b/{id}/fb2`      | GET    | No   | Direct FB2 download         |
 | `/b/{id}/epub`     | GET    | No   | Direct EPUB download        |
-| `/b/{id}/mail`     | POST   | Yes  | Send book to email          |
+| `/b/{id}/mail`     | GET/POST | Yes | Candidate mail form / submit |
 | `/b/{id}/complain` | GET    | Yes  | Complain about file quality |
 
 ### Book details page (`/b/{id}`) — parsed fields:
@@ -335,7 +335,7 @@ GET /rec
 
 ---
 
-## 17. NEWLY DISCOVERED
+## 17. HISTORICAL CANDIDATES (NOT VALIDATED)
 
 | Endpoint                      | Method | Auth | Description                           |
 | ----------------------------- | ------ | ---- | ------------------------------------- |
@@ -351,7 +351,7 @@ GET /rec
 
 ---
 
-## PARSING NOTES
+## HISTORICAL PARSING ASSUMPTIONS (NOT VALIDATED)
 
 ### HTML Search Results
 

@@ -19,11 +19,12 @@ structure. It neither saves page bodies nor authenticates, posts forms, or
 downloads books.
 
 The client uses TLS verification for HTTPS, a 5-second connect timeout, a
-20-second read timeout, no automatic cross-origin redirects, and at most two
-retries for safe GET/HEAD requests. It honours `Retry-After` and caps retry
-backoff at 30 seconds. Legacy scripts share the same client and therefore stop
-when robots disallows the origin. Do not bypass that guard; use authorised local
-HTML fixtures to evolve parsers while live crawling is unavailable.
+20-second read timeout, no automatic cross-origin redirects, and checks the
+exact target URL against `robots.txt`. It honours the larger of the configured
+interval and the declared `Crawl-delay`; it deliberately does not retry requests
+automatically, so retry bursts cannot violate that delay. Scripts that use
+`FlibustaClient` share this guard. Do not bypass it; use authorised local HTML
+fixtures to evolve parsers while live crawling is unavailable.
 
 ## Evidence levels
 

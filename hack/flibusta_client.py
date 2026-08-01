@@ -13,8 +13,6 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import requests
 from bs4 import BeautifulSoup
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
@@ -179,34 +177,27 @@ class FlibustaClient:
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/120.0.0.0 Safari/537.36"
         )
-        retry = Retry(
-            total=2,
-            backoff_factor=0.5,
-            backoff_max=30,
-            respect_retry_after_header=True,
-            status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=frozenset({"GET", "HEAD"}),
-        )
-        self.session.mount("https://", HTTPAdapter(max_retries=retry))
         self._logged_in = False
 
     def _resolve_url(self, path: str) -> str:
         url = urljoin(f"{self.base_url}/", path.lstrip("/"))
-        if urlsplit(url).netloc != self._origin:
+        parsed = urlsplit(url)
+        if parsed.scheme != urlsplit(self.base_url).scheme or parsed.netloc != self._origin:
             raise ValueError("Refusing a request outside BASE_URL")
         return url
 
-    def _wait_for_request_slot(self) -> None:
+    def _wait_for_request_slot(self, minimum_interval_seconds: float = 0) -> None:
         if self._last_request_at is None:
             return
-        remaining = self._min_request_interval_seconds - (time.monotonic() - self._last_request_at)
+        interval = max(self._min_request_interval_seconds, minimum_interval_seconds)
+        remaining = interval - (time.monotonic() - self._last_request_at)
         if remaining > 0:
             time.sleep(remaining)
 
     def _request_unchecked(
-        self, method: str, path: str, **kwargs: Any
+        self, method: str, path: str, *, minimum_interval_seconds: float = 0, **kwargs: Any
     ) -> Optional[requests.Response]:
-        self._wait_for_request_slot()
+        self._wait_for_request_slot(minimum_interval_seconds)
         kwargs.setdefault("allow_redirects", False)
         try:
             response = self.session.request(
@@ -221,7 +212,7 @@ class FlibustaClient:
             print(f"  ERR {method} {path}: {error}")
             return None
 
-    def robots_policy(self, user_agent: Optional[str] = None) -> dict[str, Any]:
+    def robots_policy(self, user_agent: Optional[str] = None, path: str = "/") -> dict[str, Any]:
         """Return the cached robots policy; fail closed when it cannot be read."""
         agent = user_agent or self.session.headers["User-Agent"]
         if self._robots_metadata is None:
@@ -239,23 +230,29 @@ class FlibustaClient:
                     "fetched": True,
                     "status": response.status_code,
                     "sha256": hashlib.sha256(response.content).hexdigest(),
-                    "crawl_delay_seconds": parser.crawl_delay(agent),
                 }
 
         policy = dict(self._robots_metadata)
-        policy["allowed"] = bool(
-            self._robots_parser and self._robots_parser.can_fetch(agent, f"{self.base_url}/")
-        )
+        crawl_delay = self._robots_parser.crawl_delay(agent) if self._robots_parser else None
+        policy["crawl_delay_seconds"] = crawl_delay
+        policy["effective_delay_seconds"] = max(self._min_request_interval_seconds, crawl_delay or 0)
+        policy["allowed"] = bool(self._robots_parser and self._robots_parser.can_fetch(agent, self._resolve_url(path)))
         return policy
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Optional[requests.Response]:
         if path.rstrip("/") != "/robots.txt":
             headers = kwargs.get("headers") or {}
-            policy = self.robots_policy(headers.get("User-Agent"))
+            policy = self.robots_policy(headers.get("User-Agent"), path)
             if not policy["allowed"]:
                 raise RobotsDisallowedError(
-                    f"robots.txt disallows requests to {self.base_url}; audit only with permission"
+                    f"robots.txt disallows requests to {self._resolve_url(path)}; audit only with permission"
                 )
+            return self._request_unchecked(
+                method,
+                path,
+                minimum_interval_seconds=policy["effective_delay_seconds"],
+                **kwargs,
+            )
         return self._request_unchecked(method, path, **kwargs)
 
     def _get(self, path: str, **kwargs: Any) -> Optional[requests.Response]:

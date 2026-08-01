@@ -42,6 +42,20 @@ class PublicSurfaceAuditTest(unittest.TestCase):
         self.assertEqual(client.session.request.call_count, 1)
         self.assertIn("robots.txt", client.session.request.call_args.args[1])
 
+    def test_client_checks_the_requested_route_against_robots(self) -> None:
+        client = FlibustaClient("https://library.example", min_request_interval_seconds=0)
+        robots = Mock(
+            status_code=200,
+            text="User-agent: *\nAllow: /\nDisallow: /private\n",
+            content=b"User-agent: *\nAllow: /\nDisallow: /private\n",
+        )
+        client.session.request = Mock(return_value=robots)
+
+        with self.assertRaises(RobotsDisallowedError):
+            client._get("/private")
+
+        self.assertEqual(client.session.request.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

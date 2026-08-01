@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup
-from flibusta_client import FlibustaClient
+from flibusta_client import FlibustaClient, RobotsDisallowedError
 
 USER_AGENT = "GlibustaPublicSurfaceAudit/1.0"
 PUBLIC_ENDPOINTS = (
@@ -106,7 +106,14 @@ def _robots_policy(client: FlibustaClient) -> dict[str, Any]:
 
 def _audit_endpoint(client: FlibustaClient, path: str, expected_type: str) -> dict[str, Any]:
     started = time.perf_counter()
-    response = client._get(path, headers={"User-Agent": USER_AGENT})
+    try:
+        response = client._get(path, headers={"User-Agent": USER_AGENT})
+    except RobotsDisallowedError:
+        return {
+            "path": path,
+            "status": "blocked_by_robots",
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+        }
     elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
     if response is None:
         return {"path": path, "error": "request failed", "elapsed_ms": elapsed_ms}
