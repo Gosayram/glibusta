@@ -140,9 +140,9 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
               childAspectRatio: 2.5,
             ),
             itemCount: 12,
-            itemBuilder: (_, _) => Card(
+            itemBuilder: (_, _) => const Card(
               child: Center(
-                child: Text(BoneMock.name),
+                child: Bone(width: 100, height: 14),
               ),
             ),
           ),

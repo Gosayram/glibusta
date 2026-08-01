@@ -251,8 +251,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           itemBuilder: (_, _) => Card(
             child: ListTile(
               leading: const Bone.circle(size: 48),
-              title: Text(BoneMock.name),
-              subtitle: Text(BoneMock.subtitle),
+              title: const Bone(width: 120, height: 12),
+              subtitle: const Bone(width: 80, height: 12),
             ),
           ),
         ),

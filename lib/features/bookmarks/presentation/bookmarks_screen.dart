@@ -141,8 +141,8 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 leading: const Bone.circle(size: 24),
-                title: Text(BoneMock.name),
-                subtitle: Text(BoneMock.subtitle),
+                title: const Bone(width: 120, height: 12),
+                subtitle: const Bone(width: 80, height: 12),
               ),
             ),
           ),

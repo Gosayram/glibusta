@@ -13,6 +13,7 @@ import '../../../core/utils/app_breakpoints.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/widgets/book_card.dart';
+import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../data/catalog_repository_impl.dart';
@@ -75,19 +76,14 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 child: categoriesAsync.when(
                   data: (List<String> categories) => _buildCategories(context, categories),
                   loading: () => SizedBox(
-                    height: 100,
+                    height: 120,
                     child: Skeletonizer.zone(
-                      child: ListView.builder(
+                      child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: 5,
-                        itemBuilder: (_, _) => Card(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: SizedBox(
-                            width: 100,
-                            child: Center(child: Text(BoneMock.name)),
-                          ),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        itemCount: 6,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, _) => const Bone(width: 80, height: 32),
                       ),
                     ),
                   ),
@@ -147,7 +143,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 child: popularAsync.when(
                   data: (List<Book> books) => _buildPopularBooks(context, ref, books),
                   loading: () => SizedBox(
-                    height: 200,
+                    height: 300,
                     child: Skeletonizer.zone(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(16),
@@ -155,16 +151,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: 0.75,
+                          childAspectRatio: 0.62,
                         ),
                         itemCount: 6,
-                        itemBuilder: (_, _) => Card(
-                          child: ListTile(
-                            leading: const Bone.circle(size: 48),
-                            title: Text(BoneMock.name),
-                            subtitle: Text(BoneMock.subtitle),
-                          ),
-                        ),
+                        itemBuilder: (_, _) => const BookCardSkeleton(),
                       ),
                     ),
                   ),
@@ -274,29 +264,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       childAspectRatio: 0.62,
                     ),
                     itemCount: 4,
-                    itemBuilder: (_, _) => Card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Expanded(
-                            child: Skeleton.replace(child: Bone.square()),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Skeleton.unite(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(BoneMock.name),
-                                  const SizedBox(height: 4),
-                                  Text(BoneMock.subtitle),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    itemBuilder: (_, _) => const BookCardSkeleton(),
                   ),
                 );
               }

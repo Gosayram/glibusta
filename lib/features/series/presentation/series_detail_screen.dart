@@ -104,15 +104,13 @@ class SeriesDetailScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Skeleton.unite(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(BoneMock.name),
-                      const SizedBox(height: 8),
-                      Text(BoneMock.paragraph),
-                    ],
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Bone(width: 120, height: 12),
+                    const SizedBox(height: 8),
+                    const Bone(width: 160, height: 12),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -128,7 +126,7 @@ class SeriesDetailScreen extends ConsumerWidget {
                             const Skeleton.replace(child: Bone(height: 120)),
                             Padding(
                               padding: const EdgeInsets.all(8),
-                              child: Text(BoneMock.subtitle),
+                              child: const Bone(width: 80, height: 12),
                             ),
                           ],
                         ),

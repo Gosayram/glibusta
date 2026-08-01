@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+/// Skeleton placeholder for a book card used in grids (catalog, popular, etc.).
 class BookCardSkeleton extends StatelessWidget {
   const BookCardSkeleton({super.key});
 
@@ -10,23 +11,17 @@ class BookCardSkeleton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Expanded(
-            child: Skeleton.replace(
-              child: SizedBox.expand(),
-            ),
-          ),
+        children: const [
+          Expanded(child: Bone()),
           Padding(
-            padding: const EdgeInsets.all(8),
-            child: Skeleton.unite(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(BoneMock.title),
-                  const SizedBox(height: 4),
-                  Text(BoneMock.subtitle),
-                ],
-              ),
+            padding: EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Bone(width: 120, height: 12),
+                SizedBox(height: 6),
+                Bone(width: 80, height: 12),
+              ],
             ),
           ),
         ],
@@ -35,6 +30,7 @@ class BookCardSkeleton extends StatelessWidget {
   }
 }
 
+/// Skeleton placeholder for a book list item (list-tile style).
 class BookListSkeleton extends StatelessWidget {
   const BookListSkeleton({super.key, this.itemCount = 6});
 
@@ -47,10 +43,10 @@ class BookListSkeleton extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: itemCount,
         separatorBuilder: (_, _) => const SizedBox(height: 4),
-        itemBuilder: (_, _) => ListTile(
-          leading: const Bone.circle(size: 40),
-          title: Text(BoneMock.name),
-          subtitle: Text(BoneMock.subtitle),
+        itemBuilder: (_, _) => const ListTile(
+          leading: Bone.circle(size: 40),
+          title: Bone(width: 120, height: 12),
+          subtitle: Bone(width: 80, height: 12),
         ),
       ),
     );
