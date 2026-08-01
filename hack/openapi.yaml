@@ -268,7 +268,10 @@ paths:
       summary: Author page with books
       description: |
         Author profile with list of books. Supports filters for ghost
-        authorships, translations, language, and sort order.
+        authorships, translations, language, and sort order. Historical local
+        snapshots additionally suggest optional biography, avatar, external
+        links, series groups, book sizes, page counts, ratings, and formats;
+        validate these parser candidates with sanitised fixtures before use.
       tags: [Authors]
       security: []
       parameters:

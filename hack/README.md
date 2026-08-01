@@ -30,6 +30,8 @@ fixtures to evolve parsers while live crawling is unavailable.
 
 - **Fixture-backed**: parsing behaviour covered by `test/fixtures/`.
 - **Historical candidate**: route or form recorded in `ENDPOINTS.md`.
+- **Archived snapshot**: metadata in ignored `test_results/`; useful for a
+  hypothesis, never a substitute for a sanitised fixture.
 - **Live audit**: metadata recorded only after `robots.txt` permits it.
 
 Promote a candidate to verified only with an authorised audit result and a

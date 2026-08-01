@@ -68,6 +68,11 @@ POST /polka/add/{id}
 
 ### Author page (`/a/{id}`) — forms:
 
+Historical local snapshots also show optional avatar, biography, external links,
+series groups, book size/page count/rating, and format links. Treat these as
+parser candidates until a sanitised fixture covers them; they are not a live API
+guarantee.
+
 ```
 GET /a/{id}
   hidden: hg1 = 1
