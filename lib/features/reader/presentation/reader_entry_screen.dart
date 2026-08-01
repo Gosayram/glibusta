@@ -61,14 +61,13 @@ class _ReaderEntryScreenState extends ConsumerState<ReaderEntryScreen> {
         }
 
         final format = detectBookFormat(data.path);
-        final capService = const FormatCapabilityService();
         if (format == BookFormat.pdf) {
           return PdfReaderScreen(filePath: data.path);
         }
         if (format == BookFormat.djvu) {
           return DjvuReaderScreen(filePath: data.path);
         }
-        if (capService.canReadInApp(format)) {
+        if (format.canReadInApp) {
           return ReaderScreen(bookId: widget.bookId, initialPosition: widget.initialPosition);
         }
         return const _ReaderOpenError(message: 'Формат не поддерживается');

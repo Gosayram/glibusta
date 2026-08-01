@@ -6,13 +6,12 @@ import 'package:glibusta/features/library/data/inspectors/book_metadata_extracto
 import 'package:glibusta/features/reader/data/parsers/book_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
-import 'package:glibusta/features/reader/data/parsers/parser_registry.dart';
 
 void main() {
   test('uses a filename fallback instead of parsing a truncated archive sample', () async {
     final parser = _RecordingEpubParser();
     final extractor = BookMetadataExtractor(
-      parserRegistry: BookParserRegistry([parser]),
+      parser: parser,
     );
 
     final metadata = await extractor.extract(

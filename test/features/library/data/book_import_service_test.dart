@@ -15,7 +15,6 @@ import 'package:glibusta/features/library/data/inspectors/book_inspection_result
 import 'package:glibusta/features/reader/data/parsers/book_parser.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
-import 'package:glibusta/features/reader/data/parsers/parser_registry.dart';
 import 'package:glibusta/shared/models/book.dart';
 
 void main() {
@@ -44,7 +43,7 @@ void main() {
         db,
         _TestAppFileStorage(tempDir),
         CoverExtractionService(_TestAppFileStorage(tempDir)),
-        parserRegistry: BookParserRegistry([parser]),
+        parsers: [parser],
       );
       final file = File('${tempDir.path}/path_based.epub');
       await file.writeAsBytes(List<int>.filled(200, 1));
@@ -112,7 +111,7 @@ void main() {
         db,
         storage,
         CoverExtractionService(storage),
-        parserRegistry: BookParserRegistry([parser]),
+        parsers: [parser],
       );
       final firstFile = File('${tempDir.path}/first.epub');
       final secondFile = File('${tempDir.path}/second.epub');
@@ -149,7 +148,7 @@ void main() {
         db,
         storage,
         CoverExtractionService(storage),
-        parserRegistry: BookParserRegistry([parser]),
+        parsers: [parser],
       );
       final firstCacheFile = File('${tempDir.path}/external_first.epub');
       final secondCacheFile = File('${tempDir.path}/external_second.epub');

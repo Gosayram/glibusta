@@ -2,77 +2,75 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/formats/format_capability.dart';
 
 void main() {
-  const service = FormatCapabilityService();
-
-  group('FormatCapabilityService', () {
+  group('BookFormatCapability extension', () {
     test('epub is readable', () {
-      expect(service.capabilityOf(BookFormat.epub), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.epub), isTrue);
-      expect(service.canImport(BookFormat.epub), isTrue);
-      expect(service.isDocumentOnly(BookFormat.epub), isFalse);
-      expect(service.hasReaderRoute(BookFormat.epub), isTrue);
+      expect(BookFormat.epub.capability, FormatCapability.readable);
+      expect(BookFormat.epub.canReadInApp, isTrue);
+      expect(BookFormat.epub.canImport, isTrue);
+      expect(BookFormat.epub.isDocumentOnly, isFalse);
+      expect(BookFormat.epub.hasReaderRoute, isTrue);
     });
 
     test('fb2 is readable', () {
-      expect(service.capabilityOf(BookFormat.fb2), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.fb2), isTrue);
+      expect(BookFormat.fb2.capability, FormatCapability.readable);
+      expect(BookFormat.fb2.canReadInApp, isTrue);
     });
 
     test('txt is readable', () {
-      expect(service.capabilityOf(BookFormat.txt), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.txt), isTrue);
+      expect(BookFormat.txt.capability, FormatCapability.readable);
+      expect(BookFormat.txt.canReadInApp, isTrue);
     });
 
     test('rtf is readable', () {
-      expect(service.capabilityOf(BookFormat.rtf), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.rtf), isTrue);
+      expect(BookFormat.rtf.capability, FormatCapability.readable);
+      expect(BookFormat.rtf.canReadInApp, isTrue);
     });
 
     test('mobi is readable', () {
-      expect(service.capabilityOf(BookFormat.mobi), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.mobi), isTrue);
+      expect(BookFormat.mobi.capability, FormatCapability.readable);
+      expect(BookFormat.mobi.canReadInApp, isTrue);
     });
 
     test('azw3 is partial', () {
-      expect(service.capabilityOf(BookFormat.azw3), FormatCapability.partial);
-      expect(service.canReadInApp(BookFormat.azw3), isTrue);
-      expect(service.canImport(BookFormat.azw3), isTrue);
-      expect(service.isDocumentOnly(BookFormat.azw3), isFalse);
+      expect(BookFormat.azw3.capability, FormatCapability.partial);
+      expect(BookFormat.azw3.canReadInApp, isTrue);
+      expect(BookFormat.azw3.canImport, isTrue);
+      expect(BookFormat.azw3.isDocumentOnly, isFalse);
     });
 
     test('prc is legacy', () {
-      expect(service.capabilityOf(BookFormat.prc), FormatCapability.legacy);
-      expect(service.canReadInApp(BookFormat.prc), isTrue);
-      expect(service.canImport(BookFormat.prc), isTrue);
+      expect(BookFormat.prc.capability, FormatCapability.legacy);
+      expect(BookFormat.prc.canReadInApp, isTrue);
+      expect(BookFormat.prc.canImport, isTrue);
     });
 
     test('pdf is documentOnly', () {
-      expect(service.capabilityOf(BookFormat.pdf), FormatCapability.documentOnly);
-      expect(service.canReadInApp(BookFormat.pdf), isFalse);
-      expect(service.canImport(BookFormat.pdf), isTrue);
-      expect(service.isDocumentOnly(BookFormat.pdf), isTrue);
-      expect(service.hasReaderRoute(BookFormat.pdf), isTrue);
+      expect(BookFormat.pdf.capability, FormatCapability.documentOnly);
+      expect(BookFormat.pdf.canReadInApp, isFalse);
+      expect(BookFormat.pdf.canImport, isTrue);
+      expect(BookFormat.pdf.isDocumentOnly, isTrue);
+      expect(BookFormat.pdf.hasReaderRoute, isTrue);
     });
 
     test('djvu is documentOnly', () {
-      expect(service.capabilityOf(BookFormat.djvu), FormatCapability.documentOnly);
-      expect(service.canReadInApp(BookFormat.djvu), isFalse);
-      expect(service.isDocumentOnly(BookFormat.djvu), isTrue);
-      expect(service.hasReaderRoute(BookFormat.djvu), isTrue);
+      expect(BookFormat.djvu.capability, FormatCapability.documentOnly);
+      expect(BookFormat.djvu.canReadInApp, isFalse);
+      expect(BookFormat.djvu.isDocumentOnly, isTrue);
+      expect(BookFormat.djvu.hasReaderRoute, isTrue);
     });
 
     test('cbr is readable through the native RAR decoder', () {
-      expect(service.capabilityOf(BookFormat.cbr), FormatCapability.readable);
-      expect(service.canReadInApp(BookFormat.cbr), isTrue);
-      expect(service.canImport(BookFormat.cbr), isTrue);
+      expect(BookFormat.cbr.capability, FormatCapability.readable);
+      expect(BookFormat.cbr.canReadInApp, isTrue);
+      expect(BookFormat.cbr.canImport, isTrue);
     });
 
     test('unknown is unsupported', () {
-      expect(service.capabilityOf(BookFormat.unknown), FormatCapability.unsupported);
-      expect(service.canReadInApp(BookFormat.unknown), isFalse);
-      expect(service.canImport(BookFormat.unknown), isFalse);
-      expect(service.isDocumentOnly(BookFormat.unknown), isFalse);
-      expect(service.hasReaderRoute(BookFormat.unknown), isFalse);
+      expect(BookFormat.unknown.capability, FormatCapability.unsupported);
+      expect(BookFormat.unknown.canReadInApp, isFalse);
+      expect(BookFormat.unknown.canImport, isFalse);
+      expect(BookFormat.unknown.isDocumentOnly, isFalse);
+      expect(BookFormat.unknown.hasReaderRoute, isFalse);
     });
   });
 
@@ -110,31 +108,31 @@ void main() {
 
   group('warningLabel', () {
     test('null for readable formats', () {
-      expect(service.warningLabel(BookFormat.epub), isNull);
-      expect(service.warningLabel(BookFormat.fb2), isNull);
-      expect(service.warningLabel(BookFormat.txt), isNull);
-      expect(service.warningLabel(BookFormat.rtf), isNull);
-      expect(service.warningLabel(BookFormat.mobi), isNull);
+      expect(BookFormat.epub.warningLabel(), isNull);
+      expect(BookFormat.fb2.warningLabel(), isNull);
+      expect(BookFormat.txt.warningLabel(), isNull);
+      expect(BookFormat.rtf.warningLabel(), isNull);
+      expect(BookFormat.mobi.warningLabel(), isNull);
     });
 
     test('non-null for documentOnly', () {
-      expect(service.warningLabel(BookFormat.pdf), isNotNull);
-      expect(service.warningLabel(BookFormat.djvu), isNotNull);
+      expect(BookFormat.pdf.warningLabel(), isNotNull);
+      expect(BookFormat.djvu.warningLabel(), isNotNull);
     });
 
     test('non-null for partial', () {
-      expect(service.warningLabel(BookFormat.azw3), isNotNull);
-      expect(service.warningLabel(BookFormat.azw3), contains('MOBI'));
+      expect(BookFormat.azw3.warningLabel(), isNotNull);
+      expect(BookFormat.azw3.warningLabel(), contains('MOBI'));
     });
 
     test('non-null for legacy', () {
-      expect(service.warningLabel(BookFormat.prc), isNotNull);
-      expect(service.warningLabel(BookFormat.prc), contains('legacy'));
+      expect(BookFormat.prc.warningLabel(), isNotNull);
+      expect(BookFormat.prc.warningLabel(), contains('legacy'));
     });
 
     test('non-null for unsupported', () {
-      expect(service.warningLabel(BookFormat.unknown), isNotNull);
-      expect(service.warningLabel(BookFormat.unknown), contains('не поддерживается'));
+      expect(BookFormat.unknown.warningLabel(), isNotNull);
+      expect(BookFormat.unknown.warningLabel(), contains('не поддерживается'));
     });
   });
 
@@ -142,7 +140,7 @@ void main() {
     test('every BookFormat has a defined capability', () {
       for (final format in BookFormat.values) {
         expect(
-          () => service.capabilityOf(format),
+          () => format.capability,
           returnsNormally,
           reason: 'format ${format.name} should have a capability',
         );

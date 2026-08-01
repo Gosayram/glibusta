@@ -21,7 +21,7 @@ import '../../../core/storage/storage_bridge.dart';
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';
-import '../../reader/data/parsers/parser_registry.dart';
+import '../../reader/data/parsers/parser_lookup.dart';
 import 'cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
@@ -42,11 +42,22 @@ class BookImportService {
     this._database,
     this._storage,
     this._coverService, {
-    BookParserRegistry? parserRegistry,
-  }) : _registry = parserRegistry ?? BookParserRegistry.defaultInstance;
-
-  final BookParserRegistry _registry;
+    List<BookParser>? parsers,
+  }) : _overrides = parsers != null
+            ? {
+                for (final p in parsers)
+                  for (final f in BookFormat.values)
+                    if (p.supports(f)) f: p,
+              }
+            : null;
+  final Map<BookFormat, BookParser>? _overrides;
   final Map<String, Future<ImportResult>> _importLocks = {};
+
+  BookParser? _parserForExtension(String ext) =>
+      _overrides?[formatForExtension(ext)] ?? lookupParserForExtension(ext);
+
+  BookParser _parserFor(BookFormat fmt) =>
+      _overrides?[fmt] ?? lookupParserFor(fmt);
   final Map<String, Future<ImportResult>> _contentImportLocks = {};
 
   static String generateAuthorId(String name) {
@@ -106,7 +117,7 @@ class BookImportService {
       return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
     return _coalesceImport(filePath, () async {
-      if (const FormatCapabilityService().isDocumentOnly(format)) {
+      if (format.isDocumentOnly) {
         return _doDocumentImport(
           BookFileInspectionResult(
             path: filePath,
@@ -312,8 +323,8 @@ class BookImportService {
 
   Future<ImportResult?> _parseMetadata(_ImportCtx ctx) async {
     final parser =
-        _registry.parserForExtension(ctx.ext) ??
-        (ctx.ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
+        _parserForExtension(ctx.ext) ??
+        (ctx.ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
     if (parser == null) {
       return ImportResult.failure(_unsupportedReaderMessage(ctx.ext));
     }
@@ -323,7 +334,7 @@ class BookImportService {
         ctx.book = await _parseBook(parser, ctx);
       } on ParserFailure catch (_) {
         if (ctx.ext != 'zip') rethrow;
-        ctx.book = await _parseBook(_registry.parserFor(BookFormat.cbz), ctx);
+        ctx.book = await _parseBook(_parserFor(BookFormat.cbz), ctx);
         ctx.format = BookFormat.cbz;
       }
 
@@ -556,7 +567,7 @@ class BookImportService {
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
-      if (const FormatCapabilityService().isDocumentOnly(resolvedFormat)) {
+      if (resolvedFormat.isDocumentOnly) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
         final targetFile = await _storage.bookFile(bookId, resolvedFormat);
         await targetFile.parent.create(recursive: true);
@@ -599,8 +610,8 @@ class BookImportService {
       }
 
       final parser =
-          _registry.parserForExtension(ext) ??
-          (ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
+          _parserForExtension(ext) ??
+          (ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
       if (parser == null) {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }
@@ -610,7 +621,7 @@ class BookImportService {
         book = await parser.parseFile(cacheFile.path);
       } on ParserFailure catch (_) {
         if (ext != 'zip') rethrow;
-        book = await _registry.parserFor(BookFormat.cbz).parseFile(cacheFile.path);
+        book = await _parserFor(BookFormat.cbz).parseFile(cacheFile.path);
         resolvedFormat = BookFormat.cbz;
       }
 

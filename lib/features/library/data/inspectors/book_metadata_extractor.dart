@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../../../core/encoding/encoding_detection.dart';
+import '../../../reader/data/parsers/book_parser.dart';
 import '../../../reader/data/parsers/format_detector.dart';
-import '../../../reader/data/parsers/parser_registry.dart';
+import '../../../reader/data/parsers/parser_lookup.dart';
 
 final class BookMetadataExtractor {
   static const _metadataTimeout = Duration(seconds: 12);
 
-  BookMetadataExtractor({BookParserRegistry? parserRegistry})
-    : _registry = parserRegistry ?? BookParserRegistry.defaultInstance;
+  BookMetadataExtractor({BookParser? parser}) : _parser = parser;
 
-  final BookParserRegistry _registry;
+  final BookParser? _parser;
 
   Future<BookMetadata> extract({
     required String path,
@@ -24,7 +24,7 @@ final class BookMetadataExtractor {
       return const BookMetadata();
     }
 
-    final parser = _registry.parserForFormat(format);
+    final parser = _parser ?? lookupParserForFormat(format);
     if (parser == null) {
       return const BookMetadata();
     }

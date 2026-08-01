@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import '../../../core/formats/format_capability.dart';
 import '../../../core/http/http_client.dart';
 import '../../../core/logging/app_logger.dart';
-import '../../../shared/models/book.dart';
 import '../../search/data/composite_source.dart';
 
 /// In-memory override of file paths for books opened via "read online".
@@ -36,13 +35,12 @@ const _onlineReadPreference = <BookFormat>[
 ];
 
 BookFormat? _pickReadableFormat(List<BookFormat> available) {
-  final capService = const FormatCapabilityService();
   final set = available.toSet();
   for (final f in _onlineReadPreference) {
-    if (set.contains(f) && capService.canReadInApp(f)) return f;
+    if (set.contains(f) && f.canReadInApp) return f;
   }
   for (final f in available) {
-    if (capService.canReadInApp(f)) return f;
+    if (f.canReadInApp) return f;
   }
   return null;
 }

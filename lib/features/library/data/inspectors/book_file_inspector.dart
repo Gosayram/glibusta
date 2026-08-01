@@ -97,8 +97,7 @@ final class BookFileInspector {
     if (metadata.isCorrupted) {
       return ImportDecision.corrupted;
     }
-    final capService = const FormatCapabilityService();
-    if (capService.isDocumentOnly(format)) {
+    if (format.isDocumentOnly) {
       return ImportDecision.importAsDocument;
     }
     if (format == BookFormat.epub || format == BookFormat.fb2) {
@@ -106,7 +105,7 @@ final class BookFileInspector {
         return ImportDecision.needsEncodingSelection;
       }
     }
-    if (capService.canReadInApp(format)) {
+    if (format.canReadInApp) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;

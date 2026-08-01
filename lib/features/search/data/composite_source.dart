@@ -8,7 +8,6 @@ import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
 import '../domain/book_source.dart';
-import 'flibusta_api_source.dart';
 import 'flibusta_source.dart';
 
 part 'composite_source.g.dart';
@@ -16,7 +15,6 @@ part 'composite_source.g.dart';
 @riverpod
 BookSource bookSource(Ref ref) {
   final sources = <BookSource>[
-    ref.watch(flibustaApiSourceProvider),
     ref.watch(flibustaSourceProvider),
   ];
   final logger = ref.watch(appLoggerProvider);

@@ -17,20 +17,81 @@ import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
 import '../../search/data/flibusta_models.dart';
-import '../data/catalog_repository_impl.dart';
+import '../../search/data/flibusta_source.dart';
 
 part 'catalog_screen.g.dart';
 
+// ponytail: minimal cache entry, same ttl as the old CatalogRepositoryImpl
+class _CacheEntry<T> {
+  final T data;
+  final DateTime expiresAt;
+  _CacheEntry(this.data, this.expiresAt);
+  bool get isExpired => DateTime.now().isAfter(expiresAt);
+}
+
+const _cacheTtl = Duration(minutes: 10);
+final _categoriesCache = <String, _CacheEntry<List<SearchGenreItem>>>{};
+final _booksCache = <String, _CacheEntry<List<Book>>>{};
+
 @riverpod
 Future<List<SearchGenreItem>> categories(Ref ref) async {
-  final repository = ref.watch(catalogRepositoryProvider);
-  return repository.getCategories();
+  final cached = _categoriesCache['categories'];
+  if (cached != null && !cached.isExpired) return cached.data;
+
+  final apiClient = ref.watch(flibustaSourceProvider);
+  try {
+    final response = await apiClient.getGenreList();
+    final result = response.genres;
+    _categoriesCache['categories'] = _CacheEntry(result, DateTime.now().add(_cacheTtl));
+    return result;
+  } on Object catch (e) {
+    AppLogger().warning('Genre list failed, using defaults: $e', name: 'Catalog');
+    return const [
+      SearchGenreItem(id: 'sf', name: 'Фантастика'),
+      SearchGenreItem(id: 'detive', name: 'Детективы'),
+      SearchGenreItem(id: 'love', name: 'Романы'),
+      SearchGenreItem(id: 'science', name: 'Научная литература'),
+      SearchGenreItem(id: 'history', name: 'История'),
+      SearchGenreItem(id: 'adventures', name: 'Приключения'),
+    ];
+  }
 }
 
 @riverpod
 Future<List<Book>> popularBooks(Ref ref) async {
-  final repository = ref.watch(catalogRepositoryProvider);
-  return repository.getPopularBooks();
+  final cached = _booksCache['popular'];
+  if (cached != null && !cached.isExpired) return cached.data;
+
+  final apiClient = ref.watch(flibustaSourceProvider);
+  try {
+    final result = await apiClient.getPopularBooks();
+    final rawBase = apiClient.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+    final books = result.books
+        .map(
+          (item) => Book(
+            id: item.id,
+            title: item.name,
+            authorIds: item.authors.map((a) => a.id).toList(),
+            authorNames: item.authors.map((a) => a.name).toList(),
+            genreIds: const [],
+            description: null,
+            coverUrl: null,
+            publishDate: null,
+            availableFormats: const [],
+            source: BookSourceInfo(
+              sourceId: 'flibusta-api',
+              sourceUrl: '$base/b/${item.id}',
+            ),
+          ),
+        )
+        .toList();
+    _booksCache['popular'] = _CacheEntry(books, DateTime.now().add(_cacheTtl));
+    return books;
+  } on Object catch (e) {
+    AppLogger().warning('Popular books query failed: $e', name: 'Catalog', error: e);
+    return const [];
+  }
 }
 
 class CatalogScreen extends ConsumerStatefulWidget {

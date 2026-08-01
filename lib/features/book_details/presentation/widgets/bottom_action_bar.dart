@@ -30,11 +30,10 @@ class BottomActionBar extends ConsumerWidget {
     final isDownloading = downloadState == BookDownloadState.downloading;
     final isDownloaded = downloadState == BookDownloadState.downloaded;
     final hasFormats = details.availableFormats.isNotEmpty;
-    final capService = const FormatCapabilityService();
     final bestFormat = book.availableFormats.isNotEmpty
         ? book.availableFormats.first
         : BookFormat.unknown;
-    final isDocumentOnly = capService.isDocumentOnly(bestFormat);
+    final isDocumentOnly = bestFormat.isDocumentOnly;
     final readLabel = isDocumentOnly ? 'Документ' : 'Читать';
 
     return Container(

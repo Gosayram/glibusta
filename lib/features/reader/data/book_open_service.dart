@@ -19,7 +19,7 @@ import '../epub/epub_parser.dart' as new_epub;
 import 'parsers/book_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
-import 'parsers/parser_registry.dart';
+import 'parsers/parser_lookup.dart';
 import 'reader_cache_service.dart';
 
 enum BookOpenError {
@@ -101,7 +101,7 @@ class BookOpenService {
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
 
-  static final _registry = BookParserRegistry.defaultInstance;
+  static final _parsers = parserForFormatMap;
 
   static Future<NormalizedBook> _parseEpubInWorker(
     ({String filePath, String imagesDirPath, String bookId}) args,
@@ -196,7 +196,7 @@ class BookOpenService {
       }
     }
 
-    final parser = _registry.parserForFormat(bookFormat);
+    final parser = _parsers[bookFormat];
     if (parser == null) {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
     }
@@ -214,7 +214,7 @@ class BookOpenService {
       book = await parseWithTimeout(parser);
     } on ParserFailure catch (e) {
       if (filePath.toLowerCase().endsWith('.zip')) {
-        final cbzParser = _registry.parserFor(BookFormat.cbz);
+        final cbzParser = _parsers[BookFormat.cbz]!;
         book = await parseWithTimeout(cbzParser);
       } else {
         throw _toBookOpenFailure(e);
