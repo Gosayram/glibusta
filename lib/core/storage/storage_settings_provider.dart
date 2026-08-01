@@ -4,17 +4,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'storage_mode.dart';
-import 'storage_settings_persistence.dart';
 
 part 'storage_settings_provider.g.dart';
 
-@Riverpod(keepAlive: true)
-Future<StorageSettingsPersistence> storageSettingsPersistence(
-  Ref ref,
-) async {
-  final prefs = await SharedPreferences.getInstance();
-  return StorageSettingsPersistence(prefs);
-}
+const _kStorageMode = 'storage_mode';
+const _kExternalFolderUri = 'external_folder_uri';
+const _kExternalFolderName = 'external_folder_name';
+const _kDirectReadMode = 'direct_read_mode';
 
 @Riverpod(keepAlive: true)
 class StorageModeNotifier extends _$StorageModeNotifier {
@@ -28,17 +24,18 @@ class StorageModeNotifier extends _$StorageModeNotifier {
 
   Future<void> _load() async {
     final version = _version;
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    state = persistence.storageMode;
+    final index = prefs.getInt(_kStorageMode) ?? 0;
+    state = StorageMode.values[index.clamp(0, StorageMode.values.length - 1)];
   }
 
   Future<void> updateMode(StorageMode mode) async {
     final version = ++_version;
     state = mode;
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    await persistence.saveStorageMode(mode);
+    await prefs.setInt(_kStorageMode, mode.index);
   }
 }
 
@@ -54,29 +51,32 @@ class ExternalFolderNotifier extends _$ExternalFolderNotifier {
 
   Future<void> _load() async {
     final version = _version;
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    state = (uri: persistence.externalFolderUri, name: persistence.externalFolderName);
+    state = (
+      uri: prefs.getString(_kExternalFolderUri),
+      name: prefs.getString(_kExternalFolderName),
+    );
   }
 
   Future<void> updateFolder({required String uri, required String name}) async {
     final version = ++_version;
     state = (uri: uri, name: name);
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    await persistence.saveExternalFolderUri(uri);
+    await prefs.setString(_kExternalFolderUri, uri);
     if (!ref.mounted || version != _version) return;
-    await persistence.saveExternalFolderName(name);
+    await prefs.setString(_kExternalFolderName, name);
   }
 
   Future<void> clearFolder() async {
     final version = ++_version;
     state = (uri: null, name: null);
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    await persistence.saveExternalFolderUri(null);
+    await prefs.remove(_kExternalFolderUri);
     if (!ref.mounted || version != _version) return;
-    await persistence.saveExternalFolderName(null);
+    await prefs.remove(_kExternalFolderName);
   }
 }
 
@@ -92,16 +92,16 @@ class DirectReadNotifier extends _$DirectReadNotifier {
 
   Future<void> _load() async {
     final version = _version;
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    state = persistence.directReadMode;
+    state = prefs.getBool(_kDirectReadMode) ?? false;
   }
 
   Future<void> update(bool value) async {
     final version = ++_version;
     state = value;
-    final persistence = await ref.read(storageSettingsPersistenceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || version != _version) return;
-    await persistence.saveDirectReadMode(value);
+    await prefs.setBool(_kDirectReadMode, value);
   }
 }

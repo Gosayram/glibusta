@@ -9,45 +9,6 @@ part of 'storage_settings_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(storageSettingsPersistence)
-final storageSettingsPersistenceProvider = StorageSettingsPersistenceProvider._();
-
-final class StorageSettingsPersistenceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<StorageSettingsPersistence>,
-          StorageSettingsPersistence,
-          FutureOr<StorageSettingsPersistence>
-        >
-    with $FutureModifier<StorageSettingsPersistence>, $FutureProvider<StorageSettingsPersistence> {
-  StorageSettingsPersistenceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'storageSettingsPersistenceProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$storageSettingsPersistenceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<StorageSettingsPersistence> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<StorageSettingsPersistence> create(Ref ref) {
-    return storageSettingsPersistence(ref);
-  }
-}
-
-String _$storageSettingsPersistenceHash() => r'b7b60f17a6bd9a464b44f320784167b3a35ebb1c';
-
 @ProviderFor(StorageModeNotifier)
 final storageModeProvider = StorageModeNotifierProvider._();
 

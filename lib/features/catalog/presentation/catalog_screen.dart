@@ -181,11 +181,12 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // ponytail: popular books already shown inline below — no separate screen
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.trending_up,
                       label: l10n.popularLabel,
-                      onTap: () => context.push('/catalog/popular'),
+                      onTap: () {},
                     ),
                   ),
                 ],

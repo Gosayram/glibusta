@@ -2,10 +2,9 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/services/catalog_cover_cache_service.dart';
 import '../models/book.dart';
+
 
 const _palette = [
   Color(0xFF5C6BC0), // indigo
@@ -27,7 +26,7 @@ Color deterministicCoverColor(String title) {
   return _palette[index];
 }
 
-class BookCoverImage extends ConsumerWidget {
+class BookCoverImage extends StatelessWidget {
   final Book book;
   final double? width;
   final double? height;
@@ -44,7 +43,7 @@ class BookCoverImage extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // Priority: local coverPath > HTTP coverUrl > data: URI > placeholder
     if (book.coverPath != null && book.coverPath!.isNotEmpty) {
       final file = File(book.coverPath!);
@@ -75,53 +74,35 @@ class BookCoverImage extends ConsumerWidget {
       return _buildPlaceholder(context);
     }
 
-    final cacheService = ref.read(catalogCoverCacheServiceProvider);
     final placeholder = _buildPlaceholder(context);
     final scale = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
     final targetWidth = width != null ? (width! * scale).round() : null;
     final targetHeight = height != null ? (height! * scale).round() : null;
 
-    return FutureBuilder<File?>(
-      future: cacheService.getCover(book.coverUrl!),
-      builder: (context, snapshot) {
-        final cachedFile = snapshot.data;
-        final imageWidget = Stack(
-          fit: StackFit.expand,
-          children: [
-            placeholder,
-            if (cachedFile != null)
-              Image.file(
-                cachedFile,
-                width: width,
-                height: height,
-                cacheWidth: targetWidth,
-                cacheHeight: targetHeight,
-                fit: fit,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              )
-            else
-              CachedNetworkImage(
-                imageUrl: book.coverUrl!,
-                width: width,
-                height: height,
-                fit: fit,
-                memCacheWidth: targetWidth,
-                memCacheHeight: targetHeight,
-                placeholder: (context, url) => const SizedBox.shrink(),
-                errorWidget: (context, url, error) => const SizedBox.shrink(),
-              ),
-          ],
-        );
-
-        if (useHero) {
-          return Hero(
-            tag: 'book_cover_${book.id}',
-            child: imageWidget,
-          );
-        }
-        return imageWidget;
-      },
+    final imageWidget = Stack(
+      fit: StackFit.expand,
+      children: [
+        placeholder,
+        CachedNetworkImage(
+          imageUrl: book.coverUrl!,
+          width: width,
+          height: height,
+          fit: fit,
+          memCacheWidth: targetWidth,
+          memCacheHeight: targetHeight,
+          placeholder: (context, url) => const SizedBox.shrink(),
+          errorWidget: (context, url, error) => const SizedBox.shrink(),
+        ),
+      ],
     );
+
+    if (useHero) {
+      return Hero(
+        tag: 'book_cover_${book.id}',
+        child: imageWidget,
+      );
+    }
+    return imageWidget;
   }
 
   Widget _buildPlaceholder(BuildContext context) {

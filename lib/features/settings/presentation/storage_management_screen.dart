@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/platform/app_file_storage.dart';
-import '../../../core/services/catalog_cover_cache_service.dart';
 import '../../../core/services/smart_cleanup_service.dart';
 import '../../../core/storage/storage_info_model.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -259,8 +259,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
   Future<void> _cleanCatalogCovers() async {
     setState(() => _isCleaning = true);
     try {
-      final cacheService = ref.read(catalogCoverCacheServiceProvider);
-      await cacheService.clearAll();
+      await DefaultCacheManager().emptyCache();
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       unawaited(SmartDialog.showToast(l10n.storageCatalogCoversCleaned));
@@ -273,8 +272,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
   Future<void> _cleanExpiredCatalogCovers() async {
     setState(() => _isCleaning = true);
     try {
-      final cacheService = ref.read(catalogCoverCacheServiceProvider);
-      await cacheService.clearExpired();
+      await DefaultCacheManager().emptyCache();
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       unawaited(SmartDialog.showToast(l10n.storageExpiredCoversCleaned));
