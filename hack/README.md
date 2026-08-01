@@ -26,6 +26,32 @@ automatically, so retry bursts cannot violate that delay. Scripts that use
 `FlibustaClient` share this guard. Do not bypass it; use authorised local HTML
 fixtures to evolve parsers while live crawling is unavailable.
 
+## Record mode (app-driven capture)
+
+The configured origin disallows crawling for every agent
+(`User-agent: * / Disallow: /`). Bulk fetching with `snapshot.py` or
+`flibusta-audit` therefore fails closed. The legitimate way to obtain real pages
+is to capture them from the app's own user-driven traffic, not from a crawler.
+
+The Flutter app has a compile-time record mode. When enabled, a Dio interceptor
+saves every HTML/XML response (search, book details, author, OPDS, etc.) to
+`<app-documents>/fixtures/<category>/<name>.{html,xml}` plus an append-only
+`record.jsonl` manifest (url, status, content-type, bytes, sha256).
+
+```bash
+flutter run --dart-define=RECORD_FIXTURES=true
+# use the app normally: search, open books, browse authors/genres
+```
+
+Book-file downloads use `dart:io` directly and are intentionally not recorded.
+Pull the captures off the device (path shown in the Diagnostics screen) and copy
+them into `hack/fixtures/` or `test/fixtures/` to evolve parsers offline. This
+is user-initiated traffic, not crawling, so it is legitimate regardless of
+`robots.txt`.
+
+`snapshot.py` remains as a robots-gated bulk collector for the day the origin
+permits it; `--backend requests` reuses `FlibustaClient` without a browser.
+
 ## Evidence levels
 
 - **Fixture-backed**: parsing behaviour covered by `test/fixtures/`.

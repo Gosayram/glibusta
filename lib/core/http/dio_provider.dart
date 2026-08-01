@@ -9,6 +9,7 @@ import '../config/app_settings.dart';
 import '../logging/app_logger.dart';
 import '../theme/app_duration.dart';
 import 'app_interceptors.dart';
+import 'fixture_recorder.dart';
 import 'user_agent.dart';
 
 part 'dio_provider.g.dart';
@@ -43,6 +44,10 @@ Dio dio(Ref ref) {
     ErrorMappingInterceptor(),
     _RetryInterceptor(dio: dio, logger: logger, maxRetries: 3),
   ]);
+  // ponytail: compile-time gate, runtime toggle in settings if ergonomics matter
+  if (const bool.fromEnvironment('RECORD_FIXTURES', defaultValue: false)) {
+    dio.interceptors.add(FixtureRecorderInterceptor(logger: logger));
+  }
   return dio;
 }
 
