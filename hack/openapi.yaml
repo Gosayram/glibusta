@@ -1,10 +1,16 @@
 openapi: 3.1.0
 info:
-  title: Flibusta API
+  title: Flibusta HTML and OPDS surface
   description: |
-    Community-driven digital library API providing book search, metadata,
-    author/series/genre browsing, OPDS catalog, user bookshelf, messaging,
-    and recommendations.
+    **Not an official API contract.** This is a candidate endpoint inventory
+    derived from local parser fixtures and historical research scripts. It must
+    not be treated as a promise that an endpoint, field, response type, or
+    authenticated operation is currently available.
+
+    The configured origin comes from `BASE_URL` in `.env`. Before any live
+    validation, run `make flibusta-audit`; the shared hack client fails closed
+    when the origin's `robots.txt` disallows crawling. Do not use this document
+    to probe endpoints, submit forms, authenticate, or download content.
 
     ## Content Types
     - HTML endpoints return `text/html` — requires client-side parsing
@@ -25,15 +31,20 @@ info:
     - Book title: second `<h1>` (first is site name)
     - Description: siblings after `<h2>Аннотация</h2>`
     - Authors: `/a/{id}` links BEFORE download links
-  version: 1.0.0
+  version: 0.1.0
   contact:
     name: Glibusta
   license:
     name: MIT
 
 servers:
-  - description: Production
+  - description: Configured origin; supplied by BASE_URL rather than this file.
     url: /
+
+x-glibusta-provenance:
+  status: unverified-candidate-inventory
+  source: local parser fixtures and historical research scripts
+  live-validation: make flibusta-audit, only when robots.txt permits it
 
 tags:
   - name: Books

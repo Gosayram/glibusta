@@ -12,7 +12,6 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib import robotparser
 from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree as ET
 
@@ -100,22 +99,9 @@ def _xml_summary(body: str) -> dict[str, Any]:
 
 def _robots_policy(client: FlibustaClient) -> dict[str, Any]:
     started = time.perf_counter()
-    response = client._get("/robots.txt", headers={"User-Agent": USER_AGENT})
+    policy = client.robots_policy(USER_AGENT)
     elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
-    if response is None:
-        return {"fetched": False, "allowed": False, "reason": "robots.txt request failed"}
-
-    parser = robotparser.RobotFileParser()
-    parser.parse(response.text.splitlines())
-    allowed = parser.can_fetch(USER_AGENT, f"{client.base_url}/")
-    return {
-        "fetched": True,
-        "status": response.status_code,
-        "elapsed_ms": elapsed_ms,
-        "sha256": hashlib.sha256(response.content).hexdigest(),
-        "crawl_delay_seconds": parser.crawl_delay(USER_AGENT),
-        "allowed": allowed,
-    }
+    return {**policy, "elapsed_ms": elapsed_ms}
 
 
 def _audit_endpoint(client: FlibustaClient, path: str, expected_type: str) -> dict[str, Any]:

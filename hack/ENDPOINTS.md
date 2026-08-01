@@ -1,6 +1,16 @@
-# Flibusta API — Complete Endpoint Reference
+# Flibusta HTML/OPDS candidate surface
 
-> Auto-generated from live site exploration. Base URL from `.env`.
+> **Verification status: unverified.** This is a historical candidate inventory,
+> not an official API contract and not evidence that an endpoint currently works.
+> The configured origin comes from `.env`; never add it to this file.
+
+The origin currently disallows automated crawling in `robots.txt`. The shared
+client therefore fails closed, including for legacy scripts such as `probe.py`
+and `test_endpoints.py`. Run only `make flibusta-audit`; it first checks the
+policy and records metadata without saving HTML or downloading content.
+
+`openapi.yaml` mirrors this inventory for design/reference only. Its response
+schemas describe parser expectations, not JSON emitted by the origin.
 
 ## 1. BOOKS (`/b/`)
 

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Flibusta API Client — Python port of flibusta-api with full parsing."""
 
+import hashlib
 import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
+from urllib import robotparser
 from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import requests
@@ -145,6 +147,10 @@ OPDS_MIME_TYPES = {
 }
 
 
+class RobotsDisallowedError(RuntimeError):
+    """Raised before a request that the configured origin disallows."""
+
+
 class FlibustaClient:
     """Flibusta API client — parses both HTML and OPDS endpoints."""
 
@@ -160,6 +166,8 @@ class FlibustaClient:
         self._timeout_seconds = timeout_seconds
         self._min_request_interval_seconds = min_request_interval_seconds
         self._last_request_at: Optional[float] = None
+        self._robots_parser: Optional[robotparser.RobotFileParser] = None
+        self._robots_metadata: Optional[dict[str, Any]] = None
         self.session = requests.Session()
         self.session.headers["User-Agent"] = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -188,8 +196,11 @@ class FlibustaClient:
         if remaining > 0:
             time.sleep(remaining)
 
-    def _request(self, method: str, path: str, **kwargs: Any) -> Optional[requests.Response]:
+    def _request_unchecked(
+        self, method: str, path: str, **kwargs: Any
+    ) -> Optional[requests.Response]:
         self._wait_for_request_slot()
+        kwargs.setdefault("allow_redirects", False)
         try:
             response = self.session.request(
                 method,
@@ -203,11 +214,48 @@ class FlibustaClient:
             print(f"  ERR {method} {path}: {error}")
             return None
 
+    def robots_policy(self, user_agent: Optional[str] = None) -> dict[str, Any]:
+        """Return the cached robots policy; fail closed when it cannot be read."""
+        agent = user_agent or self.session.headers["User-Agent"]
+        if self._robots_metadata is None:
+            response = self._request_unchecked("GET", "/robots.txt", headers={"User-Agent": agent})
+            if response is None or not 200 <= response.status_code < 300:
+                self._robots_metadata = {
+                    "fetched": False,
+                    "reason": "robots.txt request failed",
+                }
+            else:
+                parser = robotparser.RobotFileParser()
+                parser.parse(response.text.splitlines())
+                self._robots_parser = parser
+                self._robots_metadata = {
+                    "fetched": True,
+                    "status": response.status_code,
+                    "sha256": hashlib.sha256(response.content).hexdigest(),
+                    "crawl_delay_seconds": parser.crawl_delay(agent),
+                }
+
+        policy = dict(self._robots_metadata)
+        policy["allowed"] = bool(
+            self._robots_parser and self._robots_parser.can_fetch(agent, f"{self.base_url}/")
+        )
+        return policy
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> Optional[requests.Response]:
+        if path.rstrip("/") != "/robots.txt":
+            headers = kwargs.get("headers") or {}
+            policy = self.robots_policy(headers.get("User-Agent"))
+            if not policy["allowed"]:
+                raise RobotsDisallowedError(
+                    f"robots.txt disallows requests to {self.base_url}; audit only with permission"
+                )
+        return self._request_unchecked(method, path, **kwargs)
+
     def _get(self, path: str, **kwargs: Any) -> Optional[requests.Response]:
         return self._request("GET", path, **kwargs)
 
     def _post(self, path: str, data: dict, **kwargs: Any) -> Optional[requests.Response]:
-        return self._request("POST", path, data=data, allow_redirects=True, **kwargs)
+        return self._request("POST", path, data=data, **kwargs)
 
     # ── Auth ──────────────────────────────────────────────────────────────────
 
