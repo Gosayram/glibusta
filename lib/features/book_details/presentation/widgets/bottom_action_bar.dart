@@ -12,6 +12,7 @@ import '../../../../shared/models/download_task.dart';
 import '../../../downloads/presentation/download_queue.dart';
 import '../../../search/data/composite_source.dart';
 import '../book_details_providers.dart';
+import '../reading_launcher.dart';
 import 'format_selection_sheet.dart';
 
 class BottomActionBar extends ConsumerWidget {
@@ -48,7 +49,15 @@ class BottomActionBar extends ConsumerWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => unawaited(context.push('/reader/${book.id}')),
+                onPressed: () => unawaited(
+                  startReading(
+                    context,
+                    ref,
+                    book,
+                    isDownloaded: isDownloaded,
+                    availableFormats: details.availableFormats,
+                  ),
+                ),
                 icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
                 label: Text(readLabel),
               ),

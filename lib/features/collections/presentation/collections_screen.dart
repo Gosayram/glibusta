@@ -29,7 +29,6 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Коллекции'),
-        automaticallyImplyLeading: false,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateDialog(context),
