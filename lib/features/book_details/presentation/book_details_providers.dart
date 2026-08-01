@@ -5,15 +5,15 @@ import '../../../core/database/tables.dart';
 import '../../../shared/models/download_task.dart';
 import '../../reader/data/book_open_service.dart';
 import '../../reader/data/parsers/normalized_book.dart';
+import '../../search/data/composite_source.dart';
 import '../data/book_comments_service.dart';
-import '../data/book_details_repository_impl.dart';
 
 final bookDetailsProvider = FutureProvider.autoDispose.family<BookDetails, String>((
   ref,
   bookId,
 ) async {
-  final repository = ref.watch(bookDetailsRepositoryProvider);
-  return repository.getBookDetails(bookId);
+  final source = ref.watch(bookSourceProvider);
+  return source.getBookDetails(bookId);
 });
 
 final bookReadingProgressProvider = FutureProvider.autoDispose.family<ReadingProgressData?, String>(

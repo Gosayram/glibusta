@@ -1284,22 +1284,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.0"
-  powersync:
-    dependency: "direct main"
-    description:
-      name: powersync
-      sha256: fd497501e9adbfcafb65870311c6c2b48f6146cbf67bb4e2d92f3f8da23bd9ab
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.3.1"
-  powersync_flutter_libs:
-    dependency: transitive
-    description:
-      name: powersync_flutter_libs
-      sha256: "24324947bffee25912abd3534203d7ab070b99d3186a8de658205ffb44902971"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.0+eol"
   process:
     dependency: transitive
     description:
@@ -1609,14 +1593,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.0"
-  sqlite3_connection_pool:
-    dependency: transitive
-    description:
-      name: sqlite3_connection_pool
-      sha256: ad51972d37bdf82929888e4c85e722bd9a0b5ff8ad389f89b1b00d19603c0d2d
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.7"
   sqlite3_flutter_libs:
     dependency: transitive
     description:
@@ -1625,22 +1601,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.0+eol"
-  sqlite3_web:
-    dependency: transitive
-    description:
-      name: sqlite3_web
-      sha256: "59ec5b4232e7c8454ad594c6492348cde5a42444bd8815137a2cc47d6aaa4f78"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.2"
-  sqlite_async:
-    dependency: transitive
-    description:
-      name: sqlite_async
-      sha256: "17176f00a10e5b8ba6e0205e42de1c15a94ff8762745fed19750b44b6bbd5649"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.14.3"
   sqlparser:
     dependency: transitive
     description:
@@ -1961,38 +1921,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
-  workmanager:
-    dependency: "direct main"
-    description:
-      name: workmanager
-      sha256: "065673b2a465865183093806925419d311a9a5e0995aa74ccf8920fd695e2d10"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.0+3"
-  workmanager_android:
-    dependency: transitive
-    description:
-      name: workmanager_android
-      sha256: "9ae744db4ef891f5fcd2fb8671fccc712f4f96489a487a1411e0c8675e5e8cb7"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.0+2"
-  workmanager_apple:
-    dependency: transitive
-    description:
-      name: workmanager_apple
-      sha256: "1cc12ae3cbf5535e72f7ba4fde0c12dd11b757caf493a28e22d684052701f2ca"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.1+2"
-  workmanager_platform_interface:
-    dependency: transitive
-    description:
-      name: workmanager_platform_interface
-      sha256: f40422f10b970c67abb84230b44da22b075147637532ac501729256fcea10a47
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.1+1"
   xdg_directories:
     dependency: transitive
     description:
