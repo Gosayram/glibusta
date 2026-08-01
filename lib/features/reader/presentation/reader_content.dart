@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -281,19 +282,29 @@ void disposeChapterImagesCache() => _chapterImagesCache.clear();
 @visibleForTesting
 void clearChapterImagesCache() => _chapterImagesCache.clear();
 
-final Map<String, Uint8List> _base64Cache = {};
+const int _base64CacheMaxSize = 20;
+final LinkedHashMap<String, Uint8List> _base64Cache = LinkedHashMap<String, Uint8List>();
 
 @visibleForTesting
 void clearBase64Cache() => _base64Cache.clear();
 
 @visibleForTesting
+int get base64CacheSize => _base64Cache.length;
+
+@visibleForTesting
 Uint8List cachedBase64Decode(String dataPart) => _cachedBase64Decode(dataPart);
 
 Uint8List _cachedBase64Decode(String dataPart) {
-  final cached = _base64Cache[dataPart];
-  if (cached != null) return cached;
+  final cached = _base64Cache.remove(dataPart);
+  if (cached != null) {
+    _base64Cache[dataPart] = cached;
+    return cached;
+  }
   final bytes = base64Decode(dataPart);
   _base64Cache[dataPart] = bytes;
+  if (_base64Cache.length > _base64CacheMaxSize) {
+    _base64Cache.remove(_base64Cache.keys.first);
+  }
   return bytes;
 }
 

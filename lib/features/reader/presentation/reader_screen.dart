@@ -23,6 +23,7 @@ import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
 import '../../library/data/book_delete_service.dart';
+import '../data/color_preset_service.dart';
 import '../data/epub_anchor_resolver.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
@@ -119,6 +120,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   String? _selectedText;
   int _batteryLevel = -1;
   bool _finishedDialogShown = false;
+  List<ColorPreset>? _cachedPresetList;
+  String? _cachedActivePresetId;
+  ReaderColors? _cachedCustomColors;
+  Map<int, List<TextHighlight>>? _cachedHighlightsMap;
+  List<TextHighlight>? _lastHighlightsSource;
   // HG-6.4: spinner during layout recalculation
   Timer? _relayoutTimer;
   bool _isRelayouting = false;
@@ -751,6 +757,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final backgroundStyle = ref.watch(readerSettingsProvider.select((s) => s.backgroundStyle));
     final uiTheme = ref.watch(readerSettingsProvider.select((s) => s.uiTheme));
     final themeSetting = ref.watch(readerSettingsProvider.select((s) => s.theme));
+    ref.watch(readerSettingsProvider.select((s) => s.activeColorPresetId));
+    ref.watch(colorPresetListProvider);
     final mode = ref.watch(readerSettingsProvider.select((s) => s.mode));
     final fontSize = ref.watch(readerSettingsProvider.select((s) => s.fontSize));
     final font = ref.watch(readerSettingsProvider.select((s) => s.font));
@@ -1961,25 +1969,37 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   Map<int, List<TextHighlight>> _buildChapterHighlights() {
     final highlights = ref.watch(bookHighlightsProvider(widget.bookId)).value;
+    if (identical(highlights, _lastHighlightsSource) && _cachedHighlightsMap != null) {
+      return _cachedHighlightsMap!;
+    }
     final result = <int, List<TextHighlight>>{};
     if (highlights != null) {
       for (final h in highlights) {
         result.putIfAbsent(h.chapterIndex, () => []).add(h);
       }
     }
+    _lastHighlightsSource = highlights;
+    _cachedHighlightsMap = result;
     return result;
   }
 
   ReaderColors? _resolveCustomColors(ReaderSettings settings) {
-    final presetsAsync = ref.watch(colorPresetListProvider);
+    final presetsAsync = ref.read(colorPresetListProvider);
     final presets = presetsAsync.value;
     if (presets == null) return null;
+    if (identical(presets, _cachedPresetList) &&
+        settings.activeColorPresetId == _cachedActivePresetId) {
+      return _cachedCustomColors;
+    }
+    _cachedPresetList = presets;
+    _cachedActivePresetId = settings.activeColorPresetId;
     try {
       final preset = presets.firstWhere((p) => p.id == settings.activeColorPresetId);
-      return ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
+      _cachedCustomColors = ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
     } on Object catch (_) {
-      return null;
+      _cachedCustomColors = null;
     }
+    return _cachedCustomColors;
   }
 }
 

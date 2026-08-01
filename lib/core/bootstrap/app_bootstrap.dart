@@ -63,7 +63,7 @@ class AppBootstrap {
   static void _configureImageCache() {
     final cache = PaintingBinding.instance.imageCache;
     cache.maximumSize = 100;
-    cache.maximumSizeBytes = 80 << 20;
+    cache.maximumSizeBytes = 50 << 20;
   }
 
   static Future<void> initApp({required void Function() appRunner}) async {
