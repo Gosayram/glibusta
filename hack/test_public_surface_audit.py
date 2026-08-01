@@ -21,6 +21,12 @@ class PublicSurfaceAuditTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             FlibustaClient("ftp://library.example")
 
+    def test_client_rejects_invalid_network_limits(self) -> None:
+        with self.assertRaises(ValueError):
+            FlibustaClient("https://library.example", connect_timeout_seconds=0)
+        with self.assertRaises(ValueError):
+            FlibustaClient("https://library.example", min_request_interval_seconds=-1)
+
     def test_client_stops_when_robots_disallows_crawling(self) -> None:
         client = FlibustaClient("https://library.example", min_request_interval_seconds=0)
         robots = Mock(

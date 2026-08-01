@@ -158,12 +158,17 @@ class FlibustaClient:
         self,
         base_url: Optional[str] = None,
         *,
-        timeout_seconds: float = 15,
+        connect_timeout_seconds: float = 5,
+        read_timeout_seconds: float = 20,
         min_request_interval_seconds: float = 1,
     ) -> None:
+        if connect_timeout_seconds <= 0 or read_timeout_seconds <= 0:
+            raise ValueError("request timeouts must be positive")
+        if min_request_interval_seconds < 0:
+            raise ValueError("min_request_interval_seconds must not be negative")
         self.base_url = _normalize_base_url(base_url or _load_base_url())
         self._origin = urlsplit(self.base_url).netloc
-        self._timeout_seconds = timeout_seconds
+        self._timeout = (connect_timeout_seconds, read_timeout_seconds)
         self._min_request_interval_seconds = min_request_interval_seconds
         self._last_request_at: Optional[float] = None
         self._robots_parser: Optional[robotparser.RobotFileParser] = None
@@ -177,6 +182,8 @@ class FlibustaClient:
         retry = Retry(
             total=2,
             backoff_factor=0.5,
+            backoff_max=30,
+            respect_retry_after_header=True,
             status_forcelist=(429, 500, 502, 503, 504),
             allowed_methods=frozenset({"GET", "HEAD"}),
         )
@@ -205,7 +212,7 @@ class FlibustaClient:
             response = self.session.request(
                 method,
                 self._resolve_url(path),
-                timeout=self._timeout_seconds,
+                timeout=self._timeout,
                 **kwargs,
             )
             self._last_request_at = time.monotonic()
