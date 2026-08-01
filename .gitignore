@@ -123,6 +123,7 @@ app.*.symbols
 
 # Custome ignore folders
 test_results/
+.firecrawl/
 docs/
 .key-generate.conf
 *.backup

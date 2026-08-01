@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """Flibusta API Client — Python port of flibusta-api with full parsing."""
 
-import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-from urllib.parse import urljoin, quote
+from typing import Any, Optional
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import requests
-import urllib3
 from bs4 import BeautifulSoup
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
@@ -32,6 +31,15 @@ def _load_base_url() -> str:
 
 def _get_numbers(s: str) -> str:
     return re.sub(r"\D", "", s)
+
+
+def _normalize_base_url(base_url: str) -> str:
+    parsed = urlsplit(base_url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("BASE_URL must be an absolute http(s) URL")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("BASE_URL must not contain credentials, a query, or a fragment")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
 
 
 # ── Data classes ──────────────────────────────────────────────────────────────
@@ -140,34 +148,66 @@ OPDS_MIME_TYPES = {
 class FlibustaClient:
     """Flibusta API client — parses both HTML and OPDS endpoints."""
 
-    def __init__(self, base_url: Optional[str] = None):
-        self.base_url = (base_url or _load_base_url()).rstrip("/")
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        *,
+        timeout_seconds: float = 15,
+        min_request_interval_seconds: float = 1,
+    ) -> None:
+        self.base_url = _normalize_base_url(base_url or _load_base_url())
+        self._origin = urlsplit(self.base_url).netloc
+        self._timeout_seconds = timeout_seconds
+        self._min_request_interval_seconds = min_request_interval_seconds
+        self._last_request_at: Optional[float] = None
         self.session = requests.Session()
         self.session.headers["User-Agent"] = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/120.0.0.0 Safari/537.36"
         )
+        retry = Retry(
+            total=2,
+            backoff_factor=0.5,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET", "HEAD"}),
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retry))
         self._logged_in = False
 
-    def _get(self, path: str, **kwargs) -> Optional[requests.Response]:
+    def _resolve_url(self, path: str) -> str:
+        url = urljoin(f"{self.base_url}/", path.lstrip("/"))
+        if urlsplit(url).netloc != self._origin:
+            raise ValueError("Refusing a request outside BASE_URL")
+        return url
+
+    def _wait_for_request_slot(self) -> None:
+        if self._last_request_at is None:
+            return
+        remaining = self._min_request_interval_seconds - (time.monotonic() - self._last_request_at)
+        if remaining > 0:
+            time.sleep(remaining)
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> Optional[requests.Response]:
+        self._wait_for_request_slot()
         try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            return self.session.get(url, timeout=15, verify=False, **kwargs)
-        except Exception as e:
-            print(f"  ERR GET {path}: {e}")
+            response = self.session.request(
+                method,
+                self._resolve_url(path),
+                timeout=self._timeout_seconds,
+                **kwargs,
+            )
+            self._last_request_at = time.monotonic()
+            return response
+        except requests.RequestException as error:
+            print(f"  ERR {method} {path}: {error}")
             return None
 
-    def _post(self, path: str, data: dict, **kwargs) -> Optional[requests.Response]:
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            return self.session.post(
-                url, data=data, timeout=15, verify=False,
-                allow_redirects=True, **kwargs,
-            )
-        except Exception as e:
-            print(f"  ERR POST {path}: {e}")
-            return None
+    def _get(self, path: str, **kwargs: Any) -> Optional[requests.Response]:
+        return self._request("GET", path, **kwargs)
+
+    def _post(self, path: str, data: dict, **kwargs: Any) -> Optional[requests.Response]:
+        return self._request("POST", path, data=data, allow_redirects=True, **kwargs)
 
     # ── Auth ──────────────────────────────────────────────────────────────────
 
