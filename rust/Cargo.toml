@@ -15,25 +15,14 @@ zune-image = ["dep:zune-image"]
 
 [dependencies]
 aho-corasick = "1"
-ammonia = "4"
 anyhow = "1"
 base64 = "0.22"
-bitcode = "0.6"
-bitflags = "2"
-blake3 = "1"
-bon = "3"
-bstr = "1"
 bumpalo = "3"
-byteorder = "1"
 
 # ─── Файловая система ──────────────────────────────────────────────────
-camino = "1"
 chardetng = "1.0"
 compact_str = "0.8"
 crc32fast = "1"
-csscolorparser = "0.7"
-dashmap = "6"
-deunicode = "1"
 djvu-rs = { version = "0.25.0", default-features = false, features = ["std"] }
 
 # ─── Кодировки ─────────────────────────────────────────────────────────
@@ -43,51 +32,32 @@ flate2 = "1"
 flutter_rust_bridge = "=2.12.0"
 
 # ─── Поиск по библиотеке ───────────────────────────────────────────────
-fst = "0.4"
-globset = "0.4"
-html5ever = "0.39"
 hyphenation = { version = "0.8", features = ["embed_all", "unicode-normalization"] }
-ignore = "0.4"
 
 # ─── Изображения ───────────────────────────────────────────────────────
 # image crate is gated behind pdf feature
 image = { version = "0.25", optional = true }
 
 # ─── Структуры данных ──────────────────────────────────────────────────
-indexmap = { version = "2", features = ["serde"] }
-itertools = "0.13"
-jwalk = "0.8"
 
 # ─── CSS / Layout ──────────────────────────────────────────────────────
-lightningcss = "1.0.0-alpha.71"
-log = "0.4"
-lol_html = "0.4"
 lopdf = { version = "0.37", optional = true }
-lru = "0.18"
 memchr = "2"
 memmap2 = "0.9"
-miette = "7"
 
 # ─── Кэш и память ──────────────────────────────────────────────────────
 moka = { version = "0.12", features = ["sync"] }
 nom = { version = "8.0.0", features = ["std"] }
-notify = "7"
-once_cell = "1"
-parking_lot = "0.12"
-pathdiff = "0.2"
 
 # ─── PDF ───────────────────────────────────────────────────────────────
 pdfium-render = { version = "0.9", optional = true }
-pulldown-cmark = "0.13"
 
 # ─── XML / HTML парсинг ────────────────────────────────────────────────
 quick-xml = { version = "0.41", features = ["serialize"] }
 
 # ─── Параллелизм ───────────────────────────────────────────────────────
-rayon = "1"
 
 # ─── Хранение / KV ─────────────────────────────────────────────────────
-redb = "2"
 
 # ─── Регулярки ─────────────────────────────────────────────────────────
 regex = { version = "1", default-features = false, features = ["std", "perf", "unicode-perl", "unicode-case"] }
@@ -95,8 +65,6 @@ regex = { version = "1", default-features = false, features = ["std", "perf", "u
 
 # ─── SVG ───────────────────────────────────────────────────────────────
 resvg = { version = "0.44", optional = true }
-rkyv = "0.8"
-roxmltree = "0.21"
 scraper = "0.27"
 
 # ─── Сериализация ──────────────────────────────────────────────────────
@@ -105,36 +73,25 @@ serde_json = "1"
 
 # ─── Хэширование ───────────────────────────────────────────────────────
 sha2 = "0.10"
-simdutf8 = "0.1"
-similar = "2"
-slotmap = { version = "1", features = ["serde"] }
 smallvec = { version = "1", features = ["serde"] }
 
 # ─── Enum / Builder / Errors ───────────────────────────────────────────
-strum = { version = "0.26", features = ["derive"] }
 taffy = "0.4"
-thiserror = "2"
 tracing = "0.1"
-tracing-subscriber = "0.3"
 
 # ─── Шрифты ────────────────────────────────────────────────────────────
-ttf-parser = "0.25"
-ulid = "1"
-unicode-normalization = "0.1"
 
 # ─── Текст, Unicode, поиск ─────────────────────────────────────────────
 unicode-segmentation = "1"
 unrar-ng = "0.7"
 
 # ─── Утилиты ───────────────────────────────────────────────────────────
-url = "2"
 
 # ─── ID generation ─────────────────────────────────────────────────────
 uuid = { version = "1", features = ["v4"] }
 whatlang = "0.18"
 
 # ─── Парсинг бинарных форматов (MOBI/PRC) ──────────────────────────────
-winnow = "0.7"
 
 # ─── Архивы ────────────────────────────────────────────────────────────
 zip = { version = "8", default-features = false, features = ["deflate"] }
@@ -191,9 +148,6 @@ strip = "symbols"     # strip debug symbols from .so
 [profile.release.package."*"]
 opt-level = "z"
 
-# SIMD crates need opt-level 3 or inlining breaks
-[profile.release.package.simdutf8]
-opt-level = 3
 
 [profile.release.package.aho-corasick]
 opt-level = 3

@@ -1,3 +1,6 @@
+@Tags(['native'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +21,7 @@ void main() {
     expect(book.chapters, isNotEmpty);
   });
 
-  test('parses EPUB metadata returned as an opaque Rust value', () async {
+  test('parses EPUB metadata returned by the Flutter Rust bridge', () async {
     final file = File(p.join(Directory.current.path, 'test_results', '161303.epub'));
     expect(await file.exists(), isTrue);
 
@@ -26,6 +29,6 @@ void main() {
 
     expect(book.title, isNotEmpty);
     expect(book.chapters, isNotEmpty);
-    expect(book.metadata, isNull);
+    expect(book.metadata, containsPair('language', 'ru'));
   });
 }

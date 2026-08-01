@@ -2,19 +2,21 @@ version: 2
 updates:
   - package-ecosystem: 'github-actions'
     directory: '/'
+    target-branch: 'main'
     schedule:
       interval: 'daily'
       time: '09:00'
-      timezone: 'Asia/Tashkent'
+      timezone: 'Asia/Almaty'
     commit-message:
       prefix: '[CI] - update'
 
   - package-ecosystem: 'pub'
     directory: '/'
+    target-branch: 'main'
     schedule:
       interval: 'daily'
       time: '09:00'
-      timezone: 'Asia/Tashkent'
+      timezone: 'Asia/Almaty'
     commit-message:
       prefix: '[UPD] - update'
     ignore:
@@ -23,10 +25,11 @@ updates:
 
   - package-ecosystem: 'cargo'
     directory: '/rust'
+    target-branch: 'main'
     schedule:
       interval: 'daily'
       time: '09:00'
-      timezone: 'Asia/Tashkent'
+      timezone: 'Asia/Almaty'
     commit-message:
       prefix: '[UPD] - update'
     ignore:

@@ -1,4 +1,6 @@
-import 'dart:io' as io;
+@Tags(['live'])
+@Timeout(Duration(seconds: 30))
+library;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,7 +13,6 @@ void main() {
   late FlibustaHtmlSource source;
 
   setUpAll(() {
-    io.HttpOverrides.global = _TestHttpOverrides();
     final dio = Dio(
       BaseOptions(
         baseUrl: 'https://www.flibusta.is',
@@ -76,11 +77,4 @@ void main() {
       expect(details.book.authorNames, isNotEmpty);
     });
   });
-}
-
-class _TestHttpOverrides extends io.HttpOverrides {
-  @override
-  io.HttpClient createHttpClient(io.SecurityContext? context) {
-    return super.createHttpClient(context)..badCertificateCallback = (_, _, _) => true;
-  }
 }

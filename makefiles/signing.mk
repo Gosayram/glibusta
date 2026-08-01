@@ -4,16 +4,14 @@ SIGNING_MK := 1
 SIGNING_CONFIG ?= .key-generate.conf
 SIGNING_KEYSTORE ?= .signing/release.keystore
 SIGNING_SCRIPT ?= ./scripts/signing.sh
-PATCH_GRADLE_SIGNING_SCRIPT ?= ./scripts/patch-gradle-signing.sh
 
 ##@ Signing
 
 .PHONY: sign-android
-sign-android: ## Generate Android signing keys and patch Gradle config
+sign-android: ## Generate Android signing keys
 	@$(PRINT_STEP) "Configuring Android signing"
 	@if [ -f "$(SIGNING_CONFIG)" ]; then \
 		$(SIGNING_SCRIPT); \
-		$(PATCH_GRADLE_SIGNING_SCRIPT); \
 		$(PRINT_OK) "Android signing configured"; \
 	else \
 		$(PRINT_ERROR) "Signing config not found: $(SIGNING_CONFIG)"; \
@@ -35,16 +33,4 @@ use-existing-android-cert: ## Reuse existing Android release certificate
 	fi
 	@$(SIGNING_SCRIPT)
 	@$(PRINT_OK) "Android signing configured with existing certificate"
-
-.PHONY: patch-gradle-signing
-patch-gradle-signing: ## Patch Gradle signing configuration
-	@$(PRINT_STEP) "Patching Gradle signing configuration"
-	@if [ -f "$(PATCH_GRADLE_SIGNING_SCRIPT)" ]; then \
-		$(PATCH_GRADLE_SIGNING_SCRIPT); \
-		$(PRINT_OK) "Gradle signing configuration patched"; \
-	else \
-		$(PRINT_ERROR) "Patch script not found: $(PATCH_GRADLE_SIGNING_SCRIPT)"; \
-		exit 1; \
-	fi
-
 endif

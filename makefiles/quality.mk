@@ -96,10 +96,24 @@ diagnostics-strict: require-flutter require-python ## Summarize diagnostics and 
 	@$(PRINT_STEP) "Collecting strict Dart analyzer diagnostics"
 	@$(PYTHON) $(DIAGNOSTICS_SCRIPT) --strict -- $(FLUTTER_ANALYZE_NO_FATAL)
 
-.PHONY: test
-test: require-flutter ## Run Flutter tests
-	@$(PRINT_STEP) "Running Flutter tests"
-	$(FLUTTER_TEST)
+.PHONY: test test-dart test-live test-native test-rust
+test: test-dart test-rust ## Run deterministic Dart and Rust tests
+
+test-dart: require-flutter ## Run deterministic Dart tests (offline)
+	@$(PRINT_STEP) "Running deterministic Dart tests"
+	$(FLUTTER_TEST) --exclude-tags=live --exclude-tags=native
+
+test-live: require-flutter ## Run opt-in live Dart tests
+	@$(PRINT_STEP) "Running live Dart tests"
+	$(FLUTTER_TEST) --tags=live
+
+test-native: rust-build-release require-flutter ## Run the native Flutter Rust bridge smoke test
+	@$(PRINT_STEP) "Running native Flutter Rust bridge smoke test"
+	$(FLUTTER_TEST) --tags=native test/rust_bridge_smoke_test.dart
+
+test-rust: require-rust ## Run Rust tests
+	@$(PRINT_STEP) "Running Rust tests"
+	cd rust && cargo test --locked
 
 .PHONY: rustfmt
 rustfmt: ## Format Rust sources
@@ -262,12 +276,18 @@ benchmark: require-flutter ## Run integration benchmark on connected device
 # ── Fix / Check ────────────────────────────────────────────────────────────────
 
 .PHONY: fix-all
-fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix miri-check ## Apply all automatic fixes and formatting
+fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
+.PHONY: check-fast
+check-fast: format-check analyze test ## Run deterministic format, analysis, and tests
+
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check miri-check ## Run all local linting and formatting checks
+check-all: check-fast install-python-tools prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-sort-check ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
+
+.PHONY: check-deep
+check-deep: check-all rust-deny rust-audit miri-check ## Run optional deep dependency and UB checks
 
 .PHONY: check
 check: check-all ## Alias for check-all

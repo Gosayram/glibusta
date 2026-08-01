@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -11,6 +12,7 @@ void main() {
   late AppDatabase db;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     db = AppDatabase(NativeDatabase.memory());
   });
 

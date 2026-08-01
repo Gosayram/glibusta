@@ -19,7 +19,6 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/backup_service.dart';
 import '../../../core/services/calibre_client.dart';
-import '../../../core/services/content_safety_service.dart';
 import '../../../core/services/webdav_client.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
 import '../../../core/storage/storage_mode.dart';
@@ -183,12 +182,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           _SettingsTile(
-            icon: Icons.shield_outlined,
-            title: l10n.settingsContentFilter,
-            subtitle: l10n.settingsContentFilterSub,
-            onTap: () => _showContentSafety(context),
-          ),
-          _SettingsTile(
             icon: Icons.font_download,
             title: l10n.settingsFonts,
             subtitle: l10n.settingsFontsSub,
@@ -241,42 +234,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/settings/diagnostics'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showContentSafety(BuildContext context) {
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          return FutureBuilder<ContentSafetyLevel>(
-            future: ContentSafetyService.load(),
-            builder: (context, snapshot) {
-              final current = snapshot.data ?? ContentSafetyLevel.standard;
-              return AlertDialog(
-                title: const Text('Фильтр контента'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: ContentSafetyLevel.values.map((level) {
-                    return ListTile(
-                      leading: Icon(
-                        level == current ? Icons.check_circle : Icons.circle_outlined,
-                        color: level == current ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                      title: Text(level.displayName),
-                      subtitle: Text(level.description),
-                      onTap: () {
-                        unawaited(ContentSafetyService.save(level));
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  }).toList(),
-                ),
-              );
-            },
-          );
-        },
       ),
     );
   }

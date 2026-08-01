@@ -284,12 +284,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get settingsDarkThemeSub => 'Использовать тёмную тему';
 
   @override
-  String get settingsContentFilter => 'Фильтр контента';
-
-  @override
-  String get settingsContentFilterSub => 'Настройка безопасности';
-
-  @override
   String get settingsFonts => 'Шрифты';
 
   @override

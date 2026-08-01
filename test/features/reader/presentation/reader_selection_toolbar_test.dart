@@ -310,7 +310,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Онлайн-словарь'), findsOneWidget);
-    expect(find.textContaining('будет отправлен на en.wiktionary.org'), findsOneWidget);
+    expect(find.textContaining('На en.wiktionary.org будет отправлен'), findsOneWidget);
 
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();

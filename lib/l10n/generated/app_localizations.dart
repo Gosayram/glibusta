@@ -572,18 +572,6 @@ abstract class AppLocalizations {
   /// **'Use dark theme'**
   String get settingsDarkThemeSub;
 
-  /// No description provided for @settingsContentFilter.
-  ///
-  /// In en, this message translates to:
-  /// **'Content Filter'**
-  String get settingsContentFilter;
-
-  /// No description provided for @settingsContentFilterSub.
-  ///
-  /// In en, this message translates to:
-  /// **'Security settings'**
-  String get settingsContentFilterSub;
-
   /// No description provided for @settingsFonts.
   ///
   /// In en, this message translates to:
