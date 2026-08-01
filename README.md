@@ -1,4 +1,5 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
+[![CI](https://github.com/Gosayram/glibusta/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Gosayram/glibusta/actions/workflows/ci.yml)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-blue.svg)](https://flutter.dev)
 [![Riverpod](https://img.shields.io/badge/Riverpod-3.x-02569B.svg)](https://riverpod.dev)
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I81X6E3R)

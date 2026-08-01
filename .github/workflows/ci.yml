@@ -33,7 +33,18 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - run: flutter pub get --enforce-lockfile
-      - run: make format-check analyze test
+      - run: make format-check analyze
+      - run: make test-dart-coverage
+
+      - name: Upload Dart test artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dart-test-artifacts
+          path: |
+            coverage/lcov.info
+            build/test-results/dart-tests.json
+          if-no-files-found: warn
 
   rust:
     name: Rust
@@ -56,6 +67,31 @@ jobs:
 
       - uses: taiki-e/install-action@314b6e93a9b2f40a64f401a23fed55603083dc69 # nextest
       - run: make rustfmt-check rust-clippy rust-nextest-ci
+
+  codegen:
+    name: Code generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.44.8
+          cache: false
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.pub-cache
+          key: codegen-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'rust/Cargo.lock') }}
+
+      - run: cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+      - run: make codegen-check
 
   quality:
     name: Quality

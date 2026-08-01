@@ -35,9 +35,10 @@ CARGO_CHECK := cd rust && cargo check
 # The repository default is rust/.cargo/config.toml ([build] jobs = 4).
 # CARGO_BUILD_JOBS remains an explicit per-invocation override for CI or a
 # developer who deliberately wants a different limit.
-ANDROID_NDK_HOME ?= $(HOME)/Library/Android/sdk/ndk/29.0.13846066
-ANDROID_NDK_TOOLCHAIN_BIN := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin
-ANDROID_NDK_SYSROOT_LIB := $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib
+ANDROID_NDK_HOME ?= $(or $(ANDROID_NDK_ROOT),$(ANDROID_NDK_LATEST_HOME),$(HOME)/Library/Android/sdk/ndk/29.0.13846066)
+ANDROID_NDK_PREBUILT_DIR := $(firstword $(wildcard $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/*))
+ANDROID_NDK_TOOLCHAIN_BIN := $(ANDROID_NDK_PREBUILT_DIR)/bin
+ANDROID_NDK_SYSROOT_LIB := $(ANDROID_NDK_PREBUILT_DIR)/sysroot/usr/lib
 ANDROID_RUST_API_LEVEL ?= 21
 ANDROID_LINK_SHIMS := $(CURDIR)/rust/android-link-shims
 JNILIBS_DIR := android/app/src/main/jniLibs
@@ -59,8 +60,14 @@ rust-build-release: require-rust ## Build Rust native library in release mode
 	@ls -lh rust/target/release/libglibusta_core.* 2>/dev/null || true
 	@$(PRINT_OK) "Rust release build complete"
 
+.PHONY: require-android-ndk
+require-android-ndk:
+	@test -d "$(ANDROID_NDK_HOME)" || { $(PRINT_ERROR) "Android NDK not found: $(ANDROID_NDK_HOME). Set ANDROID_NDK_HOME to an installed NDK."; exit 1; }
+	@test -d "$(ANDROID_NDK_PREBUILT_DIR)" || { $(PRINT_ERROR) "Android NDK host toolchain not found under $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt. Install a host-compatible NDK or set ANDROID_NDK_HOME."; exit 1; }
+	@test -x "$(ANDROID_NDK_TOOLCHAIN_BIN)/llvm-ar" || { $(PRINT_ERROR) "Android NDK host toolchain is incomplete: $(ANDROID_NDK_TOOLCHAIN_BIN)."; exit 1; }
+
 .PHONY: rust-build-android
-rust-build-android: require-rust ## Build Rust native libraries for Android (arm64-v8a + armeabi-v7a)
+rust-build-android: require-rust require-android-ndk ## Build Rust native libraries for Android (arm64-v8a + armeabi-v7a)
 	@$(PRINT_STEP) "Building Rust libraries for Android"
 	@export ANDROID_NDK_HOME="$(ANDROID_NDK_HOME)"; \
 	export CXXFLAGS="$${CXXFLAGS:+$${CXXFLAGS} }$(UNRAR_NG_ANDROID_CXXFLAGS)"; \

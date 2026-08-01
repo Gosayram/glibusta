@@ -96,12 +96,18 @@ diagnostics-strict: require-flutter require-python ## Summarize diagnostics and 
 	@$(PRINT_STEP) "Collecting strict Dart analyzer diagnostics"
 	@$(PYTHON) $(DIAGNOSTICS_SCRIPT) --strict -- $(FLUTTER_ANALYZE_NO_FATAL)
 
-.PHONY: test test-dart test-live test-native test-rust
+.PHONY: test test-dart test-dart-coverage test-live test-native test-rust
 test: test-dart test-rust ## Run deterministic Dart and Rust tests
 
 test-dart: require-flutter ## Run deterministic Dart tests (offline)
 	@$(PRINT_STEP) "Running deterministic Dart tests"
 	$(FLUTTER_TEST) --exclude-tags=live --exclude-tags=native
+
+test-dart-coverage: require-flutter ## Run deterministic Dart tests and write coverage/report artifacts
+	@$(PRINT_STEP) "Running deterministic Dart tests with coverage"
+	@mkdir -p build/test-results
+	$(FLUTTER_TEST) --coverage --file-reporter=json:build/test-results/dart-tests.json \
+		--exclude-tags=live --exclude-tags=native
 
 test-live: require-flutter ## Run opt-in live Dart tests
 	@$(PRINT_STEP) "Running live Dart tests"

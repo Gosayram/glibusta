@@ -1,6 +1,7 @@
 # Miscellaneous
 *.class
 *.lock
+!pubspec.lock
 *.log
 *.pyc
 *.swp
@@ -203,4 +204,3 @@ build/symbols/
 # Rust snapshots new temp files
 # ==========================================
 *.snap.new
-
