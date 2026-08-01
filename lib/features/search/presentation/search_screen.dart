@@ -641,15 +641,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           }
           return false;
         },
-        child: ListView.builder(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            8,
-            16,
-            MediaQuery.viewPaddingOf(context).bottom + 24,
+        child: FocusTraversalGroup(
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.viewPaddingOf(context).bottom + 24,
+            ),
+            itemCount: resultChildren.length,
+            itemBuilder: (context, index) => resultChildren[index],
           ),
-          itemCount: resultChildren.length,
-          itemBuilder: (context, index) => resultChildren[index],
         ),
       ),
     );

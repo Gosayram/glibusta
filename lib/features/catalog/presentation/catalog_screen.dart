@@ -331,8 +331,9 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               }
               final downloadedMap = snapshot.data ?? {};
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
+              return FocusTraversalGroup(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
                   final width = constraints.maxWidth;
 
                   // Determine grid layout based on width
@@ -402,6 +403,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                     );
                   }
                 },
+                ),
               );
             },
           ),

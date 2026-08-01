@@ -1152,9 +1152,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
-    return RestorableCustomScrollView(
-      restorationId: 'library-books-scroll',
-      slivers: [
+    return FocusTraversalGroup(
+      child: RestorableCustomScrollView(
+        restorationId: 'library-books-scroll',
+        slivers: [
         if (pinnedBooksList.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -1248,6 +1249,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ),
           ),
       ],
+      ),
     );
   }
 

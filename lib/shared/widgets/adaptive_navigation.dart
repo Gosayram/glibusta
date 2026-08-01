@@ -165,45 +165,47 @@ class SidebarNavigation extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final branchIdx = _branchIndexForItem[index];
-                  final isBranchItem = branchIdx != null;
-                  final isSelected = isBranchItem && branchIdx == selectedIndex;
-                  return ListTile(
-                    leading: Icon(
-                      item.icon,
-                      color: isSelected ? colorScheme.primary : null,
-                    ),
-                    title: Text(
-                      item.label,
-                      style: TextStyle(
+              child: FocusTraversalGroup(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final branchIdx = _branchIndexForItem[index];
+                    final isBranchItem = branchIdx != null;
+                    final isSelected = isBranchItem && branchIdx == selectedIndex;
+                    return ListTile(
+                      leading: Icon(
+                        item.icon,
                         color: isSelected ? colorScheme.primary : null,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
-                    ),
-                    selected: isSelected,
-                    selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    onTap: () {
-                      if (isBranchItem) {
-                        onDestinationSelected?.call(branchIdx);
-                      } else {
-                        final route = item.route;
-                        if (route.isNotEmpty) {
-                          unawaited(context.push<void>(route));
+                      title: Text(
+                        item.label,
+                        style: TextStyle(
+                          color: isSelected ? colorScheme.primary : null,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      onTap: () {
+                        if (isBranchItem) {
+                          onDestinationSelected?.call(branchIdx);
+                        } else {
+                          final route = item.route;
+                          if (route.isNotEmpty) {
+                            unawaited(context.push<void>(route));
+                          }
                         }
-                      }
-                    },
-                  );
-                },
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],

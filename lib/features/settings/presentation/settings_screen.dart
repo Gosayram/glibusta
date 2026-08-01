@@ -47,16 +47,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         title: Text(l10n.settingsTitle),
         automaticallyImplyLeading: false,
       ),
-      body: ListView(
-        children: [
-          _SectionHeader(title: l10n.settingsAccount),
-          if (isAuthenticated)
-            _SettingsTile(
-              icon: Icons.person,
-              title: authData?.session?.name ?? 'Пользователь',
-              subtitle: 'Нажмите, чтобы выйти',
-              onTap: () => _logout(context, ref),
-            )
+      body: FocusTraversalGroup(
+        child: ListView(
+          children: [
+            _SectionHeader(title: l10n.settingsAccount),
+            if (isAuthenticated)
+              _SettingsTile(
+                icon: Icons.person,
+                title: authData?.session?.name ?? 'Пользователь',
+                subtitle: 'Нажмите, чтобы выйти',
+                onTap: () => _logout(context, ref),
+              )
           else
             _SettingsTile(
               icon: Icons.login,
@@ -223,7 +224,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: l10n.settingsDiagnosticsSub,
             onTap: () => context.push('/settings/diagnostics'),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

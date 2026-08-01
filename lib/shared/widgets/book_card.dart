@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -37,6 +38,28 @@ class BookCard extends StatefulWidget {
 
 class _BookCardState extends State<BookCard> {
   bool _hovered = false;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _activate() {
+    final onTap = widget.onTap;
+    if (onTap != null) {
+      onTap();
+    } else {
+      context.push('/book/${widget.book.id}');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,29 +68,51 @@ class _BookCardState extends State<BookCard> {
     final format = widget.book.availableFormats.isNotEmpty
         ? widget.book.availableFormats.first.name.toUpperCase()
         : null;
+    final focused = _focusNode.hasFocus;
 
     return RepaintBoundary(
       child: Semantics(
         label: 'Книга: ${widget.book.title}${author.isNotEmpty ? ', $author' : ''}',
         button: true,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.onTap ?? () => context.push('/book/${widget.book.id}'),
-            onLongPress: widget.onLongPress ?? () => _showStatusMenu(context),
-            onSecondaryTapDown: (details) => _showContextMenu(
-              context,
-              details.globalPosition,
-            ),
-            child: AnimatedScale(
-              scale: _hovered ? 1.025 : 1,
-              duration: const Duration(milliseconds: 140),
-              curve: Curves.easeOut,
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: Column(
+        child: Focus(
+          focusNode: _focusNode,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.space) {
+                _activate();
+                return KeyEventResult.handled;
+              }
+            }
+            return KeyEventResult.ignored;
+          },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: GestureDetector(
+              onTap: _activate,
+              onLongPress: widget.onLongPress ?? () => _showStatusMenu(context),
+              onSecondaryTapDown: (details) => _showContextMenu(
+                context,
+                details.globalPosition,
+              ),
+              child: AnimatedScale(
+                scale: _hovered || focused ? 1.025 : 1,
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOut,
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    side: focused
+                        ? BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 2,
+                          )
+                        : BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
@@ -164,6 +209,7 @@ class _BookCardState extends State<BookCard> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );
