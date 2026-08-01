@@ -19,9 +19,7 @@ final class GenreListProvider
           GenreListResponse,
           FutureOr<GenreListResponse>
         >
-    with
-        $FutureModifier<GenreListResponse>,
-        $FutureProvider<GenreListResponse> {
+    with $FutureModifier<GenreListResponse>, $FutureProvider<GenreListResponse> {
   GenreListProvider._()
     : super(
         from: null,
@@ -60,9 +58,7 @@ final class GenreBooksProvider
           GenreBooksResponse,
           FutureOr<GenreBooksResponse>
         >
-    with
-        $FutureModifier<GenreBooksResponse>,
-        $FutureProvider<GenreBooksResponse> {
+    with $FutureModifier<GenreBooksResponse>, $FutureProvider<GenreBooksResponse> {
   GenreBooksProvider._({
     required GenreBooksFamily super.from,
     required String super.argument,
@@ -120,8 +116,7 @@ final class GenreBooksFamily extends $Family
         isAutoDispose: true,
       );
 
-  GenreBooksProvider call(String genreId) =>
-      GenreBooksProvider._(argument: genreId, from: this);
+  GenreBooksProvider call(String genreId) => GenreBooksProvider._(argument: genreId, from: this);
 
   @override
   String toString() => r'genreBooksProvider';

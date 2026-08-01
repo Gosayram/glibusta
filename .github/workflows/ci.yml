@@ -32,6 +32,22 @@ jobs:
           key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
           restore-keys: pub-${{ runner.os }}-
 
+      - name: Install pinned SOPS
+        run: |
+          make install-sops
+          echo "$GITHUB_WORKSPACE/.tools/bin" >> "$GITHUB_PATH"
+
+      - name: Decrypt environment
+        env:
+          GLIBUSTA_SOPS_KEY: ${{ secrets.GLIBUSTA_SOPS_KEY }}
+        run: |
+          test -n "$GLIBUSTA_SOPS_KEY" || { echo "GLIBUSTA_SOPS_KEY is required" >&2; exit 1; }
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$GLIBUSTA_SOPS_KEY" > "$key_file"
+          chmod 600 "$key_file"
+          SOPS_AGE_KEY_FILE="$key_file" make env-decrypt
+
       - run: flutter pub get --enforce-lockfile
       - run: make format-check analyze
       - run: make test-dart-coverage

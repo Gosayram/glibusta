@@ -3,6 +3,7 @@
 library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/http/http_client.dart';
 import 'package:glibusta/features/search/data/flibusta_source.dart';
@@ -12,10 +13,12 @@ void main() {
   late HttpClient client;
   late FlibustaHtmlSource source;
 
-  setUpAll(() {
+  setUpAll(() async {
+    await dotenv.load();
+    final baseUrl = dotenv.get('BASE_URL');
     final dio = Dio(
       BaseOptions(
-        baseUrl: 'https://www.flibusta.is',
+        baseUrl: baseUrl,
         responseType: ResponseType.plain,
         headers: {'User-Agent': 'Mozilla/5.0'},
       ),

@@ -100,14 +100,17 @@ class _CollectionBookCard extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
     await ref.read(databaseProvider).collectionDao.removeBookFromCollection(book.id, collectionId);
     ref
       ..invalidate(collectionBooksProvider(collectionId))
       ..invalidate(userCollectionsProvider);
-    if (context.mounted)
+    if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Книга удалена из коллекции')));
+    }
   }
 }

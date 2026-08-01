@@ -10,6 +10,7 @@ include makefiles/quality.mk
 include makefiles/upgrade.mk
 include makefiles/signing.mk
 include makefiles/device.mk
+include makefiles/secrets.mk
 
 .DEFAULT_GOAL := help
 

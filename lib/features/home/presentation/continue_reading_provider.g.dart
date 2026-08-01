@@ -19,9 +19,7 @@ final class ContinueReadingInfosProvider
           List<ContinueReadingInfo>,
           FutureOr<List<ContinueReadingInfo>>
         >
-    with
-        $FutureModifier<List<ContinueReadingInfo>>,
-        $FutureProvider<List<ContinueReadingInfo>> {
+    with $FutureModifier<List<ContinueReadingInfo>>, $FutureProvider<List<ContinueReadingInfo>> {
   ContinueReadingInfosProvider._()
     : super(
         from: null,
@@ -48,5 +46,4 @@ final class ContinueReadingInfosProvider
   }
 }
 
-String _$continueReadingInfosHash() =>
-    r'ced143fc8ec78a110f1dc48a35148ab4de3e8ad6';
+String _$continueReadingInfosHash() => r'ced143fc8ec78a110f1dc48a35148ab4de3e8ad6';

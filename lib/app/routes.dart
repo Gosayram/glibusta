@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
-import '../features/collections/presentation/collections_screen.dart';
 import '../features/collections/presentation/collection_detail_screen.dart';
+import '../features/collections/presentation/collections_screen.dart';
 import '../features/highlights/presentation/highlights_notes_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 
