@@ -31,6 +31,19 @@ class LocalParserEvidenceTest(unittest.TestCase):
     def test_route_id_does_not_include_a_format_digit(self) -> None:
         self.assertEqual(_get_numbers("/b/743131/fb2"), "743131")
 
+    def test_book_search_supports_the_table_fixture(self) -> None:
+        soup = BeautifulSoup(
+            (FIXTURES / "search" / "multiple_results.html").read_text(encoding="utf-8"),
+            "html.parser",
+        )
+        client = FlibustaClient("https://library.example")
+        client._get_html_page = lambda _: soup
+
+        result = client.search_books_by_name("test")
+
+        self.assertEqual([item.book.id for item in result], [12345, 67890, 11111])
+        self.assertEqual(result[0].authors[0].id, 100)
+
     def test_opds_preserves_all_authors_and_uses_ceiling_pages(self) -> None:
         feed = ET.fromstring(
             f"""<feed xmlns=\"{ATOM_NS}\" xmlns:os=\"{OS_NS}\">

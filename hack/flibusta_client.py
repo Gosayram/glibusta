@@ -363,6 +363,40 @@ class FlibustaClient:
                 return ul
         return None
 
+    def _book_search_results(self, soup: BeautifulSoup) -> list[BooksByName]:
+        """Parse list and table layouts seen in local search fixtures."""
+        main = soup.select_one("#main") or soup
+        items = []
+        results_ul = self._find_results_ul(soup, "/b/")
+        if results_ul:
+            items = results_ul.find_all("li", recursive=False)
+        else:
+            table = main.select_one("table.series")
+            if table:
+                items = table.find_all("tr")
+
+        results = []
+        for item in items:
+            links = item.find_all("a", href=True)
+            book_link = next(
+                (link for link in links if re.fullmatch(r"/b/\d+", link["href"])), None
+            )
+            if book_link is None:
+                continue
+            book_id = _get_numbers(book_link["href"])
+            book_name = book_link.get_text(strip=True)
+            if not book_id or not book_name:
+                continue
+            authors = []
+            for link in links:
+                href = link["href"]
+                author_id = _get_numbers(href) if href.startswith("/a/") else ""
+                author_name = link.get_text(strip=True)
+                if author_id and author_name:
+                    authors.append(Author(id=int(author_id), name=author_name))
+            results.append(BooksByName(book=Book(id=int(book_id), name=book_name), authors=authors))
+        return results
+
     def _remove_pager(self, soup: BeautifulSoup) -> BeautifulSoup:
         for pager in soup.select("div.item-list .pager"):
             pager.decompose()
@@ -466,30 +500,7 @@ class FlibustaClient:
             return []
 
         soup = self._remove_pager(soup)
-        results = []
-        results_ul = self._find_results_ul(soup, "/b/")
-        if not results_ul:
-            return []
-
-        for li in results_ul.find_all("li", recursive=False):
-            children = li.find_all("a", recursive=False)
-            if not children:
-                continue
-            book_link = children[0]
-            href = book_link.get("href", "")
-            if not href.startswith("/b/"):
-                continue
-            book_id = _get_numbers(href)
-            book_name = book_link.get_text(strip=True)
-            if book_id and book_name:
-                results.append(BooksByName(
-                    book=Book(id=int(book_id), name=book_name),
-                    authors=[
-                        Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
-                        for a in children[1:]
-                    ],
-                ))
-        return results
+        return self._book_search_results(soup)
 
     def search_books_by_name_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
         """Search books by name with pagination."""
@@ -503,27 +514,7 @@ class FlibustaClient:
         total_count = self._get_total_count(soup)
         soup = self._remove_pager(soup)
 
-        results_ul = self._find_results_ul(soup, "/b/")
-        items = []
-        if results_ul:
-            for li in results_ul.find_all("li", recursive=False)[:limit]:
-                children = li.find_all("a", recursive=False)
-                if not children:
-                    continue
-                book_link = children[0]
-                href = book_link.get("href", "")
-                if not href.startswith("/b/"):
-                    continue
-                book_id = _get_numbers(href)
-                book_name = book_link.get_text(strip=True)
-                if book_id and book_name:
-                    items.append(BooksByName(
-                        book=Book(id=int(book_id), name=book_name),
-                        authors=[
-                            Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
-                            for a in children[1:]
-                        ],
-                    ))
+        items = self._book_search_results(soup)[:limit]
 
         return PaginatedResult(
             items=items,
