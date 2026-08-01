@@ -13,7 +13,8 @@ mixin _$TagDaoMixin on DatabaseAccessor<AppDatabase> {
 class TagDaoManager {
   final _$TagDaoMixin _db;
   TagDaoManager(this._db);
-  $$TagsTableTableManager get tags => $$TagsTableTableManager(_db.attachedDatabase, _db.tags);
+  $$TagsTableTableManager get tags =>
+      $$TagsTableTableManager(_db.attachedDatabase, _db.tags);
   $$BookTagsTableTableManager get bookTags =>
       $$BookTagsTableTableManager(_db.attachedDatabase, _db.bookTags);
   $$SavedBooksTableTableManager get savedBooks =>

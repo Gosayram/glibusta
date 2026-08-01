@@ -10,7 +10,8 @@ part of 'storage_settings_provider.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(storageSettingsPersistence)
-final storageSettingsPersistenceProvider = StorageSettingsPersistenceProvider._();
+final storageSettingsPersistenceProvider =
+    StorageSettingsPersistenceProvider._();
 
 final class StorageSettingsPersistenceProvider
     extends
@@ -19,7 +20,9 @@ final class StorageSettingsPersistenceProvider
           StorageSettingsPersistence,
           FutureOr<StorageSettingsPersistence>
         >
-    with $FutureModifier<StorageSettingsPersistence>, $FutureProvider<StorageSettingsPersistence> {
+    with
+        $FutureModifier<StorageSettingsPersistence>,
+        $FutureProvider<StorageSettingsPersistence> {
   StorageSettingsPersistenceProvider._()
     : super(
         from: null,
@@ -46,7 +49,8 @@ final class StorageSettingsPersistenceProvider
   }
 }
 
-String _$storageSettingsPersistenceHash() => r'b7b60f17a6bd9a464b44f320784167b3a35ebb1c';
+String _$storageSettingsPersistenceHash() =>
+    r'b7b60f17a6bd9a464b44f320784167b3a35ebb1c';
 
 @ProviderFor(StorageModeNotifier)
 final storageModeProvider = StorageModeNotifierProvider._();
@@ -80,7 +84,8 @@ final class StorageModeNotifierProvider
   }
 }
 
-String _$storageModeNotifierHash() => r'c255ad10714c91e63034bb2b78b0bffdf197c9ff';
+String _$storageModeNotifierHash() =>
+    r'c255ad10714c91e63034bb2b78b0bffdf197c9ff';
 
 abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
   StorageMode build();
@@ -104,7 +109,11 @@ abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
 final externalFolderProvider = ExternalFolderNotifierProvider._();
 
 final class ExternalFolderNotifierProvider
-    extends $NotifierProvider<ExternalFolderNotifier, ({String? name, String? uri})> {
+    extends
+        $NotifierProvider<
+          ExternalFolderNotifier,
+          ({String? name, String? uri})
+        > {
   ExternalFolderNotifierProvider._()
     : super(
         from: null,
@@ -134,18 +143,28 @@ final class ExternalFolderNotifierProvider
   }
 }
 
-String _$externalFolderNotifierHash() => r'8a42b62b242793ef65924768e0380d727ac0bd74';
+String _$externalFolderNotifierHash() =>
+    r'8a42b62b242793ef65924768e0380d727ac0bd74';
 
-abstract class _$ExternalFolderNotifier extends $Notifier<({String? name, String? uri})> {
+abstract class _$ExternalFolderNotifier
+    extends $Notifier<({String? name, String? uri})> {
   ({String? name, String? uri}) build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<({String? name, String? uri}), ({String? name, String? uri})>;
+    final ref =
+        this.ref
+            as $Ref<
+              ({String? name, String? uri}),
+              ({String? name, String? uri})
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<({String? name, String? uri}), ({String? name, String? uri})>,
+              AnyNotifier<
+                ({String? name, String? uri}),
+                ({String? name, String? uri})
+              >,
               ({String? name, String? uri}),
               Object?,
               Object?
@@ -157,7 +176,8 @@ abstract class _$ExternalFolderNotifier extends $Notifier<({String? name, String
 @ProviderFor(DirectReadNotifier)
 final directReadProvider = DirectReadNotifierProvider._();
 
-final class DirectReadNotifierProvider extends $NotifierProvider<DirectReadNotifier, bool> {
+final class DirectReadNotifierProvider
+    extends $NotifierProvider<DirectReadNotifier, bool> {
   DirectReadNotifierProvider._()
     : super(
         from: null,
@@ -185,7 +205,8 @@ final class DirectReadNotifierProvider extends $NotifierProvider<DirectReadNotif
   }
 }
 
-String _$directReadNotifierHash() => r'fdd2d274ecdd4b0b09872fadb22a640e4b8bc64e';
+String _$directReadNotifierHash() =>
+    r'fdd2d274ecdd4b0b09872fadb22a640e4b8bc64e';
 
 abstract class _$DirectReadNotifier extends $Notifier<bool> {
   bool build();
@@ -194,7 +215,13 @@ abstract class _$DirectReadNotifier extends $Notifier<bool> {
   WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
-        ref.element as $ClassProviderElement<AnyNotifier<bool, bool>, bool, Object?, Object?>;
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
     return element.handleCreate(ref, build);
   }
 }

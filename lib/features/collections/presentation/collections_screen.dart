@@ -311,7 +311,7 @@ class _UserCollectionTile extends StatelessWidget {
             const PopupMenuItem(value: 'delete', child: Text('Удалить')),
           ],
         ),
-        onTap: () => context.go('/collections'),
+        onTap: () => context.push('/collections/${collection.id}'),
       ),
     );
   }

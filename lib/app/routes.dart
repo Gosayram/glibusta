@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
+import '../features/collections/presentation/collection_detail_screen.dart';
 import '../features/highlights/presentation/highlights_notes_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
 
@@ -15,6 +16,18 @@ class CollectionsRoute extends GoRouteData with $CollectionsRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) {
     return const CollectionsScreen();
+  }
+}
+
+@TypedGoRoute<CollectionDetailRoute>(path: '/collections/:collectionId', name: 'collectionDetail')
+class CollectionDetailRoute extends GoRouteData with $CollectionDetailRoute {
+  const CollectionDetailRoute({required this.collectionId});
+
+  final String collectionId;
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return CollectionDetailScreen(collectionId: collectionId);
   }
 }
 

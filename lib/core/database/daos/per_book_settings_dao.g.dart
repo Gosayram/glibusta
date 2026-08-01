@@ -11,8 +11,9 @@ mixin _$PerBookSettingsDaoMixin on DatabaseAccessor<AppDatabase> {
 class PerBookSettingsDaoManager {
   final _$PerBookSettingsDaoMixin _db;
   PerBookSettingsDaoManager(this._db);
-  $$PerBookSettingsTableTableManager get perBookSettings => $$PerBookSettingsTableTableManager(
-    _db.attachedDatabase,
-    _db.perBookSettings,
-  );
+  $$PerBookSettingsTableTableManager get perBookSettings =>
+      $$PerBookSettingsTableTableManager(
+        _db.attachedDatabase,
+        _db.perBookSettings,
+      );
 }

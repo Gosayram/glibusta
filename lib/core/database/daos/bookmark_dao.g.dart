@@ -15,7 +15,8 @@ class BookmarkDaoManager {
   BookmarkDaoManager(this._db);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db.attachedDatabase, _db.bookmarks);
-  $$NotesTableTableManager get notes => $$NotesTableTableManager(_db.attachedDatabase, _db.notes);
+  $$NotesTableTableManager get notes =>
+      $$NotesTableTableManager(_db.attachedDatabase, _db.notes);
   $$QuotesTableTableManager get quotes =>
       $$QuotesTableTableManager(_db.attachedDatabase, _db.quotes);
 }
