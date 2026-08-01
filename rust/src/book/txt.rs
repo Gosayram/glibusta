@@ -2,7 +2,7 @@ use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ParseWarning, ReaderBlock, ReaderChapter, TocEntry,
 };
 use crate::book::normalize_whitespace;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -24,15 +24,20 @@ static CHAPTER_SPLIT_RE: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<NormalizedBook> {
+    let raw_bytes = if looks_like_zip(bytes) {
+        read_txt_from_zip(bytes)?
+    } else {
+        bytes.to_vec()
+    };
     let mut warnings = Vec::new();
     let text = if let Some(enc) = forced_encoding {
-        decode_text(bytes, enc)?
+        decode_text(&raw_bytes, enc)?
     } else {
-        let encoding = crate::book::encoding::detect_encoding(bytes);
+        let encoding = crate::book::encoding::detect_encoding(&raw_bytes);
         warnings.push(ParseWarning {
             message: format!("Encoding auto-detected: {}", encoding),
         });
-        decode_text(bytes, encoding)?
+        decode_text(&raw_bytes, encoding)?
     };
 
     // `decode_without_bom_handling` intentionally preserves a BOM. It is an
@@ -105,6 +110,37 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         images: Vec::new(),
         toc,
     })
+}
+
+fn looks_like_zip(bytes: &[u8]) -> bool {
+    bytes.len() >= 2 && bytes[0] == b'P' && bytes[1] == b'K'
+}
+
+fn read_txt_from_zip(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut zip = crate::book::archive::decode_zip(bytes).context("Failed to open TXT.ZIP")?;
+    let Some(name) = zip
+        .entry_names()
+        .iter()
+        .find(|name| is_txt_book_entry(name))
+        .cloned()
+    else {
+        anyhow::bail!("No .txt file found in archive");
+    };
+    zip.read_file_limited(&name, crate::api::models::MAX_FILE_SIZE as usize)?
+        .context("TXT archive entry disappeared")
+}
+
+fn is_txt_book_entry(name: &str) -> bool {
+    let normalized = name.replace('\\', "/");
+    normalized
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("txt"))
+        && !normalized.starts_with('/')
+        && !normalized.split('/').any(|segment| {
+            segment.is_empty()
+                || matches!(segment, "." | ".." | "__MACOSX")
+                || segment.starts_with('.')
+        })
 }
 
 fn is_scene_break(text: &str) -> bool {
@@ -324,6 +360,7 @@ fn split_into_chapters(blocks: Vec<ReaderBlock>, book_title: &str) -> Vec<Reader
 mod tests {
     use super::{BlockType, parse_txt};
     use encoding_rs::{BIG5, GBK, ISO_2022_JP, KOI8_R, SHIFT_JIS, WINDOWS_1251};
+    use std::io::{Cursor, Write};
 
     #[test]
     fn detects_chapters_separated_by_windows_line_endings() {
@@ -495,6 +532,21 @@ mod tests {
         let book = parse_txt(b"Column\tValue", Some("utf-8")).expect("parse tabbed TXT");
 
         assert_eq!(book.chapters[0].blocks[0].text, "Column    Value");
+    }
+
+    #[test]
+    fn parses_text_from_a_safe_zip_container() {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        zip.start_file("book.txt", zip::write::FileOptions::<()>::default())
+            .expect("start TXT entry");
+        zip.write_all(b"Zip title\n\nBody")
+            .expect("write TXT entry");
+        let bytes = zip.finish().expect("finish TXT archive").into_inner();
+
+        let book = parse_txt(&bytes, Some("utf-8")).expect("parse TXT.ZIP");
+
+        assert_eq!(book.title, "Zip title");
+        assert_eq!(book.chapters[0].blocks[1].text, "Body");
     }
 
     #[test]

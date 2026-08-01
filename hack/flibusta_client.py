@@ -397,22 +397,41 @@ class FlibustaClient:
             results.append(BooksByName(book=Book(id=int(book_id), name=book_name), authors=authors))
         return results
 
+    def _linked_books(self, soup: BeautifulSoup) -> list[dict[str, str]]:
+        """Return one title link per book, excluding read/download-format links."""
+        books = []
+        seen_ids = set()
+        for link in soup.find_all("a", href=True):
+            match = re.fullmatch(r"/b/(\d+)", urlsplit(link["href"]).path)
+            if match is None:
+                continue
+            book_id = match.group(1)
+            name = link.get_text(strip=True)
+            if name and book_id not in seen_ids:
+                books.append({"id": book_id, "name": name})
+                seen_ids.add(book_id)
+        return books
+
     def _remove_pager(self, soup: BeautifulSoup) -> BeautifulSoup:
-        for pager in soup.select("div.item-list .pager"):
+        for pager in soup.select("div.item-list .pager, .pager"):
             pager.decompose()
         return soup
 
     def _get_page_info(self, soup: BeautifulSoup) -> dict:
-        pager = soup.select_one("div.item-list .pager")
+        pager = soup.select_one("div.item-list .pager, .pager")
         if not pager:
             return {"total_pages": 1, "has_next": False, "has_previous": False}
 
-        pager_items = pager.find_all(class_=re.compile(r"pager-(current|item)"))
+        page_numbers = [
+            int(item.get_text(strip=True))
+            for item in pager.find_all(["a", "span"])
+            if item.get_text(strip=True).isdigit()
+        ]
         has_next = pager.find(class_="pager-next") is not None
         has_previous = pager.find(class_="pager-previous") is not None
 
         return {
-            "total_pages": len(pager_items),
+            "total_pages": max(page_numbers, default=1),
             "has_next": has_next,
             "has_previous": has_previous,
         }
@@ -1071,13 +1090,7 @@ class FlibustaClient:
         if not soup:
             return {"books": [], "total": 0}
 
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
+        books = self._linked_books(soup)
 
         return {"books": books, "total": len(books)}
 
@@ -1086,14 +1099,7 @@ class FlibustaClient:
         soup = self._get_html_page("/stat/b")
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_all_genres(self) -> list:
         """Get complete genre list from /g (with 500+ genres)."""
@@ -1161,13 +1167,7 @@ class FlibustaClient:
         if not soup:
             return {"books": [], "sort_options": []}
 
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
+        books = self._linked_books(soup)
 
         sort_options = []
         for form in soup.find_all("form"):
@@ -1184,14 +1184,7 @@ class FlibustaClient:
         soup = self._get_html_page(f"/g/{genre_id}?order={order}")
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_author_books_filtered(self, author_id: int, lang=None, order="a", ghosts=False, translations=False) -> list:
         """Get author books with filters."""
@@ -1208,14 +1201,7 @@ class FlibustaClient:
         soup = self._get_html_page(path)
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_mass_download_form(self) -> dict:
         """Get mass download form from /new page."""
@@ -1302,11 +1288,4 @@ class FlibustaClient:
         soup = self._get_html_page(path)
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)

@@ -44,6 +44,26 @@ class LocalParserEvidenceTest(unittest.TestCase):
         self.assertEqual([item.book.id for item in result], [12345, 67890, 11111])
         self.assertEqual(result[0].authors[0].id, 100)
 
+    def test_linked_books_skips_duplicate_format_links(self) -> None:
+        soup = BeautifulSoup(
+            (FIXTURES / "search" / "multiple_results.html").read_text(encoding="utf-8"),
+            "html.parser",
+        )
+
+        books = FlibustaClient("https://library.example")._linked_books(soup)
+
+        self.assertEqual([book["id"] for book in books], ["12345", "67890", "11111"])
+
+    def test_page_info_supports_the_fixture_pager(self) -> None:
+        soup = BeautifulSoup(
+            (FIXTURES / "search" / "multiple_results.html").read_text(encoding="utf-8"),
+            "html.parser",
+        )
+
+        page_info = FlibustaClient("https://library.example")._get_page_info(soup)
+
+        self.assertEqual(page_info["total_pages"], 3)
+
     def test_opds_preserves_all_authors_and_uses_ceiling_pages(self) -> None:
         feed = ET.fromstring(
             f"""<feed xmlns=\"{ATOM_NS}\" xmlns:os=\"{OS_NS}\">
