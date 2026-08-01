@@ -13,8 +13,15 @@ part of 'catalog_screen.dart';
 final categoriesProvider = CategoriesProvider._();
 
 final class CategoriesProvider
-    extends $FunctionalProvider<AsyncValue<List<String>>, List<String>, FutureOr<List<String>>>
-    with $FutureModifier<List<String>>, $FutureProvider<List<String>> {
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<SearchGenreItem>>,
+          List<SearchGenreItem>,
+          FutureOr<List<SearchGenreItem>>
+        >
+    with
+        $FutureModifier<List<SearchGenreItem>>,
+        $FutureProvider<List<SearchGenreItem>> {
   CategoriesProvider._()
     : super(
         from: null,
@@ -31,23 +38,28 @@ final class CategoriesProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<String>> $createElement(
+  $FutureProviderElement<List<SearchGenreItem>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<String>> create(Ref ref) {
+  FutureOr<List<SearchGenreItem>> create(Ref ref) {
     return categories(ref);
   }
 }
 
-String _$categoriesHash() => r'8d5efbea107941e11b2e53d1075b8722168af299';
+String _$categoriesHash() => r'209bcd2ff3f86b5b544c3f597056730675ec10dd';
 
 @ProviderFor(popularBooks)
 final popularBooksProvider = PopularBooksProvider._();
 
 final class PopularBooksProvider
-    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Book>>,
+          List<Book>,
+          FutureOr<List<Book>>
+        >
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   PopularBooksProvider._()
     : super(

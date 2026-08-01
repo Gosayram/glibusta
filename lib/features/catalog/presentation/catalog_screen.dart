@@ -16,12 +16,13 @@ import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
+import '../../search/data/flibusta_models.dart';
 import '../data/catalog_repository_impl.dart';
 
 part 'catalog_screen.g.dart';
 
 @riverpod
-Future<List<String>> categories(Ref ref) async {
+Future<List<SearchGenreItem>> categories(Ref ref) async {
   final repository = ref.watch(catalogRepositoryProvider);
   return repository.getCategories();
 }
@@ -74,7 +75,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       : 'cat_data_${categoriesAsync.value?.length ?? 0}',
                 ),
                 child: categoriesAsync.when(
-                  data: (List<String> categories) => _buildCategories(context, categories),
+                  data: (List<SearchGenreItem> categories) => _buildCategories(context, categories),
                   loading: () => SizedBox(
                     height: 120,
                     child: Skeletonizer.zone(
@@ -175,7 +176,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     );
   }
 
-  Widget _buildCategories(BuildContext context, List<String> categories) {
+  Widget _buildCategories(BuildContext context, List<SearchGenreItem> categories) {
     final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,13 +206,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             itemBuilder: (context, index) {
               final category = categories[index];
               return Padding(
-                key: ValueKey('$category-$index'),
+                key: ValueKey('${category.id}-$index'),
                 padding: const EdgeInsets.only(right: 8),
                 child: ActionChip(
-                  label: Text(category, style: const TextStyle(fontSize: 13)),
-                  onPressed: () {
-                    unawaited(context.push('/search?category=${Uri.encodeComponent(category)}'));
-                  },
+                  label: Text(category.name, style: const TextStyle(fontSize: 13)),
+                  onPressed: () => context.push('/genre/${category.id}'),
                 ),
               );
             },

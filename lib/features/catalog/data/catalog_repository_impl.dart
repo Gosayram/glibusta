@@ -5,6 +5,7 @@ import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
 import '../../search/data/composite_source.dart';
 import '../../search/data/flibusta_api_client.dart';
+import '../../search/data/flibusta_models.dart';
 import '../../search/domain/book_source.dart';
 import '../domain/catalog_repository.dart';
 
@@ -29,28 +30,28 @@ class CatalogRepositoryImpl implements CatalogRepository {
   CatalogRepositoryImpl(this._source, this._apiClient);
 
   static const _cacheTtl = Duration(minutes: 10);
-  final _categoriesCache = <String, _CacheEntry<List<String>>>{};
+  final _categoriesCache = <String, _CacheEntry<List<SearchGenreItem>>>{};
   final _booksCache = <String, _CacheEntry<List<Book>>>{};
 
   @override
-  Future<List<String>> getCategories() async {
+  Future<List<SearchGenreItem>> getCategories() async {
     final cached = _categoriesCache['categories'];
     if (cached != null && !cached.isExpired) return cached.data;
 
     try {
       final response = await _apiClient.getGenreList();
-      final result = response.genres.map((g) => g.name).toList();
+      final result = response.genres;
       _categoriesCache['categories'] = _CacheEntry(result, DateTime.now().add(_cacheTtl));
       return result;
     } on Object catch (e) {
       _logger.warning('Genre list failed, using defaults: $e', name: 'Catalog');
       return const [
-        'Фантастика',
-        'Детективы',
-        'Романы',
-        'Научная литература',
-        'История',
-        'Приключения',
+        SearchGenreItem(id: 'sf', name: 'Фантастика'),
+        SearchGenreItem(id: 'detive', name: 'Детективы'),
+        SearchGenreItem(id: 'love', name: 'Романы'),
+        SearchGenreItem(id: 'science', name: 'Научная литература'),
+        SearchGenreItem(id: 'history', name: 'История'),
+        SearchGenreItem(id: 'adventures', name: 'Приключения'),
       ];
     }
   }
