@@ -30,7 +30,17 @@ def _load_base_url() -> str:
 
 
 def _get_numbers(s: str) -> str:
-    return re.sub(r"\D", "", s)
+    match = re.search(r"/(\d+)(?:/|$)", urlsplit(s).path)
+    return match.group(1) if match else ""
+
+
+def _download_format(href: str, book_id: str) -> str | None:
+    path = urlsplit(href).path
+    direct = re.fullmatch(rf"/b/{re.escape(book_id)}/([a-z0-9]+)", path, re.IGNORECASE)
+    if direct and direct.group(1).lower() not in {"complain", "download", "mail", "read"}:
+        return direct.group(1).lower()
+    download = re.fullmatch(rf"/b/{re.escape(book_id)}/download/[^/]+\.([a-z0-9]+)", path, re.IGNORECASE)
+    return download.group(1).lower() if download else None
 
 
 def _normalize_base_url(base_url: str) -> str:
@@ -95,6 +105,7 @@ class OpdsDownload:
 
 @dataclass
 class OpdsBook:
+    id: str = ""
     authors: list = field(default_factory=list)  # list[OpdsAuthor]
     title: str = ""
     updated: str = ""
@@ -394,24 +405,17 @@ class FlibustaClient:
 
     def _parse_opds_entry(self, entry: ET.Element) -> OpdsBook:
         authors = []
-        author_el = entry.find(f"{{{ATOM_NS}}}author")
-        if author_el is not None:
-            if isinstance(author_el, list):
-                for a in author_el:
-                    name_el = a.find(f"{{{ATOM_NS}}}name")
-                    uri_el = a.find(f"{{{ATOM_NS}}}uri")
-                    authors.append(OpdsAuthor(
-                        name=name_el.text if name_el is not None else "",
-                        uri=uri_el.text if uri_el is not None else "",
-                    ))
-            else:
-                name_el = author_el.find(f"{{{ATOM_NS}}}name")
-                uri_el = author_el.find(f"{{{ATOM_NS}}}uri")
-                authors.append(OpdsAuthor(
+        for author_el in entry.findall(f"{{{ATOM_NS}}}author"):
+            name_el = author_el.find(f"{{{ATOM_NS}}}name")
+            uri_el = author_el.find(f"{{{ATOM_NS}}}uri")
+            authors.append(
+                OpdsAuthor(
                     name=name_el.text if name_el is not None else "",
                     uri=uri_el.text if uri_el is not None else "",
-                ))
+                )
+            )
 
+        entry_id = entry.findtext(f"{{{ATOM_NS}}}id", "")
         title = entry.findtext(f"{{{ATOM_NS}}}title", "")
         updated = entry.findtext(f"{{{ATOM_NS}}}updated", "")
 
@@ -441,6 +445,7 @@ class FlibustaClient:
                 description = text_el.text
 
         return OpdsBook(
+            id=entry_id,
             authors=authors,
             title=title,
             updated=updated,
@@ -814,7 +819,7 @@ class FlibustaClient:
 
         has_next = (start_index + items_per_page) < total_results
         has_previous = start_index > 0
-        total_pages = max(1, round(total_results / items_per_page)) if items_per_page else 1
+        total_pages = max(1, (total_results + items_per_page - 1) // items_per_page) if items_per_page else 1
 
         return PaginatedResult(
             items=items,
@@ -915,7 +920,7 @@ class FlibustaClient:
                 title = text
                 break
 
-        # Description: find h2 "Аннотация" and get following siblings until next h2
+        # Description: find h2 "Аннотация" and get following siblings until next h2.
         description = ""
         for h2 in soup.find_all("h2"):
             if "Аннотация" in h2.get_text():
@@ -926,6 +931,9 @@ class FlibustaClient:
                     desc_parts.append(sib.get_text(strip=True))
                 description = " ".join(desc_parts)
                 break
+        if not description:
+            description_el = soup.select_one(".book_description")
+            description = description_el.get_text(" ", strip=True) if description_el else ""
 
         # Cover image
         cover_img = soup.find("img", src=lambda s: s and "cover" in s.lower())
@@ -939,16 +947,14 @@ class FlibustaClient:
                 book_info_div = div
                 break
 
-        # Authors: only from /a/ links BEFORE the first /b/ download link
+        # Authors: only from /a/ links BEFORE the first book download link.
         authors = []
         seen_author_ids = set()
-        if book_info_div:
+        if book_info_div or soup:
             found_download = False
-            for a in book_info_div.find_all("a", href=True):
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
-                if href.startswith("/b/") and "/download" in href or any(
-                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
-                ):
+                if _download_format(href, book_id) is not None:
                     found_download = True
                     continue
                 if found_download:
@@ -963,13 +969,11 @@ class FlibustaClient:
         # Genres: from /g/ links in the book info div
         genres = []
         seen_genre_ids = set()
-        if book_info_div:
+        if book_info_div or soup:
             found_download = False
-            for a in book_info_div.find_all("a", href=True):
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
-                if href.startswith("/b/") and any(
-                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
-                ):
+                if _download_format(href, book_id) is not None:
                     found_download = True
                     continue
                 if found_download:
@@ -987,10 +991,9 @@ class FlibustaClient:
         seen_formats = set()
         for a in soup.find_all("a", href=True):
             href = a["href"]
-            fmt_match = re.match(rf"/b/{book_id}/(\w+)", href)
-            if fmt_match:
-                fmt = fmt_match.group(1)
-                if fmt not in seen_formats and fmt != "read":
+            fmt = _download_format(href, book_id)
+            if fmt:
+                if fmt not in seen_formats:
                     formats.append(fmt)
                     seen_formats.add(fmt)
                 if href not in download_urls:
@@ -999,8 +1002,8 @@ class FlibustaClient:
         # Series: from /sequence/ or /s/ links in book info div
         series = []
         seen_series_ids = set()
-        if book_info_div:
-            for a in book_info_div.find_all("a", href=True):
+        if book_info_div or soup:
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
                 if "/sequence/" in href or href.startswith("/s/"):
                     series_id = _get_numbers(href)
