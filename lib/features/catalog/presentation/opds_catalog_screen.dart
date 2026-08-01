@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+import '../../../core/config/app_settings.dart';
 import '../../../core/services/opds_service.dart';
 import '../../../l10n/generated/app_localizations.dart';
 
 final opdsCatalogsProvider = Provider<List<OpdsCatalog>>((ref) {
-  return builtInCatalogs;
+  return builtInCatalogs(ref.watch(appSettingsControllerProvider).baseUrl);
 });
 
 class OpdsCatalogScreen extends ConsumerStatefulWidget {

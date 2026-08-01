@@ -10,20 +10,14 @@ import requests
 import urllib3
 from bs4 import BeautifulSoup
 
+from flibusta_client import _load_base_url
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 OUTPUT = Path("/tmp/flibusta_pars")
 OUTPUT.mkdir(exist_ok=True)
 
-def load_url() -> str:
-    env = Path(__file__).parent.parent / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            if line.startswith("BASE_URL="):
-                return line.split("=", 1)[1].strip()
-    return "http://flibusta.is"
-
-BASE = load_url()
+BASE = _load_base_url()
 S = requests.Session()
 S.headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
 

@@ -21,12 +21,13 @@ OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
 
 def _load_base_url() -> str:
     env = Path(__file__).parent.parent / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("BASE_URL="):
-                return line.split("=", 1)[1].strip().rstrip("/")
-    return "https://www.flibusta.is"
+    if not env.exists():
+        raise RuntimeError(".env is required; run 'make env-decrypt' first")
+    for line in env.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("BASE_URL="):
+            return line.split("=", 1)[1].strip().rstrip("/")
+    raise RuntimeError("BASE_URL is required in .env")
 
 
 def _get_numbers(s: str) -> str:

@@ -9,11 +9,13 @@ import requests
 import urllib3
 from pathlib import Path
 
+from flibusta_client import _load_base_url
+
 DISABLE_TLS_VERIFY = os.environ.get('DISABLE_TLS_VERIFY', '').lower() in ('1', 'true', 'yes')
 if DISABLE_TLS_VERIFY:
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-BASE_URL = "https://www.flibusta.is"
+BASE_URL = _load_base_url()
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 }
