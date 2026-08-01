@@ -1,6 +1,7 @@
 use crate::api::models::{
     BlockType, BookFormat, NormalizedBook, ReaderBlock, ReaderChapter, RichSpan, TocEntry,
 };
+use crate::book::add_soft_hyphens;
 use crate::book::archive::{self, ZipFile};
 use crate::book::encoding::{
     attr_eq, decode_bytes, get_class_attr_arena, get_normalized_xml_attr, get_xml_attr,
@@ -2313,6 +2314,7 @@ fn parse_xhtml_to_blocks(
                             }
                         };
                         if !t.is_empty() || rich.is_some() {
+                            let t = add_soft_hyphens(&t);
                             let has_pb = pending_page_break_before;
                             pending_page_break_before = false;
                             let effective_type =
@@ -2441,7 +2443,7 @@ fn parse_xhtml_to_blocks(
                                     superscript,
                                     &href,
                                 );
-                                let t_text = current_text.trim().to_string();
+                                let t_text = add_soft_hyphens(current_text.trim());
                                 if !t_text.is_empty() {
                                     let has_pb = pending_page_break_before;
                                     pending_page_break_before = false;
@@ -2533,7 +2535,7 @@ fn parse_xhtml_to_blocks(
                             superscript,
                             &href,
                         );
-                        let t = current_text.trim().to_string();
+                        let t = add_soft_hyphens(current_text.trim());
                         if !t.is_empty() {
                             blocks.push(ReaderBlock {
                                 index: block_index,
@@ -2634,7 +2636,7 @@ fn parse_xhtml_to_blocks(
                                 .enumerate()
                                 .map(|(i, item)| ReaderBlock {
                                     index: block_index + i as i32,
-                                    text: item.clone(),
+                                    text: add_soft_hyphens(item),
                                     block_type: BlockType::Paragraph,
                                     image_url: None,
                                     note_ref: None,
@@ -2684,7 +2686,7 @@ fn parse_xhtml_to_blocks(
                                 .enumerate()
                                 .map(|(i, item)| ReaderBlock {
                                     index: block_index + i as i32,
-                                    text: item.clone(),
+                                    text: add_soft_hyphens(item),
                                     block_type: BlockType::Paragraph,
                                     image_url: None,
                                     note_ref: None,
@@ -3092,6 +3094,7 @@ fn flush_block(
     note_id: Option<String>,
 ) {
     let trimmed = crate::book::normalize_typography(text.trim());
+    let trimmed = add_soft_hyphens(&trimmed);
     if !trimmed.is_empty() {
         let rich = if rich_spans.is_empty() {
             None

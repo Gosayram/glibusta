@@ -2,6 +2,7 @@ use crate::api::models::{
     BlockType, BookFormat, MAX_FILE_SIZE, MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock,
     ReaderChapter, RichSpan,
 };
+use crate::book::add_soft_hyphens;
 use crate::book::archive;
 use crate::book::encoding::{attr_eq, get_xml_attr};
 use anyhow::{Context, Result, bail};
@@ -437,7 +438,7 @@ fn parse_fb2_xml(
                         if !in_notes_body && !current_text.trim().is_empty() {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
-                                text: current_text.trim().to_string(),
+                                text: add_soft_hyphens(current_text.trim()),
                                 block_type: BlockType::Poem,
                                 ..default_block()
                             });
@@ -972,6 +973,7 @@ fn parse_fb2_xml(
                             } else {
                                 Some(std::mem::take(&mut current_rich_spans))
                             };
+                            let text = add_soft_hyphens(&text);
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
                                 text,
@@ -1021,7 +1023,7 @@ fn parse_fb2_xml(
                     }
                     b"title" if in_body => in_content_title = false,
                     b"subtitle" if in_body => {
-                        let text = current_text.trim().to_string();
+                        let text = add_soft_hyphens(current_text.trim());
                         current_text.clear();
                         if !text.is_empty() {
                             body_blocks.push(ReaderBlock {
@@ -1048,7 +1050,7 @@ fn parse_fb2_xml(
                         in_subtitle = false;
                     }
                     b"epigraph" if in_body => {
-                        let text = current_text.trim().to_string();
+                        let text = add_soft_hyphens(current_text.trim());
                         current_text.clear();
                         if !text.is_empty() {
                             body_blocks.push(ReaderBlock {
@@ -1075,7 +1077,7 @@ fn parse_fb2_xml(
                         in_epigraph = false;
                     }
                     b"text-author" if in_body => {
-                        let text = current_text.trim().to_string();
+                        let text = add_soft_hyphens(current_text.trim());
                         current_text.clear();
                         if !text.is_empty() {
                             body_blocks.push(ReaderBlock {
@@ -1124,7 +1126,7 @@ fn parse_fb2_xml(
                         if !current_text.trim().is_empty() {
                             body_blocks.push(ReaderBlock {
                                 index: block_index,
-                                text: current_text.trim().to_string(),
+                                text: add_soft_hyphens(current_text.trim()),
                                 block_type: BlockType::Poem,
                                 ..default_block()
                             });
@@ -1841,6 +1843,7 @@ fn flush_fb2_block(
         &None,
     );
     let t = crate::book::normalize_typography(current_text.trim());
+    let t = add_soft_hyphens(&t);
     if !t.is_empty() {
         let rich = if current_rich_spans.is_empty() {
             None

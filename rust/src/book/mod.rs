@@ -141,6 +141,66 @@ fn copy_char(text: &str, i: usize) -> (&str, usize) {
     (&text[i..end], end)
 }
 
+/// Insert soft hyphens (U+00AD) at TeX hyphenation break points.
+/// Skips words shorter than 3 characters and already-hyphenated words.
+pub(crate) fn add_soft_hyphens(text: &str) -> String {
+    // ponytail: skip if already processed
+    if text.contains('\u{00AD}') {
+        return text.to_string();
+    }
+    let mut result = String::with_capacity(text.len() + text.len() / 5);
+    for segment in split_keep_delims(text) {
+        if segment.is_empty() {
+            continue;
+        }
+        let first_char = segment.chars().next().unwrap();
+        if first_char.is_alphanumeric() {
+            let word = segment.to_string();
+            let breaks = crate::api::api::hyphenate_word(word);
+            if breaks.is_empty() {
+                result.push_str(segment);
+            } else {
+                let bytes = segment.as_bytes();
+                let mut last = 0;
+                for pos in &breaks {
+                    let &pos = pos;
+                    if pos > last && pos < bytes.len() {
+                        result.push_str(&segment[last..pos]);
+                        result.push('\u{00AD}');
+                        last = pos;
+                    }
+                }
+                result.push_str(&segment[last..]);
+            }
+        } else {
+            result.push_str(segment);
+        }
+    }
+    result
+}
+
+/// Split text into alternating alphanumeric and non-alphanumeric segments.
+/// Delimiters (punctuation, spaces) are preserved exactly.
+fn split_keep_delims(text: &str) -> Vec<&str> {
+    let mut segments = Vec::new();
+    let mut start = 0;
+    let mut in_alpha = false;
+    for (i, ch) in text.char_indices() {
+        let is_a = ch.is_alphanumeric();
+        if i == start {
+            in_alpha = is_a;
+        } else if is_a != in_alpha {
+            segments.push(&text[start..i]);
+            start = i;
+            in_alpha = is_a;
+        }
+    }
+    if start < text.len() {
+        segments.push(&text[start..]);
+    }
+    segments
+}
+
 // ---------------------------------------------------------------------------
 // RCE-28.2: Rust-side BookParser trait
 // ---------------------------------------------------------------------------
