@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,9 +12,6 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../src/rust/api/api/api.dart' as rust_api;
 import '../../library/domain/book_file_repository.dart';
-import '../epub/epub_book_adapter.dart';
-import '../epub/epub_image_store.dart';
-import '../epub/epub_parser.dart' as new_epub;
 import 'parsers/book_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
@@ -103,15 +99,6 @@ class BookOpenService {
 
   static final _parsers = parserForFormatMap;
 
-  static Future<NormalizedBook> _parseEpubInWorker(
-    ({String filePath, String imagesDirPath, String bookId}) args,
-  ) async {
-    final imageStore = EpubImageStore(Directory(args.imagesDirPath));
-    final parser = new_epub.CustomEpubParser(imageStore: imageStore);
-    final epubBook = await parser.parse(args.filePath);
-    return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
-  }
-
   Future<NormalizedBook> openBook(String bookId) async {
     final cid = 'open-$bookId-${DateTime.now().millisecondsSinceEpoch}';
     _logger.info('Opening book', name: 'Reader', cid: cid);
@@ -152,50 +139,6 @@ class BookOpenService {
     String filePath, [
     String? bookId,
   ]) async {
-    if (bookFormat == BookFormat.epub) {
-      final effectiveBookId = bookId ?? _extractBookId(filePath);
-      final bookDir = await cache.getBookDir(effectiveBookId);
-      final imagesDir = Directory('${bookDir.path}/epub_images');
-      if (!await imagesDir.exists()) {
-        await imagesDir.create(recursive: true);
-      }
-
-      try {
-        final normalized =
-            await Isolate.run(
-              () => _parseEpubInWorker((
-                filePath: filePath,
-                imagesDirPath: imagesDir.path,
-                bookId: effectiveBookId,
-              )),
-            ).timeout(
-              _parsingTimeout,
-              onTimeout: () => throw TimeoutException(
-                'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
-                'Попробуйте повторить.',
-              ),
-            );
-        _logger.info(
-          'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
-          name: 'Reader',
-        );
-        final cleaned = normalized.withCleanedBlocks();
-        final fontMap = cleaned.metadata?['fonts'];
-        if (fontMap is Map && fontMap.isNotEmpty) {
-          await EpubFontLoader.loadFonts(
-            epubPath: filePath,
-            fontMap: Map<String, dynamic>.from(fontMap),
-          );
-        }
-        return cleaned;
-      } on TimeoutException {
-        rethrow;
-      } on Object catch (e, st) {
-        _logger.severe('EPUB parser failed: $e', name: 'Reader', error: e, st: st);
-        throw _toBookOpenFailure(e);
-      }
-    }
-
     final parser = _parsers[bookFormat];
     if (parser == null) {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
@@ -221,12 +164,14 @@ class BookOpenService {
       }
     }
     final cleaned = book.withCleanedBlocks();
-    if (bookFormat != BookFormat.docx || bookId == null) return cleaned;
 
-    return _materializeDocxImages(cleaned, filePath, bookId);
+    if (bookId != null && (bookFormat == BookFormat.epub || bookFormat == BookFormat.docx)) {
+      return _materializeArchiveImages(cleaned, filePath, bookId);
+    }
+    return cleaned;
   }
 
-  Future<NormalizedBook> _materializeDocxImages(
+  Future<NormalizedBook> _materializeArchiveImages(
     NormalizedBook book,
     String filePath,
     String bookId,
@@ -254,7 +199,7 @@ class BookOpenService {
         resolved[assetId] = imageFile.path;
       } on Object catch (e, st) {
         _logger.warning(
-          'Unable to materialize DOCX image $assetId',
+          'Unable to materialize archive image $assetId',
           name: 'Reader',
           error: e,
           st: st,
@@ -267,12 +212,6 @@ class BookOpenService {
 
   static String _docxImageFileName(String assetId) =>
       Uri.encodeComponent(assetId).replaceAll('%', '_');
-
-  String _extractBookId(String filePath) {
-    final name = filePath.split('/').last;
-    final dotIndex = name.lastIndexOf('.');
-    return dotIndex > 0 ? name.substring(0, dotIndex) : name;
-  }
 
   Future<CacheSourceFingerprint?> _computeCacheFingerprint(
     String bookId,
