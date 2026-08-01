@@ -272,7 +272,7 @@ class FlibustaApiClient {
         while (sibling != null) {
           if (sibling.localName == 'h2') break;
           if (sibling.localName == 'p' || sibling.localName == 'div') {
-            final text = sibling.text.trim();
+            final text = _visibleText(sibling);
             if (text.isNotEmpty) parts.add(text);
           }
           sibling = sibling.nextElementSibling;
@@ -399,6 +399,16 @@ class FlibustaApiClient {
       genres: genreIds,
       series: seriesList,
     );
+  }
+
+  /// Visible text from [element], with non-content nodes stripped so inline
+  /// `<script>`/`<style>` source and the review `<form>` ("Добавить
+  /// впечатление о книге") never leak into parsed fields.
+  String _visibleText(Element element) {
+    // Skip interactive blocks (the "add impression" review form, etc.).
+    if (element.querySelector('form') != null) return '';
+    element.querySelectorAll('script, style, noscript').forEach((n) => n.remove());
+    return element.text.trim();
   }
 
   Future<String> getDownloadUrl(String bookId, String format) async {
