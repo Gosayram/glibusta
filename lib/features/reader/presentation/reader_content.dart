@@ -689,7 +689,7 @@ Widget _buildChapterTitle(
         ctx,
         title,
         baseStyle.copyWith(
-          fontSize: baseStyle.fontSize! * 1.4,
+          fontSize: (baseStyle.fontSize ?? 14.0) * 1.4,
           fontWeight: FontWeight.bold,
         ),
         TextAlign.center,
@@ -2035,7 +2035,7 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
   }
 }
 
-class _FocusModeBody extends StatelessWidget {
+class _FocusModeBody extends StatefulWidget {
   const _FocusModeBody({
     required this.metadata,
     required this.loadedChapters,
@@ -2065,62 +2065,104 @@ class _FocusModeBody extends StatelessWidget {
   final void Function(int chapterIndex, int paragraphIndex)? onFocusPositionChanged;
 
   @override
-  Widget build(BuildContext context) {
+  State<_FocusModeBody> createState() => _FocusModeBodyState();
+}
+
+class _FocusModeBodyState extends State<_FocusModeBody> {
+  late PageController _controller;
+  late List<_FocusBlock> _blocks;
+
+  @override
+  void initState() {
+    super.initState();
+    _blocks = _buildBlocks();
+    _controller = PageController(initialPage: _initialPage());
+  }
+
+  @override
+  void didUpdateWidget(_FocusModeBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialChapterIndex != widget.initialChapterIndex ||
+        oldWidget.initialParagraphIndex != widget.initialParagraphIndex ||
+        oldWidget.loadedChapters != widget.loadedChapters ||
+        oldWidget.metadata.chapterCount != widget.metadata.chapterCount) {
+      _blocks = _buildBlocks();
+      _controller.dispose();
+      _controller = PageController(initialPage: _initialPage());
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  List<_FocusBlock> _buildBlocks() {
     final blocks = <_FocusBlock>[];
-    for (var ch = 0; ch < metadata.chapterCount; ch++) {
-      final chapter = loadedChapters[ch];
+    for (var ch = 0; ch < widget.metadata.chapterCount; ch++) {
+      final chapter = widget.loadedChapters[ch];
       if (chapter == null) continue;
       for (var blk = 0; blk < chapter.blocks.length; blk++) {
         blocks.add(_FocusBlock(chapterIndex: ch, blockIndex: blk));
       }
     }
+    return blocks;
+  }
 
-    final initialIndex = blocks.indexWhere(
-      (b) => b.chapterIndex == initialChapterIndex && b.blockIndex == initialParagraphIndex,
+  int _initialPage() {
+    final index = _blocks.indexWhere(
+      (b) =>
+          b.chapterIndex == widget.initialChapterIndex &&
+          b.blockIndex == widget.initialParagraphIndex,
     );
-    final controller = PageController(initialPage: initialIndex >= 0 ? initialIndex : 0);
+    return index >= 0 ? index : 0;
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return PageView.builder(
-      controller: controller,
+      controller: _controller,
       scrollDirection: Axis.vertical,
-      itemCount: blocks.length,
+      itemCount: _blocks.length,
       onPageChanged: (index) {
-        if (index < blocks.length) {
-          final position = blocks[index];
-          onPageChanged?.call(position.chapterIndex);
-          onFocusPositionChanged?.call(position.chapterIndex, position.blockIndex);
+        if (index < _blocks.length) {
+          final position = _blocks[index];
+          widget.onPageChanged?.call(position.chapterIndex);
+          widget.onFocusPositionChanged?.call(position.chapterIndex, position.blockIndex);
         }
       },
       itemBuilder: (context, index) {
-        final fb = blocks[index];
-        final chapter = loadedChapters[fb.chapterIndex];
+        final fb = _blocks[index];
+        final chapter = widget.loadedChapters[fb.chapterIndex];
         if (chapter == null || fb.blockIndex >= chapter.blocks.length) {
           return const SizedBox.shrink();
         }
         final block = chapter.blocks[fb.blockIndex];
-        final margin = settings.separateMargins
+        final s = widget.settings;
+        final margin = s.separateMargins
             ? EdgeInsets.only(
-                top: settings.marginTop,
-                bottom: settings.marginBottom,
-                left: settings.marginLeft,
-                right: settings.marginRight,
+                top: s.marginTop,
+                bottom: s.marginBottom,
+                left: s.marginLeft,
+                right: s.marginRight,
               )
-            : EdgeInsets.all(settings.margin);
+            : EdgeInsets.all(s.margin);
 
         final colors =
-            customColors ??
+            widget.customColors ??
             ReaderColors.forThemeWithContext(
-              settings.theme,
+              s.theme,
               MediaQuery.platformBrightnessOf(context),
             );
         final readerCtx = ReaderCtx(
-          settings: settings,
-          customColors: customColors,
-          highlightQuery: highlightQuery,
+          settings: s,
+          customColors: widget.customColors,
+          highlightQuery: widget.highlightQuery,
           linkColor: colors.link,
           brightness: MediaQuery.platformBrightnessOf(context),
-          onLinkTap: onLinkTap,
-          embeddedFontFamily: _embeddedFontFamily(metadata),
+          onLinkTap: widget.onLinkTap,
+          embeddedFontFamily: _embeddedFontFamily(widget.metadata),
         );
 
         return Padding(

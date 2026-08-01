@@ -5,6 +5,7 @@ import '../data/parsers/normalized_book.dart';
 const int chapterWindowSize = 2;
 // MD-2.3: max loaded chapters before eviction kicks in
 const int maxLoadedChapters = 20;
+const int continuousBackwardWindow = 10;
 final _wordTokenPattern = RegExp(r'\S+');
 
 final class ReaderContentHelper {
@@ -74,7 +75,7 @@ final class ReaderContentHelper {
     return updates;
   }
 
-  Map<int, ReaderChapter> evictDistantChapters(
+  static Map<int, ReaderChapter> evictDistantChapters(
     int centerIndex,
     Map<int, ReaderChapter> loaded, {
     int? windowSize,
@@ -82,22 +83,31 @@ final class ReaderContentHelper {
     bool keepAllBefore = false,
   }) {
     final win = (windowSize ?? chapterWindowSize + 1);
-    final minKeep = keepFrom ?? (centerIndex - win).clamp(0, centerIndex + win);
+    final int minKeep;
+    if (keepAllBefore) {
+      minKeep = (centerIndex - continuousBackwardWindow).clamp(0, centerIndex);
+    } else {
+      minKeep = keepFrom ?? (centerIndex - win).clamp(0, centerIndex + win);
+    }
     final maxKeep = centerIndex + win;
 
-    final updated = Map<int, ReaderChapter>.from(loaded);
     final keysToRemove = <int>[];
-    for (final key in updated.keys) {
+    for (final key in loaded.keys) {
       if (key < minKeep || key > maxKeep) {
         keysToRemove.add(key);
       }
     }
+
+    // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
+    final needsMemoryEviction = loaded.length > maxLoadedChapters;
+    if (keysToRemove.isEmpty && !needsMemoryEviction) return loaded;
+
+    final updated = Map<int, ReaderChapter>.from(loaded);
     for (final key in keysToRemove) {
       updated.remove(key);
     }
 
-    // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
-    if (updated.length > maxLoadedChapters) {
+    if (needsMemoryEviction) {
       if (keepAllBefore) {
         final toEvict = updated.keys.where((k) => k > centerIndex).toList()..sort();
         for (final key in toEvict) {

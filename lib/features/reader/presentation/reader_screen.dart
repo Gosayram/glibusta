@@ -796,7 +796,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
-    if (!readerState.isLoading && readerState.metadata != null && readerState.chapterCount == 0) {
+    if (readerState.metadata == null) {
+      return AnimatedTheme(
+        data: theme,
+        duration: themeTransition,
+        curve: Curves.easeOutCubic,
+        child: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (!readerState.isLoading && readerState.chapterCount == 0) {
       return AnimatedTheme(
         data: theme,
         duration: themeTransition,
@@ -1206,49 +1217,50 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               onClose: () => _ctrl.clearSearchHighlight(),
             ),
           ),
-        Positioned(
-          bottom: MediaQuery.paddingOf(context).bottom + 80,
-          left: 24,
-          right: 24,
-          child: ReaderSelectionToolbar(
-            bookId: widget.bookId,
-            chapterIndex: readerState.currentPosition.chapterIndex,
-            paragraphIndex: readerState.currentPosition.paragraphIndex,
-            selectedText: _selectedText!,
-            onDismiss: () => setState(() => _selectedText = null),
-            onSearchInBook: (query) {
-              setState(() {
-                _pendingSearchQuery = query;
-                _selectedText = null;
-              });
-              _ctrl.toggleSearch();
-            },
-            highlightMode: readerState.highlightMode,
-            onSetHighlightStart: () {
-              _ctrl.setMultiHighlightStart(
-                readerState.currentPosition.chapterIndex,
-                readerState.currentPosition.paragraphIndex,
-                _selectedText ?? '',
-              );
-              setState(() => _selectedText = null);
-            },
-            onFinishHighlight: () {
-              unawaited(
-                _ctrl.finishMultiHighlight(
-                  bookId: widget.bookId,
-                  endChapterIndex: readerState.currentPosition.chapterIndex,
-                  endParagraphIndex: readerState.currentPosition.paragraphIndex,
-                  endSelectedText: _selectedText ?? '',
-                ),
-              );
-              setState(() => _selectedText = null);
-            },
-            onCancelHighlight: () {
-              _ctrl.cancelMultiHighlight();
-              setState(() => _selectedText = null);
-            },
+        if (_selectedText != null)
+          Positioned(
+            bottom: MediaQuery.paddingOf(context).bottom + 80,
+            left: 24,
+            right: 24,
+            child: ReaderSelectionToolbar(
+              bookId: widget.bookId,
+              chapterIndex: readerState.currentPosition.chapterIndex,
+              paragraphIndex: readerState.currentPosition.paragraphIndex,
+              selectedText: _selectedText!,
+              onDismiss: () => setState(() => _selectedText = null),
+              onSearchInBook: (query) {
+                setState(() {
+                  _pendingSearchQuery = query;
+                  _selectedText = null;
+                });
+                _ctrl.toggleSearch();
+              },
+              highlightMode: readerState.highlightMode,
+              onSetHighlightStart: () {
+                _ctrl.setMultiHighlightStart(
+                  readerState.currentPosition.chapterIndex,
+                  readerState.currentPosition.paragraphIndex,
+                  _selectedText ?? '',
+                );
+                setState(() => _selectedText = null);
+              },
+              onFinishHighlight: () {
+                unawaited(
+                  _ctrl.finishMultiHighlight(
+                    bookId: widget.bookId,
+                    endChapterIndex: readerState.currentPosition.chapterIndex,
+                    endParagraphIndex: readerState.currentPosition.paragraphIndex,
+                    endSelectedText: _selectedText ?? '',
+                  ),
+                );
+                setState(() => _selectedText = null);
+              },
+              onCancelHighlight: () {
+                _ctrl.cancelMultiHighlight();
+                setState(() => _selectedText = null);
+              },
+            ),
           ),
-        ),
         if (readerState.highlightMode == HighlightSelectionMode.startSet && _selectedText == null)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 8,

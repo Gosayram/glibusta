@@ -618,8 +618,12 @@ final class ReaderController {
       // Chapter loading captures the current window before awaiting I/O.  Evict
       // again after that work completes so the captured, now-distant chapters
       // cannot be reintroduced after the eager eviction in [handlePageChanged].
-      final windowed = _content.evictDistantChapters(centerIndex, updated);
-      _updateState(_state.copyWith(loadedChapters: windowed, isDynamicallyLoading: false));
+      final windowed = ReaderContentHelper.evictDistantChapters(centerIndex, updated);
+      if (!identical(windowed, _state.loadedChapters)) {
+        _updateState(_state.copyWith(loadedChapters: windowed, isDynamicallyLoading: false));
+      } else {
+        _updateState(_state.copyWith(isDynamicallyLoading: false));
+      }
     } on Object catch (error, stackTrace) {
       if (_disposed || generation != _chapterLoadGeneration) return;
       if (!_loaded) rethrow;
@@ -635,7 +639,7 @@ final class ReaderController {
 
   void _evictDistantChapters(int centerIndex) {
     final isContinuous = effectiveMode == ReaderMode.continuous;
-    final updated = _content.evictDistantChapters(
+    final updated = ReaderContentHelper.evictDistantChapters(
       centerIndex,
       _state.loadedChapters,
       keepFrom: isContinuous ? 0 : null,
