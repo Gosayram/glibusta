@@ -282,6 +282,65 @@ void disposeChapterImagesCache() => _chapterImagesCache.clear();
 @visibleForTesting
 void clearChapterImagesCache() => _chapterImagesCache.clear();
 
+final Map<int, List<String>> _chapterWordsCache = {};
+final RegExp _wordSplitRegex = RegExp(r'\s+');
+
+void evictChapterWords(Iterable<int> chapterIndices) {
+  for (final index in chapterIndices) {
+    _chapterWordsCache.remove(index);
+  }
+}
+
+void disposeChapterWordsCache() => _chapterWordsCache.clear();
+
+@visibleForTesting
+void clearChapterWordsCache() => _chapterWordsCache.clear();
+
+@visibleForTesting
+Map<int, List<String>> get chapterWordsCacheForTest => Map.unmodifiable(_chapterWordsCache);
+
+@visibleForTesting
+void putChapterWordsForTest(int chapterIndex, List<String> words) {
+  _chapterWordsCache[chapterIndex] = words;
+}
+
+final Map<int, (int, List<_ChapterRenderItem>)> _renderItemsCache = {};
+
+void evictChapterRenderItems(Iterable<int> chapterIndices) {
+  for (final index in chapterIndices) {
+    _renderItemsCache.remove(index);
+  }
+}
+
+void disposeRenderItemsCache() => _renderItemsCache.clear();
+
+@visibleForTesting
+void clearRenderItemsCache() => _renderItemsCache.clear();
+
+@visibleForTesting
+// ignore: library_private_types_in_public_api — @visibleForTesting only
+List<_ChapterRenderItem>? renderItemsForTest(int chapterIndex) =>
+    _renderItemsCache[chapterIndex]?.$2;
+
+@visibleForTesting
+int? renderItemsHashForTest(int chapterIndex) => _renderItemsCache[chapterIndex]?.$1;
+
+@visibleForTesting
+int? renderItemsCountForTest(int chapterIndex) => _renderItemsCache[chapterIndex]?.$2.length;
+
+@visibleForTesting
+void putRenderItemsForTest(
+  int chapterIndex,
+  ReaderChapter chapter,
+  List<BlockTransformer>? blockTransformers,
+) {
+  final cacheHash = Object.hash(chapter, blockTransformers?.length ?? 0);
+  final cached = _renderItemsCache[chapterIndex];
+  if (cached != null && cached.$1 == cacheHash) return;
+  final items = _computeChapterRenderItems(chapter, blockTransformers);
+  _renderItemsCache[chapterIndex] = (cacheHash, items);
+}
+
 const int _base64CacheMaxSize = 20;
 final LinkedHashMap<String, Uint8List> _base64Cache = LinkedHashMap<String, Uint8List>();
 
@@ -1983,7 +2042,15 @@ class _ReaderContentBodyState extends State<ReaderContentBody> {
           )
         : const SizedBox.shrink();
 
-    final renderItems = _computeChapterRenderItems(chapter, widget.blockTransformers);
+    final cacheHash = Object.hash(chapter, widget.blockTransformers?.length ?? 0);
+    final cached = _renderItemsCache[chapterIndex];
+    List<_ChapterRenderItem> renderItems;
+    if (cached != null && cached.$1 == cacheHash) {
+      renderItems = cached.$2;
+    } else {
+      renderItems = _computeChapterRenderItems(chapter, widget.blockTransformers);
+      _renderItemsCache[chapterIndex] = (cacheHash, renderItems);
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2333,7 +2400,9 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       _heightCache.clear();
       _repaginationGeneration++;
       _isRepaginating = true;
-      unawaited(_scheduleBackgroundRepagination(_repaginationGeneration));
+      unawaited(
+        _scheduleBackgroundRepagination(_repaginationGeneration, MediaQuery.textScalerOf(context)),
+      );
     }
     if (widget.initialPage != oldWidget.initialPage ||
         widget.initialParagraph != oldWidget.initialParagraph) {
@@ -2387,6 +2456,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     double availableHeight,
     double contentWidth,
     String settingsKey,
+    TextScaler textScaler,
   ) {
     final cacheKey = '${chIdx}_$settingsKey';
     final cached = _chapterPageCache[cacheKey];
@@ -2414,19 +2484,19 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     final suffixSums = List<double>.filled(blockCount + 1, 0);
     for (int j = blockCount - 1; j >= 0; j--) {
       final b = chapter.blocks[j];
-      final k = _blockHeightCacheKey(b, settings, contentWidth);
+      final k = _blockHeightCacheKey(b, settings, contentWidth, textScaler);
       suffixSums[j] =
           suffixSums[j + 1] +
           _heightCache.putIfAbsent(k, () {
-            return _estimateBlockHeight(b, settings, contentWidth);
+            return _estimateBlockHeight(b, settings, contentWidth, textScaler);
           });
     }
 
     for (int i = 0; i < blockCount; i++) {
       final block = chapter.blocks[i];
-      final cacheKey = _blockHeightCacheKey(block, settings, contentWidth);
+      final cacheKey = _blockHeightCacheKey(block, settings, contentWidth, textScaler);
       final blockHeight = _heightCache.putIfAbsent(cacheKey, () {
-        return _estimateBlockHeight(block, settings, contentWidth);
+        return _estimateBlockHeight(block, settings, contentWidth, textScaler);
       });
 
       if (block.pageBreakBefore && i > pageStart) {
@@ -2477,7 +2547,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     return pages;
   }
 
-  int _blockHeightCacheKey(ReaderBlock block, ReaderSettings settings, double contentWidth) {
+  int _blockHeightCacheKey(
+    ReaderBlock block,
+    ReaderSettings settings,
+    double contentWidth,
+    TextScaler textScaler,
+  ) {
     return Object.hashAll([
       block.text,
       block.type,
@@ -2504,7 +2579,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       settings.showImages,
       settings.imageWidth,
       contentWidth,
-      MediaQuery.textScalerOf(context),
+      textScaler,
     ]);
   }
 
@@ -2517,12 +2592,18 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   static const int _backgroundBatchSize = 5;
 
-  Future<void> _scheduleBackgroundRepagination(int generation) async {
-    final chKey = _currentSettingsKey();
+  Future<void> _scheduleBackgroundRepagination(int generation, TextScaler textScaler) async {
+    final chKey = _currentSettingsKey(textScaler);
     final totalChapters = widget.metadata.chapterCount;
     final currentChapter = widget.initialPage.clamp(0, totalChapters - 1);
 
-    _paginateSingleChapter(currentChapter, _lastAvailableHeight, _lastContentWidth, chKey);
+    _paginateSingleChapter(
+      currentChapter,
+      _lastAvailableHeight,
+      _lastContentWidth,
+      chKey,
+      textScaler,
+    );
 
     for (var start = 0; start < totalChapters; start += _backgroundBatchSize) {
       await Future<void>.delayed(Duration.zero);
@@ -2530,7 +2611,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       final end = (start + _backgroundBatchSize).clamp(0, totalChapters);
       for (var i = start; i < end; i++) {
         if (i == currentChapter) continue;
-        _paginateSingleChapter(i, _lastAvailableHeight, _lastContentWidth, chKey);
+        _paginateSingleChapter(i, _lastAvailableHeight, _lastContentWidth, chKey, textScaler);
       }
     }
 
@@ -2540,9 +2621,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (mounted) setState(() {});
   }
 
-  String _currentSettingsKey() {
+  String _currentSettingsKey(TextScaler textScaler) {
     final s = widget.settings;
-    final textScaler = MediaQuery.textScalerOf(context);
     return '${s.fontSize}_${s.lineHeight}_${s.margin}_'
         '${s.paragraphSpacing}_${s.letterSpacing}_${s.paragraphFirstLineIndent}_'
         '${s.font}_${s.hyphenation}_${s.textAlign.name}_'
@@ -2556,10 +2636,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
   double _lastAvailableHeight = 1.0;
   double _lastContentWidth = 1.0;
 
-  List<_PageContent> _paginateContent(double availableHeight, double contentWidth) {
+  List<_PageContent> _paginateContent(
+    double availableHeight,
+    double contentWidth,
+    TextScaler textScaler,
+  ) {
     final settings = widget.settings;
     final pages = <_PageContent>[];
-    final textScaler = MediaQuery.textScalerOf(context);
 
     // MD-2.3: per-chapter settings key for cache
     final chKey =
@@ -2583,7 +2666,13 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       final cacheKey = '${chIdx}_$chKey';
       final isCached = _chapterPageCache.containsKey(cacheKey);
       if (_isRepaginating && !isCached) continue;
-      final chapterPages = _paginateSingleChapter(chIdx, availableHeight, contentWidth, chKey);
+      final chapterPages = _paginateSingleChapter(
+        chIdx,
+        availableHeight,
+        contentWidth,
+        chKey,
+        textScaler,
+      );
       for (final p in chapterPages) {
         final showTitle = chIdx != lastChIdx;
         pages.add(
@@ -2603,7 +2692,12 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
 
   /// MD-2.1: Estimate block height using layout-engine measurement.
   /// Now delegates to [_measureBlockHeight] for accurate rich-text + hyphenation.
-  double _estimateBlockHeight(ReaderBlock block, ReaderSettings settings, double width) {
+  double _estimateBlockHeight(
+    ReaderBlock block,
+    ReaderSettings settings,
+    double width,
+    TextScaler textScaler,
+  ) {
     final ps = settings.paragraphSpacing;
     final colors =
         widget.customColors ??
@@ -2616,26 +2710,29 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.heading:
         final level = block.headingLevel ?? 2;
         final spacing = _headingSpacing(ps, level);
-        final h = _measureBlockHeight(block, settings, colors, width);
+        final h = _measureBlockHeight(block, settings, colors, width, textScaler);
         return h + spacing + ps;
       case BlockType.subtitle:
-        return _measureBlockHeight(block, settings, colors, width) + ps * 3;
+        return _measureBlockHeight(block, settings, colors, width, textScaler) + ps * 3;
       case BlockType.epigraph:
-        return _measureBlockHeight(block, settings, colors, width - settings.margin) + ps * 2 + 24;
+        return _measureBlockHeight(block, settings, colors, width - settings.margin, textScaler) +
+            ps * 2 +
+            24;
       case BlockType.poem:
-        return _measureBlockHeight(block, settings, colors, width - 48) + ps * 4;
+        return _measureBlockHeight(block, settings, colors, width - 48, textScaler) + ps * 4;
       case BlockType.cite:
-        return _measureBlockHeight(block, settings, colors, width - 40) + ps + 16;
+        return _measureBlockHeight(block, settings, colors, width - 40, textScaler) + ps + 16;
       case BlockType.textAuthor:
-        return _measureBlockHeight(block, settings, colors, width, fontScale: 0.9) + ps;
+        return _measureBlockHeight(block, settings, colors, width, textScaler, fontScale: 0.9) + ps;
       case BlockType.quote:
-        return _measureBlockHeight(block, settings, colors, width - 32) + ps + 16;
+        return _measureBlockHeight(block, settings, colors, width - 32, textScaler) + ps + 16;
       case BlockType.separator:
         return ps * 4;
       case BlockType.image:
         if (!settings.showImages) return 0;
         if (block.imageUrl == null || block.imageUrl!.isEmpty) {
-          return _measureBlockHeight(block, settings, colors, width, fontScale: 0.85) + ps;
+          return _measureBlockHeight(block, settings, colors, width, textScaler, fontScale: 0.85) +
+              ps;
         }
         final imgWidth = (width * settings.imageWidth).clamp(50.0, width);
         final imgHeight = (imgWidth / 1.4).clamp(80.0, width * 0.7) + ps;
@@ -2650,6 +2747,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
                 settings,
                 colors,
                 width - settings.margin,
+                textScaler,
                 fontScale: 0.8,
               ) +
               ps;
@@ -2662,6 +2760,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               settings,
               colors,
               width,
+              textScaler,
               fontScale: noteFs / settings.fontSize,
             ) +
             ps;
@@ -2671,13 +2770,14 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       case BlockType.list:
         var totalHeight = ps + 8.0;
         for (final item in block.listItems ?? <ReaderBlock>[]) {
-          totalHeight += _measureBlockHeight(item, settings, colors, width - 32) + 4;
+          totalHeight += _measureBlockHeight(item, settings, colors, width - 32, textScaler) + 4;
         }
         return totalHeight;
       case BlockType.listItem:
-        return _measureBlockHeight(block, settings, colors, width - settings.margin) + ps * 0.5;
+        return _measureBlockHeight(block, settings, colors, width - settings.margin, textScaler) +
+            ps * 0.5;
       case BlockType.preformatted:
-        return _measureBlockHeight(block, settings, colors, width) + ps;
+        return _measureBlockHeight(block, settings, colors, width, textScaler) + ps;
       case BlockType.paragraph:
         final indent = switch (settings.paragraphIndentMode) {
           ParagraphIndentMode.asInBook when !settings.ignoreBookIndent => (block.textIndent ?? 0.0),
@@ -2694,6 +2794,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
               settings,
               colors,
               width,
+              textScaler,
               firstLineIndent: indent,
             ) +
             bottomPad;
@@ -2707,7 +2808,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     ReaderBlock block,
     ReaderSettings s,
     ReaderColors colors,
-    double maxWidth, {
+    double maxWidth,
+    TextScaler textScaler, {
     double firstLineIndent = 0,
     double? fontScale,
   }) {
@@ -2748,7 +2850,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
       ..text = textSpan
       ..textDirection = dir
       ..locale = locale
-      ..textScaler = MediaQuery.textScalerOf(context);
+      ..textScaler = textScaler;
     // A WidgetSpan gives the first rendered line its indentation, but it
     // cannot be used in a standalone TextPainter. Measuring against the
     // first-line content width is conservative: it may put a page break a
@@ -2992,11 +3094,11 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
             '${safeAvailableHeight.toStringAsFixed(1)}_${pageContentWidth.toStringAsFixed(1)}_'
             '${widget.loadedChapters.length}_$textScaler';
         if (_isRepaginating) {
-          _pages = _paginateContent(safeAvailableHeight, pageContentWidth);
+          _pages = _paginateContent(safeAvailableHeight, pageContentWidth, textScaler);
         } else if (key == _cacheKey && _cachedPages.isNotEmpty) {
           _pages = _cachedPages;
         } else {
-          _pages = _paginateContent(safeAvailableHeight, pageContentWidth);
+          _pages = _paginateContent(safeAvailableHeight, pageContentWidth, textScaler);
           _cacheKey = key;
           _cachedPages = _pages;
         }
@@ -3481,15 +3583,25 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
   }
 
   List<String> _buildWordList() {
-    final words = <String>[];
-    for (var ch = 0; ch < widget.metadata.chapterCount; ch++) {
-      final chapter = widget.loadedChapters[ch];
-      if (chapter == null) continue;
-      for (final block in chapter.blocks) {
-        if (block.text.isNotEmpty) {
-          words.addAll(block.text.split(RegExp(r'\s+')));
+    final loadedKeys = widget.loadedChapters.keys.toSet();
+    final staleKeys = _chapterWordsCache.keys.where((k) => !loadedKeys.contains(k)).toList();
+    for (final key in staleKeys) {
+      _chapterWordsCache.remove(key);
+    }
+    for (final entry in widget.loadedChapters.entries) {
+      if (!_chapterWordsCache.containsKey(entry.key)) {
+        final chapterWords = <String>[];
+        for (final block in entry.value.blocks) {
+          if (block.text.isNotEmpty) {
+            chapterWords.addAll(block.text.split(_wordSplitRegex));
+          }
         }
+        _chapterWordsCache[entry.key] = chapterWords;
       }
+    }
+    final words = <String>[];
+    for (final key in loadedKeys.toList()..sort()) {
+      words.addAll(_chapterWordsCache[key]!);
     }
     return words;
   }

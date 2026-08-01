@@ -22,7 +22,14 @@ import '../data/book_search_service.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/per_book_settings_service.dart';
 import '../domain/reader.dart';
-import 'reader_content.dart' show disposeChapterImagesCache, evictChapterImages;
+import 'reader_content.dart'
+    show
+        disposeChapterImagesCache,
+        disposeChapterWordsCache,
+        disposeRenderItemsCache,
+        evictChapterImages,
+        evictChapterRenderItems,
+        evictChapterWords;
 import 'reader_content_helper.dart';
 import 'reader_corner_tap.dart';
 import 'reader_link_history.dart';
@@ -270,6 +277,8 @@ final class ReaderController {
     _flushPages();
     savePosition();
     disposeChapterImagesCache();
+    disposeChapterWordsCache();
+    disposeRenderItemsCache();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
     _disposed = true;
@@ -648,6 +657,8 @@ final class ReaderController {
     if (updated.length != _state.loadedChapters.length) {
       final evictedKeys = _state.loadedChapters.keys.where((k) => !updated.containsKey(k));
       evictChapterImages(evictedKeys);
+      evictChapterWords(evictedKeys);
+      evictChapterRenderItems(evictedKeys);
       _updateState(_state.copyWith(loadedChapters: updated));
     }
   }
