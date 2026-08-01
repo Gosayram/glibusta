@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -40,6 +41,9 @@ final class ReaderCacheService {
   final FullTextSearchService? _ftsService;
   final AppLogger _logger;
   final Map<String, Map<String, String>> _chapterChecksumsByBook = {};
+  static final LinkedHashMap<String, ReaderChapter> _chapterCache =
+      LinkedHashMap<String, ReaderChapter>();
+  static const int _chapterCacheMaxSize = 10;
 
   static const int _splitCacheVersion = 2;
   // Chapter title normalization changed: invalidate stale metadata/TOC entries
@@ -142,6 +146,13 @@ final class ReaderCacheService {
   }
 
   Future<ReaderChapter?> getChapter(String bookId, int index) async {
+    final cacheKey = '$bookId:$index';
+    final cached = _chapterCache[cacheKey];
+    if (cached != null) {
+      _chapterCache.remove(cacheKey);
+      _chapterCache[cacheKey] = cached;
+      return cached;
+    }
     try {
       final bookDir = await _getExistingBookDir(bookId);
       if (!await bookDir.exists()) return null;
@@ -164,6 +175,10 @@ final class ReaderCacheService {
         );
         return null;
       }
+      _chapterCache[cacheKey] = chapter;
+      if (_chapterCache.length > _chapterCacheMaxSize) {
+        _chapterCache.remove(_chapterCache.keys.first);
+      }
       return chapter;
     } on Object catch (e) {
       _logger.warning(
@@ -179,6 +194,12 @@ final class ReaderCacheService {
     final bookDir = await getBookDir(bookId);
     final chapterFile = _getChapterFile(bookDir, chapter.index);
     await _writeJsonAtomically(chapterFile, chapter.toJson());
+    final cacheKey = '$bookId:${chapter.index}';
+    _chapterCache.remove(cacheKey);
+    _chapterCache[cacheKey] = chapter;
+    if (_chapterCache.length > _chapterCacheMaxSize) {
+      _chapterCache.remove(_chapterCache.keys.first);
+    }
   }
 
   Future<void> putBook(String bookId, NormalizedBook book) async {
@@ -226,6 +247,7 @@ final class ReaderCacheService {
         name: 'ReaderCache',
       );
       _chapterChecksumsByBook.remove(bookId);
+      _chapterCache.removeWhere((key, _) => key.startsWith('$bookId:'));
     } on Object catch (e) {
       _logger.warning(
         'Failed to invalidate reader cache for $bookId: $e',

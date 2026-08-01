@@ -744,9 +744,47 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Widget _buildForState(BuildContext context, ReaderState readerState) {
-    final settings = ref.watch(readerSettingsProvider);
-    final theme = _getThemeData(settings);
-    final themeTransition = settings.eink ? Duration.zero : AppDuration.readerThemeTransition;
+    final settings = ref.read(readerSettingsProvider);
+    final brightness = ref.watch(readerSettingsProvider.select((s) => s.brightness));
+    final warmth = ref.watch(readerSettingsProvider.select((s) => s.warmth));
+    final eink = ref.watch(readerSettingsProvider.select((s) => s.eink));
+    final backgroundStyle = ref.watch(readerSettingsProvider.select((s) => s.backgroundStyle));
+    final uiTheme = ref.watch(readerSettingsProvider.select((s) => s.uiTheme));
+    final themeSetting = ref.watch(readerSettingsProvider.select((s) => s.theme));
+    final mode = ref.watch(readerSettingsProvider.select((s) => s.mode));
+    final fontSize = ref.watch(readerSettingsProvider.select((s) => s.fontSize));
+    final font = ref.watch(readerSettingsProvider.select((s) => s.font));
+    final lineHeight = ref.watch(readerSettingsProvider.select((s) => s.lineHeight));
+    final textAlign = ref.watch(readerSettingsProvider.select((s) => s.textAlign));
+    final hyphenation = ref.watch(readerSettingsProvider.select((s) => s.hyphenation));
+    final readerWidth = ref.watch(readerSettingsProvider.select((s) => s.readerWidth));
+    final twoPageEnabled = ref.watch(readerSettingsProvider.select((s) => s.twoPageEnabled));
+    final showTopInfoBar = ref.watch(readerSettingsProvider.select((s) => s.showTopInfoBar));
+    final showTopToolbar = ref.watch(readerSettingsProvider.select((s) => s.showTopToolbar));
+    final showBottomBar = ref.watch(readerSettingsProvider.select((s) => s.showBottomBar));
+    final effectiveSettings = settings.copyWith(
+      brightness: brightness,
+      warmth: warmth,
+      eink: eink,
+      backgroundStyle: backgroundStyle,
+      uiTheme: uiTheme,
+      theme: themeSetting,
+      mode: mode,
+      fontSize: fontSize,
+      font: font,
+      lineHeight: lineHeight,
+      textAlign: textAlign,
+      hyphenation: hyphenation,
+      readerWidth: readerWidth,
+      twoPageEnabled: twoPageEnabled,
+      showTopInfoBar: showTopInfoBar,
+      showTopToolbar: showTopToolbar,
+      showBottomBar: showBottomBar,
+    );
+    final theme = _getThemeData(effectiveSettings);
+    final themeTransition = effectiveSettings.eink
+        ? Duration.zero
+        : AppDuration.readerThemeTransition;
 
     if (readerState.isLoading) {
       return AnimatedTheme(
@@ -860,11 +898,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           onNextPage: () => _goToNextPage(),
           onPreviousPage: () => _goToPreviousPage(),
           onIncreaseFontSize: () {
-            final newSize = (settings.fontSize + 2.0).clamp(10.0, 40.0);
+            final newSize = (effectiveSettings.fontSize + 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onDecreaseFontSize: () {
-            final newSize = (settings.fontSize - 2.0).clamp(10.0, 40.0);
+            final newSize = (effectiveSettings.fontSize - 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onSearch: () => _ctrl.toggleSearch(),
@@ -889,7 +927,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             if (_ctrl.popLinkPosition()) return;
             Navigator.of(context).pop();
           },
-          child: _buildReaderLayout(context, readerState, settings),
+          child: _buildReaderLayout(context, readerState, effectiveSettings),
         ),
       ),
     );

@@ -187,11 +187,15 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
           ),
         ],
       ),
-      body: _buildBody(colorScheme),
+      body: _buildBody(context, colorScheme),
     );
   }
 
-  Widget _buildBody(ColorScheme colorScheme) {
+  int _cacheDim(BuildContext context, double displaySize) {
+    return (displaySize * MediaQuery.devicePixelRatioOf(context)).round();
+  }
+
+  Widget _buildBody(BuildContext context, ColorScheme colorScheme) {
     if (_error != null) {
       return Center(
         child: Padding(
@@ -228,6 +232,8 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
                   ? Image.memory(
                       _currentImage!,
                       fit: BoxFit.contain,
+                      cacheWidth: _cacheDim(context, MediaQuery.sizeOf(context).width),
+                      cacheHeight: _cacheDim(context, MediaQuery.sizeOf(context).height),
                       errorBuilder: (_, _, _) => const Center(
                         child: Text('Ошибка рендеринга страницы'),
                       ),

@@ -281,6 +281,22 @@ void disposeChapterImagesCache() => _chapterImagesCache.clear();
 @visibleForTesting
 void clearChapterImagesCache() => _chapterImagesCache.clear();
 
+final Map<String, Uint8List> _base64Cache = {};
+
+@visibleForTesting
+void clearBase64Cache() => _base64Cache.clear();
+
+@visibleForTesting
+Uint8List cachedBase64Decode(String dataPart) => _cachedBase64Decode(dataPart);
+
+Uint8List _cachedBase64Decode(String dataPart) {
+  final cached = _base64Cache[dataPart];
+  if (cached != null) return cached;
+  final bytes = base64Decode(dataPart);
+  _base64Cache[dataPart] = bytes;
+  return bytes;
+}
+
 @visibleForTesting
 List<String>? chapterImagesForTest(int chapterIndex) => _chapterImagesCache[chapterIndex];
 
@@ -1037,7 +1053,7 @@ Widget _readerImageWidget(
     if (data.length == 2) {
       Uint8List bytes;
       try {
-        bytes = base64Decode(data.last);
+        bytes = _cachedBase64Decode(data.last);
       } on FormatException {
         return Icon(Icons.broken_image, size: 64, color: errorColor);
       }
@@ -1189,7 +1205,7 @@ Future<(File, bool)?> _shareableImageFile(String imageUrl) async {
   final data = imageUrl.split(',');
   if (data.length != 2) return null;
   try {
-    final bytes = base64Decode(data.last);
+    final bytes = _cachedBase64Decode(data.last);
     final mime = RegExp(r'^data:image/([^;,]+)', caseSensitive: false).firstMatch(data.first);
     final extension = mime?.group(1)?.toLowerCase() ?? 'img';
     final file = File(
@@ -1306,7 +1322,7 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
       if (data.length == 2) {
         try {
           return Image.memory(
-            base64Decode(data.last),
+            _cachedBase64Decode(data.last),
             fit: fit,
             cacheWidth: (600 * MediaQuery.devicePixelRatioOf(context)).round(),
             cacheHeight: (800 * MediaQuery.devicePixelRatioOf(context)).round(),
