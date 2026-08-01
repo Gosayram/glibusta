@@ -2,30 +2,29 @@ ifndef SECRETS_MK
 SECRETS_MK := 1
 
 SOPS ?= sops
-SOPS_VERSION := 3.13.3
-SOPS_LINUX_AMD64_SHA256 := e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
-SOPS_INSTALL_DIR ?= .tools/bin
 ENV_FILE ?= .env
 ENV_ENCRYPTED_FILE ?= .env.enc
 ENV_KEY ?=
 ENV_VALUE_FILE ?=
 
-.PHONY: install-sops env-status env-encrypt env-decrypt env-sync env-set env-unset
-install-sops: ## Install pinned SOPS for Linux CI and verify its SHA-256
-	@test "$$(uname -s)" = Linux || { echo "ERROR: install-sops supports Linux CI only" >&2; exit 1; }
-	@mkdir -p "$(SOPS_INSTALL_DIR)"
-	@tmp_file="$$(mktemp)"; trap 'rm -f "$$tmp_file"' EXIT; \
-		curl -fsSL -o "$$tmp_file" "https://github.com/getsops/sops/releases/download/v$(SOPS_VERSION)/sops-v$(SOPS_VERSION).linux.amd64"; \
-		echo "$(SOPS_LINUX_AMD64_SHA256)  $$tmp_file" | sha256sum --check --status; \
-		install -m 0755 "$$tmp_file" "$(SOPS_INSTALL_DIR)/sops"
+.PHONY: env-status env-encrypt env-decrypt env-sync env-set env-unset
 
 env-status: ## Show whether .env.enc is valid SOPS data
 	@$(SOPS) filestatus --input-type dotenv "$(ENV_ENCRYPTED_FILE)"
 
-env-encrypt: ## Create .env.enc from .env once; use env-set for later changes
+env-encrypt: ## Create a missing/empty .env.enc, or verify and sync its changed keys
 	@test -f "$(ENV_FILE)" || { echo "ERROR: $(ENV_FILE) is required" >&2; exit 1; }
-	@test ! -e "$(ENV_ENCRYPTED_FILE)" || { echo "ERROR: $(ENV_ENCRYPTED_FILE) already exists; use make env-set" >&2; exit 1; }
-	$(SOPS) --encrypt --input-type dotenv --output-type dotenv --filename-override "$(ENV_ENCRYPTED_FILE)" --output "$(ENV_ENCRYPTED_FILE)" "$(ENV_FILE)"
+	@if test -s "$(ENV_ENCRYPTED_FILE)"; then \
+		status="$$( $(SOPS) filestatus --input-type dotenv "$(ENV_ENCRYPTED_FILE)" )" || { echo "ERROR: $(ENV_ENCRYPTED_FILE) is not valid SOPS data" >&2; exit 1; }; \
+		test "$$status" = '{"encrypted":true}' || { echo "ERROR: $(ENV_ENCRYPTED_FILE) is not encrypted SOPS data" >&2; exit 1; }; \
+		echo "Verified $(ENV_ENCRYPTED_FILE); syncing only changed keys"; \
+		$(MAKE) --no-print-directory env-sync; \
+	else \
+		tmp_file="$$(mktemp)"; trap 'rm -f "$$tmp_file"' EXIT; \
+		$(SOPS) --encrypt --input-type dotenv --output-type dotenv --filename-override "$(ENV_ENCRYPTED_FILE)" --output "$$tmp_file" "$(ENV_FILE)"; \
+		mv "$$tmp_file" "$(ENV_ENCRYPTED_FILE)"; \
+		echo "Created encrypted $(ENV_ENCRYPTED_FILE)"; \
+	fi
 
 env-decrypt: ## Explicitly restore .env from .env.enc
 	@umask 077; $(SOPS) --decrypt --input-type dotenv --output-type dotenv --output "$(ENV_FILE)" "$(ENV_ENCRYPTED_FILE)"

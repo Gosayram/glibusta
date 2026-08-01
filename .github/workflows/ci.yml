@@ -33,18 +33,18 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Install pinned SOPS
-        run: |
-          make install-sops
-          echo "$GITHUB_WORKSPACE/.tools/bin" >> "$GITHUB_PATH"
+        uses: mdgreenwald/mozilla-sops-action@55177c1ff20a2b396280e4c5f53c32b69f0c1e40 # v2.1.1
+        with:
+          version: v3.13.3
 
       - name: Decrypt environment
         env:
-          GLIBUSTA_SOPS_KEY: ${{ secrets.GLIBUSTA_SOPS_KEY }}
+          SOPS_MASTER_KEY: ${{ secrets.SOPS_MASTER_KEY }}
         run: |
-          test -n "$GLIBUSTA_SOPS_KEY" || { echo "GLIBUSTA_SOPS_KEY is required" >&2; exit 1; }
+          test -n "$SOPS_MASTER_KEY" || { echo "SOPS_MASTER_KEY is required" >&2; exit 1; }
           key_file="$(mktemp)"
           trap 'rm -f "$key_file"' EXIT
-          printf '%s\n' "$GLIBUSTA_SOPS_KEY" > "$key_file"
+          printf '%s\n' "$SOPS_MASTER_KEY" > "$key_file"
           chmod 600 "$key_file"
           SOPS_AGE_KEY_FILE="$key_file" make env-decrypt
 
