@@ -5,6 +5,7 @@ CODEGEN_CHECK_SCRIPT ?= scripts/codegen_check.sh
 HACK_VENV ?= .venv-hack
 HACK_PYTHON ?= $(HACK_VENV)/bin/python
 HACK_REQUIREMENTS ?= hack/requirements.txt
+SNAPSHOT_BACKEND ?= crawl4ai
 
 include makefiles/common.mk
 include makefiles/bootstrap.mk
@@ -29,6 +30,10 @@ install-hack-tools: require-python ## Install isolated dependencies for public F
 
 flibusta-audit: install-hack-tools ## Audit public Flibusta metadata only when robots.txt allows it
 	@$(HACK_PYTHON) hack/public_surface_audit.py
+
+.PHONY: flibusta-snapshots
+flibusta-snapshots: install-hack-tools ## Collect bare HTML/XML fixtures via crawl4ai (robots-gated). Override backend: make flibusta-snapshots SNAPSHOT_BACKEND=requests
+	@$(HACK_PYTHON) hack/snapshot.py --backend $(SNAPSHOT_BACKEND)
 
 .PHONY: help
 help: ## Show this help
