@@ -46,15 +46,15 @@ class BookDetailsScreen extends ConsumerWidget {
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Bone(width: 120, height: 12),
-                            const SizedBox(height: 8),
-                            const Bone(width: 80, height: 12),
-                            const SizedBox(height: 8),
-                            const Bone(width: 120, height: 12),
-                          ],
-                        ),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Bone(width: 120, height: 12),
+                          const SizedBox(height: 8),
+                          const Bone(width: 80, height: 12),
+                          const SizedBox(height: 8),
+                          const Bone(width: 120, height: 12),
+                        ],
+                      ),
                     ),
                   ],
                 ),

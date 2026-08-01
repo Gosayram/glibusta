@@ -6,8 +6,22 @@ import 'package:file_picker/file_picker.dart';
 /// Fallback: `file_selector` (official Flutter team, security hardening)
 class BookFilePicker {
   static const _bookExtensions = [
-    'epub', 'fb2', 'zip', 'txt', 'rtf', 'pdf', 'mobi', 'azw', 'azw3',
-    'prc', 'djvu', 'djv', 'docx', 'docm', 'cbz', 'cbr',
+    'epub',
+    'fb2',
+    'zip',
+    'txt',
+    'rtf',
+    'pdf',
+    'mobi',
+    'azw',
+    'azw3',
+    'prc',
+    'djvu',
+    'djv',
+    'docx',
+    'docm',
+    'cbz',
+    'cbr',
   ];
 
   /// Pick a single book file.

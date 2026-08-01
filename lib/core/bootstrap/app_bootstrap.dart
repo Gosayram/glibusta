@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../src/rust/api/frb_generated.dart';
 import '../logging/app_logger.dart';
-import '../services/sync_service.dart';
 
 class AppBootstrap {
   AppBootstrap._();
@@ -30,17 +29,6 @@ class AppBootstrap {
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();
-    // STR-4.2: initialize background sync without delaying app startup.
-    unawaited(
-      SyncService.initialize().catchError((Object error, StackTrace stackTrace) {
-        AppLogger().warning(
-          'Background sync initialization failed',
-          name: 'Bootstrap',
-          error: error,
-          st: stackTrace,
-        );
-      }),
-    );
   }
 
   static void _configureErrorHandlers() {

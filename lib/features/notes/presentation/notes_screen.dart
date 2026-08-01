@@ -89,13 +89,13 @@ class NotesScreen extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Bone(width: 120, height: 12),
-                      const SizedBox(height: 8),
-                      const Bone(width: 160, height: 12),
-                    ],
-                  ),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Bone(width: 120, height: 12),
+                    const SizedBox(height: 8),
+                    const Bone(width: 160, height: 12),
+                  ],
+                ),
               ),
             ),
           ),
