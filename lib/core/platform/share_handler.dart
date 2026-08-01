@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -22,6 +23,9 @@ class ShareHandler {
   final _logger = AppLogger();
 
   void init(BuildContext context, SharedBookImporter importFile) {
+    // ponytail: receive_sharing_intent has no macOS impl — receiving shared
+    // files is an Android/iOS-only feature.
+    if (Platform.isMacOS) return;
     _logger.info('ShareHandler initialized', name: 'Share');
     final generation = ++_subscriptionGeneration;
     final previousSubscription = _subscription;

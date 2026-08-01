@@ -6,6 +6,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/http/http_client.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
@@ -75,6 +76,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       try {
         bookResult = await _source.searchBooks(searchQuery, cancelToken: bookToken);
       } on Object catch (e) {
+        if (isCancellation(e)) return;
         bookError = e;
         _logger.warning('Book search failed: $e', name: 'Search', error: e);
         bookResult = SearchResultPage(
@@ -91,6 +93,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       try {
         authorResult = await _source.searchAuthors(searchQuery, cancelToken: localAuthorToken);
       } on Object catch (e) {
+        if (isCancellation(e)) return;
         _logger.warning('Author search failed: $e', name: 'Search', error: e);
         authorResult = const SearchAuthorsResultPage(authors: []);
       }
@@ -133,6 +136,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         }
       }
     } on Object catch (e, st) {
+      if (isCancellation(e)) return;
       if (!_isCurrentRequest(generation)) return;
       _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -169,6 +173,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: null,
       );
     } on Object catch (e, st) {
+      if (isCancellation(e)) return;
       if (!_isCurrentRequest(generation)) return;
       _logger.severe('Load more failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());

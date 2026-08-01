@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:powersync/powersync.dart';
 import 'package:workmanager/workmanager.dart';
@@ -34,6 +35,9 @@ class SyncService {
 
   static Future<void> initialize() async {
     if (_initialized) return;
+    // ponytail: workmanager_apple is iOS-only — no macOS impl, would throw
+    // MissingPluginException. Background sync is a mobile-only feature.
+    if (Platform.isMacOS) return;
 
     await Workmanager().initialize(
       callbackDispatcher,

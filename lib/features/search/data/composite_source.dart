@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/errors/failures.dart';
+import '../../../core/http/http_client.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
@@ -60,6 +61,7 @@ class CompositeBookSource extends BookSource {
         );
         errors.add(e);
       } on Object catch (e, st) {
+        if (isCancellation(e)) rethrow;
         _logger?.severe(
           'SearchBooks unexpected error (${source.runtimeType}): $e',
           name: 'CompositeSource',
@@ -109,6 +111,7 @@ class CompositeBookSource extends BookSource {
         );
         errors.add(e);
       } on Object catch (e, st) {
+        if (isCancellation(e)) rethrow;
         _logger?.warning(
           'SearchAuthors unexpected error (${source.runtimeType}): $e',
           name: 'CompositeSource',
@@ -135,6 +138,7 @@ class CompositeBookSource extends BookSource {
         );
         errors.add(e);
       } on Object catch (e, st) {
+        if (isCancellation(e)) rethrow;
         _logger?.severe(
           'GetBookDetails unexpected error ($bookId): $e',
           name: 'CompositeSource',
@@ -164,6 +168,7 @@ class CompositeBookSource extends BookSource {
         );
         errors.add(e);
       } on Object catch (e, st) {
+        if (isCancellation(e)) rethrow;
         _logger?.warning(
           'GetAvailableFormats unexpected error ($bookId): $e',
           name: 'CompositeSource',
@@ -191,6 +196,7 @@ class CompositeBookSource extends BookSource {
         );
         errors.add(e);
       } on Object catch (e, st) {
+        if (isCancellation(e)) rethrow;
         _logger?.severe(
           'GetDownloadUrl unexpected error ($bookId, ${format.name}): $e',
           name: 'CompositeSource',
