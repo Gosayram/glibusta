@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
+import 'package:path/path.dart' as p;
 
 import '../data/parsers/smil_parser.dart';
 import 'epub_archive.dart';
@@ -28,7 +29,17 @@ final class CustomEpubParser {
     );
     final coverResource = _findCoverResource(opf);
 
-    final toc = await _parseToc(epub, opf, resolver);
+    final tocResult = await _parseToc(epub, opf, resolver);
+    final toc = tocResult?.items;
+    // Map each spine file to its TOC title so chapter names always match the
+    // table of contents (содержание), not the first rendered heading.
+    final tocTitleByPath = <String, String>{};
+    if (tocResult != null) {
+      final baseDir = tocResult.basePath.contains('/')
+          ? tocResult.basePath.substring(0, tocResult.basePath.lastIndexOf('/'))
+          : '';
+      _collectTocTitles(tocResult.items, baseDir, tocTitleByPath);
+    }
 
     final chapters = <EpubChapter>[];
     String? textDirection;
@@ -54,7 +65,9 @@ final class CustomEpubParser {
       if (result.blocks.isEmpty) continue;
 
       textDirection ??= result.textDirection;
-      final title = _extractTitle(result.blocks);
+      final tocTitle = tocTitleByPath[resource.fullPath];
+      final title =
+          tocTitle != null && tocTitle.isNotEmpty ? tocTitle : _extractTitle(result.blocks);
 
       // LW-6.1: Parse SMIL media overlay if present
       final List<SmilEntry>? smilEntries;
@@ -142,7 +155,7 @@ final class CustomEpubParser {
     }
   }
 
-  Future<List<TocItem>?> _parseToc(
+  Future<({List<TocItem> items, String basePath})?> _parseToc(
     EpubArchive epub,
     EpubOpfData opf,
     EpubResourceResolver resolver,
@@ -152,7 +165,7 @@ final class CustomEpubParser {
       try {
         final navText = epub.readText(navResource.fullPath);
         final toc = parseNavToc(navText);
-        if (toc.isNotEmpty) return toc;
+        if (toc.isNotEmpty) return (items: toc, basePath: navResource.fullPath);
       } on Object catch (_) {}
     }
     final ncxResource = opf.resources.values.firstWhereOrNull(
@@ -161,10 +174,28 @@ final class CustomEpubParser {
     if (ncxResource != null) {
       try {
         final ncxText = epub.readText(ncxResource.fullPath);
-        return parseNcx(ncxText);
+        final toc = parseNcx(ncxText);
+        if (toc.isNotEmpty) return (items: toc, basePath: ncxResource.fullPath);
       } on Object catch (_) {}
     }
     return null;
+  }
+
+  /// Flattens the (possibly nested) TOC into a map of resolved archive path →
+  /// title. The first TOC entry referencing a file wins, matching the usual
+  /// convention that the chapter label precedes sub-section labels.
+  void _collectTocTitles(List<TocItem> items, String baseDir, Map<String, String> out) {
+    for (final item in items) {
+      final hrefPath = Uri.decodeFull(item.href.split('#').first);
+      if (hrefPath.isNotEmpty && !hrefPath.contains('://')) {
+        final resolved = p.posix.normalize(p.posix.join(baseDir, hrefPath));
+        final title = item.title.trim();
+        if (title.isNotEmpty) out.putIfAbsent(resolved, () => title);
+      }
+      if (item.children.isNotEmpty) {
+        _collectTocTitles(item.children, baseDir, out);
+      }
+    }
   }
 
   String _extractTitle(List<ReaderBlock> blocks) {
