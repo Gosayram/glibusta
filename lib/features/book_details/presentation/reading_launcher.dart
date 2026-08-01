@@ -46,7 +46,12 @@ Future<void> startReading(
     AppLogger().warning('Online read failed: ${e.message}', name: 'ReadingLauncher');
     if (context.mounted) unawaited(_toast(context, e.message));
   } on Object catch (e, st) {
-    AppLogger().severe('Online read failed for ${book.id}', name: 'ReadingLauncher', error: e, st: st);
+    AppLogger().severe(
+      'Online read failed for ${book.id}',
+      name: 'ReadingLauncher',
+      error: e,
+      st: st,
+    );
     if (context.mounted) unawaited(_toast(context, 'Не удалось открыть книгу'));
   } finally {
     if (context.mounted) Navigator.of(context, rootNavigator: true).pop();

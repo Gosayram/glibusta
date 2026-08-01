@@ -66,8 +66,9 @@ final class CustomEpubParser {
 
       textDirection ??= result.textDirection;
       final tocTitle = tocTitleByPath[resource.fullPath];
-      final title =
-          tocTitle != null && tocTitle.isNotEmpty ? tocTitle : _extractTitle(result.blocks);
+      final title = tocTitle != null && tocTitle.isNotEmpty
+          ? tocTitle
+          : _extractTitle(result.blocks);
 
       // LW-6.1: Parse SMIL media overlay if present
       final List<SmilEntry>? smilEntries;

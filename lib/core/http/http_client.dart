@@ -299,5 +299,4 @@ class HttpException implements Exception {
 
 /// Whether [error] is a cancelled-request [HttpException] (debounce/dispose),
 /// not a real failure — should be silenced, not logged as an error.
-bool isCancellation(Object error) =>
-    error is HttpException && error.message == 'Cancelled';
+bool isCancellation(Object error) => error is HttpException && error.message == 'Cancelled';

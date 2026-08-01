@@ -36,9 +36,7 @@ class FixtureRecorderInterceptor extends Interceptor {
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
     final status = response.statusCode ?? 0;
     final contentType = (response.headers.value('content-type') ?? '').toLowerCase();
-    if (status >= 200 &&
-        status < 300 &&
-        _textContentTypes.any(contentType.contains)) {
+    if (status >= 200 && status < 300 && _textContentTypes.any(contentType.contains)) {
       final bytes = _toBytes(response.data);
       if (bytes != null && bytes.isNotEmpty) {
         unawaited(_record(response, bytes, contentType));
@@ -98,24 +96,22 @@ class FixtureRecorderInterceptor extends Interceptor {
   static String _categoryFor(String path) {
     final first = path.replaceAll(RegExp(r'^/+|/+$'), '').split('/').firstOrNull ?? '';
     return const {
-      'b': 'book',
-      'a': 'author',
-      'g': 'genre',
-      's': 'series',
-      'sequence': 'series',
-      'booksearch': 'search',
-      'opds': 'opds',
-      'new': 'recent',
-      'stat': 'stat',
-    }[first] ??
+          'b': 'book',
+          'a': 'author',
+          'g': 'genre',
+          's': 'series',
+          'sequence': 'series',
+          'booksearch': 'search',
+          'opds': 'opds',
+          'new': 'recent',
+          'stat': 'stat',
+        }[first] ??
         'misc';
   }
 
   static String _nameFor(Uri uri) {
     final path = uri.path.replaceAll(RegExp(r'^/+|/+$'), '');
-    final base = path.isEmpty
-        ? 'root'
-        : path.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+    final base = path.isEmpty ? 'root' : path.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
     final capped = base.length > 56 ? '${base.substring(0, 48)}_${base.length}' : base;
     if (uri.query.isEmpty) return capped;
     final q = sha1.convert(utf8.encode(uri.query)).toString().substring(0, 8);
