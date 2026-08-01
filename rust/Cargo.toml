@@ -64,7 +64,6 @@ regex = { version = "1", default-features = false, features = ["std", "perf", "u
 # zune-image = "0.5"  # TODO: replace image when stable
 
 # ─── SVG ───────────────────────────────────────────────────────────────
-resvg = { version = "0.44", optional = true }
 scraper = "0.27"
 
 # ─── Сериализация ──────────────────────────────────────────────────────
