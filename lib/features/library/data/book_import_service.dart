@@ -44,20 +44,19 @@ class BookImportService {
     this._coverService, {
     List<BookParser>? parsers,
   }) : _overrides = parsers != null
-            ? {
-                for (final p in parsers)
-                  for (final f in BookFormat.values)
-                    if (p.supports(f)) f: p,
-              }
-            : null;
+           ? {
+               for (final p in parsers)
+                 for (final f in BookFormat.values)
+                   if (p.supports(f)) f: p,
+             }
+           : null;
   final Map<BookFormat, BookParser>? _overrides;
   final Map<String, Future<ImportResult>> _importLocks = {};
 
   BookParser? _parserForExtension(String ext) =>
       _overrides?[formatForExtension(ext)] ?? lookupParserForExtension(ext);
 
-  BookParser _parserFor(BookFormat fmt) =>
-      _overrides?[fmt] ?? lookupParserFor(fmt);
+  BookParser _parserFor(BookFormat fmt) => _overrides?[fmt] ?? lookupParserFor(fmt);
   final Map<String, Future<ImportResult>> _contentImportLocks = {};
 
   static String generateAuthorId(String name) {
@@ -323,8 +322,7 @@ class BookImportService {
 
   Future<ImportResult?> _parseMetadata(_ImportCtx ctx) async {
     final parser =
-        _parserForExtension(ctx.ext) ??
-        (ctx.ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
+        _parserForExtension(ctx.ext) ?? (ctx.ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
     if (parser == null) {
       return ImportResult.failure(_unsupportedReaderMessage(ctx.ext));
     }
@@ -609,9 +607,7 @@ class BookImportService {
         return ImportResult.success(title);
       }
 
-      final parser =
-          _parserForExtension(ext) ??
-          (ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
+      final parser = _parserForExtension(ext) ?? (ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
       if (parser == null) {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }

@@ -9,12 +9,10 @@ final Map<BookFormat, BookParser> parserForFormatMap = {
       if (p.supports(f)) f: p,
 };
 
-BookParser? lookupParserForFormat(BookFormat format) =>
-    parserForFormatMap[format];
+BookParser? lookupParserForFormat(BookFormat format) => parserForFormatMap[format];
 
 BookParser lookupParserFor(BookFormat format) =>
-    parserForFormatMap[format] ??
-    (throw UnsupportedError('No parser for format: ${format.name}'));
+    parserForFormatMap[format] ?? (throw UnsupportedError('No parser for format: ${format.name}'));
 
 BookParser? lookupParserForExtension(String ext) {
   final format = formatForExtension(ext);

@@ -198,6 +198,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let opf_dir = opf_path.rsplit('/').nth(1).unwrap_or("");
 
     let (metadata, manifest_items, spine_ids, ncx_id) = parse_opf(&opf_text)?;
+    let guide_references = parse_opf_guide(&opf_text);
 
     let title = metadata.get("title").cloned().unwrap_or_default();
     let authors_raw = metadata.get("creator").cloned().unwrap_or_default();
@@ -209,7 +210,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let description = metadata.get("description").cloned();
     let language = metadata.get("language").cloned();
 
-    let (cover_url, cover_href) = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir)?
+    let (cover_url, cover_href) = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, &spine_ids, &guide_references)?
         .map_or((None, None), |cover| (Some(cover.url), Some(cover.href)));
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
@@ -860,6 +861,48 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
     Ok((metadata, manifest_items, spine_ids, ncx_id))
 }
 
+/// Parse `<guide>` section from OPF to extract reference entries.
+fn parse_opf_guide(text: &str) -> Vec<(String, String)> {
+    let mut reader = Reader::from_str(text);
+    let mut references = Vec::new();
+    let mut in_guide = false;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(Event::Start(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "guide" {
+                    in_guide = true;
+                } else if in_guide && tag == "reference" {
+                    if let (Some(t), Some(h)) =
+                        (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
+                    {
+                        references.push((t, h));
+                    }
+                }
+            }
+            Ok(Event::Empty(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if in_guide && tag == "reference" {
+                    if let (Some(t), Some(h)) =
+                        (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
+                    {
+                        references.push((t, h));
+                    }
+                }
+            }
+            Ok(Event::End(ref e)) => {
+                let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
+                if tag == "guide" {
+                    in_guide = false;
+                }
+            }
+            _ => {}
+        }
+    }
+    references
+}
+
 #[derive(Debug, Default)]
 struct ParsedTocEntry {
     title: String,
@@ -1032,50 +1075,167 @@ struct ExtractedCover {
     href: String,
 }
 
+/// Find the first image reference in an XHTML document and resolve it
+/// against the XHTML file's archive path.
+fn extract_image_from_xhtml(xhtml_content: &str, xhtml_href: &str) -> Option<String> {
+    let mut reader = Reader::from_str(xhtml_content);
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Empty(ref e)) | Ok(Event::Start(ref e)) => {
+                let name = e.local_name();
+                let src = if name.as_ref() == b"img" {
+                    get_xml_attr(e, b"src")
+                } else if name.as_ref() == b"image" {
+                    get_normalized_xml_attr(e, b"xlink:href")
+                        .or_else(|| get_normalized_xml_attr(e, b"href"))
+                } else {
+                    None
+                };
+                if let Some(src) = src {
+                    return resolve_epub_href(xhtml_href, &src);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+        buffer.clear();
+    }
+    None
+}
+
+fn is_xhtml_media_type(media_type: &str) -> bool {
+    media_type == "application/xhtml+xml"
+}
+
+fn is_xhtml_item(item: &ManifestItem) -> bool {
+    is_xhtml_media_type(&item.media_type)
+        || item.href.ends_with(".xhtml")
+        || item.href.ends_with(".html")
+}
+
+fn guess_image_mime(href: &str) -> &str {
+    if href.ends_with(".png") {
+        "image/png"
+    } else if href.ends_with(".gif") {
+        "image/gif"
+    } else if href.ends_with(".svg") {
+        "image/svg+xml"
+    } else {
+        "image/jpeg"
+    }
+}
+
+fn join_opf_dir(opf_dir: &str, href: &str) -> String {
+    if opf_dir.is_empty() {
+        href.to_string()
+    } else {
+        format!("{}/{}", opf_dir, href)
+    }
+}
+
+fn find_manifest_item_by_href<'a>(
+    manifest: &'a HashMap<String, ManifestItem>,
+    href: &str,
+) -> Option<&'a ManifestItem> {
+    manifest.values().find(|item| item.href == href)
+}
+
+fn resolve_cover_from_item(
+    zip: &mut ZipFile<'_>,
+    item: &ManifestItem,
+    full_href: &str,
+) -> Result<Option<ExtractedCover>> {
+    if is_xhtml_item(item) {
+        let bytes = zip.read_file_limited(full_href, crate::api::models::MAX_CHAPTER_SIZE)?;
+        if let Some(xhtml_bytes) = bytes {
+            let text = decode_epub_xml(&xhtml_bytes, None);
+            if let Some(img_href) = extract_image_from_xhtml(&text, full_href) {
+                let img_mime = guess_image_mime(&img_href);
+                if let Some(url) = read_cover_image(zip, &img_href, img_mime)? {
+                    return Ok(Some(ExtractedCover {
+                        url,
+                        href: img_href,
+                    }));
+                }
+            }
+        }
+    } else {
+        if let Some(url) = read_cover_image(zip, full_href, &item.media_type)? {
+            return Ok(Some(ExtractedCover {
+                url,
+                href: full_href.to_string(),
+            }));
+        }
+    }
+    Ok(None)
+}
+
 fn extract_cover_url(
     zip: &mut ZipFile<'_>,
     manifest: &HashMap<String, ManifestItem>,
     metadata: &HashMap<String, String>,
     opf_dir: &str,
+    spine_ids: &[String],
+    guide: &[(String, String)],
 ) -> Result<Option<ExtractedCover>> {
-    // Try cover-id from <meta name="cover" content="..."/>
+    // Strategy 1: meta[name="cover"] — enhanced with XHTML wrapper handling
     if let Some(cover_id) = metadata.get("cover-id") {
         if let Some(item) = manifest.get(cover_id.as_str()) {
-            let href = if opf_dir.is_empty() {
-                item.href.clone()
-            } else {
-                format!("{}/{}", opf_dir, item.href)
-            };
-            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(ExtractedCover { url, href }));
+            let href = join_opf_dir(opf_dir, &item.href);
+            if let Some(cover) = resolve_cover_from_item(zip, item, &href)? {
+                return Ok(Some(cover));
             }
         }
     }
 
-    // Fallback: look for manifest item with properties="cover-image"
+    // Strategy 2: properties="cover-image"
     for item in manifest.values() {
         if item.properties.iter().any(|p| p == "cover-image") {
-            let href = if opf_dir.is_empty() {
-                item.href.clone()
-            } else {
-                format!("{}/{}", opf_dir, item.href)
-            };
-            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(ExtractedCover { url, href }));
+            let href = join_opf_dir(opf_dir, &item.href);
+            if let Some(cover) = resolve_cover_from_item(zip, item, &href)? {
+                return Ok(Some(cover));
             }
         }
     }
 
-    // Fallback: look for item whose id contains "cover"
+    // Strategy 3: guide reference type="cover" or type="title-page"
+    // ponytail: from freeLib — guide fallback for cover detection
+    for (ref_type, ref_href) in guide {
+        if ref_type == "cover" || ref_type == "title-page" {
+            if let Some(item) = find_manifest_item_by_href(manifest, ref_href) {
+                let href = join_opf_dir(opf_dir, &item.href);
+                if let Some(cover) = resolve_cover_from_item(zip, item, &href)? {
+                    return Ok(Some(cover));
+                }
+            }
+        }
+    }
+
+    // Strategy 4: first spine itemref
+    // ponytail: from freeLib — first spine item as cover fallback
+    if let Some(first_id) = spine_ids.first() {
+        if let Some(item) = manifest.get(first_id.as_str()) {
+            let href = join_opf_dir(opf_dir, &item.href);
+            if let Some(cover) = resolve_cover_from_item(zip, item, &href)? {
+                return Ok(Some(cover));
+            }
+        }
+    }
+
+    // Strategy 5: heuristic id matching — expanded patterns with XHTML support
     for (id, item) in manifest.iter() {
-        if id.contains("cover") && item.media_type.starts_with("image/") {
-            let href = if opf_dir.is_empty() {
-                item.href.clone()
-            } else {
-                format!("{}/{}", opf_dir, item.href)
-            };
-            if let Some(url) = read_cover_image(zip, &href, &item.media_type)? {
-                return Ok(Some(ExtractedCover { url, href }));
+        let id_lower = id.to_ascii_lowercase();
+        if (id_lower.contains("cover")
+            || id_lower.contains("titlepage")
+            || id_lower.contains("frontcover")
+            || id_lower.contains("cover-image"))
+            && (item.media_type.starts_with("image/") || is_xhtml_media_type(&item.media_type))
+        {
+            let href = join_opf_dir(opf_dir, &item.href);
+            if let Some(cover) = resolve_cover_from_item(zip, item, &href)? {
+                return Ok(Some(cover));
             }
         }
     }
@@ -3402,5 +3562,59 @@ mod tests {
         let (blocks, _, _) = parse_xhtml_to_blocks(html, 0, &std::collections::HashMap::new());
         assert_eq!(blocks.len(), 1);
         assert!(!blocks[0].has_drop_cap);
+    }
+
+    #[test]
+    fn extract_image_from_xhtml_finds_html_img() {
+        let xhtml =
+            r#"<html><body><img src="../images/cover.jpg" alt="Cover"/></body></html>"#;
+        let result = super::extract_image_from_xhtml(xhtml, "OEBPS/Text/cover.xhtml");
+        assert_eq!(result.as_deref(), Some("OEBPS/images/cover.jpg"));
+    }
+
+    #[test]
+    fn extract_image_from_xhtml_finds_svg_image_href() {
+        let xhtml = r#"<html><body><svg><image href="cover.png"/></svg></body></html>"#;
+        let result = super::extract_image_from_xhtml(xhtml, "OEBPS/Text/cover.xhtml");
+        assert_eq!(result.as_deref(), Some("OEBPS/Text/cover.png"));
+    }
+
+    #[test]
+    fn extract_image_from_xhtml_finds_svg_image_xlink_href() {
+        let xhtml = r#"<html><body><svg><image xlink:href="img/cover.jpg"/></svg></body></html>"#;
+        let result = super::extract_image_from_xhtml(xhtml, "OEBPS/Text/cover.xhtml");
+        assert_eq!(result.as_deref(), Some("OEBPS/Text/img/cover.jpg"));
+    }
+
+    #[test]
+    fn extract_image_from_xhtml_returns_none_when_no_image() {
+        let xhtml = r#"<html><body><p>No image here</p></body></html>"#;
+        let result = super::extract_image_from_xhtml(xhtml, "OEBPS/Text/cover.xhtml");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn parse_opf_guide_extracts_references() {
+        let opf = r#"<?xml version="1.0"?>
+        <package xmlns="http://www.idpf.org/2007/opf">
+            <guide>
+                <reference type="cover" title="Cover" href="cover.xhtml"/>
+                <reference type="toc" title="TOC" href="toc.xhtml"/>
+            </guide>
+        </package>"#;
+        let refs = super::parse_opf_guide(opf);
+        assert_eq!(refs.len(), 2);
+        assert_eq!(refs[0], ("cover".to_string(), "cover.xhtml".to_string()));
+        assert_eq!(refs[1], ("toc".to_string(), "toc.xhtml".to_string()));
+    }
+
+    #[test]
+    fn parse_opf_guide_handles_empty_guide() {
+        let opf = r#"<?xml version="1.0"?>
+        <package xmlns="http://www.idpf.org/2007/opf">
+            <guide/>
+        </package>"#;
+        let refs = super::parse_opf_guide(opf);
+        assert!(refs.is_empty());
     }
 }

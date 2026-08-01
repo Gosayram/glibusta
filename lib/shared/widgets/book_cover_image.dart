@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../models/book.dart';
 
-
 const _palette = [
   Color(0xFF5C6BC0), // indigo
   Color(0xFF26A69A), // teal
