@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
+import '../../../core/config/app_info.dart';
 import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
@@ -222,6 +223,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _SectionHeader(title: l10n.settingsAbout),
           const _VersionTile(),
           _SettingsTile(
+            icon: Icons.info_outline,
+            title: kAppName,
+            subtitle: appLegalese,
+            onTap: () => unawaited(_showAbout(context)),
+          ),
+          _SettingsTile(
             icon: Icons.keyboard,
             title: l10n.settingsShortcuts,
             subtitle: l10n.settingsShortcutsSub,
@@ -267,6 +274,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showAbout(BuildContext context) async {
+    final info = await PackageInfo.fromPlatform();
+    if (!context.mounted) return;
+    showAboutDialog(
+      context: context,
+      applicationName: kAppName,
+      applicationVersion: '${info.version}+${info.buildNumber}',
+      applicationLegalese: appLegalese,
     );
   }
 
