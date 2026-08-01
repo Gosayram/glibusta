@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../data/reading_info_formatter.dart';
 import '../data/reading_info_model.dart';
 import 'reading_info_provider.dart';
@@ -15,7 +16,7 @@ class ReadingInfoSettingsScreen extends ConsumerWidget {
     final config = ref.watch<ReadingInfoModel>(readingInfoProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Reading Info Bar'),
         actions: [
           IconButton(

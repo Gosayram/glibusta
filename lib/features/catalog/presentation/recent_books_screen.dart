@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_models.dart';
@@ -17,7 +18,7 @@ class RecentBooksScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final asyncBooks = ref.watch(recentBooksProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.recentlyAdded)),
+      appBar: AdaptiveAppBar(title: Text(l10n.recentlyAdded)),
       body: asyncBooks.when(
         data: (RecentBooksResponse response) {
           if (response.books.isEmpty) {

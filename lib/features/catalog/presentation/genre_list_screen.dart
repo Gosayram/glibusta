@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../search/data/flibusta_models.dart';
 
@@ -39,7 +40,7 @@ class _GenreListScreenState extends ConsumerState<GenreListScreen> {
         : 4;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: Text(l10n.genresTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),

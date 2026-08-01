@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/book_card.dart';
 import 'user_collections_provider.dart';
 
@@ -21,7 +22,7 @@ class CollectionDetailScreen extends ConsumerWidget {
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(body: Center(child: Text('Ошибка: $error'))),
       data: (value) => Scaffold(
-        appBar: AppBar(title: Text(value?.name ?? 'Коллекция')),
+        appBar: AdaptiveAppBar(title: Text(value?.name ?? 'Коллекция')),
         body: value == null
             ? const Center(child: Text('Коллекция не найдена'))
             : _CollectionBooks(collectionId: collectionId),

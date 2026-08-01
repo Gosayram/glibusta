@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/services/stats_export_service.dart';
 import '../../../core/telemetry/reader_telemetry.dart' as telemetry;
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../home/presentation/reading_heatmap.dart';
 import '../../home/presentation/reading_stats_provider.dart';
 import '../../reading_goals/data/weekly_reading_goal_progress.dart';
@@ -47,7 +48,7 @@ class ReadingStatsScreen extends ConsumerWidget {
     final favGenresAsync = ref.watch(rsp.favoriteGenresProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Статистика чтения'),
         actions: [
           PopupMenuButton<String>(

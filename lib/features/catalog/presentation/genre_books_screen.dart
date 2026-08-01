@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_models.dart';
@@ -20,7 +21,7 @@ class GenreBooksScreen extends ConsumerWidget {
     final asyncBooks = ref.watch(genreBooksProvider(genreId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(asyncBooks.value?.name ?? l10n.genreTitle)),
+      appBar: AdaptiveAppBar(title: Text(asyncBooks.value?.name ?? l10n.genreTitle)),
       body: asyncBooks.when(
         data: (GenreBooksResponse response) {
           if (response.books.isEmpty) {

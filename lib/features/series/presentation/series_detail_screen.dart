@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 
 import '../../../shared/widgets/book_card.dart';
@@ -20,11 +21,11 @@ class SeriesDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: detailAsync.when(
-        data: (SeriesDetail? detail) => AppBar(
+        data: (SeriesDetail? detail) => AdaptiveAppBar(
           title: Text(detail?.name ?? 'Серия'),
         ),
-        loading: () => AppBar(title: const Text('Серия')),
-        error: (_, _) => AppBar(title: const Text('Серия')),
+        loading: () => AdaptiveAppBar(title: const Text('Серия')),
+        error: (_, _) => AdaptiveAppBar(title: const Text('Серия')),
       ),
       body: detailAsync.when(
         data: (SeriesDetail? detail) {

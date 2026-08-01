@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_settings.dart';
+import '../../../core/platform/app_platform.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_models.dart';
@@ -29,6 +31,8 @@ class AuthorDetailScreen extends ConsumerWidget {
                 SliverAppBar(
                   title: Text(detail.name.isNotEmpty ? detail.name : l10n.authorFallback),
                   pinned: true,
+                  leading: hasNativeMenuBar ? const AdaptiveBackButton() : null,
+                  leadingWidth: hasNativeMenuBar ? kToolbarHeight + kMacTrafficLightsInset : null,
                 ),
                 const SliverFillRemaining(
                   child: Center(
@@ -108,6 +112,8 @@ class _AuthorDetailContentState extends State<_AuthorDetailContent> {
         SliverAppBar(
           title: Text(detail.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           pinned: true,
+          leading: hasNativeMenuBar ? const AdaptiveBackButton() : null,
+          leadingWidth: hasNativeMenuBar ? kToolbarHeight + kMacTrafficLightsInset : null,
         ),
 
         SliverToBoxAdapter(

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/quote_repository.dart';
@@ -23,7 +24,7 @@ class QuotesScreen extends ConsumerWidget {
     final quotesAsync = ref.watch(quotesStreamProvider(bookId));
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Цитаты'),
       ),
       body: quotesAsync.when(

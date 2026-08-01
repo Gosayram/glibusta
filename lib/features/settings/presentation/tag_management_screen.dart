@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/services/tag_service.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 
 class TagManagementScreen extends ConsumerStatefulWidget {
   const TagManagementScreen({super.key});
@@ -19,7 +20,7 @@ class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
     final tagsAsync = ref.watch(allTagsProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Теги'),
         actions: [
           IconButton(

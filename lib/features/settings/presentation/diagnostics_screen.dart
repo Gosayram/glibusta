@@ -19,6 +19,7 @@ import '../../../core/connectivity/offline_mode.dart' show currentNetworkProvide
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/format_utils.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
@@ -45,7 +46,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Диагностика')),
+      appBar: AdaptiveAppBar(title: const Text('Диагностика')),
       body: FutureBuilder<DiagnosticsInfo>(
         future: _infoFuture,
         builder: (context, snapshot) {

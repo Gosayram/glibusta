@@ -10,6 +10,7 @@ import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../data/book_comments_service.dart';
 import 'book_details_providers.dart';
 import 'widgets/book_header.dart';
@@ -27,7 +28,7 @@ class BookDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(bookDetailsProvider(bookId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('О книге')),
+      appBar: AdaptiveAppBar(title: const Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => BookDetailsContent(details: details, bookId: bookId),
         loading: () => Skeletonizer(
@@ -733,7 +734,7 @@ class _LoginPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Вход')),
+      appBar: AdaptiveAppBar(title: const Text('Вход')),
       body: const Center(
         child: Text('Откройте Настройки → Вход для авторизации'),
       ),

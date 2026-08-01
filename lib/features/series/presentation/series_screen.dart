@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 
 import 'series_provider.dart';
@@ -16,7 +17,7 @@ class SeriesScreen extends ConsumerWidget {
     final seriesAsync = ref.watch(allSeriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Серии')),
+      appBar: AdaptiveAppBar(title: const Text('Серии')),
       body: seriesAsync.when(
         data: (List<SeriesInfo> seriesList) {
           if (seriesList.isEmpty) {

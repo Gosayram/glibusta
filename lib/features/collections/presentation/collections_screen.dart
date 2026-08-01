@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/book_card.dart';
 import 'smart_collections_provider.dart';
 import 'user_collections_provider.dart';
@@ -27,7 +28,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final userAsync = ref.watch(userCollectionsProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Коллекции'),
       ),
       floatingActionButton: FloatingActionButton(

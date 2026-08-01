@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/formats/format_capability.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../library/domain/book_file_repository.dart';
 import '../data/online_read_service.dart';
 import '../data/parsers/format_detector.dart';
@@ -85,7 +86,7 @@ class _ReaderOpenError extends StatelessWidget {
   Widget build(BuildContext context) {
     AppLogger().warning('Reader open error: $message', name: 'Reader');
     return Scaffold(
-      appBar: AppBar(title: const Text('Открытие книги')),
+      appBar: AdaptiveAppBar(title: const Text('Открытие книги')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

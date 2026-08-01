@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../src/rust/api/api/api.dart' as rust_api;
 import 'djvu_zoom.dart';
 
@@ -167,7 +168,7 @@ class _DjvuReaderScreenState extends State<DjvuReaderScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: Text(_totalPages > 0 ? 'Стр. $_currentPage / $_totalPages' : 'DjVu'),
         actions: [
           IconButton(

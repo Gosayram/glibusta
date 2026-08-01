@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../reader/domain/reader.dart';
 import '../data/annotation_export.dart';
@@ -131,14 +132,14 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
   Widget build(BuildContext context) {
     if (_initialLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Аннотации')),
+        appBar: AdaptiveAppBar(title: const Text('Аннотации')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_initialError != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Аннотации')),
+        appBar: AdaptiveAppBar(title: const Text('Аннотации')),
         body: ErrorStateWidget(
           message: 'Не удалось загрузить аннотации',
           details: _initialError.toString(),
@@ -158,7 +159,7 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     }
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: _isSearching
             ? TextField(
                 controller: _searchController,

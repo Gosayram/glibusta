@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -64,7 +65,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authAsync = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Вход'),
       ),
       body: Center(

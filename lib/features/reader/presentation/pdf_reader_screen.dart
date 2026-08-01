@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
+
 /// Returns whether [link] can be resolved within the opened document.
 ///
 /// PDF URI actions are deliberately not forwarded to a platform launcher: a
@@ -120,7 +122,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final file = File(widget.filePath);
     if (!file.existsSync()) {
       return Scaffold(
-        appBar: AppBar(title: const Text('PDF')),
+        appBar: AdaptiveAppBar(title: const Text('PDF')),
         body: Center(child: Text('Файл не найден: ${widget.filePath}')),
       );
     }
@@ -130,7 +132,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: Text(_appBarTitle),
         actions: [
           IconButton(

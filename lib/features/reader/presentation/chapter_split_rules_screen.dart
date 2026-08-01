@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../data/chapter_split_rule.dart';
 import '../data/chapter_split_service.dart';
 
@@ -42,7 +43,7 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Chapter Split Rules'),
         actions: [
           IconButton(

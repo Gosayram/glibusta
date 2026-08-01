@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/fonts/font_download_service.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import 'font_download_service_provider.dart';
 
 final fontListProvider = FutureProvider<List<DownloadableFont>>((ref) async {
@@ -29,7 +30,7 @@ class _FontDownloadScreenState extends ConsumerState<FontDownloadScreen> {
     final fontsAsync = ref.watch(fontListProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Шрифты'),
       ),
       body: fontsAsync.when(

@@ -9,6 +9,7 @@ import '../../../core/services/catalog_cover_cache_service.dart';
 import '../../../core/services/smart_cleanup_service.dart';
 import '../../../core/storage/storage_info_model.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
   const StorageManagementScreen({super.key});
@@ -27,7 +28,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: Text(l10n.storageTitle),
         actions: [
           IconButton(

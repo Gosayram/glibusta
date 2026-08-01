@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../reader/domain/reader.dart';
@@ -45,7 +46,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
     final bookmarksAsync = ref.watch(bookmarksStreamProvider(widget.bookId));
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: _isSearching
             ? TextField(
                 controller: _searchController,
