@@ -227,7 +227,7 @@ rust-nextest: ## Run Rust tests with cargo-nextest (faster)
 .PHONY: rust-nextest-ci
 rust-nextest-ci: ## Run Rust tests with nextest (CI mode, no re-runs)
 	@$(PRINT_STEP) "Running Rust tests (CI mode)"
-	cd rust && cargo nextest run --failure-quick
+	cd rust && cargo nextest run --fail-fast
 
 .PHONY: miri-setup
 miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
