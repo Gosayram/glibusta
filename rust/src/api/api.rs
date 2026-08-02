@@ -1096,12 +1096,7 @@ pub fn score_encoding_quality(text: String) -> f64 {
     let chars: Vec<char> = sample.chars().collect();
     let mojibake_count = chars
         .windows(2)
-        .filter(|w| {
-            matches!(
-                w[0],
-                'Р' | 'С' | 'Ð' | 'Ñ' | 'â' | 'Ã'
-            )
-        })
+        .filter(|w| matches!(w[0], 'Р' | 'С' | 'Ð' | 'Ñ' | 'â' | 'Ã'))
         .count();
     score -= mojibake_count as f64 * 0.03;
 
@@ -1110,10 +1105,7 @@ pub fn score_encoding_quality(text: String) -> f64 {
         .chars()
         .filter(|c| ('\u{0400}'..='\u{04FF}').contains(c) || *c == 'ё' || *c == 'Ё')
         .count();
-    let latin_count = sample
-        .chars()
-        .filter(|c| c.is_ascii_alphabetic())
-        .count();
+    let latin_count = sample.chars().filter(|c| c.is_ascii_alphabetic()).count();
     let letters_count = cyrillic_count + latin_count;
     if (letters_count as f64) < (sample.len() as f64 * 0.20) {
         score -= 0.25;
@@ -1127,14 +1119,26 @@ pub fn score_encoding_quality(text: String) -> f64 {
 
     // Reward common Russian words (simple contains with word-boundary heuristic)
     let lower = sample.to_lowercase();
-    let common_words = ["и", "в", "не", "на", "что", "он", "она", "как", "это", "его", "книга", "глава"];
+    let common_words = [
+        "и",
+        "в",
+        "не",
+        "на",
+        "что",
+        "он",
+        "она",
+        "как",
+        "это",
+        "его",
+        "книга",
+        "глава",
+    ];
     let common_hits = common_words
         .iter()
         .filter(|word| {
             // Check if word appears as a whole word (surrounded by non-alphanumeric or at boundaries)
             if let Some(pos) = lower.find(*word) {
-                let before_ok = pos == 0
-                    || !lower.as_bytes()[pos - 1].is_ascii_alphanumeric();
+                let before_ok = pos == 0 || !lower.as_bytes()[pos - 1].is_ascii_alphanumeric();
                 let after_pos = pos + word.len();
                 let after_ok = after_pos >= lower.len()
                     || !lower.as_bytes()[after_pos].is_ascii_alphanumeric();

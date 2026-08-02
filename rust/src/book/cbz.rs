@@ -15,7 +15,9 @@ use crate::api::models::{
     MAX_IMAGE_SIZE, NormalizedBook, ReaderBlock, ReaderChapter,
 };
 
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "jxl", "avif"];
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "jxl", "avif",
+];
 const MAX_COMIC_INFO_BYTES: u64 = 1024 * 1024;
 
 /// Parse a CBZ archive from its filesystem path.
@@ -69,7 +71,8 @@ pub fn parse_cbz_path(path: &Path) -> Result<NormalizedBook> {
         }
         if size > 0
             && (compressed == 0
-                || size as u128 > (compressed as u128).saturating_mul(MAX_COMPRESSION_RATIO as u128))
+                || size as u128
+                    > (compressed as u128).saturating_mul(MAX_COMPRESSION_RATIO as u128))
         {
             bail!(
                 "CBZ entry '{}' exceeds maximum compression ratio of {}:1",
@@ -385,21 +388,15 @@ fn trim_leading_zeroes(number: &[u8]) -> &[u8] {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        cbz_content_id, image_media_type, natural_cmp, parse_cbz_path,
-        parse_comic_info,
-    };
+    use super::{cbz_content_id, image_media_type, natural_cmp, parse_cbz_path, parse_comic_info};
     use crate::api::models::BlockType;
     use std::cmp::Ordering;
     use std::io::Write;
     use std::path::PathBuf;
 
     fn create_cbz_fixture(name: &str, entries: &[(&str, &[u8])]) -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "glibusta-{}-{}.cbz",
-            name,
-            uuid::Uuid::new_v4()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("glibusta-{}-{}.cbz", name, uuid::Uuid::new_v4()));
         let file = std::fs::File::create(&path).expect("create CBZ fixture");
         let mut writer = zip::ZipWriter::new(file);
         let options = zip::write::FileOptions::<()>::default()
@@ -511,16 +508,21 @@ mod tests {
         assert_eq!(book.chapters.len(), 1);
         assert_eq!(book.chapters[0].blocks.len(), 2);
         assert_eq!(book.chapters[0].blocks[0].block_type, BlockType::Image);
-        assert!(book
-            .chapters[0].blocks[0]
-            .image_url
-            .as_ref()
-            .is_some_and(|url| url.starts_with("data:image/jpeg;base64,")));
+        assert!(
+            book.chapters[0].blocks[0]
+                .image_url
+                .as_ref()
+                .is_some_and(|url| url.starts_with("data:image/jpeg;base64,"))
+        );
         assert_eq!(
             book.chapters[0].blocks[1].image_url.as_deref(),
             Some("002.png")
         );
-        assert!(book.cover_url.as_ref().is_some_and(|url| url.starts_with("data:")));
+        assert!(
+            book.cover_url
+                .as_ref()
+                .is_some_and(|url| url.starts_with("data:"))
+        );
     }
 
     #[test]
@@ -561,7 +563,12 @@ mod tests {
         let _ = std::fs::remove_file(&path);
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("no supported images"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("no supported images")
+        );
     }
 
     #[test]
@@ -570,10 +577,8 @@ mod tests {
         ignore = "ZipArchive uses std::fs::File which Miri cannot execute"
     )]
     fn rejects_non_zip_file() {
-        let path = std::env::temp_dir().join(format!(
-            "glibusta-invalid-cbz-{}.cbz",
-            uuid::Uuid::new_v4()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("glibusta-invalid-cbz-{}.cbz", uuid::Uuid::new_v4()));
         std::fs::write(&path, b"not a ZIP archive").expect("write invalid CBZ fixture");
 
         let result = parse_cbz_path(&path);

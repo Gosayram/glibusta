@@ -244,21 +244,19 @@ pub(crate) fn collapse_whitespace(text: &str) -> String {
 
 /// Remove blocks with empty text (whitespace-only) that are not images/separators,
 /// and collapse whitespace in text content. Applied after parsing.
-pub(crate) fn postprocess_chapters(chapters: &mut Vec<crate::api::models::ReaderChapter>) {
+pub(crate) fn postprocess_chapters(chapters: &mut [crate::api::models::ReaderChapter]) {
     for chapter in chapters.iter_mut() {
         chapter.blocks.retain(|b| {
             !b.text.trim().is_empty()
                 || matches!(
                     b.block_type,
-                    crate::api::models::BlockType::Image
-                        | crate::api::models::BlockType::Separator
+                    crate::api::models::BlockType::Image | crate::api::models::BlockType::Separator
                 )
         });
         for block in &mut chapter.blocks {
             if matches!(
                 block.block_type,
-                crate::api::models::BlockType::Image
-                    | crate::api::models::BlockType::Separator
+                crate::api::models::BlockType::Image | crate::api::models::BlockType::Separator
             ) {
                 continue;
             }

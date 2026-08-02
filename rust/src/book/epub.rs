@@ -211,8 +211,15 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
     let description = metadata.get("description").cloned();
     let language = metadata.get("language").cloned();
 
-    let (cover_url, cover_href) = extract_cover_url(&mut zip, &manifest_items, &metadata, opf_dir, &spine_ids, &guide_references)?
-        .map_or((None, None), |cover| (Some(cover.url), Some(cover.href)));
+    let (cover_url, cover_href) = extract_cover_url(
+        &mut zip,
+        &manifest_items,
+        &metadata,
+        opf_dir,
+        &spine_ids,
+        &guide_references,
+    )?
+    .map_or((None, None), |cover| (Some(cover.url), Some(cover.href)));
 
     let mut chapters: Vec<ReaderChapter> = Vec::new();
     // Maps each spine document to its first rendered reader chapter. A single
@@ -875,8 +882,7 @@ fn parse_opf_guide(text: &str) -> Vec<(String, String)> {
                 if tag == "guide" {
                     in_guide = true;
                 } else if in_guide && tag == "reference" {
-                    if let (Some(t), Some(h)) =
-                        (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
+                    if let (Some(t), Some(h)) = (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
                     {
                         references.push((t, h));
                     }
@@ -885,8 +891,7 @@ fn parse_opf_guide(text: &str) -> Vec<(String, String)> {
             Ok(Event::Empty(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 if in_guide && tag == "reference" {
-                    if let (Some(t), Some(h)) =
-                        (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
+                    if let (Some(t), Some(h)) = (get_xml_attr(e, b"type"), get_xml_attr(e, b"href"))
                     {
                         references.push((t, h));
                     }
@@ -3569,8 +3574,7 @@ mod tests {
 
     #[test]
     fn extract_image_from_xhtml_finds_html_img() {
-        let xhtml =
-            r#"<html><body><img src="../images/cover.jpg" alt="Cover"/></body></html>"#;
+        let xhtml = r#"<html><body><img src="../images/cover.jpg" alt="Cover"/></body></html>"#;
         let result = super::extract_image_from_xhtml(xhtml, "OEBPS/Text/cover.xhtml");
         assert_eq!(result.as_deref(), Some("OEBPS/images/cover.jpg"));
     }
