@@ -260,7 +260,7 @@ class TabletShell extends StatelessWidget {
               policy: ReadingOrderTraversalPolicy(),
               child: Focus(
                 canRequestFocus: false,
-                onKeyEvent: _consumeHorizontalArrows,
+                onKeyEvent: _handleSidebarKey,
                 child: AdaptiveNavigation(
                   selectedIndex: navigationShell.currentIndex,
                   onDestinationSelected: (index) => navigationShell.goBranch(
@@ -298,7 +298,7 @@ class DesktopShell extends StatelessWidget {
               policy: ReadingOrderTraversalPolicy(),
               child: Focus(
                 canRequestFocus: false,
-                onKeyEvent: _consumeHorizontalArrows,
+                onKeyEvent: _handleSidebarKey,
                 child: AdaptiveNavigation(
                   selectedIndex: navigationShell.currentIndex,
                   onDestinationSelected: (index) => navigationShell.goBranch(
@@ -322,10 +322,15 @@ class DesktopShell extends StatelessWidget {
   }
 }
 
-KeyEventResult _consumeHorizontalArrows(FocusNode node, KeyEvent event) {
+KeyEventResult _handleSidebarKey(FocusNode node, KeyEvent event) {
   if (event is! KeyDownEvent) return KeyEventResult.ignored;
-  if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-      event.logicalKey == LogicalKeyboardKey.arrowRight) {
+  // Left arrow: sidebar is flat (no sub-items) — ignore.
+  if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+    return KeyEventResult.ignored;
+  }
+  // Right arrow: move focus to the content FocusTraversalGroup (next scope).
+  if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+    FocusScope.of(node.context!).nextFocus();
     return KeyEventResult.handled;
   }
   return KeyEventResult.ignored;
@@ -349,7 +354,7 @@ class MacOSShell extends ConsumerWidget {
               policy: ReadingOrderTraversalPolicy(),
               child: Focus(
                 canRequestFocus: false,
-                onKeyEvent: _consumeHorizontalArrows,
+                onKeyEvent: _handleSidebarKey,
                 child: SidebarNavigation(
                   selectedIndex: navigationShell.currentIndex,
                   onDestinationSelected: (index) => navigationShell.goBranch(

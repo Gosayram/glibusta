@@ -57,7 +57,7 @@ void main() {
       expect(focusNodes[3].hasFocus, isTrue, reason: 'should not leave sidebar');
     });
 
-    testWidgets('Right arrow in sidebar stays in sidebar', (tester) async {
+    testWidgets('Right arrow from sidebar moves to content', (tester) async {
       final sidebarNodes = List.generate(3, (_) => FocusNode());
       final contentNodes = List.generate(3, (_) => FocusNode());
       await tester.pumpWidget(
@@ -70,10 +70,14 @@ void main() {
                   child: Focus(
                     canRequestFocus: false,
                     onKeyEvent: (node, event) {
-                      if (event is KeyDownEvent &&
-                          (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
-                           event.logicalKey == LogicalKeyboardKey.arrowRight)) {
-                        return KeyEventResult.handled;
+                      if (event is KeyDownEvent) {
+                        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                          return KeyEventResult.ignored;
+                        }
+                        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                          FocusScope.of(node.context!).nextFocus();
+                          return KeyEventResult.handled;
+                        }
                       }
                       return KeyEventResult.ignored;
                     },
@@ -109,17 +113,66 @@ void main() {
         ),
       );
 
-      sidebarNodes[0].requestFocus();
+      sidebarNodes[2].requestFocus();
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pump();
 
-      final sidebarFocused = sidebarNodes.any((n) => n.hasFocus);
-      expect(sidebarFocused, isTrue, reason: 'focus should stay in sidebar');
-      for (final node in contentNodes) {
-        expect(node.hasFocus, isFalse);
-      }
+      // Right from sidebar should move to content area
+      final contentFocused = contentNodes.any((n) => n.hasFocus);
+      expect(contentFocused, isTrue, reason: 'Right from sidebar should focus content');
+    });
+
+    testWidgets('Left arrow in sidebar stays in sidebar', (tester) async {
+      final focusNodes = List.generate(3, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: Focus(
+                    canRequestFocus: false,
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                        return KeyEventResult.ignored;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: Column(
+                      children: List.generate(
+                        3,
+                        (i) => Focus(
+                          focusNode: focusNodes[i],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: const SizedBox(width: 200, height: 200),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      focusNodes[0].requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pump();
+
+      expect(focusNodes[0].hasFocus, isTrue, reason: 'Left should stay in sidebar');
     });
 
     testWidgets('Tab moves from sidebar to content', (tester) async {
