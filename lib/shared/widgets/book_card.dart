@@ -113,103 +113,103 @@ class _BookCardState extends State<BookCard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          BookCoverImage(book: widget.book),
-                          if (widget.book.readingStatus != ReadingStatus.none)
-                            Positioned(
-                              top: 4,
-                              left: 4,
-                              child: _StatusBadge(status: widget.book.readingStatus),
-                            ),
-                          if (widget.isDownloaded == true)
-                            const Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Icon(
-                                Icons.download_done,
-                                size: 16,
-                                color: AppColors.success,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            BookCoverImage(book: widget.book),
+                            if (widget.book.readingStatus != ReadingStatus.none)
+                              Positioned(
+                                top: 4,
+                                left: 4,
+                                child: _StatusBadge(status: widget.book.readingStatus),
                               ),
-                            )
-                          else if (widget.isDownloaded == false)
-                            const Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Icon(
-                                Icons.cloud_download_outlined,
-                                size: 16,
-                                color: AppColors.info,
-                              ),
-                            ),
-                          if (widget.progress != null && widget.progress! > 0)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: LinearProgressIndicator(
-                                value: widget.progress,
-                                minHeight: 3,
-                                backgroundColor: Colors.black26,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  theme.colorScheme.secondary,
+                            if (widget.isDownloaded == true)
+                              const Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Icon(
+                                  Icons.download_done,
+                                  size: 16,
+                                  color: AppColors.success,
+                                ),
+                              )
+                            else if (widget.isDownloaded == false)
+                              const Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Icon(
+                                  Icons.cloud_download_outlined,
+                                  size: 16,
+                                  color: AppColors.info,
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                      child: Text(
-                        widget.book.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                            if (widget.progress != null && widget.progress! > 0)
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: LinearProgressIndicator(
+                                  value: widget.progress,
+                                  minHeight: 3,
+                                  backgroundColor: Colors.black26,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    theme.colorScheme.secondary,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    ),
-                    if (author.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                         child: Text(
-                          author,
-                          maxLines: 1,
+                          widget.book.title,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    if (format != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                      if (author.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
                           child: Text(
-                            format,
+                            author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 10,
-                              color: theme.colorScheme.onSecondaryContainer,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                      if (format != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              format,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         ),
       ),
     );

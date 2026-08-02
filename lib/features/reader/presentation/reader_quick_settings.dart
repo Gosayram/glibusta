@@ -2319,12 +2319,14 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             TextButton.icon(
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Сохранить текущую типографику'),
-              onPressed: () => notifier.update(ReaderTypography(
-                fontSize: settings.fontSize,
-                lineHeight: settings.lineHeight,
-                marginHorizontal: settings.margin,
-                fontFamily: settings.font.name,
-              )),
+              onPressed: () => notifier.update(
+                ReaderTypography(
+                  fontSize: settings.fontSize,
+                  lineHeight: settings.lineHeight,
+                  marginHorizontal: settings.margin,
+                  fontFamily: settings.font.name,
+                ),
+              ),
             )
           else ...[
             _buildPerBookSlider(
@@ -2397,7 +2399,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       ],
     );
   }
-
 }
 
 class _SectionTitle extends StatelessWidget {

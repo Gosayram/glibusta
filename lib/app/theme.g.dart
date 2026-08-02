@@ -12,8 +12,7 @@ part of 'theme.dart';
 @ProviderFor(ThemeModeNotifier)
 final themeModeProvider = ThemeModeNotifierProvider._();
 
-final class ThemeModeNotifierProvider
-    extends $NotifierProvider<ThemeModeNotifier, ThemeMode> {
+final class ThemeModeNotifierProvider extends $NotifierProvider<ThemeModeNotifier, ThemeMode> {
   ThemeModeNotifierProvider._()
     : super(
         from: null,

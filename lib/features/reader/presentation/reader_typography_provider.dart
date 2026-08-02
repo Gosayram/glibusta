@@ -39,9 +39,11 @@ class ReaderTypographyNotifier extends _$ReaderTypographyNotifier {
 
   void _applyToGlobalSettings() {
     final global = ref.read(readerSettingsProvider);
-    ref.read(readerSettingsProvider.notifier).applyProfile(
-      _mergeWithGlobal(global, state),
-    );
+    ref
+        .read(readerSettingsProvider.notifier)
+        .applyProfile(
+          _mergeWithGlobal(global, state),
+        );
   }
 
   static ReaderSettings _mergeWithGlobal(ReaderSettings global, ReaderTypography typo) {

@@ -373,8 +373,7 @@ class ReaderTypography {
     return ReaderTypography(
       fontSize: clearFontSize ? null : (fontSize ?? this.fontSize),
       lineHeight: clearLineHeight ? null : (lineHeight ?? this.lineHeight),
-      marginHorizontal:
-          clearMarginHorizontal ? null : (marginHorizontal ?? this.marginHorizontal),
+      marginHorizontal: clearMarginHorizontal ? null : (marginHorizontal ?? this.marginHorizontal),
       fontFamily: clearFontFamily ? null : (fontFamily ?? this.fontFamily),
       darkMode: clearDarkMode ? null : (darkMode ?? this.darkMode),
     );

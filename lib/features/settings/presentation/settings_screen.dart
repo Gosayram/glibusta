@@ -58,172 +58,172 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: 'Нажмите, чтобы выйти',
                 onTap: () => _logout(context, ref),
               )
-          else
+            else
+              _SettingsTile(
+                icon: Icons.login,
+                title: 'Вход',
+                subtitle: 'Войдите для доступа к дополнительным функциям',
+                onTap: () => _login(context),
+              ),
+
+            const Divider(),
+            _SectionHeader(title: l10n.settingsSource),
             _SettingsTile(
-              icon: Icons.login,
-              title: 'Вход',
-              subtitle: 'Войдите для доступа к дополнительным функциям',
-              onTap: () => _login(context),
+              icon: Icons.language,
+              title: l10n.settingsBaseUrl,
+              subtitle: settings.baseUrl,
+              onTap: () => _editBaseUrl(context, ref, settings),
+            ),
+            _SettingsTile(
+              icon: Icons.dns,
+              title: l10n.settingsMirrors,
+              subtitle: settings.mirrors.isEmpty
+                  ? l10n.settingsNotConfigured
+                  : '${settings.mirrors.length} зеркал(а)',
+              onTap: () => _editMirrors(context, ref, settings),
             ),
 
-          const Divider(),
-          _SectionHeader(title: l10n.settingsSource),
-          _SettingsTile(
-            icon: Icons.language,
-            title: l10n.settingsBaseUrl,
-            subtitle: settings.baseUrl,
-            onTap: () => _editBaseUrl(context, ref, settings),
-          ),
-          _SettingsTile(
-            icon: Icons.dns,
-            title: l10n.settingsMirrors,
-            subtitle: settings.mirrors.isEmpty
-                ? l10n.settingsNotConfigured
-                : '${settings.mirrors.length} зеркал(а)',
-            onTap: () => _editMirrors(context, ref, settings),
-          ),
-
-          const Divider(),
-          _SectionHeader(title: l10n.settingsDownloads),
-          _SettingsTile(
-            icon: Icons.speed,
-            title: l10n.settingsParallelDownloads,
-            subtitle: '${settings.maxConcurrentDownloads}',
-            onTap: () => _editMaxConcurrent(context, ref, settings),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.cell_tower),
-            title: Text(
-              l10n.settingsMobileDownloads,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            const Divider(),
+            _SectionHeader(title: l10n.settingsDownloads),
+            _SettingsTile(
+              icon: Icons.speed,
+              title: l10n.settingsParallelDownloads,
+              subtitle: '${settings.maxConcurrentDownloads}',
+              onTap: () => _editMaxConcurrent(context, ref, settings),
             ),
-            subtitle: Text(
-              l10n.settingsMobileDownloadsSub,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            SwitchListTile(
+              secondary: const Icon(Icons.cell_tower),
+              title: Text(
+                l10n.settingsMobileDownloads,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                l10n.settingsMobileDownloadsSub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              value: ref.watch(allowMobileDownloadsProvider),
+              onChanged: (v) => ref.read(allowMobileDownloadsProvider.notifier).update(v),
             ),
-            value: ref.watch(allowMobileDownloadsProvider),
-            onChanged: (v) => ref.read(allowMobileDownloadsProvider.notifier).update(v),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.play_circle),
-            title: Text(
-              l10n.settingsAutoResume,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            SwitchListTile(
+              secondary: const Icon(Icons.play_circle),
+              title: Text(
+                l10n.settingsAutoResume,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                l10n.settingsAutoResumeSub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              value: ref.watch(autoResumeOnWifiProvider),
+              onChanged: (v) => ref.read(autoResumeOnWifiProvider.notifier).update(v),
             ),
-            subtitle: Text(
-              l10n.settingsAutoResumeSub,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+
+            const Divider(),
+            _SectionHeader(title: l10n.settingsStorage),
+            _buildStorageModeTile(context, ref, l10n),
+            _SettingsTile(
+              icon: Icons.folder_open,
+              title: l10n.settingsStoragePermission,
+              subtitle: l10n.settingsStoragePermissionSub,
+              onTap: () => _checkStoragePermission(context),
             ),
-            value: ref.watch(autoResumeOnWifiProvider),
-            onChanged: (v) => ref.read(autoResumeOnWifiProvider.notifier).update(v),
-          ),
-
-          const Divider(),
-          _SectionHeader(title: l10n.settingsStorage),
-          _buildStorageModeTile(context, ref, l10n),
-          _SettingsTile(
-            icon: Icons.folder_open,
-            title: l10n.settingsStoragePermission,
-            subtitle: l10n.settingsStoragePermissionSub,
-            onTap: () => _checkStoragePermission(context),
-          ),
-          _SettingsTile(
-            icon: Icons.storage,
-            title: l10n.settingsStorageManagement,
-            subtitle: l10n.settingsStorageManagementSub,
-            onTap: () => context.push('/settings/storage'),
-          ),
-          _SettingsTile(
-            icon: Icons.refresh,
-            title: l10n.settingsRefreshLibrary,
-            subtitle: l10n.settingsRefreshLibrarySub,
-            onTap: () => _rescanLibrary(context, ref),
-          ),
-          _SettingsTile(
-            icon: Icons.label,
-            title: l10n.settingsTags,
-            subtitle: l10n.settingsTagsSub,
-            onTap: () => context.push('/settings/tags'),
-          ),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: 'Reading Info Bar',
-            subtitle: 'Настройка header/footer в reader',
-            onTap: () => context.push('/settings/reading-info'),
-          ),
-          _SettingsTile(
-            icon: Icons.view_list,
-            title: 'Chapter Split Rules',
-            subtitle: 'Правила разделения TXT на главы',
-            onTap: () => context.push('/settings/chapter-split-rules'),
-          ),
-
-          const Divider(),
-          _SectionHeader(title: l10n.settingsAppearance),
-          SwitchListTile(
-            secondary: const Icon(Icons.dark_mode),
-            title: Text(l10n.settingsDarkTheme, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text(
-              l10n.settingsDarkThemeSub,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            _SettingsTile(
+              icon: Icons.storage,
+              title: l10n.settingsStorageManagement,
+              subtitle: l10n.settingsStorageManagementSub,
+              onTap: () => context.push('/settings/storage'),
             ),
-            value: Theme.of(context).brightness == Brightness.dark,
-            onChanged: (value) {
-              ref
-                  .read(themeModeProvider.notifier)
-                  .setMode(
-                    value ? ThemeMode.dark : ThemeMode.light,
-                  );
-            },
-          ),
-          _SettingsTile(
-            icon: Icons.font_download,
-            title: l10n.settingsFonts,
-            subtitle: l10n.settingsFontsSub,
-            onTap: () => context.push('/settings/fonts'),
-          ),
+            _SettingsTile(
+              icon: Icons.refresh,
+              title: l10n.settingsRefreshLibrary,
+              subtitle: l10n.settingsRefreshLibrarySub,
+              onTap: () => _rescanLibrary(context, ref),
+            ),
+            _SettingsTile(
+              icon: Icons.label,
+              title: l10n.settingsTags,
+              subtitle: l10n.settingsTagsSub,
+              onTap: () => context.push('/settings/tags'),
+            ),
+            _SettingsTile(
+              icon: Icons.info_outline,
+              title: 'Reading Info Bar',
+              subtitle: 'Настройка header/footer в reader',
+              onTap: () => context.push('/settings/reading-info'),
+            ),
+            _SettingsTile(
+              icon: Icons.view_list,
+              title: 'Chapter Split Rules',
+              subtitle: 'Правила разделения TXT на главы',
+              onTap: () => context.push('/settings/chapter-split-rules'),
+            ),
 
-          const Divider(),
-          _SectionHeader(title: l10n.settingsData),
-          _SettingsTile(
-            icon: Icons.upload_file,
-            title: l10n.settingsExport,
-            subtitle: l10n.settingsExportSub,
-            onTap: () => _exportData(context),
-          ),
-          _SettingsTile(
-            icon: Icons.download,
-            title: l10n.settingsImport,
-            subtitle: l10n.settingsImportSub,
-            onTap: () => _importData(context),
-          ),
+            const Divider(),
+            _SectionHeader(title: l10n.settingsAppearance),
+            SwitchListTile(
+              secondary: const Icon(Icons.dark_mode),
+              title: Text(l10n.settingsDarkTheme, maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                l10n.settingsDarkThemeSub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              value: Theme.of(context).brightness == Brightness.dark,
+              onChanged: (value) {
+                ref
+                    .read(themeModeProvider.notifier)
+                    .setMode(
+                      value ? ThemeMode.dark : ThemeMode.light,
+                    );
+              },
+            ),
+            _SettingsTile(
+              icon: Icons.font_download,
+              title: l10n.settingsFonts,
+              subtitle: l10n.settingsFontsSub,
+              onTap: () => context.push('/settings/fonts'),
+            ),
 
-          const Divider(),
-          _SectionHeader(title: l10n.settingsAbout),
-          const _VersionTile(),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: kAppName,
-            subtitle: appLegalese,
-            onTap: () => unawaited(_showAbout(context)),
-          ),
-          _SettingsTile(
-            icon: Icons.keyboard,
-            title: l10n.settingsShortcuts,
-            subtitle: l10n.settingsShortcutsSub,
-            onTap: () => _showShortcuts(context),
-          ),
-          _SettingsTile(
-            icon: Icons.bug_report_outlined,
-            title: l10n.settingsDiagnostics,
-            subtitle: l10n.settingsDiagnosticsSub,
-            onTap: () => context.push('/settings/diagnostics'),
-          ),
+            const Divider(),
+            _SectionHeader(title: l10n.settingsData),
+            _SettingsTile(
+              icon: Icons.upload_file,
+              title: l10n.settingsExport,
+              subtitle: l10n.settingsExportSub,
+              onTap: () => _exportData(context),
+            ),
+            _SettingsTile(
+              icon: Icons.download,
+              title: l10n.settingsImport,
+              subtitle: l10n.settingsImportSub,
+              onTap: () => _importData(context),
+            ),
+
+            const Divider(),
+            _SectionHeader(title: l10n.settingsAbout),
+            const _VersionTile(),
+            _SettingsTile(
+              icon: Icons.info_outline,
+              title: kAppName,
+              subtitle: appLegalese,
+              onTap: () => unawaited(_showAbout(context)),
+            ),
+            _SettingsTile(
+              icon: Icons.keyboard,
+              title: l10n.settingsShortcuts,
+              subtitle: l10n.settingsShortcutsSub,
+              onTap: () => _showShortcuts(context),
+            ),
+            _SettingsTile(
+              icon: Icons.bug_report_outlined,
+              title: l10n.settingsDiagnostics,
+              subtitle: l10n.settingsDiagnosticsSub,
+              onTap: () => context.push('/settings/diagnostics'),
+            ),
           ],
         ),
       ),
