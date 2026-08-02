@@ -1,0 +1,273 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('Arrow key navigation focus isolation', () {
+    testWidgets('Down arrow moves between sidebar items only', (tester) async {
+      final focusNodes = List.generate(4, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: Column(
+                    children: List.generate(
+                      4,
+                      (i) => Focus(
+                        focusNode: focusNodes[i],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Column(
+                      children: List.generate(
+                        4,
+                        (i) => Focus(
+                          child: SizedBox(key: Key('content_$i'), width: 200, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      focusNodes[0].requestFocus();
+      await tester.pump();
+
+      for (var i = 1; i < 4; i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
+        expect(focusNodes[i].hasFocus, isTrue, reason: 'should focus item $i');
+      }
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusNodes[3].hasFocus, isTrue, reason: 'should not leave sidebar');
+    });
+
+    testWidgets('Right arrow in sidebar stays in sidebar', (tester) async {
+      final sidebarNodes = List.generate(3, (_) => FocusNode());
+      final contentNodes = List.generate(3, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: Focus(
+                    canRequestFocus: false,
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                           event.logicalKey == LogicalKeyboardKey.arrowRight)) {
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: Column(
+                      children: List.generate(
+                        3,
+                        (i) => Focus(
+                          focusNode: sidebarNodes[i],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Column(
+                      children: List.generate(
+                        3,
+                        (i) => Focus(
+                          focusNode: contentNodes[i],
+                          child: const SizedBox(width: 200, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      sidebarNodes[0].requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+
+      final sidebarFocused = sidebarNodes.any((n) => n.hasFocus);
+      expect(sidebarFocused, isTrue, reason: 'focus should stay in sidebar');
+      for (final node in contentNodes) {
+        expect(node.hasFocus, isFalse);
+      }
+    });
+
+    testWidgets('Tab moves from sidebar to content', (tester) async {
+      final sidebarNode = FocusNode();
+      final contentNode = FocusNode();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: Focus(
+                    focusNode: sidebarNode,
+                    child: const SizedBox(width: 100, height: 40),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Focus(
+                      focusNode: contentNode,
+                      child: const SizedBox(width: 200, height: 40),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      sidebarNode.requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+
+      expect(contentNode.hasFocus, isTrue);
+    });
+
+    testWidgets('Down arrow in grid moves to next row', (tester) async {
+      final focusNodes = List.generate(6, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Column(
+                children: [
+                  Row(
+                    children: List.generate(
+                      3,
+                      (i) => Focus(
+                        focusNode: focusNodes[i],
+                        child: const SizedBox(width: 100, height: 80),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: List.generate(
+                      3,
+                      (i) => Focus(
+                        focusNode: focusNodes[i + 3],
+                        child: const SizedBox(width: 100, height: 80),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      focusNodes[0].requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+
+      expect(focusNodes[3].hasFocus, isTrue);
+    });
+
+    testWidgets('Right arrow in grid moves to next card in row', (tester) async {
+      final focusNodes = List.generate(3, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Row(
+                children: List.generate(
+                  3,
+                  (i) => Focus(
+                    focusNode: focusNodes[i],
+                    child: const SizedBox(width: 100, height: 80),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      focusNodes[0].requestFocus();
+      await tester.pump();
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pump();
+
+      expect(focusNodes[1].hasFocus, isTrue);
+    });
+
+    testWidgets('Enter activates focused item', (tester) async {
+      var activated = false;
+      final focusNode = FocusNode();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                focusNode: focusNode,
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      event.logicalKey == LogicalKeyboardKey.enter) {
+                    activated = true;
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: const SizedBox(width: 100, height: 80),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      focusNode.requestFocus();
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(activated, isTrue);
+    });
+  });
+}

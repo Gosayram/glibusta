@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -253,20 +254,30 @@ class TabletShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: FocusTraversalGroup(
-          child: Row(
-            children: [
-              AdaptiveNavigation(
-                selectedIndex: navigationShell.currentIndex,
-                onDestinationSelected: (index) => navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
+        child: Row(
+          children: [
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _consumeHorizontalArrows,
+                child: AdaptiveNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
                 ),
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: navigationShell),
-            ],
-          ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: navigationShell,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -281,24 +292,43 @@ class DesktopShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: FocusTraversalGroup(
-          child: Row(
-            children: [
-              AdaptiveNavigation(
-                selectedIndex: navigationShell.currentIndex,
-                onDestinationSelected: (index) => navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
+        child: Row(
+          children: [
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _consumeHorizontalArrows,
+                child: AdaptiveNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
                 ),
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: navigationShell),
-            ],
-          ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: navigationShell,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+KeyEventResult _consumeHorizontalArrows(FocusNode node, KeyEvent event) {
+  if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+      event.logicalKey == LogicalKeyboardKey.arrowRight) {
+    return KeyEventResult.handled;
+  }
+  return KeyEventResult.ignored;
 }
 
 /// macOS-style shell with sidebar
@@ -313,24 +343,38 @@ class MacOSShell extends ConsumerWidget {
     return Scaffold(
       body: BookDropZone(
         onBooksDropped: (paths) => _handleDrop(context, ref, paths),
-        child: FocusTraversalGroup(
-          child: Row(
-            children: [
-              SidebarNavigation(
-                selectedIndex: navigationShell.currentIndex,
-                onDestinationSelected: (index) => navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
+        child: Row(
+          children: [
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _consumeHorizontalArrows,
+                child: SidebarNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
                 ),
               ),
-              const VerticalDivider(width: 1),
-              Expanded(child: navigationShell),
-              if (selectedBook != null) ...[
-                const VerticalDivider(width: 1),
-                const MacOSRightPanel(),
-              ],
-            ],
-          ),
+            ),
+            const VerticalDivider(width: 1),
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: Row(
+                  children: [
+                    Expanded(child: navigationShell),
+                    if (selectedBook != null) ...[
+                      const VerticalDivider(width: 1),
+                      const MacOSRightPanel(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
