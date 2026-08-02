@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
+import '../features/bookmarks/presentation/all_bookmarks_screen.dart';
 import '../features/collections/presentation/collection_detail_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/highlights/presentation/highlights_notes_screen.dart';
@@ -38,6 +39,16 @@ class AnnotationsRoute extends GoRouteData with $AnnotationsRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) {
     return const AnnotationsScreen();
+  }
+}
+
+@TypedGoRoute<AllBookmarksRoute>(path: '/bookmarks', name: 'allBookmarks')
+class AllBookmarksRoute extends GoRouteData with $AllBookmarksRoute {
+  const AllBookmarksRoute();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return const AllBookmarksScreen();
   }
 }
 

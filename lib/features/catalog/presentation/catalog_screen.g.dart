@@ -19,7 +19,9 @@ final class CategoriesProvider
           List<SearchGenreItem>,
           FutureOr<List<SearchGenreItem>>
         >
-    with $FutureModifier<List<SearchGenreItem>>, $FutureProvider<List<SearchGenreItem>> {
+    with
+        $FutureModifier<List<SearchGenreItem>>,
+        $FutureProvider<List<SearchGenreItem>> {
   CategoriesProvider._()
     : super(
         from: null,
@@ -52,7 +54,12 @@ String _$categoriesHash() => r'd53efa2f220be02e355180bf6b35052d7f0b05c0';
 final popularBooksProvider = PopularBooksProvider._();
 
 final class PopularBooksProvider
-    extends $FunctionalProvider<AsyncValue<List<Book>>, List<Book>, FutureOr<List<Book>>>
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<Book>>,
+          List<Book>,
+          FutureOr<List<Book>>
+        >
     with $FutureModifier<List<Book>>, $FutureProvider<List<Book>> {
   PopularBooksProvider._()
     : super(

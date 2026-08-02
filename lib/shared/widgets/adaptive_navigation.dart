@@ -108,12 +108,15 @@ class SidebarNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int>? onDestinationSelected;
 
+  /// Maps list item index to shell branch index.
+  /// Items not in this map are push-routes (no shell branch).
   static const _branchIndexForItem = <int, int>{
-    0: 0,
-    1: 1,
-    2: 2,
-    3: 3,
-    7: 4,
+    0: 2, // Catalog → branch 2
+    1: 1, // Search → branch 1
+    2: 0, // Library (Все книги) → branch 0
+    // 3-6: push-routes (no branch)
+    7: 3, // Downloads → branch 3
+    9: 4, // Settings → branch 4
   };
 
   @override
@@ -122,21 +125,36 @@ class SidebarNavigation extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     final items = [
-      _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
-      _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      // Section: Обзор
       _SidebarItem(icon: Icons.explore, label: l10n.catalogTitle, route: '/catalog'),
-      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
+      _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      // Section: Библиотека
+      _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
+      const _SidebarItem(icon: Icons.auto_stories, label: 'Чтение', route: '/collections'),
+      const _SidebarItem(
+        icon: Icons.bookmark_border,
+        label: 'Хочу прочитать',
+        route: '/collections',
+      ),
       _SidebarItem(
         icon: Icons.collections_bookmark,
         label: l10n.collectionsTitle,
         route: '/collections',
+      ),
+      const _SidebarItem(
+        icon: Icons.bookmark,
+        label: 'Закладки',
+        route: '/bookmarks',
       ),
       _SidebarItem(
         icon: Icons.sticky_note_2_outlined,
         label: l10n.annotationsTitle,
         route: '/annotations',
       ),
-      _SidebarItem(icon: Icons.bar_chart, label: l10n.statisticsTitle, route: '/stats'),
+      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
+      // Spacer placeholder for bottom alignment
+      const _SidebarItem(icon: Icons.settings, label: '', isSpacer: true),
+      // Settings (bottom)
       _SidebarItem(icon: Icons.settings, label: l10n.settingsTitle, route: '/settings'),
     ];
 
@@ -171,6 +189,20 @@ class SidebarNavigation extends StatelessWidget {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];
+
+                  // Spacer placeholder
+                  if (item.isSpacer) {
+                    return const SizedBox(height: 16);
+                  }
+
+                  // Section headers
+                  if (index == 0) {
+                    return const _SectionHeader('Обзор');
+                  }
+                  if (index == 2) {
+                    return const _SectionHeader('Библиотека');
+                  }
+
                   final branchIdx = _branchIndexForItem[index];
                   final isBranchItem = branchIdx != null;
                   final isSelected = isBranchItem && branchIdx == selectedIndex;
@@ -218,11 +250,32 @@ class _SidebarItem {
   const _SidebarItem({
     required this.icon,
     required this.label,
-    required this.route,
+    this.route = '',
+    this.isSpacer = false,
   });
   final IconData icon;
   final String label;
   final String route;
+  final bool isSpacer;
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Shells ─────────────────────────────────────────────

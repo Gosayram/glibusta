@@ -33,9 +33,11 @@ final class LibraryViewModeNotifierProvider
   LibraryViewModeNotifier create() => LibraryViewModeNotifier();
 }
 
-String _$libraryViewModeNotifierHash() => r'007c66e1a8f8e620a1d917cebf2b23ff81b55bea';
+String _$libraryViewModeNotifierHash() =>
+    r'007c66e1a8f8e620a1d917cebf2b23ff81b55bea';
 
-abstract class _$LibraryViewModeNotifier extends $AsyncNotifier<LibraryViewMode> {
+abstract class _$LibraryViewModeNotifier
+    extends $AsyncNotifier<LibraryViewMode> {
   FutureOr<LibraryViewMode> build();
   @$mustCallSuper
   @override

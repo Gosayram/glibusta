@@ -49,7 +49,8 @@ final class ReaderTypographyNotifierProvider
 
   @override
   bool operator ==(Object other) {
-    return other is ReaderTypographyNotifierProvider && other.argument == argument;
+    return other is ReaderTypographyNotifierProvider &&
+        other.argument == argument;
   }
 
   @override
@@ -58,7 +59,8 @@ final class ReaderTypographyNotifierProvider
   }
 }
 
-String _$readerTypographyNotifierHash() => r'e5e0d088c7f7a5dc6617201578465cc8297ecb4f';
+String _$readerTypographyNotifierHash() =>
+    r'e5e0d088c7f7a5dc6617201578465cc8297ecb4f';
 
 final class ReaderTypographyNotifierFamily extends $Family
     with
