@@ -66,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -145,6 +145,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 18) {
             await m.addColumn(readingTime, readingTime.wpm);
             await m.addColumn(readingTime, readingTime.wpmSessionCount);
+          }
+          if (from < 19) {
+            await m.addColumn(bookmarks, bookmarks.highlightStyle);
+            await m.addColumn(bookmarks, bookmarks.highlightColor);
           }
         });
       } finally {

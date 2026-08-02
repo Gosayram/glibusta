@@ -122,6 +122,8 @@ class Bookmarks extends Table {
   RealColumn get localOffset => real().withDefault(const Constant(0.0))();
   TextColumn get selectedText => text().nullable()();
   TextColumn get note => text().nullable()();
+  TextColumn get highlightStyle => text().nullable()();
+  TextColumn get highlightColor => text().nullable()();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
 
   @override

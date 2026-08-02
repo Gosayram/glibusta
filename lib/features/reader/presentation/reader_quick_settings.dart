@@ -14,6 +14,7 @@ import '../domain/reader.dart';
 import 'color_preset_provider.dart';
 import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
+import 'reader_typography_provider.dart';
 import 'reading_break_reminder.dart';
 
 class _TypographyPreset {
@@ -105,8 +106,10 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               const SizedBox(height: 12),
               _buildPageIndicator(context, isEink: isEink),
               const SizedBox(height: 8),
-              if (widget.bookId != null)
+              if (widget.bookId != null) ...[
                 _buildPerBookSection(context, ref, widget.bookId!, settings),
+                _buildPerBookTypographySection(context, ref, widget.bookId!, settings),
+              ],
               SizedBox(
                 height: _estimatedPageHeight(context),
                 child: PageView(
@@ -2270,6 +2273,131 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
       },
     );
   }
+
+  Widget _buildPerBookTypographySection(
+    BuildContext context,
+    WidgetRef ref,
+    String bookId,
+    ReaderSettings settings,
+  ) {
+    final typo = ref.watch(readerTypographyProvider(bookId));
+    final notifier = ref.read(readerTypographyProvider(bookId).notifier);
+    final theme = Theme.of(context);
+    final hasOverrides = !typo.isEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8, left: 20, right: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.text_fields, size: 16, color: theme.colorScheme.tertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Индивидуальная типографика',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (hasOverrides)
+                TextButton(
+                  onPressed: () => notifier.reset(),
+                  child: const Text('Сбросить'),
+                ),
+            ],
+          ),
+          if (!hasOverrides)
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Сохранить текущую типографику'),
+              onPressed: () => notifier.update(ReaderTypography(
+                fontSize: settings.fontSize,
+                lineHeight: settings.lineHeight,
+                marginHorizontal: settings.margin,
+                fontFamily: settings.font.name,
+              )),
+            )
+          else ...[
+            _buildPerBookSlider(
+              'Шрифт',
+              typo.fontSize ?? settings.fontSize,
+              10,
+              40,
+              (v) => notifier.update(typo.copyWith(fontSize: v)),
+              onClear: () => notifier.update(typo.copyWith(clearFontSize: true)),
+              isOverridden: typo.fontSize != null,
+            ),
+            _buildPerBookSlider(
+              'Межстрочный',
+              typo.lineHeight ?? settings.lineHeight,
+              1.0,
+              3.0,
+              (v) => notifier.update(typo.copyWith(lineHeight: v)),
+              onClear: () => notifier.update(typo.copyWith(clearLineHeight: true)),
+              isOverridden: typo.lineHeight != null,
+            ),
+            _buildPerBookSlider(
+              'Отступы',
+              typo.marginHorizontal ?? settings.margin,
+              0,
+              60,
+              (v) => notifier.update(typo.copyWith(marginHorizontal: v)),
+              onClear: () => notifier.update(typo.copyWith(clearMarginHorizontal: true)),
+              isOverridden: typo.marginHorizontal != null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerBookSlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged, {
+    required VoidCallback onClear,
+    required bool isOverridden,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label ${value.round()}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isOverridden ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
+        ),
+        if (isOverridden)
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(Icons.close, size: 16),
+          ),
+      ],
+    );
+  }
+
 }
 
 class _SectionTitle extends StatelessWidget {

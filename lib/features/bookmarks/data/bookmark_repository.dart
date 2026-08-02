@@ -50,6 +50,8 @@ class BookmarkRepository {
     double localOffset = 0.0,
     String? selectedText,
     String? note,
+    String? highlightStyle,
+    String? highlightColor,
   }) async {
     return _db
         .into(_db.bookmarks)
@@ -62,6 +64,8 @@ class BookmarkRepository {
             localOffset: Value(localOffset),
             selectedText: Value(selectedText),
             note: Value(note),
+            highlightStyle: Value(highlightStyle),
+            highlightColor: Value(highlightColor),
           ),
         );
   }
@@ -70,11 +74,15 @@ class BookmarkRepository {
     required String id,
     String? note,
     String? selectedText,
+    String? highlightStyle,
+    String? highlightColor,
   }) async {
     final count = await (_db.update(_db.bookmarks)..where((b) => b.id.equals(id))).write(
       BookmarksCompanion(
         note: Value(note),
         selectedText: Value(selectedText),
+        highlightStyle: Value(highlightStyle),
+        highlightColor: Value(highlightColor),
       ),
     );
     return count > 0;
@@ -96,6 +104,8 @@ class BookmarkRepository {
             localOffset: Value(bookmark.localOffset),
             selectedText: Value(bookmark.selectedText),
             note: Value(bookmark.note),
+            highlightStyle: Value(bookmark.highlightStyle),
+            highlightColor: Value(bookmark.highlightColor),
           ),
         );
   }

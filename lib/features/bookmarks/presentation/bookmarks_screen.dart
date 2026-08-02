@@ -168,7 +168,7 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
 bool _matchesBookmarkQuery(Bookmark bookmark, String query) {
   final normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.isEmpty) return true;
-  return [bookmark.selectedText, bookmark.note].any(
+  return [bookmark.selectedText, bookmark.note, bookmark.highlightColor].any(
     (value) => value?.toLowerCase().contains(normalizedQuery) ?? false,
   );
 }
@@ -208,6 +208,7 @@ class BookmarkTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final note = bookmark.note;
+    final colorHex = bookmark.highlightColor;
     return RepaintBoundary(
       child: Dismissible(
         key: Key(bookmark.id),
@@ -239,7 +240,12 @@ class BookmarkTile extends StatelessWidget {
         ),
         onDismissed: (_) => onDelete?.call(),
         child: ListTile(
-          leading: const Icon(Icons.bookmark),
+          leading: colorHex != null
+              ? CircleAvatar(
+                  backgroundColor: _parseHighlightColor(colorHex),
+                  radius: 12,
+                )
+              : const Icon(Icons.bookmark),
           title: bookmark.selectedText != null
               ? Text(
                   bookmark.selectedText!,
@@ -270,4 +276,20 @@ class BookmarkTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _parseHighlightColor(String value) {
+  const named = {
+    'yellow': Color(0xFFFFEB3B),
+    'green': Color(0xFF81C784),
+    'blue': Color(0xFF90CAF9),
+    'pink': Color(0xFFF48FB1),
+  };
+  if (named.containsKey(value)) return named[value]!;
+  // try parsing hex like '#FFEB3B' or 'FFEB3B'
+  final hex = value.replaceFirst('#', '');
+  if (hex.length == 6) {
+    return Color(int.parse('FF$hex', radix: 16));
+  }
+  return const Color(0xFFFFEB3B);
 }

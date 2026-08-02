@@ -342,6 +342,72 @@ abstract class ReaderPosition with _$ReaderPosition {
   }
 }
 
+/// Per-book typography overrides. Null fields mean "use global default".
+class ReaderTypography {
+  const ReaderTypography({
+    this.fontSize,
+    this.lineHeight,
+    this.marginHorizontal,
+    this.fontFamily,
+    this.darkMode,
+  });
+
+  final double? fontSize;
+  final double? lineHeight;
+  final double? marginHorizontal;
+  final String? fontFamily;
+  final bool? darkMode;
+
+  ReaderTypography copyWith({
+    double? fontSize,
+    bool clearFontSize = false,
+    double? lineHeight,
+    bool clearLineHeight = false,
+    double? marginHorizontal,
+    bool clearMarginHorizontal = false,
+    String? fontFamily,
+    bool clearFontFamily = false,
+    bool? darkMode,
+    bool clearDarkMode = false,
+  }) {
+    return ReaderTypography(
+      fontSize: clearFontSize ? null : (fontSize ?? this.fontSize),
+      lineHeight: clearLineHeight ? null : (lineHeight ?? this.lineHeight),
+      marginHorizontal:
+          clearMarginHorizontal ? null : (marginHorizontal ?? this.marginHorizontal),
+      fontFamily: clearFontFamily ? null : (fontFamily ?? this.fontFamily),
+      darkMode: clearDarkMode ? null : (darkMode ?? this.darkMode),
+    );
+  }
+
+  bool get isEmpty =>
+      fontSize == null &&
+      lineHeight == null &&
+      marginHorizontal == null &&
+      fontFamily == null &&
+      darkMode == null;
+
+  Map<String, dynamic> toJson() => {
+    if (fontSize != null) 'fontSize': fontSize,
+    if (lineHeight != null) 'lineHeight': lineHeight,
+    if (marginHorizontal != null) 'marginHorizontal': marginHorizontal,
+    if (fontFamily != null) 'fontFamily': fontFamily,
+    if (darkMode != null) 'darkMode': darkMode,
+  };
+
+  factory ReaderTypography.fromJson(Map<String, dynamic> json) {
+    return ReaderTypography(
+      fontSize: (json['fontSize'] as num?)?.toDouble(),
+      lineHeight: (json['lineHeight'] as num?)?.toDouble(),
+      marginHorizontal: (json['marginHorizontal'] as num?)?.toDouble(),
+      fontFamily: json['fontFamily'] as String?,
+      darkMode: json['darkMode'] as bool?,
+    );
+  }
+
+  static const empty = ReaderTypography();
+}
+
 class ReadingProgress {
   final ReaderPosition position;
   final int totalPages;

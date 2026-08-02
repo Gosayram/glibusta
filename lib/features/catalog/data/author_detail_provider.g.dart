@@ -19,7 +19,9 @@ final class AuthorDetailProvider
           AuthorDetailResponse,
           FutureOr<AuthorDetailResponse>
         >
-    with $FutureModifier<AuthorDetailResponse>, $FutureProvider<AuthorDetailResponse> {
+    with
+        $FutureModifier<AuthorDetailResponse>,
+        $FutureProvider<AuthorDetailResponse> {
   AuthorDetailProvider._({
     required AuthorDetailFamily super.from,
     required String super.argument,
@@ -64,7 +66,7 @@ final class AuthorDetailProvider
   }
 }
 
-String _$authorDetailHash() => r'38d521476bd11fba376b29d5656a28b71962e326';
+String _$authorDetailHash() => r'ec4629afdd6a059b9ff396a59bf17c4c2349f6aa';
 
 final class AuthorDetailFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<AuthorDetailResponse>, String> {

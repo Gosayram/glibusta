@@ -306,6 +306,7 @@ class ReaderBlock {
   final bool pageBreakBefore;
   final bool pageBreakInsideAvoid;
   final bool hasDropCap;
+  final String? rawCssProps;
 
   const ReaderBlock({
     required this.index,
@@ -328,6 +329,7 @@ class ReaderBlock {
     this.pageBreakBefore = false,
     this.pageBreakInsideAvoid = false,
     this.hasDropCap = false,
+    this.rawCssProps,
   });
 
   ReaderBlock withImageUrl(String value) => ReaderBlock(
@@ -351,6 +353,7 @@ class ReaderBlock {
     pageBreakBefore: pageBreakBefore,
     pageBreakInsideAvoid: pageBreakInsideAvoid,
     hasDropCap: hasDropCap,
+    rawCssProps: rawCssProps,
   );
 
   Map<String, dynamic> toJson() => {
@@ -379,6 +382,7 @@ class ReaderBlock {
     if (pageBreakBefore) 'pageBreakBefore': true,
     if (pageBreakInsideAvoid) 'pageBreakInsideAvoid': true,
     if (hasDropCap) 'hasDropCap': true,
+    if (rawCssProps != null) 'rawCssProps': rawCssProps,
   };
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
@@ -411,6 +415,7 @@ class ReaderBlock {
     pageBreakBefore: json['pageBreakBefore'] as bool? ?? false,
     pageBreakInsideAvoid: json['pageBreakInsideAvoid'] as bool? ?? false,
     hasDropCap: json['hasDropCap'] as bool? ?? false,
+    rawCssProps: json['rawCssProps'] as String?,
   );
 }
 

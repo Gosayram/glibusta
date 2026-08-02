@@ -12,6 +12,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../src/rust/api/api/api.dart' as rust_api;
 import '../../library/domain/book_file_repository.dart';
+import 'content_transformers.dart';
 import 'parsers/book_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';

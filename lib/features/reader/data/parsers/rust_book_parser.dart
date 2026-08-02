@@ -156,6 +156,7 @@ class RustBookParser implements BookParser {
                       noteId: rb.noteId,
                       pageBreakBefore: rb.pageBreakBefore,
                       pageBreakInsideAvoid: rb.pageBreakInsideAvoid,
+                      rawCssProps: rb.textAlign,
                     ),
                   )
                   .toList(),

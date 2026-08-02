@@ -272,6 +272,11 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
                 onTap: () => unawaited(_addBookmark(context)),
               ),
               _ToolbarButton(
+                icon: Icons.bookmark,
+                label: 'Метка',
+                onTap: () => unawaited(_addHighlightBookmark(context)),
+              ),
+              _ToolbarButton(
                 icon: Icons.sticky_note_2,
                 label: 'Заметка',
                 onTap: () => unawaited(_addNote(context)),
@@ -339,6 +344,50 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
         );
     if (context.mounted) {
       unawaited(SmartDialog.showToast('Закладка добавлена'));
+    }
+    widget.onDismiss();
+  }
+
+  Future<void> _addHighlightBookmark(BuildContext context) async {
+    if (_selectedText == null || _selectedText!.isEmpty) return;
+    final selectedColor = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              leading: Icon(Icons.bookmark),
+              title: Text('Цвет метки'),
+            ),
+            for (final entry in _highlightBookmarkColors.entries)
+              ListTile(
+                leading: CircleAvatar(backgroundColor: entry.value),
+                title: Text(entry.key),
+                onTap: () => Navigator.of(ctx).pop(entry.key),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || selectedColor == null) return;
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.bookmarks)
+        .insert(
+          BookmarksCompanion.insert(
+            id: '${widget.bookId}-${newMonotonicId()}',
+            bookId: widget.bookId,
+            chapterIndex: widget.chapterIndex,
+            paragraphIndex: widget.paragraphIndex,
+            selectedText: Value(_selectedText),
+            highlightColor: Value(selectedColor),
+            highlightStyle: const Value('highlight'),
+          ),
+        );
+    if (context.mounted) {
+      unawaited(SmartDialog.showToast('Метка добавлена'));
     }
     widget.onDismiss();
   }
@@ -993,6 +1042,13 @@ const List<_HighlightColor> _highlightColors = <_HighlightColor>[
   _HighlightColor(id: 'blue', name: 'Синий', value: Color(0xFF90CAF9)),
   _HighlightColor(id: 'pink', name: 'Розовый', value: Color(0xFFF48FB1)),
 ];
+
+const Map<String, Color> _highlightBookmarkColors = <String, Color>{
+  'Жёлтый': Color(0xFFFFEB3B),
+  'Зелёный': Color(0xFF81C784),
+  'Синий': Color(0xFF90CAF9),
+  'Розовый': Color(0xFFF48FB1),
+};
 
 const List<(HighlightDecoration, String)> _highlightDecorations =
     <

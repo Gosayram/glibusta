@@ -36,6 +36,7 @@ import 'reader_link_history.dart';
 import 'reader_progress_helper.dart';
 import 'reader_providers.dart';
 import 'reader_two_finger_chapter_gesture.dart';
+import 'reader_typography_provider.dart';
 
 enum HighlightSelectionMode { idle, startSet }
 
@@ -1509,8 +1510,28 @@ final class ReaderController {
     final requestVersion = ++_perBookSettingsRequestVersion;
     try {
       final service = _ref.read(perBookSettingsServiceProvider);
-      final effective = await service.getEffectiveSettings(_bookId, deviceClass: deviceClass);
+      var effective = await service.getEffectiveSettings(_bookId, deviceClass: deviceClass);
       if (requestVersion != _perBookSettingsRequestVersion) return;
+
+      // Apply per-book typography overrides on top of DB-based per-book settings
+      final typo = _ref.read(readerTypographyProvider(_bookId));
+      if (!typo.isEmpty) {
+        effective = effective.copyWith(
+          fontSize: typo.fontSize ?? effective.fontSize,
+          lineHeight: typo.lineHeight ?? effective.lineHeight,
+          margin: typo.marginHorizontal ?? effective.margin,
+          font: typo.fontFamily != null
+              ? ReaderFont.values.firstWhere(
+                  (f) => f.name == typo.fontFamily,
+                  orElse: () => effective.font,
+                )
+              : effective.font,
+          theme: typo.darkMode != null
+              ? (typo.darkMode! ? ReaderTheme.dark : ReaderTheme.light)
+              : effective.theme,
+        );
+      }
+
       _ref.read(readerSettingsProvider.notifier).applyProfile(effective);
     } on Object catch (e) {
       _logger.warning('Failed to apply per-book settings: $e', name: 'Reader', error: e);

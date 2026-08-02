@@ -40,7 +40,8 @@ abstract class _$ColorPresetList extends $AsyncNotifier<List<ColorPreset>> {
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<List<ColorPreset>>, List<ColorPreset>>;
+    final ref =
+        this.ref as $Ref<AsyncValue<List<ColorPreset>>, List<ColorPreset>>;
     final element =
         ref.element
             as $ClassProviderElement<

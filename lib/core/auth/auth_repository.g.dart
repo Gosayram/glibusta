@@ -16,11 +16,12 @@ UserSession _$UserSessionFromJson(Map<String, dynamic> json) => UserSession(
       const {},
 );
 
-Map<String, dynamic> _$UserSessionToJson(UserSession instance) => <String, dynamic>{
-  'name': instance.name,
-  'mail': instance.mail,
-  'cookies': instance.cookies,
-};
+Map<String, dynamic> _$UserSessionToJson(UserSession instance) =>
+    <String, dynamic>{
+      'name': instance.name,
+      'mail': instance.mail,
+      'cookies': instance.cookies,
+    };
 
 // **************************************************************************
 // RiverpodGenerator
