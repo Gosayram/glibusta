@@ -36,6 +36,7 @@ import '../data/inspectors/book_inspection_result.dart';
 import '../domain/book_repository.dart';
 import 'library_sort.dart';
 import 'library_view_mode_provider.dart';
+import 'continue_reading_provider.dart';
 import 'pinned_books_provider.dart';
 
 part 'library_screen.g.dart';
@@ -1152,9 +1153,49 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
+    final continueReadingAsync = ref.watch(continueReadingProvider);
+    final continueBooks = switch (continueReadingAsync) {
+      AsyncData(:final value) => value,
+      _ => <ContinueReadingBook>[],
+    };
+
     return RestorableCustomScrollView(
       restorationId: 'library-books-scroll',
       slivers: [
+        if (continueBooks.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                'Продолжить чтение',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 200,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: continueBooks.length,
+                separatorBuilder: (_, _)=> const SizedBox(width: 12),
+                itemBuilder: (_, index) {
+ final item = continueBooks[index];
+                  return _ContinueReadingCard(
+                    item: item,
+                    onTap: () => unawaited(
+                      context.push('/reader/${item.book.id}'),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
+        ],
         if (pinnedBooksList.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -1969,5 +2010,50 @@ class _CollectionPickerSheetState extends ConsumerState<_CollectionPickerSheet> 
       Navigator.pop(ctx);
       unawaited(SmartDialog.showToast('Коллекции обновлены'));
     }
+  }
+}
+
+class _ContinueReadingCard extends StatelessWidget {
+  const _ContinueReadingCard({required this.item, required this.onTap});
+
+  final ContinueReadingBook item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 120,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: BookCoverImage(book: item.book),
+              ),
+            ),
+            const SizedBox(height: 4),
+            LinearProgressIndicator(
+              value: item.progress,
+              minHeight: 3,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(2),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              item.book.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

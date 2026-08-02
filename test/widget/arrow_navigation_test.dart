@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('Arrow key navigation focus isolation', () {
     testWidgets('Down arrow moves between sidebar items only', (tester) async {
-      final focusNodes = List.generate(4, (_) => FocusNode());
+      // Mirrors sectioned sidebar: 8 focusable ListTiles across 3 sections
+      final focusNodes = List.generate(8, (_) => FocusNode());
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -14,13 +15,26 @@ void main() {
                 FocusTraversalGroup(
                   policy: ReadingOrderTraversalPolicy(),
                   child: Column(
-                    children: List.generate(
-                      4,
-                      (i) => Focus(
-                        focusNode: focusNodes[i],
-                        child: const SizedBox(width: 100, height: 40),
+                    children: [
+                      // Section header: Обзор (non-focusable Text)
+                      const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text('Обзор'),
                       ),
-                    ),
+                      Focus(focusNode: focusNodes[0], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[1], child: const SizedBox(width: 100, height: 40)),
+                      // Section header: Библиотека
+                      const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Text('Библиотека'),
+                      ),
+                      Focus(focusNode: focusNodes[2], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[3], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[4], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[5], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[6], child: const SizedBox(width: 100, height: 40)),
+                      Focus(focusNode: focusNodes[7], child: const SizedBox(width: 100, height: 40)),
+                    ],
                   ),
                 ),
                 const VerticalDivider(width: 1),
@@ -46,19 +60,20 @@ void main() {
       focusNodes[0].requestFocus();
       await tester.pump();
 
-      for (var i = 1; i < 4; i++) {
+      for (var i = 1; i < 8; i++) {
         await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
         await tester.pump();
         expect(focusNodes[i].hasFocus, isTrue, reason: 'should focus item $i');
       }
 
+      // Down at last item stays in sidebar
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await tester.pump();
-      expect(focusNodes[3].hasFocus, isTrue, reason: 'should not leave sidebar');
+      expect(focusNodes[7].hasFocus, isTrue, reason: 'should not leave sidebar');
     });
 
     testWidgets('Right arrow from sidebar moves to content', (tester) async {
-      final sidebarNodes = List.generate(3, (_) => FocusNode());
+      final sidebarNodes = List.generate(5, (_) => FocusNode());
       final contentNodes = List.generate(3, (_) => FocusNode());
       await tester.pumpWidget(
         MaterialApp(
@@ -82,13 +97,36 @@ void main() {
                       return KeyEventResult.ignored;
                     },
                     child: Column(
-                      children: List.generate(
-                        3,
-                        (i) => Focus(
-                          focusNode: sidebarNodes[i],
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text('Обзор'),
+                        ),
+                        Focus(
+                          focusNode: sidebarNodes[0],
                           child: const SizedBox(width: 100, height: 40),
                         ),
-                      ),
+                        Focus(
+                          focusNode: sidebarNodes[1],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text('Библиотека'),
+                        ),
+                        Focus(
+                          focusNode: sidebarNodes[2],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                        Focus(
+                          focusNode: sidebarNodes[3],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                        Focus(
+                          focusNode: sidebarNodes[4],
+                          child: const SizedBox(width: 100, height: 40),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -113,7 +151,7 @@ void main() {
         ),
       );
 
-      sidebarNodes[2].requestFocus();
+      sidebarNodes[4].requestFocus();
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
@@ -173,6 +211,102 @@ void main() {
       await tester.pump();
 
       expect(focusNodes[0].hasFocus, isTrue, reason: 'Left should stay in sidebar');
+    });
+
+    testWidgets('Section headers are not focusable', (tester) async {
+      // Section headers are plain Text widgets — no Focus, so traversal skips them
+      final focusNodes = List.generate(4, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Column(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('Обзор'),
+                  ),
+                  Focus(focusNode: focusNodes[0], child: const SizedBox(width: 100, height: 40)),
+                  Focus(focusNode: focusNodes[1], child: const SizedBox(width: 100, height: 40)),
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('Библиотека'),
+                  ),
+                  Focus(focusNode: focusNodes[2], child: const SizedBox(width: 100, height: 40)),
+                  Focus(focusNode: focusNodes[3], child: const SizedBox(width: 100, height: 40)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      focusNodes[0].requestFocus();
+      await tester.pump();
+
+      // Down should go directly to focusNodes[1], skipping the "Обзор" header
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusNodes[1].hasFocus, isTrue, reason: 'should skip section header');
+
+      // Continue down — skip "Библиотека" header, land on focusNodes[2]
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusNodes[2].hasFocus, isTrue, reason: 'should skip second section header');
+    });
+
+    testWidgets('Down arrow at last sidebar item stays in sidebar', (tester) async {
+      final focusNodes = List.generate(3, (_) => FocusNode());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Row(
+              children: [
+                FocusTraversalGroup(
+                  policy: ReadingOrderTraversalPolicy(),
+                  child: Column(
+                    children: List.generate(
+                      3,
+                      (i) => Focus(
+                        focusNode: focusNodes[i],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                    ),
+                  ),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(
+                  child: FocusTraversalGroup(
+                    policy: ReadingOrderTraversalPolicy(),
+                    child: Column(
+                      children: List.generate(
+                        3,
+                        (i) => Focus(
+                          child: SizedBox(key: Key('content_$i'), width: 200, height: 40),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // Focus the last sidebar item
+      focusNodes[2].requestFocus();
+      await tester.pump();
+
+      // Down arrow should stay on the last item, not escape to content
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusNodes[2].hasFocus, isTrue, reason: 'Down at last item should stay');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      expect(focusNodes[2].hasFocus, isTrue, reason: 'Still should not leave sidebar');
     });
 
     testWidgets('Tab moves from sidebar to content', (tester) async {
