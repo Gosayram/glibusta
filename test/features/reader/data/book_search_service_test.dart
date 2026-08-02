@@ -33,7 +33,7 @@ void main() {
   late BookSearchService service;
 
   setUp(() {
-    service = BookSearchService(_testBook());
+    service = BookSearchService(_testBook(), '/dummy');
   });
 
   group('literal search', () {
@@ -142,7 +142,7 @@ void main() {
           ),
         ],
       );
-      final slowService = BookSearchService(slowBook);
+      final slowService = BookSearchService(slowBook, '/dummy');
       final searchFuture = slowService.search('cat');
       slowService.cancelPending();
       final results = await searchFuture;

@@ -41,8 +41,7 @@ final class StorageModeNotifierProvider
   }
 }
 
-String _$storageModeNotifierHash() =>
-    r'f565d290b02fc7d5bc6d584bac636ce0f367bd3d';
+String _$storageModeNotifierHash() => r'f565d290b02fc7d5bc6d584bac636ce0f367bd3d';
 
 abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
   StorageMode build();
@@ -66,11 +65,7 @@ abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
 final externalFolderProvider = ExternalFolderNotifierProvider._();
 
 final class ExternalFolderNotifierProvider
-    extends
-        $NotifierProvider<
-          ExternalFolderNotifier,
-          ({String? name, String? uri})
-        > {
+    extends $NotifierProvider<ExternalFolderNotifier, ({String? name, String? uri})> {
   ExternalFolderNotifierProvider._()
     : super(
         from: null,
@@ -100,28 +95,18 @@ final class ExternalFolderNotifierProvider
   }
 }
 
-String _$externalFolderNotifierHash() =>
-    r'1329b12b2371f34846fe35ce53e0161525a2b4a6';
+String _$externalFolderNotifierHash() => r'1329b12b2371f34846fe35ce53e0161525a2b4a6';
 
-abstract class _$ExternalFolderNotifier
-    extends $Notifier<({String? name, String? uri})> {
+abstract class _$ExternalFolderNotifier extends $Notifier<({String? name, String? uri})> {
   ({String? name, String? uri}) build();
   @$mustCallSuper
   @override
   WhenComplete runBuild() {
-    final ref =
-        this.ref
-            as $Ref<
-              ({String? name, String? uri}),
-              ({String? name, String? uri})
-            >;
+    final ref = this.ref as $Ref<({String? name, String? uri}), ({String? name, String? uri})>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<
-                ({String? name, String? uri}),
-                ({String? name, String? uri})
-              >,
+              AnyNotifier<({String? name, String? uri}), ({String? name, String? uri})>,
               ({String? name, String? uri}),
               Object?,
               Object?
@@ -133,8 +118,7 @@ abstract class _$ExternalFolderNotifier
 @ProviderFor(DirectReadNotifier)
 final directReadProvider = DirectReadNotifierProvider._();
 
-final class DirectReadNotifierProvider
-    extends $NotifierProvider<DirectReadNotifier, bool> {
+final class DirectReadNotifierProvider extends $NotifierProvider<DirectReadNotifier, bool> {
   DirectReadNotifierProvider._()
     : super(
         from: null,
@@ -162,8 +146,7 @@ final class DirectReadNotifierProvider
   }
 }
 
-String _$directReadNotifierHash() =>
-    r'4ea7ffc9d7e931d3d0fdfb4cd1e6e78657a5b721';
+String _$directReadNotifierHash() => r'4ea7ffc9d7e931d3d0fdfb4cd1e6e78657a5b721';
 
 abstract class _$DirectReadNotifier extends $Notifier<bool> {
   bool build();
@@ -172,13 +155,7 @@ abstract class _$DirectReadNotifier extends $Notifier<bool> {
   WhenComplete runBuild() {
     final ref = this.ref as $Ref<bool, bool>;
     final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<bool, bool>,
-              bool,
-              Object?,
-              Object?
-            >;
+        ref.element as $ClassProviderElement<AnyNotifier<bool, bool>, bool, Object?, Object?>;
     return element.handleCreate(ref, build);
   }
 }

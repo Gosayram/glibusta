@@ -65,8 +65,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authAsync = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AdaptiveAppBar(
-        title: const Text('Вход'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Вход'),
       ),
       body: Center(
         child: ConstrainedBox(

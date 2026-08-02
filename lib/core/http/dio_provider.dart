@@ -45,7 +45,7 @@ Dio dio(Ref ref) {
     _RetryInterceptor(dio: dio, logger: logger, maxRetries: 3),
   ]);
   // ponytail: compile-time gate, runtime toggle in settings if ergonomics matter
-  if (const bool.fromEnvironment('RECORD_FIXTURES', defaultValue: false)) {
+  if (const bool.fromEnvironment('RECORD_FIXTURES')) {
     dio.interceptors.add(FixtureRecorderInterceptor(logger: logger));
   }
   return dio;

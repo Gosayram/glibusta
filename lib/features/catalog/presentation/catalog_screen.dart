@@ -12,6 +12,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/utils/cache_entry.dart';
 import '../../../shared/widgets/book_card.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../../shared/widgets/error_state_widget.dart';
@@ -21,28 +22,20 @@ import '../../search/data/flibusta_source.dart';
 
 part 'catalog_screen.g.dart';
 
-// ponytail: minimal cache entry, same ttl as the old CatalogRepositoryImpl
-class _CacheEntry<T> {
-  final T data;
-  final DateTime expiresAt;
-  _CacheEntry(this.data, this.expiresAt);
-  bool get isExpired => DateTime.now().isAfter(expiresAt);
-}
-
 const _cacheTtl = Duration(minutes: 10);
-final _categoriesCache = <String, _CacheEntry<List<SearchGenreItem>>>{};
-final _booksCache = <String, _CacheEntry<List<Book>>>{};
+final _categoriesCache = <String, CacheEntry<List<SearchGenreItem>>>{};
+final _booksCache = <String, CacheEntry<List<Book>>>{};
 
 @riverpod
 Future<List<SearchGenreItem>> categories(Ref ref) async {
   final cached = _categoriesCache['categories'];
-  if (cached != null && !cached.isExpired) return cached.data;
+  if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
 
   final apiClient = ref.watch(flibustaSourceProvider);
   try {
     final response = await apiClient.getGenreList();
     final result = response.genres;
-    _categoriesCache['categories'] = _CacheEntry(result, DateTime.now().add(_cacheTtl));
+    _categoriesCache['categories'] = CacheEntry(result);
     return result;
   } on Object catch (e) {
     AppLogger().warning('Genre list failed, using defaults: $e', name: 'Catalog');
@@ -60,7 +53,7 @@ Future<List<SearchGenreItem>> categories(Ref ref) async {
 @riverpod
 Future<List<Book>> popularBooks(Ref ref) async {
   final cached = _booksCache['popular'];
-  if (cached != null && !cached.isExpired) return cached.data;
+  if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
 
   final apiClient = ref.watch(flibustaSourceProvider);
   try {
@@ -86,7 +79,7 @@ Future<List<Book>> popularBooks(Ref ref) async {
           ),
         )
         .toList();
-    _booksCache['popular'] = _CacheEntry(books, DateTime.now().add(_cacheTtl));
+    _booksCache['popular'] = CacheEntry(books);
     return books;
   } on Object catch (e) {
     AppLogger().warning('Popular books query failed: $e', name: 'Catalog', error: e);

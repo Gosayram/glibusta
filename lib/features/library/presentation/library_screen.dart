@@ -34,9 +34,9 @@ import '../data/book_repository_impl.dart';
 import '../data/inspectors/book_inspection_provider.dart';
 import '../data/inspectors/book_inspection_result.dart';
 import '../domain/book_repository.dart';
+import 'continue_reading_provider.dart';
 import 'library_sort.dart';
 import 'library_view_mode_provider.dart';
-import 'continue_reading_provider.dart';
 import 'pinned_books_provider.dart';
 
 part 'library_screen.g.dart';
@@ -249,11 +249,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             childAspectRatio: 0.75,
           ),
           itemCount: 6,
-          itemBuilder: (_, _) => Card(
+          itemBuilder: (_, _) => const Card(
             child: ListTile(
-              leading: const Bone.circle(size: 48),
-              title: const Bone(width: 120, height: 12),
-              subtitle: const Bone(width: 80, height: 12),
+              leading: Bone.circle(size: 48),
+              title: Bone(width: 120, height: 12),
+              subtitle: Bone(width: 80, height: 12),
             ),
           ),
         ),
@@ -1181,9 +1181,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: continueBooks.length,
-                separatorBuilder: (_, _)=> const SizedBox(width: 12),
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
                 itemBuilder: (_, index) {
- final item = continueBooks[index];
+                  final item = continueBooks[index];
                   return _ContinueReadingCard(
                     item: item,
                     onTap: () => unawaited(

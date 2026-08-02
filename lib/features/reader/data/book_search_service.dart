@@ -35,9 +35,7 @@ class BookSearchService {
   int get totalParagraphs => _book.chapters.fold(0, (sum, c) => sum + c.blocks.length);
 
   String _chapterTitle(int chapterIndex) {
-    final titles = _book.chapters
-        .where((c) => c.index == chapterIndex)
-        .map((c) => c.title);
+    final titles = _book.chapters.where((c) => c.index == chapterIndex).map((c) => c.title);
     return titles.isNotEmpty ? titles.first : '';
   }
 

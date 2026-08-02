@@ -137,12 +137,12 @@ class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 5,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Bone.circle(size: 24),
-                title: const Bone(width: 120, height: 12),
-                subtitle: const Bone(width: 80, height: 12),
+                leading: Bone.circle(size: 24),
+                title: Bone(width: 120, height: 12),
+                subtitle: Bone(width: 80, height: 12),
               ),
             ),
           ),

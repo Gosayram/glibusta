@@ -24,12 +24,13 @@ Future<List<ContinueReadingBook>> continueReading(Ref ref) async {
   final db = ref.watch(databaseProvider);
   final repository = ref.watch(bookRepositoryProvider);
 
-  final progressRows = await (db.select(db.readingProgress)
-        ..where((t) => t.progressPercent.isBiggerThanValue(0))
-        ..where((t) => t.progressPercent.isSmallerThanValue(1))
-        ..orderBy([(t) => OrderingTerm.desc(t.lastRead)])
-        ..limit(6))
-      .get();
+  final progressRows =
+      await (db.select(db.readingProgress)
+            ..where((t) => t.progressPercent.isBiggerThanValue(0))
+            ..where((t) => t.progressPercent.isSmallerThanValue(1))
+            ..orderBy([(t) => OrderingTerm.desc(t.lastRead)])
+            ..limit(6))
+          .get();
 
   if (progressRows.isEmpty) return [];
 

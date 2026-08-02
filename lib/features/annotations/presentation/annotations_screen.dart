@@ -131,15 +131,15 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
   @override
   Widget build(BuildContext context) {
     if (_initialLoading) {
-      return Scaffold(
-        appBar: AdaptiveAppBar(title: const Text('Аннотации')),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        appBar: AdaptiveAppBar(title: Text('Аннотации')),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_initialError != null) {
       return Scaffold(
-        appBar: AdaptiveAppBar(title: const Text('Аннотации')),
+        appBar: const AdaptiveAppBar(title: Text('Аннотации')),
         body: ErrorStateWidget(
           message: 'Не удалось загрузить аннотации',
           details: _initialError.toString(),

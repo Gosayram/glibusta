@@ -28,8 +28,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final userAsync = ref.watch(userCollectionsProvider);
 
     return Scaffold(
-      appBar: AdaptiveAppBar(
-        title: const Text('Коллекции'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Коллекции'),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateDialog(context),

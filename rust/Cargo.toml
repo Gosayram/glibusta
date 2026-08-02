@@ -147,6 +147,6 @@ strip = "symbols"     # strip debug symbols from .so
 [profile.release.package."*"]
 opt-level = "z"
 
-
 [profile.release.package.aho-corasick]
 opt-level = 3
+

@@ -362,7 +362,7 @@ void main() {
 const _emptyBook = NormalizedBook(id: 'test', title: 'Test', authors: []);
 
 class _ControlledSearchService extends BookSearchService {
-  _ControlledSearchService() : super(_emptyBook);
+  _ControlledSearchService() : super(_emptyBook, '/dummy');
 
   final queries = <String>[];
   final _pending = <String, Completer<List<BookSearchResult>>>{};

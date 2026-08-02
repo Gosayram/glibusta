@@ -19,9 +19,7 @@ final class ContinueReadingProvider
           List<ContinueReadingBook>,
           FutureOr<List<ContinueReadingBook>>
         >
-    with
-        $FutureModifier<List<ContinueReadingBook>>,
-        $FutureProvider<List<ContinueReadingBook>> {
+    with $FutureModifier<List<ContinueReadingBook>>, $FutureProvider<List<ContinueReadingBook>> {
   ContinueReadingProvider._()
     : super(
         from: null,

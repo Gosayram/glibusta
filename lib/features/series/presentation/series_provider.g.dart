@@ -52,12 +52,7 @@ String _$allSeriesHash() => r'3c1478133921383eb1463670b0b5f753c1949684';
 final seriesDetailProvider = SeriesDetailFamily._();
 
 final class SeriesDetailProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<SeriesDetail?>,
-          SeriesDetail?,
-          FutureOr<SeriesDetail?>
-        >
+    extends $FunctionalProvider<AsyncValue<SeriesDetail?>, SeriesDetail?, FutureOr<SeriesDetail?>>
     with $FutureModifier<SeriesDetail?>, $FutureProvider<SeriesDetail?> {
   SeriesDetailProvider._({
     required SeriesDetailFamily super.from,

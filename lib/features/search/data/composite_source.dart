@@ -7,6 +7,7 @@ import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../../shared/models/search_query.dart';
+import '../../../shared/utils/cache_entry.dart';
 import '../domain/book_source.dart';
 import 'flibusta_source.dart';
 
@@ -27,9 +28,8 @@ class CompositeBookSource extends BookSource {
   final List<BookSource> sources;
   final AppLogger? _logger;
 
-  // Ponytail: simple in-memory cache, max 50 entries, 5 min TTL
-  final Map<String, _CacheEntry<SearchResultPage>> _searchCache = {};
-  final Map<String, _CacheEntry<SearchAuthorsResultPage>> _authorCache = {};
+  final Map<String, CacheEntry<SearchResultPage>> _searchCache = {};
+  final Map<String, CacheEntry<SearchAuthorsResultPage>> _authorCache = {};
   static const _cacheTtl = Duration(minutes: 5);
   static const _cacheMaxSize = 50;
 
@@ -40,7 +40,7 @@ class CompositeBookSource extends BookSource {
   Future<SearchResultPage> searchBooks(SearchQuery query, {CancelToken? cancelToken}) async {
     final key = _searchKey(query);
     final cached = _searchCache[key];
-    if (cached != null && !cached.isExpired) return cached.value;
+    if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
     _searchCache.remove(key);
 
     final errors = <AppFailure>[];
@@ -90,7 +90,7 @@ class CompositeBookSource extends BookSource {
   }) async {
     final key = _searchKey(query);
     final cached = _authorCache[key];
-    if (cached != null && !cached.isExpired) return cached.value;
+    if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
     _authorCache.remove(key);
 
     final errors = <AppFailure>[];
@@ -209,18 +209,11 @@ class CompositeBookSource extends BookSource {
     );
   }
 
-  void _put<T>(Map<String, _CacheEntry<T>> cache, String key, T value) {
+  void _put<T>(Map<String, CacheEntry<T>> cache, String key, T value) {
     if (cache.length >= _cacheMaxSize) {
       final oldest = cache.keys.first;
       cache.remove(oldest);
     }
-    cache[key] = _CacheEntry(value);
+    cache[key] = CacheEntry(value);
   }
-}
-
-class _CacheEntry<T> {
-  final T value;
-  final DateTime _createdAt;
-  _CacheEntry(this.value) : _createdAt = DateTime.now();
-  bool get isExpired => DateTime.now().difference(_createdAt) > CompositeBookSource._cacheTtl;
 }

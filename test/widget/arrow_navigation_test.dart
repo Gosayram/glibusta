@@ -21,19 +21,43 @@ void main() {
                         padding: EdgeInsets.all(8),
                         child: Text('Обзор'),
                       ),
-                      Focus(focusNode: focusNodes[0], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[1], child: const SizedBox(width: 100, height: 40)),
+                      Focus(
+                        focusNode: focusNodes[0],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[1],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
                       // Section header: Библиотека
                       const Padding(
                         padding: EdgeInsets.all(8),
                         child: Text('Библиотека'),
                       ),
-                      Focus(focusNode: focusNodes[2], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[3], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[4], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[5], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[6], child: const SizedBox(width: 100, height: 40)),
-                      Focus(focusNode: focusNodes[7], child: const SizedBox(width: 100, height: 40)),
+                      Focus(
+                        focusNode: focusNodes[2],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[3],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[4],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[5],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[6],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
+                      Focus(
+                        focusNode: focusNodes[7],
+                        child: const SizedBox(width: 100, height: 40),
+                      ),
                     ],
                   ),
                 ),
@@ -433,8 +457,7 @@ void main() {
               child: Focus(
                 focusNode: focusNode,
                 onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent &&
-                      event.logicalKey == LogicalKeyboardKey.enter) {
+                  if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.enter) {
                     activated = true;
                     return KeyEventResult.handled;
                   }

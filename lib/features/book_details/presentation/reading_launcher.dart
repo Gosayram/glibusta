@@ -33,7 +33,6 @@ Future<void> startReading(
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      useRootNavigator: true,
       builder: (_) => const _ReadLoadingDialog(),
     ),
   );

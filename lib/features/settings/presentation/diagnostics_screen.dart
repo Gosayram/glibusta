@@ -46,7 +46,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AdaptiveAppBar(title: const Text('Диагностика')),
+      appBar: const AdaptiveAppBar(title: Text('Диагностика')),
       body: FutureBuilder<DiagnosticsInfo>(
         future: _infoFuture,
         builder: (context, snapshot) {

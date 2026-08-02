@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:fl_charset/fl_charset.dart';
 import 'package:flutter_charset_detector/flutter_charset_detector.dart';
 
-import '../../../src/rust/api/api/api.dart' as rust_api;
+import '../../src/rust/api/api/api.dart' as rust_api;
 import 'encoding_utils.dart';
 
 /// Source of encoding detection result.

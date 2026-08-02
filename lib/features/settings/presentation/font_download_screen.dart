@@ -30,8 +30,8 @@ class _FontDownloadScreenState extends ConsumerState<FontDownloadScreen> {
     final fontsAsync = ref.watch(fontListProvider);
 
     return Scaffold(
-      appBar: AdaptiveAppBar(
-        title: const Text('Шрифты'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Шрифты'),
       ),
       body: fontsAsync.when(
         data: (fonts) {

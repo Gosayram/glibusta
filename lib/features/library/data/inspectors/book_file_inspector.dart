@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import '../../../../src/rust/api/api/api.dart' as rust_api;
-
 import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/formats/book_file_size_policy.dart';
 import '../../../../core/formats/format_capability.dart';
+import '../../../../src/rust/api/api/api.dart' as rust_api;
 import 'book_format_detector.dart';
 import 'book_inspection_result.dart';
 import 'book_metadata_extractor.dart';

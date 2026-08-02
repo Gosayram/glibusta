@@ -17,7 +17,7 @@ class SeriesScreen extends ConsumerWidget {
     final seriesAsync = ref.watch(allSeriesProvider);
 
     return Scaffold(
-      appBar: AdaptiveAppBar(title: const Text('Серии')),
+      appBar: const AdaptiveAppBar(title: Text('Серии')),
       body: seriesAsync.when(
         data: (List<SeriesInfo> seriesList) {
           if (seriesList.isEmpty) {
@@ -61,12 +61,12 @@ class SeriesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 6,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Bone.circle(size: 40),
-                title: const Bone(width: 120, height: 12),
-                subtitle: const Bone(width: 80, height: 12),
+                leading: Bone.circle(size: 40),
+                title: Bone(width: 120, height: 12),
+                subtitle: Bone(width: 80, height: 12),
               ),
             ),
           ),

@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/logging/app_logger.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/data/reader_cache_service.dart';
 import 'package:glibusta/shared/models/book.dart';
+import 'package:glibusta/src/rust/api/api/api.dart' as rust_api;
 
 final class _TestStorage implements AppFileStorage {
   const _TestStorage(this.root);
@@ -295,7 +295,7 @@ void main() {
     final manifestFile = File('${bookDir.path}/manifest.json');
     final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
     final checksums = manifest['chapterChecksums'] as Map<String, dynamic>;
-    checksums['0'] = sha256.convert(utf8.encode(swappedChapter)).toString();
+    checksums['0'] = await rust_api.sha256Hash(bytes: utf8.encode(swappedChapter));
     await manifestFile.writeAsString(jsonEncode(manifest));
 
     expect(await service.isCacheValid('book', metadata!), isTrue);

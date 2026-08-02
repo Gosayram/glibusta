@@ -57,7 +57,7 @@ class _BookCardState extends State<BookCard> {
     if (onTap != null) {
       onTap();
     } else {
-      context.push('/book/${widget.book.id}');
+      unawaited(context.push('/book/${widget.book.id}'));
     }
   }
 
@@ -78,7 +78,7 @@ class _BookCardState extends State<BookCard> {
           focusNode: _focusNode,
           onFocusChange: (hasFocus) {
             if (hasFocus) {
-              Scrollable.ensureVisible(context, alignment: 0.5);
+              unawaited(Scrollable.ensureVisible(context, alignment: 0.5));
             }
           },
           onKeyEvent: (node, event) {

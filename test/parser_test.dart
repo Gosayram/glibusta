@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/core/formats/supported_extensions.dart';
 import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
 import 'package:glibusta/shared/models/search_query.dart';
 
@@ -58,7 +57,7 @@ void main() {
 
     test('picker exposes every parser-backed document and comic extension', () {
       expect(
-        supportedBookExtensions,
+        importableExtensions,
         containsAll(['docx', 'docm', 'cbz', 'cbr']),
       );
     });

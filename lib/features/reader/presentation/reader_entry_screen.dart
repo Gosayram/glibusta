@@ -15,7 +15,7 @@ import 'djvu_reader_screen.dart';
 import 'pdf_reader_screen.dart';
 import 'reader_screen.dart';
 
-/// Resolves the local file path for [bookId]: an online-read temp copy (via the
+/// Resolves the local file path for a book: an online-read temp copy (via the
 /// registry) takes precedence, then the downloads table, then saved books.
 final readerFilePathProvider = FutureProvider.family<({String path, bool exists}), String>(
   (ref, bookId) async {
@@ -85,7 +85,7 @@ class _ReaderOpenError extends StatelessWidget {
   Widget build(BuildContext context) {
     AppLogger().warning('Reader open error: $message', name: 'Reader');
     return Scaffold(
-      appBar: AdaptiveAppBar(title: const Text('Открытие книги')),
+      appBar: const AdaptiveAppBar(title: Text('Открытие книги')),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

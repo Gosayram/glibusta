@@ -11,13 +11,11 @@ import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
-import '../../../src/rust/api/api/api.dart' as rust_api;
-
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
-
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';

@@ -1654,7 +1654,9 @@ final class ReaderController {
       final db = _ref.read(databaseProvider);
       final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(_bookId))).get();
       for (final row in rows) {
-        if (row.status == DownloadStatusDb.completed && row.targetPath != null && row.targetPath!.isNotEmpty) {
+        if (row.status == DownloadStatusDb.completed &&
+            row.targetPath != null &&
+            row.targetPath!.isNotEmpty) {
           return row.targetPath;
         }
       }

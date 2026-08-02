@@ -24,8 +24,8 @@ class SeriesDetailScreen extends ConsumerWidget {
         data: (SeriesDetail? detail) => AdaptiveAppBar(
           title: Text(detail?.name ?? 'Серия'),
         ),
-        loading: () => AdaptiveAppBar(title: const Text('Серия')),
-        error: (_, _) => AdaptiveAppBar(title: const Text('Серия')),
+        loading: () => const AdaptiveAppBar(title: Text('Серия')),
+        error: (_, _) => const AdaptiveAppBar(title: Text('Серия')),
       ),
       body: detailAsync.when(
         data: (SeriesDetail? detail) {
@@ -104,12 +104,12 @@ class SeriesDetailScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Bone(width: 120, height: 12),
-                    const SizedBox(height: 8),
-                    const Bone(width: 160, height: 12),
+                    Bone(width: 120, height: 12),
+                    SizedBox(height: 8),
+                    Bone(width: 160, height: 12),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -118,15 +118,15 @@ class SeriesDetailScreen extends ConsumerWidget {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: 4,
-                    itemBuilder: (_, _) => SizedBox(
+                    itemBuilder: (_, _) => const SizedBox(
                       width: 120,
                       child: Card(
                         child: Column(
                           children: [
-                            const Skeleton.replace(child: Bone(height: 120)),
+                            Skeleton.replace(child: Bone(height: 120)),
                             Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: const Bone(width: 80, height: 12),
+                              padding: EdgeInsets.all(8),
+                              child: Bone(width: 80, height: 12),
                             ),
                           ],
                         ),

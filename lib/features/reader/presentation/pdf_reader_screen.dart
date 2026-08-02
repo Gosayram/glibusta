@@ -122,7 +122,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
     final file = File(widget.filePath);
     if (!file.existsSync()) {
       return Scaffold(
-        appBar: AdaptiveAppBar(title: const Text('PDF')),
+        appBar: const AdaptiveAppBar(title: Text('PDF')),
         body: Center(child: Text('Файл не найден: ${widget.filePath}')),
       );
     }

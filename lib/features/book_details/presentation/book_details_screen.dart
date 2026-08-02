@@ -28,40 +28,40 @@ class BookDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(bookDetailsProvider(bookId));
 
     return Scaffold(
-      appBar: AdaptiveAppBar(title: const Text('О книге')),
+      appBar: const AdaptiveAppBar(title: Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => BookDetailsContent(details: details, bookId: bookId),
-        loading: () => Skeletonizer(
+        loading: () => const Skeletonizer(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Skeleton.replace(
+                    Skeleton.replace(
                       child: Bone(width: 120, height: 180),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Bone(width: 120, height: 12),
-                          const SizedBox(height: 8),
-                          const Bone(width: 80, height: 12),
-                          const SizedBox(height: 8),
-                          const Bone(width: 120, height: 12),
+                          Bone(width: 120, height: 12),
+                          SizedBox(height: 8),
+                          Bone(width: 80, height: 12),
+                          SizedBox(height: 8),
+                          Bone(width: 120, height: 12),
                         ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                const Bone(height: 40),
-                const SizedBox(height: 16),
-                const Bone(height: 100),
+                SizedBox(height: 24),
+                Bone(height: 40),
+                SizedBox(height: 16),
+                Bone(height: 100),
               ],
             ),
           ),
@@ -731,9 +731,9 @@ class _LoginPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveAppBar(title: const Text('Вход')),
-      body: const Center(
+    return const Scaffold(
+      appBar: AdaptiveAppBar(title: Text('Вход')),
+      body: Center(
         child: Text('Откройте Настройки → Вход для авторизации'),
       ),
     );

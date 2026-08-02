@@ -24,8 +24,8 @@ class QuotesScreen extends ConsumerWidget {
     final quotesAsync = ref.watch(quotesStreamProvider(bookId));
 
     return Scaffold(
-      appBar: AdaptiveAppBar(
-        title: const Text('Цитаты'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Цитаты'),
       ),
       body: quotesAsync.when(
         data: (quotes) {
@@ -82,18 +82,18 @@ class QuotesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 4,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Bone(width: 120, height: 12),
-                    const SizedBox(height: 8),
-                    const Bone(width: 160, height: 12),
-                    const SizedBox(height: 8),
-                    const Bone(width: 120, height: 12),
+                    Bone(width: 120, height: 12),
+                    SizedBox(height: 8),
+                    Bone(width: 160, height: 12),
+                    SizedBox(height: 8),
+                    Bone(width: 120, height: 12),
                   ],
                 ),
               ),
