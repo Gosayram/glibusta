@@ -165,47 +165,45 @@ class SidebarNavigation extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: FocusTraversalGroup(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final branchIdx = _branchIndexForItem[index];
-                    final isBranchItem = branchIdx != null;
-                    final isSelected = isBranchItem && branchIdx == selectedIndex;
-                    return ListTile(
-                      leading: Icon(
-                        item.icon,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final branchIdx = _branchIndexForItem[index];
+                  final isBranchItem = branchIdx != null;
+                  final isSelected = isBranchItem && branchIdx == selectedIndex;
+                  return ListTile(
+                    leading: Icon(
+                      item.icon,
+                      color: isSelected ? colorScheme.primary : null,
+                    ),
+                    title: Text(
+                      item.label,
+                      style: TextStyle(
                         color: isSelected ? colorScheme.primary : null,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
-                      title: Text(
-                        item.label,
-                        style: TextStyle(
-                          color: isSelected ? colorScheme.primary : null,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      onTap: () {
-                        if (isBranchItem) {
-                          onDestinationSelected?.call(branchIdx);
-                        } else {
-                          final route = item.route;
-                          if (route.isNotEmpty) {
-                            unawaited(context.push<void>(route));
-                          }
+                    ),
+                    selected: isSelected,
+                    selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    onTap: () {
+                      if (isBranchItem) {
+                        onDestinationSelected?.call(branchIdx);
+                      } else {
+                        final route = item.route;
+                        if (route.isNotEmpty) {
+                          unawaited(context.push<void>(route));
                         }
-                      },
-                    );
-                  },
-                ),
+                      }
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -255,18 +253,20 @@ class TabletShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Row(
-          children: [
-            AdaptiveNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+        child: FocusTraversalGroup(
+          child: Row(
+            children: [
+              AdaptiveNavigation(
+                selectedIndex: navigationShell.currentIndex,
+                onDestinationSelected: (index) => navigationShell.goBranch(
+                  index,
+                  initialLocation: index == navigationShell.currentIndex,
+                ),
               ),
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
-          ],
+              const VerticalDivider(width: 1),
+              Expanded(child: navigationShell),
+            ],
+          ),
         ),
       ),
     );
@@ -281,18 +281,20 @@ class DesktopShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Row(
-          children: [
-            AdaptiveNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+        child: FocusTraversalGroup(
+          child: Row(
+            children: [
+              AdaptiveNavigation(
+                selectedIndex: navigationShell.currentIndex,
+                onDestinationSelected: (index) => navigationShell.goBranch(
+                  index,
+                  initialLocation: index == navigationShell.currentIndex,
+                ),
               ),
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
-          ],
+              const VerticalDivider(width: 1),
+              Expanded(child: navigationShell),
+            ],
+          ),
         ),
       ),
     );
@@ -311,22 +313,24 @@ class MacOSShell extends ConsumerWidget {
     return Scaffold(
       body: BookDropZone(
         onBooksDropped: (paths) => _handleDrop(context, ref, paths),
-        child: Row(
-          children: [
-            SidebarNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+        child: FocusTraversalGroup(
+          child: Row(
+            children: [
+              SidebarNavigation(
+                selectedIndex: navigationShell.currentIndex,
+                onDestinationSelected: (index) => navigationShell.goBranch(
+                  index,
+                  initialLocation: index == navigationShell.currentIndex,
+                ),
               ),
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
-            if (selectedBook != null) ...[
               const VerticalDivider(width: 1),
-              const MacOSRightPanel(),
+              Expanded(child: navigationShell),
+              if (selectedBook != null) ...[
+                const VerticalDivider(width: 1),
+                const MacOSRightPanel(),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

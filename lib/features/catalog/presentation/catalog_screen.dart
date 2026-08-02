@@ -331,79 +331,77 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
               }
               final downloadedMap = snapshot.data ?? {};
 
-              return FocusTraversalGroup(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final width = constraints.maxWidth;
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
 
-                    // Determine grid layout based on width
-                    if (width < AppBreakpoints.compact) {
-                      // Phone: 2 columns
-                      return GridView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.62,
-                        ),
-                        itemCount: books.length,
-                        itemBuilder: (context, index) {
-                          final book = books[index];
-                          return BookCard(
-                            key: ValueKey(book.id),
-                            book: book,
-                            isDownloaded: downloadedMap[book.id],
-                          );
-                        },
-                      );
-                    } else if (width < AppBreakpoints.medium) {
-                      // Tablet: 3-4 columns
-                      final crossAxisCount = (width / 180).floor().clamp(3, 4);
-                      return GridView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.62,
-                        ),
-                        itemCount: books.length,
-                        itemBuilder: (context, index) {
-                          final book = books[index];
-                          return BookCard(
-                            key: ValueKey(book.id),
-                            book: book,
-                            isDownloaded: downloadedMap[book.id],
-                          );
-                        },
-                      );
-                    } else {
-                      // Desktop: adaptive card width (180-220px)
-                      return GridView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 0.62,
-                        ),
-                        itemCount: books.length,
-                        itemBuilder: (context, index) {
-                          final book = books[index];
-                          return BookCard(
-                            key: ValueKey(book.id),
-                            book: book,
-                            isDownloaded: downloadedMap[book.id],
-                          );
-                        },
-                      );
-                    }
-                  },
-                ),
+                  // Determine grid layout based on width
+                  if (width < AppBreakpoints.compact) {
+                    // Phone: 2 columns
+                    return GridView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.62,
+                      ),
+                      itemCount: books.length,
+                      itemBuilder: (context, index) {
+                        final book = books[index];
+                        return BookCard(
+                          key: ValueKey(book.id),
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
+                      },
+                    );
+                  } else if (width < AppBreakpoints.medium) {
+                    // Tablet: 3-4 columns
+                    final crossAxisCount = (width / 180).floor().clamp(3, 4);
+                    return GridView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.62,
+                      ),
+                      itemCount: books.length,
+                      itemBuilder: (context, index) {
+                        final book = books[index];
+                        return BookCard(
+                          key: ValueKey(book.id),
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
+                      },
+                    );
+                  } else {
+                    // Desktop: adaptive card width (180-220px)
+                    return GridView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 220,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.62,
+                      ),
+                      itemCount: books.length,
+                      itemBuilder: (context, index) {
+                        final book = books[index];
+                        return BookCard(
+                          key: ValueKey(book.id),
+                          book: book,
+                          isDownloaded: downloadedMap[book.id],
+                        );
+                      },
+                    );
+                  }
+                },
               );
             },
           ),

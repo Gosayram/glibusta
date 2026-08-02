@@ -76,6 +76,11 @@ class _BookCardState extends State<BookCard> {
         button: true,
         child: Focus(
           focusNode: _focusNode,
+          onFocusChange: (hasFocus) {
+            if (hasFocus) {
+              Scrollable.ensureVisible(context, alignment: 0.5);
+            }
+          },
           onKeyEvent: (node, event) {
             if (event is KeyDownEvent) {
               if (event.logicalKey == LogicalKeyboardKey.enter ||

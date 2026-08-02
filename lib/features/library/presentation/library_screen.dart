@@ -1152,104 +1152,102 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final pinnedBooksList = books.where((b) => pinnedIds.contains(b.id)).toList();
     final unpinnedBooks = books.where((b) => !pinnedIds.contains(b.id)).toList();
 
-    return FocusTraversalGroup(
-      child: RestorableCustomScrollView(
-        restorationId: 'library-books-scroll',
-        slivers: [
-          if (pinnedBooksList.isNotEmpty) ...[
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.push_pin,
-                      size: 16,
+    return RestorableCustomScrollView(
+      restorationId: 'library-books-scroll',
+      slivers: [
+        if (pinnedBooksList.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.push_pin,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Закреплённые',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.primary,
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Закреплённые',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 180,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 0.62,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final book = pinnedBooksList[index];
-                    return _wrapWithSelection(
-                      context,
-                      ref,
-                      book,
-                      BookCard(
-                        key: ValueKey(book.id),
-                        book: book,
-                        onTap: _selectionMode
-                            ? () => _toggleSelection(book.id)
-                            : () => unawaited(context.push('/reader/${book.id}')),
-                        onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
-                        onEditMetadata: () => _showEditMetadata(context, ref, book),
-                        onAddToCollection: () => _showCollectionPicker(context, ref, book),
-                      ),
-                    );
-                  },
-                  childCount: pinnedBooksList.length,
-                ),
-              ),
-            ),
-            const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
-          ],
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            sliver: SliverToBoxAdapter(
-              child: Text(
-                pinnedBooksList.isNotEmpty ? 'Все книги' : '',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                  ),
+                ],
               ),
             ),
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: _buildBookSliver(context, ref, unpinnedBooks),
-          ),
-          if (_hasMore)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: _isLoadingMore
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            unawaited(_loadNextPage());
-                            return const SizedBox.shrink();
-                          },
-                        ),
-                ),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 180,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.62,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final book = pinnedBooksList[index];
+                  return _wrapWithSelection(
+                    context,
+                    ref,
+                    book,
+                    BookCard(
+                      key: ValueKey(book.id),
+                      book: book,
+                      onTap: _selectionMode
+                          ? () => _toggleSelection(book.id)
+                          : () => unawaited(context.push('/reader/${book.id}')),
+                      onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
+                      onEditMetadata: () => _showEditMetadata(context, ref, book),
+                      onAddToCollection: () => _showCollectionPicker(context, ref, book),
+                    ),
+                  );
+                },
+                childCount: pinnedBooksList.length,
               ),
             ),
+          ),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 8)),
         ],
-      ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          sliver: SliverToBoxAdapter(
+            child: Text(
+              pinnedBooksList.isNotEmpty ? 'Все книги' : '',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: _buildBookSliver(context, ref, unpinnedBooks),
+        ),
+        if (_hasMore)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Center(
+                child: _isLoadingMore
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Builder(
+                        builder: (context) {
+                          unawaited(_loadNextPage());
+                          return const SizedBox.shrink();
+                        },
+                      ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
