@@ -14,16 +14,16 @@ schemas describe parser expectations, not JSON emitted by the origin.
 
 ## 1. BOOKS (`/b/`)
 
-| Endpoint           | Method | Auth | Description                 |
-| ------------------ | ------ | ---- | --------------------------- |
-| `/b`               | GET    | No   | Book index (alphabetical)   |
-| `/b/{id}`          | GET    | No   | Book details page           |
-| `/b/{id}/read`     | GET    | No   | Read online (HTML viewer)   |
-| `/b/{id}/download` | GET    | No   | Download page (all formats) |
-| `/b/{id}/fb2`      | GET    | No   | Direct FB2 download         |
-| `/b/{id}/epub`     | GET    | No   | Direct EPUB download        |
-| `/b/{id}/mail`     | GET/POST | Yes | Candidate mail form / submit |
-| `/b/{id}/complain` | GET    | Yes  | Complain about file quality |
+| Endpoint           | Method   | Auth | Description                  |
+| ------------------ | -------- | ---- | ---------------------------- |
+| `/b`               | GET      | No   | Book index (alphabetical)    |
+| `/b/{id}`          | GET      | No   | Book details page            |
+| `/b/{id}/read`     | GET      | No   | Read online (HTML viewer)    |
+| `/b/{id}/download` | GET      | No   | Download page (all formats)  |
+| `/b/{id}/fb2`      | GET      | No   | Direct FB2 download          |
+| `/b/{id}/epub`     | GET      | No   | Direct EPUB download         |
+| `/b/{id}/mail`     | GET/POST | Yes  | Candidate mail form / submit |
+| `/b/{id}/complain` | GET      | Yes  | Complain about file quality  |
 
 ### Book details page (`/b/{id}`) — parsed fields:
 
