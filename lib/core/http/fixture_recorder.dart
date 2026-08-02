@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../src/rust/api/api/api.dart' as rust_api;
 import '../logging/app_logger.dart';
 
 /// Captures Flibusta HTML/XML responses to disk so parsers can be developed
@@ -58,7 +58,7 @@ class FixtureRecorderInterceptor extends Interceptor {
       final isXml = contentType.contains('xml') || contentType.contains('atom');
       final ext = isXml ? 'xml' : 'html';
       final category = _categoryFor(uri.path);
-      final name = _nameFor(uri);
+      final name = await _nameFor(uri);
       final rel = '$category/$name.$ext';
 
       final file = File('${base.path}/$rel');
@@ -74,7 +74,7 @@ class FixtureRecorderInterceptor extends Interceptor {
         'status': response.statusCode,
         'content_type': contentType,
         'bytes': bytes.length,
-        'sha256': sha256.convert(bytes).toString(),
+        'sha256': await rust_api.sha256Hash(bytes: bytes, maxBytes: BigInt.from(bytes.length)),
         'file': rel,
       };
       await File('${base.path}/record.jsonl').writeAsString(
@@ -109,12 +109,12 @@ class FixtureRecorderInterceptor extends Interceptor {
         'misc';
   }
 
-  static String _nameFor(Uri uri) {
+  static Future<String> _nameFor(Uri uri) async {
     final path = uri.path.replaceAll(RegExp(r'^/+|/+$'), '');
     final base = path.isEmpty ? 'root' : path.replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
     final capped = base.length > 56 ? '${base.substring(0, 48)}_${base.length}' : base;
     if (uri.query.isEmpty) return capped;
-    final q = sha1.convert(utf8.encode(uri.query)).toString().substring(0, 8);
+    final q = await rust_api.sha256Hash(bytes: utf8.encode(uri.query), maxBytes: BigInt.from(8));
     return '${capped.length > 48 ? capped.substring(0, 48) : capped}_$q';
   }
 }

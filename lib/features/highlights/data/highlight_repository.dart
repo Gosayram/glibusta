@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/daos/highlight_dao.dart';
 import '../../../core/database/tables.dart';
 import '../../../core/utils/monotonic_id.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 
 class HighlightValidationException implements Exception {
   HighlightValidationException(this.message);
@@ -22,9 +22,10 @@ class HighlightRepository {
 
   HighlightDao get _dao => _db.highlightDao;
 
-  String computeChapterId(String title) {
+  Future<String> computeChapterId(String title) async {
     final bytes = utf8.encode(title.trim().toLowerCase());
-    return sha256.convert(bytes).toString().substring(0, 16);
+    final hash = await rust_api.sha256Hash(bytes: bytes);
+    return hash.substring(0, 16);
   }
 
   static void validateHighlight({

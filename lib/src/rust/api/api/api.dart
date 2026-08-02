@@ -79,7 +79,8 @@ Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
 Future<Uint8List> getAssetBytes({
   required String path,
   required String assetId,
-}) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+}) =>
+    RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
 
 /// Compare two books parsed from the same file at different times.
 Future<BookDiff> diffParsedBook({
@@ -214,6 +215,10 @@ Future<NormalizedBook> parseMobi({
 Future<NormalizedBook> parseCbr({required String path}) =>
     RustLib.instance.api.crateApiApiParseCbr(path: path);
 
+/// Parse a CBZ (comic book ZIP) from a filesystem path.
+Future<NormalizedBook> parseCbz({required String path}) =>
+    RustLib.instance.api.crateApiApiParseCbz(path: path);
+
 Future<List<String>> decodeZipEntries({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDecodeZipEntries(bytes: bytes);
 
@@ -234,6 +239,12 @@ Future<String> sha256Hash({required List<int> bytes, BigInt? maxBytes}) =>
       bytes: bytes,
       maxBytes: maxBytes,
     );
+
+/// Quality scoring for Russian/English text decoding.
+/// Returns 0.0–1.0 where higher is better. Catches cases where
+/// a charset detector confidently returns the wrong encoding.
+Future<double> scoreEncodingQuality({required String text}) =>
+    RustLib.instance.api.crateApiApiScoreEncodingQuality(text: text);
 
 /// Legacy dispatcher — kept for backward compat.
 Future<NormalizedBook> parseBookLegacy({

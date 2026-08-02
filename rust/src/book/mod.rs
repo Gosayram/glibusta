@@ -1,5 +1,6 @@
 pub mod archive;
 pub mod cbr;
+pub mod cbz;
 pub mod djvu;
 pub mod docx;
 pub mod encoding;
@@ -201,6 +202,74 @@ fn split_keep_delims(text: &str) -> Vec<&str> {
     segments
 }
 
+/// Collapse multiple whitespace into single spaces and multiple newlines
+/// into single newlines, then trim. Skips image/separator blocks.
+pub(crate) fn collapse_whitespace(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_was_space = true;
+    let mut consecutive_newlines = 0u32;
+
+    for ch in text.chars() {
+        match ch {
+            '\r' => continue,
+            '\n' => {
+                consecutive_newlines += 1;
+                if consecutive_newlines <= 1 {
+                    result.push('\n');
+                }
+                prev_was_space = true;
+            }
+            ' ' | '\t' | '\x0C' => {
+                if !prev_was_space {
+                    result.push(' ');
+                }
+                prev_was_space = true;
+            }
+            _ => {
+                consecutive_newlines = 0;
+                prev_was_space = false;
+                result.push(ch);
+            }
+        }
+    }
+
+    // Trim trailing whitespace
+    let trimmed = result.trim_end();
+    if trimmed.len() == result.len() {
+        result
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Remove blocks with empty text (whitespace-only) that are not images/separators,
+/// and collapse whitespace in text content. Applied after parsing.
+pub(crate) fn postprocess_chapters(chapters: &mut Vec<crate::api::models::ReaderChapter>) {
+    for chapter in chapters.iter_mut() {
+        chapter.blocks.retain(|b| {
+            !b.text.trim().is_empty()
+                || matches!(
+                    b.block_type,
+                    crate::api::models::BlockType::Image
+                        | crate::api::models::BlockType::Separator
+                )
+        });
+        for block in &mut chapter.blocks {
+            if matches!(
+                block.block_type,
+                crate::api::models::BlockType::Image
+                    | crate::api::models::BlockType::Separator
+            ) {
+                continue;
+            }
+            let cleaned = collapse_whitespace(&block.text);
+            if cleaned != block.text {
+                block.text = cleaned;
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // RCE-28.2: Rust-side BookParser trait
 // ---------------------------------------------------------------------------
@@ -231,6 +300,7 @@ pub fn dispatch_parse_trait(format: BookFormat, bytes: &[u8]) -> anyhow::Result<
         BookFormat::Rtf => rtf::parse_rtf(bytes, None),
         BookFormat::Mobi | BookFormat::Azw3 | BookFormat::Prc => mobi::parse_mobi(bytes, None),
         BookFormat::Cbr => Err(anyhow::anyhow!("CBR parsing requires a filesystem path")),
+        BookFormat::Cbz => Err(anyhow::anyhow!("CBZ parsing requires a filesystem path")),
         _ => Err(anyhow::anyhow!("Unsupported format: {:?}", format)),
     }
 }

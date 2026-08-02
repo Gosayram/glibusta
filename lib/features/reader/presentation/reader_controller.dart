@@ -249,6 +249,7 @@ final class ReaderController {
   int _loadGeneration = 0;
   int _chapterLoadGeneration = 0;
   String _cacheMode = 'unknown';
+  String? _bookFilePath;
   bool _isLoadingNextChapter = false;
   double _lastScrollOffset = 0;
   final _linkHistory = ReaderLinkHistory();
@@ -385,6 +386,8 @@ final class ReaderController {
       _updateState(_state.copyWith(loadingStage: ReaderLoadingStage.readingMetadata));
       final meta = await _content.loadMetadata(onCacheMode: (mode) => _cacheMode = mode);
       if (!_isActiveLoad(loadGeneration)) return;
+
+      _bookFilePath = await _findBookFilePath();
 
       // Apply per-book settings if available
       await _applyPerBookSettings(deviceClass: _layoutDeviceClass);
@@ -1641,9 +1644,24 @@ final class ReaderController {
 
   BookSearchService? createSearchService() {
     final meta = _state.metadata;
-    if (meta == null) return null;
+    if (meta == null || _bookFilePath == null) return null;
     final book = _content.buildBookForSearch(meta, _state.loadedChapters);
-    return BookSearchService(book);
+    return BookSearchService(book, _bookFilePath!);
+  }
+
+  Future<String?> _findBookFilePath() async {
+    try {
+      final db = _ref.read(databaseProvider);
+      final rows = await (db.select(db.downloads)..where((d) => d.bookId.equals(_bookId))).get();
+      for (final row in rows) {
+        if (row.status == DownloadStatusDb.completed && row.targetPath != null && row.targetPath!.isNotEmpty) {
+          return row.targetPath;
+        }
+      }
+    } on Object catch (e) {
+      _logger.warning('Failed to look up book file path: $e', name: 'Reader');
+    }
+    return null;
   }
 
   Future<void> deleteBookFile() async {

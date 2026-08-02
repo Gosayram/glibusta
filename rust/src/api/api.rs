@@ -232,7 +232,7 @@ fn map_file(path: &str) -> Result<BookBytes, CoreError> {
 }
 
 fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, CoreError> {
-    match format {
+    let mut book = match format {
         BookFormat::Fb2 => crate::book::fb2::parse_fb2(bytes, None)
             .map_err(|e| CoreError::ParserFailed(e.to_string())),
         BookFormat::Epub => crate::book::epub::parse_epub(bytes, None)
@@ -265,8 +265,13 @@ fn dispatch_parse(bytes: &[u8], format: BookFormat) -> Result<NormalizedBook, Co
         BookFormat::Cbr => Err(CoreError::FeatureDisabled(
             "CBR parsing requires a filesystem path".into(),
         )),
+        BookFormat::Cbz => Err(CoreError::FeatureDisabled(
+            "CBZ parsing requires a filesystem path".into(),
+        )),
         BookFormat::Unknown => Err(CoreError::UnsupportedFormat("unknown".into())),
-    }
+    }?;
+    crate::book::postprocess_chapters(&mut book.chapters);
+    Ok(book)
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +296,14 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     }
     // Cache miss: parse from file
     let format = detect_format_from_path(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
+    // Path-based formats that need filesystem access
+    if format == BookFormat::Cbz {
+        let book = crate::book::cbz::parse_cbz_path(Path::new(&path))
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        memory_cache_store(fingerprint, book.clone());
+        disk_cache_store(&cache_key, &book);
+        return Ok(book);
+    }
     let mmap = map_file(&path).map_err(|e| anyhow::anyhow!("{}", e))?;
     let mut book = dispatch_parse(&mmap, format).map_err(|e| anyhow::anyhow!("{}", e))?;
     book.book_format = format;
@@ -619,6 +632,10 @@ pub fn get_asset_bytes(path: String, asset_id: String) -> anyhow::Result<Vec<u8>
             read_archive_asset(&mut zip, &asset_id)
         }
         BookFormat::Docx => {
+            let mut zip = crate::book::archive::decode_zip(&bytes)?;
+            read_archive_asset(&mut zip, &asset_id)
+        }
+        BookFormat::Cbz => {
             let mut zip = crate::book::archive::decode_zip(&bytes)?;
             read_archive_asset(&mut zip, &asset_id)
         }
@@ -1014,6 +1031,11 @@ pub fn parse_cbr(path: String) -> anyhow::Result<NormalizedBook> {
     crate::book::cbr::parse_cbr_path(Path::new(&path)).map_err(|e| anyhow::anyhow!("{e}"))
 }
 
+/// Parse a CBZ (comic book ZIP) from a filesystem path.
+pub fn parse_cbz(path: String) -> anyhow::Result<NormalizedBook> {
+    crate::book::cbz::parse_cbz_path(Path::new(&path)).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
 pub fn decode_zip_entries(bytes: Vec<u8>) -> anyhow::Result<Vec<String>> {
     let zip = crate::book::archive::decode_zip(&bytes)
         .map_err(|e| anyhow::anyhow!("Failed to decode ZIP: {}", e))?;
@@ -1037,6 +1059,94 @@ pub fn sha256_hash(bytes: Vec<u8>, max_bytes: Option<usize>) -> anyhow::Result<S
     let limit = max_bytes.unwrap_or(bytes.len());
     let to_hash = &bytes[..bytes.len().min(limit)];
     Ok(crate::book::sha256_hex(to_hash))
+}
+
+/// Quality scoring for Russian/English text decoding.
+/// Returns 0.0–1.0 where higher is better. Catches cases where
+/// a charset detector confidently returns the wrong encoding.
+pub fn score_encoding_quality(text: String) -> f64 {
+    if text.is_empty() {
+        return 0.0;
+    }
+    let sample: String = if text.len() > 20000 {
+        text.chars().take(20000).collect()
+    } else {
+        text
+    };
+
+    let mut score: f64 = 1.0;
+
+    // Penalize replacement characters (U+FFFD)
+    let replacement_count = sample.chars().filter(|&c| c == '\u{FFFD}').count();
+    score -= replacement_count as f64 * 0.08;
+
+    // Penalize control characters (except common whitespace: \t \n \r and space)
+    let control_count = sample
+        .chars()
+        .filter(|&c| {
+            ('\x00'..='\x08').contains(&c)
+                || c == '\x0B'
+                || c == '\x0C'
+                || ('\x0E'..='\x1F').contains(&c)
+        })
+        .count();
+    score -= control_count as f64 * 0.04;
+
+    // Penalize mojibake patterns (common in wrong-encoding decode)
+    let chars: Vec<char> = sample.chars().collect();
+    let mojibake_count = chars
+        .windows(2)
+        .filter(|w| {
+            matches!(
+                w[0],
+                'Р' | 'С' | 'Ð' | 'Ñ' | 'â' | 'Ã'
+            )
+        })
+        .count();
+    score -= mojibake_count as f64 * 0.03;
+
+    // Reward letter density
+    let cyrillic_count = sample
+        .chars()
+        .filter(|c| ('\u{0400}'..='\u{04FF}').contains(c) || *c == 'ё' || *c == 'Ё')
+        .count();
+    let latin_count = sample
+        .chars()
+        .filter(|c| c.is_ascii_alphabetic())
+        .count();
+    let letters_count = cyrillic_count + latin_count;
+    if (letters_count as f64) < (sample.len() as f64 * 0.20) {
+        score -= 0.25;
+    }
+
+    // Reward whitespace density (normal text has spaces/newlines)
+    let whitespace_count = sample.chars().filter(|c| c.is_whitespace()).count();
+    if (whitespace_count as f64) < (sample.len() as f64 * 0.05) {
+        score -= 0.15;
+    }
+
+    // Reward common Russian words (simple contains with word-boundary heuristic)
+    let lower = sample.to_lowercase();
+    let common_words = ["и", "в", "не", "на", "что", "он", "она", "как", "это", "его", "книга", "глава"];
+    let common_hits = common_words
+        .iter()
+        .filter(|word| {
+            // Check if word appears as a whole word (surrounded by non-alphanumeric or at boundaries)
+            if let Some(pos) = lower.find(*word) {
+                let before_ok = pos == 0
+                    || !lower.as_bytes()[pos - 1].is_ascii_alphanumeric();
+                let after_pos = pos + word.len();
+                let after_ok = after_pos >= lower.len()
+                    || !lower.as_bytes()[after_pos].is_ascii_alphanumeric();
+                before_ok && after_ok
+            } else {
+                false
+            }
+        })
+        .count();
+    score += common_hits as f64 * 0.02;
+
+    score.clamp(0.0, 1.0)
 }
 
 /// Legacy dispatcher — kept for backward compat.

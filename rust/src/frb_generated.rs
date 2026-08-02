@@ -29,7 +29,7 @@
 use crate::api::api::*;
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -40,7 +40,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -472294608;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1691345983;
 
 // Section: executor
 
@@ -1611,6 +1611,41 @@ fn wire__crate__api__api__parse_cbr_impl(
         },
     )
 }
+fn wire__crate__api__api__parse_cbz_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "parse_cbz",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::api::parse_cbz(api_path)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__api__parse_chapter_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2124,6 +2159,40 @@ fn wire__crate__api__api__safe_parse_book_impl(
         },
     )
 }
+fn wire__crate__api__api__score_encoding_quality_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "score_encoding_quality",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Result::<_, ()>::Ok(crate::api::api::score_encoding_quality(api_text))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__api__search_in_book_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2393,7 +2462,8 @@ impl SseDecode for crate::api::models::BookFormat {
             8 => crate::api::models::BookFormat::Pdf,
             9 => crate::api::models::BookFormat::Djvu,
             10 => crate::api::models::BookFormat::Cbr,
-            11 => crate::api::models::BookFormat::Unknown,
+            11 => crate::api::models::BookFormat::Cbz,
+            12 => crate::api::models::BookFormat::Unknown,
             _ => unreachable!("Invalid variant for BookFormat: {}", inner),
         };
     }
@@ -3144,23 +3214,25 @@ fn pde_ffi_dispatcher_primary_impl(
         40 => wire__crate__api__api__parse_book_impl(port, ptr, rust_vec_len, data_len),
         41 => wire__crate__api__api__parse_book_legacy_impl(port, ptr, rust_vec_len, data_len),
         42 => wire__crate__api__api__parse_cbr_impl(port, ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__api__parse_chapter_impl(port, ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__api__parse_docx_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__api__parse_epub_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__api__parse_fb2_impl(port, ptr, rust_vec_len, data_len),
-        47 => wire__crate__api__api__parse_html_blocks_impl(port, ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__api__parse_mobi_impl(port, ptr, rust_vec_len, data_len),
-        49 => wire__crate__api__api__parse_rtf_impl(port, ptr, rust_vec_len, data_len),
-        50 => wire__crate__api__api__parse_toc_impl(port, ptr, rust_vec_len, data_len),
-        51 => wire__crate__api__api__parse_txt_impl(port, ptr, rust_vec_len, data_len),
-        52 => wire__crate__api__api__pdf_page_count_impl(port, ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__api__render_djvu_thumbnail_impl(port, ptr, rust_vec_len, data_len),
-        54 => wire__crate__api__api__render_pdf_thumbnail_impl(port, ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__api__repair_book_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__api__safe_parse_book_impl(port, ptr, rust_vec_len, data_len),
-        57 => wire__crate__api__api__search_in_book_impl(port, ptr, rust_vec_len, data_len),
-        58 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__api__validate_book_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__api__parse_cbz_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__api__parse_chapter_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__api__parse_docx_impl(port, ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__api__parse_epub_impl(port, ptr, rust_vec_len, data_len),
+        47 => wire__crate__api__api__parse_fb2_impl(port, ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__api__parse_html_blocks_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__api__parse_mobi_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__api__parse_rtf_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__api__parse_toc_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__api__parse_txt_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__api__pdf_page_count_impl(port, ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__api__render_djvu_thumbnail_impl(port, ptr, rust_vec_len, data_len),
+        55 => wire__crate__api__api__render_pdf_thumbnail_impl(port, ptr, rust_vec_len, data_len),
+        56 => wire__crate__api__api__repair_book_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__api__safe_parse_book_impl(port, ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__api__score_encoding_quality_impl(port, ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__api__search_in_book_impl(port, ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__api__sha256_hash_impl(port, ptr, rust_vec_len, data_len),
+        61 => wire__crate__api__api__validate_book_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3312,7 +3384,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::BookFormat {
             Self::Pdf => 8.into_dart(),
             Self::Djvu => 9.into_dart(),
             Self::Cbr => 10.into_dart(),
-            Self::Unknown => 11.into_dart(),
+            Self::Cbz => 11.into_dart(),
+            Self::Unknown => 12.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -3780,7 +3853,8 @@ impl SseEncode for crate::api::models::BookFormat {
                 crate::api::models::BookFormat::Pdf => 8,
                 crate::api::models::BookFormat::Djvu => 9,
                 crate::api::models::BookFormat::Cbr => 10,
-                crate::api::models::BookFormat::Unknown => 11,
+                crate::api::models::BookFormat::Cbz => 11,
+                crate::api::models::BookFormat::Unknown => 12,
                 _ => {
                     unimplemented!("");
                 }
@@ -4281,7 +4355,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -4349,7 +4423,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

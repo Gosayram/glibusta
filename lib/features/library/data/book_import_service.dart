@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +11,7 @@ import '../../../core/database/tables.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
@@ -59,10 +59,11 @@ class BookImportService {
   BookParser _parserFor(BookFormat fmt) => _overrides?[fmt] ?? lookupParserFor(fmt);
   final Map<String, Future<ImportResult>> _contentImportLocks = {};
 
-  static String generateAuthorId(String name) {
+  static Future<String> generateAuthorId(String name) async {
     final normalized = name.trim().toLowerCase();
     final bytes = utf8.encode(normalized);
-    return 'author_${sha256.convert(bytes).toString().substring(0, 16)}';
+    final hash = await rust_api.sha256Hash(bytes: bytes);
+    return 'author_${hash.substring(0, 16)}';
   }
 
   /// Import a file from its inspection result.
@@ -300,7 +301,7 @@ class BookImportService {
     ctx.fileSize = fileSize;
     ctx.contentHash = ctx.inspection != null && ctx.inspection!.hash.isNotEmpty
         ? ctx.inspection!.hash
-        : (await sha256.bind(ctx.file.openRead()).first).toString();
+        : await rust_api.calculateHash(path: ctx.filePath);
     ctx.bookId = ctx.contentHash;
   }
 
@@ -367,7 +368,7 @@ class BookImportService {
     ctx.authorIds = [];
     final authorCompanions = <AuthorsCompanion>[];
     for (final authorName in book.authors) {
-      final authorId = generateAuthorId(authorName);
+      final authorId = await generateAuthorId(authorName);
       ctx.authorIds.add(authorId);
       authorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
     }
@@ -521,8 +522,7 @@ class BookImportService {
         return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
       }
 
-      final digest = await sha256.bind(cachedFile.openRead()).first;
-      final contentHash = digest.toString();
+      final contentHash = await rust_api.calculateHash(path: cachedFile.path);
       return _coalesceExternalContentImport(
         contentHash: contentHash,
         format: format,
@@ -633,7 +633,7 @@ class BookImportService {
       final extAuthorIds = <String>[];
       final extAuthorCompanions = <AuthorsCompanion>[];
       for (final authorName in book.authors) {
-        final authorId = generateAuthorId(authorName);
+        final authorId = await generateAuthorId(authorName);
         extAuthorIds.add(authorId);
         extAuthorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
       }

@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
+import '../../../../src/rust/api/api/api.dart' as rust_api;
 
 import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/formats/book_file_size_policy.dart';
@@ -112,8 +112,7 @@ final class BookFileInspector {
   }
 
   Future<String> _computeStreamHash(File file) async {
-    final digest = await sha256.bind(file.openRead()).last;
-    return digest.toString();
+    return rust_api.calculateHash(path: file.path);
   }
 
   Future<Uint8List> _readFileHead(File file, int maxBytes) async {

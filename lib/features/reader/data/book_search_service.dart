@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import 'parsers/normalized_book.dart';
 
 class BookSearchResult {
@@ -22,33 +23,23 @@ class BookSearchResult {
 
 class BookSearchService {
   final NormalizedBook _book;
-  final List<String> _paragraphs = [];
-  final List<int> _chapterIndices = [];
-  final List<int> _paragraphIndices = [];
-  final List<String> _chapterTitles = [];
+  final String _filePath;
 
   int _searchGeneration = 0;
 
-  BookSearchService(this._book) {
-    _buildIndex();
-  }
-
-  void _buildIndex() {
-    for (final chapter in _book.chapters) {
-      for (final block in chapter.blocks) {
-        if (block.text.trim().isEmpty) continue;
-        _paragraphs.add(block.text);
-        _chapterIndices.add(chapter.index);
-        _paragraphIndices.add(block.index);
-        _chapterTitles.add(chapter.title);
-      }
-    }
-  }
-
-  int get totalParagraphs => _paragraphs.length;
+  BookSearchService(this._book, this._filePath);
 
   /// Stable identifier used to scope device-local reader search history.
   String get bookId => _book.id;
+
+  int get totalParagraphs => _book.chapters.fold(0, (sum, c) => sum + c.blocks.length);
+
+  String _chapterTitle(int chapterIndex) {
+    final titles = _book.chapters
+        .where((c) => c.index == chapterIndex)
+        .map((c) => c.title);
+    return titles.isNotEmpty ? titles.first : '';
+  }
 
   Future<List<BookSearchResult>> search(
     String query, {
@@ -61,53 +52,28 @@ class BookSearchService {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
 
-    RegExp? regex;
-    if (useRegex) {
-      try {
-        regex = RegExp(query, caseSensitive: matchCase);
-      } on Object catch (_) {
-        return const [];
-      }
-    } else if (wholeWord) {
-      regex = RegExp(
-        r'\b' + RegExp.escape(query) + r'\b',
-        caseSensitive: matchCase,
-      );
-    }
-
-    final lowerQuery = matchCase ? query : query.toLowerCase();
-    final results = <BookSearchResult>[];
-
-    for (var i = 0; i < _paragraphs.length; i++) {
-      if (chapterIndex != null && _chapterIndices[i] != chapterIndex) continue;
-      if (i % 500 == 0) {
-        await Future<void>.delayed(Duration.zero);
-        if (gen != _searchGeneration) return const [];
-      }
-      final paragraph = _paragraphs[i];
-      final isMatch = regex != null
-          ? regex.hasMatch(paragraph)
-          : (matchCase ? paragraph.contains(query) : paragraph.toLowerCase().contains(lowerQuery));
-      if (!isMatch) continue;
-
-      final before = i > 0 ? _paragraphs[i - 1] : '';
-      final after = i < _paragraphs.length - 1 ? _paragraphs[i + 1] : '';
-
-      results.add(
-        BookSearchResult(
-          chapterIndex: _chapterIndices[i],
-          paragraphIndex: _paragraphIndices[i],
-          chapterTitle: _chapterTitles[i],
-          matchText: paragraph,
-          beforeContext: before,
-          afterContext: after,
-        ),
-      );
-
-      if (results.length >= maxResults) break;
-    }
+    final matches = await rust_api.searchInBook(
+      path: _filePath,
+      query: query,
+      limit: BigInt.from(maxResults),
+    );
 
     if (gen != _searchGeneration) return const [];
+
+    final results = <BookSearchResult>[];
+    for (final m in matches) {
+      if (chapterIndex != null && m.chapterIndex != chapterIndex) continue;
+      results.add(
+        BookSearchResult(
+          chapterIndex: m.chapterIndex,
+          paragraphIndex: m.blockIndex,
+          chapterTitle: _chapterTitle(m.chapterIndex),
+          matchText: m.preview,
+          beforeContext: '',
+          afterContext: '',
+        ),
+      );
+    }
     return results;
   }
 
@@ -115,26 +81,5 @@ class BookSearchService {
     _searchGeneration++;
   }
 
-  List<String> suggestions(String prefix, {int maxSuggestions = 8}) {
-    if (prefix.trim().isEmpty) return const [];
-    final lowerPrefix = prefix.toLowerCase();
-    final seen = <String>{};
-    final suggestions = <String>[];
-
-    for (final paragraph in _paragraphs) {
-      final lower = paragraph.toLowerCase();
-      final index = lower.indexOf(lowerPrefix);
-      if (index < 0) continue;
-
-      final start = index > 20 ? index - 20 : 0;
-      final snippet = paragraph.substring(start).trim();
-      final ellipsed = (start > 0 ? '…' : '') + snippet;
-      if (seen.add(ellipsed)) {
-        suggestions.add(ellipsed);
-        if (suggestions.length >= maxSuggestions) break;
-      }
-    }
-
-    return suggestions;
-  }
+  List<String> suggestions(String prefix, {int maxSuggestions = 8}) => const [];
 }

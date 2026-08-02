@@ -108,6 +108,15 @@ impl BookFormat {
                 css: false,
                 footnotes: false,
             },
+            BookFormat::Cbz => FormatCapabilities {
+                metadata: true,
+                cover: true,
+                toc: false,
+                text: false,
+                images: true,
+                css: false,
+                footnotes: false,
+            },
             BookFormat::Unknown => FormatCapabilities {
                 metadata: false,
                 cover: false,
@@ -146,6 +155,7 @@ pub enum BookFormat {
     Pdf,
     Djvu,
     Cbr,
+    Cbz,
     Unknown,
 }
 
@@ -163,6 +173,7 @@ impl BookFormat {
             BookFormat::Pdf => "pdf",
             BookFormat::Djvu => "djvu",
             BookFormat::Cbr => "cbr",
+            BookFormat::Cbz => "cbz",
             BookFormat::Unknown => "unknown",
         }
     }
@@ -180,6 +191,7 @@ impl BookFormat {
             "pdf" => BookFormat::Pdf,
             "djvu" | "djv" => BookFormat::Djvu,
             "cbr" => BookFormat::Cbr,
+            "cbz" => BookFormat::Cbz,
             _ => BookFormat::Unknown,
         }
     }
@@ -187,7 +199,7 @@ impl BookFormat {
     pub fn extensions() -> &'static [&'static str] {
         &[
             "fb2", "fb2.zip", "epub", "txt", "docx", "docm", "rtf", "mobi", "azw3", "azw", "prc",
-            "pdf", "djvu", "djv", "cbr",
+            "pdf", "djvu", "djv", "cbr", "cbz",
         ]
     }
 }

@@ -22,7 +22,8 @@ class RustBookParser implements BookParser {
     BookFormat.rtf ||
     BookFormat.mobi ||
     BookFormat.azw3 ||
-    BookFormat.prc => true,
+    BookFormat.prc ||
+    BookFormat.cbz => true,
     _ => false,
   };
 

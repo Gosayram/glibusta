@@ -19,7 +19,7 @@ final class CbzParser implements BookParser {
   static const int _maxComicInfoBytes = 1024 * 1024;
 
   @override
-  bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
+  bool supports(BookFormat format) => format == BookFormat.cbz;
 
   @override
   Future<NormalizedBook> parse(
@@ -27,9 +27,40 @@ final class CbzParser implements BookParser {
     String? fileName,
     String? forcedEncoding,
   }) async {
-    if (fileName != null && detectBookFormat(fileName) == BookFormat.cbr) {
-      throw const ParserFailure('CBR needs a file path and cannot be parsed from memory');
+    try {
+      // Try Rust parser via temp file for best performance
+      final tempDir = Directory.systemTemp;
+      final tempFile = File(
+        '${tempDir.path}/glibusta_cbz_${DateTime.now().millisecondsSinceEpoch}.cbz',
+      );
+      try {
+        await tempFile.writeAsBytes(bytes, flush: true);
+        return await RustBookParser().parseFile(tempFile.path);
+      } finally {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
+      }
+    } on Object catch (_) {
+      // Fall back to Dart parser if Rust fails
+      return _parseDart(bytes, fileName: fileName);
     }
+  }
+
+  @override
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  }) async {
+    try {
+      return await RustBookParser().parseFile(filePath);
+    } on Object catch (e) {
+      throw ParserFailure('Rust CBZ parser failed: $e');
+    }
+  }
+
+  /// Dart fallback: parse CBZ from in-memory bytes.
+  NormalizedBook _parseDart(Uint8List bytes, {String? fileName}) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       ArchiveSafety.validateZip(archive);
@@ -75,32 +106,6 @@ final class CbzParser implements BookParser {
       rethrow;
     } on Object catch (e) {
       throw ParserFailure('Ошибка разбора comic book: $e');
-    }
-  }
-
-  @override
-  Future<NormalizedBook> parseFile(
-    String filePath, {
-    String? forcedEncoding,
-  }) async {
-    if (detectBookFormat(filePath) == BookFormat.cbr) {
-      return RustBookParser().parseCbrFile(filePath);
-    }
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        throw ParserFailure('Файл не найден: $filePath');
-      }
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        throw ParserFailure('Файл пуст: $filePath');
-      }
-      final name = filePath.split('/').last;
-      return parse(bytes, fileName: name, forcedEncoding: forcedEncoding);
-    } on ParserFailure {
-      rethrow;
-    } on FileSystemException catch (e) {
-      throw ParserFailure('Не удалось прочитать файл: ${e.message}');
     }
   }
 

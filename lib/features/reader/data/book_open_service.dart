@@ -166,13 +166,14 @@ class BookOpenService {
     }
     final cleaned = book.withCleanedBlocks();
     final pipeline = ContentTransformerPipeline([
-      EmptyBlockFilterTransformer(),
-      WhitespaceCollapsingTransformer(),
       RichSpanColorTransformer(),
     ]);
     final transformed = pipeline.transform(cleaned);
 
-    if (bookId != null && (bookFormat == BookFormat.epub || bookFormat == BookFormat.docx)) {
+    if (bookId != null &&
+        (bookFormat == BookFormat.epub ||
+            bookFormat == BookFormat.docx ||
+            bookFormat == BookFormat.cbz)) {
       return _materializeArchiveImages(transformed, filePath, bookId);
     }
     return transformed;

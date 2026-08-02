@@ -2,11 +2,10 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
-
 import '../../../core/database/full_text_search.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import 'parsers/normalized_book.dart';
 
 final class CacheSourceFingerprint {
@@ -160,7 +159,7 @@ final class ReaderCacheService {
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
       final expectedChecksum = await _getChapterChecksum(bookId, bookDir, index);
-      if (expectedChecksum != null && _chapterChecksum(json) != expectedChecksum) {
+      if (expectedChecksum != null && await _chapterChecksum(json) != expectedChecksum) {
         _logger.warning(
           'Cached chapter $index for $bookId failed integrity verification',
           name: 'ReaderCache',
@@ -388,7 +387,7 @@ final class ReaderCacheService {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
       final chapterJson = jsonEncode(chapter.toJson());
       await _writeTextAtomically(chapterFile, chapterJson);
-      chapterChecksums['${chapter.index}'] = _chapterChecksum(chapterJson);
+      chapterChecksums['${chapter.index}'] = await _chapterChecksum(chapterJson);
     }
     await _writeJsonAtomically(
       _getManifestFile(bookDir),
@@ -428,7 +427,8 @@ final class ReaderCacheService {
     return parsedChecksums['$index'];
   }
 
-  static String _chapterChecksum(String json) => sha256.convert(utf8.encode(json)).toString();
+  static Future<String> _chapterChecksum(String json) async =>
+      rust_api.sha256Hash(bytes: utf8.encode(json));
 
   Future<void> _indexFtsContent(String bookId, NormalizedBook book) async {
     if (_ftsService == null) return;
