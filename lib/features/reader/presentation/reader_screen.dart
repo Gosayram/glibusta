@@ -1082,6 +1082,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           _showKaraokeUnavailable(context);
                         }
                       },
+                      onFontIncrease: () {
+                        final newSize = (settings.fontSize + 1.0).clamp(10.0, 40.0);
+                        ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+                      },
+                      onFontDecrease: () {
+                        final newSize = (settings.fontSize - 1.0).clamp(10.0, 40.0);
+                        ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+                      },
                     ),
                   ),
                 );
@@ -1118,6 +1126,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       chapterTitleAt: readerState.chapterTitle,
                       onJumpToProgress: _ctrl.jumpToProgress,
                       onModeChanged: (mode) {
+                        _ctrl.stopAutoScroll();
                         ref.read(readerSettingsProvider.notifier).updateMode(mode);
                       },
                       checkpoints: readerState.checkpoints,
@@ -1129,6 +1138,72 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           : null,
                     ),
                   ),
+                );
+              },
+            ),
+          ),
+        if (settings.mode == ReaderMode.continuous)
+          Positioned(
+            bottom: readerState.uiVisible ? 72 : 16,
+            right: 16,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _ctrl.autoScrollEnabled,
+              builder: (context, enabled, _) {
+                return ValueListenableBuilder<double>(
+                  valueListenable: _ctrl.autoScrollSpeed,
+                  builder: (context, speed, _) {
+                    if (!enabled) {
+                      return Semantics(
+                        button: true,
+                        label: 'Автопрокрутка',
+                        child: FloatingActionButton.small(
+                          heroTag: 'auto-scroll-toggle',
+                          onPressed: _ctrl.startAutoScroll,
+                          child: const Icon(Icons.play_arrow, size: 20),
+                        ),
+                      );
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: 'Пауза автопрокрутки',
+                            child: IconButton(
+                              icon: const Icon(Icons.pause),
+                              iconSize: 20,
+                              onPressed: _ctrl.stopAutoScroll,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 100,
+                            child: Slider(
+                              value: speed,
+                              min: 10,
+                              max: 300,
+                              onChanged: _ctrl.updateAutoScrollSpeed,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 36,
+                            child: Text(
+                              '${speed.round()}',
+                              style: Theme.of(context).textTheme.labelSmall,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),

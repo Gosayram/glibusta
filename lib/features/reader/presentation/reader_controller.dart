@@ -244,9 +244,12 @@ final class ReaderController {
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
   Timer? _pageFlushTimer;
+  Timer? _autoScrollTimer;
   ScrollController? _scrollController;
   ReaderState _state = ReaderState();
   final _stateController = StreamController<ReaderState>.broadcast();
+  final autoScrollEnabled = ValueNotifier<bool>(false);
+  final autoScrollSpeed = ValueNotifier<double>(50.0);
   bool _disposed = false;
   bool _loaded = false;
   List<BookSearchResult> _searchMatches = const [];
@@ -278,6 +281,9 @@ final class ReaderController {
     _hideTimer?.cancel();
     _autoThemeTimer?.cancel();
     _pageFlushTimer?.cancel();
+    _autoScrollTimer?.cancel();
+    autoScrollEnabled.dispose();
+    autoScrollSpeed.dispose();
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _flushSessionTime();
@@ -715,6 +721,44 @@ final class ReaderController {
     }
     _scrollController ??= ScrollController()..addListener(_onScroll);
     return _scrollController!;
+  }
+
+  void toggleAutoScroll() {
+    if (autoScrollEnabled.value) {
+      stopAutoScroll();
+    } else {
+      startAutoScroll();
+    }
+  }
+
+  void startAutoScroll() {
+    if (_mode != ReaderMode.continuous) return;
+    if (_scrollController == null || !_scrollController!.hasClients) return;
+    autoScrollEnabled.value = true;
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (_disposed || _scrollController == null || !_scrollController!.hasClients) {
+        stopAutoScroll();
+        return;
+      }
+      final current = _scrollController!.offset;
+      final max = _scrollController!.position.maxScrollExtent;
+      if (current >= max) {
+        stopAutoScroll();
+        return;
+      }
+      unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * 0.016));
+    });
+  }
+
+  void stopAutoScroll() {
+    autoScrollEnabled.value = false;
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
+  }
+
+  void updateAutoScrollSpeed(double speed) {
+    autoScrollSpeed.value = speed.clamp(10.0, 300.0);
   }
 
   /// LITHIUM-READ-005: update cached chapter positions from the content body.

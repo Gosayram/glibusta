@@ -83,6 +83,8 @@ class ReaderTopBar extends StatelessWidget {
     this.onLinkForward,
     this.onBookInfo,
     this.onKaraoke,
+    this.onFontIncrease,
+    this.onFontDecrease,
   });
 
   final ReaderSettings settings;
@@ -100,6 +102,8 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback? onLinkForward;
   final VoidCallback? onBookInfo;
   final VoidCallback? onKaraoke;
+  final VoidCallback? onFontIncrease;
+  final VoidCallback? onFontDecrease;
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +243,28 @@ class ReaderTopBar extends StatelessWidget {
                   color: colors.text,
                   tooltip: 'Аудиосинхронизация',
                   onPressed: onKaraoke,
+                ),
+              ),
+            if (onFontDecrease != null)
+              Semantics(
+                button: true,
+                label: 'Уменьшить шрифт',
+                child: IconButton(
+                  icon: const Icon(Icons.text_decrease),
+                  color: colors.text,
+                  tooltip: 'Уменьшить шрифт',
+                  onPressed: onFontDecrease,
+                ),
+              ),
+            if (onFontIncrease != null)
+              Semantics(
+                button: true,
+                label: 'Увеличить шрифт',
+                child: IconButton(
+                  icon: const Icon(Icons.text_increase),
+                  color: colors.text,
+                  tooltip: 'Увеличить шрифт',
+                  onPressed: onFontIncrease,
                 ),
               ),
             Semantics(
