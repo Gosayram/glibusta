@@ -1289,6 +1289,11 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                _ContrastWarning(
+                  background: bgColor,
+                  foreground: fgColor,
+                ),
               ],
             ),
             actions: [
@@ -2412,6 +2417,45 @@ class _SectionTitle extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _ContrastWarning extends StatelessWidget {
+  const _ContrastWarning({required this.background, required this.foreground});
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = ReaderColorPreview.fromColors(
+      background: background,
+      text: foreground,
+      link: foreground,
+    );
+    final ratio = preview.textContrast;
+    final passes = ratio >= 4.5;
+    if (passes) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 16, color: Colors.amber.shade700),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Контраст ${ratio.toStringAsFixed(1)}:1 — ниже нормы WCAG AA (4.5:1)',
+              style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+            ),
+          ),
+        ],
       ),
     );
   }

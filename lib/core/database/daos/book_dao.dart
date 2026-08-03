@@ -16,9 +16,14 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     required int limit,
     int offset = 0,
     List<OrderingTerm Function($SavedBooksTable t)>? orderBy,
+    String? formatFilter,
   }) async {
     final query = select(savedBooks)
-      ..where((t) => t.deletedAt.isNull())
+      ..where(
+        (t) =>
+            t.deletedAt.isNull() &
+            (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)),
+      )
       ..limit(limit, offset: offset);
     if (orderBy != null) {
       query.orderBy(orderBy);
@@ -42,11 +47,14 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     String query, {
     required int limit,
     int offset = 0,
+    String? formatFilter,
   }) async {
     final lower = '%$query%';
     return (select(savedBooks)
           ..where(
-            (t) => t.title.like(lower) | t.description.like(lower),
+            (t) =>
+                (t.title.like(lower) | t.description.like(lower)) &
+                (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)])
           ..limit(limit, offset: offset))

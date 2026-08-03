@@ -27,18 +27,30 @@ class BookRepositoryImpl implements BookRepository {
     int offset = 0,
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
+    String? formatFilter,
   }) async {
     final rows = await _db.bookDao.getPagedBooks(
       limit: limit,
       offset: offset,
       orderBy: [(t) => _mapSortField(t, sortField, ascending)],
+      formatFilter: formatFilter,
     );
     return _resolveAuthors(rows);
   }
 
   @override
-  Future<List<Book>> searchBooksPaged(String query, {required int limit, int offset = 0}) async {
-    final rows = await _db.bookDao.searchBooksPaged(query, limit: limit, offset: offset);
+  Future<List<Book>> searchBooksPaged(
+    String query, {
+    required int limit,
+    int offset = 0,
+    String? formatFilter,
+  }) async {
+    final rows = await _db.bookDao.searchBooksPaged(
+      query,
+      limit: limit,
+      offset: offset,
+      formatFilter: formatFilter,
+    );
     return _resolveAuthors(rows);
   }
 

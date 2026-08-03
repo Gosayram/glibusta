@@ -16,6 +16,7 @@ class _FakeBookRepository implements BookRepository {
     int offset = 0,
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
+    String? formatFilter,
   }) async => [];
 
   @override
@@ -23,6 +24,7 @@ class _FakeBookRepository implements BookRepository {
     String query, {
     required int limit,
     int offset = 0,
+    String? formatFilter,
   }) async => [];
 
   @override

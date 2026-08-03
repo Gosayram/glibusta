@@ -62,6 +62,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   LibrarySort _sort = LibrarySort.recentlyAdded;
   String? _selectedCollectionId;
   String? _selectedCollectionName;
+  String? _selectedFormat;
   Set<String> _collectionBookIds = {};
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
@@ -114,6 +115,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           query,
           limit: _pageSize,
           offset: _loadedBooks.length,
+          formatFilter: _selectedFormat,
         );
       } else {
         newBooks = await repository.getPagedBooks(
@@ -121,6 +123,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           offset: _loadedBooks.length,
           sortField: _sortField,
           ascending: _sortAscending,
+          formatFilter: _selectedFormat,
         );
       }
       if (!mounted) return;
@@ -207,6 +210,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
               ),
             ),
+          if (!_showTrash) _buildFormatFilterBar(context),
           Expanded(
             child: _showTrash
                 ? _buildTrashView(context, ref)
@@ -419,6 +423,47 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       case LibraryViewMode.compact:
         return Icons.view_compact;
     }
+  }
+
+  Widget _buildFormatFilterBar(BuildContext context) {
+    final formats = [
+      (null, 'Все'),
+      ('epub', 'EPUB'),
+      ('fb2', 'FB2'),
+      ('pdf', 'PDF'),
+      ('mobi', 'MOBI'),
+      ('txt', 'TXT'),
+      ('djvu', 'DJVU'),
+      ('docx', 'DOCX'),
+      ('cbz', 'CBZ'),
+    ];
+
+    return SizedBox(
+      height: 48,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        itemCount: formats.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final (formatValue, label) = formats[index];
+          final isSelected = _selectedFormat == formatValue;
+          return FilterChip(
+            label: Text(label),
+            selected: isSelected,
+            onSelected: (_) {
+              setState(() {
+                _selectedFormat = formatValue;
+                _resetPagination();
+              });
+              unawaited(_loadNextPage());
+            },
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+        },
+      ),
+    );
   }
 
   void _enterSelectionMode(String bookId) {

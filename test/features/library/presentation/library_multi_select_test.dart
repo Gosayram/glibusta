@@ -20,6 +20,7 @@ class _FakeBookRepository implements BookRepository {
     int offset = 0,
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
+    String? formatFilter,
   }) async {
     final end = (offset + limit).clamp(0, books.length);
     if (offset >= books.length) return [];
@@ -31,6 +32,7 @@ class _FakeBookRepository implements BookRepository {
     String query, {
     required int limit,
     int offset = 0,
+    String? formatFilter,
   }) async {
     final lower = query.toLowerCase();
     final filtered = books.where((b) => b.title.toLowerCase().contains(lower)).toList();
