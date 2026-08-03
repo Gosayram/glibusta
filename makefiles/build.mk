@@ -285,6 +285,8 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	rm -rf "$(MACOS_DMG_STAGING)"
 	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
+	$(MAKE) checksums
+	$(MAKE) release-notes
 
 .PHONY: build-release
 build-release: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS DMG in one pass (single clean)
@@ -318,8 +320,59 @@ build-release: clean-build rust-build-android subset-fonts bump-build require-fl
 	rm -rf "$(MACOS_DMG_STAGING)"
 	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
+	$(MAKE) checksums
+	$(MAKE) release-notes
 	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
 	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
+
+.PHONY: checksums
+checksums: ## Generate per-file .sha256/.sha384/.sha512 + unified checksums.txt for all dist/releases artifacts
+	@$(PRINT_STEP) "Generating checksums for release artifacts"
+	@test -d "$(DIST_DIR)" || { $(PRINT_ERROR) "No artifacts in $(DIST_DIR)"; exit 1; }
+	@> "$(DIST_DIR)/checksums.txt"
+	@for f in $(DIST_DIR)/*; do \
+		[ -f "$$f" ] || continue; \
+		fname=$$(basename "$$f"); \
+		case "$$fname" in checksums.txt|*.sha*) continue;; esac; \
+		sha256sum "$$f" 2>/dev/null | cut -d' ' -f1 > "$$f.sha256"; \
+		sha384sum "$$f" 2>/dev/null | cut -d' ' -f1 > "$$f.sha384"; \
+		sha512sum "$$f" 2>/dev/null | cut -d' ' -f1 > "$$f.sha512"; \
+		sha256sum "$$f" >> "$(DIST_DIR)/checksums.txt"; \
+		echo "  $$fname"; \
+	done
+	@echo "" >> "$(DIST_DIR)/checksums.txt"
+	@$(PRINT_OK) "Checksums written to $(DIST_DIR)/checksums.txt"
+
+.PHONY: release-notes
+release-notes: ## Generate RELEASE_NOTES from git log (commits since last tag)
+	@$(PRINT_STEP) "Generating release notes for $(APP_VERSION)"
+	@TAG=$$(git describe --tags --abbrev=0 2>/dev/null); \
+	if [ -n "$$TAG" ]; then \
+		RANGE="$$TAG..HEAD"; \
+	else \
+		RANGE="HEAD"; \
+	fi; \
+	echo "# Release $(APP_VERSION)" > "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "## What's Changed" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "### Features" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --grep="\[FEATURE\]\|\[feat\]\|\[Feat\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "### Fixes" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --grep="\[FIX\]\|\[fix\]\|\[Fix\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "### Other" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --invert-grep="\[FIX\]\|\[FEATURE\]\|\[REFACTOR\]\|\[CI\]\|\[DOCS\]\|\[UPD\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "### Checksums" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo '```' >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	cat "$(DIST_DIR)/checksums.txt" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || echo "No checksums available yet" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
+	echo '```' >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
+	@$(PRINT_OK) "Release notes: $(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
 
 .PHONY: build-all
 build-all: build-android build-macos ## Build signed release artifacts for all available platforms
