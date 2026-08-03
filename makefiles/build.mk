@@ -15,6 +15,8 @@ MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).apk
 ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).aab
 MACOS_DMG_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.dmg
+MACOS_ENTITLEMENTS ?= macos/Runner/Release.entitlements
+MACOS_DMG_STAGING ?= $(BUILD_DIR)/macos_dmg_staging
 
 MACOS_CODESIGN_IDENTITY ?= GoSayram Glibusta
 
@@ -165,6 +167,7 @@ clean-build: ## Remove all build artifacts, caches and release artifacts for a f
 	@$(PRINT_STEP) "Cleaning build artifacts and caches"
 	rm -rf "$(BUILD_DIR)"
 	rm -rf "$(DIST_DIR)"
+	rm -rf "$(MACOS_DMG_STAGING)"
 	rm -rf .dart_tool
 	rm -rf .flutter-plugins
 	rm -rf .flutter-plugins-dependencies
@@ -243,12 +246,26 @@ build-android: build-android-apk build-android-apk-split build-android-aab ## Bu
 	@$(PRINT_OK) "Android artifacts completed"
 
 .PHONY: sign-macos
-sign-macos: macos-available ## Sign macOS app bundle with MACOS_CODESIGN_IDENTITY
+sign-macos: macos-available ## Sign macOS app bundle with MACOS_CODESIGN_IDENTITY + entitlements
 	@$(call REQUIRE_TOOL,$(CODESIGN))
 	@test -d "$(MACOS_APP_SOURCE)" || { $(PRINT_ERROR) "macOS app not found: $(MACOS_APP_SOURCE)"; exit 1; }
+	@test -f "$(MACOS_ENTITLEMENTS)" || { $(PRINT_ERROR) "Entitlements not found: $(MACOS_ENTITLEMENTS)"; exit 1; }
 	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
-	$(CODESIGN) --force --deep --timestamp --options runtime --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
+	$(CODESIGN) --force --deep --timestamp --options runtime \
+		--entitlements "$(MACOS_ENTITLEMENTS)" \
+		--sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
 	@$(PRINT_OK) "macOS app signed"
+
+.PHONY: verify-macos
+verify-macos: macos-available ## Verify macOS app signature
+	@$(call REQUIRE_TOOL,$(CODESIGN))
+	@$(call REQUIRE_TOOL,spctl)
+	@test -d "$(MACOS_APP_SOURCE)" || { $(PRINT_ERROR) "macOS app not found: $(MACOS_APP_SOURCE)"; exit 1; }
+	@$(PRINT_STEP) "Verifying macOS app signature"
+	$(CODESIGN) --verify --deep --strict --verbose=2 "$(MACOS_APP_SOURCE)"
+	@$(PRINT_STEP) "Assessing macOS app with Gatekeeper"
+	-spctl -a -vvv "$(MACOS_APP_SOURCE)" 2>&1 || $(PRINT_WARN) "Gatekeeper rejected (self-signed cert is normal)"
+	@$(PRINT_OK) "macOS signature verified"
 
 .PHONY: build-macos
 build-macos: clean-build subset-fonts bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS DMG
@@ -256,8 +273,17 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_MACOS)
 	$(MAKE) sign-macos
-	@$(PRINT_STEP) "Creating DMG"
-	hdiutil create -volname "$(PROJECT_NAME)" -srcfolder "$(MACOS_APP_SOURCE)" -ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	$(MAKE) verify-macos
+	@$(PRINT_STEP) "Creating DMG with Applications symlink"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	mkdir -p "$(MACOS_DMG_STAGING)"
+	cp -R "$(MACOS_APP_SOURCE)" "$(MACOS_DMG_STAGING)/"
+	ln -s /Applications "$(MACOS_DMG_STAGING)/Applications"
+	hdiutil create -volname "$(PROJECT_NAME)" \
+		-srcfolder "$(MACOS_DMG_STAGING)" \
+		-ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 
 .PHONY: build-release
@@ -276,9 +302,21 @@ build-release: clean-build rust-build-android subset-fonts bump-build require-fl
 	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_MACOS)
 	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
-	$(CODESIGN) --force --deep --timestamp --options runtime --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
-	@$(PRINT_STEP) "Creating DMG"
-	hdiutil create -volname "$(PROJECT_NAME)" -srcfolder "$(MACOS_APP_SOURCE)" -ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	$(CODESIGN) --force --deep --timestamp --options runtime \
+		--entitlements "$(MACOS_ENTITLEMENTS)" \
+		--sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
+	@$(PRINT_STEP) "Verifying macOS app signature"
+	$(CODESIGN) --verify --deep --strict --verbose=2 "$(MACOS_APP_SOURCE)"
+	@$(PRINT_STEP) "Creating DMG with Applications symlink"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	mkdir -p "$(MACOS_DMG_STAGING)"
+	cp -R "$(MACOS_APP_SOURCE)" "$(MACOS_DMG_STAGING)/"
+	ln -s /Applications "$(MACOS_DMG_STAGING)/Applications"
+	hdiutil create -volname "$(PROJECT_NAME)" \
+		-srcfolder "$(MACOS_DMG_STAGING)" \
+		-ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
 	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
