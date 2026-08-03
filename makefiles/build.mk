@@ -220,17 +220,42 @@ build-android-apk: clean-build rust-build-android subset-fonts bump-build requir
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
 
 .PHONY: build-android-apk-split
-build-android-apk-split: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed split APKs (per-ABI)
-	@$(PRINT_STEP) "Building signed split Android APKs $(APP_ARTIFACT_VERSION)"
+build-android-apk-split: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS DMG + checksums + release notes
+	@$(call REQUIRE_TOOL,hdiutil)
+	@$(call REQUIRE_TOOL,$(CODESIGN))
+	@$(PRINT_STEP) "Building split Android APKs $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK_SPLIT) || true
 	@for abi in arm64-v8a armeabi-v7a; do \
 		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
 		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
-		if [ -f "$$src" ]; then cp "$$src" "$$dst"; else echo "Warning: Missing $$abi APK"; fi; \
+		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
 	done
 	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
 	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk"
-	@$(PRINT_OK) "Split APKs: $(DIST_DIR)"
+	@$(PRINT_OK) "Split APKs done"
+	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
+	$(FLUTTER_BUILD_MACOS)
+	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
+	$(CODESIGN) --force --deep --timestamp --options runtime \
+		--entitlements "$(MACOS_ENTITLEMENTS)" \
+		--sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
+	@$(PRINT_STEP) "Verifying macOS app signature"
+	$(CODESIGN) --verify --deep --strict --verbose=2 "$(MACOS_APP_SOURCE)"
+	@$(PRINT_STEP) "Creating DMG with Applications symlink"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	mkdir -p "$(MACOS_DMG_STAGING)"
+	cp -R "$(MACOS_APP_SOURCE)" "$(MACOS_DMG_STAGING)/"
+	ln -s /Applications "$(MACOS_DMG_STAGING)/Applications"
+	hdiutil create -volname "$(PROJECT_NAME)" \
+		-srcfolder "$(MACOS_DMG_STAGING)" \
+		-ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	rm -rf "$(MACOS_DMG_STAGING)"
+	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
+	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
+	$(MAKE) checksums
+	$(MAKE) release-notes
+	@$(PRINT_OK) "All release artifacts in $(DIST_DIR)"
+	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
 
 .PHONY: build-android-aab
 build-android-aab: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android prepare-artifacts ## Build signed Android release App Bundle
@@ -288,43 +313,6 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	$(MAKE) checksums
 	$(MAKE) release-notes
 
-.PHONY: build-release
-build-release: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS DMG in one pass (single clean)
-	@$(call REQUIRE_TOOL,hdiutil)
-	@$(PRINT_STEP) "Building split Android APKs $(APP_ARTIFACT_VERSION)"
-	$(FLUTTER_BUILD_APK_SPLIT) || true
-	@for abi in arm64-v8a armeabi-v7a; do \
-		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
-		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
-		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
-	done
-	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
-	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk"
-	@$(PRINT_OK) "Split APKs done"
-	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
-	$(FLUTTER_BUILD_MACOS)
-	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
-	$(CODESIGN) --force --deep --timestamp --options runtime \
-		--entitlements "$(MACOS_ENTITLEMENTS)" \
-		--sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
-	@$(PRINT_STEP) "Verifying macOS app signature"
-	$(CODESIGN) --verify --deep --strict --verbose=2 "$(MACOS_APP_SOURCE)"
-	@$(PRINT_STEP) "Creating DMG with Applications symlink"
-	rm -rf "$(MACOS_DMG_STAGING)"
-	mkdir -p "$(MACOS_DMG_STAGING)"
-	cp -R "$(MACOS_APP_SOURCE)" "$(MACOS_DMG_STAGING)/"
-	ln -s /Applications "$(MACOS_DMG_STAGING)/Applications"
-	hdiutil create -volname "$(PROJECT_NAME)" \
-		-srcfolder "$(MACOS_DMG_STAGING)" \
-		-ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
-	rm -rf "$(MACOS_DMG_STAGING)"
-	$(CODESIGN) --force --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_DMG_ARTIFACT)"
-	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
-	$(MAKE) checksums
-	$(MAKE) release-notes
-	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
-	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
-
 .PHONY: checksums
 checksums: ## Generate per-file .sha256/.sha384/.sha512 + unified checksums.txt for all dist/releases artifacts
 	@$(PRINT_STEP) "Generating checksums for release artifacts"
@@ -353,7 +341,7 @@ release-notes: ## Generate RELEASE_NOTES from git log between version changes in
 	@$(PRINT_OK) "Release notes: $(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
 
 .PHONY: build-all
-build-all: build-android build-macos ## Build signed release artifacts for all available platforms
+build-all: build-android-apk-split build-android-aab ## Build all release artifacts (split APKs + AAB + macOS DMG + checksums + notes)
 	@$(PRINT_OK) "Release artifacts are in $(DIST_DIR)"
 
 .PHONY: release
