@@ -1037,6 +1037,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       settings: settings,
                       bookTitle: readerState.metadata?.title ?? '',
                       bookAuthor: readerState.metadata?.authors.join(', '),
+                      coverUrl: readerState.metadata?.coverUrl,
                       isBookmarked: readerState.checkpoints.any(
                         (c) => (c - readerState.scrollProgress).abs() < 0.02,
                       ),

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -459,6 +461,75 @@ void main() {
 
     expect(find.text('Глава 3 из 15'), findsOneWidget);
     expect(find.text('30%'), findsOneWidget);
+  });
+
+  testWidgets('renders cover thumbnail for HTTP cover URL', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: _noOp,
+            coverUrl: 'https://example.com/cover.jpg',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('renders cover thumbnail for data URI', (tester) async {
+    final base64Image = base64Encode(List.filled(100, 0));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: const ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: _noOp,
+            coverUrl: 'data:image/png;base64,$base64Image',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsOneWidget);
+  });
+
+  testWidgets('hides cover thumbnail when coverUrl is null', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: _noOp,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('hides cover thumbnail when coverUrl is empty', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderTopBar(
+            settings: ReaderSettings(),
+            bookTitle: 'Book',
+            onBack: _noOp,
+            coverUrl: '',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(Image), findsNothing);
   });
 }
 

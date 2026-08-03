@@ -1150,45 +1150,49 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   Widget _buildBooksGrid(BuildContext context, WidgetRef ref, List<Book> books) {
     if (books.isEmpty && !_isLoadingMore) {
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.library_books_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Библиотека пуста',
-              style: TextStyle(
-                fontSize: 18,
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.library_books_outlined,
+                size: 80,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Найдите и скачайте книги, или импортируйте файлы',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 13,
+              const SizedBox(height: 16),
+              Text(
+                'Ваша библиотека пуста',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.tonal(
-              onPressed: () {
-                final shell = StatefulNavigationShell.of(context);
-                shell.goBranch(2, initialLocation: true);
-              },
-              child: const Text('Перейти в каталог'),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () => _importBook(context, ref),
-              child: const Text('Импортировать файл'),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Добавьте книги через импорт или скачивание',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => _importBook(context, ref),
+                icon: const Icon(Icons.file_upload_outlined),
+                label: const Text('Импорт файла'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final shell = StatefulNavigationShell.of(context);
+                  shell.goBranch(2, initialLocation: true);
+                },
+                icon: const Icon(Icons.explore_outlined),
+                label: const Text('OPDS каталог'),
+              ),
+            ],
+          ),
         ).animate().fadeIn(duration: 250.ms),
       );
     }

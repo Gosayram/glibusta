@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -70,6 +72,7 @@ class ReaderTopBar extends StatelessWidget {
     required this.bookTitle,
     required this.onBack,
     this.bookAuthor,
+    this.coverUrl,
     this.onSearch,
     this.onToc,
     this.onBookmark,
@@ -86,6 +89,7 @@ class ReaderTopBar extends StatelessWidget {
   final String bookTitle;
   final VoidCallback onBack;
   final String? bookAuthor;
+  final String? coverUrl;
   final VoidCallback? onSearch;
   final VoidCallback? onToc;
   final VoidCallback? onBookmark;
@@ -144,6 +148,11 @@ class ReaderTopBar extends StatelessWidget {
                   tooltip: 'Вперёд по ссылке',
                   onPressed: onLinkForward,
                 ),
+              ),
+            if (coverUrl != null && coverUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _CoverThumbnail(coverUrl: coverUrl!, color: colors.text),
               ),
             Expanded(
               child: Semantics(
@@ -822,6 +831,48 @@ class _CheckpointButton extends StatelessWidget {
           constraints: const BoxConstraints.tightFor(width: 28, height: 28),
           visualDensity: VisualDensity.compact,
         ),
+      ),
+    );
+  }
+}
+
+class _CoverThumbnail extends StatelessWidget {
+  const _CoverThumbnail({required this.coverUrl, required this.color});
+
+  final String coverUrl;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDataUri = coverUrl.toLowerCase().startsWith('data:');
+    if (isDataUri) {
+      final parts = coverUrl.split(',');
+      if (parts.length != 2) return const SizedBox.shrink();
+      Uint8List bytes;
+      try {
+        bytes = base64Decode(parts.last);
+      } on FormatException {
+        return const SizedBox.shrink();
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Image.memory(
+          bytes,
+          width: 24,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Image.network(
+        coverUrl,
+        width: 24,
+        height: 36,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
       ),
     );
   }

@@ -161,10 +161,9 @@ clean-artifacts: ## Remove generated release artifacts
 	rm -rf "$(DIST_DIR)"
 
 .PHONY: clean-build
-clean-build: ## Remove all build artifacts, caches and release artifacts for a fresh build
+clean-build: ## Remove all build artifacts and caches for a fresh build (keeps release artifacts)
 	@$(PRINT_STEP) "Cleaning build artifacts and caches"
 	rm -rf "$(BUILD_DIR)"
-	rm -rf "$(DIST_DIR)"
 	rm -rf .dart_tool
 	rm -rf .flutter-plugins
 	rm -rf .flutter-plugins-dependencies
@@ -258,6 +257,11 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	$(MAKE) sign-macos
 	$(DITTO) -c -k --keepParent "$(MACOS_APP_SOURCE)" "$(MACOS_ZIP_ARTIFACT)"
 	@$(PRINT_OK) "macOS zip: $(MACOS_ZIP_ARTIFACT)"
+
+.PHONY: build-release
+build-release: build-android-apk-split build-macos ## Build signed split APKs + macOS zip (most common distribution combo)
+	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
+	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
 
 .PHONY: build-all
 build-all: build-android build-macos ## Build signed release artifacts for all available platforms
