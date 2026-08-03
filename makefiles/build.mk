@@ -161,9 +161,10 @@ clean-artifacts: ## Remove generated release artifacts
 	rm -rf "$(DIST_DIR)"
 
 .PHONY: clean-build
-clean-build: ## Remove all build artifacts and caches for a fresh build (keeps release artifacts)
+clean-build: ## Remove all build artifacts, caches and release artifacts for a fresh build
 	@$(PRINT_STEP) "Cleaning build artifacts and caches"
 	rm -rf "$(BUILD_DIR)"
+	rm -rf "$(DIST_DIR)"
 	rm -rf .dart_tool
 	rm -rf .flutter-plugins
 	rm -rf .flutter-plugins-dependencies
@@ -259,7 +260,24 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	@$(PRINT_OK) "macOS zip: $(MACOS_ZIP_ARTIFACT)"
 
 .PHONY: build-release
-build-release: build-android-apk-split build-macos ## Build signed split APKs + macOS zip (most common distribution combo)
+build-release: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS zip in one pass (single clean)
+	@$(call REQUIRE_TOOL,$(DITTO))
+	@$(PRINT_STEP) "Building split Android APKs $(APP_ARTIFACT_VERSION)"
+	$(FLUTTER_BUILD_APK_SPLIT) || true
+	@for abi in arm64-v8a armeabi-v7a; do \
+		src="$(ANDROID_APK_SPLIT_DIR)/app-$$abi-release.apk"; \
+		dst="$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-$$abi.apk"; \
+		if [ -f "$$src" ]; then cp "$$src" "$$dst"; fi; \
+	done
+	@[ -f "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk" ] || { $(PRINT_ERROR) "No APKs produced"; exit 1; }
+	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-arm64-v8a.apk"
+	@$(PRINT_OK) "Split APKs done"
+	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
+	$(FLUTTER_BUILD_MACOS)
+	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
+	$(CODESIGN) --force --deep --timestamp --options runtime --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
+	$(DITTO) -c -k --keepParent "$(MACOS_APP_SOURCE)" "$(MACOS_ZIP_ARTIFACT)"
+	@$(PRINT_OK) "macOS zip: $(MACOS_ZIP_ARTIFACT)"
 	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
 	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
 
