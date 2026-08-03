@@ -581,7 +581,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Глава 1 из 5'), findsOneWidget);
-      expect(find.text('~150 мин'), findsOneWidget);
+      expect(find.text('~2 ч 30 мин'), findsOneWidget);
     });
 
     testWidgets('shows only minutes when less than hour', (tester) async {

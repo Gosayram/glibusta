@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../data/reader_colors.dart';
+import '../data/reading_info_formatter.dart';
 import '../domain/reader.dart';
 
 /// Explains the reader controls that are temporarily revealed by a central tap.
@@ -256,6 +257,7 @@ class ReaderBottomBar extends StatelessWidget {
     required this.totalChapters,
     required this.scrollProgress,
     required this.estimatedMinutesLeft,
+    this.estimatedChapterMinutesLeft = 0,
     required this.chapterTitle,
     this.chapterTitleAt,
     this.onJumpToProgress,
@@ -270,6 +272,7 @@ class ReaderBottomBar extends StatelessWidget {
   final int totalChapters;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final int estimatedChapterMinutesLeft;
   final String chapterTitle;
   final String Function(int chapterIndex)? chapterTitleAt;
   final ValueChanged<double>? onJumpToProgress;
@@ -376,6 +379,9 @@ class ReaderBottomBar extends StatelessWidget {
       case BottomBarContent.chapter:
         return chapterPosition;
       case BottomBarContent.time:
+        if (estimatedChapterMinutesLeft > 0) {
+          return '$chapterPosition · ${formatReadingTimeEstimate(estimatedChapterMinutesLeft)}';
+        }
         return chapterPosition;
       case BottomBarContent.none:
         return '';
@@ -396,7 +402,7 @@ class ReaderBottomBar extends StatelessWidget {
       case BottomBarContent.chapter:
         return '$percent%';
       case BottomBarContent.time:
-        return minutesLeft > 0 ? '~$minutesLeft мин' : '$percent%';
+        return minutesLeft > 0 ? formatReadingTimeEstimate(minutesLeft) : '$percent%';
       case BottomBarContent.none:
         return '';
     }

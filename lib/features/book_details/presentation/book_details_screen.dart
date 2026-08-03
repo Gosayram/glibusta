@@ -16,6 +16,7 @@ import 'book_details_providers.dart';
 import 'widgets/book_header.dart';
 import 'widgets/bottom_action_bar.dart';
 import 'widgets/reading_progress_indicator.dart';
+import 'widgets/reading_status_selector.dart';
 import 'widgets/series_info_section.dart';
 
 class BookDetailsScreen extends ConsumerWidget {
@@ -221,6 +222,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
                   child: SeriesInfoSection(bookId: widget.bookId),
                 ),
               ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: ReadingStatusSelector(bookId: widget.bookId),
+                ),
+              ),
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _TabBarDelegate(
@@ -275,6 +282,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverToBoxAdapter(
                   child: SeriesInfoSection(bookId: widget.bookId),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverToBoxAdapter(
+                  child: ReadingStatusSelector(bookId: widget.bookId),
                 ),
               ),
               SliverPadding(

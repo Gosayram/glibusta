@@ -1,6 +1,6 @@
 import '../../../shared/models/book.dart';
 
-enum BookSortField { addedAt, title }
+enum BookSortField { addedAt, title, progress }
 
 abstract class BookRepository {
   Future<List<Book>> getAllBooks();

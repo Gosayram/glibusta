@@ -29,12 +29,22 @@ class BookRepositoryImpl implements BookRepository {
     bool ascending = false,
     String? formatFilter,
   }) async {
-    final rows = await _db.bookDao.getPagedBooks(
-      limit: limit,
-      offset: offset,
-      orderBy: [(t) => _mapSortField(t, sortField, ascending)],
-      formatFilter: formatFilter,
-    );
+    final List<SavedBook> rows;
+    if (sortField == BookSortField.progress) {
+      rows = await _db.bookDao.getPagedBooksWithProgress(
+        limit: limit,
+        offset: offset,
+        ascending: ascending,
+        formatFilter: formatFilter,
+      );
+    } else {
+      rows = await _db.bookDao.getPagedBooks(
+        limit: limit,
+        offset: offset,
+        orderBy: [(t) => _mapSortField(t, sortField, ascending)],
+        formatFilter: formatFilter,
+      );
+    }
     return _resolveAuthors(rows);
   }
 
@@ -61,6 +71,8 @@ class BookRepositoryImpl implements BookRepository {
         return OrderingTerm(expression: t.addedAt, mode: direction);
       case BookSortField.title:
         return OrderingTerm(expression: t.title, mode: direction);
+      case BookSortField.progress:
+        return OrderingTerm(expression: t.addedAt, mode: direction);
     }
   }
 

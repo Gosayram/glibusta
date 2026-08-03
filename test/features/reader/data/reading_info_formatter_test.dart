@@ -12,6 +12,17 @@ void main() {
       expect(formatReadingTimeEstimate(60), '~1 ч');
       expect(formatReadingTimeEstimate(95), '~1 ч 35 мин');
     });
+
+    test('formats days for 24+ hours', () {
+      expect(formatReadingTimeEstimate(1440), '~1 д');
+      expect(formatReadingTimeEstimate(1500), '~1 д 1 ч');
+      expect(formatReadingTimeEstimate(2880), '~2 д');
+      expect(formatReadingTimeEstimate(3000), '~2 д 2 ч');
+    });
+
+    test('formats sub-minute as < 1 мин', () {
+      expect(formatReadingTimeEstimate(-1), '—');
+    });
   });
 
   test('current chapter estimate uses the remaining chapter average', () {

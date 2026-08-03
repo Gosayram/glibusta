@@ -123,6 +123,29 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<int> deleteReadingProgress(String bookId) =>
       (delete(readingProgress)..where((t) => t.bookId.equals(bookId))).go();
 
+  Future<List<SavedBook>> getPagedBooksWithProgress({
+    required int limit,
+    int offset = 0,
+    bool ascending = true,
+    String? formatFilter,
+  }) async {
+    final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
+    final query =
+        select(savedBooks).join([
+            leftOuterJoin(readingProgress, readingProgress.bookId.equalsExp(savedBooks.id)),
+          ])
+          ..where(
+            savedBooks.deletedAt.isNull() &
+                (formatFilter != null
+                    ? savedBooks.filePath.like('%.$formatFilter')
+                    : const Constant(true)),
+          )
+          ..orderBy([OrderingTerm(expression: readingProgress.progressPercent, mode: direction)])
+          ..limit(limit, offset: offset);
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(savedBooks)).toList();
+  }
+
   Future<List<SavedBook>> getBooksWithProgress() async {
     final query = select(savedBooks).join([
       innerJoin(

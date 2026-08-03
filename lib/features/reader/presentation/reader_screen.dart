@@ -1110,6 +1110,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       totalChapters: readerState.chapterCount,
                       scrollProgress: readerState.scrollProgress,
                       estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                      estimatedChapterMinutesLeft: readerState.estimatedChapterMinutesLeft,
                       chapterTitle: readerState.chapterTitle(
                         readerState.currentPosition.chapterIndex,
                       ),

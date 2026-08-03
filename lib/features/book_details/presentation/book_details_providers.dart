@@ -16,6 +16,11 @@ final bookDetailsProvider = FutureProvider.autoDispose.family<BookDetails, Strin
   return source.getBookDetails(bookId);
 });
 
+final savedBookProvider = StreamProvider.autoDispose.family<SavedBook?, String>((ref, bookId) {
+  final db = ref.watch(databaseProvider);
+  return db.bookDao.watchBookById(bookId);
+});
+
 final bookReadingProgressProvider = FutureProvider.autoDispose.family<ReadingProgressData?, String>(
   (
     ref,

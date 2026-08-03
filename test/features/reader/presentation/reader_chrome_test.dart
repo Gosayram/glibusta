@@ -419,6 +419,47 @@ void main() {
     expect(find.text('Введите число от 0 до 100'), findsOneWidget);
     expect(jumps, 0);
   });
+
+  testWidgets('time mode shows chapter position with remaining chapter time', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.time),
+            currentChapterIndex: 2,
+            totalChapters: 15,
+            scrollProgress: 0.3,
+            estimatedMinutesLeft: 120,
+            estimatedChapterMinutesLeft: 25,
+            chapterTitle: '',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Глава 3 из 15 · ~25 мин'), findsOneWidget);
+    expect(find.text('~2 ч'), findsOneWidget);
+  });
+
+  testWidgets('time mode falls back to chapter position when no chapter estimate', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: ReaderBottomBar(
+            settings: ReaderSettings(bottomBarContent: BottomBarContent.time),
+            currentChapterIndex: 2,
+            totalChapters: 15,
+            scrollProgress: 0.3,
+            estimatedMinutesLeft: 0,
+            chapterTitle: '',
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Глава 3 из 15'), findsOneWidget);
+    expect(find.text('30%'), findsOneWidget);
+  });
 }
 
 void _noOp() {}

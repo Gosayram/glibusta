@@ -5,12 +5,14 @@ import '../../../shared/utils/author_utils.dart';
 enum LibrarySort {
   recentlyAdded,
   title,
-  author;
+  author,
+  progress;
 
   String get label => switch (this) {
     LibrarySort.recentlyAdded => 'Недавно добавленные',
     LibrarySort.title => 'По названию',
     LibrarySort.author => 'По автору',
+    LibrarySort.progress => 'По прогрессу',
   };
 }
 
@@ -22,6 +24,7 @@ List<Book> sortLibraryBooks(Iterable<Book> books, LibrarySort sort) {
       LibrarySort.recentlyAdded => _addedAt(right).compareTo(_addedAt(left)),
       LibrarySort.title => _compareText(left.title, right.title),
       LibrarySort.author => _compareAuthor(left.displayAuthor, right.displayAuthor),
+      LibrarySort.progress => 0, // DB-level only, no in-memory fallback
     };
     return primary != 0 ? primary : _compareText(left.id, right.id);
   });

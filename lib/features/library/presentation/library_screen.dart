@@ -91,10 +91,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         return BookSortField.title;
       case LibrarySort.author:
         return BookSortField.addedAt;
+      case LibrarySort.progress:
+        return BookSortField.progress;
     }
   }
 
-  bool get _sortAscending => _sort == LibrarySort.title;
+  bool get _sortAscending => _sort == LibrarySort.title || _sort == LibrarySort.progress;
 
   void _resetPagination() {
     _loadedBooks.clear();

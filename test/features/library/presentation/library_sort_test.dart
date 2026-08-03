@@ -95,5 +95,24 @@ void main() {
       // 'Asimov Isaac' → swapped → 'isaac asimov'
       expect(sorted.map((b) => b.id), ['1', '2', '3']);
     });
+
+    test('progress sort is DB-level only and preserves input order', () {
+      final input = [
+        book(id: 'a', title: 'A'),
+        book(id: 'b', title: 'B'),
+      ];
+      final sorted = sortLibraryBooks(input, LibrarySort.progress);
+      expect(sorted.map((b) => b.id), ['a', 'b']);
+    });
+  });
+
+  group('LibrarySort.progress', () {
+    test('has correct label', () {
+      expect(LibrarySort.progress.label, 'По прогрессу');
+    });
+
+    test('is included in all values', () {
+      expect(LibrarySort.values, contains(LibrarySort.progress));
+    });
   });
 }
