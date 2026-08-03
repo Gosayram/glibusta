@@ -65,6 +65,10 @@ class ReadingStatsScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              _StreakBanner(stats: stats),
+              const SizedBox(height: 12),
+              _TodayProgressCard(todayMinutes: stats.todayMinutes),
+              const SizedBox(height: 16),
               _SummaryCards(stats: stats),
               const SizedBox(height: 16),
               _WpmCard(averageWpm: stats.averageWpm, trend: stats.wpmTrend),
@@ -117,6 +121,8 @@ class ReadingStatsScreen extends ConsumerWidget {
                   child: ReadingHeatmap(data: stats.heatmapData),
                 ),
               ),
+              const SizedBox(height: 24),
+              _WeeklyGoalChart(readings: stats.heatmapData),
               const SizedBox(height: 24),
               Text(
                 'Ритм чтения',
@@ -1121,6 +1127,297 @@ class _WpmCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StreakBanner extends StatelessWidget {
+  const _StreakBanner({required this.stats});
+
+  final ReadingStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final streak = stats.currentStreak;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final String streakLabel;
+    final String streakSubtitle;
+    final Color bgColor;
+
+    if (streak == 0) {
+      streakLabel = '0';
+      streakSubtitle = 'Начните читать сегодня!';
+      bgColor = colorScheme.surfaceContainerHighest;
+    } else if (streak == 1) {
+      streakLabel = '1';
+      streakSubtitle = '1 день подряд';
+      bgColor = Colors.orange.shade50;
+    } else {
+      streakLabel = '$streak';
+      streakSubtitle = '$streak дней подряд';
+      bgColor = Colors.orange.shade50;
+    }
+
+    return Card(
+      color: bgColor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            const Text('🔥', style: TextStyle(fontSize: 36)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    streakLabel,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: streak > 0 ? Colors.orange.shade800 : colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    streakSubtitle,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: streak > 0 ? Colors.orange.shade700 : colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (stats.longestStreak > streak)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Рекорд',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  Text(
+                    '${stats.longestStreak}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TodayProgressCard extends ConsumerWidget {
+  const _TodayProgressCard({required this.todayMinutes});
+
+  final int todayMinutes;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final goalAsync = ref.watch(readingGoalProvider);
+
+    return goalAsync.when(
+      data: (goal) {
+        if (!goal.isEnabled) return const SizedBox.shrink();
+
+        final progress = (todayMinutes / goal.dailyMinutes).clamp(0.0, 1.0);
+        final isMet = todayMinutes >= goal.dailyMinutes;
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      isMet ? Icons.check_circle : Icons.today,
+                      size: 20,
+                      color: isMet ? Colors.green : Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Сегодня',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (isMet)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          '🎉',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    Text(
+                      '$todayMinutes из ${goal.dailyMinutes} мин',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isMet ? Colors.green : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  formatDailyGoalProgressMessage(
+                    todayMinutes: todayMinutes,
+                    goalMinutes: goal.dailyMinutes,
+                  ),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _WeeklyGoalChart extends ConsumerWidget {
+  const _WeeklyGoalChart({required this.readings});
+
+  final List<DayReading> readings;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final goalAsync = ref.watch(readingGoalProvider);
+
+    return goalAsync.when(
+      data: (goal) {
+        if (!goal.isEnabled) return const SizedBox.shrink();
+
+        final now = DateTime.now();
+        final todayStart = DateTime(now.year, now.month, now.day);
+        final dailyMinutesMap = <DateTime, int>{};
+        for (final r in readings) {
+          final day = DateTime(r.date.year, r.date.month, r.date.day);
+          dailyMinutesMap[day] = (dailyMinutesMap[day] ?? 0) + r.minutes;
+        }
+
+        final days = List<int>.generate(7, (i) {
+          final day = todayStart.subtract(Duration(days: 6 - i));
+          return dailyMinutesMap[day] ?? 0;
+        });
+        final maxMinutes = days.cast<int>().fold<int>(0, (a, b) => b > a ? b : a);
+        final dayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Прогресс за неделю',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 80,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: List.generate(7, (i) {
+                      final minutes = days[i];
+                      final metGoal = minutes >= goal.dailyMinutes;
+                      final ratio = maxMinutes > 0 ? minutes / maxMinutes : 0.0;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Align(
+                                  alignment: Alignment.bottomCenter,
+                                  child: FractionallySizedBox(
+                                    heightFactor: ratio,
+                                    widthFactor: 1,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: metGoal
+                                            ? Colors.green
+                                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                        borderRadius: const BorderRadius.vertical(
+                                          top: Radius.circular(3),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                dayLabels[(todayStart.weekday - 7 + i) % 7],
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(width: 12, height: 12, color: Colors.green),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Цель достигнута',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 12,
+                      height: 12,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Не достигнута',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }
