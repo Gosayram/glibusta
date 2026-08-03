@@ -344,34 +344,12 @@ checksums: ## Generate per-file .sha256/.sha384/.sha512 + unified checksums.txt 
 	@$(PRINT_OK) "Checksums written to $(DIST_DIR)/checksums.txt"
 
 .PHONY: release-notes
-release-notes: ## Generate RELEASE_NOTES from git log (commits since last tag)
+release-notes: ## Generate RELEASE_NOTES from git log between version changes in pubspec.yaml
 	@$(PRINT_STEP) "Generating release notes for $(APP_VERSION)"
-	@TAG=$$(git describe --tags --abbrev=0 2>/dev/null); \
-	if [ -n "$$TAG" ]; then \
-		RANGE="$$TAG..HEAD"; \
-	else \
-		RANGE="HEAD"; \
-	fi; \
-	echo "# Release $(APP_VERSION)" > "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "## What's Changed" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "### Features" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --grep="\[FEATURE\]\|\[feat\]\|\[Feat\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "### Fixes" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --grep="\[FIX\]\|\[fix\]\|\[Fix\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "### Other" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	git log $$RANGE --pretty=format:"- %s (%h)" --no-merges --invert-grep="\[FIX\]\|\[FEATURE\]\|\[REFACTOR\]\|\[CI\]\|\[DOCS\]\|\[UPD\]" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || true; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "### Checksums" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo "" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo '```' >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	cat "$(DIST_DIR)/checksums.txt" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md" 2>/dev/null || echo "No checksums available yet" >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"; \
-	echo '```' >> "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
+	@$(PYTHON) $(SCRIPTS_DIR)/generate_release_notes.py \
+		--version "$(APP_VERSION)" \
+		--checksums "$(DIST_DIR)/checksums.txt" \
+		--output "$(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
 	@$(PRINT_OK) "Release notes: $(DIST_DIR)/RELEASE_NOTES_$(APP_ARTIFACT_VERSION).md"
 
 .PHONY: build-all
