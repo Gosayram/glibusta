@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/router.dart';
 import '../../../core/database/app_database.dart';
@@ -1209,6 +1210,19 @@ void _showImageActions(String imageUrl, String imageDescription) {
   );
 }
 
+@visibleForTesting
+void showImageActions(BuildContext context, String imageUrl, String imageDescription) {
+  unawaited(
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => _ImageActionsSheet(
+        imageUrl: imageUrl,
+        imageDescription: imageDescription,
+      ),
+    ),
+  );
+}
+
 class _ImageActionsSheet extends StatelessWidget {
   const _ImageActionsSheet({required this.imageUrl, required this.imageDescription});
 
@@ -1241,6 +1255,54 @@ class _ImageActionsSheet extends StatelessWidget {
     }
   }
 
+  Future<void> _saveToDevice(ScaffoldMessengerState messenger) async {
+    try {
+      final uri = Uri.tryParse(imageUrl);
+      final isDataUri = imageUrl.toLowerCase().startsWith('data:');
+
+      if (isDataUri) {
+        final data = imageUrl.split(',');
+        if (data.length != 2) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Не удалось сохранить изображение')),
+          );
+          return;
+        }
+        final bytes = base64Decode(data.last);
+        final mime = RegExp(r'^data:image/([^;,]+)', caseSensitive: false).firstMatch(data.first);
+        final ext = mime?.group(1)?.toLowerCase() ?? 'png';
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/glibusta-$ext');
+        await file.writeAsBytes(bytes, flush: true);
+      } else if (uri?.scheme == 'file' || uri == null || !uri.isAbsolute) {
+        final path = uri?.scheme == 'file' ? uri!.path : imageUrl;
+        final file = File(path);
+        final dir = await getApplicationDocumentsDirectory();
+        final ext = path.split('.').last;
+        await file.copy('${dir.path}/glibusta-image.$ext');
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Сохранение доступно только для локальных изображений')),
+        );
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Изображение сохранено')),
+      );
+    } on Object {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Не удалось сохранить изображение')),
+      );
+    }
+  }
+
+  Future<void> _copyUrl(ScaffoldMessengerState messenger) async {
+    await Clipboard.setData(ClipboardData(text: imageUrl));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('URL скопирован')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1249,14 +1311,39 @@ class _ImageActionsSheet extends StatelessWidget {
         namesRoute: true,
         explicitChildNodes: true,
         label: 'Действия с изображением',
-        child: ListTile(
-          leading: const Icon(Icons.ios_share),
-          title: const Text('Поделиться изображением'),
-          subtitle: Text(imageDescription, maxLines: 1, overflow: TextOverflow.ellipsis),
-          onTap: () async {
-            Navigator.of(context).pop();
-            await _share(context);
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: const Text('Поделиться изображением'),
+              subtitle: Text(imageDescription, maxLines: 1, overflow: TextOverflow.ellipsis),
+              onTap: () async {
+                Navigator.of(context).pop();
+                await _share(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.save_alt),
+              title: const Text('Сохранить'),
+              subtitle: const Text('Сохранить изображение на устройство'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(context).pop();
+                await _saveToDevice(messenger);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Копировать URL'),
+              subtitle: const Text('Скопировать ссылку на изображение'),
+              onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(context).pop();
+                await _copyUrl(messenger);
+              },
+            ),
+          ],
         ),
       ),
     );

@@ -9,6 +9,7 @@ Usage:
     generate_release_notes.py --range v1.0..v2.0  # explicit range
     generate_release_notes.py --output RELEASE_NOTES_v2.0.md
 """
+
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,10 @@ TAG_PATTERNS: dict[str, re.Pattern[str]] = {
 
 def _git(*args: str) -> str:
     result = subprocess.run(
-        ["git"] + list(args), capture_output=True, text=True, check=True,
+        ["git", *args],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return result.stdout.strip()
 
@@ -58,8 +62,8 @@ def _find_version_boundary() -> str | None:
     except subprocess.CalledProcessError:
         return None
 
-    current_ver = (VERSION_RE.search(current) or re.search(r"version:\s*(\S+)", current))
-    previous_ver = (VERSION_RE.search(previous) or re.search(r"version:\s*(\S+)", previous))
+    current_ver = VERSION_RE.search(current) or re.search(r"version:\s*(\S+)", current)
+    previous_ver = VERSION_RE.search(previous) or re.search(r"version:\s*(\S+)", previous)
     if not current_ver or not previous_ver:
         return None
 
@@ -71,8 +75,7 @@ def _find_version_boundary() -> str | None:
         if log:
             lines = log.splitlines()
             # OLDEST commit = where old string was first set
-            boundary = lines[-1].strip()
-            return boundary
+            return lines[-1].strip()
 
     # Semver changed — find when old version was set
     old_line = f"version: {old_version}"
@@ -96,7 +99,7 @@ def _classify_commit(message: str) -> str:
 def _format_commit_line(hash_full: str, message: str) -> str:
     short = hash_full[:7]
     # Strip tag prefix like [FEATURE] - ... → keep the meaningful part
-    cleaned = re.sub(r"^\[[A-Z]+\]\s*[-–—]?\s*", "", message.strip())
+    cleaned = re.sub(r"^\[[A-Z]+\]\s*[-]?\s*", "", message.strip())
     return f"- {cleaned} (`{short}`)"
 
 
@@ -110,16 +113,20 @@ def _collect_commits(git_range: str) -> list[dict[str, str]]:
         if "||" not in line:
             continue
         hash_full, subject = line.split("||", 1)
-        commits.append({
-            "hash": hash_full.strip(),
-            "subject": subject.strip(),
-            "category": _classify_commit(subject),
-        })
+        commits.append(
+            {
+                "hash": hash_full.strip(),
+                "subject": subject.strip(),
+                "category": _classify_commit(subject),
+            }
+        )
     return commits
 
 
 def _generate_markdown(
-    version: str, commits: list[dict[str, str]], checksums_path: Path | None,
+    version: str,
+    commits: list[dict[str, str]],
+    checksums_path: Path | None,
 ) -> str:
     lines: list[str] = []
     lines.append(f"# Release {version}")
@@ -142,8 +149,7 @@ def _generate_markdown(
         has_content = True
         lines.append(f"### {section}")
         lines.append("")
-        for c in items:
-            lines.append(_format_commit_line(c["hash"], c["subject"]))
+        lines.extend(_format_commit_line(c["hash"], c["subject"]) for c in items)
         lines.append("")
 
     if not has_content:
@@ -175,11 +181,13 @@ def main() -> int:
         description="Generate release notes from git log.",
     )
     parser.add_argument(
-        "--range", dest="git_range",
+        "--range",
+        dest="git_range",
         help="Explicit git range (e.g. v1.0..HEAD). Auto-detected if omitted.",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         help="Output file path. Prints to stdout if omitted.",
     )
     parser.add_argument(

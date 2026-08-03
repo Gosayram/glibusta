@@ -1996,7 +1996,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _cachedActivePresetId = settings.activeColorPresetId;
     try {
       final preset = presets.firstWhere((p) => p.id == settings.activeColorPresetId);
-      _cachedCustomColors = ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
+      _cachedCustomColors = ReaderColors.fromPreset(
+        preset.backgroundColor,
+        preset.fontColor,
+        linkColor: preset.linkColor,
+        highlightColor: preset.highlightColor,
+      );
     } on Object catch (_) {
       _cachedCustomColors = null;
     }

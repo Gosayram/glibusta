@@ -1,4 +1,4 @@
-import 'package:flutter/painting.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/reader/data/color_preset_service.dart';
 import 'package:glibusta/features/reader/data/reader_colors.dart';
@@ -18,7 +18,12 @@ ReaderColors? resolveCustomColors({
   ReaderColors? result;
   try {
     final preset = presets.firstWhere((p) => p.id == activePresetId);
-    result = ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
+    result = ReaderColors.fromPreset(
+      preset.backgroundColor,
+      preset.fontColor,
+      linkColor: preset.linkColor,
+      highlightColor: preset.highlightColor,
+    );
   } on Object catch (_) {
     result = null;
   }
@@ -164,6 +169,44 @@ void main() {
       expect(second, isNotNull);
       expect(second!.scaffold, const Color(0xFFEEEEEE));
       expect(identical(first, second), isFalse);
+    });
+
+    test('passes link and highlight colors from preset', () {
+      final presets = [
+        const ColorPreset(
+          id: 'custom',
+          name: 'My Blue',
+          backgroundColor: Color(0xFF0A1628),
+          fontColor: Color(0xFF8ECAE6),
+          linkColor: Color(0xFF48CAE4),
+          highlightColor: Color(0x4000FF00),
+        ),
+      ];
+      final result = callResolve(
+        presets: presets,
+        activePresetId: 'custom',
+      );
+      expect(result, isNotNull);
+      expect(result!.link, const Color(0xFF48CAE4));
+      expect(result.highlight, const Color(0x4000FF00));
+    });
+
+    test('falls back to defaults when link/highlight not set', () {
+      final presets = [
+        const ColorPreset(
+          id: 'legacy',
+          name: 'Legacy',
+          backgroundColor: Color(0xFF111318),
+          fontColor: Color(0xFFE6E1E5),
+        ),
+      ];
+      final result = callResolve(
+        presets: presets,
+        activePresetId: 'legacy',
+      );
+      expect(result, isNotNull);
+      expect(result!.link, Colors.blue);
+      expect(result.highlight, const Color(0x40FFEB3B));
     });
   });
 }

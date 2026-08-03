@@ -1199,6 +1199,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   ) {
     var bgColor = existing?.backgroundColor ?? Colors.white;
     var fgColor = existing?.fontColor ?? Colors.black87;
+    var linkColor = existing?.linkColor ?? Colors.blue.shade700;
+    var highlightColor = existing?.highlightColor ?? const Color(0x40FFEB3B);
     final nameController = TextEditingController(text: existing?.name ?? '');
 
     unawaited(
@@ -1207,94 +1209,56 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             title: Text(existing != null ? 'Редактировать' : 'Новый пресет'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Название'),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
-                      children: [
-                        const Text('Фон', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () async {
-                            final color = await showColorPicker(
-                              context: ctx,
-                              initialColor: bgColor,
-                            );
-                            if (color != null) setDialogState(() => bgColor = color);
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Текст', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () async {
-                            final color = await showColorPicker(
-                              context: ctx,
-                              initialColor: fgColor,
-                            );
-                            if (color != null) setDialogState(() => fgColor = color);
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: fgColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Превью', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Aa',
-                              style: TextStyle(color: fgColor, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _ContrastWarning(
-                  background: bgColor,
-                  foreground: fgColor,
-                ),
-              ],
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Название'),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Фон',
+                    bgColor,
+                    (c) => setDialogState(() => bgColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Текст',
+                    fgColor,
+                    (c) => setDialogState(() => fgColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Ссылки',
+                    linkColor,
+                    (c) => setDialogState(() => linkColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Выделение',
+                    highlightColor,
+                    (c) => setDialogState(() => highlightColor = c),
+                  ),
+                  const SizedBox(height: 16),
+                  // Live preview card
+                  _PresetPreviewCard(
+                    background: bgColor,
+                    text: fgColor,
+                    link: linkColor,
+                    highlight: highlightColor,
+                  ),
+                  const SizedBox(height: 12),
+                  _ContrastWarning(background: bgColor, foreground: fgColor),
+                  _ContrastWarning(background: bgColor, foreground: linkColor),
+                ],
+              ),
             ),
             actions: [
               if (existing != null)
@@ -1332,6 +1296,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     name: name,
                     backgroundColor: bgColor,
                     fontColor: fgColor,
+                    linkColor: linkColor,
+                    highlightColor: highlightColor,
                   );
                   if (existing != null) {
                     unawaited(ref.read(colorPresetListProvider.notifier).updatePreset(preset));
@@ -1347,6 +1313,35 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ),
       ).whenComplete(nameController.dispose),
+    );
+  }
+
+  static Widget _buildColorPickerRow(
+    BuildContext ctx,
+    String label,
+    Color color,
+    ValueChanged<Color> onChanged,
+  ) {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () async {
+            final picked = await showColorPicker(context: ctx, initialColor: color);
+            if (picked != null) onChanged(picked);
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(fontSize: 13)),
+      ],
     );
   }
 
@@ -2453,6 +2448,80 @@ class _ContrastWarning extends StatelessWidget {
             child: Text(
               'Контраст ${ratio.toStringAsFixed(1)}:1 — ниже нормы WCAG AA (4.5:1)',
               style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetPreviewCard extends StatelessWidget {
+  const _PresetPreviewCard({
+    required this.background,
+    required this.text,
+    required this.link,
+    required this.highlight,
+  });
+
+  final Color background;
+  final Color text;
+  final Color link;
+  final Color highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = ReaderColorPreview.fromColors(
+      background: background,
+      text: text,
+      link: link,
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Обычный текст',
+            style: TextStyle(color: text, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Текст с ',
+                  style: TextStyle(color: text, fontSize: 14),
+                ),
+                TextSpan(
+                  text: 'ссылкой',
+                  style: TextStyle(
+                    color: link,
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            color: highlight,
+            child: Text('Выделенный текст', style: TextStyle(color: text, fontSize: 14)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Т ${preview.textContrast.toStringAsFixed(1)} · С ${preview.linkContrast.toStringAsFixed(1)}',
+            style: TextStyle(
+              fontSize: 10,
+              color: text.withValues(alpha: 0.6),
             ),
           ),
         ],

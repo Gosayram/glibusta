@@ -89,14 +89,20 @@ class ReaderColors {
     link: link,
   );
 
-  factory ReaderColors.fromPreset(Color bgColor, Color fgColor) {
+  factory ReaderColors.fromPreset(
+    Color bgColor,
+    Color fgColor, {
+    Color? linkColor,
+    Color? highlightColor,
+  }) {
+    final link = linkColor ?? Colors.blue;
     return ReaderColors(
       scaffold: bgColor,
       text: fgColor,
-      link: Colors.blue,
-      highlight: const Color(0x40FFEB3B),
+      link: link,
+      highlight: highlightColor ?? const Color(0x40FFEB3B),
       footnote: fgColor.withValues(alpha: 0.7),
-      accent: Colors.blue,
+      accent: link,
     );
   }
 
