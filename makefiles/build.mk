@@ -14,7 +14,7 @@ MACOS_APP_SOURCE ?= $(BUILD_DIR)/macos/Build/Products/Release/$(APP_NAME).app
 
 ANDROID_APK_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).apk
 ANDROID_AAB_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION).aab
-MACOS_ZIP_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.zip
+MACOS_DMG_ARTIFACT ?= $(DIST_DIR)/$(APP_NAME)-$(APP_ARTIFACT_VERSION)-macos.dmg
 
 MACOS_CODESIGN_IDENTITY ?= GoSayram Glibusta
 
@@ -251,17 +251,18 @@ sign-macos: macos-available ## Sign macOS app bundle with MACOS_CODESIGN_IDENTIT
 	@$(PRINT_OK) "macOS app signed"
 
 .PHONY: build-macos
-build-macos: clean-build subset-fonts bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS release zip
-	@$(call REQUIRE_TOOL,$(DITTO))
+build-macos: clean-build subset-fonts bump-build require-flutter macos-available prepare-artifacts ## Build signed macOS DMG
+	@$(call REQUIRE_TOOL,hdiutil)
 	@$(PRINT_STEP) "Building macOS release $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_MACOS)
 	$(MAKE) sign-macos
-	$(DITTO) -c -k --keepParent "$(MACOS_APP_SOURCE)" "$(MACOS_ZIP_ARTIFACT)"
-	@$(PRINT_OK) "macOS zip: $(MACOS_ZIP_ARTIFACT)"
+	@$(PRINT_STEP) "Creating DMG"
+	hdiutil create -volname "$(PROJECT_NAME)" -srcfolder "$(MACOS_APP_SOURCE)" -ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 
 .PHONY: build-release
-build-release: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS zip in one pass (single clean)
-	@$(call REQUIRE_TOOL,$(DITTO))
+build-release: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS DMG in one pass (single clean)
+	@$(call REQUIRE_TOOL,hdiutil)
 	@$(PRINT_STEP) "Building split Android APKs $(APP_ARTIFACT_VERSION)"
 	$(FLUTTER_BUILD_APK_SPLIT) || true
 	@for abi in arm64-v8a armeabi-v7a; do \
@@ -276,8 +277,9 @@ build-release: clean-build rust-build-android subset-fonts bump-build require-fl
 	$(FLUTTER_BUILD_MACOS)
 	@$(PRINT_STEP) "Signing macOS app with identity '$(MACOS_CODESIGN_IDENTITY)'"
 	$(CODESIGN) --force --deep --timestamp --options runtime --sign "$(MACOS_CODESIGN_IDENTITY)" "$(MACOS_APP_SOURCE)"
-	$(DITTO) -c -k --keepParent "$(MACOS_APP_SOURCE)" "$(MACOS_ZIP_ARTIFACT)"
-	@$(PRINT_OK) "macOS zip: $(MACOS_ZIP_ARTIFACT)"
+	@$(PRINT_STEP) "Creating DMG"
+	hdiutil create -volname "$(PROJECT_NAME)" -srcfolder "$(MACOS_APP_SOURCE)" -ov -format UDZO "$(MACOS_DMG_ARTIFACT)"
+	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 	@$(PRINT_OK) "All signed release artifacts in $(DIST_DIR)"
 	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
 
