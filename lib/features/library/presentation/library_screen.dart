@@ -60,6 +60,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _isSearchOpen = false;
   String _searchQuery = '';
   LibrarySort _sort = LibrarySort.recentlyAdded;
+  ReadingStatus? _statusFilter;
   String? _selectedCollectionId;
   String? _selectedCollectionName;
   String? _selectedFormat;
@@ -270,6 +271,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (_selectedCollectionId != null) {
       filtered = filtered.where((b) => _collectionBookIds.contains(b.id)).toList();
     }
+    if (_statusFilter != null) {
+      filtered = filtered.where((b) => b.readingStatus == _statusFilter).toList();
+    }
     if (_sort == LibrarySort.author) {
       filtered = sortLibraryBooks(filtered, _sort);
     }
@@ -440,31 +444,82 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ('cbz', 'CBZ'),
     ];
 
-    return SizedBox(
-      height: 48,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        itemCount: formats.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (_, index) {
-          final (formatValue, label) = formats[index];
-          final isSelected = _selectedFormat == formatValue;
-          return FilterChip(
-            label: Text(label),
-            selected: isSelected,
-            onSelected: (_) {
-              setState(() {
-                _selectedFormat = formatValue;
-                _resetPagination();
-              });
-              unawaited(_loadNextPage());
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 48,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: formats.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, index) {
+              final (formatValue, label) = formats[index];
+              final isSelected = _selectedFormat == formatValue;
+              return FilterChip(
+                label: Text(label),
+                selected: isSelected,
+                onSelected: (_) {
+                  setState(() {
+                    _selectedFormat = formatValue;
+                    _resetPagination();
+                  });
+                  unawaited(_loadNextPage());
+                },
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              );
             },
-            visualDensity: VisualDensity.compact,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          );
-        },
-      ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              FilterChip(
+                label: const Text('Непрочитано'),
+                selected: _statusFilter == ReadingStatus.none,
+                onSelected: (_) {
+                  setState(() {
+                    _statusFilter = _statusFilter == ReadingStatus.none ? null : ReadingStatus.none;
+                  });
+                },
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              FilterChip(
+                label: const Text('Читаю'),
+                selected: _statusFilter == ReadingStatus.reading,
+                onSelected: (_) {
+                  setState(() {
+                    _statusFilter = _statusFilter == ReadingStatus.reading
+                        ? null
+                        : ReadingStatus.reading;
+                  });
+                },
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              FilterChip(
+                label: const Text('Прочитано'),
+                selected: _statusFilter == ReadingStatus.finished,
+                onSelected: (_) {
+                  setState(() {
+                    _statusFilter = _statusFilter == ReadingStatus.finished
+                        ? null
+                        : ReadingStatus.finished;
+                  });
+                },
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

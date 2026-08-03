@@ -1223,6 +1223,30 @@ void showImageActions(BuildContext context, String imageUrl, String imageDescrip
   );
 }
 
+@visibleForTesting
+void showFullscreenImage(
+  BuildContext context,
+  String imageUrl, {
+  List<String> allImages = const [],
+}) {
+  final images = allImages.isNotEmpty ? allImages : [imageUrl];
+  final initialIndex = images.indexOf(imageUrl).clamp(0, images.length - 1);
+  unawaited(
+    Navigator.of(context).push<void>(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black87,
+        barrierDismissible: true,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, a, b) => _FullscreenImageViewer(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    ),
+  );
+}
+
 class _ImageActionsSheet extends StatelessWidget {
   const _ImageActionsSheet({required this.imageUrl, required this.imageDescription});
 
@@ -1386,6 +1410,7 @@ class _FullscreenImageViewer extends StatefulWidget {
 
 class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
   late final PageController _pageController;
+  late final ScrollController _thumbController;
   late int _currentIndex;
   bool _fillMode = false;
 
@@ -1394,12 +1419,36 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+    _thumbController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scrollThumbToIndex(widget.initialIndex);
+    });
   }
 
   @override
   void dispose() {
+    _thumbController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _scrollThumbToIndex(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_thumbController.hasClients) return;
+      const thumbWidth = 64.0;
+      const spacing = 8.0;
+      final offset =
+          index * (thumbWidth + spacing) -
+          (_thumbController.position.viewportDimension / 2) +
+          thumbWidth / 2;
+      unawaited(
+        _thumbController.animateTo(
+          offset.clamp(0.0, _thumbController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        ),
+      );
+    });
   }
 
   @override
@@ -1410,16 +1459,19 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
       namesRoute: true,
       explicitChildNodes: true,
       label: 'Полноэкранный просмотр изображения',
-      child: GestureDetector(
-        onTap: close,
-        onDoubleTap: () => setState(() => _fillMode = !_fillMode),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            PageView.builder(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          GestureDetector(
+            onTap: close,
+            onDoubleTap: () => setState(() => _fillMode = !_fillMode),
+            child: PageView.builder(
               controller: _pageController,
               itemCount: widget.images.length,
-              onPageChanged: (index) => setState(() => _currentIndex = index),
+              onPageChanged: (index) {
+                setState(() => _currentIndex = index);
+                _scrollThumbToIndex(index);
+              },
               itemBuilder: (context, index) => Center(
                 child: InteractiveViewer(
                   maxScale: 5.0,
@@ -1431,39 +1483,90 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
                 ),
               ),
             ),
-            if (widget.images.length > 1)
-              Positioned(
-                bottom: 24,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(12),
+          ),
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 64,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: SizedBox(
+                  height: 64,
+                  child: ListView.builder(
+                    controller: _thumbController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: widget.images.length,
+                    itemBuilder: (context, index) {
+                      final selected = index == _currentIndex;
+                      return GestureDetector(
+                        onTap: () {
+                          unawaited(
+                            _pageController.animateToPage(
+                              index,
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOut,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 56,
+                          height: 56,
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: selected ? Colors.white : Colors.transparent,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Opacity(
+                            opacity: selected ? 1.0 : 0.5,
+                            child: _buildImage(
+                              widget.images[index],
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  child: Text(
-                    '${_currentIndex + 1} / ${widget.images.length}',
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                ),
-              ),
-            PositionedDirectional(
-              top: 16,
-              end: 16,
-              child: Semantics(
-                button: true,
-                excludeSemantics: true,
-                label: 'Закрыть полноэкранный просмотр изображения',
-                onTap: close,
-                child: IconButton(
-                  icon: const Icon(Icons.close),
-                  color: Colors.white,
-                  tooltip: 'Закрыть просмотр изображения',
-                  onPressed: close,
                 ),
               ),
             ),
-          ],
-        ),
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentIndex + 1} / ${widget.images.length}',
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ),
+          PositionedDirectional(
+            top: 16,
+            end: 16,
+            child: Semantics(
+              button: true,
+              excludeSemantics: true,
+              label: 'Закрыть полноэкранный просмотр изображения',
+              onTap: close,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                color: Colors.white,
+                tooltip: 'Закрыть просмотр изображения',
+                onPressed: close,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -610,6 +610,18 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Ориентация экрана'),
         _buildOrientationLockRow(settings, notifier),
         const SizedBox(height: 16),
+        const _SectionTitle('Зона тапа для листания'),
+        _buildSliderRow(
+          'Ширина боковой зоны',
+          settings.tapZoneWidth,
+          0.1,
+          0.5,
+          (v) => notifier.updateTapZoneWidth(v),
+        ),
+        const SizedBox(height: 16),
+        const _SectionTitle('Полноэкранный режим'),
+        _buildFullScreenModeRow(settings, notifier),
+        const SizedBox(height: 16),
         const _SectionTitle('Двойной тап'),
         _buildDoubleTapActionRow(settings, notifier),
         const SizedBox(height: 12),
@@ -2151,6 +2163,23 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     },
     onChanged: (v) => notifier.updateHorizontalGestureScroll(v),
   );
+
+  static Widget _buildFullScreenModeRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Wrap(
+      spacing: 8,
+      children: FullScreenMode.values.map((mode) {
+        final selected = settings.fullScreenMode == mode;
+        return ChoiceChip(
+          label: Text(mode.displayName),
+          selected: selected,
+          onSelected: selected ? null : (_) => notifier.updateFullScreenMode(mode),
+        );
+      }).toList(),
+    );
+  }
 
   static Widget _buildOrientationLockRow(
     ReaderSettings settings,
