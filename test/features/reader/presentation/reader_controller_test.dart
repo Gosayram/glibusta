@@ -2,6 +2,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
 
 void main() {
+  group('ReaderState.estimatedChapterMinutesLeft', () {
+    test('defaults to 0', () {
+      final state = ReaderState();
+      expect(state.estimatedChapterMinutesLeft, 0);
+    });
+
+    test('copyWith preserves value when not specified', () {
+      final original = ReaderState(estimatedChapterMinutesLeft: 15);
+      final copied = original.copyWith();
+      expect(copied.estimatedChapterMinutesLeft, 15);
+    });
+
+    test('copyWith overrides value when specified', () {
+      final original = ReaderState(estimatedChapterMinutesLeft: 15);
+      final copied = original.copyWith(estimatedChapterMinutesLeft: 25);
+      expect(copied.estimatedChapterMinutesLeft, 25);
+    });
+  });
+
   group('ReaderController.resolveChapterAtViewportTop', () {
     test('returns 0 when positions list is empty', () {
       expect(

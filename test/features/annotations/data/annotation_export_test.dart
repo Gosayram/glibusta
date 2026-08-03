@@ -84,4 +84,115 @@ void main() {
 
     expect(export.filename, '___-annotations.md');
   });
+
+  group('HTML export', () {
+    test('produces valid HTML with title and annotation sections', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: annotations,
+        format: AnnotationExportFormat.html,
+        bookTitle: 'Тестовая книга',
+      );
+
+      expect(export.filename, 'Тестовая книга-annotations.html');
+      expect(export.content, contains('<!DOCTYPE html>'));
+      expect(export.content, contains('<title>Аннотации — Тестовая книга</title>'));
+      expect(export.content, contains('<h2>Закладки</h2>'));
+      expect(export.content, contains('<h2>Заметки</h2>'));
+      expect(export.content, contains('<h2>Цитаты</h2>'));
+      expect(export.content, contains('Текст закладки'));
+      expect(export.content, contains('Собственная заметка'));
+      expect(export.content, contains('Текст цитаты'));
+    });
+
+    test('preserves highlight colors in HTML', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: annotations,
+        format: AnnotationExportFormat.html,
+        bookTitle: 'Книга',
+      );
+
+      expect(export.content, contains('#00FF00'));
+    });
+
+    test('handles empty annotations', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: const AnnotationData(bookmarks: [], notes: [], quotes: []),
+        format: AnnotationExportFormat.html,
+        bookTitle: 'Пустая',
+      );
+
+      expect(export.content, contains('<!DOCTYPE html>'));
+      expect(export.content, isNot(contains('<h2>')));
+    });
+  });
+
+  group('JSON export', () {
+    test('produces valid JSON with correct structure', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: annotations,
+        format: AnnotationExportFormat.json,
+        bookTitle: 'Книга JSON',
+      );
+
+      expect(export.filename, 'Книга JSON-annotations.json');
+      expect(export.content, contains('"version":"1.0"'));
+      expect(export.content, contains('"book_title":"Книга JSON"'));
+      expect(export.content, contains('"exported_at"'));
+      expect(export.content, contains('"type":"bookmark"'));
+      expect(export.content, contains('"type":"note"'));
+      expect(export.content, contains('"type":"quote"'));
+      expect(export.content, contains('"text":"Текст закладки"'));
+      expect(export.content, contains('"text":"Собственная заметка"'));
+      expect(export.content, contains('"text":"Текст цитаты"'));
+    });
+
+    test('preserves highlight color and book_id in JSON', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: annotations,
+        format: AnnotationExportFormat.json,
+        bookTitle: 'Книга',
+      );
+
+      expect(export.content, contains('"color":"#00FF00"'));
+      expect(export.content, contains('"book_id":"book"'));
+      expect(export.content, contains('"chapter":1'));
+      expect(export.content, contains('"paragraph":2'));
+    });
+
+    test('handles empty annotations', () {
+      final export = AnnotationExportFormatter.build(
+        annotations: const AnnotationData(bookmarks: [], notes: [], quotes: []),
+        format: AnnotationExportFormat.json,
+        bookTitle: 'Пустая',
+      );
+
+      expect(export.content, contains('"annotations":[]'));
+    });
+
+    test('escapes special characters in JSON', () {
+      final data = AnnotationData(
+        bookmarks: [
+          Bookmark(
+            id: 'b1',
+            bookId: 'book',
+            chapterIndex: 0,
+            paragraphIndex: 0,
+            localOffset: 0,
+            selectedText: r'Кавычки "и" обратный \ слэш',
+            createdAt: DateTime.utc(2026),
+          ),
+        ],
+        notes: [],
+        quotes: [],
+      );
+      final export = AnnotationExportFormatter.build(
+        annotations: data,
+        format: AnnotationExportFormat.json,
+        bookTitle: 'Книга',
+      );
+
+      expect(export.content, contains(r'\"и\"'));
+      expect(export.content, contains(r'\\'));
+    });
+  });
 }

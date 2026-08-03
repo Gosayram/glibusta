@@ -1,7 +1,7 @@
 import '../../../core/database/app_database.dart';
 import 'annotations_providers.dart';
 
-enum AnnotationExportFormat { markdown, plainText }
+enum AnnotationExportFormat { markdown, plainText, html, json }
 
 /// A local, portable representation of the user's own annotations.
 ///
@@ -35,6 +35,14 @@ class AnnotationExportFormatter {
       AnnotationExportFormat.plainText => AnnotationExport(
         filename: '$safeName-annotations.txt',
         content: _plainText(annotations, bookTitle),
+      ),
+      AnnotationExportFormat.html => AnnotationExport(
+        filename: '$safeName-annotations.html',
+        content: _html(annotations, bookTitle),
+      ),
+      AnnotationExportFormat.json => AnnotationExport(
+        filename: '$safeName-annotations.json',
+        content: _json(annotations, bookTitle),
       ),
     };
   }
@@ -120,6 +128,179 @@ class AnnotationExportFormatter {
       if (_hasText(item.note)) buffer.writeln('Заметка: ${item.note}');
       buffer.writeln('Создано: ${item.createdAt.toIso8601String()}\n');
     }
+  }
+
+  static String _html(AnnotationData annotations, String title) {
+    final buffer = StringBuffer()
+      ..writeln('<!DOCTYPE html>')
+      ..writeln('<html lang="ru"><head><meta charset="utf-8">')
+      ..writeln('<meta name="viewport" content="width=device-width, initial-scale=1">')
+      ..writeln('<title>Аннотации — ${_escHtml(title)}</title>')
+      ..writeln('<style>')
+      ..writeln(
+        'body{font-family:system-ui,sans-serif;max-width:48rem;margin:2rem auto;padding:0 1rem; '
+        'color:#222;background:#fafafa;line-height:1.6}',
+      )
+      ..writeln('h1{border-bottom:2px solid #ddd;padding-bottom:.5rem}')
+      ..writeln('h2{color:#555;margin-top:2rem}')
+      ..writeln(
+        '.card{background:#fff;border:1px solid #e0e0e0;border-radius:8px; '
+        'padding:1rem;margin:.75rem 0;page-break-inside:avoid}',
+      )
+      ..writeln('.meta{font-size:.85rem;color:#888;margin-top:.5rem}')
+      ..writeln(
+        'blockquote{margin:.5rem 0;padding:.5rem 1rem;border-left:3px solid #ccc; '
+        'background:#f5f5f5;border-radius:0 4px 4px 0}',
+      )
+      ..writeln('.note{color:#555;font-style:italic;margin-top:.4rem}')
+      ..writeln('.hl{border-radius:2px;padding:1px 3px}')
+      ..writeln('</style></head><body>')
+      ..writeln('<h1>Аннотации — ${_escHtml(title)}</h1>');
+
+    if (annotations.bookmarks.isNotEmpty) {
+      buffer.writeln('<h2>Закладки</h2>');
+      for (final b in annotations.bookmarks) {
+        buffer.writeln('<div class="card">');
+        if (_hasText(b.selectedText)) {
+          final style = _highlightStyleAttr(b.highlightColor);
+          buffer.writeln('<blockquote class="hl"$style>${_escHtml(b.selectedText!)}</blockquote>');
+        }
+        if (_hasText(b.note)) buffer.writeln('<p class="note">${_escHtml(b.note!)}</p>');
+        buffer.writeln(
+          '<div class="meta">${_escHtml(_anchor(b.chapterIndex, b.paragraphIndex, b.localOffset))}'
+          ' &middot; ${b.createdAt.toIso8601String()}</div>',
+        );
+        buffer.writeln('</div>');
+      }
+    }
+
+    if (annotations.notes.isNotEmpty) {
+      buffer.writeln('<h2>Заметки</h2>');
+      for (final n in annotations.notes) {
+        buffer.writeln('<div class="card">');
+        final style = _highlightStyleAttr(n.highlightColor);
+        buffer.writeln('<p class="hl"$style>${_escHtml(n.content)}</p>');
+        buffer.writeln(
+          '<div class="meta">Цвет: ${_escHtml(n.highlightColor)}'
+          ' &middot; ${_escHtml(_anchor(n.chapterIndex, n.paragraphIndex, n.localOffset))}'
+          ' &middot; ${n.createdAt.toIso8601String()}</div>',
+        );
+        buffer.writeln('</div>');
+      }
+    }
+
+    if (annotations.quotes.isNotEmpty) {
+      buffer.writeln('<h2>Цитаты</h2>');
+      for (final q in annotations.quotes) {
+        buffer.writeln('<div class="card">');
+        buffer.writeln('<blockquote>${_escHtml(q.selectedText)}</blockquote>');
+        if (_hasText(q.note)) buffer.writeln('<p class="note">${_escHtml(q.note!)}</p>');
+        buffer.writeln(
+          '<div class="meta">${_escHtml(_anchor(q.chapterIndex, q.paragraphIndex))}'
+          ' &middot; ${q.createdAt.toIso8601String()}</div>',
+        );
+        buffer.writeln('</div>');
+      }
+    }
+
+    buffer.writeln('</body></html>');
+    return buffer.toString();
+  }
+
+  static String _json(AnnotationData annotations, String title) {
+    final annotationsList = <Map<String, Object?>>[];
+
+    for (final b in annotations.bookmarks) {
+      annotationsList.add({
+        'type': 'bookmark',
+        'text': b.selectedText,
+        'note': b.note,
+        'color': b.highlightColor,
+        'style': b.highlightStyle,
+        'book_id': b.bookId,
+        'chapter': b.chapterIndex,
+        'paragraph': b.paragraphIndex,
+        'offset': b.localOffset,
+        'created_at': b.createdAt.toIso8601String(),
+      });
+    }
+    for (final n in annotations.notes) {
+      annotationsList.add({
+        'type': 'note',
+        'text': n.content,
+        'note': null,
+        'color': n.highlightColor,
+        'style': null,
+        'book_id': n.bookId,
+        'chapter': n.chapterIndex,
+        'paragraph': n.paragraphIndex,
+        'offset': n.localOffset,
+        'created_at': n.createdAt.toIso8601String(),
+      });
+    }
+    for (final q in annotations.quotes) {
+      annotationsList.add({
+        'type': 'quote',
+        'text': q.selectedText,
+        'note': q.note,
+        'color': null,
+        'style': null,
+        'book_id': q.bookId,
+        'chapter': q.chapterIndex,
+        'paragraph': q.paragraphIndex,
+        'offset': null,
+        'created_at': q.createdAt.toIso8601String(),
+      });
+    }
+
+    final map = <String, Object?>{
+      'version': '1.0',
+      'book_title': title,
+      'exported_at': DateTime.now().toIso8601String(),
+      'annotations': annotationsList,
+    };
+    return _jsonEncode(map);
+  }
+
+  static String _escHtml(String text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+  }
+
+  static String _highlightStyleAttr(String? color) {
+    if (color == null || color.isEmpty) return '';
+    return ' style="background-color:${_escHtml(color)}20;border-left:3px solid ${_escHtml(color)}"';
+  }
+
+  /// Minimal JSON encoder — no dart:convert dependency kept out of the file
+  /// to stay consistent with the rest of the formatter.
+  static String _jsonEncode(Object? value) {
+    if (value == null) return 'null';
+    if (value is String) {
+      final escaped = value
+          .replaceAll(r'\', r'\\')
+          .replaceAll('"', r'\"')
+          .replaceAll('\n', r'\n')
+          .replaceAll('\r', r'\r')
+          .replaceAll('\t', r'\t');
+      return '"$escaped"';
+    }
+    if (value is num) return value.toString();
+    if (value is bool) return value ? 'true' : 'false';
+    if (value is List) {
+      final items = value.map(_jsonEncode).join(',');
+      return '[$items]';
+    }
+    if (value is Map) {
+      final entries = value.entries
+          .map((e) => '${_jsonEncode(e.key)}:${_jsonEncode(e.value)}')
+          .join(',');
+      return '{$entries}';
+    }
+    return '"${_escHtml(value.toString())}"';
   }
 
   static String _anchor(int chapterIndex, int paragraphIndex, [double? localOffset]) {

@@ -1595,9 +1595,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.time => _formatTime(),
         InfoSlotMode.battery => _formatBattery(),
         InfoSlotMode.batteryAndTime => '${_formatBattery()} ${_formatTime()}',
-        InfoSlotMode.remainingChapter => formatCurrentChapterTimeEstimate(
-          bookMinutesLeft: readerState.estimatedMinutesLeft,
-          chaptersRemaining: readerState.chapterCount - readerState.currentPosition.chapterIndex,
+        InfoSlotMode.remainingChapter => formatReadingTimeEstimate(
+          readerState.estimatedChapterMinutesLeft,
         ),
         InfoSlotMode.remainingBook => formatReadingTimeEstimate(readerState.estimatedMinutesLeft),
         InfoSlotMode.none => '',

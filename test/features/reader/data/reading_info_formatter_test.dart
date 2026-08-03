@@ -24,4 +24,20 @@ void main() {
       '—',
     );
   });
+
+  group('chapter-level estimate integration', () {
+    test('formatReadingTimeEstimate works with chapter-level values', () {
+      // Simulates what the info bar does with estimatedChapterMinutesLeft
+      const chapterMinutesLeft = 12;
+      expect(formatReadingTimeEstimate(chapterMinutesLeft), '~12 мин');
+    });
+
+    test('formatReadingTimeEstimate handles edge case of 1 minute', () {
+      expect(formatReadingTimeEstimate(1), '~1 мин');
+    });
+
+    test('formatReadingTimeEstimate handles large chapter estimates', () {
+      expect(formatReadingTimeEstimate(120), '~2 ч');
+    });
+  });
 }

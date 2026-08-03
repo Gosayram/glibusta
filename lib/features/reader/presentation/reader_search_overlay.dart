@@ -51,6 +51,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
   ReaderSearchHistory? _history;
   List<String> _historyEntries = const [];
   var _searchRequestId = 0;
+  String _lastQuery = '';
 
   @override
   void initState() {
@@ -185,6 +186,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
       _results = results;
       _selectedMatchIndex = 0;
       _isSearching = false;
+      _lastQuery = query;
     });
   }
 
@@ -379,7 +381,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                     itemCount: _results.length,
                     itemBuilder: (context, index) {
                       final result = _results[index];
-                      return _buildResultTile(result, textColor, hintColor);
+                      return _buildResultTile(result, textColor, hintColor, _lastQuery);
                     },
                   ),
                 ),
@@ -420,6 +422,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
     BookSearchResult result,
     Color textColor,
     Color hintColor,
+    String query,
   ) {
     final chapterTitle = result.chapterTitle.isNotEmpty
         ? result.chapterTitle
@@ -465,16 +468,7 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
                   ),
                 ],
                 const SizedBox(height: 4),
-                Text(
-                  result.matchText,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
+                _buildHighlightedText(result.matchText, query, textColor),
                 if (afterContext.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -494,6 +488,46 @@ class _BookSearchOverlayState extends State<BookSearchOverlay> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHighlightedText(String text, String query, Color textColor) {
+    if (query.isEmpty) {
+      return Text(
+        text,
+        maxLines: 3,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
+      );
+    }
+    final spans = <TextSpan>[];
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    var start = 0;
+    while (start < text.length) {
+      final index = lowerText.indexOf(lowerQuery, start);
+      if (index < 0) {
+        spans.add(TextSpan(text: text.substring(start)));
+        break;
+      }
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index)));
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(index, index + query.length),
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      );
+      start = index + query.length;
+    }
+    return RichText(
+      maxLines: 3,
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
+        children: spans,
       ),
     );
   }
@@ -558,40 +592,41 @@ class _SearchHistoryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.only(bottom: 16),
-      itemCount: entries.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Недавние запросы',
-                    style: TextStyle(color: hintColor, fontSize: 13),
-                  ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Недавние запросы',
+                  style: TextStyle(color: hintColor, fontSize: 13),
                 ),
-                TextButton(onPressed: onClear, child: const Text('Очистить')),
-              ],
-            ),
-          );
-        }
-
-        final query = entries[index - 1];
-        return ListTile(
-          leading: Icon(Icons.history, color: hintColor),
-          title: Text(query, style: TextStyle(color: textColor)),
-          onTap: () => onSelect(query),
-          trailing: IconButton(
-            tooltip: 'Удалить запрос',
-            icon: const Icon(Icons.close),
-            color: hintColor,
-            onPressed: () => onRemove(query),
+              ),
+              TextButton(onPressed: onClear, child: const Text('Очистить')),
+            ],
           ),
-        );
-      },
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final query in entries)
+                InputChip(
+                  avatar: Icon(Icons.history, color: hintColor, size: 16),
+                  label: Text(query, style: TextStyle(color: textColor, fontSize: 13)),
+                  deleteIcon: Icon(Icons.close, size: 14, color: hintColor),
+                  onDeleted: () => onRemove(query),
+                  onPressed: () => onSelect(query),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

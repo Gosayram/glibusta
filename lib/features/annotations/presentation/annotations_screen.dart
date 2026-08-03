@@ -97,7 +97,9 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
     });
   }
 
-  Future<void> _exportAnnotations() async {
+  Future<void> _exportAnnotations([
+    AnnotationExportFormat format = AnnotationExportFormat.markdown,
+  ]) async {
     final data = AnnotationData(
       bookmarks: _bookmarks,
       notes: _notes,
@@ -109,7 +111,7 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
           : await ref.read(databaseProvider).bookDao.getBookById(widget.bookId!);
       final export = AnnotationExportFormatter.build(
         annotations: data,
-        format: AnnotationExportFormat.markdown,
+        format: format,
         bookTitle: book?.title ?? 'Мои аннотации',
       );
       final directory = await getApplicationDocumentsDirectory();
@@ -175,7 +177,7 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
           PopupMenuButton<AnnotationExportFormat>(
             tooltip: 'Экспортировать аннотации',
             icon: const Icon(Icons.ios_share),
-            onSelected: (_) => unawaited(_exportAnnotations()),
+            onSelected: (format) => unawaited(_exportAnnotations(format)),
             itemBuilder: (context) => const [
               PopupMenuItem(
                 value: AnnotationExportFormat.markdown,
@@ -184,6 +186,14 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
               PopupMenuItem(
                 value: AnnotationExportFormat.plainText,
                 child: Text('Экспортировать в TXT'),
+              ),
+              PopupMenuItem(
+                value: AnnotationExportFormat.html,
+                child: Text('Экспортировать в HTML'),
+              ),
+              PopupMenuItem(
+                value: AnnotationExportFormat.json,
+                child: Text('Экспортировать в JSON'),
               ),
             ],
           ),

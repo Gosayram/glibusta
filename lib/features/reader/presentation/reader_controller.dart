@@ -71,6 +71,7 @@ class ReaderState {
   final bool isBottomSheetOpen;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final int estimatedChapterMinutesLeft;
   final bool isSearchOpen;
   final String? highlightedQuery;
   final int searchMatchCount;
@@ -98,6 +99,7 @@ class ReaderState {
     this.isBottomSheetOpen = false,
     this.scrollProgress = 0.0,
     this.estimatedMinutesLeft = 0,
+    this.estimatedChapterMinutesLeft = 0,
     this.isSearchOpen = false,
     this.highlightedQuery,
     this.searchMatchCount = 0,
@@ -150,6 +152,7 @@ class ReaderState {
     bool? isBottomSheetOpen,
     double? scrollProgress,
     int? estimatedMinutesLeft,
+    int? estimatedChapterMinutesLeft,
     bool? isSearchOpen,
     String? highlightedQuery,
     bool clearHighlight = false,
@@ -180,6 +183,7 @@ class ReaderState {
       isBottomSheetOpen: isBottomSheetOpen ?? this.isBottomSheetOpen,
       scrollProgress: scrollProgress ?? this.scrollProgress,
       estimatedMinutesLeft: estimatedMinutesLeft ?? this.estimatedMinutesLeft,
+      estimatedChapterMinutesLeft: estimatedChapterMinutesLeft ?? this.estimatedChapterMinutesLeft,
       isSearchOpen: isSearchOpen ?? this.isSearchOpen,
       highlightedQuery: clearHighlight ? null : (highlightedQuery ?? this.highlightedQuery),
       searchMatchCount: clearSearchMatches ? 0 : (searchMatchCount ?? this.searchMatchCount),
@@ -235,6 +239,7 @@ final class ReaderController {
   int _accumulatedSeconds = 0;
   int _sessionWordsRead = 0;
   int _estimatedTotalWords = 0;
+  final Map<int, int> _chapterWordCounts = {};
   bool _paused = false;
   Timer? _hideTimer;
   Timer? _autoThemeTimer;
@@ -370,6 +375,7 @@ final class ReaderController {
         currentPosition: ReaderPosition.initial,
         scrollProgress: 0,
         estimatedMinutesLeft: 0,
+        estimatedChapterMinutesLeft: 0,
         clearHighlight: true,
         isDynamicallyLoading: false,
         checkpoints: const [],
@@ -450,12 +456,14 @@ final class ReaderController {
       final wpm = totalSeconds > 60 && _sessionWordsRead > 0
           ? (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800)
           : 200;
+      _rebuildChapterWordCounts();
       _updateState(
         _state.copyWith(
           estimatedMinutesLeft: _estimateMinutesLeft(
             _progressForPosition(_state.currentPosition),
             wpm: wpm,
           ),
+          estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(wpm: wpm),
           wpm: wpm,
         ),
       );
@@ -633,6 +641,7 @@ final class ReaderController {
       // cannot be reintroduced after the eager eviction in [handlePageChanged].
       final windowed = ReaderContentHelper.evictDistantChapters(centerIndex, updated);
       if (!identical(windowed, _state.loadedChapters)) {
+        _rebuildChapterWordCounts();
         _updateState(_state.copyWith(loadedChapters: windowed, isDynamicallyLoading: false));
       } else {
         _updateState(_state.copyWith(isDynamicallyLoading: false));
@@ -801,6 +810,7 @@ final class ReaderController {
         scrollProgress: progress,
         currentPosition: position,
         estimatedMinutesLeft: _estimateMinutesLeft(progress),
+        estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(),
       ),
     );
     _ref
@@ -870,6 +880,37 @@ final class ReaderController {
     final remainingWords = (_estimatedTotalWords * (1 - progress.clamp(0.0, 1.0))).ceil();
     if (remainingWords == 0) return 0;
     return (remainingWords / (wpm ?? _state.wpm)).ceil();
+  }
+
+  int _estimateChapterMinutesLeft({int? wpm}) {
+    final effectiveWpm = wpm ?? _state.wpm;
+    if (effectiveWpm <= 0 || _state.chapterCount == 0) return 0;
+    final ch = _state.currentPosition.chapterIndex;
+    final totalBlocks = _state.loadedChapters[ch]?.blocks.length ?? 0;
+    final para = _state.currentPosition.paragraphIndex.clamp(
+      0,
+      totalBlocks > 0 ? totalBlocks - 1 : 0,
+    );
+    final chapterWords = _chapterWordCounts[ch] ?? 0;
+    final intraProgress = totalBlocks > 0 ? para / totalBlocks : 0.0;
+    var remainingWords = (chapterWords * (1.0 - intraProgress)).ceil();
+    for (var i = ch + 1; i < _state.chapterCount; i++) {
+      remainingWords += _chapterWordCounts[i] ?? 0;
+    }
+    if (remainingWords <= 0) return 0;
+    return (remainingWords / effectiveWpm).ceil();
+  }
+
+  void _rebuildChapterWordCounts() {
+    _chapterWordCounts.clear();
+    final pattern = RegExp(r'\S+');
+    for (final entry in _state.loadedChapters.entries) {
+      var words = 0;
+      for (final block in entry.value.blocks) {
+        words += pattern.allMatches(block.text).length;
+      }
+      _chapterWordCounts[entry.key] = words;
+    }
   }
 
   void _restoreSavedPosition(ReaderPosition position) {
@@ -1040,6 +1081,7 @@ final class ReaderController {
         ),
         scrollProgress: progress,
         estimatedMinutesLeft: _estimateMinutesLeft(progress),
+        estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(),
       ),
     );
     unawaited(_ensureChaptersLoaded(target));
@@ -1067,6 +1109,7 @@ final class ReaderController {
           ),
           scrollProgress: _chapterProgress(nextChapter),
           estimatedMinutesLeft: _estimateMinutesLeft(_chapterProgress(nextChapter)),
+          estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(),
         ),
       );
       unawaited(_ensureChaptersLoaded(nextChapter));
@@ -1148,6 +1191,7 @@ final class ReaderController {
           ),
           scrollProgress: _chapterProgress(previousChapter),
           estimatedMinutesLeft: _estimateMinutesLeft(_chapterProgress(previousChapter)),
+          estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(),
         ),
       );
       unawaited(_ensureChaptersLoaded(previousChapter));
@@ -1184,6 +1228,7 @@ final class ReaderController {
           currentPosition: clamped,
           scrollProgress: progress,
           estimatedMinutesLeft: _estimateMinutesLeft(progress),
+          estimatedChapterMinutesLeft: _estimateChapterMinutesLeft(),
         ),
       );
       unawaited(_ensureChaptersLoaded(clamped.chapterIndex));
@@ -1723,6 +1768,7 @@ final class ReaderController {
     buffer.writeln('Loading stage: ${_state.loadingStage?.name ?? "ready"}');
     buffer.writeln('Dynamic loading: ${_state.isDynamicallyLoading}');
     buffer.writeln('Estimated minutes left: ${_state.estimatedMinutesLeft}');
+    buffer.writeln('Estimated chapter minutes left: ${_state.estimatedChapterMinutesLeft}');
     buffer.writeln('Platform: ${Platform.operatingSystem}');
     buffer.writeln('Time: ${DateTime.now().toIso8601String()}');
     return buffer.toString();

@@ -8,6 +8,12 @@ import 'package:glibusta/features/reader/domain/reader.dart';
 import 'package:glibusta/features/reader/presentation/reader_search_overlay.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Finder _richTextContaining(String text) {
+  return find.byWidgetPredicate(
+    (w) => w is RichText && w.text.toPlainText().contains(text),
+  );
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -39,12 +45,12 @@ void main() {
 
     service.complete('first', const [_SearchResult('stale result')]);
     await tester.pump();
-    expect(find.text('stale result'), findsNothing);
+    expect(_richTextContaining('stale result'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     service.complete('second', const [_SearchResult('fresh result')]);
     await tester.pump();
-    expect(find.text('fresh result'), findsOneWidget);
+    expect(_richTextContaining('fresh result'), findsOneWidget);
   });
 
   testWidgets('clearing a query cancels its pending debounce', (tester) async {
@@ -115,10 +121,10 @@ void main() {
         'Результат поиска. Chapter. Matching paragraph Перед: $beforeExcerpt. После: '
         '$afterExcerpt.';
     expect(find.text(beforeExcerpt), findsOneWidget);
-    expect(find.text('Matching paragraph'), findsOneWidget);
+    expect(_richTextContaining('Matching paragraph'), findsOneWidget);
     expect(find.text(afterExcerpt), findsOneWidget);
     expect(
-      tester.getSemantics(find.text('Matching paragraph')),
+      tester.getSemantics(_richTextContaining('Matching paragraph')),
       matchesSemantics(
         label: semanticsLabel,
         isButton: true,
@@ -156,7 +162,12 @@ void main() {
     expect(find.text('recent query'), findsOneWidget);
     expect(find.text('older query'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Удалить запрос').first);
+    await tester.tap(
+      find.descendant(
+        of: find.widgetWithText(InputChip, 'recent query'),
+        matching: find.byIcon(Icons.close),
+      ),
+    );
     await tester.pump();
     expect(find.text('recent query'), findsNothing);
     expect(find.text('older query'), findsOneWidget);
@@ -321,6 +332,40 @@ void main() {
     await tester.pump();
     expect(find.text('3/3'), findsOneWidget);
     expect(jumped, [2]);
+  });
+
+  testWidgets('highlighted query text is bold in search results', (tester) async {
+    final service = _ControlledSearchService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: BookSearchOverlay(
+            searchService: service,
+            onJumpToResult: (_, _, _, _) {},
+            onDismiss: () {},
+            theme: ReaderTheme.light,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), 'cat');
+    await tester.pump(const Duration(milliseconds: 300));
+    service.complete(
+      'cat',
+      const [_SearchResult('The cat sat on the mat')],
+    );
+    await tester.pump();
+
+    final richText = tester.widget<RichText>(_richTextContaining('The cat sat on the mat'));
+    final spans = (richText.text as TextSpan).children!;
+    final boldSpans = spans
+        .whereType<TextSpan>()
+        .where((s) => s.style?.fontWeight == FontWeight.w700)
+        .toList();
+    expect(boldSpans, hasLength(1));
+    expect(boldSpans.first.text, 'cat');
   });
 
   testWidgets('next wraps around from last to first', (tester) async {
