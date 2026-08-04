@@ -966,7 +966,7 @@ final class ReaderController {
 
   double _chapterProgress(int chapterIndex) {
     final lastChapter = _state.chapterCount - 1;
-    if (lastChapter <= 0) return 0;
+    if (lastChapter <= 0) return _state.scrollProgress;
     return (chapterIndex / lastChapter).clamp(0.0, 1.0);
   }
 

@@ -271,7 +271,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _handleVerticalDragEnd(DragEndDetails details) {
     if (_dragStartedInTopZone &&
         details.primaryVelocity != null &&
-        details.primaryVelocity! > 300) {
+        details.primaryVelocity! > 700) {
       _exitReader();
     }
   }
@@ -390,6 +390,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final velocity = details.primaryVelocity ?? 0;
 
     if (deltaX.abs() > threshold || velocity.abs() > 500) {
+      if (_edgeSwipeActive && deltaX > 0) return;
       final isForward = deltaX < 0 || velocity < 0;
       final isInverted = settings.horizontalGesture == HorizontalGesture.inverse;
       if (isForward != isInverted) {

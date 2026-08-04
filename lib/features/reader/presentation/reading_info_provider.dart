@@ -13,6 +13,7 @@ const _key = 'reading_info_config';
 @riverpod
 class ReadingInfoNotifier extends _$ReadingInfoNotifier {
   var _version = 0;
+  var _loaded = false;
 
   @override
   ReadingInfoModel build() {
@@ -31,10 +32,14 @@ class ReadingInfoNotifier extends _$ReadingInfoNotifier {
           Map<String, dynamic>.from(jsonDecode(json) as Map),
         );
       }
-    } on Object catch (_) {}
+      _loaded = true;
+    } on Object catch (_) {
+      _loaded = true;
+    }
   }
 
   Future<void> _save() async {
+    if (!_loaded) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_key, jsonEncode(state.toJson()));
