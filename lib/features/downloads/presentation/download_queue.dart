@@ -225,6 +225,7 @@ class DownloadQueue {
   }
 
   Future<void> remove(String taskId) async {
+    await _bgDownload.cancel(taskId);
     _tasks.remove(taskId);
     _bgDownload.removeTask(taskId);
     await _repository.removeDownload(taskId);

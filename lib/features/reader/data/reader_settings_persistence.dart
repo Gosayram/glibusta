@@ -176,6 +176,14 @@ class ReaderSettingsPersistence {
           orElse: () => ImageColorEffect.off,
         ),
         activeColorPresetId: map['activeColorPresetId'] as String? ?? 'blue_light',
+        eink: map['eink'] as bool? ?? false,
+        showTopInfoBar: map['showTopInfoBar'] as bool? ?? true,
+        showTopToolbar: map['showTopToolbar'] as bool? ?? true,
+        showBottomBar: map['showBottomBar'] as bool? ?? true,
+        backgroundStyle: BackgroundStyle.values.firstWhere(
+          (e) => e.name == map['backgroundStyle'],
+          orElse: () => BackgroundStyle.solid,
+        ),
         uiTheme: map['uiTheme'] != null
             ? ReaderTheme.values.firstWhere(
                 (e) => e.name == map['uiTheme'],
@@ -271,6 +279,11 @@ class ReaderSettingsPersistence {
         'imageWidth': settings.imageWidth,
         'imageColorEffect': settings.imageColorEffect.name,
         'activeColorPresetId': settings.activeColorPresetId,
+        'eink': settings.eink,
+        'showTopInfoBar': settings.showTopInfoBar,
+        'showTopToolbar': settings.showTopToolbar,
+        'showBottomBar': settings.showBottomBar,
+        'backgroundStyle': settings.backgroundStyle.name,
         if (settings.uiTheme != null) 'uiTheme': settings.uiTheme!.name,
       }),
     );
