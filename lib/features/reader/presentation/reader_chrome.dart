@@ -85,6 +85,7 @@ class ReaderTopBar extends StatelessWidget {
     this.onKaraoke,
     this.onFontIncrease,
     this.onFontDecrease,
+    this.onCycleTheme,
   });
 
   final ReaderSettings settings;
@@ -104,6 +105,7 @@ class ReaderTopBar extends StatelessWidget {
   final VoidCallback? onKaraoke;
   final VoidCallback? onFontIncrease;
   final VoidCallback? onFontDecrease;
+  final VoidCallback? onCycleTheme;
 
   @override
   Widget build(BuildContext context) {
@@ -245,6 +247,17 @@ class ReaderTopBar extends StatelessWidget {
                   onPressed: onKaraoke,
                 ),
               ),
+            if (onCycleTheme != null)
+              Semantics(
+                button: true,
+                label: 'Сменить тему',
+                child: IconButton(
+                  icon: Icon(_themeIcon(settings.theme)),
+                  color: colors.text,
+                  tooltip: 'Тема: ${settings.theme.displayName}',
+                  onPressed: onCycleTheme,
+                ),
+              ),
             if (onFontDecrease != null)
               Semantics(
                 button: true,
@@ -281,6 +294,18 @@ class ReaderTopBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData _themeIcon(ReaderTheme theme) {
+    return switch (theme) {
+      ReaderTheme.system => Icons.brightness_auto,
+      ReaderTheme.light => Icons.light_mode_outlined,
+      ReaderTheme.paper => Icons.menu_book,
+      ReaderTheme.sepia => Icons.wb_sunny_outlined,
+      ReaderTheme.dark => Icons.dark_mode_outlined,
+      ReaderTheme.oled => Icons.contrast,
+      ReaderTheme.bedtime => Icons.bedtime,
+    };
   }
 }
 

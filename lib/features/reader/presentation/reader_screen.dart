@@ -1092,6 +1092,19 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                         final newSize = (settings.fontSize - 1.0).clamp(10.0, 40.0);
                         ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
                       },
+                      onCycleTheme: () {
+                        const cycle = [
+                          ReaderTheme.light,
+                          ReaderTheme.sepia,
+                          ReaderTheme.dark,
+                          ReaderTheme.oled,
+                          ReaderTheme.bedtime,
+                          ReaderTheme.paper,
+                        ];
+                        final idx = cycle.indexOf(settings.theme);
+                        final next = cycle[(idx + 1) % cycle.length];
+                        ref.read(readerSettingsProvider.notifier).updateTheme(next);
+                      },
                     ),
                   ),
                 );
@@ -1869,6 +1882,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (meta.description != null && meta.description!.isNotEmpty) ...[
+                    Text(
+                      meta.description!,
+                      style: theme.textTheme.bodySmall,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                  ],
                   _statRow(theme, 'Главы', '${meta.chapterCount}'),
                   _statRow(theme, 'Абзацев', '$totalBlocks'),
                   _statRow(theme, 'Иллюстраций', '$totalImages'),
