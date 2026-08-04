@@ -272,7 +272,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_dragStartedInTopZone &&
         details.primaryVelocity != null &&
         details.primaryVelocity! > 300) {
-      Navigator.of(context).pop();
+      _exitReader();
     }
   }
 
@@ -377,7 +377,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_edgeSwipeActive && deltaX > 80) {
       unawaited(HapticFeedback.mediumImpact());
       if (_ctrl.popLinkPosition()) return;
-      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) _exitReader();
       return;
     }
 
@@ -640,10 +640,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
   }
 
+  void _exitReader() {
+    _ctrl.saveProgress();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   void _closeReader() {
     _ctrl.saveProgress();
     _ctrl.saveCheckpoint();
-    GoRouter.of(context).go('/');
+    GoRouter.of(context).go('/library');
   }
 
   @override
@@ -733,7 +738,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      Navigator.of(context).pop();
+      _exitReader();
       return true;
     }
     return false;
@@ -880,7 +885,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => _exitReader(),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Назад'),
                 ),
@@ -930,12 +935,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           },
           onLibrary: () {
             if (_ctrl.popLinkPosition()) return;
-            Navigator.of(context).pop();
+            _exitReader();
           },
           onSettings: () => _showQuickSettings(context),
           onClosePanel: () {
             if (_ctrl.popLinkPosition()) return;
-            Navigator.of(context).pop();
+            _exitReader();
           },
           onScrollToTop: _ctrl.scrollToTop,
           child: _buildReaderLayout(context, readerState, effectiveSettings),
@@ -1048,7 +1053,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                       hasLinkForward: _ctrl.hasLinkForward,
                       onBack: () {
                         if (_ctrl.popLinkPosition()) return;
-                        Navigator.of(context).pop();
+                        _exitReader();
                       },
                       onLinkForward: _ctrl.forwardLinkPosition,
                       onSearch: () {

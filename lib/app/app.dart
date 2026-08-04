@@ -106,7 +106,11 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> {
     if (bookId.isEmpty) return;
     final ctx = rootNavigatorKey.currentContext;
     if (ctx != null) {
-      ctx.go('/reader/$bookId');
+      try {
+        ctx.go('/reader/$bookId');
+      } on Object {
+        // Context may be stale during widget rebuild
+      }
     }
   }
 

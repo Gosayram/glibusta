@@ -144,7 +144,14 @@ class BookmarkRepository {
         if (e.value == null) {
           buf.write('null');
         } else if (e.value is String) {
-          buf.write('"${e.value.toString().replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"');
+          final escaped = e.value
+              .toString()
+              .replaceAll(r'\', r'\\')
+              .replaceAll('"', r'\"')
+              .replaceAll('\n', r'\n')
+              .replaceAll('\r', r'\r')
+              .replaceAll('\t', r'\t');
+          buf.write('"$escaped"');
         } else {
           buf.write(e.value);
         }

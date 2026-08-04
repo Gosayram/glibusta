@@ -53,7 +53,7 @@ Future<void> startReading(
     );
     if (context.mounted) unawaited(_toast(context, 'Не удалось открыть книгу'));
   } finally {
-    if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+    if (context.mounted) Navigator.of(context).pop();
   }
 }
 

@@ -331,21 +331,29 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   Future<void> _addBookmark(BuildContext context) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
     final db = ref.read(databaseProvider);
-    await db
-        .into(db.bookmarks)
-        .insert(
-          BookmarksCompanion.insert(
-            id: '${widget.bookId}-${newMonotonicId()}',
-            bookId: widget.bookId,
-            chapterIndex: widget.chapterIndex,
-            paragraphIndex: widget.paragraphIndex,
-            selectedText: Value(_selectedText),
-          ),
+    try {
+      await db
+          .into(db.bookmarks)
+          .insert(
+            BookmarksCompanion.insert(
+              id: '${widget.bookId}-${newMonotonicId()}',
+              bookId: widget.bookId,
+              chapterIndex: widget.chapterIndex,
+              paragraphIndex: widget.paragraphIndex,
+              selectedText: Value(_selectedText),
+            ),
+          );
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Закладка добавлена'));
+      }
+      widget.onDismiss();
+    } on Object catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
         );
-    if (context.mounted) {
-      unawaited(SmartDialog.showToast('Закладка добавлена'));
+      }
     }
-    widget.onDismiss();
   }
 
   Future<void> _addHighlightBookmark(BuildContext context) async {
@@ -373,23 +381,31 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
     );
     if (!mounted || selectedColor == null) return;
     final db = ref.read(databaseProvider);
-    await db
-        .into(db.bookmarks)
-        .insert(
-          BookmarksCompanion.insert(
-            id: '${widget.bookId}-${newMonotonicId()}',
-            bookId: widget.bookId,
-            chapterIndex: widget.chapterIndex,
-            paragraphIndex: widget.paragraphIndex,
-            selectedText: Value(_selectedText),
-            highlightColor: Value(selectedColor),
-            highlightStyle: const Value('highlight'),
-          ),
+    try {
+      await db
+          .into(db.bookmarks)
+          .insert(
+            BookmarksCompanion.insert(
+              id: '${widget.bookId}-${newMonotonicId()}',
+              bookId: widget.bookId,
+              chapterIndex: widget.chapterIndex,
+              paragraphIndex: widget.paragraphIndex,
+              selectedText: Value(_selectedText),
+              highlightColor: Value(selectedColor),
+              highlightStyle: const Value('highlight'),
+            ),
+          );
+      if (context.mounted) {
+        unawaited(SmartDialog.showToast('Метка добавлена'));
+      }
+      widget.onDismiss();
+    } on Object catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e')),
         );
-    if (context.mounted) {
-      unawaited(SmartDialog.showToast('Метка добавлена'));
+      }
     }
-    widget.onDismiss();
   }
 
   Future<void> _addNote(BuildContext context) async {
