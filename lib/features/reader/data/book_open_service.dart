@@ -113,7 +113,12 @@ class BookOpenService {
       throw const BookMissingFailure('Файл книги не найден');
     }
 
-    final fileSize = await file.length();
+    int fileSize;
+    try {
+      fileSize = await file.length();
+    } on FileSystemException {
+      throw const BookMissingFailure('Файл книги не найден');
+    }
     if (fileSize == 0) {
       throw const CacheCorruptedFailure('Файл пуст');
     }
@@ -289,9 +294,11 @@ class BookOpenService {
         }
         final chapters = <ReaderChapter>[];
         for (var i = 0; i < cachedMeta.chapterCount; i++) {
-          final chapter = await cache.getChapter(bookId, i);
-          if (chapter != null) {
-            chapters.add(chapter);
+          try {
+            final chapter = await cache.getChapter(bookId, i);
+            if (chapter != null) chapters.add(chapter);
+          } on Object {
+            // Corrupt chapter cache — skip, will be re-fetched
           }
         }
         if (chapters.length == cachedMeta.chapterCount) {

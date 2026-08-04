@@ -91,7 +91,8 @@ class ColorPresetService {
       jsonEncode(indexed.map((p) => p.toJson()).toList()),
     );
     if (!ok) {
-      throw StateError('Failed to persist color presets');
+      // ponytail: preferences persist is best-effort, silently fail
+      return;
     }
   }
 

@@ -93,7 +93,7 @@ class ReaderErrorPanel extends StatelessWidget {
                   children: [
                     ReaderErrorSummary(
                       kind: kind,
-                      message: readerState.errorMessage!,
+                      message: readerState.errorMessage ?? '',
                     ),
                     if (readerState.errorFilePath != null) ...[
                       const SizedBox(height: 12),

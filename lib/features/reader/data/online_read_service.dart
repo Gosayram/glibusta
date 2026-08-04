@@ -74,8 +74,8 @@ class OnlineReadService {
 
     try {
       await _ref.read(httpClientProvider).download(url, savePath, onProgress: onProgress);
-    } on HttpException catch (e) {
-      throw OnlineReadFailure(e.message);
+    } on Object catch (e) {
+      throw OnlineReadFailure(e.toString());
     }
 
     registry.register(bookId, savePath);
