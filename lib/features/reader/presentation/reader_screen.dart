@@ -935,6 +935,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             if (_ctrl.popLinkPosition()) return;
             Navigator.of(context).pop();
           },
+          onScrollToTop: _ctrl.scrollToTop,
           child: _buildReaderLayout(context, readerState, effectiveSettings),
         ),
       ),
@@ -1135,6 +1136,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                           : null,
                       onCheckpointBack: _ctrl.hasCheckpointBehind
                           ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                          : null,
+                      onPrevChapter: readerState.currentPosition.chapterIndex > 0
+                          ? () => _ctrl.navigateToAdjacentChapter(
+                              direction: TwoFingerChapterDirection.previous,
+                            )
+                          : null,
+                      onNextChapter:
+                          readerState.currentPosition.chapterIndex < readerState.chapterCount - 1
+                          ? () => _ctrl.navigateToAdjacentChapter(
+                              direction: TwoFingerChapterDirection.next,
+                            )
                           : null,
                     ),
                   ),
@@ -1678,6 +1690,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.remainingBook => formatReadingTimeEstimate(readerState.estimatedMinutesLeft),
         InfoSlotMode.none => '',
         InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
+        InfoSlotMode.sessionTime => _ctrl.sessionTimeLabel,
       };
       return Text(
         text,

@@ -14,6 +14,7 @@ class ReaderShortcuts extends StatefulWidget {
     this.onLibrary,
     this.onSettings,
     this.onClosePanel,
+    this.onScrollToTop,
   });
 
   final Widget child;
@@ -26,6 +27,7 @@ class ReaderShortcuts extends StatefulWidget {
   final VoidCallback? onLibrary;
   final VoidCallback? onSettings;
   final VoidCallback? onClosePanel;
+  final VoidCallback? onScrollToTop;
 
   @override
   State<ReaderShortcuts> createState() => _ReaderShortcutsState();
@@ -56,6 +58,7 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
       const SingleActivator(LogicalKeyboardKey.comma, meta: true): const SettingsIntent(),
       const SingleActivator(LogicalKeyboardKey.comma, control: true): const SettingsIntent(),
       const SingleActivator(LogicalKeyboardKey.escape): const ClosePanelIntent(),
+      const SingleActivator(LogicalKeyboardKey.home): const ScrollToTopIntent(),
     };
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
@@ -100,6 +103,9 @@ class _ReaderShortcutsState extends State<ReaderShortcuts> {
           ),
           ClosePanelIntent: CallbackAction<ClosePanelIntent>(
             onInvoke: (_) => widget.onClosePanel?.call(),
+          ),
+          ScrollToTopIntent: CallbackAction<ScrollToTopIntent>(
+            onInvoke: (_) => widget.onScrollToTop?.call(),
           ),
         },
         child: Focus(
@@ -146,4 +152,8 @@ class SettingsIntent extends Intent {
 
 class ClosePanelIntent extends Intent {
   const ClosePanelIntent();
+}
+
+class ScrollToTopIntent extends Intent {
+  const ScrollToTopIntent();
 }

@@ -300,6 +300,8 @@ class ReaderBottomBar extends StatelessWidget {
     this.checkpoints = const [],
     this.onCheckpointForward,
     this.onCheckpointBack,
+    this.onPrevChapter,
+    this.onNextChapter,
   });
 
   final ReaderSettings settings;
@@ -315,6 +317,8 @@ class ReaderBottomBar extends StatelessWidget {
   final List<double> checkpoints;
   final VoidCallback? onCheckpointForward;
   final VoidCallback? onCheckpointBack;
+  final VoidCallback? onPrevChapter;
+  final VoidCallback? onNextChapter;
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +372,23 @@ class ReaderBottomBar extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                if (onPrevChapter != null)
+                  Semantics(
+                    button: true,
+                    label: 'Предыдущая глава',
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.skip_previous),
+                      color: colors.text.withValues(alpha: 0.7),
+                      tooltip: 'Предыдущая глава',
+                      onPressed: onPrevChapter,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 32),
                 Semantics(
                   label: 'Позиция чтения: $chapterPosition',
                   child: ExcludeSemantics(
@@ -381,6 +402,23 @@ class ReaderBottomBar extends StatelessWidget {
                   _rightLabel(settings, chapterPosition, percent, estimatedMinutesLeft),
                   style: TextStyle(color: colors.text, fontSize: 12),
                 ),
+                if (onNextChapter != null)
+                  Semantics(
+                    button: true,
+                    label: 'Следующая глава',
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.skip_next),
+                      color: colors.text.withValues(alpha: 0.7),
+                      tooltip: 'Следующая глава',
+                      onPressed: onNextChapter,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 32),
               ],
             ),
             if (onJumpToProgress != null) ...[

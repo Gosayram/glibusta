@@ -761,6 +761,27 @@ final class ReaderController {
     autoScrollSpeed.value = speed.clamp(10.0, 300.0);
   }
 
+  void scrollToTop() {
+    if (_disposed || _scrollController == null || !_scrollController!.hasClients) return;
+    stopAutoScroll();
+    unawaited(
+      _scrollController!.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      ),
+    );
+  }
+
+  String get sessionTimeLabel {
+    final elapsed = _accumulatedSeconds + _sessionStopwatch.elapsed.inSeconds;
+    if (elapsed < 60) return '$elapsed мин';
+    final hours = elapsed ~/ 3600;
+    final minutes = (elapsed % 3600) ~/ 60;
+    if (hours > 0) return '$hours ч $minutes мин';
+    return '$minutes мин';
+  }
+
   /// LITHIUM-READ-005: update cached chapter positions from the content body.
   void setChapterPositions(List<double> positions) {
     _chapterPositions = positions;

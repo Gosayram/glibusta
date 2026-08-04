@@ -179,6 +179,8 @@ class _SlotPicker extends StatelessWidget {
         return 'Remaining Book';
       case InfoSlotMode.wpm:
         return 'WPM Speed';
+      case InfoSlotMode.sessionTime:
+        return 'Время за чтением';
     }
   }
 }
@@ -273,6 +275,8 @@ class _PreviewWidget extends StatelessWidget {
         return Text(formatReadingTimeEstimate(95), style: style, textAlign: TextAlign.center);
       case InfoSlotMode.wpm:
         return Text('245 сл/мин', style: style, textAlign: TextAlign.center);
+      case InfoSlotMode.sessionTime:
+        return Text('12 мин', style: style);
     }
   }
 }

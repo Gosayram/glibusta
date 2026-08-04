@@ -9,6 +9,7 @@ enum InfoSlotMode {
   remainingChapter,
   remainingBook,
   wpm,
+  sessionTime,
 }
 
 class ReadingInfoModel {
