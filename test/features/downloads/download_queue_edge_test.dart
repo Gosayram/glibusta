@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/notifications/download_notification_service.dart';
+import 'package:glibusta/core/services/task_queue_service.dart';
 import 'package:glibusta/features/downloads/data/background_download_service.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
@@ -16,11 +17,14 @@ class MockDownloadNotificationService extends Mock implements DownloadNotificati
 
 class MockBookImportService extends Mock implements BookImportService {}
 
+class MockTaskQueueService extends Mock implements TaskQueueService {}
+
 void main() {
   late MockDownloadRepository mockRepo;
   late MockBackgroundDownloadService mockBgDownload;
   late MockDownloadNotificationService mockNotificationService;
   late MockBookImportService mockBookImport;
+  late MockTaskQueueService mockTaskQueue;
 
   setUpAll(() {
     registerFallbackValue(DownloadStatus.queued);
@@ -45,6 +49,7 @@ void main() {
     mockBgDownload = MockBackgroundDownloadService();
     mockNotificationService = MockDownloadNotificationService();
     mockBookImport = MockBookImportService();
+    mockTaskQueue = MockTaskQueueService();
     when(() => mockNotificationService.cancel(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showCompleted(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showFailed(any(), any())).thenAnswer((_) async {});
@@ -67,6 +72,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.pause('nonexistent');
       verifyNever(() => mockRepo.updateStatus(any(), any()));
@@ -81,6 +87,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.cancel('nonexistent');
       verifyNever(() => mockRepo.cancelDownload(any()));
@@ -95,6 +102,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.remove('nonexistent');
       verify(() => mockRepo.removeDownload('nonexistent')).called(1);
@@ -109,6 +117,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       final tasks = await queue.onDownloadsChanged.first.timeout(const Duration(seconds: 2));
       expect(tasks, isEmpty);
@@ -153,6 +162,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.enqueue(
         bookId: 'b1',
@@ -209,6 +219,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
 
       await expectLater(

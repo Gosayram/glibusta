@@ -8,17 +8,21 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../../features/library/data/book_import_service.dart';
 import '../../features/reader/data/parsers/format_detector.dart';
 import '../logging/app_logger.dart';
+import '../services/background_task_provider.dart';
+import '../services/task_queue_service.dart';
 import '../storage/storage_bridge_impl.dart';
 
 typedef SharedBookImporter = Future<ImportResult> Function(String filePath);
 typedef SharedUriCache = Future<String?> Function(String uri);
 
 class ShareHandler {
-  ShareHandler({SharedUriCache? cacheSharedUri})
-    : _cacheSharedUri = cacheSharedUri ?? StorageBridgeImpl().copyToCache;
+  ShareHandler({required TaskQueueService taskQueue, SharedUriCache? cacheSharedUri})
+    : _taskQueue = taskQueue,
+      _cacheSharedUri = cacheSharedUri ?? StorageBridgeImpl().copyToCache;
 
   StreamSubscription<List<SharedMediaFile>>? _subscription;
   var _subscriptionGeneration = 0;
+  final TaskQueueService _taskQueue;
   final SharedUriCache _cacheSharedUri;
   final _logger = AppLogger();
 
@@ -123,7 +127,11 @@ class ShareHandler {
       }
 
       if (!context.mounted || _subscriptionGeneration != generation) return;
-      final result = await importFile(filePath);
+      final result = await _taskQueue.run<ImportResult>(
+        type: BackgroundTaskType.import,
+        message: 'Импорт: ${filePath.split('/').last}',
+        task: () => importFile(filePath),
+      );
       if (!context.mounted || _subscriptionGeneration != generation) return;
       await SmartDialog.showToast(
         result.isSuccess

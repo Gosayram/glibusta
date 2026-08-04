@@ -12,6 +12,7 @@ import '../core/notifications/download_notification_service.dart';
 import '../core/platform/app_platform.dart';
 
 import '../core/platform/share_handler.dart';
+import '../core/services/task_queue_service.dart';
 import '../features/downloads/data/download_listener.dart';
 import '../features/library/data/book_import_service.dart';
 import '../features/library/data/library_scanner.dart';
@@ -39,7 +40,7 @@ class GlibustaApp extends ConsumerStatefulWidget {
 }
 
 class _GlibustaAppState extends ConsumerState<GlibustaApp> {
-  final _shareHandler = ShareHandler();
+  ShareHandler? _shareHandler;
   bool _shareHandlerInitialized = false;
   bool _downloadListenerInitialized = false;
   bool _notifPermRequested = false;
@@ -57,8 +58,10 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> {
     super.didChangeDependencies();
     if (!_shareHandlerInitialized) {
       _shareHandlerInitialized = true;
+      final taskQueue = ref.read(taskQueueProvider);
       final importService = ref.read(bookImportServiceProvider);
-      _shareHandler.init(context, importService.importFile);
+      _shareHandler = ShareHandler(taskQueue: taskQueue);
+      _shareHandler!.init(context, importService.importFile);
     }
     if (!_downloadListenerInitialized) {
       _downloadListenerInitialized = true;
@@ -160,7 +163,7 @@ class _GlibustaAppState extends ConsumerState<GlibustaApp> {
   @override
   void dispose() {
     unawaited(_notificationTapSub?.cancel());
-    _shareHandler.dispose();
+    _shareHandler?.dispose();
     super.dispose();
   }
 

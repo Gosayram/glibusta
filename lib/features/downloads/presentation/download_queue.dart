@@ -5,6 +5,8 @@ import 'package:glibusta/features/downloads/data/download_listener.dart' show Do
 
 import '../../../core/logging/app_logger.dart';
 import '../../../core/notifications/download_notification_service.dart';
+import '../../../core/services/background_task_provider.dart';
+import '../../../core/services/task_queue_service.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
 import '../../library/data/book_import_service.dart';
@@ -17,7 +19,14 @@ final downloadQueueProvider = Provider<DownloadQueue>((ref) {
   final bgDownload = ref.watch(backgroundDownloadServiceProvider);
   final notificationService = ref.watch(downloadNotificationServiceProvider);
   final bookImport = ref.watch(bookImportServiceProvider);
-  final queue = DownloadQueue(repository, bgDownload, notificationService, bookImport);
+  final taskQueue = ref.watch(taskQueueProvider);
+  final queue = DownloadQueue(
+    repository,
+    bgDownload,
+    notificationService,
+    bookImport,
+    taskQueue,
+  );
   ref.onDispose(() => queue.dispose());
   return queue;
 });
@@ -37,12 +46,14 @@ class DownloadQueue {
     this._bgDownload,
     this._notificationService,
     this._bookImport,
+    this._taskQueue,
   );
 
   final DownloadRepository _repository;
   final BackgroundDownloadService _bgDownload;
   final DownloadNotificationService _notificationService;
   final BookImportService _bookImport;
+  final TaskQueueService _taskQueue;
   final _logger = AppLogger();
 
   final _downloadsController = StreamController<List<DownloadTask>>.broadcast();
@@ -248,8 +259,13 @@ class DownloadQueue {
     unawaited(_notificationService.showCompleted(task));
 
     if (task.targetPath != null) {
+      final targetPath = task.targetPath!;
       try {
-        final result = await _bookImport.importFile(task.targetPath!);
+        final result = await _taskQueue.run<ImportResult>(
+          type: BackgroundTaskType.import,
+          message: 'Импорт: ${task.bookTitle ?? targetPath.split('/').last}',
+          task: () => _bookImport.importFile(targetPath),
+        );
         if (result.isSuccess) {
           _logger.info(
             'Book imported after download: ${result.title}',

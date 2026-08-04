@@ -87,13 +87,14 @@ Future<ReadingStats> readingStats(Ref ref) async {
   final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
   final monthStart = DateTime(now.year, now.month);
 
-  final todaySessions = await db.bookDao.getSessionsForDateRange(todayStart, now);
-  final weekSessions = await db.bookDao.getSessionsForDateRange(weekStart, now);
-  final monthSessions = await db.bookDao.getSessionsForDateRange(monthStart, now);
   final allSessions = await db.bookDao.getSessionsForDateRange(
     now.subtract(const Duration(days: 365)),
     now,
   );
+
+  final todaySessions = allSessions.where((s) => s.startedAt.isAfter(todayStart)).toList();
+  final weekSessions = allSessions.where((s) => s.startedAt.isAfter(weekStart)).toList();
+  final monthSessions = allSessions.where((s) => s.startedAt.isAfter(monthStart)).toList();
 
   final todayMinutes = todaySessions.fold<int>(0, (sum, s) => sum + _sessionMinutes(s));
   final weekMinutes = weekSessions.fold<int>(0, (sum, s) => sum + _sessionMinutes(s));

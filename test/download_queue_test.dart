@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/notifications/download_notification_service.dart';
+import 'package:glibusta/core/services/task_queue_service.dart';
 import 'package:glibusta/features/downloads/data/background_download_service.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
@@ -18,11 +19,14 @@ class MockDownloadNotificationService extends Mock implements DownloadNotificati
 
 class MockBookImportService extends Mock implements BookImportService {}
 
+class MockTaskQueueService extends Mock implements TaskQueueService {}
+
 void main() {
   late MockDownloadRepository mockRepo;
   late MockBackgroundDownloadService mockBgDownload;
   late MockDownloadNotificationService mockNotificationService;
   late MockBookImportService mockBookImport;
+  late MockTaskQueueService mockTaskQueue;
 
   setUpAll(() {
     registerFallbackValue(DownloadStatus.queued);
@@ -47,6 +51,7 @@ void main() {
     mockBgDownload = MockBackgroundDownloadService();
     mockNotificationService = MockDownloadNotificationService();
     mockBookImport = MockBookImportService();
+    mockTaskQueue = MockTaskQueueService();
     when(() => mockNotificationService.cancel(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showCompleted(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showFailed(any(), any())).thenAnswer((_) async {});
@@ -104,6 +109,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       addTearDown(queue.dispose);
 
@@ -159,6 +165,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       addTearDown(queue.dispose);
 
@@ -227,6 +234,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
 
       await queue.enqueue(
@@ -259,6 +267,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.remove('task-99');
 
@@ -304,6 +313,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       final progressUpdate = Completer<List<DownloadTask>>();
       final updates = queue.onDownloadsChanged.listen((tasks) {
@@ -349,6 +359,7 @@ void main() {
       mockBgDownload,
       mockNotificationService,
       mockBookImport,
+      mockTaskQueue,
     );
     addTearDown(queue.dispose);
 

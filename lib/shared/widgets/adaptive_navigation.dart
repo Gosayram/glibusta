@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
+import '../../core/services/background_task_provider.dart';
+import '../../core/services/task_queue_service.dart';
 import '../../features/library/data/book_import_service.dart';
 import '../../features/reader/data/parsers/format_detector.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -449,17 +451,24 @@ class MacOSShell extends ConsumerWidget {
       return;
     }
     final importService = ref.read(bookImportServiceProvider);
+    final taskQueue = ref.read(taskQueueProvider);
     for (final path in bookPaths) {
       unawaited(
-        importService.importFile(path).then((result) {
-          if (!context.mounted) return;
-          final msg = result.isSuccess
-              ? 'Импортировано: ${result.title}'
-              : result.isDuplicate
-              ? 'Дубликат: ${result.title}'
-              : 'Ошибка: ${result.error}';
-          unawaited(SmartDialog.showToast(msg));
-        }),
+        taskQueue
+            .run<ImportResult>(
+              type: BackgroundTaskType.import,
+              message: 'Импорт: ${path.split('/').last}',
+              task: () => importService.importFile(path),
+            )
+            .then((result) {
+              if (!context.mounted) return;
+              final msg = result.isSuccess
+                  ? 'Импортировано: ${result.title}'
+                  : result.isDuplicate
+                  ? 'Дубликат: ${result.title}'
+                  : 'Ошибка: ${result.error}';
+              unawaited(SmartDialog.showToast(msg));
+            }),
       );
     }
   }

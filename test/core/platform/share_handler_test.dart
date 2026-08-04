@@ -3,10 +3,29 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/platform/share_handler.dart';
+import 'package:glibusta/core/services/background_task_provider.dart';
+import 'package:glibusta/core/services/task_queue_service.dart';
 import 'package:glibusta/features/library/data/book_import_service.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
+class FakeTaskQueueService extends Fake implements TaskQueueService {
+  final importCalls = <String>[];
+
+  @override
+  Future<T> run<T>({
+    required BackgroundTaskType type,
+    required String message,
+    required Future<T> Function() task,
+    String Function(T result)? successMessage,
+  }) async {
+    final result = await task();
+    return result;
+  }
+}
+
 void main() {
+  final fakeTaskQueue = FakeTaskQueueService();
+
   testWidgets('clears a consumed cold-start share intent', (tester) async {
     ReceiveSharingIntent.setMockValues(
       initialMedia: [
@@ -14,7 +33,7 @@ void main() {
       ],
       mediaStream: const Stream<List<SharedMediaFile>>.empty(),
     );
-    final handler = ShareHandler();
+    final handler = ShareHandler(taskQueue: fakeTaskQueue);
     late BuildContext context;
     addTearDown(() {
       handler.dispose();
@@ -53,6 +72,7 @@ void main() {
     final cachedUris = <String>[];
     final importedPaths = <String>[];
     final handler = ShareHandler(
+      taskQueue: fakeTaskQueue,
       cacheSharedUri: (uri) async {
         cachedUris.add(uri);
         return '/cache/shared.epub';
@@ -100,6 +120,7 @@ void main() {
     );
     var imported = false;
     final handler = ShareHandler(
+      taskQueue: fakeTaskQueue,
       cacheSharedUri: (_) async => throw StateError('SAF permission was revoked'),
     );
     late BuildContext context;
@@ -138,7 +159,7 @@ void main() {
       initialMedia: const [],
       mediaStream: mediaController.stream,
     );
-    final handler = ShareHandler();
+    final handler = ShareHandler(taskQueue: fakeTaskQueue);
     final firstImports = <String>[];
     final secondImports = <String>[];
     late BuildContext context;
@@ -188,6 +209,7 @@ void main() {
       mediaStream: mediaController.stream,
     );
     final handler = ShareHandler(
+      taskQueue: fakeTaskQueue,
       cacheSharedUri: (_) {
         cacheStarted.complete();
         return cachedPath.future;
