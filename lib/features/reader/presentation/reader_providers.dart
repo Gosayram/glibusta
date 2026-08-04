@@ -35,9 +35,9 @@ class ReaderSettingsNotifier extends _$ReaderSettingsNotifier {
   void _loadFromPrefs() {
     unawaited(
       ReaderSettingsPersistence.load().then((settings) {
-        if (state == const ReaderSettings()) {
-          state = settings;
-        }
+        // Riverpod swallows state writes after disposal, but guard defensively.
+        if (state != const ReaderSettings()) return;
+        state = settings;
       }),
     );
   }

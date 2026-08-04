@@ -394,149 +394,157 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   Future<void> _addNote(BuildContext context) async {
     final textController = TextEditingController(text: _selectedText);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Заметка'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_selectedText != null && _selectedText!.isNotEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Заметка'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_selectedText != null && _selectedText!.isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _selectedText!,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                child: Text(
-                  _selectedText!,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+              TextField(
+                controller: textController,
+                autofocus: true,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'Введите заметку...',
+                  border: OutlineInputBorder(),
                 ),
               ),
-            TextField(
-              controller: textController,
-              autofocus: true,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'Введите заметку...',
-                border: OutlineInputBorder(),
-              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(textController.text),
+              child: const Text('Сохранить'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(textController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (result != null && context.mounted) {
-      final db = ref.read(databaseProvider);
-      await db
-          .into(db.notes)
-          .insert(
-            NotesCompanion.insert(
-              id: '${widget.bookId}-${newMonotonicId()}',
-              bookId: widget.bookId,
-              chapterIndex: widget.chapterIndex,
-              paragraphIndex: widget.paragraphIndex,
-              content: result,
-            ),
-          );
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Заметка сохранена'));
+      if (result != null && context.mounted) {
+        final db = ref.read(databaseProvider);
+        await db
+            .into(db.notes)
+            .insert(
+              NotesCompanion.insert(
+                id: '${widget.bookId}-${newMonotonicId()}',
+                bookId: widget.bookId,
+                chapterIndex: widget.chapterIndex,
+                paragraphIndex: widget.paragraphIndex,
+                content: result,
+              ),
+            );
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Заметка сохранена'));
+        }
       }
+      widget.onDismiss();
+    } finally {
+      textController.dispose();
     }
-    widget.onDismiss();
   }
 
   Future<void> _addQuote(BuildContext context) async {
     if (_selectedText == null || _selectedText!.isEmpty) return;
     final noteController = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Цитата'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 3,
+    try {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Цитата'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 3,
+                    ),
                   ),
                 ),
+                child: Text(
+                  _selectedText!,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                ),
               ),
-              child: Text(
-                _selectedText!,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+              TextField(
+                controller: noteController,
+                autofocus: true,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  hintText: 'Комментарий (необязательно)...',
+                  border: OutlineInputBorder(),
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Отмена'),
             ),
-            TextField(
-              controller: noteController,
-              autofocus: true,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                hintText: 'Комментарий (необязательно)...',
-                border: OutlineInputBorder(),
-              ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(noteController.text),
+              child: const Text('Сохранить'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(noteController.text),
-            child: const Text('Сохранить'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (result != null && context.mounted) {
-      final db = ref.read(databaseProvider);
-      await db
-          .into(db.quotes)
-          .insert(
-            QuotesCompanion.insert(
-              id: '${widget.bookId}-${newMonotonicId()}',
-              bookId: widget.bookId,
-              chapterIndex: widget.chapterIndex,
-              paragraphIndex: widget.paragraphIndex,
-              selectedText: _selectedText!,
-              note: result.isNotEmpty ? Value(result) : const Value.absent(),
-            ),
-          );
-      if (context.mounted) {
-        unawaited(SmartDialog.showToast('Цитата сохранена'));
+      if (result != null && context.mounted) {
+        final db = ref.read(databaseProvider);
+        await db
+            .into(db.quotes)
+            .insert(
+              QuotesCompanion.insert(
+                id: '${widget.bookId}-${newMonotonicId()}',
+                bookId: widget.bookId,
+                chapterIndex: widget.chapterIndex,
+                paragraphIndex: widget.paragraphIndex,
+                selectedText: _selectedText!,
+                note: result.isNotEmpty ? Value(result) : const Value.absent(),
+              ),
+            );
+        if (context.mounted) {
+          unawaited(SmartDialog.showToast('Цитата сохранена'));
+        }
       }
+      widget.onDismiss();
+    } finally {
+      noteController.dispose();
     }
-    widget.onDismiss();
   }
 
   Future<void> _pickHighlightColor(BuildContext context) async {
@@ -634,8 +642,8 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
   // The built-in source remains useful for concise in-reader definitions.
   Future<void> _showWiktionaryPopup(BuildContext context, String query) async {
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       final uri = Uri.https(
         'en.wiktionary.org',
         '/api/rest_v1/page/summary/${Uri.encodeComponent(query)}',
@@ -644,20 +652,14 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       request.headers.set('Accept', 'application/json');
       final response = await request.close();
 
-      if (!context.mounted) {
-        client.close();
-        return;
-      }
+      if (!context.mounted) return;
 
       if (response.statusCode != 200) {
-        client.close();
         unawaited(SmartDialog.showToast('Ничего не найдено'));
         return;
       }
 
       final body = await response.transform(utf8.decoder).join();
-      client.close();
-
       final data = jsonDecode(body) as Map<String, dynamic>;
       final title = data['title'] as String? ?? query;
       final extract = data['extract'] as String? ?? '';
@@ -683,6 +685,8 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
       if (context.mounted) {
         unawaited(SmartDialog.showToast('Ошибка словаря: $e'));
       }
+    } finally {
+      client.close();
     }
   }
 

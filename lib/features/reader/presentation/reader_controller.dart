@@ -673,6 +673,10 @@ final class ReaderController {
       // cannot be reintroduced after the eager eviction in [handlePageChanged].
       final windowed = ReaderContentHelper.evictDistantChapters(centerIndex, updated);
       if (!identical(windowed, _state.loadedChapters)) {
+        final evictedKeys = _state.loadedChapters.keys.where((k) => !windowed.containsKey(k));
+        evictChapterImages(evictedKeys);
+        evictChapterWords(evictedKeys);
+        evictChapterRenderItems(evictedKeys);
         _rebuildChapterWordCounts();
         _updateState(_state.copyWith(loadedChapters: windowed, isDynamicallyLoading: false));
       } else {

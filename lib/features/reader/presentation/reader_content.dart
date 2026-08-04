@@ -278,7 +278,10 @@ void evictChapterImages(Iterable<int> chapterIndices) {
   }
 }
 
-void disposeChapterImagesCache() => _chapterImagesCache.clear();
+void disposeChapterImagesCache() {
+  _chapterImagesCache.clear();
+  clearCssCache();
+}
 
 @visibleForTesting
 void clearChapterImagesCache() => _chapterImagesCache.clear();

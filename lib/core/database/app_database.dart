@@ -338,8 +338,7 @@ QueryExecutor _openConnection() {
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
   ref.onDispose(() {
-    unawaited(db.checkpointWal());
-    unawaited(db.close());
+    unawaited(db.checkpointWal().then((_) => db.close()));
   });
   return db;
 });
