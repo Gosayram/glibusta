@@ -181,6 +181,8 @@ class _SlotPicker extends StatelessWidget {
         return 'WPM Speed';
       case InfoSlotMode.sessionTime:
         return 'Время за чтением';
+      case InfoSlotMode.streak:
+        return 'Серия дней';
     }
   }
 }
@@ -277,6 +279,8 @@ class _PreviewWidget extends StatelessWidget {
         return Text('245 сл/мин', style: style, textAlign: TextAlign.center);
       case InfoSlotMode.sessionTime:
         return Text('12 мин', style: style);
+      case InfoSlotMode.streak:
+        return Text('🔥 7 дней', style: style);
     }
   }
 }

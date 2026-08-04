@@ -10,6 +10,7 @@ enum InfoSlotMode {
   remainingBook,
   wpm,
   sessionTime,
+  streak,
 }
 
 class ReadingInfoModel {

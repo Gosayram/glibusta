@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/app_database.dart';
+import '../../bookmarks/data/bookmark_repository.dart';
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
 import 'toc_hierarchy.dart';
@@ -63,7 +66,7 @@ class TableOfContentsSheet extends StatelessWidget {
   }
 }
 
-class _TableOfContentsContent extends StatefulWidget {
+class _TableOfContentsContent extends ConsumerStatefulWidget {
   final NormalizedBookMetadata metadata;
   final int currentChapterIndex;
   final double currentChapterProgress;
@@ -83,10 +86,10 @@ class _TableOfContentsContent extends StatefulWidget {
   });
 
   @override
-  State<_TableOfContentsContent> createState() => _TableOfContentsContentState();
+  ConsumerState<_TableOfContentsContent> createState() => _TableOfContentsContentState();
 }
 
-class _TableOfContentsContentState extends State<_TableOfContentsContent> {
+class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent> {
   static const _estimatedEntryExtent = 56.0;
   static const _maxInitialPositionAttempts = 3;
 
@@ -96,11 +99,14 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
   int _initialPositionAttempts = 0;
   String _searchQuery = '';
   late final TextEditingController _searchController;
+  late final BookmarkRepository _bookmarks;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    final database = ref.read(databaseProvider);
+    _bookmarks = BookmarkRepository(database);
   }
 
   @override
@@ -203,263 +209,338 @@ class _TableOfContentsContentState extends State<_TableOfContentsContent> {
       0,
       (max, ch) => max > ch.blocks.length ? max : ch.blocks.length,
     );
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Icon(
-                Icons.table_chart_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Содержание',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.table_chart_outlined,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              ),
-              const Spacer(),
-              Text(
-                '${widget.metadata.chapterCount} глав',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                const SizedBox(width: 8),
+                Text(
+                  'Содержание',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Поиск по главам...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 20),
-                      tooltip: 'Очистить',
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                    )
-                  : null,
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            ),
-            onChanged: (value) => setState(() => _searchQuery = value.trim()),
-          ),
-        ),
-        if (isSearching && visibleEntries.isEmpty)
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  'Глав не найдено',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                const Spacer(),
+                Text(
+                  '${widget.metadata.chapterCount} глав',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ),
-            ),
-          )
-        else
-          Expanded(
-            child: ListView.builder(
-              controller: widget.scrollController,
-              itemCount: visibleEntries.length,
-              itemBuilder: (context, index) {
-                final entry = visibleEntries[index];
-                final title = entry.title.isNotEmpty ? entry.title : 'Глава ${entry.index + 1}';
-                final isActive = entry.index == widget.currentChapterIndex;
-                final isGroup = entry.isGroup;
-                final isCollapsed = _collapsedGroups.contains(entry.groupId);
-                final isLoaded = widget.loadedChapters.containsKey(entry.index);
-                final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
-                final groupToggleLabel = isCollapsed
-                    ? 'Развернуть раздел $title'
-                    : 'Свернуть раздел $title';
-
-                // MD-8.1: chapter size bar
-                final ch = widget.loadedChapters[entry.index];
-                final blockCount = ch?.blocks.length ?? 0;
-                final barFraction = maxSize > 0 ? blockCount / maxSize : 0.0;
-
-                return ListTile(
-                  key: isActive ? _currentChapterKey : ValueKey('toc-entry-${entry.index}'),
-                  contentPadding: EdgeInsets.only(
-                    left: 16.0 + entry.depth * 16.0,
-                  ),
-                  leading: isGroup
-                      ? Semantics(
-                          key: ValueKey('toc-group-toggle-${entry.index}'),
-                          button: true,
-                          label: groupToggleLabel,
-                          expanded: !isCollapsed,
-                          onTap: () => _toggleGroup(entry.groupId),
-                          child: ExcludeSemantics(
-                            child: IconButton(
-                              tooltip: groupToggleLabel,
-                              visualDensity: VisualDensity.compact,
-                              iconSize: 20,
-                              onPressed: () => _toggleGroup(entry.groupId),
-                              icon: Icon(
-                                isCollapsed ? Icons.chevron_right : Icons.expand_more,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : CircleAvatar(
-                          radius: 16,
-                          backgroundColor: isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.surfaceContainerHighest,
-                          child: isUnloaded
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Text(
-                                  '${entry.index + 1}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isActive
-                                        ? Theme.of(context).colorScheme.onPrimary
-                                        : Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                        ),
-                  title: Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: isActive
-                          ? FontWeight.bold
-                          : isGroup
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                      fontSize: isGroup ? 14 : 13,
-                      color: isUnloaded
-                          ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-                          : isActive
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                  ),
-                  subtitle: isGroup
-                      ? null
-                      : isActive
-                      ? Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: LinearProgressIndicator(
-                            value: widget.currentChapterProgress.clamp(0.0, 1.0),
-                            minHeight: 2,
-                            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          ),
-                        )
-                      : entry.index < widget.currentChapterIndex
-                      ? Text(
-                          'прочитано',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                          ),
-                        )
-                      : isUnloaded
-                      ? Text(
-                          'загрузка...',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        )
-                      : null,
-                  trailing: isGroup || blockCount == 0
-                      ? null
-                      : SizedBox(
-                          width: 40,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Container(
-                                height: 4,
-                                width: 40 * barFraction.clamp(0.05, 1.0),
-                                decoration: BoxDecoration(
-                                  color: isActive
-                                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.onSurface.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '$blockCount',
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                  dense: true,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    final resolved = resolveTocAnchor(
-                      metadata: widget.metadata.metadata,
-                      anchor: entry.anchor,
-                      chapterIndex: entry.index,
-                    );
-                    final targetChapter = resolved?.chapterIndex ?? entry.index;
-                    final targetParagraph = resolved?.paragraphIndex ?? entry.blockIndex;
-                    final progress = widget.metadata.chapterCount <= 1
-                        ? 0.0
-                        : targetChapter / (widget.metadata.chapterCount - 1);
-                    widget.onJumpToPosition(
-                      ReaderPosition(
-                        bookId: widget.metadata.id,
-                        chapterIndex: targetChapter,
-                        paragraphIndex: targetParagraph,
-                        progressPercent: progress,
-                        updatedAt: DateTime.now(),
-                      ),
-                    );
-                  },
-                );
-              },
+              ],
             ),
           ),
-      ],
+          const SizedBox(height: 8),
+          const Divider(height: 1),
+          const TabBar(
+            tabs: [
+              Tab(text: 'Главы'),
+              Tab(text: 'Закладки'),
+            ],
+            isScrollable: true,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Поиск по главам...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        tooltip: 'Очистить',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                isDense: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value.trim()),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _buildChaptersTab(entries, visibleEntries, isSearching, maxSize),
+                _buildBookmarksTab(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChaptersTab(
+    List<TocEntry> entries,
+    List<TocEntry> visibleEntries,
+    bool isSearching,
+    int maxSize,
+  ) {
+    if (isSearching && visibleEntries.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            'Глав не найдено',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
+    return ListView.builder(
+      controller: widget.scrollController,
+      itemCount: visibleEntries.length,
+      itemBuilder: (context, index) {
+        final entry = visibleEntries[index];
+        final title = entry.title.isNotEmpty ? entry.title : 'Глава ${entry.index + 1}';
+        final isActive = entry.index == widget.currentChapterIndex;
+        final isGroup = entry.isGroup;
+        final isCollapsed = _collapsedGroups.contains(entry.groupId);
+        final isLoaded = widget.loadedChapters.containsKey(entry.index);
+        final isUnloaded = !isLoaded && widget.isDynamicallyLoading;
+        final groupToggleLabel = isCollapsed
+            ? 'Развернуть раздел $title'
+            : 'Свернуть раздел $title';
+
+        // MD-8.1: chapter size bar
+        final ch = widget.loadedChapters[entry.index];
+        final blockCount = ch?.blocks.length ?? 0;
+        final barFraction = maxSize > 0 ? blockCount / maxSize : 0.0;
+
+        return ListTile(
+          key: isActive ? _currentChapterKey : ValueKey('toc-entry-${entry.index}'),
+          contentPadding: EdgeInsets.only(
+            left: 16.0 + entry.depth * 16.0,
+          ),
+          leading: isGroup
+              ? Semantics(
+                  key: ValueKey('toc-group-toggle-${entry.index}'),
+                  button: true,
+                  label: groupToggleLabel,
+                  expanded: !isCollapsed,
+                  onTap: () => _toggleGroup(entry.groupId),
+                  child: ExcludeSemantics(
+                    child: IconButton(
+                      tooltip: groupToggleLabel,
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 20,
+                      onPressed: () => _toggleGroup(entry.groupId),
+                      icon: Icon(
+                        isCollapsed ? Icons.chevron_right : Icons.expand_more,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : CircleAvatar(
+                  radius: 16,
+                  backgroundColor: isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: isUnloaded
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          '${entry.index + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isActive
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                ),
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: isActive
+                  ? FontWeight.bold
+                  : isGroup
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+              fontSize: isGroup ? 14 : 13,
+              color: isUnloaded
+                  ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+                  : isActive
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
+            ),
+          ),
+          subtitle: isGroup
+              ? null
+              : isActive
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: LinearProgressIndicator(
+                    value: widget.currentChapterProgress.clamp(0.0, 1.0),
+                    minHeight: 2,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                )
+              : entry.index < widget.currentChapterIndex
+              ? Text(
+                  'прочитано',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                )
+              : isUnloaded
+              ? Text(
+                  'загрузка...',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : null,
+          trailing: isGroup || blockCount == 0
+              ? null
+              : SizedBox(
+                  width: 40,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        height: 4,
+                        width: 40 * barFraction.clamp(0.05, 1.0),
+                        decoration: BoxDecoration(
+                          color: isActive
+                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.6)
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$blockCount',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          dense: true,
+          onTap: () {
+            Navigator.of(context).pop();
+            final resolved = resolveTocAnchor(
+              metadata: widget.metadata.metadata,
+              anchor: entry.anchor,
+              chapterIndex: entry.index,
+            );
+            final targetChapter = resolved?.chapterIndex ?? entry.index;
+            final targetParagraph = resolved?.paragraphIndex ?? entry.blockIndex;
+            final progress = widget.metadata.chapterCount <= 1
+                ? 0.0
+                : targetChapter / (widget.metadata.chapterCount - 1);
+            widget.onJumpToPosition(
+              ReaderPosition(
+                bookId: widget.metadata.id,
+                chapterIndex: targetChapter,
+                paragraphIndex: targetParagraph,
+                progressPercent: progress,
+                updatedAt: DateTime.now(),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBookmarksTab() {
+    return StreamBuilder<List<Bookmark>>(
+      stream: _bookmarks.watchBookmarks(widget.metadata.id),
+      builder: (context, snapshot) {
+        final bookmarks = snapshot.data ?? const <Bookmark>[];
+        if (bookmarks.isEmpty) return const Center(child: Text('Нет закладок'));
+        final titles = widget.metadata.chapterTitles;
+        return ListView.builder(
+          itemCount: bookmarks.length,
+          itemBuilder: (context, index) {
+            final bookmark = bookmarks[index];
+            final subtitle =
+                bookmark.selectedText ??
+                (bookmark.chapterIndex >= 0 &&
+                        bookmark.chapterIndex < titles.length &&
+                        titles[bookmark.chapterIndex].isNotEmpty
+                    ? titles[bookmark.chapterIndex]
+                    : 'Глава ${bookmark.chapterIndex + 1}');
+            return ListTile(
+              leading: const Icon(Icons.bookmark, size: 20),
+              title: Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              subtitle: Text('Глава ${bookmark.chapterIndex + 1}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                onPressed: () => _bookmarks.deleteBookmark(bookmark.id),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onJumpToPosition(
+                  ReaderPosition(
+                    bookId: widget.metadata.id,
+                    chapterIndex: bookmark.chapterIndex,
+                    paragraphIndex: bookmark.paragraphIndex,
+                    localOffset: bookmark.localOffset,
+                    progressPercent: widget.metadata.chapterCount <= 1
+                        ? 0.0
+                        : bookmark.chapterIndex / (widget.metadata.chapterCount - 1),
+                    updatedAt: DateTime.now(),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

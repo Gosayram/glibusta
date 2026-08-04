@@ -22,6 +22,7 @@ import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
+import '../../home/presentation/reading_stats_provider.dart';
 import '../../library/data/book_delete_service.dart';
 import '../data/color_preset_service.dart';
 import '../data/epub_anchor_resolver.dart';
@@ -1666,6 +1667,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }) {
     final infoConfig = ref.watch(readingInfoProvider);
     final colors = _resolveCustomColors(settings) ?? ReaderColors.forTheme(settings.theme);
+    final streak = ref
+        .watch(readingStatsProvider)
+        .maybeWhen(
+          data: (s) => s.currentStreak,
+          orElse: () => 0,
+        );
     final List<InfoSlotMode> slots = position == _ReadingInfoPosition.header
         ? [infoConfig.headerLeft, infoConfig.headerCenter, infoConfig.headerRight]
         : [infoConfig.footerLeft, infoConfig.footerCenter, infoConfig.footerRight];
@@ -1691,6 +1698,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.none => '',
         InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
         InfoSlotMode.sessionTime => _ctrl.sessionTimeLabel,
+        InfoSlotMode.streak => streak > 0 ? '$streak дней' : '',
       };
       return Text(
         text,
