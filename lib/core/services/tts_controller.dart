@@ -34,6 +34,7 @@ class TtsController {
   final Timer Function(Duration, void Function()) _timerFactory;
   late FlutterTts _tts;
   var _isTtsInitialized = false;
+  var _ttsAvailable = false;
   bool _isPlaying = false;
   String _lastLang = 'ru-RU';
   late double _lastRate;
@@ -48,7 +49,13 @@ class TtsController {
   void _ensureTts() {
     if (_isTtsInitialized) return;
 
-    _tts = _ttsFactory();
+    try {
+      _tts = _ttsFactory();
+      _ttsAvailable = true;
+    } on Object catch (e) {
+      _ttsAvailable = false;
+      debugPrint('TTS unavailable: $e');
+    }
     _lastLang = 'ru-RU';
     _lastRate = _defaultNativeRate;
     _isTtsInitialized = true;
@@ -73,6 +80,7 @@ class TtsController {
 
   Future<void> speak(String text, {String? lang, double? rate}) async {
     _ensureTts();
+    if (!_ttsAvailable) return;
     _lastText = text;
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;
@@ -88,7 +96,7 @@ class TtsController {
   /// The `flutter_tts` Android implementation resumes through its own tracked
   /// range offset when [resume] speaks the same text again.
   Future<void> pause() async {
-    if (!_isTtsInitialized || !_isPlaying) return;
+    if (!_isTtsInitialized || !_isPlaying || !_ttsAvailable) return;
     await _tts.pause();
     _isPlaying = false;
     _isPaused = true;
@@ -104,7 +112,7 @@ class TtsController {
   void stop() {
     _isPlaying = false;
     _isPaused = false;
-    if (_isTtsInitialized) {
+    if (_isTtsInitialized && _ttsAvailable) {
       _tts.stop(); // ignore: discarded_futures
     }
   }
@@ -130,6 +138,7 @@ class TtsController {
 
     _ensureTts();
     _lastLang = normalizedLanguage;
+    if (!_ttsAvailable) return;
     await _tts.setLanguage(_lastLang);
   }
 
@@ -149,6 +158,7 @@ class TtsController {
     _ensureTts();
     _playbackRate = rate;
     _lastRate = rate / 2;
+    if (!_ttsAvailable) return;
     await _tts.setSpeechRate(_lastRate);
   }
 
@@ -189,7 +199,7 @@ class TtsController {
     _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
     _lastText = null;
-    if (_isTtsInitialized) {
+    if (_isTtsInitialized && _ttsAvailable) {
       _tts.stop(); // ignore: discarded_futures
     }
     _isPlaying = false;

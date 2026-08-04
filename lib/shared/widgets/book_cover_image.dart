@@ -29,6 +29,8 @@ class BookCoverImage extends StatelessWidget {
   final Book book;
   final double? width;
   final double? height;
+  final int? memCacheWidth;
+  final int? memCacheHeight;
   final BoxFit fit;
   final bool useHero;
 
@@ -37,6 +39,8 @@ class BookCoverImage extends StatelessWidget {
     required this.book,
     this.width,
     this.height,
+    this.memCacheWidth,
+    this.memCacheHeight,
     this.fit = BoxFit.cover,
     this.useHero = true,
   });
@@ -47,6 +51,17 @@ class BookCoverImage extends StatelessWidget {
     if (book.coverPath != null && book.coverPath!.isNotEmpty) {
       final file = File(book.coverPath!);
       final placeholder = _buildPlaceholder(context);
+      final cacheW =
+          memCacheWidth ??
+          (width != null
+              ? (width! * MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0)).round()
+              : null);
+      final cacheH =
+          memCacheHeight ??
+          (height != null
+              ? (height! * MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0)).round()
+              : null);
+
       final imageWidget = Stack(
         fit: StackFit.expand,
         children: [
@@ -56,6 +71,8 @@ class BookCoverImage extends StatelessWidget {
             width: width,
             height: height,
             fit: fit,
+            cacheWidth: cacheW,
+            cacheHeight: cacheH,
             errorBuilder: (_, _, _) => const SizedBox.shrink(),
           ),
         ],
@@ -74,9 +91,16 @@ class BookCoverImage extends StatelessWidget {
     }
 
     final placeholder = _buildPlaceholder(context);
-    final scale = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0);
-    final targetWidth = width != null ? (width! * scale).round() : null;
-    final targetHeight = height != null ? (height! * scale).round() : null;
+    final cacheW =
+        memCacheWidth ??
+        (width != null
+            ? (width! * MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0)).round()
+            : null);
+    final cacheH =
+        memCacheHeight ??
+        (height != null
+            ? (height! * MediaQuery.devicePixelRatioOf(context).clamp(1.0, 2.0)).round()
+            : null);
 
     final imageWidget = Stack(
       fit: StackFit.expand,
@@ -87,8 +111,8 @@ class BookCoverImage extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
-          memCacheWidth: targetWidth,
-          memCacheHeight: targetHeight,
+          memCacheWidth: cacheW,
+          memCacheHeight: cacheH,
           placeholder: (context, url) => const SizedBox.shrink(),
           errorWidget: (context, url, error) => const SizedBox.shrink(),
         ),

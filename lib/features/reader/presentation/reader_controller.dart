@@ -345,6 +345,7 @@ final class ReaderController {
   }
 
   void pauseSession() {
+    if (_disposed) return;
     if (_paused || !_loaded) return;
     _paused = true;
     if (_sessionStopwatch.isRunning) {
@@ -356,6 +357,7 @@ final class ReaderController {
   }
 
   void resumeSession() {
+    if (_disposed) return;
     if (!_paused || !_loaded) return;
     _paused = false;
     _sessionStopwatch.start();

@@ -648,6 +648,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   @override
   void dispose() {
+    TtsController.instance.stop();
     _relayoutTimer?.cancel();
     _verticalGestureFeedbackTimer?.cancel();
     _exitImmersiveMode();

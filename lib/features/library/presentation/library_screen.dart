@@ -1446,7 +1446,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     leading: SizedBox(
                       width: 48,
                       height: 68,
-                      child: BookCoverImage(book: book),
+                      child: BookCoverImage(
+                        book: book,
+                        memCacheWidth: 96,
+                        memCacheHeight: 136,
+                      ),
                     ),
                     title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
                     subtitle: book.authorNames.isNotEmpty
@@ -2138,7 +2142,11 @@ class _ContinueReadingCard extends StatelessWidget {
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: BookCoverImage(book: item.book),
+                child: BookCoverImage(
+                  book: item.book,
+                  memCacheWidth: 240,
+                  memCacheHeight: 360,
+                ),
               ),
             ),
             const SizedBox(height: 4),

@@ -124,7 +124,12 @@ class _BookCardState extends State<BookCard> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            BookCoverImage(book: widget.book),
+                            // ponytail: memCache dims prevent full-res decode (~8MB each)
+                            BookCoverImage(
+                              book: widget.book,
+                              memCacheWidth: 240,
+                              memCacheHeight: 360,
+                            ),
                             if (widget.book.readingStatus != ReadingStatus.none)
                               Positioned(
                                 top: 4,

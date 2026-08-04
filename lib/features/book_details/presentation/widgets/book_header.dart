@@ -36,7 +36,11 @@ class BookHeader extends StatelessWidget {
             child: SizedBox(
               width: 130,
               height: 190,
-              child: BookCoverImage(book: book),
+              child: BookCoverImage(
+                book: book,
+                memCacheWidth: 260,
+                memCacheHeight: 380,
+              ),
             ),
           ),
         ),

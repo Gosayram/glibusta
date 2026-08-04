@@ -102,7 +102,7 @@ class HttpClient {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpIdle
-      ..maxConnectionsPerHost = 1;
+      ..maxConnectionsPerHost = 4;
 
     try {
       final request = await _awaitWithCancellation(client.getUrl(uri), cancelToken);
@@ -113,7 +113,7 @@ class HttpClient {
         )
         ..set(io.HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
         ..set(io.HttpHeaders.acceptEncodingHeader, 'gzip, deflate')
-        ..set(io.HttpHeaders.connectionHeader, 'close');
+        ..set(io.HttpHeaders.connectionHeader, 'keep-alive');
 
       final ua = await _getOrCreateUserAgent();
       if (ua != null) {
@@ -137,6 +137,10 @@ class HttpClient {
       if (rawBytes.isEmpty) return '';
       final detected = await _encodingDetector.detect(rawBytes);
       return detected.text;
+    } on io.SocketException catch (e) {
+      throw HttpException(message: 'Network error: ${e.message}', url: uri.toString());
+    } on TimeoutException catch (e) {
+      throw HttpException(message: 'Connection timed out: ${e.message}', url: uri.toString());
     } finally {
       client.close(force: true);
     }
@@ -199,12 +203,12 @@ class HttpClient {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpDownloadIdle
-      ..maxConnectionsPerHost = 1;
+      ..maxConnectionsPerHost = 4;
     try {
       final request = await client.getUrl(uri);
       request.headers
         ..set(io.HttpHeaders.acceptHeader, '*/*')
-        ..set(io.HttpHeaders.connectionHeader, 'close');
+        ..set(io.HttpHeaders.connectionHeader, 'keep-alive');
 
       if (startBytes > 0) {
         request.headers.set(io.HttpHeaders.rangeHeader, 'bytes=$startBytes-');

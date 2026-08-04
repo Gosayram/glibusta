@@ -447,19 +447,27 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
       if (result != null && context.mounted) {
         final db = ref.read(databaseProvider);
-        await db
-            .into(db.notes)
-            .insert(
-              NotesCompanion.insert(
-                id: '${widget.bookId}-${newMonotonicId()}',
-                bookId: widget.bookId,
-                chapterIndex: widget.chapterIndex,
-                paragraphIndex: widget.paragraphIndex,
-                content: result,
-              ),
+        try {
+          await db
+              .into(db.notes)
+              .insert(
+                NotesCompanion.insert(
+                  id: '${widget.bookId}-${newMonotonicId()}',
+                  bookId: widget.bookId,
+                  chapterIndex: widget.chapterIndex,
+                  paragraphIndex: widget.paragraphIndex,
+                  content: result,
+                ),
+              );
+          if (context.mounted) {
+            unawaited(SmartDialog.showToast('Заметка сохранена'));
+          }
+        } on Object catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Ошибка: $e')),
             );
-        if (context.mounted) {
-          unawaited(SmartDialog.showToast('Заметка сохранена'));
+          }
         }
       }
       widget.onDismiss();
@@ -525,20 +533,28 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
 
       if (result != null && context.mounted) {
         final db = ref.read(databaseProvider);
-        await db
-            .into(db.quotes)
-            .insert(
-              QuotesCompanion.insert(
-                id: '${widget.bookId}-${newMonotonicId()}',
-                bookId: widget.bookId,
-                chapterIndex: widget.chapterIndex,
-                paragraphIndex: widget.paragraphIndex,
-                selectedText: _selectedText!,
-                note: result.isNotEmpty ? Value(result) : const Value.absent(),
-              ),
+        try {
+          await db
+              .into(db.quotes)
+              .insert(
+                QuotesCompanion.insert(
+                  id: '${widget.bookId}-${newMonotonicId()}',
+                  bookId: widget.bookId,
+                  chapterIndex: widget.chapterIndex,
+                  paragraphIndex: widget.paragraphIndex,
+                  selectedText: _selectedText!,
+                  note: result.isNotEmpty ? Value(result) : const Value.absent(),
+                ),
+              );
+          if (context.mounted) {
+            unawaited(SmartDialog.showToast('Цитата сохранена'));
+          }
+        } on Object catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Ошибка: $e')),
             );
-        if (context.mounted) {
-          unawaited(SmartDialog.showToast('Цитата сохранена'));
+          }
         }
       }
       widget.onDismiss();
