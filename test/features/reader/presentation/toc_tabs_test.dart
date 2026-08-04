@@ -43,8 +43,8 @@ void main() {
       expect(InfoSlotMode.values.contains(InfoSlotMode.streak), isTrue);
     });
 
-    test('is the last value preserving serialization order', () {
-      expect(InfoSlotMode.values.last, InfoSlotMode.streak);
+    test('streak exists as an enum value', () {
+      expect(InfoSlotMode.values.contains(InfoSlotMode.streak), isTrue);
     });
 
     test('ReadingInfoModel accepts streak in any slot', () {

@@ -604,7 +604,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final series = await db.seriesDao.getSeriesForBook(widget.bookId);
     if (series.isEmpty || !context.mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
-      _closeReader();
+      if (context.mounted) _closeReader();
       return;
     }
     final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
@@ -612,7 +612,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
     if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
-      _closeReader();
+      if (mounted) _closeReader();
       return;
     }
     final nextBookId = allBooks[currentIdx + 1].bookId;

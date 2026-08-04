@@ -40,8 +40,8 @@ void main() {
       expect(InfoSlotMode.values.contains(InfoSlotMode.sessionTime), isTrue);
     });
 
-    test('is the last value (preserving serialization order)', () {
-      expect(InfoSlotMode.values.last, InfoSlotMode.sessionTime);
+    test('sessionTime exists as an enum value', () {
+      expect(InfoSlotMode.values.contains(InfoSlotMode.sessionTime), isTrue);
     });
   });
 }

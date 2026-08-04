@@ -271,6 +271,7 @@ final class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
+    _disposed = true;
     _loadGeneration++;
     _settingsSub?.close();
     _linkHistory.clear();
@@ -294,7 +295,6 @@ final class ReaderController {
     disposeRenderItemsCache();
     unawaited(WakelockPlus.disable());
     unawaited(_stateController.close());
-    _disposed = true;
   }
 
   void _flushSessionTime() {
@@ -307,10 +307,24 @@ final class ReaderController {
     if (totalSeconds > 0 && !_disposed) {
       final db = _ref.read(databaseProvider);
       final now = DateTime.now();
-      unawaited(db.readingTimeDao.addReadingTime(_bookId, now, totalSeconds));
+      unawaited(
+        db.readingTimeDao
+            .addReadingTime(_bookId, now, totalSeconds)
+            .then(
+              (_) {},
+              onError: (Object e) => _logger.warning('addReadingTime failed: $e', name: 'Reader'),
+            ),
+      );
       if (totalSeconds > 60 && _sessionWordsRead > 0) {
         final wpm = (_sessionWordsRead / totalSeconds * 60).round().clamp(50, 800).toDouble();
-        unawaited(db.readingTimeDao.addWpm(_bookId, now, wpm));
+        unawaited(
+          db.readingTimeDao
+              .addWpm(_bookId, now, wpm)
+              .then(
+                (_) {},
+                onError: (Object e) => _logger.warning('addWpm failed: $e', name: 'Reader'),
+              ),
+        );
       }
     }
   }
@@ -320,7 +334,14 @@ final class ReaderController {
     final pages = _accumulatedPages;
     _accumulatedPages = 0;
     final db = _ref.read(databaseProvider);
-    unawaited(db.readingTimeDao.addPagesRead(_bookId, DateTime.now(), pages));
+    unawaited(
+      db.readingTimeDao
+          .addPagesRead(_bookId, DateTime.now(), pages)
+          .then(
+            (_) {},
+            onError: (Object e) => _logger.warning('addPagesRead failed: $e', name: 'Reader'),
+          ),
+    );
   }
 
   void pauseSession() {
@@ -344,7 +365,12 @@ final class ReaderController {
     if (_accumulatedSeconds > 0 && !_disposed) {
       final db = _ref.read(databaseProvider);
       unawaited(
-        db.readingTimeDao.addReadingTime(_bookId, DateTime.now(), _accumulatedSeconds),
+        db.readingTimeDao
+            .addReadingTime(_bookId, DateTime.now(), _accumulatedSeconds)
+            .then(
+              (_) {},
+              onError: (Object e) => _logger.warning('addReadingTime failed: $e', name: 'Reader'),
+            ),
       );
       _accumulatedSeconds = 0;
     }
@@ -724,6 +750,7 @@ final class ReaderController {
   }
 
   void toggleAutoScroll() {
+    if (_disposed) return;
     if (autoScrollEnabled.value) {
       stopAutoScroll();
     } else {
@@ -732,6 +759,7 @@ final class ReaderController {
   }
 
   void startAutoScroll() {
+    if (_disposed) return;
     if (_mode != ReaderMode.continuous) return;
     if (_scrollController == null || !_scrollController!.hasClients) return;
     autoScrollEnabled.value = true;
@@ -752,6 +780,7 @@ final class ReaderController {
   }
 
   void stopAutoScroll() {
+    if (_disposed) return;
     autoScrollEnabled.value = false;
     _autoScrollTimer?.cancel();
     _autoScrollTimer = null;
@@ -1318,8 +1347,12 @@ final class ReaderController {
   /// chapter window are ready. This keeps navigation from a persisted
   /// bookmark independent of the book's ordinary last-read position.
   Future<void> jumpToPositionWhenReady(ReaderPosition position) async {
-    if (_state.isLoading) {
-      await stateStream.firstWhere((state) => !state.isLoading);
+    try {
+      if (_state.isLoading) {
+        await stateStream.firstWhere((state) => !state.isLoading);
+      }
+    } on Object {
+      return;
     }
     if (_disposed || _state.errorMessage != null || _state.chapterCount == 0) return;
     jumpToPosition(position);
@@ -1731,6 +1764,7 @@ final class ReaderController {
   // ── Actions ───────────────────────────────────────────
 
   void addBookmark() {
+    if (_disposed) return;
     final total = _state.chapterCount;
     if (total == 0) return;
     final position = _state.currentPosition.copyWith(bookId: _bookId, updatedAt: DateTime.now());
@@ -1748,6 +1782,10 @@ final class ReaderController {
               localOffset: position.localOffset / 100.0,
               createdAt: position.updatedAt,
             ),
+          )
+          .then(
+            (_) {},
+            onError: (Object e) => _logger.warning('addBookmark failed: $e', name: 'Reader'),
           ),
     );
   }

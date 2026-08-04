@@ -1523,9 +1523,8 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
                           clipBehavior: Clip.antiAlias,
                           child: Opacity(
                             opacity: selected ? 1.0 : 0.5,
-                            child: _buildImage(
+                            child: _buildThumbnail(
                               widget.images[index],
-                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
@@ -1569,6 +1568,42 @@ class _FullscreenImageViewerState extends State<_FullscreenImageViewer> {
         ],
       ),
     );
+  }
+
+  Widget _buildThumbnail(String imageUrl) {
+    final uri = Uri.tryParse(imageUrl);
+    final isDataUri = uri != null && uri.scheme == 'data';
+    final isFileUri = uri != null && uri.scheme == 'file';
+    final isPlainPath = uri == null || !uri.isAbsolute;
+    final thumbSize = (56 * MediaQuery.devicePixelRatioOf(context)).round();
+
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2) {
+        try {
+          return Image.memory(
+            _cachedBase64Decode(data.last),
+            fit: BoxFit.cover,
+            cacheWidth: thumbSize,
+            cacheHeight: thumbSize,
+            errorBuilder: (_, _, _) =>
+                const Icon(Icons.broken_image, size: 24, color: Colors.white),
+          );
+        } on FormatException {
+          return const Icon(Icons.broken_image, size: 24, color: Colors.white);
+        }
+      }
+    }
+    if (isFileUri || isPlainPath) {
+      return Image.file(
+        File(isFileUri ? uri.path : imageUrl),
+        fit: BoxFit.cover,
+        cacheWidth: thumbSize,
+        cacheHeight: thumbSize,
+        errorBuilder: (_, _, _) => const Icon(Icons.broken_image, size: 24, color: Colors.white),
+      );
+    }
+    return const Icon(Icons.broken_image, size: 24, color: Colors.white);
   }
 
   Widget _buildImage(String imageUrl, {BoxFit fit = BoxFit.contain}) {
