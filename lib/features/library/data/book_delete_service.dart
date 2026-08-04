@@ -54,6 +54,10 @@ class BookDeleteService {
       await (_db.delete(_db.notes)..where((t) => t.bookId.equals(bookId))).go();
       await (_db.delete(_db.readingSessions)..where((t) => t.bookId.equals(bookId))).go();
       await (_db.delete(_db.bookCollections)..where((t) => t.bookId.equals(bookId))).go();
+      await (_db.delete(_db.readingTime)..where((t) => t.bookId.equals(bookId))).go();
+      await (_db.delete(_db.textHighlights)..where((t) => t.bookId.equals(bookId))).go();
+      await (_db.delete(_db.bookTags)..where((t) => t.bookId.equals(bookId))).go();
+      await (_db.delete(_db.perBookSettings)..where((t) => t.bookId.equals(bookId))).go();
       await _db.bookDao.deleteBook(bookId);
 
       targetPath = download?.targetPath;

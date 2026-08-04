@@ -704,6 +704,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+
+    // Don't intercept keys when a text field or dialog has focus
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (primaryFocus != null && primaryFocus.context?.widget is EditableText) {
+      return false;
+    }
+
     final settings = ref.read(readerSettingsProvider);
     if (settings.volumeButtonsEnabled) {
       if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {

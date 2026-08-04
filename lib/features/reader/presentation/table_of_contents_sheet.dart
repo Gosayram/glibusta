@@ -539,7 +539,7 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
                     bookId: widget.metadata.id,
                     chapterIndex: bookmark.chapterIndex,
                     paragraphIndex: bookmark.paragraphIndex,
-                    localOffset: bookmark.localOffset,
+                    localOffset: bookmark.localOffset * 100,
                     progressPercent: widget.metadata.chapterCount <= 1
                         ? 0.0
                         : bookmark.chapterIndex / (widget.metadata.chapterCount - 1),
@@ -583,7 +583,7 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
                     bookId: widget.metadata.id,
                     chapterIndex: note.chapterIndex,
                     paragraphIndex: note.paragraphIndex,
-                    localOffset: note.localOffset,
+                    localOffset: note.localOffset * 100,
                     progressPercent: widget.metadata.chapterCount <= 1
                         ? 0.0
                         : note.chapterIndex / (widget.metadata.chapterCount - 1),

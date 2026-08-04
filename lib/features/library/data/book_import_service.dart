@@ -823,7 +823,7 @@ class BookImportService {
   Future<SavedBook?> _findByHash(String hash) async {
     final rows = await (_database.select(
       _database.savedBooks,
-    )..where((t) => t.contentHash.equals(hash))).get();
+    )..where((t) => t.contentHash.equals(hash) & t.deletedAt.isNull())).get();
     return rows.isNotEmpty ? rows.first : null;
   }
 

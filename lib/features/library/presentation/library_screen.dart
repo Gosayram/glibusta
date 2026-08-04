@@ -486,7 +486,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 onSelected: (_) {
                   setState(() {
                     _statusFilter = _statusFilter == ReadingStatus.none ? null : ReadingStatus.none;
+                    _resetPagination();
                   });
+                  unawaited(_loadNextPage());
                 },
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -499,7 +501,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     _statusFilter = _statusFilter == ReadingStatus.reading
                         ? null
                         : ReadingStatus.reading;
+                    _resetPagination();
                   });
+                  unawaited(_loadNextPage());
                 },
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -512,7 +516,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     _statusFilter = _statusFilter == ReadingStatus.finished
                         ? null
                         : ReadingStatus.finished;
+                    _resetPagination();
                   });
+                  unawaited(_loadNextPage());
                 },
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
