@@ -183,6 +183,8 @@ class _SlotPicker extends StatelessWidget {
         return 'Время за чтением';
       case InfoSlotMode.streak:
         return 'Серия дней';
+      case InfoSlotMode.todayTime:
+        return 'Сегодня мин';
     }
   }
 }
@@ -281,6 +283,8 @@ class _PreviewWidget extends StatelessWidget {
         return Text('12 мин', style: style);
       case InfoSlotMode.streak:
         return Text('🔥 7 дней', style: style);
+      case InfoSlotMode.todayTime:
+        return Text('23 мин', style: style);
     }
   }
 }

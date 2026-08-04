@@ -1667,11 +1667,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }) {
     final infoConfig = ref.watch(readingInfoProvider);
     final colors = _resolveCustomColors(settings) ?? ReaderColors.forTheme(settings.theme);
-    final streak = ref
+    final stats = ref
         .watch(readingStatsProvider)
         .maybeWhen(
-          data: (s) => s.currentStreak,
-          orElse: () => 0,
+          data: (s) => s,
+          orElse: () => null,
         );
     final List<InfoSlotMode> slots = position == _ReadingInfoPosition.header
         ? [infoConfig.headerLeft, infoConfig.headerCenter, infoConfig.headerRight]
@@ -1698,7 +1698,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.none => '',
         InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
         InfoSlotMode.sessionTime => _ctrl.sessionTimeLabel,
-        InfoSlotMode.streak => streak > 0 ? '$streak дней' : '',
+        InfoSlotMode.streak =>
+          (stats?.currentStreak ?? 0) > 0 ? '${stats!.currentStreak} дней' : '',
+        InfoSlotMode.todayTime =>
+          (stats?.todayMinutes ?? 0) > 0 ? '${stats!.todayMinutes} мин' : '',
       };
       return Text(
         text,

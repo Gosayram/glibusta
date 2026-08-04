@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../bookmarks/data/bookmark_repository.dart';
+import '../../notes/data/note_repository.dart';
+import '../../quotes/data/quote_repository.dart';
 import '../data/parsers/normalized_book.dart';
 import '../domain/reader.dart';
 import 'toc_hierarchy.dart';
@@ -100,6 +102,8 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
   String _searchQuery = '';
   late final TextEditingController _searchController;
   late final BookmarkRepository _bookmarks;
+  late final NoteRepository _notes;
+  late final QuoteRepository _quotes;
 
   @override
   void initState() {
@@ -107,6 +111,8 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
     _searchController = TextEditingController();
     final database = ref.read(databaseProvider);
     _bookmarks = BookmarkRepository(database);
+    _notes = NoteRepository(database);
+    _quotes = QuoteRepository(database);
   }
 
   @override
@@ -210,7 +216,7 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
       (max, ch) => max > ch.blocks.length ? max : ch.blocks.length,
     );
     return DefaultTabController(
-      length: 2,
+      length: 4,
       child: Column(
         children: [
           Padding(
@@ -255,6 +261,8 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
             tabs: [
               Tab(text: 'Главы'),
               Tab(text: 'Закладки'),
+              Tab(text: 'Заметки'),
+              Tab(text: 'Цитаты'),
             ],
             isScrollable: true,
           ),
@@ -289,6 +297,8 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
               children: [
                 _buildChaptersTab(entries, visibleEntries, isSearching, maxSize),
                 _buildBookmarksTab(),
+                _buildNotesTab(),
+                _buildQuotesTab(),
               ],
             ),
           ),
@@ -533,6 +543,98 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
                     progressPercent: widget.metadata.chapterCount <= 1
                         ? 0.0
                         : bookmark.chapterIndex / (widget.metadata.chapterCount - 1),
+                    updatedAt: DateTime.now(),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildNotesTab() {
+    return StreamBuilder<List<Note>>(
+      stream: _notes.watchNotes(widget.metadata.id),
+      builder: (context, snapshot) {
+        final notes = snapshot.data ?? const <Note>[];
+        if (notes.isEmpty) return const Center(child: Text('Нет заметок'));
+        return ListView.builder(
+          itemCount: notes.length,
+          itemBuilder: (context, index) {
+            final note = notes[index];
+            return ListTile(
+              leading: const Icon(Icons.note_outlined, size: 20),
+              title: Text(
+                note.content,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text('Глава ${note.chapterIndex + 1}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                onPressed: () => _notes.deleteNote(note.id),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onJumpToPosition(
+                  ReaderPosition(
+                    bookId: widget.metadata.id,
+                    chapterIndex: note.chapterIndex,
+                    paragraphIndex: note.paragraphIndex,
+                    localOffset: note.localOffset,
+                    progressPercent: widget.metadata.chapterCount <= 1
+                        ? 0.0
+                        : note.chapterIndex / (widget.metadata.chapterCount - 1),
+                    updatedAt: DateTime.now(),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildQuotesTab() {
+    return StreamBuilder<List<Quote>>(
+      stream: _quotes.watchQuotes(widget.metadata.id),
+      builder: (context, snapshot) {
+        final quotes = snapshot.data ?? const <Quote>[];
+        if (quotes.isEmpty) return const Center(child: Text('Нет цитат'));
+        return ListView.builder(
+          itemCount: quotes.length,
+          itemBuilder: (context, index) {
+            final quote = quotes[index];
+            final subtitle = [
+              quote.beforeContext,
+              quote.selectedText,
+              quote.afterContext,
+            ].whereType<String>().where((value) => value.trim().isNotEmpty).join(' ');
+            return ListTile(
+              leading: const Icon(Icons.format_quote, size: 20),
+              title: Text(
+                subtitle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text('Глава ${quote.chapterIndex + 1}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                onPressed: () => _quotes.deleteQuote(quote.id),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                widget.onJumpToPosition(
+                  ReaderPosition(
+                    bookId: widget.metadata.id,
+                    chapterIndex: quote.chapterIndex,
+                    paragraphIndex: quote.paragraphIndex,
+                    progressPercent: widget.metadata.chapterCount <= 1
+                        ? 0.0
+                        : quote.chapterIndex / (widget.metadata.chapterCount - 1),
                     updatedAt: DateTime.now(),
                   ),
                 );
