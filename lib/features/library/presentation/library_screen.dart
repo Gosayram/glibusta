@@ -69,6 +69,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final _searchFocusNode = FocusNode();
   final Set<String> _selectedBookIds = {};
   bool _showTrash = false;
+  String? _openingBookId;
 
   final List<Book> _loadedBooks = [];
   bool _isLoadingMore = false;
@@ -1292,9 +1293,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   final item = continueBooks[index];
                   return _ContinueReadingCard(
                     item: item,
-                    onTap: () => unawaited(
-                      context.push('/reader/${item.book.id}'),
-                    ),
+                    onTap: () {
+                      if (_openingBookId == item.book.id) return;
+                      _openingBookId = item.book.id;
+                      unawaited(
+                        context.push('/reader/${item.book.id}').then((_) {
+                          if (mounted) _openingBookId = null;
+                        }),
+                      );
+                    },
                   );
                 },
               ),
@@ -1346,7 +1353,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       book: book,
                       onTap: _selectionMode
                           ? () => _toggleSelection(book.id)
-                          : () => unawaited(context.push('/reader/${book.id}')),
+                          : () {
+                              if (_openingBookId == book.id) return;
+                              _openingBookId = book.id;
+                              unawaited(
+                                context.push('/reader/${book.id}').then((_) {
+                                  if (mounted) _openingBookId = null;
+                                }),
+                              );
+                            },
                       onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
                       onEditMetadata: () => _showEditMetadata(context, ref, book),
                       onAddToCollection: () => _showCollectionPicker(context, ref, book),
@@ -1422,7 +1437,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 book: books[index],
                 onTap: _selectionMode
                     ? () => _toggleSelection(books[index].id)
-                    : () => unawaited(context.push('/reader/${books[index].id}')),
+                    : () {
+                        if (_openingBookId == books[index].id) return;
+                        _openingBookId = books[index].id;
+                        unawaited(
+                          context.push('/reader/${books[index].id}').then((_) {
+                            if (mounted) _openingBookId = null;
+                          }),
+                        );
+                      },
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
                 onEditMetadata: () => _showEditMetadata(context, ref, books[index]),
                 onAddToCollection: () => _showCollectionPicker(context, ref, books[index]),
@@ -1458,7 +1481,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         : null,
                     onTap: _selectionMode
                         ? () => _toggleSelection(book.id)
-                        : () => unawaited(context.push('/reader/${book.id}')),
+                        : () {
+                            if (_openingBookId == book.id) return;
+                            _openingBookId = book.id;
+                            unawaited(
+                              context.push('/reader/${book.id}').then((_) {
+                                if (mounted) _openingBookId = null;
+                              }),
+                            );
+                          },
                     onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
                   ),
                 ),
@@ -1485,7 +1516,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 book: books[index],
                 onTap: _selectionMode
                     ? () => _toggleSelection(books[index].id)
-                    : () => unawaited(context.push('/reader/${books[index].id}')),
+                    : () {
+                        if (_openingBookId == books[index].id) return;
+                        _openingBookId = books[index].id;
+                        unawaited(
+                          context.push('/reader/${books[index].id}').then((_) {
+                            if (mounted) _openingBookId = null;
+                          }),
+                        );
+                      },
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
                 onEditMetadata: () => _showEditMetadata(context, ref, books[index]),
                 onAddToCollection: () => _showCollectionPicker(context, ref, books[index]),

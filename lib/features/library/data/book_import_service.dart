@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -358,7 +359,10 @@ class BookImportService {
   Future<void> _copyToStorage(_ImportCtx ctx) async {
     ctx.targetFile = await _storage.bookFile(ctx.bookId, ctx.format);
     await ctx.targetFile!.parent.create(recursive: true);
-    await ctx.file.copy(ctx.targetFile!.path);
+    await Isolate.run(() {
+      // ignore: avoid_slow_async_io
+      File(ctx.file.path).copySync(ctx.targetFile!.path);
+    });
   }
 
   Future<void> _registerBookInDb(_ImportCtx ctx) async {

@@ -68,7 +68,6 @@ class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
         else
           task,
     ];
-    _scheduleCleanup(id);
   }
 
   void fail(String id, String error) {
@@ -83,13 +82,6 @@ class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
         else
           task,
     ];
-    _scheduleCleanup(id);
-  }
-
-  void _scheduleCleanup(String id) {
-    Future.delayed(const Duration(seconds: 5), () {
-      state = state.where((t) => t.id != id).toList();
-    });
   }
 
   void clearCompleted() {
