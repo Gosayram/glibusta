@@ -208,8 +208,12 @@ class _TagManagementScreenState extends ConsumerState<TagManagementScreen> {
   }
 
   Color _parseColor(String hex) {
-    final clean = hex.replaceFirst('#', '');
-    return Color(int.parse('FF$clean', radix: 16));
+    try {
+      final clean = hex.replaceFirst('#', '');
+      return Color(int.parse('FF$clean', radix: 16));
+    } on Object catch (_) {
+      return Colors.grey;
+    }
   }
 }
 

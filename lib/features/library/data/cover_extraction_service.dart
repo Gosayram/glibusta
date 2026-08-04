@@ -116,7 +116,7 @@ class CoverExtractionService {
   /// Extract cover bytes from FB2 file.
   Uint8List? _extractFb2Cover(Uint8List bytes) {
     try {
-      final text = String.fromCharCodes(bytes);
+      final text = utf8.decode(bytes, allowMalformed: true);
       final doc = XmlDocument.parse(text);
 
       // Find coverpage > image href

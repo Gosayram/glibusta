@@ -108,13 +108,6 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
               onTap: _cleanCatalogCovers,
               enabled: !_isCleaning,
             ),
-            _ActionTile(
-              icon: Icons.timer,
-              title: l10n.storageCleanExpiredCovers,
-              subtitle: l10n.storageCleanExpiredCoversSub,
-              onTap: _cleanExpiredCatalogCovers,
-              enabled: !_isCleaning,
-            ),
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -263,19 +256,6 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       unawaited(SmartDialog.showToast(l10n.storageCatalogCoversCleaned));
-      ref.invalidate(storageInfoProvider);
-    } finally {
-      if (mounted) setState(() => _isCleaning = false);
-    }
-  }
-
-  Future<void> _cleanExpiredCatalogCovers() async {
-    setState(() => _isCleaning = true);
-    try {
-      await DefaultCacheManager().emptyCache();
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context);
-      unawaited(SmartDialog.showToast(l10n.storageExpiredCoversCleaned));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);
