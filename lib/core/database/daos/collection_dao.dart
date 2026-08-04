@@ -34,25 +34,26 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
     return (select(collections)..where((t) => t.id.isIn(colIds))).get();
   }
 
-  Future<void> addBookToCollection(String bookId, String collectionId) async {
-    await into(bookCollections).insertOnConflictUpdate(
-      BookCollectionsCompanion.insert(
-        bookId: bookId,
-        collectionId: collectionId,
-      ),
-    );
-    await _syncBookIds(collectionId);
+  Future<void> addBookToCollection(String bookId, String collectionId) {
+    return attachedDatabase.transaction(() async {
+      await into(bookCollections).insertOnConflictUpdate(
+        BookCollectionsCompanion.insert(
+          bookId: bookId,
+          collectionId: collectionId,
+        ),
+      );
+      await _syncBookIds(collectionId);
+    });
   }
 
-  Future<void> removeBookFromCollection(
-    String bookId,
-    String collectionId,
-  ) async {
-    await (delete(bookCollections)..where(
-          (t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId),
-        ))
-        .go();
-    await _syncBookIds(collectionId);
+  Future<void> removeBookFromCollection(String bookId, String collectionId) {
+    return attachedDatabase.transaction(() async {
+      await (delete(bookCollections)..where(
+            (t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId),
+          ))
+          .go();
+      await _syncBookIds(collectionId);
+    });
   }
 
   // ponytail: denormalized cache kept in sync with join table; column already

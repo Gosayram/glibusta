@@ -255,45 +255,6 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  Future<void> fixDatabaseHeader() async {
-    final dbPath = await _databasePath;
-    final dbFile = File(dbPath);
-    if (!await dbFile.exists()) return;
-
-    try {
-      final bytes = await dbFile.readAsBytes();
-      if (bytes.length < 20) return;
-
-      const walMagicOffset = 18;
-      final byte0 = bytes[0];
-      final byte1 = bytes[1];
-
-      if (byte0 == 0x37 && byte1 == 0x0f && bytes.length > walMagicOffset + 2) {
-        final walByte0 = bytes[walMagicOffset];
-        final walByte1 = bytes[walMagicOffset + 1];
-
-        if (walByte0 == 0x37 && walByte1 == 0x0f) {
-          AppLogger().info(
-            'Patching WAL header for legacy compatibility',
-            name: 'Database',
-          );
-          final patched = Uint8List.fromList(bytes);
-          patched[walMagicOffset] = 0x37;
-          patched[walMagicOffset + 1] = 0x0f;
-          patched[walMagicOffset + 2] = 0x10;
-          patched[walMagicOffset + 3] = 0x20;
-          await dbFile.writeAsBytes(patched);
-        }
-      }
-    } on Object catch (e) {
-      AppLogger().warning(
-        'Failed to fix database header: $e',
-        name: 'Database',
-        error: e,
-      );
-    }
-  }
-
   Future<void> checkpointWal() async {
     try {
       await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');

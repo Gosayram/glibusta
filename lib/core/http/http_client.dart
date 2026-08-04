@@ -236,12 +236,18 @@ class HttpClient {
         );
       }
 
+      // ponytail: server may ignore Range and return 200 with the full body —
+      // appending would corrupt the file, so truncate and recount from 0.
+      final serverHonoredRange = startBytes > 0 && response.statusCode == 206;
+      final effectiveMode = serverHonoredRange ? io.FileMode.append : io.FileMode.write;
       final file = io.File(savePath);
-      final sink = file.openWrite(mode: startBytes > 0 ? io.FileMode.append : io.FileMode.write);
+      final sink = file.openWrite(mode: effectiveMode);
       final cancellation = onCancel?.catchError((Object _) {});
       try {
-        int received = 0;
-        final total = response.contentLength;
+        int received = serverHonoredRange ? startBytes : 0;
+        final total = serverHonoredRange
+            ? response.contentLength + startBytes
+            : response.contentLength;
 
         final iterator = StreamIterator<List<int>>(response);
         try {

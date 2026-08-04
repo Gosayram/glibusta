@@ -609,9 +609,14 @@ final class ReaderController {
   void handlePageChanged(int chapterIndex) {
     if (_disposed || _state.chapterCount == 0) return;
     final clamped = chapterIndex.clamp(0, _state.chapterCount - 1);
-    final progress = _chapterProgress(clamped);
-    if (clamped != _state.currentPosition.chapterIndex) {
-      _accumulatedPages++;
+    final chapterChanged = clamped != _state.currentPosition.chapterIndex;
+
+    _accumulatedPages++;
+    _pageFlushTimer?.cancel();
+    _pageFlushTimer = Timer(const Duration(seconds: 30), _flushPages);
+
+    if (chapterChanged) {
+      final progress = _chapterProgress(clamped);
       _updateState(
         _state.copyWith(
           currentPosition: _state.currentPosition.copyWith(
@@ -622,8 +627,6 @@ final class ReaderController {
           estimatedMinutesLeft: _estimateMinutesLeft(progress),
         ),
       );
-      _pageFlushTimer?.cancel();
-      _pageFlushTimer = Timer(const Duration(seconds: 30), _flushPages);
     }
     _chapterLoadDebouncer.call(() {
       if (_disposed) return;
@@ -956,7 +959,7 @@ final class ReaderController {
     return ReaderPosition(
       bookId: _bookId,
       chapterIndex: chapterIndex,
-      paragraphIndex: estimate.paragraphIndex,
+      paragraphIndex: chapterIndex == estimate.chapterIndex ? estimate.paragraphIndex : 0,
       localOffset: progress * 100.0,
       progressPercent: progress,
       contentHash: _state.currentPosition.contentHash,
@@ -1065,10 +1068,15 @@ final class ReaderController {
 
   void saveProgress() {
     if (!_loaded) return;
-    var totalBlocks = 0;
-    for (final chapter in _state.loadedChapters.values) {
-      totalBlocks += chapter.blocks.length;
-    }
+    final loadedCount = _state.loadedChapters.length;
+    final loadedBlocks = _state.loadedChapters.values.fold<int>(
+      0,
+      (sum, ch) => sum + ch.blocks.length,
+    );
+    // ponytail: estimate total from average of loaded chapters
+    final totalBlocks = loadedCount > 0
+        ? (loadedBlocks / loadedCount * _state.chapterCount).round()
+        : loadedBlocks;
     _progress?.saveProgress(_state.currentPosition, totalBlocks);
   }
 
