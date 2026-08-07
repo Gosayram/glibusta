@@ -92,6 +92,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       case LibrarySort.title:
         return BookSortField.title;
       case LibrarySort.author:
+        // Author sort is performed client-side by `sortLibraryBooks`; there is
+        // no author column on SavedBooks, so fall back to addedAt here.
         return BookSortField.addedAt;
       case LibrarySort.progress:
         return BookSortField.progress;
@@ -128,6 +130,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           sortField: _sortField,
           ascending: _sortAscending,
           formatFilter: _selectedFormat,
+          collectionId: _selectedCollectionId,
         );
       }
       if (!mounted) return;

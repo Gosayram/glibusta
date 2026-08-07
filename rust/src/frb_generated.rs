@@ -29,7 +29,7 @@
 use crate::api::api::*;
 use crate::*;
 use flutter_rust_bridge::for_generated::byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
-use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
 use flutter_rust_bridge::{Handler, IntoIntoDart};
 
 // Section: boilerplate
@@ -2786,6 +2786,7 @@ impl SseDecode for crate::api::models::NormalizedBook {
         let mut var_coverUrl = <Option<String>>::sse_decode(deserializer);
         let mut var_chapters = <Vec<crate::api::models::ReaderChapter>>::sse_decode(deserializer);
         let mut var_metadata = <Option<Value>>::sse_decode(deserializer);
+        let mut var_metadataJson = <Option<String>>::sse_decode(deserializer);
         let mut var_bookFormat = <crate::api::models::BookFormat>::sse_decode(deserializer);
         let mut var_language = <Option<String>>::sse_decode(deserializer);
         let mut var_warnings = <Vec<crate::api::models::ParseWarning>>::sse_decode(deserializer);
@@ -2799,6 +2800,7 @@ impl SseDecode for crate::api::models::NormalizedBook {
             cover_url: var_coverUrl,
             chapters: var_chapters,
             metadata: var_metadata,
+            metadata_json: var_metadataJson,
             book_format: var_bookFormat,
             language: var_language,
             warnings: var_warnings,
@@ -3555,6 +3557,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::models::NormalizedBook {
             self.cover_url.into_into_dart().into_dart(),
             self.chapters.into_into_dart().into_dart(),
             self.metadata.into_into_dart().into_dart(),
+            self.metadata_json.into_into_dart().into_dart(),
             self.book_format.into_into_dart().into_dart(),
             self.language.into_into_dart().into_dart(),
             self.warnings.into_into_dart().into_dart(),
@@ -4103,6 +4106,7 @@ impl SseEncode for crate::api::models::NormalizedBook {
         <Option<String>>::sse_encode(self.cover_url, serializer);
         <Vec<crate::api::models::ReaderChapter>>::sse_encode(self.chapters, serializer);
         <Option<Value>>::sse_encode(self.metadata, serializer);
+        <Option<String>>::sse_encode(self.metadata_json, serializer);
         <crate::api::models::BookFormat>::sse_encode(self.book_format, serializer);
         <Option<String>>::sse_encode(self.language, serializer);
         <Vec<crate::api::models::ParseWarning>>::sse_encode(self.warnings, serializer);
@@ -4355,7 +4359,7 @@ mod io {
     use flutter_rust_bridge::for_generated::byteorder::{
         NativeEndian, ReadBytesExt, WriteBytesExt,
     };
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate
@@ -4423,7 +4427,7 @@ mod web {
     };
     use flutter_rust_bridge::for_generated::wasm_bindgen;
     use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{Lifetimeable, Lockable, transform_result_dco};
+    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
     use flutter_rust_bridge::{Handler, IntoIntoDart};
 
     // Section: boilerplate

@@ -349,6 +349,7 @@ impl DjvuEngine {
             book_format: crate::api::models::BookFormat::Djvu,
             warnings: Vec::new(),
             metadata: None,
+            metadata_json: None,
             language: None,
             images: Vec::new(),
         })

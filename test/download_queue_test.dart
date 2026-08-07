@@ -269,6 +269,7 @@ void main() {
         mockBookImport,
         mockTaskQueue,
       );
+      when(() => mockBgDownload.cancel(any())).thenAnswer((_) async {});
       await queue.remove('task-99');
 
       verify(() => mockRepo.removeDownload('task-99')).called(1);

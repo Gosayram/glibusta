@@ -183,6 +183,7 @@ pub fn parse_cbr_path(path: &Path) -> Result<NormalizedBook> {
             blocks,
         }],
         metadata: comic_metadata,
+        metadata_json: None,
         book_format: BookFormat::Cbr,
         language: None,
         warnings: Vec::new(),

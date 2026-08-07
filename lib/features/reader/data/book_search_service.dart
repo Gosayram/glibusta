@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import '../../../src/rust/api/api/api.dart' as rust_api;
 import 'parsers/normalized_book.dart';
@@ -30,10 +29,10 @@ class BookSearchService {
 
   BookSearchService(this._book, this._filePath);
 
-  /// Stable identifier used to scope device-local reader search history.
   String get bookId => _book.id;
 
-  int get totalParagraphs => _book.chapters.fold(0, (sum, c) => sum + c.blocks.length);
+  int get totalParagraphs => _book.chapters.fold(
+      0, (sum, c) => sum + c.blocks.where((b) => b.text.trim().isNotEmpty).length);
 
   String _chapterTitle(int chapterIndex) {
     final titles = _book.chapters.where((c) => c.index == chapterIndex).map((c) => c.title);
@@ -51,11 +50,31 @@ class BookSearchService {
     if (query.trim().isEmpty) return const [];
     final gen = ++_searchGeneration;
 
-    final matches = await rust_api.searchInBook(
-      path: _filePath,
-      query: query,
-      limit: BigInt.from(maxResults),
-    );
+    List<_RustMatch> matches;
+    try {
+      final rawMatches = await rust_api.searchInBook(
+        path: _filePath,
+        query: query,
+        limit: BigInt.from(maxResults),
+      );
+      matches = rawMatches
+          .map((m) => _RustMatch(
+                chapterIndex: m.chapterIndex,
+                blockIndex: m.blockIndex,
+                spanStart: m.spanStart.toInt(),
+                spanEnd: m.spanEnd.toInt(),
+                preview: m.preview,
+              ))
+          .toList();
+    } on Object catch (_) {
+      matches = _searchInMemory(
+        query,
+        maxResults,
+        matchCase: matchCase,
+        useRegex: useRegex,
+        wholeWord: wholeWord,
+      );
+    }
 
     if (gen != _searchGeneration) return const [];
 
@@ -68,20 +87,18 @@ class BookSearchService {
       try {
         final ch = _book.chapters.where((c) => c.index == m.chapterIndex);
         if (ch.isNotEmpty) {
-          final bl = ch.first.blocks.where((b) => b.index == m.blockIndex);
-          if (bl.isNotEmpty) {
-            final ctx = _extractContext(
-              bl.first.text,
-              m.spanStart.toInt(),
-              m.spanEnd.toInt(),
-            );
-            before = ctx.before;
-            after = ctx.after;
+          final blocks = ch.first.blocks;
+          final blockIdx = blocks.indexWhere((b) => b.index == m.blockIndex);
+          if (blockIdx != -1) {
+            if (blockIdx > 0) {
+              before = blocks[blockIdx - 1].text;
+            }
+            if (blockIdx < blocks.length - 1) {
+              after = blocks[blockIdx + 1].text;
+            }
           }
         }
-      } on Object catch (_) {
-        // Fallback: leave context empty rather than crashing the search.
-      }
+      } on Object catch (_) {}
 
       results.add(
         BookSearchResult(
@@ -101,34 +118,131 @@ class BookSearchService {
     _searchGeneration++;
   }
 
-  List<String> suggestions(String prefix, {int maxSuggestions = 8}) => const [];
+  List<String> suggestions(String prefix, {int maxSuggestions = 8}) {
+    final trimmed = prefix.trim();
+    if (trimmed.isEmpty) return const [];
+    final lower = trimmed.toLowerCase();
+    final seen = <String>{};
+    final results = <String>[];
 
-  /// Converts a UTF-8 byte offset (from Rust) to a Dart string character index.
-  static int _byteToCharOffset(String text, int byteOffset) {
-    var charIndex = 0;
-    var byteCount = 0;
-    for (final rune in text.runes) {
-      final size = rune < 0x80 ? 1 : (rune < 0x800 ? 2 : (rune < 0x10000 ? 3 : 4));
-      if (byteCount + size > byteOffset) break;
-      byteCount += size;
-      charIndex++;
+    for (final chapter in _book.chapters) {
+      for (final block in chapter.blocks) {
+        final text = block.text;
+        if (text.isEmpty) continue;
+        final lowerText = text.toLowerCase();
+        var idx = 0;
+        while (idx < text.length && results.length < maxSuggestions) {
+          final found = lowerText.indexOf(lower, idx);
+          if (found == -1) break;
+
+          final matchEnd = found + trimmed.length;
+          final start = found > 30 ? found - 30 : 0;
+          final end = matchEnd + 30 < text.length ? matchEnd + 30 : text.length;
+          final snippet = (start > 0 ? '…' : '') +
+              text.substring(start, end) +
+              (end < text.length ? '…' : '');
+
+          if (seen.add(snippet)) {
+            results.add(snippet);
+          }
+          idx = matchEnd;
+        }
+        if (results.length >= maxSuggestions) break;
+      }
+      if (results.length >= maxSuggestions) break;
     }
-    return charIndex;
+    return results;
   }
 
-  /// Extracts surrounding context from the paragraph text around a match.
-  static ({String before, String after}) _extractContext(
-    String paragraphText,
-    int spanStartByte,
-    int spanEndByte,
-  ) {
-    final start = _byteToCharOffset(paragraphText, spanStartByte);
-    final end = _byteToCharOffset(paragraphText, spanEndByte);
-    const ctxLen = 120;
-    final before = start > 0 ? paragraphText.substring(max(0, start - ctxLen), start) : '';
-    final after = end < paragraphText.length
-        ? paragraphText.substring(end, min(paragraphText.length, end + ctxLen))
-        : '';
-    return (before: before, after: after);
+  List<_RustMatch> _searchInMemory(
+    String query,
+    int maxResults, {
+    required bool matchCase,
+    required bool useRegex,
+    required bool wholeWord,
+  }) {
+    final results = <_RustMatch>[];
+    RegExp? pattern;
+    if (useRegex) {
+      try {
+        pattern = RegExp(query, caseSensitive: matchCase, multiLine: true);
+      } on Object catch (_) {
+        return results;
+      }
+    }
+    final needle = matchCase ? query : query.toLowerCase();
+
+    for (final chapter in _book.chapters) {
+      for (final block in chapter.blocks) {
+        if (block.text.isEmpty) continue;
+        final text = block.text;
+        final lowerText = matchCase ? text : text.toLowerCase();
+
+        int? matchStart;
+        int? matchEnd;
+
+        if (pattern != null) {
+          final m = pattern.firstMatch(text);
+          if (m != null) {
+            matchStart = m.start;
+            matchEnd = m.end;
+          }
+        } else {
+          final idx = lowerText.indexOf(needle);
+          if (idx != -1) {
+            matchStart = idx;
+            matchEnd = idx + query.length;
+
+            if (wholeWord) {
+              final before = matchStart > 0 ? text[matchStart - 1] : ' ';
+              final after = matchEnd < text.length ? text[matchEnd] : ' ';
+              if (_isWordChar(before) || _isWordChar(after)) {
+                matchStart = null;
+                matchEnd = null;
+              }
+            }
+          }
+        }
+
+        if (matchStart != null && matchEnd != null) {
+          if (wholeWord && pattern != null) {
+            final before = matchStart > 0 ? text[matchStart - 1] : ' ';
+            final after = matchEnd < text.length ? text[matchEnd] : ' ';
+            if (_isWordChar(before) || _isWordChar(after)) continue;
+          }
+
+          results.add(_RustMatch(
+            chapterIndex: chapter.index,
+            blockIndex: block.index,
+            spanStart: matchStart,
+            spanEnd: matchEnd,
+            preview: text,
+            areCharOffsets: true,
+          ));
+          if (results.length >= maxResults) return results;
+        }
+      }
+    }
+    return results;
   }
+
+  static bool _isWordChar(String c) => c.isNotEmpty && RegExp(r'\w').hasMatch(c);
+}
+
+class _RustMatch {
+  final int chapterIndex;
+  final int blockIndex;
+  final int spanStart;
+  final int spanEnd;
+  final String preview;
+  final bool areCharOffsets;
+
+  const _RustMatch({
+    required this.chapterIndex,
+    required this.blockIndex,
+    required this.spanStart,
+    required this.spanEnd,
+    required this.preview,
+    this.areCharOffsets = false,
+  });
 }

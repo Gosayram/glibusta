@@ -101,6 +101,7 @@ pub fn parse_docx(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(metadata)),
+        metadata_json: None,
         book_format: BookFormat::Docx,
         language: None,
         warnings: Vec::new(),

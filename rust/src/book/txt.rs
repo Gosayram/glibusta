@@ -104,6 +104,7 @@ pub fn parse_txt(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normaliz
         cover_url: None,
         chapters,
         metadata: None,
+        metadata_json: None,
         book_format: BookFormat::Txt,
         language: None,
         warnings,

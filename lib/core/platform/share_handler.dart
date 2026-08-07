@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -16,20 +17,26 @@ typedef SharedBookImporter = Future<ImportResult> Function(String filePath);
 typedef SharedUriCache = Future<String?> Function(String uri);
 
 class ShareHandler {
-  ShareHandler({required TaskQueueService taskQueue, SharedUriCache? cacheSharedUri})
-    : _taskQueue = taskQueue,
-      _cacheSharedUri = cacheSharedUri ?? StorageBridgeImpl().copyToCache;
+  ShareHandler({
+    required TaskQueueService taskQueue,
+    SharedUriCache? cacheSharedUri,
+    @visibleForTesting bool forceEnable = false,
+  }) : _taskQueue = taskQueue,
+       _cacheSharedUri = cacheSharedUri ?? StorageBridgeImpl().copyToCache,
+       _forceEnable = forceEnable;
 
   StreamSubscription<List<SharedMediaFile>>? _subscription;
   var _subscriptionGeneration = 0;
   final TaskQueueService _taskQueue;
   final SharedUriCache _cacheSharedUri;
+  final bool _forceEnable;
   final _logger = AppLogger();
 
   void init(BuildContext context, SharedBookImporter importFile) {
     // ponytail: receive_sharing_intent has no macOS impl — receiving shared
-    // files is an Android/iOS-only feature.
-    if (Platform.isMacOS) return;
+    // files is an Android/iOS-only feature. Tests pass forceEnable to exercise
+    // the platform-independent logic with a mocked plugin.
+    if (!_forceEnable && Platform.isMacOS) return;
     _logger.info('ShareHandler initialized', name: 'Share');
     final generation = ++_subscriptionGeneration;
     final previousSubscription = _subscription;

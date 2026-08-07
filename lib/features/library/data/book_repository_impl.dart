@@ -28,7 +28,14 @@ class BookRepositoryImpl implements BookRepository {
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
     String? formatFilter,
+    String? collectionId,
   }) async {
+    List<String>? bookIds;
+    if (collectionId != null) {
+      final colBooks = await _db.collectionDao.getBooksInCollection(collectionId);
+      bookIds = colBooks.map((b) => b.id).toList();
+      if (bookIds.isEmpty) return [];
+    }
     final List<SavedBook> rows;
     if (sortField == BookSortField.progress) {
       rows = await _db.bookDao.getPagedBooksWithProgress(
@@ -36,13 +43,15 @@ class BookRepositoryImpl implements BookRepository {
         offset: offset,
         ascending: ascending,
         formatFilter: formatFilter,
+        bookIds: bookIds,
       );
     } else {
       rows = await _db.bookDao.getPagedBooks(
         limit: limit,
         offset: offset,
-        orderBy: [(t) => _mapSortField(t, sortField, ascending)],
+        orderBy: _buildOrderBy(sortField, ascending),
         formatFilter: formatFilter,
+        bookIds: bookIds,
       );
     }
     return _resolveAuthors(rows);
@@ -64,16 +73,25 @@ class BookRepositoryImpl implements BookRepository {
     return _resolveAuthors(rows);
   }
 
-  OrderingTerm _mapSortField($SavedBooksTable t, BookSortField field, bool ascending) {
+  List<OrderingTerm Function($SavedBooksTable)> _buildOrderBy(
+    BookSortField field,
+    bool ascending,
+  ) {
     final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
-    switch (field) {
-      case BookSortField.addedAt:
-        return OrderingTerm(expression: t.addedAt, mode: direction);
-      case BookSortField.title:
-        return OrderingTerm(expression: t.title, mode: direction);
-      case BookSortField.progress:
-        return OrderingTerm(expression: t.addedAt, mode: direction);
-    }
+    return switch (field) {
+      BookSortField.addedAt => [
+        (t) => OrderingTerm(expression: t.addedAt, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+      BookSortField.title => [
+        (t) => OrderingTerm(expression: t.title, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+      BookSortField.progress => [
+        (t) => OrderingTerm(expression: t.addedAt, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+    };
   }
 
   @override

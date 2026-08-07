@@ -857,7 +857,9 @@ class FlibustaHtmlSource extends BookSource {
       authorNames: authors,
       genreIds: genreIds,
       description: description.isNotEmpty ? description : null,
-      coverUrl: coverUrl != null ? '$base$coverUrl' : null,
+      coverUrl: coverUrl != null && coverUrl.isNotEmpty
+          ? (coverUrl.startsWith('http') ? coverUrl : '$base$coverUrl')
+          : null,
       publishDate: null,
       availableFormats: formats,
       source: BookSourceInfo(sourceId: sourceId, sourceUrl: '$base/b/$bookId'),

@@ -79,7 +79,8 @@ Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
 Future<Uint8List> getAssetBytes({
   required String path,
   required String assetId,
-}) => RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+}) =>
+    RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
 
 /// Compare two books parsed from the same file at different times.
 Future<BookDiff> diffParsedBook({

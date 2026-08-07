@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show TextAlign;
 
@@ -99,16 +100,29 @@ class RustBookParser implements BookParser {
   }
 
   static local.NormalizedBook _toNormalizedBook(rust_models.NormalizedBook r) {
-    final meta = <String, dynamic>{
-      if (r.language != null) 'language': r.language,
-    };
+    Map<String, dynamic>? metadata;
+    if (r.metadataJson != null && r.metadataJson!.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(r.metadataJson!);
+        if (parsed is Map) {
+          metadata = parsed.map((k, v) => MapEntry(k.toString(), v));
+        }
+      } on Object catch (_) {
+        // ignore malformed metadata
+      }
+    }
+    if (metadata == null && r.language != null) {
+      metadata = {'language': r.language};
+    } else if (metadata != null && r.language != null) {
+      metadata['language'] = r.language;
+    }
     return local.NormalizedBook(
       id: r.id,
       title: r.title,
       authors: r.authors,
       description: r.description,
       coverUrl: r.coverUrl,
-      metadata: meta.isEmpty ? null : meta,
+      metadata: metadata,
       chapters: r.chapters
           .map(
             (rc) => local.ReaderChapter(

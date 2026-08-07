@@ -33,7 +33,7 @@ void main() {
       ],
       mediaStream: const Stream<List<SharedMediaFile>>.empty(),
     );
-    final handler = ShareHandler(taskQueue: fakeTaskQueue);
+    final handler = ShareHandler(taskQueue: fakeTaskQueue, forceEnable: true);
     late BuildContext context;
     addTearDown(() {
       handler.dispose();
@@ -73,6 +73,7 @@ void main() {
     final importedPaths = <String>[];
     final handler = ShareHandler(
       taskQueue: fakeTaskQueue,
+      forceEnable: true,
       cacheSharedUri: (uri) async {
         cachedUris.add(uri);
         return '/cache/shared.epub';
@@ -121,6 +122,7 @@ void main() {
     var imported = false;
     final handler = ShareHandler(
       taskQueue: fakeTaskQueue,
+      forceEnable: true,
       cacheSharedUri: (_) async => throw StateError('SAF permission was revoked'),
     );
     late BuildContext context;
@@ -159,7 +161,7 @@ void main() {
       initialMedia: const [],
       mediaStream: mediaController.stream,
     );
-    final handler = ShareHandler(taskQueue: fakeTaskQueue);
+    final handler = ShareHandler(taskQueue: fakeTaskQueue, forceEnable: true);
     final firstImports = <String>[];
     final secondImports = <String>[];
     late BuildContext context;
@@ -210,6 +212,7 @@ void main() {
     );
     final handler = ShareHandler(
       taskQueue: fakeTaskQueue,
+      forceEnable: true,
       cacheSharedUri: (_) {
         cacheStarted.complete();
         return cachedPath.future;

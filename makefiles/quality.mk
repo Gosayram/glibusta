@@ -99,14 +99,16 @@ diagnostics-strict: require-flutter require-python ## Summarize diagnostics and 
 .PHONY: test test-dart test-dart-coverage test-live test-native test-rust
 test: test-dart test-rust ## Run deterministic Dart and Rust tests
 
-test-dart: require-flutter ## Run deterministic Dart tests (offline)
+test-dart: rust-build-release require-flutter ## Run deterministic Dart tests (offline)
 	@$(PRINT_STEP) "Running deterministic Dart tests"
-	$(FLUTTER_TEST) --exclude-tags=live --exclude-tags=native
+	FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR=$(CURDIR)/rust/target/release \
+		$(FLUTTER_TEST) --exclude-tags=live --exclude-tags=native
 
-test-dart-coverage: require-flutter ## Run deterministic Dart tests and write coverage/report artifacts
+test-dart-coverage: rust-build-release require-flutter ## Run deterministic Dart tests and write coverage/report artifacts
 	@$(PRINT_STEP) "Running deterministic Dart tests with coverage"
 	@mkdir -p build/test-results
-	$(FLUTTER_TEST) --coverage --file-reporter=json:build/test-results/dart-tests.json \
+	FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR=$(CURDIR)/rust/target/release \
+		$(FLUTTER_TEST) --coverage --file-reporter=json:build/test-results/dart-tests.json \
 		--exclude-tags=live --exclude-tags=native
 
 test-live: require-flutter ## Run opt-in live Dart tests

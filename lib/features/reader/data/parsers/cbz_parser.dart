@@ -19,7 +19,8 @@ final class CbzParser implements BookParser {
   static const int _maxComicInfoBytes = 1024 * 1024;
 
   @override
-  bool supports(BookFormat format) => format == BookFormat.cbz;
+  bool supports(BookFormat format) =>
+      format == BookFormat.cbz || format == BookFormat.cbr;
 
   @override
   Future<NormalizedBook> parse(
@@ -30,12 +31,34 @@ final class CbzParser implements BookParser {
     try {
       // Try Rust parser via temp file for best performance
       final tempDir = Directory.systemTemp;
+      final safeName = (fileName ?? 'glibusta_cbz')
+          .replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
       final tempFile = File(
-        '${tempDir.path}/glibusta_cbz_${DateTime.now().millisecondsSinceEpoch}.cbz',
+        '${tempDir.path}/$safeName-${DateTime.now().millisecondsSinceEpoch}.cbz',
       );
       try {
         await tempFile.writeAsBytes(bytes, flush: true);
-        return await RustBookParser().parseFile(tempFile.path);
+        final book = await RustBookParser().parseFile(tempFile.path);
+        // Only override title if Rust parser used filename fallback
+        // (ComicInfo title takes precedence)
+        if (fileName != null) {
+          final fallbackTitle = _titleFromFileName(
+            tempFile.path.split('/').last,
+          );
+          if (book.title == fallbackTitle) {
+            return NormalizedBook(
+              id: book.id,
+              title: _titleFromFileName(fileName),
+              authors: book.authors,
+              description: book.description,
+              coverUrl: book.coverUrl,
+              chapters: book.chapters,
+              metadata: book.metadata,
+              fonts: book.fonts,
+            );
+          }
+        }
+        return book;
       } finally {
         if (await tempFile.exists()) {
           await tempFile.delete();

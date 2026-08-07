@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/presentation/table_of_contents_sheet.dart';
@@ -13,23 +14,25 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => FilledButton(
-              onPressed: () => TableOfContentsSheet.show(
-                context,
-                metadata: NormalizedBookMetadata(
-                  id: 'book-1',
-                  title: 'Book',
-                  authors: const [],
-                  chapterCount: chapterTitles.length,
-                  chapterTitles: chapterTitles,
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => FilledButton(
+                onPressed: () => TableOfContentsSheet.show(
+                  context,
+                  metadata: NormalizedBookMetadata(
+                    id: 'book-1',
+                    title: 'Book',
+                    authors: const [],
+                    chapterCount: chapterTitles.length,
+                    chapterTitles: chapterTitles,
+                  ),
+                  currentChapterIndex: currentChapter,
+                  onJumpToPosition: (_) => jumpCount++,
                 ),
-                currentChapterIndex: currentChapter,
-                onJumpToPosition: (_) => jumpCount++,
+                child: const Text('Open contents'),
               ),
-              child: const Text('Open contents'),
             ),
           ),
         ),
@@ -40,7 +43,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final currentTitle = 'Chapter ${currentChapter + 1}';
-    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+    final scrollable = tester.state<ScrollableState>(
+      find.byType(Scrollable).last,
+    );
     expect(scrollable.position.pixels, greaterThan(900));
     expect(find.text(currentTitle), findsOneWidget);
     expect(
@@ -56,23 +61,25 @@ void main() {
     const childTitle = '1.1 Подраздел';
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => FilledButton(
-              onPressed: () => TableOfContentsSheet.show(
-                context,
-                metadata: const NormalizedBookMetadata(
-                  id: 'book-1',
-                  title: 'Book',
-                  authors: [],
-                  chapterCount: 4,
-                  chapterTitles: [title, childTitle, '1.2 Ещё подраздел', '2 Второй раздел'],
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => FilledButton(
+                onPressed: () => TableOfContentsSheet.show(
+                  context,
+                  metadata: const NormalizedBookMetadata(
+                    id: 'book-1',
+                    title: 'Book',
+                    authors: [],
+                    chapterCount: 4,
+                    chapterTitles: [title, childTitle, '1.2 Ещё подраздел', '2 Второй раздел'],
+                  ),
+                  currentChapterIndex: 0,
+                  onJumpToPosition: (_) {},
                 ),
-                currentChapterIndex: 0,
-                onJumpToPosition: (_) {},
+                child: const Text('Open contents'),
               ),
-              child: const Text('Open contents'),
             ),
           ),
         ),

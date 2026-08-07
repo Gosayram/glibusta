@@ -17,6 +17,7 @@ class _FakeBookRepository implements BookRepository {
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
     String? formatFilter,
+    String? collectionId,
   }) async => [];
 
   @override
@@ -74,15 +75,15 @@ void main() {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();
 
-      expect(find.text('Библиотека пуста'), findsOneWidget);
+      expect(find.text('Ваша библиотека пуста'), findsOneWidget);
     });
 
     testWidgets('shows import buttons when empty', (tester) async {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();
 
-      expect(find.text('Перейти в каталог'), findsOneWidget);
-      expect(find.text('Импортировать файл'), findsOneWidget);
+      expect(find.text('OPDS каталог'), findsOneWidget);
+      expect(find.text('Импорт файла'), findsOneWidget);
     });
 
     testWidgets('has search button in app bar', (tester) async {

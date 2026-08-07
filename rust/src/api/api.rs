@@ -300,6 +300,7 @@ pub fn parse_book(path: String) -> anyhow::Result<NormalizedBook> {
     if format == BookFormat::Cbz {
         let book = crate::book::cbz::parse_cbz_path(Path::new(&path))
             .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let book = repair_normalized_book(book);
         memory_cache_store(fingerprint, book.clone());
         disk_cache_store(&cache_key, &book);
         return Ok(book);
@@ -565,6 +566,14 @@ pub fn repair_book(path: String) -> anyhow::Result<NormalizedBook> {
 }
 
 fn repair_normalized_book(mut book: NormalizedBook) -> NormalizedBook {
+    // Auto-populate metadata_json from metadata for Dart-side access
+    if book.metadata_json.is_none() {
+        if let Some(ref m) = book.metadata {
+            if let Ok(json) = serde_json::to_string(m) {
+                book.metadata_json = Some(json);
+            }
+        }
+    }
     // Remove empty chapters and re-index
     let mut new_chapters = Vec::new();
     let mut old_to_new: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();

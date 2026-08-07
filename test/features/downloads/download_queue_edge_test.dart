@@ -104,6 +104,7 @@ void main() {
         mockBookImport,
         mockTaskQueue,
       );
+      when(() => mockBgDownload.cancel(any())).thenAnswer((_) async {});
       await queue.remove('nonexistent');
       verify(() => mockRepo.removeDownload('nonexistent')).called(1);
       queue.dispose();

@@ -1550,6 +1550,7 @@ fn parse_fb2_xml(
         cover_url,
         chapters,
         metadata,
+        metadata_json: None,
         book_format: BookFormat::Fb2,
         language,
         warnings: Vec::new(),

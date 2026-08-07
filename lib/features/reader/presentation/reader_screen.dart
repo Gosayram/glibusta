@@ -577,7 +577,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   void _checkBookFinished(ReaderState readerState) {
     if (_finishedDialogShown) return;
-    if (readerState.scrollProgress < 0.99) return;
+    // Gate on actually being at the final chapter: in multi-chapter continuous
+    // mode scrollProgress can reach ~1.0 at the bottom of the loaded chapter
+    // window while more chapters still load lazily.
+    final onLastChapter =
+        readerState.chapterCount <= 1 ||
+        readerState.currentPosition.chapterIndex >= readerState.chapterCount - 1;
+    if (!onLastChapter || readerState.scrollProgress < 0.99) return;
     _finishedDialogShown = true;
     // STR-6.1: request review after finishing a book
     unawaited(_requestReview());

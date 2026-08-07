@@ -191,6 +191,7 @@ pub fn parse_cbz_path(path: &Path) -> Result<NormalizedBook> {
             blocks,
         }],
         metadata: comic_metadata,
+        metadata_json: None,
         book_format: BookFormat::Cbz,
         language: None,
         warnings: Vec::new(),
@@ -300,7 +301,20 @@ fn decode_comic_info(bytes: &[u8]) -> Option<String> {
     let (bytes, big_endian) = match bytes {
         [0xFF, 0xFE, rest @ ..] => (rest, false),
         [0xFE, 0xFF, rest @ ..] => (rest, true),
-        _ => return std::str::from_utf8(bytes).ok().map(str::to_owned),
+        _ => {
+            // Try UTF-8 first
+            if let Ok(s) = std::str::from_utf8(bytes) {
+                return Some(s.to_owned());
+            }
+            // Try encoding from XML declaration: <?xml ... encoding="..." ?>
+            let header_len = bytes.len().min(256);
+            let header = &bytes[..header_len];
+            if let Some(encoding) = detect_xml_encoding(header) {
+                let (decoded, _, _) = encoding.decode(bytes);
+                return Some(decoded.into_owned());
+            }
+            return None;
+        }
     };
     if bytes.len() % 2 != 0 {
         return None;
@@ -316,6 +330,28 @@ fn decode_comic_info(bytes: &[u8]) -> Option<String> {
         })
         .collect::<Vec<_>>();
     String::from_utf16(&code_units).ok()
+}
+
+fn detect_xml_encoding(header: &[u8]) -> Option<&'static encoding_rs::Encoding> {
+    // Search raw bytes for encoding="..." — the keyword is always ASCII
+    let lower_header: Vec<u8> = header.iter().map(|b| b.to_ascii_lowercase()).collect();
+    let needle = b"encoding=";
+    let start = lower_header.windows(needle.len()).position(|w| w == needle)?;
+    let key_end = start + needle.len();
+    if key_end >= header.len() {
+        return None;
+    }
+    let quote = header[key_end];
+    if quote != b'"' && quote != b'\'' {
+        return None;
+    }
+    let value_start = key_end + 1;
+    let value_end = header[value_start..]
+        .iter()
+        .position(|&b| b == quote)?
+        + value_start;
+    let encoding_name = &header[value_start..value_end];
+    encoding_rs::Encoding::for_label(encoding_name)
 }
 
 fn image_media_type(path: &str) -> Option<&'static str> {

@@ -430,6 +430,9 @@ pub struct NormalizedBook {
     pub chapters: Vec<ReaderChapter>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    /// JSON-serialized metadata for Dart-side access
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_json: Option<String>,
     /// New fields
     pub book_format: BookFormat,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -847,6 +850,7 @@ mod book_diff_tests {
                 }],
             }],
             metadata: None,
+            metadata_json: None,
             book_format: BookFormat::Txt,
             language: None,
             warnings: Vec::new(),

@@ -17,12 +17,14 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     int offset = 0,
     List<OrderingTerm Function($SavedBooksTable t)>? orderBy,
     String? formatFilter,
+    List<String>? bookIds,
   }) async {
     final query = select(savedBooks)
       ..where(
         (t) =>
             t.deletedAt.isNull() &
-            (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)),
+            (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)) &
+            (bookIds != null ? t.id.isIn(bookIds) : const Constant(true)),
       )
       ..limit(limit, offset: offset);
     if (orderBy != null) {
@@ -128,6 +130,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     int offset = 0,
     bool ascending = true,
     String? formatFilter,
+    List<String>? bookIds,
   }) async {
     final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
     final query =
@@ -138,7 +141,8 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
             savedBooks.deletedAt.isNull() &
                 (formatFilter != null
                     ? savedBooks.filePath.like('%.$formatFilter')
-                    : const Constant(true)),
+                    : const Constant(true)) &
+                (bookIds != null ? savedBooks.id.isIn(bookIds) : const Constant(true)),
           )
           ..orderBy([OrderingTerm(expression: readingProgress.progressPercent, mode: direction)])
           ..limit(limit, offset: offset);

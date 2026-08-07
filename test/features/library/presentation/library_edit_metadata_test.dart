@@ -21,6 +21,7 @@ class FakeBookRepository implements BookRepository {
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
     String? formatFilter,
+    String? collectionId,
   }) async => [];
 
   @override

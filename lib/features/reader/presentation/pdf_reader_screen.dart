@@ -127,7 +127,12 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
       );
     }
 
-    final searcher = _searcher ??= PdfTextSearcher(_controller);
+    final PdfTextSearcher? searcher;
+    if (widget.testViewer != null) {
+      searcher = null;
+    } else {
+      searcher = _searcher ??= PdfTextSearcher(_controller);
+    }
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -194,7 +199,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
                     }
                   },
                   pagePaintCallbacks: [
-                    searcher.pageTextMatchPaintCallback,
+                    searcher!.pageTextMatchPaintCallback,
                   ],
                   viewerOverlayBuilder: (context, size, handleLinkTap) {
                     return [
@@ -337,7 +342,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
               left: 0,
               right: 0,
               child: _SearchOverlay(
-                searcher: searcher,
+                searcher: searcher!,
                 searchController: _searchController,
                 onClose: () => setState(() => _showSearch = false),
               ),

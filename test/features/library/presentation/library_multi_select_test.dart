@@ -21,6 +21,7 @@ class _FakeBookRepository implements BookRepository {
     BookSortField sortField = BookSortField.addedAt,
     bool ascending = false,
     String? formatFilter,
+    String? collectionId,
   }) async {
     final end = (offset + limit).clamp(0, books.length);
     if (offset >= books.length) return [];

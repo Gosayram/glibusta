@@ -955,6 +955,7 @@ pub fn parse_mobi(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         cover_url,
         chapters,
         metadata: Some(serde_json::Value::Object(meta)),
+        metadata_json: None,
         book_format: BookFormat::Mobi,
         language: metadata.language.map(|s| s.to_string()),
         warnings: Vec::new(),
