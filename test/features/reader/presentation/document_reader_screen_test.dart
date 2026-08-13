@@ -71,54 +71,55 @@ void main() {
     'DjVu reader ignores a stale page-render failure after a newer page wins',
     skip: true, // Same native library issue as the PDF test above
     (tester) async {
-    final file = File(
-      '${Directory.systemTemp.path}/glibusta-djvu-${DateTime.now().microsecondsSinceEpoch}.djvu',
-    );
-    await file.writeAsBytes([0]);
-    addTearDown(file.delete);
+      final file = File(
+        '${Directory.systemTemp.path}/glibusta-djvu-${DateTime.now().microsecondsSinceEpoch}.djvu',
+      );
+      await file.writeAsBytes([0]);
+      addTearDown(file.delete);
 
-    final secondPage = Completer<Uint8List>();
-    final returnToFirstPage = Completer<Uint8List>();
-    var firstPageLoads = 0;
+      final secondPage = Completer<Uint8List>();
+      final returnToFirstPage = Completer<Uint8List>();
+      var firstPageLoads = 0;
 
-    Future<Uint8List> loadThumbnail({
-      required String path,
-      required int pageIndex,
-      required int maxWidth,
-    }) {
-      expect(path, file.path);
-      expect(maxWidth, 1080);
-      if (pageIndex == 1) return secondPage.future;
-      firstPageLoads++;
-      return firstPageLoads == 1
-          ? Future<Uint8List>.value(_transparentPng)
-          : returnToFirstPage.future;
-    }
+      Future<Uint8List> loadThumbnail({
+        required String path,
+        required int pageIndex,
+        required int maxWidth,
+      }) {
+        expect(path, file.path);
+        expect(maxWidth, 1080);
+        if (pageIndex == 1) return secondPage.future;
+        firstPageLoads++;
+        return firstPageLoads == 1
+            ? Future<Uint8List>.value(_transparentPng)
+            : returnToFirstPage.future;
+      }
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: DjvuReaderScreen(
-          filePath: file.path,
-          pageCountLoader: (_) async => 2,
-          thumbnailLoader: loadThumbnail,
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DjvuReaderScreen(
+            filePath: file.path,
+            pageCountLoader: (_) async => 2,
+            thumbnailLoader: loadThumbnail,
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    await tester.tap(find.byIcon(Icons.chevron_right));
-    await tester.pump();
-    await tester.tap(find.byIcon(Icons.chevron_left));
-    await tester.pump();
+      await tester.tap(find.byIcon(Icons.chevron_right));
+      await tester.pump();
+      await tester.tap(find.byIcon(Icons.chevron_left));
+      await tester.pump();
 
-    returnToFirstPage.complete(_transparentPng);
-    await tester.pump();
-    secondPage.completeError(StateError('stale page failed'));
-    await tester.pump();
+      returnToFirstPage.complete(_transparentPng);
+      await tester.pump();
+      secondPage.completeError(StateError('stale page failed'));
+      await tester.pump();
 
-    expect(find.text('stale page failed'), findsNothing);
-    expect(find.text('1 / 2'), findsWidgets);
-  });
+      expect(find.text('stale page failed'), findsNothing);
+      expect(find.text('1 / 2'), findsWidgets);
+    },
+  );
 
   group('PDF link safety', () {
     test('allows only an in-document destination within the page range', () {

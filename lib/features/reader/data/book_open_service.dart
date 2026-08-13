@@ -213,7 +213,9 @@ class BookOpenService {
         resolved[assetId] = imageFile.path;
       } on Object catch (e, st) {
         if (temporaryFile != null) {
-          try { await temporaryFile.delete(); } on Object catch (_) {}
+          try {
+            await temporaryFile.delete();
+          } on Object catch (_) {}
         }
         _logger.warning(
           'Unable to materialize archive image $assetId',

@@ -19,8 +19,7 @@ final class CbzParser implements BookParser {
   static const int _maxComicInfoBytes = 1024 * 1024;
 
   @override
-  bool supports(BookFormat format) =>
-      format == BookFormat.cbz || format == BookFormat.cbr;
+  bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
 
   @override
   Future<NormalizedBook> parse(
@@ -31,8 +30,7 @@ final class CbzParser implements BookParser {
     try {
       // Try Rust parser via temp file for best performance
       final tempDir = Directory.systemTemp;
-      final safeName = (fileName ?? 'glibusta_cbz')
-          .replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+      final safeName = (fileName ?? 'glibusta_cbz').replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
       final tempFile = File(
         '${tempDir.path}/$safeName-${DateTime.now().millisecondsSinceEpoch}.cbz',
       );

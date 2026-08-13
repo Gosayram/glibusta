@@ -32,7 +32,9 @@ class BookSearchService {
   String get bookId => _book.id;
 
   int get totalParagraphs => _book.chapters.fold(
-      0, (sum, c) => sum + c.blocks.where((b) => b.text.trim().isNotEmpty).length);
+    0,
+    (sum, c) => sum + c.blocks.where((b) => b.text.trim().isNotEmpty).length,
+  );
 
   String _chapterTitle(int chapterIndex) {
     final titles = _book.chapters.where((c) => c.index == chapterIndex).map((c) => c.title);
@@ -71,13 +73,15 @@ class BookSearchService {
           limit: BigInt.from(maxResults),
         );
         matches = rawMatches
-            .map((m) => _RustMatch(
-                  chapterIndex: m.chapterIndex,
-                  blockIndex: m.blockIndex,
-                  spanStart: m.spanStart.toInt(),
-                  spanEnd: m.spanEnd.toInt(),
-                  preview: m.preview,
-                ))
+            .map(
+              (m) => _RustMatch(
+                chapterIndex: m.chapterIndex,
+                blockIndex: m.blockIndex,
+                spanStart: m.spanStart.toInt(),
+                spanEnd: m.spanEnd.toInt(),
+                preview: m.preview,
+              ),
+            )
             .toList();
       } on Object catch (_) {
         matches = _searchInMemory(
@@ -152,9 +156,8 @@ class BookSearchService {
           final matchEnd = found + trimmed.length;
           final start = found > 30 ? found - 30 : 0;
           final end = matchEnd + 30 < text.length ? matchEnd + 30 : text.length;
-          final snippet = (start > 0 ? '…' : '') +
-              text.substring(start, end) +
-              (end < text.length ? '…' : '');
+          final snippet =
+              (start > 0 ? '…' : '') + text.substring(start, end) + (end < text.length ? '…' : '');
 
           if (seen.add(snippet)) {
             results.add(snippet);
@@ -225,14 +228,16 @@ class BookSearchService {
             if (_isWordChar(before) || _isWordChar(after)) continue;
           }
 
-          results.add(_RustMatch(
-            chapterIndex: chapter.index,
-            blockIndex: block.index,
-            spanStart: matchStart,
-            spanEnd: matchEnd,
-            preview: text,
-            areCharOffsets: true,
-          ));
+          results.add(
+            _RustMatch(
+              chapterIndex: chapter.index,
+              blockIndex: block.index,
+              spanStart: matchStart,
+              spanEnd: matchEnd,
+              preview: text,
+              areCharOffsets: true,
+            ),
+          );
           if (results.length >= maxResults) return results;
         }
       }
