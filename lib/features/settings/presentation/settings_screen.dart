@@ -287,13 +287,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // Write to a temporary file and share it via the system share sheet.
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
       final tempFile = File('${Directory.systemTemp.path}/glibusta_backup_$timestamp.json');
-      await tempFile.writeAsString(json);
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(tempFile.path)],
-          text: 'Glibusta settings',
-        ),
-      );
+      try {
+        await tempFile.writeAsString(json);
+        await SharePlus.instance.share(
+          ShareParams(
+            files: [XFile(tempFile.path)],
+            text: 'Glibusta settings',
+          ),
+        );
+      } finally {
+        try { await tempFile.delete(); } on Object catch (_) {}
+      }
 
       if (!context.mounted) return;
 

@@ -106,18 +106,30 @@ class BackupService {
       final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
 
       await db.batch((b) {
-        b.deleteAll(db.readingProgress);
-        b.insertAll(db.readingProgress, progressList.map(_progressFromMap));
-        b.deleteAll(db.bookmarks);
-        b.insertAll(db.bookmarks, bookmarksList.map(_bookmarkFromMap));
-        b.deleteAll(db.notes);
-        b.insertAll(db.notes, notesList.map(_noteFromMap));
-        b.deleteAll(db.quotes);
-        b.insertAll(db.quotes, quotesList.map(_quoteFromMap));
-        b.deleteAll(db.collections);
-        b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
-        b.deleteAll(db.textHighlights);
-        b.insertAll(db.textHighlights, highlightsList.map(_highlightFromMap));
+        if (progressList.isNotEmpty) {
+          b.deleteAll(db.readingProgress);
+          b.insertAll(db.readingProgress, progressList.map(_progressFromMap));
+        }
+        if (bookmarksList.isNotEmpty) {
+          b.deleteAll(db.bookmarks);
+          b.insertAll(db.bookmarks, bookmarksList.map(_bookmarkFromMap));
+        }
+        if (notesList.isNotEmpty) {
+          b.deleteAll(db.notes);
+          b.insertAll(db.notes, notesList.map(_noteFromMap));
+        }
+        if (quotesList.isNotEmpty) {
+          b.deleteAll(db.quotes);
+          b.insertAll(db.quotes, quotesList.map(_quoteFromMap));
+        }
+        if (collectionsList.isNotEmpty) {
+          b.deleteAll(db.collections);
+          b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
+        }
+        if (highlightsList.isNotEmpty) {
+          b.deleteAll(db.textHighlights);
+          b.insertAll(db.textHighlights, highlightsList.map(_highlightFromMap));
+        }
 
         // ponytail: bookCollections junction table is not exported, rebuild
         // from collections.bookIds so getBooksInCollection/getCollectionsForBook
@@ -150,7 +162,10 @@ class BackupService {
       }
       if (goalMap != null) {
         await prefs.setInt(_readingGoalMinutesKey, (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30);
-        await prefs.setBool(_readingGoalEnabledKey, goalMap['isEnabled'] as bool? ?? false);
+        final goalEnabled = goalMap['isEnabled'] is bool
+            ? goalMap['isEnabled'] as bool
+            : (goalMap['isEnabled']?.toString() == 'true');
+        await prefs.setBool(_readingGoalEnabledKey, goalEnabled);
       }
 
       _logger.info(
@@ -169,7 +184,7 @@ class BackupService {
     } on FormatException catch (e) {
       _logger.warning('Import failed: invalid JSON - ${e.message}', name: 'Backup');
       return ImportResult(success: false, error: 'Invalid JSON: ${e.message}');
-    } on Exception catch (e) {
+    } on Object catch (e) {
       _logger.warning('Import failed: $e', name: 'Backup');
       return ImportResult(success: false, error: e.toString());
     }
