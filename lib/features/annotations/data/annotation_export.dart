@@ -50,7 +50,8 @@ class AnnotationExportFormatter {
   }
 
   static String _markdown(AnnotationData annotations, String title) {
-    final buffer = StringBuffer('# Аннотации — $title\n\n');
+    final safeTitle = title.replaceAll('\n', ' ');
+    final buffer = StringBuffer('# Аннотации — $safeTitle\n\n');
     _writeMarkdownBookmarks(buffer, annotations.bookmarks);
     _writeMarkdownNotes(buffer, annotations.notes);
     _writeMarkdownQuotes(buffer, annotations.quotes);
@@ -245,6 +246,8 @@ class AnnotationExportFormatter {
         'type': 'quote',
         'text': q.selectedText,
         'note': q.note,
+        'before_context': q.beforeContext,
+        'after_context': q.afterContext,
         'color': null,
         'style': null,
         'book_id': q.bookId,

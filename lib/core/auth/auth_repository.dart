@@ -281,11 +281,13 @@ class AuthStateNotifier extends _$AuthStateNotifier {
         error: e,
       );
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kSessionNameKey);
-    await prefs.remove(_kSessionMailKey);
-    final secureStorage = ref.read(flutterSecureStorageProvider);
-    await secureStorage.deleteAll();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kSessionNameKey);
+      await prefs.remove(_kSessionMailKey);
+      final secureStorage = ref.read(flutterSecureStorageProvider);
+      await secureStorage.deleteAll();
+    } on Object catch (_) {}
     state = const AsyncValue.data(AuthStateData());
   }
 
@@ -293,6 +295,8 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final current = state.value;
     if (current != null) {
       state = AsyncValue.data(current.copyWith(error: null));
+    } else if (state is AsyncError) {
+      state = const AsyncValue.data(AuthStateData());
     }
   }
 
@@ -321,6 +325,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       return true;
     } on Object catch (e) {
       AppLogger().warning('Auto-login failed: $e', name: 'Auth');
+      state = const AsyncValue.data(AuthStateData());
       return false;
     }
   }

@@ -191,6 +191,7 @@ fn parse_fb2_xml(
     let mut in_text_author = false;
     let mut in_poem = false;
     let mut in_stanza = false;
+    let mut poem_had_stanza = false;
     let mut in_cite = false;
     let mut in_pre = false;
     let mut in_table = false;
@@ -427,6 +428,7 @@ fn parse_fb2_xml(
                     b"poem" if in_body => {
                         mark_fb2_section_content(&mut section_structure)?;
                         in_poem = true;
+                        poem_had_stanza = false;
                     }
                     b"stanza" if in_body && in_poem => {
                         if !in_notes_body && !current_text.trim().is_empty() {
@@ -439,6 +441,15 @@ fn parse_fb2_xml(
                             block_index += 1;
                         }
                         if !in_notes_body {
+                            if poem_had_stanza {
+                                body_blocks.push(ReaderBlock {
+                                    index: block_index,
+                                    text: String::new(),
+                                    block_type: BlockType::Separator,
+                                    ..default_block()
+                                });
+                                block_index += 1;
+                            }
                             current_text.clear();
                         }
                         in_stanza = true;
@@ -1108,6 +1119,15 @@ fn parse_fb2_xml(
                             &mut block_index,
                             BlockType::Poem,
                         );
+                        if poem_had_stanza {
+                            body_blocks.push(ReaderBlock {
+                                index: block_index,
+                                text: String::new(),
+                                block_type: BlockType::Separator,
+                                ..default_block()
+                            });
+                            block_index += 1;
+                        }
                         in_poem = false;
                         in_stanza = false;
                     }
@@ -1129,13 +1149,7 @@ fn parse_fb2_xml(
                             block_index += 1;
                         }
                         current_text.clear();
-                        body_blocks.push(ReaderBlock {
-                            index: block_index,
-                            text: String::new(),
-                            block_type: BlockType::Separator,
-                            ..default_block()
-                        });
-                        block_index += 1;
+                        poem_had_stanza = true;
                         in_stanza = false;
                     }
                     b"v" if in_body && in_poem => {

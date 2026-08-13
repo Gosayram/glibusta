@@ -763,7 +763,24 @@ fn parse_opf(text: &str) -> Result<OpfResult> {
             Ok(Event::End(ref e)) => {
                 let tag = String::from_utf8_lossy(e.local_name().as_ref()).to_string();
                 match tag.as_str() {
-                    "metadata" => in_metadata = false,
+                    "metadata" => {
+                        if in_dc_tag {
+                            let val = current_text.trim().to_string();
+                            if !val.is_empty() {
+                                let entry = metadata.entry(current_dc_tag.clone()).or_default();
+                                if entry.is_empty() {
+                                    *entry = val;
+                                } else {
+                                    entry.push_str("; ");
+                                    entry.push_str(&val);
+                                }
+                            }
+                            in_dc_tag = false;
+                            current_dc_tag.clear();
+                            current_text.clear();
+                        }
+                        in_metadata = false;
+                    }
                     "manifest" => in_manifest = false,
                     "spine" => in_spine = false,
                     _ => {

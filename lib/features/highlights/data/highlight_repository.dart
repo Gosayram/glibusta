@@ -250,9 +250,10 @@ class HighlightRepository {
         lastChapter = h.chapterIndex;
         buf.writeln('---\n## Глава ${h.chapterIndex + 1}\n');
       }
-      buf.writeln('> ${h.selectedText}\n');
+      buf.writeln(h.selectedText.split('\n').map((l) => '> $l').join('\n'));
+      buf.writeln();
       if (h.noteText != null && h.noteText!.isNotEmpty) {
-        buf.writeln('*Заметка: ${h.noteText}*\n');
+        buf.writeln('*Заметка: ${h.noteText!.replaceAll('*', r'\*')}*\n');
       }
     }
 
