@@ -44,7 +44,7 @@ class _ReadingGoalDialogState extends ConsumerState<ReadingGoalDialog> {
 
   void _loadInitialGoal(ReadingGoal goal) {
     if (_hasLoadedGoal) return;
-    _dailyMinutes = goal.dailyMinutes.toDouble();
+    _dailyMinutes = goal.dailyMinutes.toDouble().clamp(5.0, 180.0);
     _isEnabled = goal.isEnabled;
     _hasLoadedGoal = true;
     if (mounted) setState(() {});

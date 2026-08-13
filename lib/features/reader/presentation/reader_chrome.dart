@@ -688,14 +688,16 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
       builder: (context) => _PercentJumpDialog(initialPercent: (widget.value * 100).round()),
     );
 
-    if (target != null) widget.onChanged(target / 100);
+    if (target != null && mounted) widget.onChanged(target / 100);
   }
 
   @override
   Widget build(BuildContext context) {
     final value = _dragging ? _dragValue : widget.value;
     final dragPercent = (value * 100).round();
-    final dragChapter = (value * widget.totalChapters).ceil().clamp(1, widget.totalChapters);
+    final dragChapter = widget.totalChapters > 0
+        ? (value * widget.totalChapters).ceil().clamp(1, widget.totalChapters)
+        : 1;
     final moved = _dragging && (value - _preDragValue).abs() > 0.005;
     final chapterTitle = widget.chapterTitleAt?.call(dragChapter - 1) ?? '';
 

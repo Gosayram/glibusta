@@ -1816,7 +1816,7 @@ fn flush_rich_span(
     href: &Option<String>,
 ) {
     let text = std::mem::take(span_text);
-    if text.trim().is_empty() {
+    if text.is_empty() {
         return;
     }
     spans.push(RichSpan {

@@ -657,7 +657,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _closeReader() {
     _ctrl.saveProgress();
     _ctrl.saveCheckpoint();
-    GoRouter.of(context).go('/library');
+    if (mounted) GoRouter.of(context).go('/library');
   }
 
   @override

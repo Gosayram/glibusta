@@ -152,7 +152,8 @@ class ReadingStatsScreen extends ConsumerWidget {
               favGenresAsync.when(
                 data: (genres) {
                   if (genres.isEmpty) return const SizedBox.shrink();
-                  final maxCount = genres.first.value;
+                  final maxCount = genres.fold<int>(0, (max, e) => e.value > max ? e.value : max);
+                  if (maxCount == 0) return const SizedBox.shrink();
                   return Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),

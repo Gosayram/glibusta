@@ -106,7 +106,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/',
         name: 'home',
         redirect: (_, state) {
-          if (state.uri.path == '/') return '/library';
+          if (state.uri.path == '/') {
+            final query = state.uri.query;
+            return query.isNotEmpty ? '/library?$query' : '/library';
+          }
           return null;
         },
       ),

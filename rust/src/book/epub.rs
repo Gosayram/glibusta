@@ -196,7 +196,7 @@ pub fn parse_epub(bytes: &[u8], forced_encoding: Option<&str>) -> Result<Normali
         .with_context(|| format!("OPF file not found: {}", opf_path))?;
     let opf_text = decode_epub_xml(&opf_bytes, forced_encoding);
 
-    let opf_dir = opf_path.rsplit('/').nth(1).unwrap_or("");
+    let opf_dir = opf_path.rsplit_once('/').map_or("", |(dir, _)| dir);
 
     let (metadata, manifest_items, spine_ids, ncx_id) = parse_opf(&opf_text)?;
     let guide_references = parse_opf_guide(&opf_text);

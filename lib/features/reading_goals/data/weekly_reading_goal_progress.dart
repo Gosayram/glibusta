@@ -16,7 +16,7 @@ final class WeeklyReadingGoalProgress {
 
   bool get isComplete => completedMinutes >= targetMinutes;
 
-  double get completion => (completedMinutes / targetMinutes).clamp(0.0, 1.0);
+  double get completion => targetMinutes <= 0 ? 0.0 : (completedMinutes / targetMinutes).clamp(0.0, 1.0);
 }
 
 /// Calculates the current local calendar week's target from a daily goal.

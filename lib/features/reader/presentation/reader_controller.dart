@@ -732,11 +732,12 @@ final class ReaderController {
     if (nextIndex >= _state.chapterCount) return;
     if (loaded.containsKey(nextIndex)) return;
 
+    final generation = _loadGeneration;
     _isLoadingNextChapter = true;
     try {
       final service = _ref.read(bookOpenServiceProvider);
       final chapter = await service.loadChapter(_bookId, nextIndex);
-      if (_disposed || chapter == null) return;
+      if (_disposed || generation != _loadGeneration || chapter == null) return;
       final merged = Map<int, ReaderChapter>.from(_state.loadedChapters);
       merged[nextIndex] = chapter;
       _updateState(_state.copyWith(loadedChapters: merged));
@@ -777,20 +778,24 @@ final class ReaderController {
     _autoScrollTimer?.cancel();
     var lastTick = DateTime.now();
     _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (_disposed || _scrollController == null || !_scrollController!.hasClients) {
+      try {
+        if (_disposed || _scrollController == null || !_scrollController!.hasClients) {
+          stopAutoScroll();
+          return;
+        }
+        final now = DateTime.now();
+        final dt = now.difference(lastTick).inMicroseconds / 1000000.0;
+        lastTick = now;
+        final current = _scrollController!.offset;
+        final max = _scrollController!.position.maxScrollExtent;
+        if (current >= max) {
+          stopAutoScroll();
+          return;
+        }
+        unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * dt));
+      } on Object {
         stopAutoScroll();
-        return;
       }
-      final now = DateTime.now();
-      final dt = now.difference(lastTick).inMicroseconds / 1000000.0;
-      lastTick = now;
-      final current = _scrollController!.offset;
-      final max = _scrollController!.position.maxScrollExtent;
-      if (current >= max) {
-        stopAutoScroll();
-        return;
-      }
-      unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * dt));
     });
   }
 
@@ -1274,6 +1279,8 @@ final class ReaderController {
           if (newPara < 0) newPara = 0;
         }
       }
+    } else {
+      newPara = newPara.clamp(0, 0);
     }
 
     if (newCh != ch) {

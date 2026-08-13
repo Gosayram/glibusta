@@ -51,8 +51,12 @@ Future<PdfTextAvailability> detectPdfTextAvailability(
   Iterable<Future<String> Function()> pageTextLoaders,
 ) async {
   for (final loadText in pageTextLoaders.take(pdfTextAvailabilitySamplePageLimit)) {
-    if ((await loadText()).trim().isNotEmpty) {
-      return PdfTextAvailability.available;
+    try {
+      if ((await loadText()).trim().isNotEmpty) {
+        return PdfTextAvailability.available;
+      }
+    } on Object {
+      // Skip malformed page, continue checking others
     }
   }
   return PdfTextAvailability.unavailable;

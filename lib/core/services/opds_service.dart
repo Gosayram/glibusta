@@ -93,7 +93,11 @@ class OpdsService {
           : null,
     );
 
-    final xmlStr = response.data.toString();
+    final data = response.data;
+    if (data == null || data.toString().isEmpty) {
+      throw StateError('Empty OPDS response from $url');
+    }
+    final xmlStr = data.toString();
     final doc = XmlDocument.parse(xmlStr);
     final entries = <OpdsEntry>[];
 
@@ -154,7 +158,8 @@ class OpdsService {
     String? username,
     String? password,
   }) async {
-    final searchUrl = '$catalogUrl?search=${Uri.encodeComponent(query)}';
+    final separator = catalogUrl.contains('?') ? '&' : '?';
+    final searchUrl = '$catalogUrl${separator}search=${Uri.encodeComponent(query)}';
     return fetchFeed(searchUrl, username: username, password: password);
   }
 }

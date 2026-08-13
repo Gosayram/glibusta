@@ -172,6 +172,7 @@ class _TableOfContentsContentState extends ConsumerState<_TableOfContentsContent
         targetOffset.clamp(0.0, position.maxScrollExtent),
       );
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         final currentChapterContext = _currentChapterKey.currentContext;
         if (currentChapterContext == null) return;
         unawaited(Scrollable.ensureVisible(currentChapterContext, alignment: 0.5));

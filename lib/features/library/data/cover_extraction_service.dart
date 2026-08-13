@@ -173,18 +173,21 @@ class CoverExtractionService {
       (ArchiveFile f) => f.name == 'META-INF/container.xml',
     );
     if (containerFile != null) {
-      final containerDoc = XmlDocument.parse(
-        String.fromCharCodes(containerFile.content as List<int>),
-      );
-      final rootFilePath = containerDoc
-          .findAllElements('rootfile')
-          .firstOrNull
-          ?.getAttribute('full-path');
-      if (rootFilePath != null) {
-        return archive.files.firstWhereOrNull(
-          (ArchiveFile f) => f.name == rootFilePath,
+      try {
+        final content = containerFile.content;
+        final containerDoc = XmlDocument.parse(
+          String.fromCharCodes(content as List<int>),
         );
-      }
+        final rootFilePath = containerDoc
+            .findAllElements('rootfile')
+            .firstOrNull
+            ?.getAttribute('full-path');
+        if (rootFilePath != null) {
+          return archive.files.firstWhereOrNull(
+            (ArchiveFile f) => f.name == rootFilePath,
+          );
+        }
+      } on Object catch (_) {}
     }
     // Fallback: find any .opf file
     return archive.files.firstWhereOrNull(
@@ -233,6 +236,7 @@ class CoverExtractionService {
 
     final jpg = img.encodeJpg(resized, quality: 82);
     final coversDir = await _storage.coversDir();
+    await coversDir.create(recursive: true);
     final file = File('${coversDir.path}/$bookId.jpg');
     await file.writeAsBytes(jpg, flush: true);
     return file.path;

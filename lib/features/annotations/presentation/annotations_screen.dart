@@ -69,9 +69,8 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
         _bookmarks.addAll(page.bookmarks);
         _notes.addAll(page.notes);
         _quotes.addAll(page.quotes);
-        if (page.bookmarks.length < _pageSize &&
-            page.notes.length < _pageSize &&
-            page.quotes.length < _pageSize) {
+        final totalReturned = page.bookmarks.length + page.notes.length + page.quotes.length;
+        if (totalReturned < _pageSize) {
           _hasMore = false;
         }
         _initialLoading = false;

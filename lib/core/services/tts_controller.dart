@@ -86,9 +86,9 @@ class TtsController {
     if (rate != null) _lastRate = rate;
     await _tts.setLanguage(_lastLang);
     await _tts.setSpeechRate(_lastRate);
+    await _tts.speak(text);
     _isPlaying = true;
     _isPaused = false;
-    await _tts.speak(text);
   }
 
   /// Pauses the current utterance when the platform supports it.

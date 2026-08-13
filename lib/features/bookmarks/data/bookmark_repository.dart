@@ -126,10 +126,14 @@ class BookmarkRepository {
         .map(
           (b) => {
             'id': b.id,
+            'bookId': b.bookId,
             'chapterIndex': b.chapterIndex,
             'paragraphIndex': b.paragraphIndex,
+            'localOffset': b.localOffset,
             'selectedText': b.selectedText,
             'note': b.note,
+            'highlightStyle': b.highlightStyle,
+            'highlightColor': b.highlightColor,
             'createdAt': b.createdAt.toIso8601String(),
           },
         )

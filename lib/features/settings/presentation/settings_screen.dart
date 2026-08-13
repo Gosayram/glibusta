@@ -302,7 +302,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!context.mounted) return;
 
       unawaited(SmartDialog.showToast('Данные экспортированы'));
-    } on Exception catch (e) {
+    } on Object catch (e) {
       if (!context.mounted) return;
       unawaited(SmartDialog.showToast('Ошибка экспорта: $e'));
     }

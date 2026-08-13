@@ -10,14 +10,26 @@ class BookmarkDao extends DatabaseAccessor<AppDatabase> with _$BookmarkDaoMixin 
   BookmarkDao(super.attachedDatabase);
 
   Future<List<Bookmark>> getBookmarksForBook(String bookId) async =>
-      (select(bookmarks)..where((t) => t.bookId.equals(bookId))).get();
+      (select(bookmarks)
+            ..where((t) => t.bookId.equals(bookId))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ).get();
 
   Stream<List<Bookmark>> watchBookmarksForBook(String bookId) =>
-      (select(bookmarks)..where((t) => t.bookId.equals(bookId))).watch();
+      (select(bookmarks)
+            ..where((t) => t.bookId.equals(bookId))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ).watch();
 
   Future<List<Quote>> getQuotesForBook(String bookId) async =>
-      (select(quotes)..where((t) => t.bookId.equals(bookId))).get();
+      (select(quotes)
+            ..where((t) => t.bookId.equals(bookId))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ).get();
 
   Stream<List<Quote>> watchQuotesForBook(String bookId) =>
-      (select(quotes)..where((t) => t.bookId.equals(bookId))).watch();
+      (select(quotes)
+            ..where((t) => t.bookId.equals(bookId))
+            ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ).watch();
 }

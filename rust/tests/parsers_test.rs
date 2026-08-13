@@ -1235,6 +1235,7 @@ fn test_normalized_book_json_roundtrip() {
             }],
         }],
         metadata: None,
+        metadata_json: None,
         book_format: BookFormat::Fb2,
         language: Some("ru".into()),
         warnings: vec![],

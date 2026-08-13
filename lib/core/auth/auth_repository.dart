@@ -227,9 +227,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     final secureStorage = ref.read(flutterSecureStorageProvider);
     final cookiesRaw = await secureStorage.read(key: _kSessionCookiesKey);
     final cookies = cookiesRaw != null && cookiesRaw.isNotEmpty
-        ? Map<String, String>.from(
-            Uri.splitQueryString(cookiesRaw).map((k, v) => MapEntry(k, Uri.decodeComponent(v))),
-          )
+        ? Map<String, String>.from(Uri.splitQueryString(cookiesRaw))
         : <String, String>{};
     if (cookies.isEmpty) {
       return const AuthStateData();
@@ -286,7 +284,7 @@ class AuthStateNotifier extends _$AuthStateNotifier {
       await prefs.remove(_kSessionNameKey);
       await prefs.remove(_kSessionMailKey);
       final secureStorage = ref.read(flutterSecureStorageProvider);
-      await secureStorage.deleteAll();
+      await secureStorage.delete(key: _kSessionCookiesKey);
     } on Object catch (_) {}
     state = const AsyncValue.data(AuthStateData());
   }
