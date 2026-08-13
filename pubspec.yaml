@@ -80,7 +80,7 @@ dependencies:
 
   # Analytics & Monitoring
   shared_preferences: ^2.5.5
-  flutter_secure_storage: ^10.3.1
+  flutter_secure_storage: ^11.0.0
   share_plus: ^13.2.0
   native_dio_adapter: ^1.6.0
   flutter_local_notifications: ^22.0.1
