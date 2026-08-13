@@ -1397,30 +1397,27 @@ fn parse_css_rules(css: &str) -> HashMap<String, HashMap<String, String>> {
         }
 
         // Filter selector: class selectors and simple tag selectors only
-        let selector = if selector.starts_with('.') {
-            selector
-        } else if !selector.contains(' ') && !selector.contains(':') {
-            let tag = selector.trim();
-            if !tag.is_empty() {
-                selector
-            } else {
-                continue;
-            }
-        } else {
-            continue;
-        };
-        if !selector.is_empty() {
-            let props = rules.entry(selector.to_string()).or_default();
-            for prop in body.split(';') {
-                let prop = prop.trim();
-                if let Some(colon) = prop.find(':') {
-                    let name = prop[..colon].trim().to_string();
-                    let value = prop[colon + 1..].trim().to_string();
-                    if !name.is_empty() && !value.is_empty() {
-                        props.insert(name, value);
+        // Handle comma-separated selectors (e.g. "h1, h2, h3 { ... }")
+        let mut dominated = false;
+        for sel in selector.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            let valid = sel.starts_with('.') || (!sel.contains(' ') && !sel.contains(':'));
+            if valid {
+                let props = rules.entry(sel.to_string()).or_default();
+                for prop in body.split(';') {
+                    let prop = prop.trim();
+                    if let Some(colon) = prop.find(':') {
+                        let name = prop[..colon].trim().to_string();
+                        let value = prop[colon + 1..].trim().to_string();
+                        if !name.is_empty() && !value.is_empty() {
+                            props.insert(name, value);
+                        }
                     }
                 }
+                dominated = true;
             }
+        }
+        if !dominated {
+            continue;
         }
     }
     rules

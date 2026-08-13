@@ -329,7 +329,6 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
   }
 
   Future<void> _addBookmark(BuildContext context) async {
-    if (_selectedText == null || _selectedText!.isEmpty) return;
     final db = ref.read(databaseProvider);
     try {
       await db
@@ -486,7 +485,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
           }
         }
       }
-      widget.onDismiss();
+      if (mounted) widget.onDismiss();
     } finally {
       textController.dispose();
     }
@@ -573,7 +572,7 @@ class _ReaderSelectionToolbarState extends ConsumerState<ReaderSelectionToolbar>
           }
         }
       }
-      widget.onDismiss();
+      if (mounted) widget.onDismiss();
     } finally {
       noteController.dispose();
     }
