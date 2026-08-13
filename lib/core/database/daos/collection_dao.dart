@@ -38,9 +38,9 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
 
   Future<void> addBookToCollection(String bookId, String collectionId) {
     return attachedDatabase.transaction(() async {
-      final exists = await (select(collections)
-            ..where((t) => t.id.equals(collectionId))
-          ).getSingleOrNull();
+      final exists = await (select(
+        collections,
+      )..where((t) => t.id.equals(collectionId))).getSingleOrNull();
       if (exists == null) return;
       await into(bookCollections).insertOnConflictUpdate(
         BookCollectionsCompanion.insert(
@@ -75,14 +75,16 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
   }
 
   Future<List<SavedBook>> getBooksInCollection(String collectionId) async {
-    final bcRows = await (select(bookCollections)
-          ..where((t) => t.collectionId.equals(collectionId))
-          ..orderBy([(t) => OrderingTerm.asc(t.addedAt)])
-        ).get();
+    final bcRows =
+        await (select(bookCollections)
+              ..where((t) => t.collectionId.equals(collectionId))
+              ..orderBy([(t) => OrderingTerm.asc(t.addedAt)]))
+            .get();
     if (bcRows.isEmpty) return [];
     final bookIds = bcRows.map((r) => r.bookId).toList();
     return (select(savedBooks)..where(
-      (t) => t.id.isIn(bookIds) & t.deletedAt.isNull(),
-    )).get();
+          (t) => t.id.isIn(bookIds) & t.deletedAt.isNull(),
+        ))
+        .get();
   }
 }

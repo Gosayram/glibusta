@@ -53,7 +53,8 @@ class DownloadListener {
       for (final task in stale) {
         final path = task.targetPath;
         final fileExists = path != null && await File(path).exists();
-        final looksComplete = fileExists &&
+        final looksComplete =
+            fileExists &&
             task.totalBytes != null &&
             task.totalBytes! > 0 &&
             task.downloadedBytes != null &&

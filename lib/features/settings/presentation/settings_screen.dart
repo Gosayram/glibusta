@@ -296,7 +296,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         );
       } finally {
-        try { await tempFile.delete(); } on Object catch (_) {}
+        try {
+          await tempFile.delete();
+        } on Object catch (_) {}
       }
 
       if (!context.mounted) return;

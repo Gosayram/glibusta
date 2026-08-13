@@ -87,7 +87,8 @@ class OpdsService {
       options: username != null
           ? Options(
               headers: {
-                'Authorization': 'Basic ${base64Encode(utf8.encode('$username:${password ?? ''}'))}',
+                'Authorization':
+                    'Basic ${base64Encode(utf8.encode('$username:${password ?? ''}'))}',
               },
             )
           : null,

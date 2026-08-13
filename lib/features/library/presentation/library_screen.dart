@@ -1309,11 +1309,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       if (_openingBookId == item.book.id) return;
                       _openingBookId = item.book.id;
                       unawaited(
-                        context.push('/reader/${item.book.id}').then((_) {
-                          if (mounted) _openingBookId = null;
-                        }).catchError((_) {
-                          if (mounted) _openingBookId = null;
-                        }),
+                        context
+                            .push('/reader/${item.book.id}')
+                            .then((_) {
+                              if (mounted) _openingBookId = null;
+                            })
+                            .catchError((_) {
+                              if (mounted) _openingBookId = null;
+                            }),
                       );
                     },
                   );
@@ -1371,11 +1374,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               if (_openingBookId == book.id) return;
                               _openingBookId = book.id;
                               unawaited(
-                                context.push('/reader/${book.id}').then((_) {
-                                  if (mounted) _openingBookId = null;
-                                }).catchError((_) {
-                                  if (mounted) _openingBookId = null;
-                                }),
+                                context
+                                    .push('/reader/${book.id}')
+                                    .then((_) {
+                                      if (mounted) _openingBookId = null;
+                                    })
+                                    .catchError((_) {
+                                      if (mounted) _openingBookId = null;
+                                    }),
                               );
                             },
                       onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
@@ -1457,11 +1463,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         if (_openingBookId == books[index].id) return;
                         _openingBookId = books[index].id;
                         unawaited(
-                          context.push('/reader/${books[index].id}').then((_) {
-                            if (mounted) _openingBookId = null;
-                          }).catchError((_) {
-                            if (mounted) _openingBookId = null;
-                          }),
+                          context
+                              .push('/reader/${books[index].id}')
+                              .then((_) {
+                                if (mounted) _openingBookId = null;
+                              })
+                              .catchError((_) {
+                                if (mounted) _openingBookId = null;
+                              }),
                         );
                       },
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),
@@ -1502,12 +1511,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         : () {
                             if (_openingBookId == book.id) return;
                             _openingBookId = book.id;
-                        unawaited(
-                          context.push('/reader/${books[index].id}').then((_) {
-                            if (mounted) _openingBookId = null;
-                          }).catchError((_) {
-                            if (mounted) _openingBookId = null;
-                          }),
+                            unawaited(
+                              context
+                                  .push('/reader/${books[index].id}')
+                                  .then((_) {
+                                    if (mounted) _openingBookId = null;
+                                  })
+                                  .catchError((_) {
+                                    if (mounted) _openingBookId = null;
+                                  }),
                             );
                           },
                     onLongPress: _selectionMode ? null : () => _enterSelectionMode(book.id),
@@ -1540,11 +1552,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         if (_openingBookId == books[index].id) return;
                         _openingBookId = books[index].id;
                         unawaited(
-                          context.push('/reader/${books[index].id}').then((_) {
-                            if (mounted) _openingBookId = null;
-                          }).catchError((_) {
-                            if (mounted) _openingBookId = null;
-                          }),
+                          context
+                              .push('/reader/${books[index].id}')
+                              .then((_) {
+                                if (mounted) _openingBookId = null;
+                              })
+                              .catchError((_) {
+                                if (mounted) _openingBookId = null;
+                              }),
                         );
                       },
                 onLongPress: _selectionMode ? null : () => _enterSelectionMode(books[index].id),

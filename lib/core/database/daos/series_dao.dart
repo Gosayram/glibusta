@@ -36,8 +36,7 @@ class SeriesDao extends DatabaseAccessor<AppDatabase> with _$SeriesDaoMixin {
     });
   }
 
-  Future<int> removeBookFromSeries(String bookId, String seriesId) =>
-      (delete(bookSeries)
-            ..where((t) => t.bookId.equals(bookId) & t.seriesId.equals(seriesId)))
-          .go();
+  Future<int> removeBookFromSeries(String bookId, String seriesId) => (delete(
+    bookSeries,
+  )..where((t) => t.bookId.equals(bookId) & t.seriesId.equals(seriesId))).go();
 }

@@ -49,8 +49,9 @@ class _SessionStartNotifier extends Notifier<DateTime?> {
   void endSession() => state = null;
 }
 
-final currentSessionStartProvider =
-    NotifierProvider<_SessionStartNotifier, DateTime?>(_SessionStartNotifier.new);
+final currentSessionStartProvider = NotifierProvider<_SessionStartNotifier, DateTime?>(
+  _SessionStartNotifier.new,
+);
 
 final sessionTimerProvider = StreamProvider.autoDispose<DateTime>((ref) {
   return Stream<DateTime>.periodic(const Duration(minutes: 1), (_) => DateTime.now());

@@ -39,9 +39,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     final lower = '%$query%';
     return (select(savedBooks)
           ..where(
-            (t) =>
-                (t.title.like(lower) | t.description.like(lower)) &
-                t.deletedAt.isNull(),
+            (t) => (t.title.like(lower) | t.description.like(lower)) & t.deletedAt.isNull(),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)]))
         .get();

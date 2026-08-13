@@ -840,7 +840,12 @@ class _GoalCard extends ConsumerWidget {
                   children: [
                     Icon(Icons.flag_outlined, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 12),
-                    Expanded(child: Text('Установить цель чтения', style: Theme.of(context).textTheme.titleSmall)),
+                    Expanded(
+                      child: Text(
+                        'Установить цель чтения',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
                   ],
                 ),
               ),

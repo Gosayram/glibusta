@@ -95,13 +95,19 @@ class BackupService {
     try {
       final parsed = jsonDecode(json) as Map<String, dynamic>;
 
-      final progressList = (parsed['readingProgress'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final bookmarksList = (parsed['bookmarks'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final notesList = (parsed['notes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final quotesList = (parsed['quotes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final collectionsList = (parsed['collections'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final highlightsList = (parsed['textHighlights'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-      final pinnedIds = (parsed['pinnedBooks'] as List?)?.cast<String>() ?? [];
+      final progressList =
+          (parsed['readingProgress'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final bookmarksList =
+          (parsed['bookmarks'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final notesList =
+          (parsed['notes'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final quotesList =
+          (parsed['quotes'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final collectionsList =
+          (parsed['collections'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final highlightsList =
+          (parsed['textHighlights'] as List?)?.whereType<Map<String, dynamic>>().toList() ?? [];
+      final pinnedIds = (parsed['pinnedBooks'] as List?)?.whereType<String>().toList() ?? [];
       final goalMap = parsed['readingGoal'] as Map<String, dynamic>?;
       final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
 
@@ -134,21 +140,22 @@ class BackupService {
         // ponytail: bookCollections junction table is not exported, rebuild
         // from collections.bookIds so getBooksInCollection/getCollectionsForBook
         // return correct results after import.
-        b.deleteAll(db.bookCollections);
-        for (final collectionMap in collectionsList) {
-          final collectionId = collectionMap['id'] as String;
-          final bookIds = collectionMap['bookIds'] is String
-              ? _safeDecodeBookIds(collectionMap['bookIds'] as String)
-              : (collectionMap['bookIds'] as List<dynamic>?)?.cast<String>() ??
-                  <String>[];
-          for (final bookId in bookIds) {
-            b.insert(
-              db.bookCollections,
-              BookCollectionsCompanion.insert(
-                bookId: bookId,
-                collectionId: collectionId,
-              ),
-            );
+        if (collectionsList.isNotEmpty) {
+          b.deleteAll(db.bookCollections);
+          for (final collectionMap in collectionsList) {
+            final collectionId = collectionMap['id'] as String;
+            final bookIds = collectionMap['bookIds'] is String
+                ? _safeDecodeBookIds(collectionMap['bookIds'] as String)
+                : (collectionMap['bookIds'] as List<dynamic>?)?.cast<String>() ?? <String>[];
+            for (final bookId in bookIds) {
+              b.insert(
+                db.bookCollections,
+                BookCollectionsCompanion.insert(
+                  bookId: bookId,
+                  collectionId: collectionId,
+                ),
+              );
+            }
           }
         }
       });
@@ -161,7 +168,10 @@ class BackupService {
         await prefs.setStringList(_pinnedBooksKey, pinnedIds);
       }
       if (goalMap != null) {
-        await prefs.setInt(_readingGoalMinutesKey, (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30);
+        await prefs.setInt(
+          _readingGoalMinutesKey,
+          (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30,
+        );
         final goalEnabled = goalMap['isEnabled'] is bool
             ? goalMap['isEnabled'] as bool
             : (goalMap['isEnabled']?.toString() == 'true');
@@ -240,8 +250,8 @@ class BackupService {
 
   ReadingProgressCompanion _progressFromMap(Map<String, dynamic> map) {
     final updatedAt = map['updatedAt'] != null
-        ? DateTime.parse(map['updatedAt'] as String)
-        : (map['lastRead'] != null ? DateTime.parse(map['lastRead'] as String) : DateTime.now());
+        ? DateTime.parse(map['updatedAt'].toString())
+        : (map['lastRead'] != null ? DateTime.parse(map['lastRead'].toString()) : DateTime.now());
     return ReadingProgressCompanion.insert(
       bookId: map['bookId'] as String,
       currentPosition: Value((map['currentPosition'] as num?)?.toInt() ?? 0),

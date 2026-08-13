@@ -41,10 +41,7 @@ class HighlightDao extends DatabaseAccessor<AppDatabase> with _$HighlightDaoMixi
     String query,
   ) async {
     // ponytail: escape LIKE meta-characters so "100%" doesn't match "1000"
-    final escaped = query
-        .replaceAll(r'\', r'\\')
-        .replaceAll('%', r'\%')
-        .replaceAll('_', r'\_');
+    final escaped = query.replaceAll(r'\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_');
     final pattern = '%$escaped%';
     return (select(textHighlights)
           ..where(
