@@ -111,36 +111,47 @@ class BackupService {
       final goalMap = parsed['readingGoal'] as Map<String, dynamic>?;
       final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
 
-      await db.batch((b) {
-        if (progressList.isNotEmpty) {
+      // ponytail: per-table batches for fault isolation — one bad row
+      // in bookmarks doesn't wipe reading progress.
+      if (progressList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.readingProgress);
           b.insertAll(db.readingProgress, progressList.map(_progressFromMap));
-        }
-        if (bookmarksList.isNotEmpty) {
+        });
+      }
+      if (bookmarksList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.bookmarks);
           b.insertAll(db.bookmarks, bookmarksList.map(_bookmarkFromMap));
-        }
-        if (notesList.isNotEmpty) {
+        });
+      }
+      if (notesList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.notes);
           b.insertAll(db.notes, notesList.map(_noteFromMap));
-        }
-        if (quotesList.isNotEmpty) {
+        });
+      }
+      if (quotesList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.quotes);
           b.insertAll(db.quotes, quotesList.map(_quoteFromMap));
-        }
-        if (collectionsList.isNotEmpty) {
+        });
+      }
+      if (collectionsList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.collections);
           b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
-        }
-        if (highlightsList.isNotEmpty) {
+        });
+      }
+      if (highlightsList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.textHighlights);
           b.insertAll(db.textHighlights, highlightsList.map(_highlightFromMap));
-        }
-
-        // ponytail: bookCollections junction table is not exported, rebuild
-        // from collections.bookIds so getBooksInCollection/getCollectionsForBook
-        // return correct results after import.
-        if (collectionsList.isNotEmpty) {
+        });
+      }
+      // Rebuild bookCollections junction from collections.bookIds
+      if (collectionsList.isNotEmpty) {
+        await db.batch((b) {
           b.deleteAll(db.bookCollections);
           for (final collectionMap in collectionsList) {
             final collectionId = collectionMap['id'] as String;
@@ -157,25 +168,31 @@ class BackupService {
               );
             }
           }
-        }
-      });
+        });
+      }
 
-      final prefs = await SharedPreferences.getInstance();
-      if (settingsMap.isNotEmpty) {
-        await prefs.setString(_settingsKey, jsonEncode(settingsMap));
-      }
-      if (parsed.containsKey('pinnedBooks')) {
-        await prefs.setStringList(_pinnedBooksKey, pinnedIds);
-      }
-      if (goalMap != null) {
-        await prefs.setInt(
-          _readingGoalMinutesKey,
-          (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30,
-        );
-        final goalEnabled = goalMap['isEnabled'] is bool
-            ? goalMap['isEnabled'] as bool
-            : (goalMap['isEnabled']?.toString() == 'true');
-        await prefs.setBool(_readingGoalEnabledKey, goalEnabled);
+      // ponytail: prefs writes are non-fatal after DB commit.
+      // Wrap in try-catch so a prefs failure doesn't masquerade as import failure.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (settingsMap.isNotEmpty) {
+          await prefs.setString(_settingsKey, jsonEncode(settingsMap));
+        }
+        if (parsed.containsKey('pinnedBooks')) {
+          await prefs.setStringList(_pinnedBooksKey, pinnedIds);
+        }
+        if (goalMap != null) {
+          await prefs.setInt(
+            _readingGoalMinutesKey,
+            (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30,
+          );
+          final goalEnabled = goalMap['isEnabled'] is bool
+              ? goalMap['isEnabled'] as bool
+              : (goalMap['isEnabled']?.toString() == 'true');
+          await prefs.setBool(_readingGoalEnabledKey, goalEnabled);
+        }
+      } on Object catch (e) {
+        _logger.warning('Prefs sync failed after DB import: $e', name: 'Backup');
       }
 
       _logger.info(

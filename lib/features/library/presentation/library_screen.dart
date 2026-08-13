@@ -76,11 +76,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _hasMore = true;
   String? _paginationError;
   int _loadGeneration = 0;
+  Timer? _searchDebounce;
 
   bool get _selectionMode => _selectedBookIds.isNotEmpty;
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -154,13 +156,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _invalidateAndReload(WidgetRef ref) {
-    ref.invalidate(libraryBooksProvider);
-    _resetPagination();
+    setState(() => _resetPagination());
+    unawaited(_loadNextPage());
   }
 
   @override
   Widget build(BuildContext context) {
-    final runningTasks = ref.watch(backgroundTaskProvider.notifier).running;
+    final hasRunningTasks = ref.watch(
+      backgroundTaskProvider.select(
+        (tasks) => tasks.any((t) => t.status == BackgroundTaskStatus.running),
+      ),
+    );
     final selectedCollectionId = _selectedCollectionId;
 
     if (_loadedBooks.isEmpty && !_isLoadingMore && _paginationError == null) {
@@ -171,7 +177,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       appBar: _selectionMode ? _buildSelectionAppBar(ref) : _buildNormalAppBar(ref),
       body: Column(
         children: [
-          if (runningTasks.isNotEmpty)
+          if (hasRunningTasks)
             Material(
               color: Theme.of(context).colorScheme.primaryContainer,
               child: SizedBox(
@@ -305,11 +311,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 border: InputBorder.none,
               ),
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                  _resetPagination();
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                  if (!mounted) return;
+                  setState(() {
+                    _searchQuery = value;
+                    _resetPagination();
+                  });
+                  unawaited(_loadNextPage());
                 });
-                unawaited(_loadNextPage());
               },
             )
           : const Text('Библиотека'),
@@ -614,7 +624,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final ids = _selectedBookIds.toList();
     _exitSelectionMode();
     for (final id in ids) {
-      await service.removeFromLibrary(id);
+      try {
+        await service.removeFromLibrary(id);
+      } on Object catch (e) {
+        AppLogger().warning('Delete failed: $e', name: 'Library', error: e);
+      }
     }
     _invalidateAndReload(ref);
     if (context.mounted) {
@@ -636,12 +650,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           content: Text('$count ${_pluralBooks(count)} удалено'),
           action: SnackBarAction(
             label: 'Отменить',
-            onPressed: () async {
+            onPressed: () {
               final service = ref.read(bookDeleteServiceProvider);
-              for (final id in bookIds) {
-                await service.restoreFromTrash(id);
-              }
-              _invalidateAndReload(ref);
+              unawaited(
+                Future(() async {
+                  for (final id in bookIds) {
+                    try {
+                      await service.restoreFromTrash(id);
+                    } on Object catch (e) {
+                      AppLogger().warning('Restore failed: $e', name: 'Library', error: e);
+                    }
+                  }
+                  if (!context.mounted) return;
+                  _invalidateAndReload(ref);
+                }),
+              );
             },
           ),
           duration: const Duration(seconds: 10),

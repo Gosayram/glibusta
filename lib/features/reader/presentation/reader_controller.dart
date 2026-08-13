@@ -272,7 +272,7 @@ final class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
-    _ref.read(rsp.currentSessionStartProvider.notifier).endSession();
+    _ref.container.read(rsp.currentSessionStartProvider.notifier).endSession();
     _loadGeneration++;
     _settingsSub?.close();
     _linkHistory.clear();
@@ -309,7 +309,7 @@ final class ReaderController {
     _accumulatedSeconds = 0;
     _sessionStopwatch.reset();
     if (totalSeconds > 0 && !_disposed) {
-      final db = _ref.read(databaseProvider);
+      final db = _ref.container.read(databaseProvider);
       final now = DateTime.now();
       unawaited(
         db.readingTimeDao
@@ -337,7 +337,7 @@ final class ReaderController {
     if (_accumulatedPages <= 0 || _disposed) return;
     final pages = _accumulatedPages;
     _accumulatedPages = 0;
-    final db = _ref.read(databaseProvider);
+    final db = _ref.container.read(databaseProvider);
     unawaited(
       db.readingTimeDao
           .addPagesRead(_bookId, DateTime.now(), pages)
@@ -391,7 +391,9 @@ final class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
-    _ref.read(rsp.currentSessionStartProvider.notifier).startSession();
+    unawaited(
+      Future.microtask(() => _ref.read(rsp.currentSessionStartProvider.notifier).startSession()),
+    );
     final loadGeneration = ++_loadGeneration;
     _chapterLoadGeneration++;
     _loaded = false;
@@ -1749,6 +1751,7 @@ final class ReaderController {
   );
 
   Future<void> _autoGenreFont(String bookId) async {
+    if (_disposed) return;
     final settings = _ref.read(readerSettingsProvider);
     if (settings.font != ReaderFont.literata) return; // user chose something else
     try {
