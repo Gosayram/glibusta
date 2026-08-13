@@ -109,11 +109,13 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     required String bookId,
     String? title,
     List<String>? authorIds,
+    List<String>? genreIds,
     String? description,
   }) {
     final companion = SavedBooksCompanion(
       title: title != null ? Value(title) : const Value.absent(),
       authorIds: authorIds != null ? Value(authorIds) : const Value.absent(),
+      genreIds: genreIds != null ? Value(genreIds) : const Value.absent(),
       description: description != null ? Value(description) : const Value.absent(),
     );
     return (update(savedBooks)..where((t) => t.id.equals(bookId))).write(companion);

@@ -1159,6 +1159,7 @@ fn find_manifest_item_by_href<'a>(
     manifest: &'a HashMap<String, ManifestItem>,
     href: &str,
 ) -> Option<&'a ManifestItem> {
+    let href = href.split('#').next().unwrap_or(href);
     manifest.values().find(|item| item.href == href)
 }
 
@@ -1415,6 +1416,15 @@ fn expand_media_queries(css: &str) -> String {
     let mut i = 0;
     let bytes = css.as_bytes();
     while i < bytes.len() {
+        // Skip CSS comments — they must not be parsed as real rules
+        if bytes[i] == b'/' && i + 1 < bytes.len() && bytes[i + 1] == b'*' {
+            if let Some(end) = css[i + 2..].find("*/") {
+                i = i + 2 + end + 2;
+            } else {
+                break;
+            }
+            continue;
+        }
         // Look for @media at start of a rule or after whitespace/newline
         if bytes[i] == b'@' {
             let rest = &css[i..];
@@ -1494,6 +1504,7 @@ fn extract_font_faces(text: &str) -> Vec<(String, String)> {
                                         let rest = &value[url_start + 4..];
                                         if let Some(url_end) = rest.find(')') {
                                             src = rest[..url_end]
+                                                .trim()
                                                 .trim_matches(|c| c == '\'' || c == '"')
                                                 .to_string();
                                         }
@@ -2347,7 +2358,7 @@ fn parse_xhtml_to_blocks(
                         in_block = false;
                         block_type = BlockType::Paragraph;
                     }
-                    b"p" | b"pre" if in_block && block_type == BlockType::Paragraph => {
+                    b"p" | b"pre" if in_block && matches!(block_type, BlockType::Paragraph | BlockType::Quote) => {
                         flush_rich_span(
                             &mut rich_spans,
                             &mut span_text,
@@ -2360,8 +2371,15 @@ fn parse_xhtml_to_blocks(
                         let rich = if rich_spans.is_empty() {
                             None
                         } else {
-                            // If we only have one span that covers all text, flatten
-                            if rich_spans.len() == 1 && rich_spans[0].text == t {
+                            // Flatten only unstyled single spans — styled spans must
+                            // retain formatting (bold, italic, superscript, href).
+                            if rich_spans.len() == 1
+                                && rich_spans[0].text == t
+                                && !rich_spans[0].bold
+                                && !rich_spans[0].italic
+                                && !rich_spans[0].superscript
+                                && rich_spans[0].href.is_none()
+                            {
                                 None
                             } else {
                                 Some(rich_spans.clone())

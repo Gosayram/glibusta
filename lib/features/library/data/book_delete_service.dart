@@ -32,7 +32,11 @@ class BookDeleteService {
   Future<void> purgeTrash() async {
     final deletedBooks = await _db.bookDao.getDeletedBooks();
     for (final book in deletedBooks) {
-      await deleteBookCompletely(book.id);
+      try {
+        await deleteBookCompletely(book.id);
+      } on Object catch (e) {
+        _logger.warning('Failed to purge ${book.id}: $e', name: 'BookDelete', error: e);
+      }
     }
     _logger.info('Purged ${deletedBooks.length} books from trash', name: 'BookDelete');
   }

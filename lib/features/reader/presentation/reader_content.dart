@@ -2686,6 +2686,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     String settingsKey,
     TextScaler textScaler,
   ) {
+    _currentChapterForCss = chIdx;
     final cacheKey = '${chIdx}_$settingsKey';
     final cached = _chapterPageCache[cacheKey];
     if (cached != null) return cached;
@@ -3906,7 +3907,10 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
               child: GestureDetector(
                 onTap: _togglePlay,
                 onLongPress: () => _skip(-10),
-                onHorizontalDragEnd: (_) => _skip(0),
+                onHorizontalDragEnd: (details) {
+                  final dx = details.primaryVelocity ?? 0;
+                  _skip(dx < 0 ? 10 : -10);
+                },
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),

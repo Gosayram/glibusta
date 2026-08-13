@@ -775,18 +775,22 @@ final class ReaderController {
     if (_scrollController == null || !_scrollController!.hasClients) return;
     autoScrollEnabled.value = true;
     _autoScrollTimer?.cancel();
+    var lastTick = DateTime.now();
     _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       if (_disposed || _scrollController == null || !_scrollController!.hasClients) {
         stopAutoScroll();
         return;
       }
+      final now = DateTime.now();
+      final dt = now.difference(lastTick).inMicroseconds / 1000000.0;
+      lastTick = now;
       final current = _scrollController!.offset;
       final max = _scrollController!.position.maxScrollExtent;
       if (current >= max) {
         stopAutoScroll();
         return;
       }
-      unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * 0.016));
+      unawaited(_scrollController!.position.moveTo(current + autoScrollSpeed.value * dt));
     });
   }
 

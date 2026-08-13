@@ -117,7 +117,7 @@ class BookRepositoryImpl implements BookRepository {
   @override
   Future<Book?> getBookById(String id) async {
     final row = await _db.bookDao.getBookById(id);
-    if (row == null) return null;
+    if (row == null || row.deletedAt != null) return null;
     final books = await _resolveAuthors([row]);
     return books.first;
   }
@@ -145,6 +145,7 @@ class BookRepositoryImpl implements BookRepository {
       bookId: book.id,
       title: book.title,
       authorIds: book.authorIds,
+      genreIds: book.genreIds,
       description: book.description,
     );
   }
