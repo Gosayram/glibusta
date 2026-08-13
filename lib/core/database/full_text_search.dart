@@ -43,15 +43,17 @@ class FullTextSearchService {
     required String content,
   }) async {
     await _ensureFtsTable();
-    // Delete existing entry for this chapter before re-indexing
-    await _db.customStatement(
-      'DELETE FROM books_fts WHERE bookId = ? AND chapterIndex = ?',
-      [bookId, chapterIndex],
-    );
-    await _db.customStatement(
-      'INSERT INTO books_fts(bookId, chapterIndex, title, content) VALUES(?, ?, ?, ?)',
-      [bookId, chapterIndex, title, content],
-    );
+    // ponytail: wrap in transaction so concurrent search never sees a gap.
+    await _db.transaction(() async {
+      await _db.customStatement(
+        'DELETE FROM books_fts WHERE bookId = ? AND chapterIndex = ?',
+        [bookId, chapterIndex],
+      );
+      await _db.customStatement(
+        'INSERT INTO books_fts(bookId, chapterIndex, title, content) VALUES(?, ?, ?, ?)',
+        [bookId, chapterIndex, title, content],
+      );
+    });
   }
 
   /// Index all chapters for a book at once.
@@ -60,18 +62,21 @@ class FullTextSearchService {
     required List<BookChapterContent> chapters,
   }) async {
     await _ensureFtsTable();
-    // Delete all existing entries for this book
-    await _db.customStatement(
-      'DELETE FROM books_fts WHERE bookId = ?',
-      [bookId],
-    );
-    // Insert all chapters
-    for (final chapter in chapters) {
+    // ponytail: single transaction + batch — atomic and 1 fsync instead of N+1.
+    await _db.transaction(() async {
       await _db.customStatement(
-        'INSERT INTO books_fts(bookId, chapterIndex, title, content) VALUES(?, ?, ?, ?)',
-        [bookId, chapter.chapterIndex, chapter.title, chapter.content],
+        'DELETE FROM books_fts WHERE bookId = ?',
+        [bookId],
       );
-    }
+      await _db.batch((b) {
+        for (final chapter in chapters) {
+          b.customStatement(
+            'INSERT INTO books_fts(bookId, chapterIndex, title, content) VALUES(?, ?, ?, ?)',
+            [bookId, chapter.chapterIndex, chapter.title, chapter.content],
+          );
+        }
+      });
+    });
     _logger.info(
       'Indexed ${chapters.length} chapters for book $bookId',
       name: 'FTS',

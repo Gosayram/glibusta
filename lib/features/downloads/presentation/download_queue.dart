@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:glibusta/features/downloads/data/download_listener.dart' show DownloadListener;
@@ -218,6 +219,7 @@ class DownloadQueue {
     if (task == null) return;
 
     await _bgDownload.cancel(taskId);
+    await _tryDeleteFile(task.targetPath);
     await _repository.cancelDownload(taskId);
     _tasks[taskId] = task.copyWith(status: DownloadStatus.canceled);
     _bgDownload.removeTask(taskId);
@@ -225,7 +227,9 @@ class DownloadQueue {
   }
 
   Future<void> remove(String taskId) async {
+    final task = _tasks[taskId];
     await _bgDownload.cancel(taskId);
+    if (task != null) await _tryDeleteFile(task.targetPath);
     _tasks.remove(taskId);
     _bgDownload.removeTask(taskId);
     await _repository.removeDownload(taskId);
@@ -272,16 +276,22 @@ class DownloadQueue {
             'Book imported after download: ${result.title}',
             name: 'DownloadQueue',
           );
+          await _tryDeleteFile(task.targetPath);
         } else if (result.isDuplicate) {
           _logger.info(
             'Downloaded book is duplicate: ${result.title}',
             name: 'DownloadQueue',
           );
+          await _tryDeleteFile(task.targetPath);
         } else {
           _logger.warning(
             'Import failed after download: ${result.error}',
             name: 'DownloadQueue',
           );
+          await _tryDeleteFile(task.targetPath);
+          _tasks[taskId] = task.copyWith(status: DownloadStatus.failed);
+          await _repository.updateStatus(taskId, DownloadStatus.failed);
+          _emitUpdate();
         }
       } on Object catch (e) {
         _logger.warning(
@@ -329,6 +339,17 @@ class DownloadQueue {
     if (_disposed) return;
     _latestTasks = _tasks.values.toList();
     _downloadsController.add(_latestTasks);
+  }
+
+  // ponytail: best-effort cleanup — download files are disposable intermediates.
+  Future<void> _tryDeleteFile(String? path) async {
+    if (path == null) return;
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } on Object catch (e) {
+      _logger.warning('Could not delete $path: $e', name: 'DownloadQueue');
+    }
   }
 
   void dispose() {

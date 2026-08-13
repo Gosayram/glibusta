@@ -108,6 +108,13 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     await (delete(textHighlights)..where((t) => t.bookId.equals(id))).go();
     await (delete(readingTime)..where((t) => t.bookId.equals(id))).go();
     await (delete(bookCollections)..where((t) => t.bookId.equals(id))).go();
+    // ponytail: FTS table may not exist yet — guard with try/catch.
+    try {
+      await attachedDatabase.customStatement(
+        'DELETE FROM books_fts WHERE bookId = ?',
+        [id],
+      );
+    } on Object catch (_) {}
     return (delete(savedBooks)..where((t) => t.id.equals(id))).go();
   });
 
@@ -135,6 +142,15 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
       await (delete(textHighlights)..where((t) => t.bookId.isIn(deletedIds))).go();
       await (delete(readingTime)..where((t) => t.bookId.isIn(deletedIds))).go();
       await (delete(bookCollections)..where((t) => t.bookId.isIn(deletedIds))).go();
+      // ponytail: FTS table may not exist yet — guard with try/catch.
+      try {
+        for (final id in deletedIds) {
+          await attachedDatabase.customStatement(
+            'DELETE FROM books_fts WHERE bookId = ?',
+            [id],
+          );
+        }
+      } on Object catch (_) {}
       return (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
     });
   }

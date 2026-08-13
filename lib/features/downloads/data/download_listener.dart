@@ -53,12 +53,14 @@ class DownloadListener {
       for (final task in stale) {
         final path = task.targetPath;
         final fileExists = path != null && await File(path).exists();
+        // ponytail: measure actual file size, not estimated downloadedBytes
+        // which is progress*total rounded — can falsely report completion.
+        final actualSize = fileExists ? await File(path).length() : 0;
         final looksComplete =
             fileExists &&
             task.totalBytes != null &&
             task.totalBytes! > 0 &&
-            task.downloadedBytes != null &&
-            task.downloadedBytes! >= task.totalBytes!;
+            actualSize >= task.totalBytes!;
         if (looksComplete) {
           _logger.info(
             'Stale download file complete, completing: ${task.id}',

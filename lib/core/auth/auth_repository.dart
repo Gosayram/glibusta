@@ -282,6 +282,9 @@ class AuthStateNotifier extends _$AuthStateNotifier {
   }
 
   Future<void> logout() async {
+    // ponytail: flip state first so UI shows logout immediately, then
+    // best-effort the network call.
+    state = const AsyncValue.loading();
     try {
       await ref.read(authRepositoryProvider).logout();
     } on Object catch (e) {
@@ -346,6 +349,11 @@ class AuthStateNotifier extends _$AuthStateNotifier {
         ),
       );
       return true;
+    } on AuthException {
+      // ponytail: creds are invalid — purge to stop retry storms on every 401.
+      await _updateRememberedCredentials(name: '', password: '', persistent: false);
+      state = const AsyncValue.data(AuthStateData());
+      return false;
     } on Object catch (e) {
       AppLogger().warning('Auto-login failed: $e', name: 'Auth');
       state = const AsyncValue.data(AuthStateData());
@@ -354,6 +362,18 @@ class AuthStateNotifier extends _$AuthStateNotifier {
   }
 
   Future<void> _saveSession(UserSession session) async {
+    // ponytail: write cookies first, name last. Name is the commit pointer —
+    // if name write succeeds, cookies are guaranteed persisted. A partial
+    // failure degrades to logged-out instead of wrong-user session.
+    final secureStorage = ref.read(flutterSecureStorageProvider);
+    if (session.cookies.isEmpty) {
+      await secureStorage.delete(key: _kSessionCookiesKey);
+    } else {
+      final encoded = session.cookies.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kSessionNameKey, session.name);
     if (session.mail != null) {
@@ -361,15 +381,6 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     } else {
       await prefs.remove(_kSessionMailKey);
     }
-    final secureStorage = ref.read(flutterSecureStorageProvider);
-    if (session.cookies.isEmpty) {
-      await secureStorage.delete(key: _kSessionCookiesKey);
-      return;
-    }
-    final encoded = session.cookies.entries
-        .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
-        .join('&');
-    await secureStorage.write(key: _kSessionCookiesKey, value: encoded);
   }
 
   Future<void> _updateRememberedCredentials({

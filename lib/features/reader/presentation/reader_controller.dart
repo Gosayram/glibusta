@@ -683,7 +683,15 @@ final class ReaderController {
       // Chapter loading captures the current window before awaiting I/O.  Evict
       // again after that work completes so the captured, now-distant chapters
       // cannot be reintroduced after the eager eviction in [handlePageChanged].
-      final windowed = ReaderContentHelper.evictDistantChapters(centerIndex, updated);
+      // ponytail: use same continuous-mode eviction policy as the caller —
+      // the default narrow window would re-evict chapters that continuous
+      // mode intends to keep, causing reload thrash on back-scroll.
+      final isContinuous = effectiveMode == ReaderMode.continuous;
+      final windowed = ReaderContentHelper.evictDistantChapters(
+        centerIndex,
+        updated,
+        keepAllBefore: isContinuous,
+      );
       if (!identical(windowed, _state.loadedChapters)) {
         final evictedKeys = _state.loadedChapters.keys.where((k) => !windowed.containsKey(k));
         evictChapterImages(evictedKeys);
@@ -972,7 +980,9 @@ final class ReaderController {
     return ReaderPosition(
       bookId: _bookId,
       chapterIndex: chapterIndex,
-      paragraphIndex: chapterIndex == estimate.chapterIndex ? estimate.paragraphIndex : 0,
+      paragraphIndex: chapterIndex == estimate.chapterIndex
+          ? estimate.paragraphIndex
+          : _state.currentPosition.paragraphIndex,
       localOffset: progress * 100.0,
       progressPercent: progress,
       contentHash: _state.currentPosition.contentHash,
