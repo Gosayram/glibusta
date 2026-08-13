@@ -33,15 +33,19 @@ HERE = Path(__file__).resolve().parent.parent
 PYFTSUBSET = HERE / ".venv-tools" / "bin" / "pyftsubset"
 
 
-def subset_font(font_path: Path) -> int:
+def subset_font(font_path: Path) -> tuple[int, int]:
     orig_size = font_path.stat().st_size
     tmp = font_path.with_suffix(".subset.ttf")
-    subprocess.run(
-        [str(PYFTSUBSET), str(font_path), f"--unicodes={UNICODES}", f"--output-file={tmp}"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        subprocess.run(
+            [str(PYFTSUBSET), str(font_path), f"--unicodes={UNICODES}", f"--output-file={tmp}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR subsetting {font_path.name}: {e.stderr}", file=sys.stderr)
+        raise
     sub_size = tmp.stat().st_size
     tmp.replace(font_path)
     return orig_size, sub_size

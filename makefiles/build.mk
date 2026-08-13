@@ -218,6 +218,7 @@ build-android-apk: clean-build rust-build-android subset-fonts bump-build requir
 	cp "$(ANDROID_APK_SOURCE)" "$(ANDROID_APK_ARTIFACT)"
 	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(ANDROID_APK_ARTIFACT)"
 	@$(PRINT_OK) "APK: $(ANDROID_APK_ARTIFACT)"
+	@$(MAKE) restore-fonts
 
 .PHONY: build-android-apk-split
 build-android-apk-split: clean-build rust-build-android subset-fonts bump-build require-flutter android-available sign-android macos-available prepare-artifacts ## Build split APKs + signed macOS DMG + checksums + release notes
@@ -254,6 +255,7 @@ build-android-apk-split: clean-build rust-build-android subset-fonts bump-build 
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 	$(MAKE) checksums
 	$(MAKE) release-notes
+	@$(MAKE) restore-fonts
 	@$(PRINT_OK) "All release artifacts in $(DIST_DIR)"
 	@ls -lh "$(DIST_DIR)"/ 2>/dev/null || true
 
@@ -265,6 +267,7 @@ build-android-aab: clean-build rust-build-android subset-fonts bump-build requir
 	cp "$(ANDROID_AAB_SOURCE)" "$(ANDROID_AAB_ARTIFACT)"
 	$(ANDROID_16K_CHECK) --scan-page-size-assumptions rust/src "$(ANDROID_AAB_ARTIFACT)"
 	@$(PRINT_OK) "AAB: $(ANDROID_AAB_ARTIFACT)"
+	@$(MAKE) restore-fonts
 
 .PHONY: build-android
 build-android: build-android-apk build-android-apk-split build-android-aab ## Build all signed Android artifacts
@@ -312,6 +315,7 @@ build-macos: clean-build subset-fonts bump-build require-flutter macos-available
 	@$(PRINT_OK) "macOS DMG: $(MACOS_DMG_ARTIFACT)"
 	$(MAKE) checksums
 	$(MAKE) release-notes
+	@$(MAKE) restore-fonts
 
 .PHONY: checksums
 checksums: ## Generate per-file .sha256/.sha384/.sha512 + unified checksums.txt for all dist/releases artifacts

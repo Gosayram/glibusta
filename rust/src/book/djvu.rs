@@ -230,7 +230,7 @@ impl DjvuEngine {
         let doc = parse_document(bytes)?;
         let page = doc
             .page(page_index)
-            .context(format!("Page {} not found", page_index))?;
+            .with_context(|| format!("Page {} not found", page_index))?;
         let viewport = (max_width as u32).min(1080);
         let opts = RenderOptions::fit_to_width(page, viewport);
         let pixmap = render_pixmap(page, &opts).context("Failed to render DjVu page")?;
@@ -262,7 +262,9 @@ impl DjvuEngine {
         let page_count = doc.page_count();
         let mut chapters = Vec::new();
         for i in 0..page_count {
-            let page = doc.page(i).context(format!("Failed to get page {}", i))?;
+            let page = doc
+                .page(i)
+                .with_context(|| format!("Failed to get page {}", i))?;
             let page_text = page
                 .text()
                 .context("Failed to decode DjVu text layer")?

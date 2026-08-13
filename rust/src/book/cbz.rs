@@ -336,7 +336,9 @@ fn detect_xml_encoding(header: &[u8]) -> Option<&'static encoding_rs::Encoding> 
     // Search raw bytes for encoding="..." — the keyword is always ASCII
     let lower_header: Vec<u8> = header.iter().map(|b| b.to_ascii_lowercase()).collect();
     let needle = b"encoding=";
-    let start = lower_header.windows(needle.len()).position(|w| w == needle)?;
+    let start = lower_header
+        .windows(needle.len())
+        .position(|w| w == needle)?;
     let key_end = start + needle.len();
     if key_end >= header.len() {
         return None;
@@ -346,10 +348,7 @@ fn detect_xml_encoding(header: &[u8]) -> Option<&'static encoding_rs::Encoding> 
         return None;
     }
     let value_start = key_end + 1;
-    let value_end = header[value_start..]
-        .iter()
-        .position(|&b| b == quote)?
-        + value_start;
+    let value_end = header[value_start..].iter().position(|&b| b == quote)? + value_start;
     let encoding_name = &header[value_start..value_end];
     encoding_rs::Encoding::for_label(encoding_name)
 }

@@ -61,6 +61,8 @@ elif command -v gh >/dev/null 2>&1; then
     gh attestation verify "${attestation_path}" \
         --owner bblanchon \
         --repo pdfium-binaries 2>/dev/null || print_error "Attestation verification failed"
+else
+    print_error "Neither cosign nor gh is installed — cannot verify attestation. Install one of: cosign, gh"
 fi
 
 # ─── Parse attestation digests into associative array ────────────────────────

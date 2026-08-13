@@ -247,11 +247,19 @@ class AuthStateNotifier extends _$AuthStateNotifier {
             persistent: persistent,
           );
       await _saveSession(session);
-      await _updateRememberedCredentials(
-        name: name,
-        password: password,
-        persistent: persistent,
-      );
+      try {
+        await _updateRememberedCredentials(
+          name: name,
+          password: password,
+          persistent: persistent,
+        );
+      } on Object catch (e) {
+        AppLogger().warning(
+          'Remembered credentials save failed: $e',
+          name: 'Auth',
+          error: e,
+        );
+      }
       return AuthStateData(
         isAuthenticated: true,
         session: session,

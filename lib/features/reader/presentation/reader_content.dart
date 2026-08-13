@@ -1122,11 +1122,11 @@ Widget _readerImageWidget(
     );
   }
 
-  if (isDataUri) {
-    final data = imageUrl.split(',');
-    if (data.length == 2) {
-      Uint8List bytes;
-      try {
+    if (isDataUri) {
+      final data = imageUrl.split(',');
+      if (data.length == 2 && data[0].toLowerCase().contains(';base64')) {
+        Uint8List bytes;
+        try {
         bytes = _cachedBase64Decode(data.last);
       } on FormatException {
         return Icon(Icons.broken_image, size: 64, color: errorColor);
