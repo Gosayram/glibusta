@@ -154,9 +154,13 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
 
     final tabCount = tabs.length;
     if (tabCount != _lastTabCount) {
+      final previousIndex = _tabController?.index ?? 0;
       _tabController?.dispose();
       _lastTabCount = tabCount;
       _tabController = TabController(length: tabCount, vsync: this);
+      if (previousIndex < tabCount) {
+        _tabController!.index = previousIndex;
+      }
     }
 
     final controller = _tabController!;

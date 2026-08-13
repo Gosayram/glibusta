@@ -145,7 +145,9 @@ class BackupService {
       if (settingsMap.isNotEmpty) {
         await prefs.setString(_settingsKey, jsonEncode(settingsMap));
       }
-      await prefs.setStringList(_pinnedBooksKey, pinnedIds);
+      if (parsed.containsKey('pinnedBooks')) {
+        await prefs.setStringList(_pinnedBooksKey, pinnedIds);
+      }
       if (goalMap != null) {
         await prefs.setInt(_readingGoalMinutesKey, (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30);
         await prefs.setBool(_readingGoalEnabledKey, goalMap['isEnabled'] as bool? ?? false);

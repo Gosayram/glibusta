@@ -133,10 +133,18 @@ class _ReadingGoalDialogState extends ConsumerState<ReadingGoalDialog> {
       dailyMinutes: _dailyMinutes.round(),
       isEnabled: _isEnabled,
     );
-    final repo = await ref.read(readingGoalRepositoryProvider.future);
-    await repo.saveGoal(goal);
-    ref.invalidate(readingGoalProvider);
-    if (mounted) Navigator.of(context).pop();
+    try {
+      final repo = await ref.read(readingGoalRepositoryProvider.future);
+      await repo.saveGoal(goal);
+      ref.invalidate(readingGoalProvider);
+      if (mounted) Navigator.of(context).pop();
+    } on Object catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка сохранения: $e')),
+        );
+      }
+    }
   }
 }
 
