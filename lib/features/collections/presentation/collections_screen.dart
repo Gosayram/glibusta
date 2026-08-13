@@ -32,7 +32,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         title: Text('Коллекции'),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(context),
+        onPressed: () => _showCreateDialog(),
         child: const Icon(Icons.add),
       ),
       body: ListView(
@@ -67,7 +67,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
                     Card(
                       child: InkWell(
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () => _showCreateDialog(context),
+                        onTap: () => _showCreateDialog(),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
@@ -160,11 +160,11 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
   }
 
-  Future<void> _showCreateDialog(BuildContext context) async {
+  Future<void> _showCreateDialog() async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Новая коллекция'),
         content: TextField(
           controller: controller,
@@ -177,26 +177,34 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(dialogCtx).pop(controller.text.trim()),
             child: const Text('Создать'),
           ),
         ],
       ),
     );
 
-    if (result != null && result.isNotEmpty && context.mounted) {
-      final db = ref.read(databaseProvider);
-      await db.collectionDao.insertCollection(
-        CollectionsCompanion.insert(
-          id: const Uuid().v4(),
-          name: result,
-        ),
-      );
-      ref.invalidate(userCollectionsProvider);
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        final db = ref.read(databaseProvider);
+        await db.collectionDao.insertCollection(
+          CollectionsCompanion.insert(
+            id: const Uuid().v4(),
+            name: result,
+          ),
+        );
+        ref.invalidate(userCollectionsProvider);
+      } on Object catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка создания: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -204,7 +212,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final controller = TextEditingController(text: collection.name);
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Переименовать коллекцию'),
         content: TextField(
           controller: controller,
@@ -217,39 +225,47 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogCtx).pop(),
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            onPressed: () => Navigator.of(dialogCtx).pop(controller.text.trim()),
             child: const Text('Сохранить'),
           ),
         ],
       ),
     );
 
-    if (result != null && result.isNotEmpty && context.mounted) {
-      final db = ref.read(databaseProvider);
-      await (db.update(db.collections)..where((t) => t.id.equals(collection.id))).write(
-        CollectionsCompanion(name: Value(result)),
-      );
-      ref.invalidate(userCollectionsProvider);
+    if (result != null && result.isNotEmpty && mounted) {
+      try {
+        final db = ref.read(databaseProvider);
+        await (db.update(db.collections)..where((t) => t.id.equals(collection.id))).write(
+          CollectionsCompanion(name: Value(result)),
+        );
+        ref.invalidate(userCollectionsProvider);
+      } on Object catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка переименования: $e')),
+          );
+        }
+      }
     }
   }
 
   Future<void> _deleteCollection(String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Удалить коллекцию?'),
         content: const Text('Книги не будут удалены.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
             child: const Text('Отмена'),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
@@ -260,9 +276,17 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final db = ref.read(databaseProvider);
-      await db.collectionDao.deleteCollection(id);
-      ref.invalidate(userCollectionsProvider);
+      try {
+        final db = ref.read(databaseProvider);
+        await db.collectionDao.deleteCollection(id);
+        ref.invalidate(userCollectionsProvider);
+      } on Object catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка удаления: $e')),
+          );
+        }
+      }
     }
   }
 }

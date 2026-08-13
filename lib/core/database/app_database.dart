@@ -74,8 +74,23 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
-      await _backupDatabase(from);
+      await _backupDatabase(from); // throws on failure — aborts migration
       await customStatement('PRAGMA foreign_keys = OFF');
+
+      // Ponytail: SQLite DDL auto-commits each statement, so the enclosing
+      // transaction cannot roll back partially-applied schema changes.
+      // Wrapping addColumn in a try/catch makes the migration idempotent —
+      // if a previous run partially committed, retries won't crash on
+      // "duplicate column name".
+      // ignore: strict_raw_type
+      Future<void> addCol(TableInfo table, GeneratedColumn column) async {
+        try {
+          await m.addColumn(table, column);
+        } on Object catch (e) {
+          if (!e.toString().contains('duplicate column')) rethrow;
+        }
+      }
+
       try {
         if (from > to) {
           await _handleDowngrade(m, from, to);
@@ -83,38 +98,38 @@ class AppDatabase extends _$AppDatabase {
         }
         await transaction(() async {
           if (from < 2) {
-            await m.addColumn(savedBooks, savedBooks.contentHash);
-            await m.addColumn(savedBooks, savedBooks.fileSize);
+            await addCol(savedBooks, savedBooks.contentHash);
+            await addCol(savedBooks, savedBooks.fileSize);
           }
           if (from < 3) {
-            await m.addColumn(savedBooks, savedBooks.filePath);
+            await addCol(savedBooks, savedBooks.filePath);
           }
           if (from < 4) {
             await m.createTable(readingSessions);
           }
           if (from < 5) {
-            await m.addColumn(readingProgress, readingProgress.chapterIndex);
-            await m.addColumn(readingProgress, readingProgress.paragraphIndex);
-            await m.addColumn(readingProgress, readingProgress.localOffset);
-            await m.addColumn(readingProgress, readingProgress.progressPercent);
-            await m.addColumn(readingProgress, readingProgress.updatedAt);
+            await addCol(readingProgress, readingProgress.chapterIndex);
+            await addCol(readingProgress, readingProgress.paragraphIndex);
+            await addCol(readingProgress, readingProgress.localOffset);
+            await addCol(readingProgress, readingProgress.progressPercent);
+            await addCol(readingProgress, readingProgress.updatedAt);
           }
           if (from < 6) {
-            await m.addColumn(savedBooks, savedBooks.readingStatus);
+            await addCol(savedBooks, savedBooks.readingStatus);
           }
           if (from < 7) {
-            await m.addColumn(savedBooks, savedBooks.detectedEncoding);
-            await m.addColumn(savedBooks, savedBooks.encodingConfidence);
-            await m.addColumn(savedBooks, savedBooks.encodingSource);
-            await m.addColumn(savedBooks, savedBooks.userForcedEncoding);
+            await addCol(savedBooks, savedBooks.detectedEncoding);
+            await addCol(savedBooks, savedBooks.encodingConfidence);
+            await addCol(savedBooks, savedBooks.encodingSource);
+            await addCol(savedBooks, savedBooks.userForcedEncoding);
           }
           if (from < 8) {
-            await m.addColumn(savedBooks, savedBooks.storageMode);
-            await m.addColumn(savedBooks, savedBooks.externalUri);
+            await addCol(savedBooks, savedBooks.storageMode);
+            await addCol(savedBooks, savedBooks.externalUri);
           }
           if (from < 9) {
-            await m.addColumn(savedBooks, savedBooks.coverPath);
-            await m.addColumn(savedBooks, savedBooks.coverStatus);
+            await addCol(savedBooks, savedBooks.coverPath);
+            await addCol(savedBooks, savedBooks.coverStatus);
           }
           if (from < 10) {
             await m.createTable(perBookSettings);
@@ -130,25 +145,25 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(textHighlights);
           }
           if (from < 14) {
-            await m.addColumn(readingProgress, readingProgress.chapterId);
-            await m.addColumn(readingProgress, readingProgress.textOffset);
+            await addCol(readingProgress, readingProgress.chapterId);
+            await addCol(readingProgress, readingProgress.textOffset);
           }
           if (from < 15) {
-            await m.addColumn(textHighlights, textHighlights.decoration);
+            await addCol(textHighlights, textHighlights.decoration);
           }
           if (from < 16) {
-            await m.addColumn(savedBooks, savedBooks.deletedAt);
+            await addCol(savedBooks, savedBooks.deletedAt);
           }
           if (from < 17) {
-            await m.addColumn(readingTime, readingTime.pagesRead);
+            await addCol(readingTime, readingTime.pagesRead);
           }
           if (from < 18) {
-            await m.addColumn(readingTime, readingTime.wpm);
-            await m.addColumn(readingTime, readingTime.wpmSessionCount);
+            await addCol(readingTime, readingTime.wpm);
+            await addCol(readingTime, readingTime.wpmSessionCount);
           }
           if (from < 19) {
-            await m.addColumn(bookmarks, bookmarks.highlightStyle);
-            await m.addColumn(bookmarks, bookmarks.highlightColor);
+            await addCol(bookmarks, bookmarks.highlightStyle);
+            await addCol(bookmarks, bookmarks.highlightColor);
           }
         });
       } finally {
@@ -166,24 +181,21 @@ class AppDatabase extends _$AppDatabase {
   );
 
   Future<void> _backupDatabase(int? previousVersion) async {
-    try {
-      final dbFile = File(await _databasePath);
-      if (await dbFile.exists()) {
-        final backupFile = File(
-          '${await _databasePath}.v${previousVersion ?? 0}.bak',
-        );
-        await dbFile.copy(backupFile.path);
-        for (final ext in ['-wal', '-shm']) {
-          final src = File('${await _databasePath}$ext');
-          if (await src.exists()) {
-            await src.copy('${backupFile.path}$ext');
-          }
-        }
-      }
+    final dbFile = File(await _databasePath);
+    if (!await dbFile.exists()) {
       await _cleanupOldBackups();
-    } on Object catch (e) {
-      AppLogger().warning('Database backup failed: $e', name: 'Database', error: e);
+      return;
     }
+    final dbPath = await _databasePath;
+    final backupFile = File('$dbPath.v${previousVersion ?? 0}.bak');
+    await dbFile.copy(backupFile.path);
+    for (final ext in ['-wal', '-shm']) {
+      final src = File('$dbPath$ext');
+      if (await src.exists()) {
+        await src.copy('${backupFile.path}$ext');
+      }
+    }
+    await _cleanupOldBackups();
   }
 
   Future<void> _handleDowngrade(Migrator m, int from, int to) async {

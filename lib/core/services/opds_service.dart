@@ -189,9 +189,15 @@ final opdsServiceProvider = Provider<OpdsService>((ref) {
   return OpdsService(
     Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
-        sendTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 10),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 14; Pixel 8) '
+              'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.81 Mobile Safari/537.36',
+          'Accept': 'application/atom+xml, application/xml, text/xml, */*',
+        },
       ),
     ),
   );

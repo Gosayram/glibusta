@@ -115,6 +115,11 @@ class HttpClient {
         ..set(io.HttpHeaders.acceptEncodingHeader, 'gzip, deflate')
         ..set(io.HttpHeaders.connectionHeader, 'keep-alive');
 
+      if (_sessionCookies.isNotEmpty) {
+        final cookieHeader = _sessionCookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
+        request.headers.set(io.HttpHeaders.cookieHeader, cookieHeader);
+      }
+
       final ua = await _getOrCreateUserAgent();
       if (ua != null) {
         request.headers.set(io.HttpHeaders.userAgentHeader, ua);
@@ -129,10 +134,17 @@ class HttpClient {
       final bytes = <int>[];
       response.listen(
         bytes.addAll,
-        onDone: () => completer.complete(Uint8List.fromList(bytes)),
-        onError: completer.completeError,
+        onDone: () {
+          if (!completer.isCompleted) completer.complete(Uint8List.fromList(bytes));
+        },
+        onError: (Object e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        },
       );
-      final rawBytes = await _awaitWithCancellation(completer.future, cancelToken);
+      final rawBytes = await _awaitWithCancellation(
+        completer.future.timeout(AppDuration.httpReceive),
+        cancelToken,
+      );
 
       if (rawBytes.isEmpty) return '';
       final detected = await _encodingDetector.detect(rawBytes);
@@ -251,7 +263,10 @@ class HttpClient {
 
         final iterator = StreamIterator<List<int>>(response);
         try {
-          while (await _awaitDownloadOperation(iterator.moveNext(), cancellation)) {
+          while (await _awaitDownloadOperation(
+            iterator.moveNext().timeout(const Duration(minutes: 2)),
+            cancellation,
+          )) {
             final chunk = iterator.current;
             sink.add(chunk);
             received += chunk.length;

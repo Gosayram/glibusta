@@ -59,6 +59,12 @@ class TtsController {
     }
     _lastLang = 'ru-RU';
     _lastRate = _defaultNativeRate;
+    // ponytail: reset state on natural completion — otherwise
+    // isPlaying stays true and pause/stop buttons show wrong state.
+    _tts.setCompletionHandler(() {
+      _isPlaying = false;
+      _isPaused = false;
+    });
     _isTtsInitialized = true;
   }
 
@@ -82,6 +88,9 @@ class TtsController {
   Future<void> speak(String text, {String? lang, double? rate}) async {
     _ensureTts();
     if (!_ttsAvailable) return;
+    if (_isTtsInitialized) {
+      await _tts.stop();
+    }
     _lastText = text;
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;

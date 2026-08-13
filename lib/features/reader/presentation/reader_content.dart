@@ -3725,7 +3725,7 @@ class _FixedLayoutBodyState extends State<_FixedLayoutBody> {
       if (separator > 0 && url.substring(0, separator).toLowerCase().contains(';base64')) {
         try {
           return Image.memory(
-            base64Decode(url.substring(separator + 1)),
+            _cachedBase64Decode(url.substring(separator + 1)),
             fit: fit,
             cacheWidth: dims.width,
             cacheHeight: dims.height,

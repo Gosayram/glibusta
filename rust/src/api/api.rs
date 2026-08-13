@@ -1114,11 +1114,13 @@ pub fn score_encoding_quality(text: String) -> f64 {
         .count();
     score -= control_count as f64 * 0.04;
 
-    // Penalize mojibake patterns (common in wrong-encoding decode)
+    // Penalize mojibake patterns (common in wrong-encoding decode).
+    // Only Latin chars that appear in double-encoded Cyrillic — Р/С are real
+    // Cyrillic letters and must NOT be penalized.
     let chars: Vec<char> = sample.chars().collect();
     let mojibake_count = chars
         .windows(2)
-        .filter(|w| matches!(w[0], 'Р' | 'С' | 'Ð' | 'Ñ' | 'â' | 'Ã'))
+        .filter(|w| matches!(w[0], 'Ð' | 'Ñ' | 'â' | 'Ã'))
         .count();
     score -= mojibake_count as f64 * 0.03;
 

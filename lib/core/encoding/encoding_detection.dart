@@ -46,15 +46,23 @@ final class EncodingDetectionResult {
 /// 6. fl_charset fallback (windows-1251, koi8-r, cp866, iso-8859-5)
 /// 7. Quality scoring picks best candidate
 final class BookEncodingDetector {
-  /// Cache for CharsetDetector.autoDecode() results keyed by bytes hashCode.
-  static final Map<int, ({String text, String charset})> _autoDecodeCache = {};
-
   /// Detect encoding and decode bytes to text.
   Future<EncodingDetectionResult> detect(
     Uint8List bytes, {
     String? fileName,
     String? forcedEncoding,
   }) async {
+    // ponytail: empty input → return UTF-8, not windows-1251.
+    if (bytes.isEmpty) {
+      return const EncodingDetectionResult(
+        text: '',
+        encoding: 'utf-8',
+        confidence: 1.0,
+        source: EncodingSource.fallbackScore,
+        hasReplacementChars: false,
+      );
+    }
+
     // 1. Forced encoding (manual override from user)
     if (forcedEncoding != null && forcedEncoding.isNotEmpty) {
       final text = await _decodeByName(bytes, forcedEncoding);
@@ -105,14 +113,18 @@ final class BookEncodingDetector {
 
   EncodingDetectionResult? _decodeBom(Uint8List bytes) {
     if (startsWith(bytes, [0xEF, 0xBB, 0xBF])) {
-      final text = utf8.decode(bytes.sublist(3), allowMalformed: false);
-      return EncodingDetectionResult(
-        text: text,
-        encoding: 'utf-8',
-        confidence: 1.0,
-        source: EncodingSource.bom,
-        hasReplacementChars: false,
-      );
+      try {
+        final text = utf8.decode(bytes.sublist(3), allowMalformed: false);
+        return EncodingDetectionResult(
+          text: text,
+          encoding: 'utf-8',
+          confidence: 1.0,
+          source: EncodingSource.bom,
+          hasReplacementChars: false,
+        );
+      } on FormatException {
+        // BOM present but content is corrupt — fall through to other detection
+      }
     }
     if (startsWith(bytes, [0xFF, 0xFE])) {
       final text = decodeUtf16Le(bytes.sublist(2));
@@ -160,18 +172,9 @@ final class BookEncodingDetector {
     Uint8List bytes,
   ) async {
     try {
-      final cached = _autoDecodeCache[bytes.hashCode];
-      final String text;
-      final String encoding;
-      if (cached != null) {
-        text = cached.text;
-        encoding = cached.charset;
-      } else {
-        final decoded = await CharsetDetector.autoDecode(bytes);
-        text = decoded.string;
-        encoding = normalizeEncodingName(decoded.charset);
-        _autoDecodeCache[bytes.hashCode] = (text: text, charset: encoding);
-      }
+      final decoded = await CharsetDetector.autoDecode(bytes);
+      final text = decoded.string;
+      final encoding = normalizeEncodingName(decoded.charset);
       final score = await rust_api.scoreEncodingQuality(text: text);
       return EncodingDetectionResult(
         text: text,
@@ -248,15 +251,9 @@ final class BookEncodingDetector {
         if (enc != null) {
           return enc.decode(bytes);
         }
-        // Last resort: native detector (cached)
-        final cached = _autoDecodeCache[bytes.hashCode];
-        if (cached != null) return cached.text;
+        // Last resort: native detector
         try {
           final decoded = await CharsetDetector.autoDecode(bytes);
-          _autoDecodeCache[bytes.hashCode] = (
-            text: decoded.string,
-            charset: normalizeEncodingName(decoded.charset),
-          );
           return decoded.string;
         } on Object catch (_) {
           return utf8.decode(bytes, allowMalformed: true);
