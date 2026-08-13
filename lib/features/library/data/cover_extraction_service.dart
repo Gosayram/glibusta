@@ -84,11 +84,12 @@ class CoverExtractionService {
       final opfFile = _findOpfFile(archive);
       if (opfFile == null) return null;
 
-      final opfContent = String.fromCharCodes(
+      final opfContent = utf8.decode(
         ArchiveSafety.readEntryBytes(
           opfFile,
           maxBytes: ArchiveSafety.maxSingleEntryBytes,
         ),
+        allowMalformed: true,
       );
       final doc = XmlDocument.parse(opfContent);
 

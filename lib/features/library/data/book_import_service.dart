@@ -409,7 +409,7 @@ class BookImportService {
               id: ctx.bookId,
               bookId: ctx.bookId,
               bookTitle: Value(book.title),
-              format: formatToDbString(formatForExtension(ctx.ext)),
+              format: formatToDbString(ctx.format),
               sourceUrl: ctx.sourceUrl ?? ctx.filePath,
               targetPath: Value(ctx.targetFile!.path),
               status: DownloadStatusDb.completed,

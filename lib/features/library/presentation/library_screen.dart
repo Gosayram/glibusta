@@ -211,6 +211,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           _selectedCollectionId = null;
                           _selectedCollectionName = null;
                         });
+                        _resetPagination();
+                        unawaited(_loadNextPage());
                       },
                     ),
                   ],
@@ -2140,6 +2142,7 @@ class _CollectionPickerSheetState extends ConsumerState<_CollectionPickerSheet> 
       ),
     );
 
+    controller.dispose();
     if (result != null && result.isNotEmpty && mounted) {
       final db = ref.read(databaseProvider);
       await db.collectionDao.insertCollection(

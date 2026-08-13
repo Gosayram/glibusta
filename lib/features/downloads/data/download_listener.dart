@@ -52,16 +52,23 @@ class DownloadListener {
       );
       for (final task in stale) {
         final path = task.targetPath;
-        if (path != null && await File(path).exists()) {
+        final fileExists = path != null && await File(path).exists();
+        final looksComplete = fileExists &&
+            task.totalBytes != null &&
+            task.totalBytes! > 0 &&
+            task.downloadedBytes != null &&
+            task.downloadedBytes! >= task.totalBytes!;
+        if (looksComplete) {
           _logger.info(
-            'Stale download file exists, completing: ${task.id}',
+            'Stale download file complete, completing: ${task.id}',
             name: 'DownloadListener',
           );
           await _repository.updateStatus(task.id, DownloadStatus.completed);
           unawaited(_queue.onDownloadComplete(task.id));
         } else {
+          final reason = fileExists ? 'incomplete' : 'missing';
           _logger.warning(
-            'Stale download file missing, marking failed: ${task.id}',
+            'Stale download file $reason, marking failed: ${task.id}',
             name: 'DownloadListener',
           );
           await _repository.updateStatus(task.id, DownloadStatus.failed);

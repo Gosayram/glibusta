@@ -472,6 +472,7 @@ class _PdfReaderScreenState extends State<PdfReaderScreen> {
         ],
       ),
     );
+    ctrl.dispose();
     return result;
   }
 }

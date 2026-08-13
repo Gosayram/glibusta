@@ -42,11 +42,12 @@ BookOpenError _classifyBookOpenError(Object error) {
       error is ArchiveException) {
     return BookOpenError.corruptFile;
   }
-  if (message.contains('opf') ||
-      message.contains('container.xml') ||
-      message.contains('rootfile') ||
-      message.contains('package document') ||
-      message.contains('not found') && message.contains('epub')) {
+  if ((message.contains('opf') ||
+          message.contains('container.xml') ||
+          message.contains('rootfile') ||
+          message.contains('package document') ||
+          message.contains('not found')) &&
+      message.contains('epub')) {
     return BookOpenError.missingContent;
   }
   if (message.contains('unsupported') || message.contains('не поддерживается')) {

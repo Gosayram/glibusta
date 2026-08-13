@@ -25,7 +25,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = SearchController();
   final _genreController = TextEditingController();
   final _languageController = TextEditingController();
-  Timer? _debounceTimer;
+  Timer? _searchDebounce;
+  Timer? _genreDebounce;
+  Timer? _languageDebounce;
   bool _filtersExpanded = false;
 
   @override
@@ -42,7 +44,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
+    _searchDebounce?.cancel();
+    _genreDebounce?.cancel();
+    _languageDebounce?.cancel();
     _genreController.dispose();
     _languageController.dispose();
     _searchController.dispose();
@@ -50,12 +54,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _onSearchChanged(String value) {
-    _debounceTimer?.cancel();
+    _searchDebounce?.cancel();
     if (value.trim().isEmpty) {
       ref.read(searchControllerProvider.notifier).clearResults();
       return;
     }
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       unawaited(ref.read(searchControllerProvider.notifier).search(value.trim()));
     });
   }
@@ -90,7 +94,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _clearFilters() {
-    _debounceTimer?.cancel();
+    _searchDebounce?.cancel();
+    _genreDebounce?.cancel();
+    _languageDebounce?.cancel();
     _genreController.clear();
     _languageController.clear();
     ref.read(searchControllerProvider.notifier).setFilters(const SearchFilters());
@@ -119,7 +125,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           viewHintText: 'Поиск книг...',
           onChanged: _onSearchChanged,
           onSubmitted: (value) {
-            _debounceTimer?.cancel();
+            _searchDebounce?.cancel();
             if (value.trim().isNotEmpty) {
               _searchController.closeView(value.trim());
               unawaited(ref.read(searchControllerProvider.notifier).search(value.trim()));
@@ -463,12 +469,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
-                  _debounceTimer?.cancel();
+                  _genreDebounce?.cancel();
                   _setGenreFilter(value);
                 },
                 onChanged: (value) {
-                  _debounceTimer?.cancel();
-                  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                  _genreDebounce?.cancel();
+                  _genreDebounce = Timer(const Duration(milliseconds: 500), () {
                     _setGenreFilter(value);
                   });
                 },
@@ -487,12 +493,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 onSubmitted: (value) {
-                  _debounceTimer?.cancel();
+                  _languageDebounce?.cancel();
                   _setLanguageFilter(value);
                 },
                 onChanged: (value) {
-                  _debounceTimer?.cancel();
-                  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                  _languageDebounce?.cancel();
+                  _languageDebounce = Timer(const Duration(milliseconds: 500), () {
                     _setLanguageFilter(value);
                   });
                 },

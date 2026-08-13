@@ -1387,7 +1387,8 @@ fn expand_media_queries(css: &str) -> String {
                         j += 1;
                     }
                     // Extract inner content (between the outer braces)
-                    let inner = &css[i + open + 1..j - 1];
+                    let inner_end = if depth == 0 { j - 1 } else { j };
+                    let inner = &css[i + open + 1..inner_end];
                     result.push_str(inner);
                     result.push('\n');
                     i = j;
@@ -1430,7 +1431,8 @@ fn extract_font_faces(text: &str) -> Vec<(String, String)> {
                             }
                             j += 1;
                         }
-                        let block = &expanded[block_start..j - 1];
+                        let block_end = if depth == 0 { j - 1 } else { j };
+                        let block = &expanded[block_start..block_end];
                         let mut font_family = String::new();
                         let mut src = String::new();
                         for prop in split_css_declarations(block) {

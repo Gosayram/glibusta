@@ -810,7 +810,7 @@ final class ReaderController {
 
   String get sessionTimeLabel {
     final elapsed = _accumulatedSeconds + _sessionStopwatch.elapsed.inSeconds;
-    if (elapsed < 60) return '$elapsed мин';
+    if (elapsed < 60) return '$elapsed с';
     final hours = elapsed ~/ 3600;
     final minutes = (elapsed % 3600) ~/ 60;
     if (hours > 0) return '$hours ч $minutes мин';
@@ -1611,6 +1611,13 @@ final class ReaderController {
 
   void setSearchMatches(List<BookSearchResult> matches, int currentIndex) {
     _searchMatches = List.unmodifiable(matches);
+    if (matches.isEmpty) {
+      _searchMatchIndex = 0;
+      _updateState(
+        _state.copyWith(searchMatchCount: 0, searchMatchIndex: 0),
+      );
+      return;
+    }
     _searchMatchIndex = currentIndex.clamp(0, matches.length - 1);
     _updateState(
       _state.copyWith(

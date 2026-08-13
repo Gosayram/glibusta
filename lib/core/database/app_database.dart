@@ -173,6 +173,12 @@ class AppDatabase extends _$AppDatabase {
           '${await _databasePath}.v${previousVersion ?? 0}.bak',
         );
         await dbFile.copy(backupFile.path);
+        for (final ext in ['-wal', '-shm']) {
+          final src = File('${await _databasePath}$ext');
+          if (await src.exists()) {
+            await src.copy('${backupFile.path}$ext');
+          }
+        }
       }
       await _cleanupOldBackups();
     } on Object catch (e) {
@@ -206,7 +212,11 @@ class AppDatabase extends _$AppDatabase {
           .map((e) => File(e.path))
           .toList();
       if (bakFiles.length <= _maxBackups) return;
-      bakFiles.sort((a, b) => a.path.compareTo(b.path));
+      int extractVersion(String path) {
+        final m = RegExp(r'\.v(\d+)\.bak$').firstMatch(path);
+        return m != null ? int.parse(m.group(1)!) : 0;
+      }
+      bakFiles.sort((a, b) => extractVersion(a.path).compareTo(extractVersion(b.path)));
       for (var i = 0; i < bakFiles.length - _maxBackups; i++) {
         await bakFiles[i].delete();
       }
