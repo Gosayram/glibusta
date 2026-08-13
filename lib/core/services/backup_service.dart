@@ -13,6 +13,7 @@ class ImportResult {
   final int notesImported;
   final int quotesImported;
   final int collectionsImported;
+  final int highlightsImported;
   final String? error;
 
   const ImportResult({
@@ -22,6 +23,7 @@ class ImportResult {
     this.notesImported = 0,
     this.quotesImported = 0,
     this.collectionsImported = 0,
+    this.highlightsImported = 0,
     this.error,
   });
 }
@@ -46,6 +48,7 @@ class BackupService {
       final notes = await db.select(db.notes).get();
       final quotes = await db.select(db.quotes).get();
       final collections = await db.select(db.collections).get();
+      final highlights = await db.select(db.textHighlights).get();
 
       final prefs = await SharedPreferences.getInstance();
       final settingsJson = prefs.getString(_settingsKey);
@@ -67,6 +70,7 @@ class BackupService {
         'notes': notes.map(_noteToMap).toList(),
         'quotes': quotes.map(_quoteToMap).toList(),
         'collections': collections.map(_collectionToMap).toList(),
+        'textHighlights': highlights.map(_highlightToMap).toList(),
         'pinnedBooks': pinnedIds,
         'readingGoal': {
           'dailyMinutes': goalMinutes,
@@ -76,7 +80,7 @@ class BackupService {
       };
 
       _logger.info(
-        'Export complete: ${progress.length} progress, ${bookmarks.length} bookmarks, ${notes.length} notes, ${quotes.length} quotes, ${collections.length} collections',
+        'Export complete: ${progress.length} progress, ${bookmarks.length} bookmarks, ${notes.length} notes, ${quotes.length} quotes, ${collections.length} collections, ${highlights.length} highlights',
         name: 'Backup',
       );
       return const JsonEncoder.withIndent('  ').convert(data);
@@ -96,6 +100,7 @@ class BackupService {
       final notesList = (parsed['notes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final quotesList = (parsed['quotes'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final collectionsList = (parsed['collections'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      final highlightsList = (parsed['textHighlights'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       final pinnedIds = (parsed['pinnedBooks'] as List?)?.cast<String>() ?? [];
       final goalMap = parsed['readingGoal'] as Map<String, dynamic>?;
       final settingsMap = parsed['settings'] as Map<String, dynamic>? ?? {};
@@ -111,6 +116,8 @@ class BackupService {
         b.insertAll(db.quotes, quotesList.map(_quoteFromMap));
         b.deleteAll(db.collections);
         b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
+        b.deleteAll(db.textHighlights);
+        b.insertAll(db.textHighlights, highlightsList.map(_highlightFromMap));
       });
 
       final prefs = await SharedPreferences.getInstance();
@@ -124,7 +131,7 @@ class BackupService {
       }
 
       _logger.info(
-        'Import complete: ${progressList.length} progress, ${bookmarksList.length} bookmarks, ${notesList.length} notes, ${quotesList.length} quotes, ${collectionsList.length} collections',
+        'Import complete: ${progressList.length} progress, ${bookmarksList.length} bookmarks, ${notesList.length} notes, ${quotesList.length} quotes, ${collectionsList.length} collections, ${highlightsList.length} highlights',
         name: 'Backup',
       );
       return ImportResult(
@@ -134,6 +141,7 @@ class BackupService {
         notesImported: notesList.length,
         quotesImported: quotesList.length,
         collectionsImported: collectionsList.length,
+        highlightsImported: highlightsList.length,
       );
     } on FormatException catch (e) {
       _logger.warning('Import failed: invalid JSON - ${e.message}', name: 'Backup');
@@ -184,6 +192,8 @@ class BackupService {
       'paragraphIndex': row.paragraphIndex,
       'localOffset': row.localOffset,
       'progressPercent': row.progressPercent,
+      'chapterId': row.chapterId,
+      'textOffset': row.textOffset,
       'totalPages': row.totalPages,
       'lastRead': row.lastRead.toIso8601String(),
       'updatedAt': row.updatedAt.toIso8601String(),
@@ -201,6 +211,8 @@ class BackupService {
       paragraphIndex: Value((map['paragraphIndex'] as num?)?.toInt() ?? 0),
       localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
       progressPercent: Value((map['progressPercent'] as num?)?.toDouble() ?? 0.0),
+      chapterId: Value(map['chapterId'] as String? ?? ''),
+      textOffset: Value((map['textOffset'] as num?)?.toInt() ?? 0),
       totalPages: Value((map['totalPages'] as num?)?.toInt() ?? 0),
       lastRead: Value(
         map['lastRead'] != null ? DateTime.parse(map['lastRead'] as String) : DateTime.now(),
@@ -218,6 +230,8 @@ class BackupService {
       'localOffset': row.localOffset,
       'selectedText': row.selectedText,
       'note': row.note,
+      'highlightStyle': row.highlightStyle,
+      'highlightColor': row.highlightColor,
       'createdAt': row.createdAt.toIso8601String(),
     };
   }
@@ -231,6 +245,8 @@ class BackupService {
       localOffset: Value((map['localOffset'] as num?)?.toDouble() ?? 0.0),
       selectedText: Value(map['selectedText'] as String?),
       note: Value(map['note'] as String?),
+      highlightStyle: Value(map['highlightStyle'] as String?),
+      highlightColor: Value(map['highlightColor'] as String?),
       createdAt: Value(
         map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
       ),
@@ -303,6 +319,7 @@ class BackupService {
     return {
       'id': row.id,
       'name': row.name,
+      'description': row.description,
       'bookIds': row.bookIds,
       'createdAt': row.createdAt.toIso8601String(),
     };
@@ -312,6 +329,7 @@ class BackupService {
     return CollectionsCompanion.insert(
       id: map['id'] as String,
       name: map['name'] as String,
+      description: Value(map['description'] as String?),
       bookIds: Value(
         map['bookIds'] is String
             ? _safeDecodeBookIds(map['bookIds'] as String)
@@ -319,6 +337,48 @@ class BackupService {
       ),
       createdAt: Value(
         map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _highlightToMap(TextHighlight row) {
+    return {
+      'id': row.id,
+      'bookId': row.bookId,
+      'chapterId': row.chapterId,
+      'chapterIndex': row.chapterIndex,
+      'blockIndex': row.blockIndex,
+      'startOffset': row.startOffset,
+      'endOffset': row.endOffset,
+      'selectedText': row.selectedText,
+      'color': row.color,
+      'decoration': row.decoration,
+      'noteText': row.noteText,
+      'isOrphaned': row.isOrphaned,
+      'createdAt': row.createdAt.toIso8601String(),
+      'updatedAt': row.updatedAt?.toIso8601String(),
+    };
+  }
+
+  TextHighlightsCompanion _highlightFromMap(Map<String, dynamic> map) {
+    return TextHighlightsCompanion.insert(
+      id: map['id'] as String,
+      bookId: map['bookId'] as String,
+      chapterId: map['chapterId'] as String,
+      chapterIndex: (map['chapterIndex'] as num?)?.toInt() ?? 0,
+      blockIndex: (map['blockIndex'] as num?)?.toInt() ?? 0,
+      startOffset: (map['startOffset'] as num?)?.toInt() ?? 0,
+      endOffset: (map['endOffset'] as num?)?.toInt() ?? 0,
+      selectedText: map['selectedText'] as String,
+      color: Value(map['color'] as String? ?? 'yellow'),
+      decoration: Value(map['decoration'] as String? ?? 'none'),
+      noteText: Value(map['noteText'] as String?),
+      isOrphaned: Value(map['isOrphaned'] as bool? ?? false),
+      createdAt: Value(
+        map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
+      ),
+      updatedAt: Value(
+        map['updatedAt'] != null ? DateTime.parse(map['updatedAt'] as String) : null,
       ),
     );
   }

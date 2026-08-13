@@ -353,7 +353,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'Импортировано: ${importResult.progressImported} прогрессов, '
             '${importResult.bookmarksImported} закладок, '
             '${importResult.notesImported} заметок, '
-            '${importResult.quotesImported} цитат',
+            '${importResult.quotesImported} цитат, '
+            '${importResult.highlightsImported} выделений',
           ),
         );
       } else {
