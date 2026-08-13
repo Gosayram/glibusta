@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -149,7 +151,14 @@ class BookRepositoryImpl implements BookRepository {
 
   @override
   Future<void> deleteBook(String id) async {
+    final book = await _db.bookDao.getBookById(id);
     await _db.bookDao.deleteBook(id);
+    if (book?.coverPath != null) {
+      try {
+        final file = File(book!.coverPath!);
+        if (await file.exists()) await file.delete();
+      } on Object catch (_) {}
+    }
   }
 
   @override
@@ -175,9 +184,6 @@ class BookRepositoryImpl implements BookRepository {
     final names = authorNames != null
         ? authorIds.map((id) => authorNames[id]).whereType<String>().toList()
         : <String>[];
-    if (names.isEmpty && authorIds.isNotEmpty) {
-      names.addAll(authorIds.where((id) => !id.startsWith('author_')));
-    }
 
     final statusStr = row.readingStatus;
     final readingStatus = ReadingStatus.values.firstWhere(

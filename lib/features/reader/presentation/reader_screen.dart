@@ -609,12 +609,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   Future<void> _showNextBookDialog() async {
     final db = ref.read(databaseProvider);
     final series = await db.seriesDao.getSeriesForBook(widget.bookId);
-    if (series.isEmpty || !context.mounted) {
+    if (!context.mounted) return;
+    if (series.isEmpty) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
-      if (context.mounted) _closeReader();
+      _closeReader();
       return;
     }
     final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
+    if (!mounted) return;
     allBooks.sort((a, b) => (a.sequenceNumber ?? 0).compareTo(b.sequenceNumber ?? 0));
     final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
     if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !mounted) {

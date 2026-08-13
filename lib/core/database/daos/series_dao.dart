@@ -28,4 +28,16 @@ class SeriesDao extends DatabaseAccessor<AppDatabase> with _$SeriesDaoMixin {
 
   Future<List<BookSery>> getBooksInSeries(String seriesId) async =>
       (select(bookSeries)..where((t) => t.seriesId.equals(seriesId))).get();
+
+  Future<int> deleteSeries(String seriesId) {
+    return attachedDatabase.transaction(() async {
+      await (delete(bookSeries)..where((t) => t.seriesId.equals(seriesId))).go();
+      return (delete(series)..where((t) => t.id.equals(seriesId))).go();
+    });
+  }
+
+  Future<int> removeBookFromSeries(String bookId, String seriesId) =>
+      (delete(bookSeries)
+            ..where((t) => t.bookId.equals(bookId) & t.seriesId.equals(seriesId)))
+          .go();
 }

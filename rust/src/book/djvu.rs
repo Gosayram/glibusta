@@ -193,6 +193,9 @@ fn parse_document(bytes: &[u8]) -> Result<DjVuDocument> {
 }
 
 fn encode_png(data: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
+    if width == 0 || height == 0 {
+        return Ok(Vec::new());
+    }
     let mut out = Vec::new();
     out.extend_from_slice(b"\x89PNG\r\n\x1a\n");
     let mut ihdr = Vec::new();

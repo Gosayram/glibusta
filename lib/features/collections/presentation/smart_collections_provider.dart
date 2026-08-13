@@ -57,8 +57,9 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
   collections.add(SmartCollection(type: SmartCollectionType.reading, books: reading));
 
   // Abandoned: has progress, last read > 30 days ago
-  final abandoned = reading.where((b) {
-    final progress = progressMap[b.id]!;
+  final abandoned = allBooks.where((b) {
+    final progress = progressMap[b.id];
+    if (progress == null) return false;
     return now.difference(progress.lastRead).inDays > 30;
   }).toList();
   collections.add(SmartCollection(type: SmartCollectionType.abandoned, books: abandoned));

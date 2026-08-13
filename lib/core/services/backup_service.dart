@@ -118,6 +118,27 @@ class BackupService {
         b.insertAll(db.collections, collectionsList.map(_collectionFromMap));
         b.deleteAll(db.textHighlights);
         b.insertAll(db.textHighlights, highlightsList.map(_highlightFromMap));
+
+        // ponytail: bookCollections junction table is not exported, rebuild
+        // from collections.bookIds so getBooksInCollection/getCollectionsForBook
+        // return correct results after import.
+        b.deleteAll(db.bookCollections);
+        for (final collectionMap in collectionsList) {
+          final collectionId = collectionMap['id'] as String;
+          final bookIds = collectionMap['bookIds'] is String
+              ? _safeDecodeBookIds(collectionMap['bookIds'] as String)
+              : (collectionMap['bookIds'] as List<dynamic>?)?.cast<String>() ??
+                  <String>[];
+          for (final bookId in bookIds) {
+            b.insert(
+              db.bookCollections,
+              BookCollectionsCompanion.insert(
+                bookId: bookId,
+                collectionId: collectionId,
+              ),
+            );
+          }
+        }
       });
 
       final prefs = await SharedPreferences.getInstance();
@@ -126,7 +147,7 @@ class BackupService {
       }
       await prefs.setStringList(_pinnedBooksKey, pinnedIds);
       if (goalMap != null) {
-        await prefs.setInt(_readingGoalMinutesKey, goalMap['dailyMinutes'] as int? ?? 30);
+        await prefs.setInt(_readingGoalMinutesKey, (goalMap['dailyMinutes'] as num?)?.toInt() ?? 30);
         await prefs.setBool(_readingGoalEnabledKey, goalMap['isEnabled'] as bool? ?? false);
       }
 

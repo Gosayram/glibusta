@@ -98,6 +98,10 @@ class AuthRepository {
       throw const AuthException('Invalid username or password');
     }
 
+    if (cookies.isEmpty) {
+      throw const AuthException('Login failed: no session cookies received');
+    }
+
     return UserSession(
       name: name,
       cookies: cookies,
@@ -326,6 +330,8 @@ class AuthStateNotifier extends _$AuthStateNotifier {
     await prefs.setString(_kSessionNameKey, session.name);
     if (session.mail != null) {
       await prefs.setString(_kSessionMailKey, session.mail!);
+    } else {
+      await prefs.remove(_kSessionMailKey);
     }
     final secureStorage = ref.read(flutterSecureStorageProvider);
     if (session.cookies.isEmpty) {

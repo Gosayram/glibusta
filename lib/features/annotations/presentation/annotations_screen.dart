@@ -69,8 +69,11 @@ class _AnnotationsScreenState extends ConsumerState<AnnotationsScreen>
         _bookmarks.addAll(page.bookmarks);
         _notes.addAll(page.notes);
         _quotes.addAll(page.quotes);
-        final pageSize = page.bookmarks.length + page.notes.length + page.quotes.length;
-        if (pageSize < _pageSize) _hasMore = false;
+        if (page.bookmarks.length < _pageSize &&
+            page.notes.length < _pageSize &&
+            page.quotes.length < _pageSize) {
+          _hasMore = false;
+        }
         _initialLoading = false;
       });
     } on Object catch (e) {
@@ -663,7 +666,8 @@ Color _parseColor(String? hexString) {
   if (hexString == null || hexString.isEmpty) return Colors.amber;
   final cleaned = hexString.startsWith('#') ? hexString.substring(1) : hexString;
   if (cleaned.length != 6 && cleaned.length != 8) return Colors.amber;
-  final parsed = int.tryParse('0xFF$cleaned');
+  final prefix = cleaned.length == 8 ? '0x' : '0xFF';
+  final parsed = int.tryParse('$prefix$cleaned');
   if (parsed == null) return Colors.amber;
   return Color(parsed);
 }

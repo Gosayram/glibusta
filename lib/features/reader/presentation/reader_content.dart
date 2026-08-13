@@ -3804,9 +3804,12 @@ class _RsvpModeBodyState extends State<_RsvpModeBody> {
   void didUpdateWidget(_RsvpModeBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.loadedChapters != widget.loadedChapters) {
-      final newIndex = _wordIndex;
       _words = _buildWordList();
-      if (newIndex >= _words.length) _wordIndex = 0;
+      if (_wordIndex >= _words.length) _wordIndex = 0;
+      if (_playing) {
+        _timer?.cancel();
+        _startTimer();
+      }
     }
   }
 

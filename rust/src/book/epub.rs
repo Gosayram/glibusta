@@ -1339,35 +1339,67 @@ fn extract_css(text: &str) -> HashMap<String, HashMap<String, String>> {
 fn parse_css_rules(css: &str) -> HashMap<String, HashMap<String, String>> {
     let mut rules: HashMap<String, HashMap<String, String>> = HashMap::new();
     let expanded = expand_media_queries(css);
-    for line in expanded.lines() {
-        let line = line.trim();
-        if let Some(body_start) = line.find('{') {
-            if let Some(body_end) = line.rfind('}') {
-                let selector = &line[..body_start].trim();
-                let body = &line[body_start + 1..body_end];
-                let selector = if selector.starts_with('.') {
-                    selector
-                } else if !selector.contains(' ') && !selector.contains(':') {
-                    let tag = selector.trim();
-                    if !tag.is_empty() {
-                        selector
-                    } else {
-                        continue;
-                    }
-                } else {
-                    continue;
-                };
-                if !selector.is_empty() {
-                    let props = rules.entry(selector.to_string()).or_default();
-                    for prop in body.split(';') {
-                        let prop = prop.trim();
-                        if let Some(colon) = prop.find(':') {
-                            let name = prop[..colon].trim().to_string();
-                            let value = prop[colon + 1..].trim().to_string();
-                            if !name.is_empty() && !value.is_empty() {
-                                props.insert(name, value);
-                            }
-                        }
+    let bytes = expanded.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        // Skip whitespace between rules
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        // Find selector (everything up to the opening brace)
+        let selector_start = i;
+        while i < bytes.len() && bytes[i] != b'{' {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        let selector = expanded[selector_start..i].trim();
+        i += 1; // skip '{'
+
+        // Find matching '}' with brace-depth tracking (handles multi-line rules)
+        let body_start = i;
+        let mut depth = 1i32;
+        while i < bytes.len() && depth > 0 {
+            match bytes[i] {
+                b'{' => depth += 1,
+                b'}' => depth -= 1,
+                _ => {}
+            }
+            if depth > 0 {
+                i += 1;
+            }
+        }
+        let body = &expanded[body_start..i];
+        if depth == 0 {
+            i += 1; // skip '}'
+        }
+
+        // Filter selector: class selectors and simple tag selectors only
+        let selector = if selector.starts_with('.') {
+            selector
+        } else if !selector.contains(' ') && !selector.contains(':') {
+            let tag = selector.trim();
+            if !tag.is_empty() {
+                selector
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+        if !selector.is_empty() {
+            let props = rules.entry(selector.to_string()).or_default();
+            for prop in body.split(';') {
+                let prop = prop.trim();
+                if let Some(colon) = prop.find(':') {
+                    let name = prop[..colon].trim().to_string();
+                    let value = prop[colon + 1..].trim().to_string();
+                    if !name.is_empty() && !value.is_empty() {
+                        props.insert(name, value);
                     }
                 }
             }
@@ -2392,7 +2424,7 @@ fn parse_xhtml_to_blocks(
                                     if let Some(last) = blocks.last_mut() {
                                         last.page_break_before = true;
                                     }
-                                    page_breaks.push(blocks.len());
+                                    page_breaks.push(blocks.len() - 1);
                                 }
                                 if css_has_page_break_after(css, "p", Some(cls))
                                     || css_has_page_break_after(css, "pre", Some(cls))
@@ -2413,7 +2445,7 @@ fn parse_xhtml_to_blocks(
                                     if let Some(last) = blocks.last_mut() {
                                         last.page_break_before = true;
                                     }
-                                    page_breaks.push(blocks.len());
+                                    page_breaks.push(blocks.len() - 1);
                                 }
                                 if css_has_page_break_after(css, "p", None)
                                     || css_has_page_break_after(css, "pre", None)
@@ -2505,7 +2537,7 @@ fn parse_xhtml_to_blocks(
                                             if let Some(last) = blocks.last_mut() {
                                                 last.page_break_before = true;
                                             }
-                                            page_breaks.push(blocks.len());
+                                            page_breaks.push(blocks.len() - 1);
                                         }
                                         if css_has_page_break_after(css, htag, Some(cls)) {
                                             pending_page_break_before = true;
@@ -2520,7 +2552,7 @@ fn parse_xhtml_to_blocks(
                                             if let Some(last) = blocks.last_mut() {
                                                 last.page_break_before = true;
                                             }
-                                            page_breaks.push(blocks.len());
+                                            page_breaks.push(blocks.len() - 1);
                                         }
                                         if css_has_page_break_after(css, htag, None) {
                                             pending_page_break_before = true;

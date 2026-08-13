@@ -1129,13 +1129,14 @@ pub fn score_encoding_quality(text: String) -> f64 {
         .count();
     let latin_count = sample.chars().filter(|c| c.is_ascii_alphabetic()).count();
     let letters_count = cyrillic_count + latin_count;
-    if (letters_count as f64) < (sample.len() as f64 * 0.20) {
+    let char_count = sample.chars().count() as f64;
+    if (letters_count as f64) < (char_count * 0.20) {
         score -= 0.25;
     }
 
     // Reward whitespace density (normal text has spaces/newlines)
     let whitespace_count = sample.chars().filter(|c| c.is_whitespace()).count();
-    if (whitespace_count as f64) < (sample.len() as f64 * 0.05) {
+    if (whitespace_count as f64) < (char_count * 0.05) {
         score -= 0.15;
     }
 

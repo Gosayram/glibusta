@@ -40,12 +40,18 @@ class HighlightDao extends DatabaseAccessor<AppDatabase> with _$HighlightDaoMixi
     String bookId,
     String query,
   ) async {
-    final queryLower = '%$query%';
+    // ponytail: escape LIKE meta-characters so "100%" doesn't match "1000"
+    final escaped = query
+        .replaceAll(r'\', r'\\')
+        .replaceAll('%', r'\%')
+        .replaceAll('_', r'\_');
+    final pattern = '%$escaped%';
     return (select(textHighlights)
           ..where(
             (t) =>
                 t.bookId.equals(bookId) &
-                (t.selectedText.like(queryLower) | t.noteText.like(queryLower)),
+                (t.selectedText.like(pattern, escapeChar: r'\') |
+                    t.noteText.like(pattern, escapeChar: r'\')),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.chapterIndex)]))
         .get();
