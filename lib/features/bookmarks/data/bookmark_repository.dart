@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
@@ -131,34 +133,6 @@ class BookmarkRepository {
           },
         )
         .toList();
-    // ponytail: simple JSON encode, no dependency needed
-    final buf = StringBuffer('[');
-    for (var i = 0; i < list.length; i++) {
-      if (i > 0) buf.write(',');
-      buf.write('{');
-      var first = true;
-      for (final e in list[i].entries) {
-        if (!first) buf.write(',');
-        first = false;
-        buf.write('"${e.key}":');
-        if (e.value == null) {
-          buf.write('null');
-        } else if (e.value is String) {
-          final escaped = e.value
-              .toString()
-              .replaceAll(r'\', r'\\')
-              .replaceAll('"', r'\"')
-              .replaceAll('\n', r'\n')
-              .replaceAll('\r', r'\r')
-              .replaceAll('\t', r'\t');
-          buf.write('"$escaped"');
-        } else {
-          buf.write(e.value);
-        }
-      }
-      buf.write('}');
-    }
-    buf.write(']');
-    return buf.toString();
+    return jsonEncode(list);
   }
 }

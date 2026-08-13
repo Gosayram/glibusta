@@ -774,8 +774,10 @@ pub fn search_in_book(
                 let preview_len = 40usize;
                 let preview_start =
                     floor_char_boundary(&block.text, start.saturating_sub(preview_len));
-                let preview_end =
-                    ceil_char_boundary(&block.text, (end + preview_len).min(block.text.len()));
+                let preview_end = ceil_char_boundary(
+                    &block.text,
+                    end.saturating_add(preview_len).min(block.text.len()),
+                );
                 let preview = format!(
                     "...{}...",
                     block.text[preview_start..preview_end].replace('\n', " ")

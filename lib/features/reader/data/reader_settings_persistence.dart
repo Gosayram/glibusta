@@ -7,6 +7,12 @@ import '../domain/reader.dart';
 class ReaderSettingsPersistence {
   static const _key = 'reader_settings';
 
+  static num? _num(Object? v) {
+    if (v is num) return v;
+    if (v is String) return num.tryParse(v);
+    return null;
+  }
+
   static Future<ReaderSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     final json = prefs.getString(_key);
@@ -23,24 +29,24 @@ class ReaderSettingsPersistence {
           orElse: () => ReaderMode.paginated,
         ),
         twoPageEnabled: map['twoPageEnabled'] as bool? ?? false,
-        fontSize: (map['fontSize'] as num?)?.toDouble() ?? 18.0,
-        noteFontSize: (map['noteFontSize'] as num?)?.toDouble(),
-        lineHeight: (map['lineHeight'] as num?)?.toDouble() ?? 1.6,
-        margin: (map['margin'] as num?)?.toDouble() ?? 20.0,
-        marginTop: (map['marginTop'] as num?)?.toDouble() ?? 20.0,
-        marginBottom: (map['marginBottom'] as num?)?.toDouble() ?? 20.0,
-        marginLeft: (map['marginLeft'] as num?)?.toDouble() ?? 20.0,
-        marginRight: (map['marginRight'] as num?)?.toDouble() ?? 20.0,
+        fontSize: (_num(map['fontSize']))?.toDouble() ?? 18.0,
+        noteFontSize: (_num(map['noteFontSize']))?.toDouble(),
+        lineHeight: (_num(map['lineHeight']))?.toDouble() ?? 1.6,
+        margin: (_num(map['margin']))?.toDouble() ?? 20.0,
+        marginTop: (_num(map['marginTop']))?.toDouble() ?? 20.0,
+        marginBottom: (_num(map['marginBottom']))?.toDouble() ?? 20.0,
+        marginLeft: (_num(map['marginLeft']))?.toDouble() ?? 20.0,
+        marginRight: (_num(map['marginRight']))?.toDouble() ?? 20.0,
         separateMargins: map['separateMargins'] as bool? ?? false,
         marginAsPercent: map['marginAsPercent'] as bool? ?? false,
         font: ReaderFont.values.firstWhere(
           (e) => e.name == map['font'],
           orElse: () => ReaderFont.literata,
         ),
-        paragraphSpacing: (map['paragraphSpacing'] as num?)?.toDouble() ?? 20.0,
-        letterSpacing: (map['letterSpacing'] as num?)?.toDouble() ?? 0.0,
-        wordSpacing: (map['wordSpacing'] as num?)?.toDouble() ?? 0.0,
-        fontWeightDelta: (map['fontWeightDelta'] as num?)?.toDouble() ?? 0.0,
+        paragraphSpacing: (_num(map['paragraphSpacing']))?.toDouble() ?? 20.0,
+        letterSpacing: (_num(map['letterSpacing']))?.toDouble() ?? 0.0,
+        wordSpacing: (_num(map['wordSpacing']))?.toDouble() ?? 0.0,
+        fontWeightDelta: (_num(map['fontWeightDelta']))?.toDouble() ?? 0.0,
         textAlign: ReaderTextAlign.values.firstWhere(
           (e) => e.name == map['textAlign'],
           orElse: () => ReaderTextAlign.justify,
@@ -53,12 +59,12 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['nightTheme'],
           orElse: () => ReaderTheme.dark,
         ),
-        customDayHour: (map['customDayHour'] as num?)?.toInt() ?? 7,
-        customNightHour: (map['customNightHour'] as num?)?.toInt() ?? 20,
-        brightness: (map['brightness'] as num?)?.toDouble() ?? 1.0,
-        warmth: (map['warmth'] as num?)?.toDouble() ?? 0.0,
+        customDayHour: ((_num(map['customDayHour']))?.toInt() ?? 7).clamp(0, 23),
+        customNightHour: ((_num(map['customNightHour']))?.toInt() ?? 20).clamp(0, 23),
+        brightness: (_num(map['brightness']))?.toDouble() ?? 1.0,
+        warmth: (_num(map['warmth']))?.toDouble() ?? 0.0,
         keepScreenAwake: map['keepScreenAwake'] as bool? ?? true,
-        autoHideDelay: (map['autoHideDelay'] as num?)?.toInt() ?? 3,
+        autoHideDelay: ((_num(map['autoHideDelay']))?.toInt() ?? 3).clamp(0, 60),
         progressBarPosition: ProgressBarPosition.values.firstWhere(
           (e) => e.name == map['progressBarPosition'],
           orElse: () => ProgressBarPosition.top,
@@ -67,7 +73,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['bottomBarContent'],
           orElse: () => BottomBarContent.percent,
         ),
-        paragraphFirstLineIndent: (map['paragraphFirstLineIndent'] as num?)?.toDouble() ?? 16.0,
+        paragraphFirstLineIndent: (_num(map['paragraphFirstLineIndent']))?.toDouble() ?? 16.0,
         paragraphIndentMode: ParagraphIndentMode.values.firstWhere(
           (e) => e.name == map['paragraphIndentMode'],
           orElse: () => ParagraphIndentMode.firstLine,
@@ -75,7 +81,7 @@ class ReaderSettingsPersistence {
         hyphenation: map['hyphenation'] as bool? ?? true,
         oldStyleFigures: map['oldStyleFigures'] as bool? ?? false,
         smallCaps: map['smallCaps'] as bool? ?? false,
-        rsvpWpm: ((map['rsvpWpm'] as num?)?.toInt() ?? 300).clamp(100, 1000),
+        rsvpWpm: ((_num(map['rsvpWpm']))?.toInt() ?? 300).clamp(100, 1000),
         ignoreBookAlignment: map['ignoreBookAlignment'] as bool? ?? false,
         ignoreBookIndent: map['ignoreBookIndent'] as bool? ?? false,
         pageTurnAnimation: PageTurnAnimation.values.firstWhere(
@@ -90,7 +96,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['textDirection'],
           orElse: () => ReaderTextDirection.auto,
         ),
-        readerWidth: (map['readerWidth'] as num?)?.toDouble() ?? 820.0,
+        readerWidth: (_num(map['readerWidth']))?.toDouble() ?? 820.0,
         verticalSwipeBrightness: map['verticalSwipeBrightness'] as bool? ?? true,
         pageTurnHaptic: map['pageTurnHaptic'] as bool? ?? false,
         twoFingerChapterNavigation: map['twoFingerChapterNavigation'] as bool? ?? false,
@@ -145,7 +151,7 @@ class ReaderSettingsPersistence {
           (e) => e.name == map['horizontalGestureScroll'],
           orElse: () => HorizontalGestureScroll.half,
         ),
-        tapZoneWidth: (map['tapZoneWidth'] as num?)?.toDouble() ?? 0.33,
+        tapZoneWidth: (_num(map['tapZoneWidth']))?.toDouble() ?? 0.33,
         fullScreenMode: FullScreenMode.values.firstWhere(
           (e) => e.name == map['fullScreenMode'],
           orElse: () => FullScreenMode.immersive,
@@ -159,19 +165,19 @@ class ReaderSettingsPersistence {
         ),
         bionicReading: map['bionicReading'] as bool? ?? false,
         horizontalLimiter: map['horizontalLimiter'] as bool? ?? false,
-        horizontalLimiterHeight: (map['horizontalLimiterHeight'] as num?)?.toDouble() ?? 0.5,
-        horizontalLimiterOffset: (map['horizontalLimiterOffset'] as num?)?.toDouble() ?? 0.5,
-        horizontalLimiterDimming: (map['horizontalLimiterDimming'] as num?)?.toDouble() ?? 0.15,
+        horizontalLimiterHeight: (_num(map['horizontalLimiterHeight']))?.toDouble() ?? 0.5,
+        horizontalLimiterOffset: (_num(map['horizontalLimiterOffset']))?.toDouble() ?? 0.5,
+        horizontalLimiterDimming: (_num(map['horizontalLimiterDimming']))?.toDouble() ?? 0.15,
         horizontalLimiterLines: map['horizontalLimiterLines'] as bool? ?? true,
         scrollbarIndicator: map['scrollbarIndicator'] as bool? ?? true,
         scrollSnap: map['scrollSnap'] as bool? ?? false,
         showImages: map['showImages'] as bool? ?? true,
-        imageCornerRadius: (map['imageCornerRadius'] as num?)?.toDouble() ?? 0.0,
+        imageCornerRadius: (_num(map['imageCornerRadius']))?.toDouble() ?? 0.0,
         imageAlignment: ImageAlignment.values.firstWhere(
           (e) => e.name == map['imageAlignment'],
           orElse: () => ImageAlignment.center,
         ),
-        imageWidth: (map['imageWidth'] as num?)?.toDouble() ?? 1.0,
+        imageWidth: (_num(map['imageWidth']))?.toDouble() ?? 1.0,
         imageColorEffect: ImageColorEffect.values.firstWhere(
           (e) => e.name == map['imageColorEffect'],
           orElse: () => ImageColorEffect.off,

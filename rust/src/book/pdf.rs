@@ -9,7 +9,11 @@ static PDFIUM: OnceLock<Mutex<Pdfium>> = OnceLock::new();
 
 fn pdfium() -> Result<MutexGuard<'static, Pdfium>> {
     let mutex = PDFIUM
-        .get_or_try_init(|| Pdfium::bind_to_system_library().map(Pdfium::new).map(Mutex::new))
+        .get_or_try_init(|| {
+            Pdfium::bind_to_system_library()
+                .map(Pdfium::new)
+                .map(Mutex::new)
+        })
         .map_err(|e| anyhow::anyhow!("PDFium init failed: {e}"))?;
     Ok(mutex.lock().unwrap())
 }

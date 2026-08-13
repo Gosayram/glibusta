@@ -64,7 +64,11 @@ pub(crate) fn decode_bytes(bytes: &[u8], encoding_name: &str) -> String {
         Encoding::for_label(encoding_name.as_bytes()).unwrap_or(encoding_rs::UTF_8)
     };
     let (decoded, _) = encoding.decode_without_bom_handling(bytes);
-    decoded.into_owned()
+    // Strip leading BOM if present (decode_without_bom_handling preserves it)
+    decoded
+        .strip_prefix('\u{feff}')
+        .unwrap_or(&decoded)
+        .to_owned()
 }
 
 /// Detect text encoding using chardetng, with BOM/UTF-8 fast-paths.

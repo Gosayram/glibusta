@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../core/database/app_database.dart';
 import 'annotations_providers.dart';
 
@@ -259,7 +261,7 @@ class AnnotationExportFormatter {
       'exported_at': DateTime.now().toIso8601String(),
       'annotations': annotationsList,
     };
-    return _jsonEncode(map);
+    return jsonEncode(map);
   }
 
   static String _escHtml(String text) {
@@ -272,35 +274,9 @@ class AnnotationExportFormatter {
 
   static String _highlightStyleAttr(String? color) {
     if (color == null || color.isEmpty) return '';
-    return ' style="background-color:${_escHtml(color)}20;border-left:3px solid ${_escHtml(color)}"';
-  }
-
-  /// Minimal JSON encoder — no dart:convert dependency kept out of the file
-  /// to stay consistent with the rest of the formatter.
-  static String _jsonEncode(Object? value) {
-    if (value == null) return 'null';
-    if (value is String) {
-      final escaped = value
-          .replaceAll(r'\', r'\\')
-          .replaceAll('"', r'\"')
-          .replaceAll('\n', r'\n')
-          .replaceAll('\r', r'\r')
-          .replaceAll('\t', r'\t');
-      return '"$escaped"';
-    }
-    if (value is num) return value.toString();
-    if (value is bool) return value ? 'true' : 'false';
-    if (value is List) {
-      final items = value.map(_jsonEncode).join(',');
-      return '[$items]';
-    }
-    if (value is Map) {
-      final entries = value.entries
-          .map((e) => '${_jsonEncode(e.key)}:${_jsonEncode(e.value)}')
-          .join(',');
-      return '{$entries}';
-    }
-    return '"${_escHtml(value.toString())}"';
+    // Only allow #RRGGBB hex colors — prevents CSS injection from imported data
+    if (!RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(color)) return '';
+    return ' style="background-color:${color}20;border-left:3px solid $color"';
   }
 
   static String _anchor(int chapterIndex, int paragraphIndex, [double? localOffset]) {

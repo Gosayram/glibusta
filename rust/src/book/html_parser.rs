@@ -212,6 +212,13 @@ fn collect_text(el: ElementRef<'_>) -> String {
     let mut text = String::new();
     for node in el.descendants() {
         if let Some(t) = node.value().as_text() {
+            let skip = node
+                .parent()
+                .and_then(|p| p.value().as_element())
+                .is_some_and(|e| matches!(e.name(), "script" | "style" | "noscript" | "title"));
+            if skip {
+                continue;
+            }
             text.push_str(t);
         } else if let Some(br) = ElementRef::wrap(node) {
             if br.value().name() == "br" {
@@ -336,5 +343,10 @@ fn collect_rich_spans(el: ElementRef<'_>) -> SmallVec<[RichSpan; 4]> {
 }
 
 fn is_heading(tag: &str) -> bool {
-    tag.len() == 2 && tag.starts_with('h') && tag.as_bytes().get(1).is_some_and(u8::is_ascii_digit)
+    tag.len() == 2
+        && tag.starts_with('h')
+        && tag
+            .as_bytes()
+            .get(1)
+            .is_some_and(|d| (b'1'..=b'6').contains(d))
 }
