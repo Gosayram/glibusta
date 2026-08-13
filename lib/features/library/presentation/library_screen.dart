@@ -75,6 +75,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   String? _paginationError;
+  int _loadGeneration = 0;
 
   bool get _selectionMode => _selectedBookIds.isNotEmpty;
 
@@ -107,11 +108,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     _hasMore = true;
     _isLoadingMore = false;
     _paginationError = null;
+    _loadGeneration++;
   }
 
   Future<void> _loadNextPage() async {
     if (_isLoadingMore || !_hasMore) return;
     _isLoadingMore = true;
+    final gen = _loadGeneration;
     try {
       final repository = ref.read(bookRepositoryProvider);
       final query = _searchQuery.trim();
@@ -133,7 +136,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           collectionId: _selectedCollectionId,
         );
       }
-      if (!mounted) return;
+      if (!mounted || gen != _loadGeneration) return;
       setState(() {
         if (newBooks.length < _pageSize) {
           _hasMore = false;
@@ -142,7 +145,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         _isLoadingMore = false;
       });
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!mounted || gen != _loadGeneration) return;
       setState(() {
         _isLoadingMore = false;
         _paginationError = e.toString();
@@ -246,7 +249,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         message: 'Не удалось загрузить библиотеку',
         details: _paginationError,
         onRetry: () {
-          _resetPagination();
+          setState(() => _resetPagination());
+          unawaited(_loadNextPage());
         },
       );
     }
@@ -1424,7 +1428,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       )
                     : Builder(
                         builder: (context) {
-                          unawaited(_loadNextPage());
+                          if (_paginationError == null) {
+                            unawaited(_loadNextPage());
+                          }
                           return const SizedBox.shrink();
                         },
                       ),

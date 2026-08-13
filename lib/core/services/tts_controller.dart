@@ -55,6 +55,7 @@ class TtsController {
     } on Object catch (e) {
       _ttsAvailable = false;
       debugPrint('TTS unavailable: $e');
+      return;
     }
     _lastLang = 'ru-RU';
     _lastRate = _defaultNativeRate;
@@ -84,11 +85,16 @@ class TtsController {
     _lastText = text;
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;
-    await _tts.setLanguage(_lastLang);
-    await _tts.setSpeechRate(_lastRate);
-    await _tts.speak(text);
-    _isPlaying = true;
-    _isPaused = false;
+    try {
+      await _tts.setLanguage(_lastLang);
+      await _tts.setSpeechRate(_lastRate);
+      await _tts.speak(text);
+      _isPlaying = true;
+      _isPaused = false;
+    } on Object catch (e) {
+      debugPrint('TTS speak failed: $e');
+      _isPlaying = false;
+    }
   }
 
   /// Pauses the current utterance when the platform supports it.
@@ -157,7 +163,7 @@ class TtsController {
 
     _ensureTts();
     _playbackRate = rate;
-    _lastRate = rate / 2;
+    _lastRate = (rate / 2).clamp(0.0, 1.0);
     if (!_ttsAvailable) return;
     await _tts.setSpeechRate(_lastRate);
   }

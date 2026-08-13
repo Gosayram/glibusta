@@ -50,7 +50,7 @@ class AnnotationExportFormatter {
   }
 
   static String _markdown(AnnotationData annotations, String title) {
-    final safeTitle = title.replaceAll('\n', ' ');
+    final safeTitle = title.replaceAll(RegExp(r'[#*\[\]_~`>-]'), r'\\$&').replaceAll('\n', ' ');
     final buffer = StringBuffer('# Аннотации — $safeTitle\n\n');
     _writeMarkdownBookmarks(buffer, annotations.bookmarks);
     _writeMarkdownNotes(buffer, annotations.notes);
@@ -63,7 +63,9 @@ class AnnotationExportFormatter {
     buffer.writeln('## Закладки\n');
     for (final item in items) {
       buffer.writeln('### ${_anchor(item.chapterIndex, item.paragraphIndex, item.localOffset)}');
-      if (_hasText(item.selectedText)) buffer.writeln('> ${item.selectedText}\n');
+      if (_hasText(item.selectedText)) {
+        buffer.writeln('> ${item.selectedText!.replaceAll('\n', '\n> ')}\n');
+      }
       if (_hasText(item.note)) buffer.writeln('**Заметка:** ${item.note}\n');
       buffer.writeln('_Создано: ${item.createdAt.toIso8601String()}_\n');
     }
@@ -86,7 +88,7 @@ class AnnotationExportFormatter {
     buffer.writeln('## Цитаты\n');
     for (final item in items) {
       buffer.writeln('### ${_anchor(item.chapterIndex, item.paragraphIndex)}');
-      buffer.writeln('> ${item.selectedText}\n');
+      buffer.writeln('> ${item.selectedText.replaceAll('\n', '\n> ')}\n');
       if (_hasText(item.note)) buffer.writeln('**Заметка:** ${item.note}\n');
       buffer.writeln('_Создано: ${item.createdAt.toIso8601String()}_\n');
     }

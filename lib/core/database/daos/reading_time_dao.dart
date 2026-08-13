@@ -11,6 +11,7 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
   ReadingTimeDao(super.attachedDatabase);
 
   Future<void> addReadingTime(String bookId, DateTime date, int seconds) async {
+    if (seconds <= 0) return;
     final day = DateTime(date.year, date.month, date.day);
     await transaction(() async {
       final existing = await (select(
@@ -123,14 +124,18 @@ class ReadingTimeDao extends DatabaseAccessor<AppDatabase> with _$ReadingTimeDao
       readingTime,
     )..where((t) => t.date.isBiggerOrEqualValue(start) & t.wpm.isBiggerThanValue(0))).get();
     final dailyWpm = <DateTime, double>{};
+    final dailyCounts = <DateTime, int>{};
     for (final row in results) {
       final day = DateTime(row.date.year, row.date.month, row.date.day);
-      final existing = dailyWpm[day];
-      if (existing == null || existing == 0) {
-        dailyWpm[day] = row.wpm;
-      } else {
-        dailyWpm[day] = (existing + row.wpm) / 2;
+      final prevWpm = dailyWpm[day];
+      final prevCount = dailyCounts[day] ?? 0;
+      final newCount = prevCount + row.wpmSessionCount;
+      if (newCount > 0) {
+        dailyWpm[day] = prevWpm == null
+            ? row.wpm
+            : (prevWpm * prevCount + row.wpm * row.wpmSessionCount) / newCount;
       }
+      dailyCounts[day] = newCount;
     }
     return dailyWpm;
   }

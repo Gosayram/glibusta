@@ -24,10 +24,12 @@ abstract interface class AppFileStorage {
 }
 
 String sanitizeId(String id) {
+  if (id.isEmpty) return 'unnamed';
   var sanitized = id.replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
   while (sanitized.startsWith('.')) {
     sanitized = sanitized.substring(1);
   }
+  sanitized = sanitized.replaceAll(RegExp(r'\.+$'), '');
   sanitized = sanitized.trim();
   if (sanitized.isEmpty) sanitized = 'unnamed';
   if (sanitized.length > 200) sanitized = sanitized.substring(0, 200);

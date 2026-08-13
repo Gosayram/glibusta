@@ -208,6 +208,7 @@ class BookOpenService {
       try {
         final imageFile = File('${imagesDir.path}/${_docxImageFileName(assetId)}');
         final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
+        if (bytes.isEmpty || bytes.lengthInBytes == 0) continue;
         temporaryFile = File('${imageFile.path}.tmp');
         await temporaryFile.writeAsBytes(bytes, flush: true);
         await temporaryFile.rename(imageFile.path);
@@ -349,6 +350,7 @@ class BookOpenService {
     try {
       final book = await openBook(bookId);
       await cache.putBook(bookId, book);
+      await _loadEmbeddedFonts(book, bookId);
       return book;
     } on TimeoutException {
       await cache.invalidate(bookId, preserveImages: true);
