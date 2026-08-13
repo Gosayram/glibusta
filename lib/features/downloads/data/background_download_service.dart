@@ -53,8 +53,8 @@ class BackgroundDownloadService {
     final bdTask = bd.DownloadTask(
       url: sourceUrl,
       filename: fileName,
-      baseDirectory: bd.BaseDirectory.root,
-      directory: '/storage/emulated/0/Download/Glibusta',
+      baseDirectory: bd.BaseDirectory.applicationSupport,
+      directory: 'glibusta/downloads',
       updates: bd.Updates.statusAndProgress,
       allowPause: true,
       retries: 3,

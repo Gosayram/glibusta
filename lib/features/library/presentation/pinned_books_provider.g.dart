@@ -32,7 +32,7 @@ final class PinnedBooksProvider extends $AsyncNotifierProvider<PinnedBooks, List
   PinnedBooks create() => PinnedBooks();
 }
 
-String _$pinnedBooksHash() => r'de04ca9e7fbbadf0478b1401121f3d4511621633';
+String _$pinnedBooksHash() => r'3cc0c328f9b05df153b2edd9ffa2b9deed3d1227';
 
 abstract class _$PinnedBooks extends $AsyncNotifier<List<String>> {
   FutureOr<List<String>> build();

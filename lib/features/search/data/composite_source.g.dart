@@ -47,4 +47,4 @@ final class BookSourceProvider extends $FunctionalProvider<BookSource, BookSourc
   }
 }
 
-String _$bookSourceHash() => r'd79dc6fc68c97f06faaaa377346a81b4356000e5';
+String _$bookSourceHash() => r'6af18e4fafe49a30227bbd87a892bec28548765c';

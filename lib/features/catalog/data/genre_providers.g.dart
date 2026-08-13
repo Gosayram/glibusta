@@ -46,7 +46,7 @@ final class GenreListProvider
   }
 }
 
-String _$genreListHash() => r'a375d1bf78c8a5a6adaface9756ab1b5faf16707';
+String _$genreListHash() => r'9366ff4ab62fdb467903746bffa9e124abccbc1a';
 
 @ProviderFor(genreBooks)
 final genreBooksProvider = GenreBooksFamily._();
@@ -103,7 +103,7 @@ final class GenreBooksProvider
   }
 }
 
-String _$genreBooksHash() => r'62ed27ed57ad33464405110b173464b83a94c0a4';
+String _$genreBooksHash() => r'3e8e9d79e05af44a67c4aa63158942a5e6e92c52';
 
 final class GenreBooksFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<GenreBooksResponse>, String> {

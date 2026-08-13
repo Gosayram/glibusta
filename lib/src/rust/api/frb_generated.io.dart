@@ -22,6 +22,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     required super.portManager,
   });
 
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_ArcBookEnginePtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEnginePtr;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_BookEnginePtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEnginePtr;
+
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ValuePtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValuePtr;
 
@@ -29,12 +37,44 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
-  Value dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  ArcBookEngine
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
     dynamic raw,
   );
 
   @protected
-  Value dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  BookEngine
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    dynamic raw,
+  );
+
+  @protected
+  Value
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+    dynamic raw,
+  );
+
+  @protected
+  BookEngine
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    dynamic raw,
+  );
+
+  @protected
+  ArcBookEngine
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    dynamic raw,
+  );
+
+  @protected
+  BookEngine
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    dynamic raw,
+  );
+
+  @protected
+  Value
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     dynamic raw,
   );
 
@@ -45,10 +85,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType dco_decode_block_type(dynamic raw);
 
   @protected
+  BookAssetMeta dco_decode_book_asset_meta(dynamic raw);
+
+  @protected
+  BookDiff dco_decode_book_diff(dynamic raw);
+
+  @protected
   BookFormat dco_decode_book_format(dynamic raw);
 
   @protected
   BookMeta dco_decode_book_meta(dynamic raw);
+
+  @protected
+  BookValidationResult dco_decode_book_validation_result(dynamic raw);
 
   @protected
   bool dco_decode_bool(dynamic raw);
@@ -72,7 +121,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NormalizedBook dco_decode_box_autoadd_normalized_book(dynamic raw);
 
   @protected
+  ReaderChapter dco_decode_box_autoadd_reader_chapter(dynamic raw);
+
+  @protected
   BigInt dco_decode_box_autoadd_usize(dynamic raw);
+
+  @protected
+  ChapterLanguage dco_decode_chapter_language(dynamic raw);
 
   @protected
   EmbeddedImage dco_decode_embedded_image(dynamic raw);
@@ -81,10 +136,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double dco_decode_f_64(dynamic raw);
 
   @protected
+  FormatCapabilities dco_decode_format_capabilities(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  ImportReport dco_decode_import_report(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<BookAssetMeta> dco_decode_list_book_asset_meta(dynamic raw);
 
   @protected
   List<EmbeddedImage> dco_decode_list_embedded_image(dynamic raw);
@@ -96,10 +160,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ParseWarning> dco_decode_list_parse_warning(dynamic raw);
 
   @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  Uint64List dco_decode_list_prim_usize_strict(dynamic raw);
 
   @protected
   List<ReaderBlock> dco_decode_list_reader_block(dynamic raw);
@@ -108,7 +178,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ReaderChapter> dco_decode_list_reader_chapter(dynamic raw);
 
   @protected
+  List<(int, String)> dco_decode_list_record_i_32_string(dynamic raw);
+
+  @protected
   List<RichSpan> dco_decode_list_rich_span(dynamic raw);
+
+  @protected
+  List<SearchMatch> dco_decode_list_search_match(dynamic raw);
 
   @protected
   List<TocEntry> dco_decode_list_toc_entry(dynamic raw);
@@ -135,6 +211,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
 
   @protected
+  ReaderChapter? dco_decode_opt_box_autoadd_reader_chapter(dynamic raw);
+
+  @protected
   BigInt? dco_decode_opt_box_autoadd_usize(dynamic raw);
 
   @protected
@@ -159,13 +238,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReaderChapter dco_decode_reader_chapter(dynamic raw);
 
   @protected
+  (bool, String, BigInt) dco_decode_record_bool_string_u_64(dynamic raw);
+
+  @protected
+  (int, String) dco_decode_record_i_32_string(dynamic raw);
+
+  @protected
   RichSpan dco_decode_rich_span(dynamic raw);
+
+  @protected
+  SearchMatch dco_decode_search_match(dynamic raw);
 
   @protected
   TocEntry dco_decode_toc_entry(dynamic raw);
 
   @protected
-  int dco_decode_u_16(dynamic raw);
+  BigInt dco_decode_u_64(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -180,12 +268,44 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
-  Value sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  ArcBookEngine
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
     SseDeserializer deserializer,
   );
 
   @protected
-  Value sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  BookEngine
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  Value
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BookEngine
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ArcBookEngine
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BookEngine
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  Value
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     SseDeserializer deserializer,
   );
 
@@ -196,10 +316,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   BlockType sse_decode_block_type(SseDeserializer deserializer);
 
   @protected
+  BookAssetMeta sse_decode_book_asset_meta(SseDeserializer deserializer);
+
+  @protected
+  BookDiff sse_decode_book_diff(SseDeserializer deserializer);
+
+  @protected
   BookFormat sse_decode_book_format(SseDeserializer deserializer);
 
   @protected
   BookMeta sse_decode_book_meta(SseDeserializer deserializer);
+
+  @protected
+  BookValidationResult sse_decode_book_validation_result(
+    SseDeserializer deserializer,
+  );
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -225,7 +356,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ReaderChapter sse_decode_box_autoadd_reader_chapter(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   BigInt sse_decode_box_autoadd_usize(SseDeserializer deserializer);
+
+  @protected
+  ChapterLanguage sse_decode_chapter_language(SseDeserializer deserializer);
 
   @protected
   EmbeddedImage sse_decode_embedded_image(SseDeserializer deserializer);
@@ -234,10 +373,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   double sse_decode_f_64(SseDeserializer deserializer);
 
   @protected
+  FormatCapabilities sse_decode_format_capabilities(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  ImportReport sse_decode_import_report(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<BookAssetMeta> sse_decode_list_book_asset_meta(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<EmbeddedImage> sse_decode_list_embedded_image(
@@ -253,10 +405,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  Uint64List sse_decode_list_prim_usize_strict(SseDeserializer deserializer);
 
   @protected
   List<ReaderBlock> sse_decode_list_reader_block(SseDeserializer deserializer);
@@ -267,7 +425,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<(int, String)> sse_decode_list_record_i_32_string(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<RichSpan> sse_decode_list_rich_span(SseDeserializer deserializer);
+
+  @protected
+  List<SearchMatch> sse_decode_list_search_match(SseDeserializer deserializer);
 
   @protected
   List<TocEntry> sse_decode_list_toc_entry(SseDeserializer deserializer);
@@ -292,6 +458,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  ReaderChapter? sse_decode_opt_box_autoadd_reader_chapter(
+    SseDeserializer deserializer,
+  );
 
   @protected
   BigInt? sse_decode_opt_box_autoadd_usize(SseDeserializer deserializer);
@@ -322,13 +493,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ReaderChapter sse_decode_reader_chapter(SseDeserializer deserializer);
 
   @protected
+  (bool, String, BigInt) sse_decode_record_bool_string_u_64(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  (int, String) sse_decode_record_i_32_string(SseDeserializer deserializer);
+
+  @protected
   RichSpan sse_decode_rich_span(SseDeserializer deserializer);
+
+  @protected
+  SearchMatch sse_decode_search_match(SseDeserializer deserializer);
 
   @protected
   TocEntry sse_decode_toc_entry(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_u_16(SseDeserializer deserializer);
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -346,13 +528,50 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    ArcBookEngine self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    BookEngine self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    BookEngine self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    ArcBookEngine self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    BookEngine self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(
     Value self,
     SseSerializer serializer,
   );
@@ -364,10 +583,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_block_type(BlockType self, SseSerializer serializer);
 
   @protected
+  void sse_encode_book_asset_meta(BookAssetMeta self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_book_diff(BookDiff self, SseSerializer serializer);
+
+  @protected
   void sse_encode_book_format(BookFormat self, SseSerializer serializer);
 
   @protected
   void sse_encode_book_meta(BookMeta self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_book_validation_result(
+    BookValidationResult self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -395,7 +626,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_reader_chapter(
+    ReaderChapter self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_usize(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_chapter_language(
+    ChapterLanguage self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_embedded_image(EmbeddedImage self, SseSerializer serializer);
@@ -404,10 +647,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_f_64(double self, SseSerializer serializer);
 
   @protected
+  void sse_encode_format_capabilities(
+    FormatCapabilities self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_import_report(ImportReport self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_book_asset_meta(
+    List<BookAssetMeta> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_embedded_image(
@@ -428,11 +686,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_usize_strict(
+    Uint64List self,
     SseSerializer serializer,
   );
 
@@ -449,7 +719,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_record_i_32_string(
+    List<(int, String)> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_rich_span(List<RichSpan> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_search_match(
+    List<SearchMatch> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_toc_entry(List<TocEntry> self, SseSerializer serializer);
@@ -478,6 +760,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_reader_chapter(
+    ReaderChapter? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_usize(BigInt? self, SseSerializer serializer);
@@ -516,13 +804,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_reader_chapter(ReaderChapter self, SseSerializer serializer);
 
   @protected
+  void sse_encode_record_bool_string_u_64(
+    (bool, String, BigInt) self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_record_i_32_string(
+    (int, String) self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_rich_span(RichSpan self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_match(SearchMatch self, SseSerializer serializer);
 
   @protected
   void sse_encode_toc_entry(TocEntry self, SseSerializer serializer);
 
   @protected
-  void sse_encode_u_16(int self, SseSerializer serializer);
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
@@ -538,13 +841,83 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
 class RustLibWire implements BaseWire {
   /// The symbols are looked up in [dynamicLibrary].
-  RustLibWire(ffi.DynamicLibrary dynamicLibrary) : _lookup = dynamicLibrary.lookup;
+  RustLibWire(ffi.DynamicLibrary dynamicLibrary)
+    : _lookup = dynamicLibrary.lookup;
 
   factory RustLibWire.fromExternalLibrary(ExternalLibrary lib) =>
       RustLibWire(lib.ffiDynamicLibrary);
 
   /// Holds the symbol lookup function.
-  final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) _lookup;
+  final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
+  _lookup;
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEnginePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_glibusta_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEnginePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEnginePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_glibusta_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEngine =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerArcBookEnginePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEnginePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_glibusta_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEnginePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEnginePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_glibusta_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEngine =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerBookEnginePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerValue(

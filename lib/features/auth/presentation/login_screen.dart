@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/auth/auth_repository.dart';
 import '../../../core/config/app_settings.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -64,8 +65,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authAsync = ref.watch(authStateProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Вход'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Вход'),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -196,21 +197,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             _nameController.text.trim(),
             _passwordController.text,
             _persistent,
-          )
-          .then((_) {
-            if (_persistent && mounted) {
-              final authState = ref.read(authStateProvider);
-              if (authState.hasValue && authState.value!.isAuthenticated) {
-                final secureStorage = ref.read(flutterSecureStorageProvider);
-                unawaited(
-                  secureStorage.write(key: 'auth_username', value: _nameController.text.trim()),
-                );
-                unawaited(
-                  secureStorage.write(key: 'auth_password', value: _passwordController.text),
-                );
-              }
-            }
-          }),
+          ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class QuoteRepository {
   final AppDatabase _db;
@@ -12,6 +13,30 @@ class QuoteRepository {
           ..where((q) => q.bookId.equals(bookId))
           ..orderBy([(q) => OrderingTerm.desc(q.createdAt)]))
         .get();
+  }
+
+  Future<List<Quote>> getQuotesPage({
+    String? bookId,
+    required int limit,
+    required int offset,
+  }) {
+    final query = _db.select(_db.quotes)
+      ..orderBy([(q) => OrderingTerm.desc(q.createdAt)])
+      ..limit(limit, offset: offset);
+    if (bookId != null) {
+      query.where((q) => q.bookId.equals(bookId));
+    }
+    return query.get();
+  }
+
+  Future<int> countQuotes({String? bookId}) async {
+    final countExp = _db.quotes.id.count();
+    final query = _db.selectOnly(_db.quotes)..addColumns([countExp]);
+    if (bookId != null) {
+      query.where(_db.quotes.bookId.equals(bookId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExp)!;
   }
 
   Future<Quote?> getQuote(String id) async {
@@ -31,7 +56,7 @@ class QuoteRepository {
         .into(_db.quotes)
         .insert(
           QuotesCompanion.insert(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            id: newMonotonicId(),
             bookId: bookId,
             chapterIndex: chapterIndex,
             paragraphIndex: paragraphIndex,

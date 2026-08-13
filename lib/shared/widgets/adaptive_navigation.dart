@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/platform/adaptive_context.dart';
 import '../../core/platform/app_platform.dart';
+import '../../core/services/background_task_provider.dart';
+import '../../core/services/task_queue_service.dart';
 import '../../features/library/data/book_import_service.dart';
 import '../../features/reader/data/parsers/format_detector.dart';
 import '../../l10n/generated/app_localizations.dart';
@@ -69,16 +72,29 @@ class AdaptiveNavigation extends StatelessWidget {
       );
     }
 
-    return NavigationRail(
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onDestinationSelected,
-      extended: context.isExpanded,
-      labelType: context.isExpanded ? NavigationRailLabelType.none : NavigationRailLabelType.all,
-      leading: const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Icon(Icons.menu_book, size: 28),
-      ),
-      destinations: expandedDestinations,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useCompactRail = constraints.maxHeight < 400;
+        final rail = NavigationRail(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onDestinationSelected,
+          extended: context.isExpanded,
+          labelType: context.isExpanded || useCompactRail
+              ? NavigationRailLabelType.none
+              : NavigationRailLabelType.all,
+          leading: useCompactRail
+              ? null
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Icon(Icons.menu_book, size: 28),
+                ),
+          destinations: expandedDestinations,
+        );
+
+        // A wide foldable in landscape can select the rail while providing
+        // less vertical space than its five destinations and heading require.
+        return rail;
+      },
     );
   }
 }
@@ -94,12 +110,15 @@ class SidebarNavigation extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int>? onDestinationSelected;
 
+  /// Maps list item index to shell branch index.
+  /// Items not in this map are push-routes (no shell branch).
   static const _branchIndexForItem = <int, int>{
-    0: 0,
-    1: 1,
-    2: 2,
-    3: 3,
-    7: 4,
+    0: 2, // Catalog → branch 2
+    1: 1, // Search → branch 1
+    2: 0, // Library (Все книги) → branch 0
+    // 3-6: push-routes (no branch)
+    7: 3, // Downloads → branch 3
+    9: 4, // Settings → branch 4
   };
 
   @override
@@ -108,21 +127,36 @@ class SidebarNavigation extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     final items = [
-      _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
-      _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      // Section: Обзор
       _SidebarItem(icon: Icons.explore, label: l10n.catalogTitle, route: '/catalog'),
-      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
+      _SidebarItem(icon: Icons.search, label: l10n.searchTitle, route: '/search'),
+      // Section: Библиотека
+      _SidebarItem(icon: Icons.library_books, label: l10n.libraryTitle, route: '/library'),
+      const _SidebarItem(icon: Icons.auto_stories, label: 'Чтение', route: '/collections'),
+      const _SidebarItem(
+        icon: Icons.bookmark_border,
+        label: 'Хочу прочитать',
+        route: '/collections',
+      ),
       _SidebarItem(
         icon: Icons.collections_bookmark,
         label: l10n.collectionsTitle,
         route: '/collections',
+      ),
+      const _SidebarItem(
+        icon: Icons.bookmark,
+        label: 'Закладки',
+        route: '/bookmarks',
       ),
       _SidebarItem(
         icon: Icons.sticky_note_2_outlined,
         label: l10n.annotationsTitle,
         route: '/annotations',
       ),
-      _SidebarItem(icon: Icons.bar_chart, label: l10n.statisticsTitle, route: '/stats'),
+      _SidebarItem(icon: Icons.download, label: l10n.downloadsTitle, route: '/downloads'),
+      // Spacer placeholder for bottom alignment
+      const _SidebarItem(icon: Icons.settings, label: '', isSpacer: true),
+      // Settings (bottom)
       _SidebarItem(icon: Icons.settings, label: l10n.settingsTitle, route: '/settings'),
     ];
 
@@ -157,6 +191,20 @@ class SidebarNavigation extends StatelessWidget {
                 itemCount: items.length,
                 itemBuilder: (context, index) {
                   final item = items[index];
+
+                  // Spacer placeholder
+                  if (item.isSpacer) {
+                    return const SizedBox(height: 16);
+                  }
+
+                  // Section headers
+                  if (index == 0) {
+                    return const _SectionHeader('Обзор');
+                  }
+                  if (index == 2) {
+                    return const _SectionHeader('Библиотека');
+                  }
+
                   final branchIdx = _branchIndexForItem[index];
                   final isBranchItem = branchIdx != null;
                   final isSelected = isBranchItem && branchIdx == selectedIndex;
@@ -204,11 +252,32 @@ class _SidebarItem {
   const _SidebarItem({
     required this.icon,
     required this.label,
-    required this.route,
+    this.route = '',
+    this.isSpacer = false,
   });
   final IconData icon;
   final String label;
   final String route;
+  final bool isSpacer;
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title);
+  final String title;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Shells ─────────────────────────────────────────────
@@ -242,15 +311,27 @@ class TabletShell extends StatelessWidget {
       body: SafeArea(
         child: Row(
           children: [
-            AdaptiveNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _handleSidebarKey,
+                child: AdaptiveNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
+                ),
               ),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: navigationShell,
+              ),
+            ),
           ],
         ),
       ),
@@ -268,20 +349,46 @@ class DesktopShell extends StatelessWidget {
       body: SafeArea(
         child: Row(
           children: [
-            AdaptiveNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _handleSidebarKey,
+                child: AdaptiveNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
+                ),
               ),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: navigationShell,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+KeyEventResult _handleSidebarKey(FocusNode node, KeyEvent event) {
+  if (event is! KeyDownEvent) return KeyEventResult.ignored;
+  // Left arrow: sidebar is flat (no sub-items) — ignore.
+  if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+    return KeyEventResult.ignored;
+  }
+  // Right arrow: move focus to the content FocusTraversalGroup (next scope).
+  if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+    FocusScope.of(node.context!).nextFocus();
+    return KeyEventResult.handled;
+  }
+  return KeyEventResult.ignored;
 }
 
 /// macOS-style shell with sidebar
@@ -298,19 +405,35 @@ class MacOSShell extends ConsumerWidget {
         onBooksDropped: (paths) => _handleDrop(context, ref, paths),
         child: Row(
           children: [
-            SidebarNavigation(
-              selectedIndex: navigationShell.currentIndex,
-              onDestinationSelected: (index) => navigationShell.goBranch(
-                index,
-                initialLocation: index == navigationShell.currentIndex,
+            FocusTraversalGroup(
+              policy: ReadingOrderTraversalPolicy(),
+              child: Focus(
+                canRequestFocus: false,
+                onKeyEvent: _handleSidebarKey,
+                child: SidebarNavigation(
+                  selectedIndex: navigationShell.currentIndex,
+                  onDestinationSelected: (index) => navigationShell.goBranch(
+                    index,
+                    initialLocation: index == navigationShell.currentIndex,
+                  ),
+                ),
               ),
             ),
             const VerticalDivider(width: 1),
-            Expanded(child: navigationShell),
-            if (selectedBook != null) ...[
-              const VerticalDivider(width: 1),
-              const MacOSRightPanel(),
-            ],
+            Expanded(
+              child: FocusTraversalGroup(
+                policy: ReadingOrderTraversalPolicy(),
+                child: Row(
+                  children: [
+                    Expanded(child: navigationShell),
+                    if (selectedBook != null) ...[
+                      const VerticalDivider(width: 1),
+                      const MacOSRightPanel(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -328,17 +451,24 @@ class MacOSShell extends ConsumerWidget {
       return;
     }
     final importService = ref.read(bookImportServiceProvider);
+    final taskQueue = ref.read(taskQueueProvider);
     for (final path in bookPaths) {
       unawaited(
-        importService.importFile(path).then((result) {
-          if (!context.mounted) return;
-          final msg = result.isSuccess
-              ? 'Импортировано: ${result.title}'
-              : result.isDuplicate
-              ? 'Дубликат: ${result.title}'
-              : 'Ошибка: ${result.error}';
-          unawaited(SmartDialog.showToast(msg));
-        }),
+        taskQueue
+            .run<ImportResult>(
+              type: BackgroundTaskType.import,
+              message: 'Импорт: ${path.split('/').last}',
+              task: () => importService.importFile(path),
+            )
+            .then((result) {
+              if (!context.mounted) return;
+              final msg = result.isSuccess
+                  ? 'Импортировано: ${result.title}'
+                  : result.isDuplicate
+                  ? 'Дубликат: ${result.title}'
+                  : 'Ошибка: ${result.error}';
+              unawaited(SmartDialog.showToast(msg));
+            }),
       );
     }
   }

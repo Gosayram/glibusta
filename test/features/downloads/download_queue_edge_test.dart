@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/notifications/download_notification_service.dart';
+import 'package:glibusta/core/services/task_queue_service.dart';
 import 'package:glibusta/features/downloads/data/background_download_service.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
@@ -16,11 +17,14 @@ class MockDownloadNotificationService extends Mock implements DownloadNotificati
 
 class MockBookImportService extends Mock implements BookImportService {}
 
+class MockTaskQueueService extends Mock implements TaskQueueService {}
+
 void main() {
   late MockDownloadRepository mockRepo;
   late MockBackgroundDownloadService mockBgDownload;
   late MockDownloadNotificationService mockNotificationService;
   late MockBookImportService mockBookImport;
+  late MockTaskQueueService mockTaskQueue;
 
   setUpAll(() {
     registerFallbackValue(DownloadStatus.queued);
@@ -45,6 +49,7 @@ void main() {
     mockBgDownload = MockBackgroundDownloadService();
     mockNotificationService = MockDownloadNotificationService();
     mockBookImport = MockBookImportService();
+    mockTaskQueue = MockTaskQueueService();
     when(() => mockNotificationService.cancel(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showCompleted(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showFailed(any(), any())).thenAnswer((_) async {});
@@ -57,6 +62,7 @@ void main() {
     when(() => mockRepo.removeDownload(any())).thenAnswer((_) async {});
     when(() => mockRepo.cancelDownload(any())).thenAnswer((_) async {});
     when(() => mockRepo.updateStatus(any(), any())).thenAnswer((_) async {});
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => const []);
   });
 
   group('pause', () {
@@ -66,6 +72,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.pause('nonexistent');
       verifyNever(() => mockRepo.updateStatus(any(), any()));
@@ -80,6 +87,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.cancel('nonexistent');
       verifyNever(() => mockRepo.cancelDownload(any()));
@@ -94,7 +102,9 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
+      when(() => mockBgDownload.cancel(any())).thenAnswer((_) async {});
       await queue.remove('nonexistent');
       verify(() => mockRepo.removeDownload('nonexistent')).called(1);
       queue.dispose();
@@ -108,6 +118,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       final tasks = await queue.onDownloadsChanged.first.timeout(const Duration(seconds: 2));
       expect(tasks, isEmpty);
@@ -152,6 +163,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
       await queue.enqueue(
         bookId: 'b1',
@@ -170,6 +182,58 @@ void main() {
       ).called(1);
 
       await Future<void>.delayed(const Duration(milliseconds: 200));
+      queue.dispose();
+    });
+
+    test('marks the task failed when the native downloader rejects it', () async {
+      const task = DownloadTask(
+        id: 'task-1',
+        bookId: 'b1',
+        bookTitle: 'Book 1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b1.epub',
+        targetPath: '/tmp/b1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'b1',
+          bookTitle: 'Book 1',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b1.epub',
+        ),
+      ).thenAnswer((_) async => task);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenThrow(StateError('native scheduler unavailable'));
+
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+        mockTaskQueue,
+      );
+
+      await expectLater(
+        queue.enqueue(
+          bookId: 'b1',
+          bookTitle: 'Book 1',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b1.epub',
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      verify(() => mockRepo.updateStatus('task-1', DownloadStatus.failed)).called(1);
       queue.dispose();
     });
   });

@@ -1,31 +1,33 @@
 pub(crate) fn decode_utf16(bytes: &[u8]) -> String {
     if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-            .collect();
-        return String::from_utf16_lossy(&units);
+        return decode_utf16_units(&bytes[2..], u16::from_le_bytes);
     }
     if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c[0], c[1]]))
-            .collect();
-        return String::from_utf16_lossy(&units);
+        return decode_utf16_units(&bytes[2..], u16::from_be_bytes);
     }
-    let mut buf = String::with_capacity(bytes.len() / 2);
-    let mut i = 0;
-    while i + 1 < bytes.len() {
-        let code = (bytes[i] as u32) | ((bytes[i + 1] as u32) << 8);
-        if let Some(c) = char::from_u32(code) {
-            buf.push(c);
-        }
-        i += 2;
-    }
-    buf
+
+    // MOBI's UTF-16 code page does not require a BOM. Treat BOM-less input as
+    // little-endian, but still decode the complete u16 sequence so surrogate
+    // pairs survive rather than being silently discarded one unit at a time.
+    decode_utf16_units(bytes, u16::from_le_bytes)
 }
 
-pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {
+fn decode_utf16_units(bytes: &[u8], from_bytes: fn([u8; 2]) -> u16) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|chunk| from_bytes([chunk[0], chunk[1]]))
+        .collect();
+    String::from_utf16_lossy(&units)
+}
+
+pub(crate) fn decode_text(
+    bytes: &[u8],
+    text_encoding: u16,
+    forced_encoding: Option<&str>,
+) -> String {
+    if let Some(decoded) = forced_encoding.and_then(|encoding| decode_forced(bytes, encoding)) {
+        return decoded;
+    }
     if text_encoding == 65001 {
         return String::from_utf8_lossy(bytes).into_owned();
     }
@@ -36,11 +38,33 @@ pub(crate) fn decode_text(bytes: &[u8], text_encoding: u16) -> String {
         let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
         return decoded.into_owned();
     }
-    let utf8_text = String::from_utf8_lossy(bytes).into_owned();
-    let replacement_count = utf8_text.matches('\u{FFFD}').count();
-    if (replacement_count as f64) < (bytes.len() as f64 * 0.02) {
-        return utf8_text;
+    if let Ok(utf8_text) = std::str::from_utf8(bytes) {
+        return utf8_text.to_owned();
     }
     let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(bytes);
     decoded.into_owned()
+}
+
+/// Decode a user-selected encoding when it is one supported by the reader.
+///
+/// MOBI stores an encoding in its header, but a corrupt or incorrectly
+/// converted file can declare the wrong value.  The import path exposes the
+/// same per-book override for every text format, so honour it here as well.
+/// Unknown labels deliberately fall back to the header's controlled decoder.
+fn decode_forced(bytes: &[u8], encoding: &str) -> Option<String> {
+    let label = encoding.trim();
+    if label.eq_ignore_ascii_case("utf-8") || label.eq_ignore_ascii_case("utf8") {
+        return Some(String::from_utf8_lossy(bytes).into_owned());
+    }
+    if label.eq_ignore_ascii_case("utf-16") || label.eq_ignore_ascii_case("utf-16le") {
+        return Some(decode_utf16_units(bytes, u16::from_le_bytes));
+    }
+    if label.eq_ignore_ascii_case("utf-16be") {
+        return Some(decode_utf16_units(bytes, u16::from_be_bytes));
+    }
+
+    encoding_rs::Encoding::for_label(label.as_bytes()).map(|encoding| {
+        let (decoded, _, _) = encoding.decode(bytes);
+        decoded.into_owned()
+    })
 }

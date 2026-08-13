@@ -1,26 +1,34 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/fonts/custom_font_helper.dart';
+import '../../../core/platform/adaptive_context.dart';
 import '../../../core/services/tts_controller.dart';
 import '../../../core/theme/app_duration.dart';
 import '../../../shared/widgets/adaptive_panel.dart';
 import '../../../shared/widgets/reader_shortcuts.dart';
 import '../../../shared/widgets/selection_area_wrapper.dart';
 import '../../highlights/presentation/highlight_providers.dart';
+import '../../home/presentation/reading_stats_provider.dart';
 import '../../library/data/book_delete_service.dart';
+import '../data/color_preset_service.dart';
+import '../data/epub_anchor_resolver.dart';
 import '../data/parsers/normalized_book.dart';
 import '../data/reader_colors.dart';
+import '../data/reading_info_formatter.dart';
 import '../data/reading_info_model.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
@@ -29,21 +37,69 @@ import 'reader_chrome.dart';
 import 'reader_content.dart';
 import 'reader_context_menu.dart';
 import 'reader_controller.dart';
+import 'reader_corner_long_press.dart';
 import 'reader_error_panel.dart';
 import 'reader_gesture_coordinator.dart';
+import 'reader_link_back_pinch_gesture.dart';
+import 'reader_page_turn_haptic.dart';
 import 'reader_providers.dart';
 import 'reader_quick_settings.dart';
 import 'reader_search_overlay.dart';
 import 'reader_selection_toolbar.dart';
+import 'reader_two_finger_chapter_gesture.dart';
+import 'reader_vertical_gesture.dart';
+import 'reading_break_reminder.dart';
 import 'reading_info_provider.dart';
 import 'table_of_contents_sheet.dart';
 
 enum _ReadingInfoPosition { header, footer }
 
+typedef ExternalLinkOpener = Future<bool> Function(Uri uri);
+
+Future<bool> _openExternalLink(Uri uri) => launchUrl(uri, mode: LaunchMode.externalApplication);
+
+/// Shows the explicit confirmation required before leaving the reader.
+Future<void> showExternalLinkConfirmation(
+  BuildContext context,
+  Uri uri, {
+  ExternalLinkOpener openExternalLink = _openExternalLink,
+}) async {
+  final host = uri.host.isNotEmpty ? uri.host : uri.toString();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Внешняя ссылка'),
+      content: Text('Открыть ссылку?\n$host'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Отмена'),
+        ),
+        TextButton(
+          onPressed: () async {
+            Navigator.of(dialogContext).pop();
+            try {
+              await openExternalLink(uri);
+            } on Object catch (error, stackTrace) {
+              developer.log(
+                'Unable to open an external reader link',
+                error: error,
+                stackTrace: stackTrace,
+              );
+            }
+          },
+          child: const Text('Открыть'),
+        ),
+      ],
+    ),
+  );
+}
+
 class ReaderScreen extends ConsumerStatefulWidget {
-  const ReaderScreen({super.key, required this.bookId});
+  const ReaderScreen({super.key, required this.bookId, this.initialPosition});
 
   final String bookId;
+  final ReaderPosition? initialPosition;
 
   @override
   ConsumerState<ReaderScreen> createState() => _ReaderScreenState();
@@ -52,27 +108,29 @@ class ReaderScreen extends ConsumerStatefulWidget {
 class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   late final ReaderController _ctrl;
   final _gestureCoordinator = ReaderGestureCoordinator();
+  final _twoFingerChapterGesture = ReaderTwoFingerChapterGesture();
+  final _linkBackPinchGesture = ReaderLinkBackPinchGesture();
   AppLifecycleListener? _lifecycleListener;
   double _dragStartBrightness = 0.0;
   double _dragStartY = 0.0;
   bool _dragStartedInTopZone = false;
   bool _dragStartedInLeftHalf = false;
-  double _dragStartFontSize = 0.0;
+  double _dragStartWarmth = 0.0;
+  String? _verticalGestureFeedback;
+  Timer? _verticalGestureFeedbackTimer;
   String? _selectedText;
   int _batteryLevel = -1;
   bool _finishedDialogShown = false;
+  List<ColorPreset>? _cachedPresetList;
+  String? _cachedActivePresetId;
+  ReaderColors? _cachedCustomColors;
+  Map<int, List<TextHighlight>>? _cachedHighlightsMap;
+  List<TextHighlight>? _lastHighlightsSource;
   // HG-6.4: spinner during layout recalculation
   Timer? _relayoutTimer;
   bool _isRelayouting = false;
-
-  Future<void> _checkForSelectedText() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (mounted && data?.text != null && data!.text!.isNotEmpty && data.text != _selectedText) {
-      setState(() => _selectedText = data.text);
-    }
-  }
+  ReaderLayoutDeviceClass? _layoutDeviceClass;
+  bool? _autoHideSuspendedByAccessibility;
 
   @override
   void initState() {
@@ -82,8 +140,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
     _ctrl = ref.read(readerControllerProvider(widget.bookId));
+    final initialPosition = widget.initialPosition;
+    if (initialPosition != null) {
+      unawaited(_ctrl.jumpToPositionWhenReady(initialPosition));
+    }
     unawaited(_fetchBatteryLevel());
     unawaited(CustomFontHelper.loadSaved());
+    // FDEP-1.3: request 120Hz on Android flagships
+    unawaited(FlutterDisplayMode.setHighRefreshRate().catchError((_) {}));
     // LW-11.1: init TTS headphone auto-pause listener
     unawaited(TtsController.instance.init());
     _enterImmersiveMode();
@@ -97,6 +161,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         }
       });
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final deviceClass = readerLayoutDeviceClassFor(
+      canUseTwoPageMode: context.canUseTwoPageMode,
+    );
+    if (_layoutDeviceClass != deviceClass) {
+      _layoutDeviceClass = deviceClass;
+      unawaited(_ctrl.applyPerBookSettingsForLayout(deviceClass));
+    }
+
+    final suspendAutoHide = MediaQuery.accessibleNavigationOf(context);
+    if (_autoHideSuspendedByAccessibility != suspendAutoHide) {
+      _autoHideSuspendedByAccessibility = suspendAutoHide;
+      _ctrl.setAutoHideSuspended(suspendAutoHide);
+    }
   }
 
   void _syncOrientation(OrientationLock lock) {
@@ -114,6 +196,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _handleLayoutChange(ReaderSettings prev, ReaderSettings next) {
+    if (prev.mode != next.mode && next.mode == ReaderMode.continuous) {
+      _ctrl.prepareForContinuousLayout();
+    }
+    if (prev.mode != next.mode && next.mode == ReaderMode.focus) {
+      _ctrl.hideUi();
+    }
     final layoutChanged =
         prev.fontSize != next.fontSize ||
         prev.lineHeight != next.lineHeight ||
@@ -124,6 +212,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         prev.font != next.font ||
         prev.paragraphFirstLineIndent != next.paragraphFirstLineIndent ||
         prev.readerWidth != next.readerWidth ||
+        prev.twoPageEnabled != next.twoPageEnabled ||
         prev.hyphenation != next.hyphenation;
     if (layoutChanged) {
       // HG-6.4: show spinner if relayout takes >300ms
@@ -146,7 +235,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _dragStartedInLeftHalf = details.globalPosition.dx < screenSize.width / 2;
     if (!settings.verticalSwipeBrightness) return;
     _dragStartBrightness = settings.brightness;
-    _dragStartFontSize = settings.fontSize;
+    _dragStartWarmth = settings.warmth;
     _dragStartY = details.globalPosition.dy;
   }
 
@@ -155,31 +244,90 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (!settings.verticalSwipeBrightness) return;
     final deltaY = details.globalPosition.dy - _dragStartY;
     if (_dragStartedInLeftHalf) {
-      final brightnessChange = -deltaY / 500.0;
-      final newBrightness = (_dragStartBrightness + brightnessChange).clamp(0.2, 1.0);
+      final newBrightness = readerBrightnessForVerticalDrag(
+        startBrightness: _dragStartBrightness,
+        deltaY: deltaY,
+      );
       ref.read(readerSettingsProvider.notifier).updateBrightness(newBrightness);
+      _showVerticalGestureFeedback('Яркость ${(newBrightness * 100).round()}%');
     } else {
-      final fontChange = -deltaY / 200.0;
-      final newFontSize = (_dragStartFontSize + fontChange).clamp(10.0, 32.0);
-      ref.read(readerSettingsProvider.notifier).updateFontSize(newFontSize);
+      final newWarmth = readerWarmthForVerticalDrag(
+        startWarmth: _dragStartWarmth,
+        deltaY: deltaY,
+      );
+      ref.read(readerSettingsProvider.notifier).updateWarmth(newWarmth);
+      _showVerticalGestureFeedback('Теплота ${(newWarmth * 100).round()}%');
     }
+  }
+
+  void _showVerticalGestureFeedback(String message) {
+    _verticalGestureFeedbackTimer?.cancel();
+    if (mounted) setState(() => _verticalGestureFeedback = message);
+    _verticalGestureFeedbackTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) setState(() => _verticalGestureFeedback = null);
+    });
   }
 
   void _handleVerticalDragEnd(DragEndDetails details) {
     if (_dragStartedInTopZone &&
         details.primaryVelocity != null &&
-        details.primaryVelocity! > 300) {
-      Navigator.of(context).pop();
+        details.primaryVelocity! > 700) {
+      _exitReader();
     }
   }
 
-  // Trackpad/mouse wheel scroll → page turn
+  void _handleTwoFingerScaleStart(ScaleStartDetails details) {
+    _twoFingerChapterGesture.start(details);
+    _linkBackPinchGesture.start(details);
+  }
+
+  void _handleTwoFingerScaleEnd(ScaleEndDetails details) {
+    _twoFingerChapterGesture.end(details);
+    _linkBackPinchGesture.end(details);
+  }
+
+  void _handleTwoFingerChapterScaleUpdate(ScaleUpdateDetails details) {
+    if (_linkBackPinchGesture.update(details)) {
+      if (_scaleStartFontSize > 0) {
+        ref.read(readerSettingsProvider.notifier).updateFontSize(_scaleStartFontSize);
+      }
+      _showVerticalGestureFeedback(
+        _ctrl.popLinkPosition() ? 'Назад к ссылке' : 'Нет перехода назад',
+      );
+      return;
+    }
+
+    final direction = _twoFingerChapterGesture.update(details);
+    if (direction == null) return;
+
+    switch (direction) {
+      case TwoFingerChapterDirection.previous:
+        _ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.previous);
+        _showVerticalGestureFeedback('Предыдущая глава');
+      case TwoFingerChapterDirection.next:
+        _ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.next);
+        _showVerticalGestureFeedback('Следующая глава');
+    }
+  }
+
+  // Trackpad/mouse wheel scroll → page turn.
+  //
+  // On macOS, Flutter forwards Magic Mouse's precise scrolling as many small
+  // PointerScrollEvents, but does not expose AppKit's
+  // `hasPreciseScrollingDeltas` flag. Do not accumulate those pixel deltas:
+  // only the discrete wheel-sized events should turn a paginated page.
   double _scrollAccumulator = 0;
   static const double _scrollThreshold = 50;
+  static const double _macOSDiscreteScrollDelta = 40;
 
   void _handlePointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
-      _scrollAccumulator += event.scrollDelta.dy;
+      final scrollDelta = event.scrollDelta.dy;
+      if (defaultTargetPlatform == TargetPlatform.macOS &&
+          scrollDelta.abs() < _macOSDiscreteScrollDelta) {
+        return;
+      }
+      _scrollAccumulator += scrollDelta;
       if (_scrollAccumulator.abs() >= _scrollThreshold) {
         if (_scrollAccumulator > 0) {
           _goToNextPage();
@@ -229,7 +377,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     if (_edgeSwipeActive && deltaX > 80) {
       unawaited(HapticFeedback.mediumImpact());
       if (_ctrl.popLinkPosition()) return;
-      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) _exitReader();
       return;
     }
 
@@ -242,6 +390,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final velocity = details.primaryVelocity ?? 0;
 
     if (deltaX.abs() > threshold || velocity.abs() > 500) {
+      if (_edgeSwipeActive && deltaX > 0) return;
       final isForward = deltaX < 0 || velocity < 0;
       final isInverted = settings.horizontalGesture == HorizontalGesture.inverse;
       if (isForward != isInverted) {
@@ -253,12 +402,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   void _goToNextPage() {
-    unawaited(HapticFeedback.lightImpact());
+    unawaited(triggerPageTurnHaptic(enabled: ref.read(readerSettingsProvider).pageTurnHaptic));
     _ctrl.scrollToNext();
   }
 
   void _goToPreviousPage() {
-    unawaited(HapticFeedback.lightImpact());
+    unawaited(triggerPageTurnHaptic(enabled: ref.read(readerSettingsProvider).pageTurnHaptic));
     _ctrl.scrollToPrevious();
   }
 
@@ -318,6 +467,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         _showFootnotePopover(anchor, noteText);
         return;
       }
+    }
+
+    final target = resolveEpubAnchorTarget(
+      metadata: readerState.metadata?.metadata,
+      currentChapterIndex: readerState.currentPosition.chapterIndex,
+      href: href,
+    );
+    if (target != null) {
+      _ctrl.pushLinkPosition();
+      _ctrl.jumpToPosition(
+        readerState.currentPosition.copyWith(
+          bookId: widget.bookId,
+          chapterIndex: target.chapterIndex,
+          paragraphIndex: target.paragraphIndex,
+        ),
+      );
+      return;
     }
 
     // Fallback: search for block with matching noteId (legacy)
@@ -406,39 +572,38 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   void _showExternalLinkDialog(String href) {
     final uri = Uri.tryParse(href);
     if (uri == null) return;
-    final host = uri.host.isNotEmpty ? uri.host : href;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Внешняя ссылка'),
-          content: Text('Открыть ссылку?\n$host'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                unawaited(launchUrl(uri, mode: LaunchMode.externalApplication));
-              },
-              child: const Text('Открыть'),
-            ),
-          ],
-        ),
-      ),
-    );
+    unawaited(showExternalLinkConfirmation(context, uri));
   }
 
   void _checkBookFinished(ReaderState readerState) {
     if (_finishedDialogShown) return;
-    if (readerState.scrollProgress < 0.99) return;
+    // Gate on actually being at the final chapter: in multi-chapter continuous
+    // mode scrollProgress can reach ~1.0 at the bottom of the loaded chapter
+    // window while more chapters still load lazily.
+    final onLastChapter =
+        readerState.chapterCount <= 1 ||
+        readerState.currentPosition.chapterIndex >= readerState.chapterCount - 1;
+    if (!onLastChapter || readerState.scrollProgress < 0.99) return;
     _finishedDialogShown = true;
+    // STR-6.1: request review after finishing a book
+    unawaited(_requestReview());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_showNextBookDialog());
     });
+  }
+
+  Future<void> _requestReview() async {
+    final inAppReview = InAppReview.instance;
+    try {
+      if (await inAppReview.isAvailable()) {
+        await inAppReview.requestReview();
+      }
+    } on PlatformException catch (e) {
+      debugPrint('In-app review is unavailable: ${e.message ?? e.code}');
+    } on Object catch (e) {
+      debugPrint('In-app review request failed: $e');
+    }
   }
 
   Future<void> _showNextBookDialog() async {
@@ -446,7 +611,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final series = await db.seriesDao.getSeriesForBook(widget.bookId);
     if (series.isEmpty || !context.mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
-      _closeReader();
+      if (context.mounted) _closeReader();
       return;
     }
     final allBooks = await db.seriesDao.getBooksInSeries(series.first.id);
@@ -454,7 +619,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     final currentIdx = allBooks.indexWhere((b) => b.bookId == widget.bookId);
     if (currentIdx < 0 || currentIdx >= allBooks.length - 1 || !mounted) {
       unawaited(SmartDialog.showToast('Книга прочитана!'));
-      _closeReader();
+      if (mounted) _closeReader();
       return;
     }
     final nextBookId = allBooks[currentIdx + 1].bookId;
@@ -482,15 +647,22 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     }
   }
 
+  void _exitReader() {
+    _ctrl.saveProgress();
+    if (mounted) Navigator.of(context).pop();
+  }
+
   void _closeReader() {
     _ctrl.saveProgress();
     _ctrl.saveCheckpoint();
-    GoRouter.of(context).go('/');
+    GoRouter.of(context).go('/library');
   }
 
   @override
   void dispose() {
+    TtsController.instance.stop();
     _relayoutTimer?.cancel();
+    _verticalGestureFeedbackTimer?.cancel();
     _exitImmersiveMode();
     _lifecycleListener?.dispose();
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
@@ -531,7 +703,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       _ctrl.pauseSession();
-      _ctrl.saveProgress();
+      _ctrl.savePosition();
     } else if (state == AppLifecycleState.resumed) {
       _ctrl.resumeSession();
     }
@@ -539,13 +711,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   bool _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      _goToPreviousPage();
-      return true;
+
+    // Don't intercept keys when a text field or dialog has focus
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (primaryFocus != null && primaryFocus.context?.widget is EditableText) {
+      return false;
     }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      _goToNextPage();
-      return true;
+
+    final settings = ref.read(readerSettingsProvider);
+    if (settings.volumeButtonsEnabled) {
+      if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+        _goToPreviousPage();
+        return true;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+        _goToNextPage();
+        return true;
+      }
     }
     if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
         event.logicalKey == LogicalKeyboardKey.arrowUp) {
@@ -570,7 +752,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       return true;
     }
     if (event.logicalKey == LogicalKeyboardKey.escape) {
-      Navigator.of(context).pop();
+      _exitReader();
       return true;
     }
     return false;
@@ -589,13 +771,54 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }
 
   Widget _buildForState(BuildContext context, ReaderState readerState) {
-    final settings = ref.watch(readerSettingsProvider);
-    final theme = _getThemeData(settings);
+    final settings = ref.read(readerSettingsProvider);
+    final brightness = ref.watch(readerSettingsProvider.select((s) => s.brightness));
+    final warmth = ref.watch(readerSettingsProvider.select((s) => s.warmth));
+    final eink = ref.watch(readerSettingsProvider.select((s) => s.eink));
+    final backgroundStyle = ref.watch(readerSettingsProvider.select((s) => s.backgroundStyle));
+    final uiTheme = ref.watch(readerSettingsProvider.select((s) => s.uiTheme));
+    final themeSetting = ref.watch(readerSettingsProvider.select((s) => s.theme));
+    ref.watch(readerSettingsProvider.select((s) => s.activeColorPresetId));
+    ref.watch(colorPresetListProvider);
+    final mode = ref.watch(readerSettingsProvider.select((s) => s.mode));
+    final fontSize = ref.watch(readerSettingsProvider.select((s) => s.fontSize));
+    final font = ref.watch(readerSettingsProvider.select((s) => s.font));
+    final lineHeight = ref.watch(readerSettingsProvider.select((s) => s.lineHeight));
+    final textAlign = ref.watch(readerSettingsProvider.select((s) => s.textAlign));
+    final hyphenation = ref.watch(readerSettingsProvider.select((s) => s.hyphenation));
+    final readerWidth = ref.watch(readerSettingsProvider.select((s) => s.readerWidth));
+    final twoPageEnabled = ref.watch(readerSettingsProvider.select((s) => s.twoPageEnabled));
+    final showTopInfoBar = ref.watch(readerSettingsProvider.select((s) => s.showTopInfoBar));
+    final showTopToolbar = ref.watch(readerSettingsProvider.select((s) => s.showTopToolbar));
+    final showBottomBar = ref.watch(readerSettingsProvider.select((s) => s.showBottomBar));
+    final effectiveSettings = settings.copyWith(
+      brightness: brightness,
+      warmth: warmth,
+      eink: eink,
+      backgroundStyle: backgroundStyle,
+      uiTheme: uiTheme,
+      theme: themeSetting,
+      mode: mode,
+      fontSize: fontSize,
+      font: font,
+      lineHeight: lineHeight,
+      textAlign: textAlign,
+      hyphenation: hyphenation,
+      readerWidth: readerWidth,
+      twoPageEnabled: twoPageEnabled,
+      showTopInfoBar: showTopInfoBar,
+      showTopToolbar: showTopToolbar,
+      showBottomBar: showBottomBar,
+    );
+    final theme = _getThemeData(effectiveSettings);
+    final themeTransition = effectiveSettings.eink
+        ? Duration.zero
+        : AppDuration.readerThemeTransition;
 
     if (readerState.isLoading) {
       return AnimatedTheme(
         data: theme,
-        duration: AppDuration.readerThemeTransition,
+        duration: themeTransition,
         curve: Curves.easeOutCubic,
         child: Scaffold(
           body: Center(
@@ -640,10 +863,21 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
       );
     }
 
-    if (!readerState.isLoading && readerState.metadata != null && readerState.chapterCount == 0) {
+    if (readerState.metadata == null) {
       return AnimatedTheme(
         data: theme,
-        duration: AppDuration.readerThemeTransition,
+        duration: themeTransition,
+        curve: Curves.easeOutCubic,
+        child: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (!readerState.isLoading && readerState.chapterCount == 0) {
+      return AnimatedTheme(
+        data: theme,
+        duration: themeTransition,
         curve: Curves.easeOutCubic,
         child: Scaffold(
           appBar: AppBar(title: const Text('Читалка')),
@@ -665,7 +899,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => _exitReader(),
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Назад'),
                 ),
@@ -679,7 +913,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _checkBookFinished(readerState);
     return AnimatedTheme(
       data: theme,
-      duration: AppDuration.readerThemeTransition,
+      duration: themeTransition,
       curve: Curves.easeOutCubic,
       child: PopScope(
         canPop: false,
@@ -693,11 +927,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           onNextPage: () => _goToNextPage(),
           onPreviousPage: () => _goToPreviousPage(),
           onIncreaseFontSize: () {
-            final newSize = (settings.fontSize + 2.0).clamp(10.0, 40.0);
+            final newSize = (effectiveSettings.fontSize + 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onDecreaseFontSize: () {
-            final newSize = (settings.fontSize - 2.0).clamp(10.0, 40.0);
+            final newSize = (effectiveSettings.fontSize - 2.0).clamp(10.0, 40.0);
             ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
           },
           onSearch: () => _ctrl.toggleSearch(),
@@ -715,14 +949,15 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           },
           onLibrary: () {
             if (_ctrl.popLinkPosition()) return;
-            Navigator.of(context).pop();
+            _exitReader();
           },
           onSettings: () => _showQuickSettings(context),
           onClosePanel: () {
             if (_ctrl.popLinkPosition()) return;
-            Navigator.of(context).pop();
+            _exitReader();
           },
-          child: _buildReaderLayout(context, readerState, settings),
+          onScrollToTop: _ctrl.scrollToTop,
+          child: _buildReaderLayout(context, readerState, effectiveSettings),
         ),
       ),
     );
@@ -734,20 +969,29 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderSettings settings, {
     required Widget content,
   }) {
+    final isFocusMode = settings.mode == ReaderMode.focus;
+    final gradient = _backgroundStyleGradient(settings);
     return Stack(
       children: [
+        if (gradient != null)
+          Positioned.fill(
+            child: DecoratedBox(decoration: BoxDecoration(gradient: gradient)),
+          ),
         content,
         // HG-6.4: spinner overlay during layout recalculation
         if (_isRelayouting)
           Positioned.fill(
             child: ColoredBox(
-              color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.5),
+              color: ReaderColors.forTheme(
+                settings.effectiveUiTheme,
+              ).scaffold.withValues(alpha: 0.5),
               child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
           ),
         _buildWarmthOverlay(settings),
         _buildBrightnessOverlay(settings),
         _buildEdgeFadeOverlay(settings),
+        _buildVerticalGestureFeedback(settings),
         if (_shouldShowProgressBar(settings, readerState))
           Positioned(
             top: settings.progressBarPosition == ProgressBarPosition.top ? 0 : null,
@@ -756,7 +1000,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             right: 0,
             child: ReaderProgressBar(
               scrollProgress: readerState.scrollProgress,
-              theme: settings.theme,
+              theme: settings.effectiveUiTheme,
             ),
           ),
         if (settings.scrollbarIndicator && settings.mode == ReaderMode.continuous)
@@ -780,131 +1024,240 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
             },
           ),
         ),
-        _buildReadingInfoBar(
-          context,
-          readerState,
-          settings,
-          position: _ReadingInfoPosition.header,
-        ),
-        _buildReadingInfoBar(
-          context,
-          readerState,
-          settings,
-          position: _ReadingInfoPosition.footer,
-        ),
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Builder(
-            builder: (context) {
-              final dur = MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : AppDuration.fast;
-              return AnimatedSlide(
-                offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
-                duration: dur,
-                curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: readerState.uiVisible ? 1.0 : 0.0,
-                  duration: dur,
-                  child: ReaderTopBar(
-                    settings: settings,
-                    bookTitle: readerState.metadata?.title ?? '',
-                    bookAuthor: readerState.metadata?.authors.join(', '),
-                    isBookmarked: readerState.checkpoints.any(
-                      (c) => (c - readerState.scrollProgress).abs() < 0.02,
-                    ),
-                    hasLinkBack: _ctrl.hasLinkBack,
-                    onBack: () {
-                      if (_ctrl.popLinkPosition()) return;
-                      Navigator.of(context).pop();
-                    },
-                    onSearch: () {
-                      _ctrl.toggleSearch();
-                      if (_ctrl.state.isSearchOpen) {
-                        _gestureCoordinator.onSearchOpened();
-                      } else {
-                        _gestureCoordinator.onSearchClosed();
-                      }
-                    },
-                    onToc: readerState.metadata != null
-                        ? () {
-                            _ctrl.saveCheckpoint();
-                            TableOfContentsSheet.show(
-                              context,
-                              metadata: readerState.metadata!,
-                              currentChapterIndex: readerState.currentPosition.chapterIndex,
-                              currentChapterProgress: readerState.scrollProgress,
-                              onJumpToPosition: _ctrl.jumpToPosition,
-                              loadedChapters: readerState.loadedChapters,
-                              isDynamicallyLoading: readerState.isDynamicallyLoading,
-                            );
-                          }
-                        : null,
-                    onBookmark: () => _ctrl.addBookmark(),
-                    onMore: () => _showQuickSettings(context),
-                    onBookInfo: () => _showBookStats(context, readerState),
-                    onKaraoke: () {
-                      final chapter =
-                          readerState.loadedChapters[readerState.currentPosition.chapterIndex];
-                      if (chapter?.smilEntries != null && chapter!.smilEntries!.isNotEmpty) {
-                        unawaited(_startKaraoke(context, readerState, chapter));
-                      } else {
-                        _showKaraokeUnavailable(context);
-                      }
-                    },
-                  ),
-                ),
-              );
-            },
+        if (!isFocusMode && settings.showTopInfoBar)
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.header,
           ),
-        ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Builder(
-            builder: (context) {
-              final dur = MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : AppDuration.fast;
-              return AnimatedSlide(
-                offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
-                duration: dur,
-                curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: readerState.uiVisible ? 1.0 : 0.0,
-                  duration: dur,
-                  child: ReaderBottomBar(
-                    settings: settings,
-                    currentChapterIndex: readerState.currentPosition.chapterIndex,
-                    totalChapters: readerState.chapterCount,
-                    scrollProgress: readerState.scrollProgress,
-                    estimatedMinutesLeft: readerState.estimatedMinutesLeft,
-                    chapterTitle: readerState.chapterTitle(
-                      readerState.currentPosition.chapterIndex,
-                    ),
-                    chapterTitleAt: readerState.chapterTitle,
-                    onJumpToProgress: _ctrl.jumpToProgress,
-                    onModeChanged: (mode) {
-                      ref.read(readerSettingsProvider.notifier).updateMode(mode);
-                    },
-                    checkpoints: readerState.checkpoints,
-                    onCheckpointForward: _ctrl.hasCheckpointAhead
-                        ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
-                        : null,
-                    onCheckpointBack: _ctrl.hasCheckpointBehind
-                        ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
-                        : null,
-                  ),
-                ),
-              );
-            },
+        if (!isFocusMode && settings.showTopInfoBar)
+          _buildReadingInfoBar(
+            context,
+            readerState,
+            settings,
+            position: _ReadingInfoPosition.footer,
           ),
-        ),
+        if (settings.showTopToolbar)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Builder(
+              builder: (context) {
+                final dur = MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : AppDuration.fast;
+                return AnimatedSlide(
+                  offset: readerState.uiVisible ? Offset.zero : const Offset(0, -1),
+                  duration: dur,
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: readerState.uiVisible ? 1.0 : 0.0,
+                    duration: dur,
+                    child: ReaderTopBar(
+                      settings: settings,
+                      bookTitle: readerState.metadata?.title ?? '',
+                      bookAuthor: readerState.metadata?.authors.join(', '),
+                      coverUrl: readerState.metadata?.coverUrl,
+                      isBookmarked: readerState.checkpoints.any(
+                        (c) => (c - readerState.scrollProgress).abs() < 0.02,
+                      ),
+                      hasLinkBack: _ctrl.hasLinkBack,
+                      hasLinkForward: _ctrl.hasLinkForward,
+                      onBack: () {
+                        if (_ctrl.popLinkPosition()) return;
+                        _exitReader();
+                      },
+                      onLinkForward: _ctrl.forwardLinkPosition,
+                      onSearch: () {
+                        _ctrl.toggleSearch();
+                        if (_ctrl.state.isSearchOpen) {
+                          _gestureCoordinator.onSearchOpened();
+                        } else {
+                          _gestureCoordinator.onSearchClosed();
+                        }
+                      },
+                      onToc: readerState.metadata != null
+                          ? () {
+                              _ctrl.saveCheckpoint();
+                              TableOfContentsSheet.show(
+                                context,
+                                metadata: readerState.metadata!,
+                                currentChapterIndex: readerState.currentPosition.chapterIndex,
+                                currentChapterProgress: readerState.scrollProgress,
+                                onJumpToPosition: _ctrl.jumpToPosition,
+                                loadedChapters: readerState.loadedChapters,
+                                isDynamicallyLoading: readerState.isDynamicallyLoading,
+                              );
+                            }
+                          : null,
+                      onBookmark: () => _ctrl.addBookmark(),
+                      onMore: () => _showQuickSettings(context),
+                      onBookInfo: () => _showBookStats(context, readerState),
+                      onKaraoke: () {
+                        final chapter =
+                            readerState.loadedChapters[readerState.currentPosition.chapterIndex];
+                        if (chapter?.smilEntries != null && chapter!.smilEntries!.isNotEmpty) {
+                          unawaited(_startKaraoke(context, readerState, chapter));
+                        } else {
+                          _showKaraokeUnavailable(context);
+                        }
+                      },
+                      onFontIncrease: () {
+                        final newSize = (settings.fontSize + 1.0).clamp(10.0, 40.0);
+                        ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+                      },
+                      onFontDecrease: () {
+                        final newSize = (settings.fontSize - 1.0).clamp(10.0, 40.0);
+                        ref.read(readerSettingsProvider.notifier).updateFontSize(newSize);
+                      },
+                      onCycleTheme: () {
+                        const cycle = [
+                          ReaderTheme.light,
+                          ReaderTheme.sepia,
+                          ReaderTheme.dark,
+                          ReaderTheme.oled,
+                          ReaderTheme.bedtime,
+                          ReaderTheme.paper,
+                        ];
+                        final idx = cycle.indexOf(settings.theme);
+                        final next = cycle[(idx + 1) % cycle.length];
+                        ref.read(readerSettingsProvider.notifier).updateTheme(next);
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        if (settings.showBottomBar || readerState.uiVisible)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Builder(
+              builder: (context) {
+                final dur = MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : AppDuration.fast;
+                return AnimatedSlide(
+                  offset: readerState.uiVisible ? Offset.zero : const Offset(0, 1),
+                  duration: dur,
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: readerState.uiVisible ? 1.0 : 0.0,
+                    duration: dur,
+                    child: ReaderBottomBar(
+                      settings: settings,
+                      currentChapterIndex: readerState.currentPosition.chapterIndex,
+                      totalChapters: readerState.chapterCount,
+                      scrollProgress: readerState.scrollProgress,
+                      estimatedMinutesLeft: readerState.estimatedMinutesLeft,
+                      estimatedChapterMinutesLeft: readerState.estimatedChapterMinutesLeft,
+                      chapterTitle: readerState.chapterTitle(
+                        readerState.currentPosition.chapterIndex,
+                      ),
+                      chapterTitleAt: readerState.chapterTitle,
+                      onJumpToProgress: _ctrl.jumpToProgress,
+                      onModeChanged: (mode) {
+                        _ctrl.stopAutoScroll();
+                        ref.read(readerSettingsProvider.notifier).updateMode(mode);
+                      },
+                      checkpoints: readerState.checkpoints,
+                      onCheckpointForward: _ctrl.hasCheckpointAhead
+                          ? () => _ctrl.navigateToNearestCheckpoint(forward: true)
+                          : null,
+                      onCheckpointBack: _ctrl.hasCheckpointBehind
+                          ? () => _ctrl.navigateToNearestCheckpoint(forward: false)
+                          : null,
+                      onPrevChapter: readerState.currentPosition.chapterIndex > 0
+                          ? () => _ctrl.navigateToAdjacentChapter(
+                              direction: TwoFingerChapterDirection.previous,
+                            )
+                          : null,
+                      onNextChapter:
+                          readerState.currentPosition.chapterIndex < readerState.chapterCount - 1
+                          ? () => _ctrl.navigateToAdjacentChapter(
+                              direction: TwoFingerChapterDirection.next,
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        if (settings.mode == ReaderMode.continuous)
+          Positioned(
+            bottom: readerState.uiVisible ? 72 : 16,
+            right: 16,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _ctrl.autoScrollEnabled,
+              builder: (context, enabled, _) {
+                return ValueListenableBuilder<double>(
+                  valueListenable: _ctrl.autoScrollSpeed,
+                  builder: (context, speed, _) {
+                    if (!enabled) {
+                      return Semantics(
+                        button: true,
+                        label: 'Автопрокрутка',
+                        child: FloatingActionButton.small(
+                          heroTag: 'auto-scroll-toggle',
+                          onPressed: _ctrl.startAutoScroll,
+                          child: const Icon(Icons.play_arrow, size: 20),
+                        ),
+                      );
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            button: true,
+                            label: 'Пауза автопрокрутки',
+                            child: IconButton(
+                              icon: const Icon(Icons.pause),
+                              iconSize: 20,
+                              onPressed: _ctrl.stopAutoScroll,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 100,
+                            child: Slider(
+                              value: speed,
+                              min: 10,
+                              max: 300,
+                              onChanged: _ctrl.updateAutoScrollSpeed,
+                            ),
+                          ),
+                          SizedBox(
+                            width: 36,
+                            child: Text(
+                              '${speed.round()}',
+                              style: Theme.of(context).textTheme.labelSmall,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         // MD-20.1: floating progress dot when bars hidden
-        if (!readerState.uiVisible && settings.progressBarPosition != ProgressBarPosition.hidden)
+        if (!isFocusMode &&
+            !readerState.uiVisible &&
+            settings.progressBarPosition != ProgressBarPosition.hidden)
           Positioned(
             bottom: 12,
             left: 0,
@@ -915,32 +1268,34 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: ReaderColors.progressColor(settings.theme).withValues(alpha: 0.5),
+                  color: ReaderColors.progressColor(
+                    settings.effectiveUiTheme,
+                  ).withValues(alpha: 0.5),
                 ),
               ),
             ),
           ),
         // MD-24.5: one-handed prev/next buttons when chrome hidden
-        if (!readerState.uiVisible)
+        if (!isFocusMode && !readerState.uiVisible)
           Positioned(
             bottom: 40,
             left: 16,
             child: _ReaderNavButton(
               icon: Icons.chevron_left,
-              onTap: _ctrl.scrollToPrevious,
+              onTap: _goToPreviousPage,
             ),
           ),
-        if (!readerState.uiVisible)
+        if (!isFocusMode && !readerState.uiVisible)
           Positioned(
             bottom: 40,
             right: 16,
             child: _ReaderNavButton(
               icon: Icons.chevron_right,
-              onTap: _ctrl.scrollToNext,
+              onTap: _goToNextPage,
             ),
           ),
         // MD-6.1/15.1: sticky header — breadcrumb "Book / Chapter" persists while bars hidden
-        if (!readerState.uiVisible && readerState.metadata != null)
+        if (!isFocusMode && !readerState.uiVisible && readerState.metadata != null)
           Positioned(
             top: MediaQuery.paddingOf(context).top + 4,
             left: 0,
@@ -963,14 +1318,18 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   constraints: const BoxConstraints(maxWidth: 360),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: ReaderColors.forTheme(settings.theme).scaffold.withValues(alpha: 0.7),
+                    color: ReaderColors.forTheme(
+                      settings.effectiveUiTheme,
+                    ).scaffold.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     // MD-15.1: breadcrumb path "Book › Chapter"
                     '${readerState.metadata!.title}  ›  ${readerState.chapterTitle(readerState.currentPosition.chapterIndex)}',
                     style: TextStyle(
-                      color: ReaderColors.forTheme(settings.theme).text.withValues(alpha: 0.6),
+                      color: ReaderColors.forTheme(
+                        settings.effectiveUiTheme,
+                      ).text.withValues(alpha: 0.6),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -992,9 +1351,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 _pendingSearchQuery = null;
                 return BookSearchOverlay(
                   searchService: searchService,
-                  onJumpToResult: (position, query) {
+                  onJumpToResult: (position, query, matches, matchIndex) {
                     _ctrl.closeSearch();
                     _ctrl.highlightSearchQuery(query);
+                    _ctrl.setSearchMatches(matches, matchIndex);
                     _ctrl.jumpToPosition(
                       position.copyWith(bookId: widget.bookId),
                     );
@@ -1010,7 +1370,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               },
             ),
           ),
-        if (_selectedText != null && _selectedText!.isNotEmpty && readerState.metadata != null)
+        if (readerState.highlightedQuery != null &&
+            !readerState.isSearchOpen &&
+            readerState.searchMatchCount > 0)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 16,
+            right: 16,
+            child: _SearchFindBar(
+              query: readerState.highlightedQuery!,
+              matchIndex: readerState.searchMatchIndex,
+              matchCount: readerState.searchMatchCount,
+              onPrev: () => _ctrl.prevSearchMatch(),
+              onNext: () => _ctrl.nextSearchMatch(),
+              onClose: () => _ctrl.clearSearchHighlight(),
+            ),
+          ),
+        if (_selectedText != null)
           Positioned(
             bottom: MediaQuery.paddingOf(context).bottom + 80,
             left: 24,
@@ -1019,6 +1395,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               bookId: widget.bookId,
               chapterIndex: readerState.currentPosition.chapterIndex,
               paragraphIndex: readerState.currentPosition.paragraphIndex,
+              selectedText: _selectedText!,
               onDismiss: () => setState(() => _selectedText = null),
               onSearchInBook: (query) {
                 setState(() {
@@ -1027,6 +1404,73 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 });
                 _ctrl.toggleSearch();
               },
+              highlightMode: readerState.highlightMode,
+              onSetHighlightStart: () {
+                _ctrl.setMultiHighlightStart(
+                  readerState.currentPosition.chapterIndex,
+                  readerState.currentPosition.paragraphIndex,
+                  _selectedText ?? '',
+                );
+                setState(() => _selectedText = null);
+              },
+              onFinishHighlight: () {
+                unawaited(
+                  _ctrl.finishMultiHighlight(
+                    bookId: widget.bookId,
+                    endChapterIndex: readerState.currentPosition.chapterIndex,
+                    endParagraphIndex: readerState.currentPosition.paragraphIndex,
+                    endSelectedText: _selectedText ?? '',
+                  ),
+                );
+                setState(() => _selectedText = null);
+              },
+              onCancelHighlight: () {
+                _ctrl.cancelMultiHighlight();
+                setState(() => _selectedText = null);
+              },
+            ),
+          ),
+        if (readerState.highlightMode == HighlightSelectionMode.startSet && _selectedText == null)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 8,
+            left: 24,
+            right: 24,
+            child: Material(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Начало выделения установлено. Выделите текст в конечной точке.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        _ctrl.cancelMultiHighlight();
+                        setState(() {});
+                      },
+                      child: Icon(
+                        Icons.close,
+                        size: 18,
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
       ],
@@ -1040,6 +1484,11 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   ) {
     if (readerState.metadata == null) return const SizedBox.shrink();
     return SelectionAreaWrapper(
+      onSelectionChanged: (selectedContent) {
+        final selectedText = selectedContent?.plainText;
+        if (!mounted || selectedText == _selectedText) return;
+        setState(() => _selectedText = selectedText?.isNotEmpty == true ? selectedText : null);
+      },
       contextMenuBuilder: (BuildContext context, SelectableRegionState state) {
         return ReaderContextMenu(
           state: state,
@@ -1066,6 +1515,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                   settings.doubleTapAction != DoubleTapAction.disabled
               ? _ctrl.handleDoubleTap
               : null,
+          onScaleStart:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _handleTwoFingerScaleStart
+              : null,
+          onScaleUpdate:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _handleTwoFingerChapterScaleUpdate
+              : null,
+          onScaleEnd:
+              _gestureCoordinator.canInteract &&
+                  settings.twoFingerChapterNavigation &&
+                  _selectedText == null
+              ? _handleTwoFingerScaleEnd
+              : null,
           onHorizontalDragStart:
               _gestureCoordinator.canInteract && settings.horizontalGesture != HorizontalGesture.off
               ? _handleHorizontalDragStart
@@ -1080,33 +1547,36 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
               : null,
           onLongPress:
               _gestureCoordinator.canInteract &&
-                  settings.longPressAction != LongPressAction.disabled
-              ? () {
-                  _ctrl.handleLongPress();
-                  if (settings.longPressAction == LongPressAction.selectText) {
-                    unawaited(_checkForSelectedText());
-                  }
-                }
+                  settings.longPressAction != LongPressAction.disabled &&
+                  settings.longPressAction != LongPressAction.selectText
+              ? _ctrl.handleLongPress
               : null,
           behavior: HitTestBehavior.translucent,
           child: RepaintBoundary(
-            child: ReaderContentBody(
-              metadata: readerState.metadata!,
-              loadedChapters: readerState.loadedChapters,
+            child: ReaderCornerLongPressOverlay(
               settings: settings,
-              scrollController: _ctrl.scrollController,
-              onTap: _gestureCoordinator.canInteract
-                  ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context).width)
-                  : (
-                      _,
-                    ) {},
-              initialProgress: readerState.scrollProgress,
-              initialPage: readerState.currentPosition.chapterIndex,
-              highlightQuery: readerState.highlightedQuery,
-              chapterHighlights: _buildChapterHighlights(),
-              customColors: _resolveCustomColors(settings),
-              onLinkTap: (href) => _handleLinkTap(href, readerState),
-              onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
+              onAction: _gestureCoordinator.canInteract ? _ctrl.handleCornerLongPress : (_) {},
+              child: ReaderContentBody(
+                metadata: readerState.metadata!,
+                loadedChapters: readerState.loadedChapters,
+                settings: settings,
+                scrollController: _ctrl.scrollController,
+                onTap: _gestureCoordinator.canInteract
+                    ? (details) => _ctrl.handleTap(details, MediaQuery.sizeOf(context))
+                    : (
+                        _,
+                      ) {},
+                initialProgress: readerState.scrollProgress,
+                initialPage: readerState.currentPosition.chapterIndex,
+                initialParagraph: readerState.currentPosition.paragraphIndex,
+                highlightQuery: readerState.highlightedQuery,
+                chapterHighlights: _buildChapterHighlights(),
+                customColors: _resolveCustomColors(settings),
+                onLinkTap: (href) => _handleLinkTap(href, readerState),
+                onPageChanged: (chapterIndex) => _ctrl.handlePageChanged(chapterIndex),
+                onFocusPositionChanged: _ctrl.handleFocusPositionChanged,
+                onChapterPositionsChanged: (positions) => _ctrl.setChapterPositions(positions),
+              ),
             ),
           ),
         ),
@@ -1140,28 +1610,86 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
           : 0.0;
     }
 
-    return Scaffold(
-      backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
-      body: _buildReaderContentStack(
-        context,
-        readerState,
-        settings,
-        content: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: _buildGestureWrappedContent(context, readerState, settings),
+    final breakReminder = ref.watch(readingBreakReminderControllerProvider);
+    return ReadingBreakReminder(
+      controller: breakReminder,
+      onReminderDue: () => _showReadingBreakReminder(context, breakReminder),
+      child: Scaffold(
+        backgroundColor: _getThemeData(settings).scaffoldBackgroundColor,
+        body: _buildReaderContentStack(
+          context,
+          readerState,
+          settings,
+          content: Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: _buildGestureWrappedContent(context, readerState, settings),
+          ),
         ),
       ),
     );
   }
 
+  void _showReadingBreakReminder(
+    BuildContext context,
+    ReadingBreakReminderController controller,
+  ) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Expanded(
+                child: Text('Время дать глазам отдохнуть. Посмотрите вдаль 20 секунд.'),
+              ),
+              TextButton(
+                onPressed: controller.dismiss,
+                child: const Text('Готово'),
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: 'Через 5 мин',
+            onPressed: controller.snooze,
+          ),
+        ),
+      );
+  }
+
   ThemeData _getThemeData(ReaderSettings settings) {
     final base = Theme.of(context);
-    final custom = _resolveCustomColors(settings);
-    final colors = custom ?? ReaderColors.forTheme(settings.theme);
+    final chromeColors = ReaderColors.forTheme(settings.effectiveUiTheme);
     return base.copyWith(
-      scaffoldBackgroundColor: colors.scaffold,
-      textTheme: base.textTheme.apply(bodyColor: colors.text),
+      scaffoldBackgroundColor: chromeColors.scaffold,
+      textTheme: base.textTheme.apply(bodyColor: chromeColors.text),
     );
+  }
+
+  Gradient? _backgroundStyleGradient(ReaderSettings settings) {
+    return switch (settings.backgroundStyle) {
+      BackgroundStyle.solid => null,
+      BackgroundStyle.paper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x0AF5F0E6), Color(0x12F0EBE0)],
+      ),
+      BackgroundStyle.parchment => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x15D4BC94), Color(0x1AE8D5B7)],
+      ),
+      BackgroundStyle.darkPaper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x082A2725), Color(0x0C1E1C1A)],
+      ),
+      BackgroundStyle.warmSepia => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0x12E0D0A8), Color(0x18F0E0C0)],
+      ),
+    };
   }
 
   Widget _buildReadingInfoBar(
@@ -1172,6 +1700,12 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
   }) {
     final infoConfig = ref.watch(readingInfoProvider);
     final colors = _resolveCustomColors(settings) ?? ReaderColors.forTheme(settings.theme);
+    final stats = ref
+        .watch(readingStatsProvider)
+        .maybeWhen(
+          data: (s) => s,
+          orElse: () => null,
+        );
     final List<InfoSlotMode> slots = position == _ReadingInfoPosition.header
         ? [infoConfig.headerLeft, infoConfig.headerCenter, infoConfig.headerRight]
         : [infoConfig.footerLeft, infoConfig.footerCenter, infoConfig.footerRight];
@@ -1190,16 +1724,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         InfoSlotMode.time => _formatTime(),
         InfoSlotMode.battery => _formatBattery(),
         InfoSlotMode.batteryAndTime => '${_formatBattery()} ${_formatTime()}',
-        InfoSlotMode.remainingChapter => _formatRemaining(
-          readerState.scrollProgress,
-          readerState.chapterCount - readerState.currentPosition.chapterIndex,
+        InfoSlotMode.remainingChapter => formatReadingTimeEstimate(
+          readerState.estimatedChapterMinutesLeft,
         ),
-        InfoSlotMode.remainingBook => _formatRemaining(
-          readerState.currentPosition.chapterIndex / readerState.chapterCount.clamp(1, 9999),
-          readerState.chapterCount - readerState.currentPosition.chapterIndex,
-        ),
+        InfoSlotMode.remainingBook => formatReadingTimeEstimate(readerState.estimatedMinutesLeft),
         InfoSlotMode.none => '',
         InfoSlotMode.wpm => '${readerState.wpm} сл/мин',
+        InfoSlotMode.sessionTime => _ctrl.sessionTimeLabel,
+        InfoSlotMode.streak =>
+          (stats?.currentStreak ?? 0) > 0 ? '${stats!.currentStreak} дней' : '',
+        InfoSlotMode.todayTime =>
+          (stats?.todayMinutes ?? 0) > 0 ? '${stats!.todayMinutes} мин' : '',
       };
       return Text(
         text,
@@ -1253,13 +1788,6 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     return '$_batteryLevel%';
   }
 
-  String _formatRemaining(double progress, int chaptersLeft) {
-    final remaining = (1.0 - progress).clamp(0.0, 1.0);
-    final percent = (remaining * 100).round();
-    if (chaptersLeft <= 1) return '$percent%';
-    return '$percent% · $chaptersLeft гл.';
-  }
-
   void _cycleColorPreset(int direction) {
     final presetsAsync = ref.read(colorPresetListProvider);
     final presets = presetsAsync.value;
@@ -1275,9 +1803,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     _ctrl.saveCheckpoint();
     _ctrl.onBottomSheetOpen();
     _gestureCoordinator.onBottomSheetOpened();
+    final settings = ref.read(readerSettingsProvider);
+    final isEink = settings.eink;
     unawaited(
       showAdaptivePanel<void>(
         context: context,
+        backgroundColor: isEink ? Colors.white : null,
+        barrierColor: isEink ? Colors.black54 : null,
         child: ReaderQuickSettingsSheet(bookId: widget.bookId),
       ).then((_) {
         _ctrl.onBottomSheetClose();
@@ -1293,15 +1825,23 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     ReaderChapter chapter,
   ) async {
     final entries = chapter.smilEntries!;
+    final audioPaths = entries.map((entry) => entry.audioSrc).toSet();
+    if (audioPaths.length != 1 || audioPaths.single.isEmpty) {
+      _showKaraokeUnavailable(context);
+      return;
+    }
     final blocks = chapter.blocks.map((b) => b.text).toList();
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (_) => KaraokeOverlay(entries: entries, chapterBlocks: blocks),
+      builder: (_) => KaraokeOverlay(
+        entries: entries,
+        chapterBlocks: blocks,
+        audioPath: audioPaths.single,
+      ),
     );
   }
 
-  /// LW-6.1: placeholder for karaoke sync; wire KaraokeService when SMIL pipeline lands.
   void _showKaraokeUnavailable(BuildContext context) {
     unawaited(
       showDialog<void>(
@@ -1309,8 +1849,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Аудиосинхронизация'),
           content: const Text(
-            'Функция караоке будет доступна в книгах с аудиодорожкой.\n\n'
-            'Сейчас нет загруженных SMIL-данных для синхронизации.',
+            'Для синхронизации нужна одна доступная аудиодорожка для текущей главы.',
           ),
           actions: [
             TextButton(
@@ -1363,6 +1902,17 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (meta.description != null && meta.description!.isNotEmpty) ...[
+                    Text(
+                      meta.description!,
+                      style: theme.textTheme.bodySmall,
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                  ],
                   _statRow(theme, 'Главы', '${meta.chapterCount}'),
                   _statRow(theme, 'Абзацев', '$totalBlocks'),
                   _statRow(theme, 'Иллюстраций', '$totalImages'),
@@ -1478,9 +2028,48 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
     );
   }
 
+  Widget _buildVerticalGestureFeedback(ReaderSettings settings) {
+    final feedback = _verticalGestureFeedback;
+    if (feedback == null) return const SizedBox.shrink();
+    final colors = ReaderColors.forTheme(settings.effectiveUiTheme);
+    return Positioned(
+      top: MediaQuery.paddingOf(context).top + 56,
+      left: 24,
+      right: 24,
+      child: IgnorePointer(
+        child: Center(
+          child: Semantics(
+            label: feedback,
+            excludeSemantics: true,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.scaffold.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Text(
+                  feedback,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ponytail: subtle fade gradient on top/bottom edges for immersion
   Widget _buildEdgeFadeOverlay(ReaderSettings settings) {
-    final scaffoldColor = ReaderColors.forTheme(settings.theme).scaffold;
+    final scaffoldColor = ReaderColors.forTheme(settings.effectiveUiTheme).scaffold;
     return Positioned.fill(
       child: IgnorePointer(
         child: Column(
@@ -1524,25 +2113,42 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen> {
 
   Map<int, List<TextHighlight>> _buildChapterHighlights() {
     final highlights = ref.watch(bookHighlightsProvider(widget.bookId)).value;
+    if (identical(highlights, _lastHighlightsSource) && _cachedHighlightsMap != null) {
+      return _cachedHighlightsMap!;
+    }
     final result = <int, List<TextHighlight>>{};
     if (highlights != null) {
       for (final h in highlights) {
         result.putIfAbsent(h.chapterIndex, () => []).add(h);
       }
     }
+    _lastHighlightsSource = highlights;
+    _cachedHighlightsMap = result;
     return result;
   }
 
   ReaderColors? _resolveCustomColors(ReaderSettings settings) {
-    final presetsAsync = ref.watch(colorPresetListProvider);
+    final presetsAsync = ref.read(colorPresetListProvider);
     final presets = presetsAsync.value;
     if (presets == null) return null;
+    if (identical(presets, _cachedPresetList) &&
+        settings.activeColorPresetId == _cachedActivePresetId) {
+      return _cachedCustomColors;
+    }
+    _cachedPresetList = presets;
+    _cachedActivePresetId = settings.activeColorPresetId;
     try {
       final preset = presets.firstWhere((p) => p.id == settings.activeColorPresetId);
-      return ReaderColors.fromPreset(preset.backgroundColor, preset.fontColor);
+      _cachedCustomColors = ReaderColors.fromPreset(
+        preset.backgroundColor,
+        preset.fontColor,
+        linkColor: preset.linkColor,
+        highlightColor: preset.highlightColor,
+      );
     } on Object catch (_) {
-      return null;
+      _cachedCustomColors = null;
     }
+    return _cachedCustomColors;
   }
 }
 
@@ -1601,6 +2207,78 @@ class _ReaderNavButton extends StatelessWidget {
           height: 56,
           alignment: Alignment.center,
           child: Icon(icon, color: theme.colorScheme.onSurface, size: 28),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchFindBar extends StatelessWidget {
+  const _SearchFindBar({
+    required this.query,
+    required this.matchIndex,
+    required this.matchCount,
+    required this.onPrev,
+    required this.onNext,
+    required this.onClose,
+  });
+
+  final String query;
+  final int matchIndex;
+  final int matchCount;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            const Icon(Icons.search, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                query,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              '${matchIndex + 1} / $matchCount',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_up, size: 20),
+              onPressed: onPrev,
+              tooltip: 'Предыдущее',
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.keyboard_arrow_down, size: 20),
+              onPressed: onNext,
+              tooltip: 'Следующее',
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: onClose,
+              tooltip: 'Закрыть',
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
       ),
     );

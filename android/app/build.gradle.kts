@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.gosayram.glibusta"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -23,6 +23,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // `flutter build apk --split-per-abi` supplies the ABI filters for
+        // direct-distribution APKs. Do not duplicate them here: AGP rejects
+        // projects that configure both `ndk.abiFilters` and ABI splits.
+        // The checked-in Rust libraries contain only arm64-v8a and
+        // armeabi-v7a, so App Bundles remain limited to those ABIs as well.
     }
 
     dependencies {
@@ -58,15 +64,6 @@ android {
         }
     }
 
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a")
-            isUniversalApk = false
-        }
-    }
-
     packaging {
         resources {
             excludes += listOf(
@@ -88,4 +85,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+// AGP 9 rejects the duplicate `org.chromium.net` namespace published by
+// cronet-api and its transitive cronet-shared artifact. Play Services supplies
+// the Cronet implementation, so only the public API artifact is needed here.
+configurations.configureEach {
+    exclude(group = "org.chromium.net", module = "cronet-shared")
 }

@@ -2,25 +2,29 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import '../../../../core/encoding/encoding_detection.dart';
+import '../../../reader/data/parsers/book_parser.dart';
 import '../../../reader/data/parsers/format_detector.dart';
-import '../../../reader/data/parsers/parser_registry.dart';
+import '../../../reader/data/parsers/parser_lookup.dart';
 
 final class BookMetadataExtractor {
   static const _metadataTimeout = Duration(seconds: 12);
 
-  final _registry = BookParserRegistry.defaultInstance;
+  BookMetadataExtractor({BookParser? parser}) : _parser = parser;
+
+  final BookParser? _parser;
 
   Future<BookMetadata> extract({
     required String path,
     required Uint8List bytes,
     required BookFormat format,
     required BookEncodingDetector encodingDetector,
+    bool isCompleteFile = true,
   }) async {
     if (format == BookFormat.unknown || format == BookFormat.pdf || format == BookFormat.djvu) {
       return const BookMetadata();
     }
 
-    final parser = _registry.parserForFormat(format);
+    final parser = _parser ?? lookupParserForFormat(format);
     if (parser == null) {
       return const BookMetadata();
     }
@@ -39,6 +43,13 @@ final class BookMetadataExtractor {
         // Encoding detection timed out — proceed without forced encoding.
       } on Object catch (_) {
         // Encoding detection failed — proceed without forced encoding.
+      }
+      if (!isCompleteFile) {
+        return BookMetadata(
+          title: _titleFromFileName(fileName),
+          encoding: detectedEncoding?.encoding,
+          encodingConfidence: detectedEncoding?.confidence,
+        );
       }
       final book = await parser
           .parse(

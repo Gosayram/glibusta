@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:xml/xml.dart';
 
+import '../../../core/formats/archive_safety.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
@@ -70,6 +71,7 @@ class CoverExtractionService {
         archive = _archiveCache[cacheKey]!;
       } else {
         archive = ZipDecoder().decodeBytes(bytes);
+        ArchiveSafety.validateZip(archive);
         if (cacheKey != null) {
           if (_archiveCache.length >= _maxCacheEntries) {
             _archiveCache.remove(_archiveCache.keys.first);
@@ -82,7 +84,12 @@ class CoverExtractionService {
       final opfFile = _findOpfFile(archive);
       if (opfFile == null) return null;
 
-      final opfContent = String.fromCharCodes(opfFile.content as List<int>);
+      final opfContent = String.fromCharCodes(
+        ArchiveSafety.readEntryBytes(
+          opfFile,
+          maxBytes: ArchiveSafety.maxSingleEntryBytes,
+        ),
+      );
       final doc = XmlDocument.parse(opfContent);
 
       // Find cover image ID from metadata
@@ -97,7 +104,10 @@ class CoverExtractionService {
       final coverFile = _findArchiveFile(archive, coverHref);
       if (coverFile == null) return null;
 
-      return Uint8List.fromList(coverFile.content as List<int>);
+      return ArchiveSafety.readEntryBytes(
+        coverFile,
+        maxBytes: ArchiveSafety.maxSingleEntryBytes,
+      );
     } on Object catch (_) {
       return null;
     }
@@ -106,7 +116,7 @@ class CoverExtractionService {
   /// Extract cover bytes from FB2 file.
   Uint8List? _extractFb2Cover(Uint8List bytes) {
     try {
-      final text = String.fromCharCodes(bytes);
+      final text = utf8.decode(bytes, allowMalformed: true);
       final doc = XmlDocument.parse(text);
 
       // Find coverpage > image href
@@ -139,6 +149,7 @@ class CoverExtractionService {
   Uint8List? _extractComicCover(Uint8List bytes) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      ArchiveSafety.validateZip(archive);
       final imageExts = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
       final imageFiles =
           archive.files
@@ -146,7 +157,10 @@ class CoverExtractionService {
               .toList()
             ..sort((a, b) => a.name.compareTo(b.name));
       if (imageFiles.isEmpty) return null;
-      return Uint8List.fromList(imageFiles.first.content as List<int>);
+      return ArchiveSafety.readEntryBytes(
+        imageFiles.first,
+        maxBytes: ArchiveSafety.maxSingleEntryBytes,
+      );
     } on Object catch (_) {
       return null;
     }

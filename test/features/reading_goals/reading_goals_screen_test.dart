@@ -18,6 +18,38 @@ void main() {
   }
 
   group('ReadingGoalDialog', () {
+    testWidgets('waits for the stored goal before exposing editable controls', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [readingGoalProvider.overrideWithValue(const AsyncLoading())],
+          child: const MaterialApp(home: ReadingGoalDialog()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Загружаем настройки…'), findsOneWidget);
+      expect(find.byType(Slider), findsNothing);
+      expect(find.text('Сохранить'), findsNothing);
+    });
+
+    testWidgets('offers a retry when the stored goal cannot be loaded', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            readingGoalProvider.overrideWithValue(
+              AsyncError(StateError('preferences unavailable'), StackTrace.empty),
+            ),
+          ],
+          child: const MaterialApp(home: ReadingGoalDialog()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Не удалось загрузить настройки цели.'), findsOneWidget);
+      expect(find.text('Повторить'), findsOneWidget);
+      expect(find.byType(Slider), findsNothing);
+    });
+
     testWidgets('renders dialog with title', (tester) async {
       await tester.pumpWidget(buildTestWidget());
       await tester.pumpAndSettle();

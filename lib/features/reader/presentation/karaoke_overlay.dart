@@ -3,76 +3,86 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/karaoke_service.dart';
 import '../data/parsers/smil_parser.dart';
 
-/// LW-6.1: Karaoke overlay — auto-advances through SMIL entries via timer.
-/// ponytail: timer-based, no audio playback. Audio requires EPUB audio extraction.
+/// LW-6.1: Karaoke overlay — synchronizes text highlighting with EPUB audio.
 class KaraokeOverlay extends StatefulWidget {
   const KaraokeOverlay({
     super.key,
     required this.entries,
     required this.chapterBlocks,
+    required this.audioPath,
   });
 
   final List<SmilEntry> entries;
   final List<String> chapterBlocks;
+  final String audioPath;
 
   @override
   State<KaraokeOverlay> createState() => _KaraokeOverlayState();
 }
 
 class _KaraokeOverlayState extends State<KaraokeOverlay> {
-  Timer? _timer;
+  final KaraokeService _karaokeService = KaraokeService.instance;
+  StreamSubscription<int>? _activeParagraphSub;
+  StreamSubscription<Duration>? _positionSub;
   var _currentIndex = 0;
   var _isPlaying = false;
-  var _elapsed = Duration.zero;
-  var _startTime = DateTime.now();
+  var _position = Duration.zero;
+  var _isPreparing = true;
+  var _audioAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_prepareAudio());
+  }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    unawaited(_activeParagraphSub?.cancel());
+    unawaited(_positionSub?.cancel());
+    unawaited(_karaokeService.stop());
     super.dispose();
   }
 
-  void _togglePlay() {
-    if (_isPlaying) {
-      _timer?.cancel();
-      setState(() => _isPlaying = false);
-    } else {
-      _startTime = DateTime.now().subtract(_elapsed);
-      _timer = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
-      setState(() => _isPlaying = true);
-    }
-  }
-
-  void _tick() {
+  Future<void> _prepareAudio() async {
+    final loaded = await _karaokeService.load(entries: widget.entries, audioPath: widget.audioPath);
     if (!mounted) return;
-    final now = DateTime.now();
-    final elapsed = now.difference(_startTime);
-    setState(() => _elapsed = elapsed);
-
-    // Find current entry by elapsed time
-    for (var i = 0; i < widget.entries.length; i++) {
-      final entry = widget.entries[i];
-      if (elapsed >= entry.clipBegin && elapsed < entry.clipEnd) {
-        if (i != _currentIndex) _currentIndex = i;
-        return;
-      }
+    if (loaded) {
+      _activeParagraphSub = _karaokeService.activeParagraph.listen((index) {
+        if (mounted) setState(() => _currentIndex = index);
+      });
+      _positionSub = _karaokeService.positionStream.listen((position) {
+        if (mounted) setState(() => _position = position);
+      });
     }
-    // Past the end
-    if (elapsed > widget.entries.last.clipEnd) {
-      _timer?.cancel();
-      setState(() => _isPlaying = false);
-    }
+    setState(() {
+      _isPreparing = false;
+      _audioAvailable = loaded;
+    });
   }
 
-  void _stop() {
-    _timer?.cancel();
-    setState(() {
-      _isPlaying = false;
-      _currentIndex = 0;
-      _elapsed = Duration.zero;
-    });
+  Future<void> _togglePlay() async {
+    if (!_audioAvailable) return;
+    if (_karaokeService.isPlaying) {
+      await _karaokeService.pause();
+    } else {
+      await _karaokeService.play();
+    }
+    if (mounted) setState(() => _isPlaying = _karaokeService.isPlaying);
+  }
+
+  Future<void> _stop() async {
+    await _karaokeService.rewind();
+    if (mounted) {
+      setState(() {
+        _isPlaying = false;
+        _currentIndex = 0;
+        _position = Duration.zero;
+      });
+    }
   }
 
   @override
@@ -80,8 +90,12 @@ class _KaraokeOverlayState extends State<KaraokeOverlay> {
     final colors = Theme.of(context).colorScheme;
     final entries = widget.entries;
     final current = _currentIndex < entries.length ? entries[_currentIndex] : null;
-    final totalMs = entries.fold<int>(0, (s, e) => s + (e.clipEnd - e.clipBegin).inMilliseconds);
-    final progressMs = _elapsed.inMilliseconds.clamp(0, totalMs);
+    final total = entries.fold<Duration>(
+      Duration.zero,
+      (latest, entry) => entry.clipEnd > latest ? entry.clipEnd : latest,
+    );
+    final totalMs = total.inMilliseconds;
+    final progressMs = _position.inMilliseconds.clamp(0, totalMs);
 
     return AlertDialog(
       title: Row(
@@ -109,6 +123,16 @@ class _KaraokeOverlayState extends State<KaraokeOverlay> {
                 minHeight: 6,
               ),
             ),
+            if (_isPreparing)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: LinearProgressIndicator(),
+              )
+            else if (!_audioAvailable)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Text('Аудиодорожка недоступна для воспроизведения.'),
+              ),
             const SizedBox(height: 16),
             // Current paragraph text
             if (current != null) ...[
@@ -189,12 +213,12 @@ class _KaraokeOverlayState extends State<KaraokeOverlay> {
         TextButton.icon(
           icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: 18),
           label: Text(_isPlaying ? 'Пауза' : 'Старт'),
-          onPressed: _togglePlay,
+          onPressed: _audioAvailable ? _togglePlay : null,
         ),
         TextButton.icon(
           icon: const Icon(Icons.stop, size: 18),
           label: const Text('Стоп'),
-          onPressed: _stop,
+          onPressed: _audioAvailable ? _stop : null,
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

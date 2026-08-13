@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:fl_charset/fl_charset.dart';
 import 'package:flutter_charset_detector/flutter_charset_detector.dart';
 
-import 'encoding_quality.dart';
+import '../../src/rust/api/api/api.dart' as rust_api;
 import 'encoding_utils.dart';
 
 /// Source of encoding detection result.
@@ -75,7 +75,7 @@ final class BookEncodingDetector {
     final declared = detectDeclaredEncoding(bytes);
     if (declared != null) {
       final text = await _decodeByName(bytes, declared);
-      final score = encodingQualityScore(text);
+      final score = await rust_api.scoreEncodingQuality(text: text);
       if (declared == 'utf-8' || score > 0.50) {
         return EncodingDetectionResult(
           text: text,
@@ -90,7 +90,7 @@ final class BookEncodingDetector {
     }
 
     // 4. Strict UTF-8
-    final utf8Result = _tryStrictUtf8(bytes);
+    final utf8Result = await _tryStrictUtf8(bytes);
     if (utf8Result != null) return utf8Result;
 
     // 5. Native charset detector (Mozilla-based)
@@ -137,10 +137,10 @@ final class BookEncodingDetector {
     return null;
   }
 
-  EncodingDetectionResult? _tryStrictUtf8(Uint8List bytes) {
+  Future<EncodingDetectionResult?> _tryStrictUtf8(Uint8List bytes) async {
     try {
       final text = utf8.decode(bytes, allowMalformed: false);
-      final score = encodingQualityScore(text);
+      final score = await rust_api.scoreEncodingQuality(text: text);
       if (score > 0.80) {
         return EncodingDetectionResult(
           text: text,
@@ -172,7 +172,7 @@ final class BookEncodingDetector {
         encoding = normalizeEncodingName(decoded.charset);
         _autoDecodeCache[bytes.hashCode] = (text: text, charset: encoding);
       }
-      final score = encodingQualityScore(text);
+      final score = await rust_api.scoreEncodingQuality(text: text);
       return EncodingDetectionResult(
         text: text,
         encoding: encoding,
@@ -205,7 +205,7 @@ final class BookEncodingDetector {
           EncodingDetectionResult(
             text: text,
             encoding: encoding,
-            confidence: encodingQualityScore(text),
+            confidence: await rust_api.scoreEncodingQuality(text: text),
             source: EncodingSource.fallbackScore,
             hasReplacementChars: text.contains('\uFFFD'),
           ),

@@ -76,6 +76,7 @@ void main() {
         expect(settings.theme, ReaderTheme.paper);
         expect(settings.fontSize, 18.0); // default
         expect(settings.lineHeight, 1.6); // default
+        expect(settings.scrollbarIndicator, isTrue); // default
       });
 
       test('handles unknown theme name gracefully', () async {
@@ -98,6 +99,18 @@ void main() {
 
         final settings = await ReaderSettingsPersistence.load();
         expect(settings.font, ReaderFont.literata); // fallback
+      });
+
+      test('clamps persisted RSVP speed to a safe timer range', () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'reader_settings',
+          jsonEncode({'rsvpWpm': 0}),
+        );
+
+        final settings = await ReaderSettingsPersistence.load();
+
+        expect(settings.rsvpWpm, 100);
       });
     });
 
@@ -160,6 +173,37 @@ void main() {
         expect(loaded.autoThemeMode, AutoThemeMode.custom);
         expect(loaded.customDayHour, 6);
         expect(loaded.customNightHour, 22);
+      });
+
+      test('round-trips every reader setting', () async {
+        const settings = ReaderSettings(
+          marginTop: 1,
+          marginBottom: 2,
+          marginLeft: 3,
+          marginRight: 4,
+          separateMargins: true,
+          paragraphIndentMode: ParagraphIndentMode.emptyLine,
+          scrollInertia: ScrollInertia.heavy,
+          forcedEncoding: 'windows-1251',
+          tapZoneWidth: 0.4,
+          topLeftCornerTapAction: CornerTapAction.nextPage,
+          topRightCornerTapAction: CornerTapAction.previousPage,
+          bottomLeftCornerTapAction: CornerTapAction.addBookmark,
+          bottomRightCornerTapAction: CornerTapAction.disabled,
+          topLeftCornerLongPressAction: CornerLongPressAction.nextPage,
+          topRightCornerLongPressAction: CornerLongPressAction.previousPage,
+          bottomLeftCornerLongPressAction: CornerLongPressAction.addBookmark,
+          bottomRightCornerLongPressAction: CornerLongPressAction.disabled,
+          fullScreenMode: FullScreenMode.keepPanels,
+          pageTurnHaptic: true,
+          twoFingerChapterNavigation: true,
+          customCss: 'p { color: red; }',
+          scrollbarIndicator: false,
+        );
+
+        await ReaderSettingsPersistence.save(settings);
+
+        expect(await ReaderSettingsPersistence.load(), settings);
       });
     });
   });

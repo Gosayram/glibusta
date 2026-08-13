@@ -34,7 +34,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     unawaited(ref.read(searchControllerProvider.notifier).loadHistory());
     if (widget.initialCategory != null && widget.initialCategory!.isNotEmpty) {
       _genreController.text = widget.initialCategory!;
-      _setGenreFilter(widget.initialCategory!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _setGenreFilter(widget.initialCategory!);
+      });
     }
   }
 

@@ -1,5 +1,6 @@
 use crate::api::models::{BlockType, ReaderBlock, RichSpan};
 use scraper::{ElementRef, Html, Selector};
+use smallvec::SmallVec;
 
 /// Parse HTML content into ReaderBlocks using html5ever + scraper.
 ///
@@ -46,6 +47,9 @@ fn emit_block(
         text_indent: None,
         text_align,
         note_id: None,
+        page_break_before: false,
+        page_break_inside_avoid: false,
+        has_drop_cap: false,
     });
     *index += 1;
 }
@@ -69,15 +73,12 @@ fn walk_children(
                     } else {
                         BlockType::Paragraph
                     };
-                    emit_block(
-                        blocks,
-                        index,
-                        text,
-                        bt,
-                        None,
-                        if rich.is_empty() { None } else { Some(rich) },
-                        None,
-                    );
+                    let rich = if rich.is_empty() || (rich.len() == 1 && rich[0].text == text) {
+                        None
+                    } else {
+                        Some(rich.into_vec())
+                    };
+                    emit_block(blocks, index, text, bt, None, rich, None);
                 }
             }
             h_tag if is_heading(h_tag) && !in_list => {
@@ -115,6 +116,9 @@ fn walk_children(
                             text_indent: None,
                             text_align: None,
                             note_id: None,
+                            page_break_before: false,
+                            page_break_inside_avoid: false,
+                            has_drop_cap: false,
                         })
                         .collect();
                     blocks.push(ReaderBlock {
@@ -132,12 +136,18 @@ fn walk_children(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     *index += 1;
                 }
             }
             "img" => {
-                let src = el.attr("src").unwrap_or("").to_string();
+                let src = el
+                    .attr("src")
+                    .and_then(crate::book::epub::sanitize_epub_asset_href)
+                    .unwrap_or_default();
                 let alt = el.attr("alt").unwrap_or("").to_string();
                 if !src.is_empty() {
                     blocks.push(ReaderBlock {
@@ -155,6 +165,9 @@ fn walk_children(
                         text_indent: None,
                         text_align: None,
                         note_id: None,
+                        page_break_before: false,
+                        page_break_inside_avoid: false,
+                        has_drop_cap: false,
                     });
                     *index += 1;
                 }
@@ -214,8 +227,9 @@ fn collect_text(el: ElementRef<'_>) -> String {
 }
 
 /// Collect inline formatting (b, i, sup, a) from direct children only.
-fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
-    let mut spans = Vec::new();
+/// ponytail: SmallVec avoids heap allocation for common 1-2 span case.
+fn collect_rich_spans(el: ElementRef<'_>) -> SmallVec<[RichSpan; 4]> {
+    let mut spans = SmallVec::new();
     for child in el.children() {
         if let Some(t) = child.value().as_text() {
             let text = t.trim();
@@ -225,23 +239,30 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     bold: false,
                     italic: false,
                     superscript: false,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: false,
                 });
             }
         } else if let Some(sub) = ElementRef::wrap(child) {
             let tag = sub.value().name();
-            let text = collect_text(sub);
-            if text.is_empty() {
+            let t = collect_text(sub);
+            if t.is_empty() {
                 continue;
             }
-            let t = crate::book::normalize_typography(&text);
             match tag {
                 "b" | "strong" => spans.push(RichSpan {
                     text: t,
                     bold: true,
                     italic: false,
                     superscript: false,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: false,
                 }),
@@ -250,6 +271,10 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     bold: false,
                     italic: true,
                     superscript: false,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: false,
                 }),
@@ -258,16 +283,24 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     bold: false,
                     italic: false,
                     superscript: true,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: false,
                 }),
                 "a" => {
-                    let href = sub.attr("href").map(String::from);
+                    let href = sub.attr("href").and_then(crate::book::sanitize_href);
                     spans.push(RichSpan {
                         text: t,
                         bold: false,
                         italic: false,
                         superscript: false,
+                        subscript: false,
+                        strikethrough: false,
+                        code: false,
+                        style_name: None,
                         href,
                         line_break: false,
                     });
@@ -277,6 +310,10 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     bold: false,
                     italic: false,
                     superscript: false,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: true,
                 }),
@@ -285,6 +322,10 @@ fn collect_rich_spans(el: ElementRef<'_>) -> Vec<RichSpan> {
                     bold: false,
                     italic: false,
                     superscript: false,
+                    subscript: false,
+                    strikethrough: false,
+                    code: false,
+                    style_name: None,
                     href: None,
                     line_break: false,
                 }),

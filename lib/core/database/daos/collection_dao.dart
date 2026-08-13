@@ -19,8 +19,10 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
   Future<int> insertCollection(CollectionsCompanion entry) =>
       into(collections).insertOnConflictUpdate(entry);
 
-  Future<int> deleteCollection(String id) =>
-      (delete(collections)..where((t) => t.id.equals(id))).go();
+  Future<int> deleteCollection(String id) async {
+    await (delete(bookCollections)..where((t) => t.collectionId.equals(id))).go();
+    return (delete(collections)..where((t) => t.id.equals(id))).go();
+  }
 
   Future<List<BookCollection>> getBookCollectionsForBook(String bookId) async =>
       (select(bookCollections)..where((t) => t.bookId.equals(bookId))).get();
@@ -32,23 +34,38 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
     return (select(collections)..where((t) => t.id.isIn(colIds))).get();
   }
 
-  Future<void> addBookToCollection(String bookId, String collectionId) async {
-    await into(bookCollections).insertOnConflictUpdate(
-      BookCollectionsCompanion.insert(
-        bookId: bookId,
-        collectionId: collectionId,
-      ),
-    );
+  Future<void> addBookToCollection(String bookId, String collectionId) {
+    return attachedDatabase.transaction(() async {
+      await into(bookCollections).insertOnConflictUpdate(
+        BookCollectionsCompanion.insert(
+          bookId: bookId,
+          collectionId: collectionId,
+        ),
+      );
+      await _syncBookIds(collectionId);
+    });
   }
 
-  Future<void> removeBookFromCollection(
-    String bookId,
-    String collectionId,
-  ) async {
-    await (delete(bookCollections)..where(
-          (t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId),
-        ))
-        .go();
+  Future<void> removeBookFromCollection(String bookId, String collectionId) {
+    return attachedDatabase.transaction(() async {
+      await (delete(bookCollections)..where(
+            (t) => t.bookId.equals(bookId) & t.collectionId.equals(collectionId),
+          ))
+          .go();
+      await _syncBookIds(collectionId);
+    });
+  }
+
+  // ponytail: denormalized cache kept in sync with join table; column already
+  // exists and is used by export/import, so recompute after each mutation.
+  Future<void> _syncBookIds(String collectionId) async {
+    final rows = await (select(
+      bookCollections,
+    )..where((t) => t.collectionId.equals(collectionId))).get();
+    final ids = rows.map((r) => r.bookId).toList();
+    await (update(collections)..where((t) => t.id.equals(collectionId))).write(
+      CollectionsCompanion(bookIds: Value(ids)),
+    );
   }
 
   Future<List<SavedBook>> getBooksInCollection(String collectionId) async {

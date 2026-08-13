@@ -36,7 +36,11 @@ class BookHeader extends StatelessWidget {
             child: SizedBox(
               width: 130,
               height: 190,
-              child: BookCoverImage(book: book),
+              child: BookCoverImage(
+                book: book,
+                memCacheWidth: 260,
+                memCacheHeight: 380,
+              ),
             ),
           ),
         ),
@@ -75,11 +79,10 @@ class BookHeader extends StatelessWidget {
                 const SizedBox(height: 12),
                 Builder(
                   builder: (context) {
-                    final capService = const FormatCapabilityService();
                     return Wrap(
                       spacing: 6,
                       children: details.availableFormats.map((f) {
-                        final warning = capService.warningLabel(f);
+                        final warning = f.warningLabel();
                         final isSupported = warning == null;
                         return Tooltip(
                           message: warning ?? f.name.toUpperCase(),

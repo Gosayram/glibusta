@@ -32,6 +32,14 @@ final class InvalidEncodingFailure extends BookOpenFailure {
   const InvalidEncodingFailure([super.message]);
 }
 
+final class CorruptFileFailure extends BookOpenFailure {
+  const CorruptFileFailure([super.message]);
+}
+
+final class MissingContentFailure extends BookOpenFailure {
+  const MissingContentFailure([super.message]);
+}
+
 final class SourceUnavailableFailure extends AppFailure {
   const SourceUnavailableFailure([super.message]);
 }

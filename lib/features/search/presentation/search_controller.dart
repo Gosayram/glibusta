@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show OrderingTerm;
+import 'package:drift/drift.dart' show Expression, OrderingTerm;
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/http/http_client.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/search_query.dart';
@@ -19,6 +20,7 @@ part 'search_controller.freezed.dart';
 class SearchControllerNotifier extends _$SearchControllerNotifier {
   CancelToken? _currentToken;
   CancelToken? _authorToken;
+  var _requestGeneration = 0;
   AppLogger get _logger => ref.read(appLoggerProvider);
 
   @override
@@ -34,6 +36,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
   BookSource get _source => ref.read(bookSourceProvider);
 
+  bool _isCurrentRequest(int generation) => ref.mounted && generation == _requestGeneration;
+
   Future<void> search(String query) async {
     final normalized = query.trim();
     if (normalized.isEmpty) {
@@ -45,6 +49,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
 
     _currentToken?.cancel();
     _authorToken?.cancel();
+    final generation = ++_requestGeneration;
     _currentToken = CancelToken();
     _authorToken = CancelToken();
     final localAuthorToken = _authorToken;
@@ -71,6 +76,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       try {
         bookResult = await _source.searchBooks(searchQuery, cancelToken: bookToken);
       } on Object catch (e) {
+        if (isCancellation(e)) return;
         bookError = e;
         _logger.warning('Book search failed: $e', name: 'Search', error: e);
         bookResult = SearchResultPage(
@@ -82,16 +88,17 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         );
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
 
       try {
         authorResult = await _source.searchAuthors(searchQuery, cancelToken: localAuthorToken);
       } on Object catch (e) {
+        if (isCancellation(e)) return;
         _logger.warning('Author search failed: $e', name: 'Search', error: e);
         authorResult = const SearchAuthorsResultPage(authors: []);
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
 
       if (bookResult.books.isEmpty && authorResult.authors.isEmpty && bookError != null) {
         state = state.copyWith(
@@ -103,7 +110,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         return;
       }
 
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.info(
         'Search returned ${bookResult.books.length} books, ${authorResult.authors.length} authors',
         name: 'Search',
@@ -117,10 +124,20 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: bookError != null && bookResult.books.isEmpty ? bookError.toString() : null,
       );
       if (bookResult.books.isNotEmpty || authorResult.authors.isNotEmpty) {
-        unawaited(_rememberSearch(normalized));
+        try {
+          await _rememberSearch(normalized);
+        } on Object catch (e, st) {
+          _logger.warning(
+            'Failed to save search history: $e',
+            name: 'Search',
+            error: e,
+            st: st,
+          );
+        }
       }
     } on Object catch (e, st) {
-      if (!ref.mounted) return;
+      if (isCancellation(e)) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.severe('Search failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -140,11 +157,13 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
       filters: state.filters,
     );
     _currentToken?.cancel();
+    _authorToken?.cancel();
     _currentToken = CancelToken();
+    final generation = ++_requestGeneration;
 
     try {
       final result = await _source.searchBooks(searchQuery, cancelToken: _currentToken);
-      if (!ref.mounted) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.info('Load more returned ${result.books.length} results', name: 'Search');
       state = state.copyWith(
         books: [...state.books, ...result.books],
@@ -154,7 +173,8 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
         error: null,
       );
     } on Object catch (e, st) {
-      if (!ref.mounted) return;
+      if (isCancellation(e)) return;
+      if (!_isCurrentRequest(generation)) return;
       _logger.severe('Load more failed: $e', name: 'Search', error: e, st: st);
       state = state.copyWith(isLoading: false, error: e.toString());
     }
@@ -181,7 +201,10 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     final db = ref.read(databaseProvider);
     final rows =
         await (db.select(db.searchHistory)
-              ..orderBy([(table) => OrderingTerm.desc(table.searchedAt)])
+              ..orderBy([
+                (table) => OrderingTerm.desc(table.searchedAt),
+                (table) => OrderingTerm.desc(table.id),
+              ])
               ..limit(8))
             .get();
     if (!ref.mounted) return;
@@ -199,17 +222,26 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
     if (normalized.isEmpty) return;
 
     final db = ref.read(databaseProvider);
-    await db
-        .into(db.searchHistory)
-        .insert(
-          SearchHistoryCompanion.insert(
-            query: normalized,
-            type: 'online',
-          ),
-        );
+    await db.transaction(() async {
+      await (db.delete(db.searchHistory)..where(
+            (table) => Expression.and([
+              table.query.equals(normalized),
+              table.type.equals('online'),
+            ]),
+          ))
+          .go();
+      await db
+          .into(db.searchHistory)
+          .insert(
+            SearchHistoryCompanion.insert(
+              query: normalized,
+              type: 'online',
+            ),
+          );
+    });
 
     if (!ref.mounted) return;
-    unawaited(loadHistory());
+    await loadHistory();
   }
 
   Future<void> clearHistory() async {
@@ -220,6 +252,7 @@ class SearchControllerNotifier extends _$SearchControllerNotifier {
   }
 
   void clearResults() {
+    _requestGeneration++;
     _currentToken?.cancel();
     _currentToken = null;
     _authorToken?.cancel();

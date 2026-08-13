@@ -11,34 +11,91 @@ crate-type = ["lib", "cdylib", "staticlib"]
 [features]
 default = []
 pdf = ["pdfium-render/image_latest", "image"]
+zune-image = ["dep:zune-image"]
 
 [dependencies]
+aho-corasick = "1"
 anyhow = "1"
 base64 = "0.22"
+bumpalo = "3"
+
+# ─── Файловая система ──────────────────────────────────────────────────
 chardetng = "1.0"
+compact_str = "0.8"
+crc32fast = "1"
+djvu-rs = { version = "0.25.0", default-features = false, features = ["std"] }
+
+# ─── Кодировки ─────────────────────────────────────────────────────────
 encoding_rs = "0.8"
+flate2 = "1"
+# ─── FFI / Bridge ──────────────────────────────────────────────────────
 flutter_rust_bridge = "=2.12.0"
-html5ever = "0.39"
 
-# Rust doesn't natively support images as well as we'd like,
-# so image crate is gated behind pdf feature
+# ─── Поиск по библиотеке ───────────────────────────────────────────────
+hyphenation = { version = "0.8", features = ["embed_all", "unicode-normalization"] }
+
+# ─── Изображения ───────────────────────────────────────────────────────
+# image crate is gated behind pdf feature
 image = { version = "0.25", optional = true }
-lightningcss = "1.0.0-alpha.71"
-memchr = "2"
+# ─── Структуры данных ──────────────────────────────────────────────────
 
-# Optional: PDF thumbnail rendering via PDFium
+# ─── CSS / Layout ──────────────────────────────────────────────────────
+lopdf = { version = "0.37", optional = true }
+memchr = "2"
+memmap2 = "0.9"
+
+# ─── Кэш и память ──────────────────────────────────────────────────────
+moka = { version = "0.12", features = ["sync"] }
+nom = { version = "8.0.0", features = ["std"] }
+
+# ─── PDF ───────────────────────────────────────────────────────────────
 pdfium-render = { version = "0.9", optional = true }
+
+# ─── XML / HTML парсинг ────────────────────────────────────────────────
 quick-xml = { version = "0.41", features = ["serialize"] }
+# ─── Параллелизм ───────────────────────────────────────────────────────
+# ─── Хранение / KV ─────────────────────────────────────────────────────
+
+# ─── Регулярки ─────────────────────────────────────────────────────────
 regex = { version = "1", default-features = false, features = ["std", "perf", "unicode-perl", "unicode-case"] }
+# zune-image = "0.5"  # TODO: replace image when stable
+
+# ─── SVG ───────────────────────────────────────────────────────────────
 scraper = "0.27"
+
+# ─── Сериализация ──────────────────────────────────────────────────────
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.11"
+
+# ─── Хэширование ───────────────────────────────────────────────────────
+sha2 = "0.10"
+smallvec = { version = "1", features = ["serde"] }
+
+# ─── Enum / Builder / Errors ───────────────────────────────────────────
 taffy = "0.4"
+tracing = "0.1"
+# ─── Шрифты ────────────────────────────────────────────────────────────
+
+# ─── Текст, Unicode, поиск ─────────────────────────────────────────────
+unicode-segmentation = "1"
+unrar-ng = "0.7"
+# ─── Утилиты ───────────────────────────────────────────────────────────
+
+# ─── ID generation ─────────────────────────────────────────────────────
+uuid = { version = "1", features = ["v4"] }
+whatlang = "0.18"
+# ─── Парсинг бинарных форматов (MOBI/PRC) ──────────────────────────────
+
+# ─── Архивы ────────────────────────────────────────────────────────────
 zip = { version = "8", default-features = false, features = ["deflate"] }
+zune-image = { version = "0.5.0", optional = true }
 
 [build-dependencies]
 flutter_rust_bridge_codegen = "=2.12.0"
+
+[dev-dependencies]
+insta = "1"
+pretty_assertions = "1"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
@@ -75,7 +132,15 @@ should_implement_trait = "allow"
 # ─── Release profile: minimize .so size ────────────────────────────────
 [profile.release]
 opt-level = "z"       # aggressive size optimization
-lto = true            # Link Time Optimization — dead code elimination across crates
+lto = "fat"           # fat LTO — most aggressive dead code elimination
 codegen-units = 1     # single codegen unit = better optimization (slower build)
 panic = "abort"       # remove stack unwinding code on panic
 strip = "symbols"     # strip debug symbols from .so
+
+# Compile all dependencies with size optimization too
+[profile.release.package."*"]
+opt-level = "z"
+
+[profile.release.package.aho-corasick]
+opt-level = 3
+

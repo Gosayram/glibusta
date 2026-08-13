@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' show TextAlign;
 
@@ -22,7 +23,8 @@ class RustBookParser implements BookParser {
     BookFormat.rtf ||
     BookFormat.mobi ||
     BookFormat.azw3 ||
-    BookFormat.prc => true,
+    BookFormat.prc ||
+    BookFormat.cbz => true,
     _ => false,
   };
 
@@ -75,6 +77,16 @@ class RustBookParser implements BookParser {
     }
   }
 
+  /// Parses a CBR archive through the path-based native UnRAR API.
+  Future<local.NormalizedBook> parseCbrFile(String filePath) async {
+    try {
+      final book = await rust_api.parseCbr(path: filePath);
+      return _toNormalizedBook(book);
+    } on Object catch (e) {
+      throw ParserFailure('Rust CBR parser failed for $filePath: $e');
+    }
+  }
+
   Future<local.NormalizedBookMetadata?> parseMetadata(
     Uint8List bytes, {
     String? fileName,
@@ -88,12 +100,29 @@ class RustBookParser implements BookParser {
   }
 
   static local.NormalizedBook _toNormalizedBook(rust_models.NormalizedBook r) {
+    Map<String, dynamic>? metadata;
+    if (r.metadataJson != null && r.metadataJson!.isNotEmpty) {
+      try {
+        final parsed = jsonDecode(r.metadataJson!);
+        if (parsed is Map) {
+          metadata = parsed.map((k, v) => MapEntry(k.toString(), v));
+        }
+      } on Object catch (_) {
+        // ignore malformed metadata
+      }
+    }
+    if (metadata == null && r.language != null) {
+      metadata = {'language': r.language};
+    } else if (metadata != null && r.language != null) {
+      metadata['language'] = r.language;
+    }
     return local.NormalizedBook(
       id: r.id,
       title: r.title,
       authors: r.authors,
       description: r.description,
       coverUrl: r.coverUrl,
+      metadata: metadata,
       chapters: r.chapters
           .map(
             (rc) => local.ReaderChapter(
@@ -114,6 +143,10 @@ class RustBookParser implements BookParser {
                               bold: rs.bold,
                               italic: rs.italic,
                               superscript: rs.superscript,
+                              subscript: rs.subscript,
+                              strikethrough: rs.strikethrough,
+                              code: rs.code,
+                              styleName: rs.styleName,
                               href: rs.href,
                               lineBreak: rs.lineBreak,
                             ),
@@ -136,13 +169,16 @@ class RustBookParser implements BookParser {
                       textAlign: _parseTextAlignFromRust(rb.textAlign),
                       whiteSpaceMode: _extractProp(rb.textAlign, 'ws'),
                       noteId: rb.noteId,
+                      pageBreakBefore: rb.pageBreakBefore,
+                      pageBreakInsideAvoid: rb.pageBreakInsideAvoid,
+                      hasDropCap: rb.hasDropCap,
+                      rawCssProps: rb.textAlign,
                     ),
                   )
                   .toList(),
             ),
           )
           .toList(),
-      metadata: r.metadata != null ? Map<String, dynamic>.from(r.metadata! as Map) : null,
     );
   }
 
@@ -199,6 +235,8 @@ class RustBookParser implements BookParser {
       rust_models.BlockType.cite => local.BlockType.cite,
       rust_models.BlockType.textAuthor => local.BlockType.textAuthor,
       rust_models.BlockType.subtitle => local.BlockType.subtitle,
+      rust_models.BlockType.listItem => local.BlockType.listItem,
+      rust_models.BlockType.preformatted => local.BlockType.preformatted,
       rust_models.BlockType.paragraph => local.BlockType.paragraph,
     };
   }

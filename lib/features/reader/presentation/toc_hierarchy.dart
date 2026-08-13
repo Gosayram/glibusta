@@ -6,6 +6,8 @@ class TocEntry {
   final int depth;
   final bool isGroup;
   final int groupId;
+  final String? anchor;
+  final int blockIndex;
 
   const TocEntry({
     required this.index,
@@ -13,6 +15,8 @@ class TocEntry {
     required this.depth,
     required this.isGroup,
     required this.groupId,
+    this.anchor,
+    this.blockIndex = 0,
   });
 }
 
@@ -65,6 +69,79 @@ List<TocEntry> buildTocHierarchy(List<String> titles) {
   }).toList();
 }
 
+const _maxTitleLength = 80;
+
+String _truncateTitle(String title) {
+  if (title.length <= _maxTitleLength) return title;
+  return '${title.substring(0, _maxTitleLength - 1)}\u2026';
+}
+
+String _chapterFallbackTitle(List<String> chapterTitles, int chapterIndex) {
+  if (chapterIndex < chapterTitles.length) {
+    final t = chapterTitles[chapterIndex].trim();
+    if (t.isNotEmpty) return _truncateTitle(t);
+  }
+  return 'Глава ${chapterIndex + 1}';
+}
+
+({int chapterIndex, int paragraphIndex})? resolveTocAnchor({
+  required Map<String, dynamic>? metadata,
+  required String? anchor,
+  required int chapterIndex,
+}) {
+  if (anchor == null || anchor.isEmpty) return null;
+  final anchors = metadata?['epubAnchors'];
+  final chapterPaths = metadata?['epubChapterPaths'];
+  if (anchors is! Map || chapterPaths is! List) return null;
+  if (chapterIndex < 0 || chapterIndex >= chapterPaths.length) return null;
+  final sourcePath = chapterPaths[chapterIndex];
+  if (sourcePath is! String || sourcePath.isEmpty) return null;
+  final key = '$sourcePath#$anchor';
+  final value = anchors[key];
+  if (value is! Map) return null;
+  final resolvedChapter = value['chapterIndex'];
+  final resolvedParagraph = value['paragraphIndex'];
+  if (resolvedChapter is! int ||
+      resolvedParagraph is! int ||
+      resolvedChapter < 0 ||
+      resolvedParagraph < 0) {
+    return null;
+  }
+  return (chapterIndex: resolvedChapter, paragraphIndex: resolvedParagraph);
+}
+
+List<TocEntry> buildTocFromEpubToc(
+  List<Map<String, dynamic>> epubTocItems,
+) {
+  final result = <TocEntry>[];
+  void visit(List<Map<String, dynamic>> items, int depth) {
+    for (final item in items) {
+      final title = (item['title'] as String?) ?? '';
+      final href = (item['href'] as String?) ?? '';
+      final hashIndex = href.indexOf('#');
+      final anchor = hashIndex >= 0 ? href.substring(hashIndex + 1) : null;
+      if (title.isEmpty) continue;
+      result.add(
+        TocEntry(
+          index: result.length,
+          title: title,
+          depth: depth,
+          isGroup: false,
+          groupId: result.length,
+          anchor: anchor,
+        ),
+      );
+      final children = item['children'];
+      if (children is List && children.isNotEmpty) {
+        visit(children.cast<Map<String, dynamic>>(), depth + 1);
+      }
+    }
+  }
+
+  visit(epubTocItems, 0);
+  return result;
+}
+
 List<TocEntry> buildTocFromHeadings(
   List<String> chapterTitles,
   Map<int, ReaderChapter> loadedChapters,
@@ -86,6 +163,8 @@ List<TocEntry> buildTocFromHeadings(
   }
   if (allHeadings.isEmpty) return buildTocHierarchy(chapterTitles);
 
+  final minLevel = allHeadings.map((h) => h.level).reduce((a, b) => a < b ? a : b);
+
   final items = <TocEntry>[];
   var currentChapter = -1;
 
@@ -93,9 +172,7 @@ List<TocEntry> buildTocFromHeadings(
     final h = allHeadings[i];
     if (h.chapterIndex != currentChapter) {
       currentChapter = h.chapterIndex;
-      final chTitle = currentChapter < chapterTitles.length
-          ? chapterTitles[currentChapter]
-          : 'Глава ${currentChapter + 1}';
+      final chTitle = _chapterFallbackTitle(chapterTitles, currentChapter);
       items.add(
         TocEntry(
           index: currentChapter,
@@ -106,13 +183,27 @@ List<TocEntry> buildTocFromHeadings(
         ),
       );
     }
+    final chapter = loadedChapters[currentChapter];
+    var blockIdx = 0;
+    if (chapter != null) {
+      for (var b = 0; b < chapter.blocks.length; b++) {
+        final block = chapter.blocks[b];
+        if (block.type == BlockType.heading &&
+            block.headingLevel == h.level &&
+            block.text.trim() == h.title) {
+          blockIdx = b;
+          break;
+        }
+      }
+    }
     items.add(
       TocEntry(
         index: currentChapter,
-        title: h.title,
-        depth: h.level,
+        title: _truncateTitle(h.title),
+        depth: h.level - minLevel + 1,
         isGroup: false,
         groupId: currentChapter,
+        blockIndex: blockIdx,
       ),
     );
   }

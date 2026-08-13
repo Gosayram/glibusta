@@ -1,6 +1,7 @@
 # Miscellaneous
 *.class
 *.lock
+!pubspec.lock
 *.log
 *.pyc
 *.swp
@@ -122,12 +123,14 @@ app.*.symbols
 
 # Custome ignore folders
 test_results/
+.firecrawl/
 docs/
 .key-generate.conf
 *.backup
 
 # Environment
 .env
+!.env.enc
 
 # IDEA's
 .vscode/
@@ -198,3 +201,11 @@ tarpaulin-report.html
 # ==========================================
 
 build/symbols/
+
+# macOS local signing — each dev fills in their own certificate
+macos/Flutter/SigningConfig.xcconfig
+
+# ==========================================
+# Rust snapshots new temp files
+# ==========================================
+*.snap.new

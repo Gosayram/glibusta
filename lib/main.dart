@@ -9,6 +9,7 @@ import 'app/app.dart';
 import 'core/bootstrap/app_bootstrap.dart';
 import 'core/bootstrap/app_provider_observer.dart';
 import 'core/logging/app_logger.dart';
+import 'core/telemetry/reader_telemetry.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,11 @@ Future<void> main() async {
     appRunner: () => runZonedGuarded(
       () => runApp(
         ProviderScope(
+          overrides: [
+            readerTelemetryProvider.overrideWithValue(
+              ReaderTelemetry(AppBootstrap.prefs, AppLogger()),
+            ),
+          ],
           observers: [AppProviderObserver()],
           child: const GlibustaApp(),
         ),

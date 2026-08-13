@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,8 +22,16 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : FlutterFragmentActivity() {
 
+    private companion object {
+        val supportedBookExtensions = setOf(
+            "epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc",
+            "djvu", "djv", "docx", "docm", "cbz", "cbr",
+        )
+    }
+
     private val CHANNEL = "com.gosayram.glibusta/storage_bridge"
     private val DJVU_CHANNEL = "glibusta/djvu"
+    private val maxImportFileBytes = 500L * 1024 * 1024
     private var pendingResult: MethodChannel.Result? = null
     private var pendingPermResult: MethodChannel.Result? = null
 
@@ -63,6 +71,10 @@ class MainActivity : FlutterFragmentActivity() {
     private fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "pickFolder" -> {
+                if (pendingResult != null) {
+                    result.error("PICKER_IN_PROGRESS", "Folder picker is already open", null)
+                    return
+                }
                 pendingResult = result
                 openTreeLauncher.launch(null)
             }
@@ -85,13 +97,24 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
             }
-            "readFile" -> {
-                val fileUri = call.argument<String>("uri")
-                if (fileUri == null) {
+            "countBooks" -> {
+                val folderUri = call.argument<String>("uri")
+                if (folderUri == null) {
                     result.error("INVALID_ARG", "URI is required", null)
                     return
                 }
-                readFile(Uri.parse(fileUri), result)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val count = countBooks(Uri.parse(folderUri))
+                        withContext(Dispatchers.Main) {
+                            result.success(count)
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            result.error("SCAN_ERROR", e.message, null)
+                        }
+                    }
+                }
             }
             "copyToCache" -> {
                 val fileUri = call.argument<String>("uri")
@@ -99,7 +122,16 @@ class MainActivity : FlutterFragmentActivity() {
                     result.error("INVALID_ARG", "URI is required", null)
                     return
                 }
-                copyToCache(Uri.parse(fileUri), result)
+                val requestedMaxBytes = call.argument<Number>("maxBytes")?.toLong()
+                if (requestedMaxBytes != null && requestedMaxBytes <= 0) {
+                    result.error("INVALID_ARG", "maxBytes must be positive", null)
+                    return
+                }
+                copyToCache(
+                    Uri.parse(fileUri),
+                    requestedMaxBytes?.coerceAtMost(maxImportFileBytes) ?: maxImportFileBytes,
+                    result,
+                )
             }
             "getPersistedUris" -> {
                 val uris = contentResolver.persistedUriPermissions
@@ -127,8 +159,7 @@ class MainActivity : FlutterFragmentActivity() {
                     if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) {
                         result.success(true)
                     } else {
-                        pendingPermResult = result
-                        notifPermLauncher.launch(perm)
+                        requestRuntimePermission(perm, result)
                     }
                 } else {
                     result.success(true)
@@ -154,8 +185,7 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         result.success(false)
                     } else {
-                        pendingPermResult = result
-                        notifPermLauncher.launch(android.Manifest.permission.READ_EXTERNAL_STORAGE)
+                        requestRuntimePermission(android.Manifest.permission.READ_EXTERNAL_STORAGE, result)
                     }
                 }
             }
@@ -185,42 +215,62 @@ class MainActivity : FlutterFragmentActivity() {
         val root = DocumentFile.fromTreeUri(this, treeUri)
             ?: throw IllegalStateException("Cannot access folder")
 
-        val supportedExtensions = setOf("epub", "fb2", "zip", "txt", "rtf", "pdf", "mobi", "azw", "azw3", "prc", "djvu", "djv")
         val books = mutableListOf<Map<String, Any>>()
 
-        collectBooks(root, supportedExtensions, books)
+        collectBooks(root, books)
 
         return books
     }
 
+    private fun countBooks(treeUri: Uri): Int {
+        val root = DocumentFile.fromTreeUri(this, treeUri)
+            ?: throw IllegalStateException("Cannot access folder")
+        val directories = ArrayDeque<DocumentFile>().apply { add(root) }
+        var count = 0
+        while (directories.isNotEmpty()) {
+            for (file in directories.removeFirst().listFiles()) {
+                if (file.isDirectory) {
+                    directories.addLast(file)
+                    continue
+                }
+                val name = file.name ?: continue
+                val extension = name.substringAfterLast('.', "").lowercase()
+                if (file.isFile && !isHiddenOrTemporary(name) && extension in supportedBookExtensions) {
+                    count++
+                }
+            }
+        }
+        return count
+    }
+
     private fun collectBooks(
         directory: DocumentFile,
-        supportedExtensions: Set<String>,
         books: MutableList<Map<String, Any>>,
     ) {
-        for (file in directory.listFiles()) {
-            if (file.isDirectory) {
-                collectBooks(file, supportedExtensions, books)
-                continue
+        val directories = ArrayDeque<DocumentFile>().apply { add(directory) }
+        while (directories.isNotEmpty()) {
+            for (file in directories.removeFirst().listFiles()) {
+                if (file.isDirectory) {
+                    directories.addLast(file)
+                    continue
+                }
+                if (!file.isFile) continue
+
+                val name = file.name ?: continue
+                if (isHiddenOrTemporary(name)) continue
+
+                val ext = name.substringAfterLast('.', "").lowercase()
+                if (ext !in supportedBookExtensions) continue
+
+                books.add(mapOf(
+                    "uri" to file.uri.toString(),
+                    "name" to name,
+                    "size" to file.length(),
+                    "extension" to ext,
+                    "mimeType" to (file.type ?: ""),
+                    "lastModified" to file.lastModified(),
+                ))
             }
-            if (!file.isFile) continue
-
-            val name = file.name ?: continue
-            if (isHiddenOrTemporary(name)) continue
-
-            val ext = name.substringAfterLast('.', "").lowercase()
-            if (ext !in supportedExtensions) continue
-
-            val size = file.length()
-
-            books.add(mapOf(
-                "uri" to file.uri.toString(),
-                "name" to name,
-                "size" to size,
-                "extension" to ext,
-                "mimeType" to (file.type ?: ""),
-                "lastModified" to file.lastModified(),
-            ))
         }
     }
 
@@ -234,35 +284,62 @@ class MainActivity : FlutterFragmentActivity() {
             lower.endsWith("~")
     }
 
-    private fun copyToCache(fileUri: Uri, result: MethodChannel.Result) {
-        try {
-            val input = contentResolver.openInputStream(fileUri)
-                ?: run {
-                    result.error("READ_ERROR", "Cannot open file", null)
-                    return
+    private fun copyToCache(fileUri: Uri, maxBytes: Long, result: MethodChannel.Result) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            var tempFile: java.io.File? = null
+            try {
+                tempFile = java.io.File.createTempFile("saf_", cacheFileSuffix(fileUri), cacheDir)
+                val input = contentResolver.openInputStream(fileUri)
+                    ?: throw IllegalStateException("Cannot open file")
+                input.use { ins ->
+                    tempFile.outputStream().use { out ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var copiedBytes = 0L
+                        while (true) {
+                            val read = ins.read(buffer)
+                            if (read < 0) break
+                            copiedBytes += read
+                            if (copiedBytes > maxBytes) {
+                                throw IllegalArgumentException("File exceeds the $maxBytes byte import limit")
+                            }
+                            out.write(buffer, 0, read)
+                        }
+                    }
                 }
-            val cacheDir = cacheDir
-            val tempFile = java.io.File(cacheDir, "saf_${System.currentTimeMillis()}.tmp")
-            input.use { ins ->
-                tempFile.outputStream().use { out ->
-                    ins.copyTo(out, bufferSize = 8192)
+                withContext(Dispatchers.Main) {
+                    result.success(tempFile.absolutePath)
+                }
+            } catch (e: Exception) {
+                tempFile?.delete()
+                withContext(Dispatchers.Main) {
+                    result.error("READ_ERROR", e.message, null)
                 }
             }
-            result.success(tempFile.absolutePath)
-        } catch (e: Exception) {
-            result.error("READ_ERROR", e.message, null)
         }
     }
 
-    private fun readFile(fileUri: Uri, result: MethodChannel.Result) {
-        try {
-            contentResolver.openInputStream(fileUri)?.use { input ->
-                val bytes = input.readBytes()
-                result.success(bytes)
-            } ?: result.error("READ_ERROR", "Cannot open file", null)
-        } catch (e: Exception) {
-            result.error("READ_ERROR", e.message, null)
+    private fun cacheFileSuffix(fileUri: Uri): String {
+        val displayName = contentResolver.query(
+            fileUri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
         }
+        val extension = displayName?.substringAfterLast('.', "").orEmpty()
+        return extension.takeIf(String::isNotBlank)?.let { ".${it}" } ?: ".tmp"
+    }
+
+    private fun requestRuntimePermission(permission: String, result: MethodChannel.Result) {
+        if (pendingPermResult != null) {
+            result.error("PERMISSION_REQUEST_IN_PROGRESS", "A permission request is already open", null)
+            return
+        }
+        pendingPermResult = result
+        notifPermLauncher.launch(permission)
     }
 
     private fun hasStoragePermission(): Boolean {

@@ -1,9 +1,11 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
 import '../../../core/database/full_text_search.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import 'parsers/normalized_book.dart';
 
 final class CacheSourceFingerprint {
@@ -22,22 +24,31 @@ final class CacheSourceFingerprint {
 
 typedef CacheFingerprintProvider = Future<CacheSourceFingerprint?> Function(String bookId);
 
-class ReaderCacheService {
+final class ReaderCacheService {
   ReaderCacheService({
     required CacheFingerprintProvider fingerprintProvider,
     required AppFileStorage storage,
+    required AppLogger logger,
     FullTextSearchService? ftsService,
   }) : _fingerprintProvider = fingerprintProvider,
        _storage = storage,
+       _logger = logger,
        _ftsService = ftsService;
 
   final CacheFingerprintProvider _fingerprintProvider;
   final AppFileStorage _storage;
   final FullTextSearchService? _ftsService;
-  final _logger = AppLogger();
+  final AppLogger _logger;
+  final Map<String, Map<String, String>> _chapterChecksumsByBook = {};
+  static final LinkedHashMap<String, ReaderChapter> _chapterCache =
+      LinkedHashMap<String, ReaderChapter>();
+  static const int _chapterCacheMaxSize = 10;
 
-  static const int _splitCacheVersion = 1;
-  static const int _parserCacheVersion = 1;
+  static const int _splitCacheVersion = 2;
+  // Chapter title normalization changed: invalidate stale metadata/TOC entries
+  // that may contain a chapter's first paragraph.
+  static const int _parserCacheVersion = 3;
+  static int _temporaryFileSequence = 0;
 
   Future<String> get booksCacheDir async {
     final dir = await _storage.cacheDir();
@@ -45,11 +56,13 @@ class ReaderCacheService {
   }
 
   Future<File> _getLegacyCacheFile(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     return File('$dir/$bookId.json');
   }
 
   Future<Directory> getBookDir(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     final bookDir = Directory('$dir/$bookId');
     if (!await bookDir.exists()) {
@@ -59,8 +72,19 @@ class ReaderCacheService {
   }
 
   Future<Directory> _getExistingBookDir(String bookId) async {
+    _validateBookId(bookId);
     final dir = await booksCacheDir;
     return Directory('$dir/$bookId');
+  }
+
+  static void _validateBookId(String bookId) {
+    if (bookId.isEmpty ||
+        bookId == '.' ||
+        bookId == '..' ||
+        bookId.contains('/') ||
+        bookId.contains(r'\')) {
+      throw ArgumentError.value(bookId, 'bookId', 'must be a single path segment');
+    }
   }
 
   File _getMetadataFile(Directory bookDir) => File('${bookDir.path}/meta.json');
@@ -70,12 +94,25 @@ class ReaderCacheService {
   File _getChapterFile(Directory bookDir, int index) => File('${bookDir.path}/ch_$index.json');
 
   Future<void> _writeJsonAtomically(File target, Object? value) async {
-    final tmp = File('${target.path}.tmp');
-    await tmp.writeAsString(jsonEncode(value), flush: true);
-    if (await target.exists()) {
-      await target.delete();
+    await _writeTextAtomically(target, jsonEncode(value));
+  }
+
+  Future<void> _writeTextAtomically(File target, String contents) async {
+    final tmp = File(
+      '${target.path}.${DateTime.now().microsecondsSinceEpoch}.${_temporaryFileSequence++}.tmp',
+    );
+    try {
+      await tmp.writeAsString(contents, flush: true);
+      await tmp.rename(target.path);
+    } finally {
+      try {
+        if (await tmp.exists()) {
+          await tmp.delete();
+        }
+      } on FileSystemException {
+        // Preserve the write or rename error when cleanup itself also fails.
+      }
     }
-    await tmp.rename(target.path);
   }
 
   Future<NormalizedBookMetadata?> getMetadata(String bookId) async {
@@ -104,17 +141,44 @@ class ReaderCacheService {
   ) async {
     final bookDir = await _getExistingBookDir(bookId);
     if (!await bookDir.exists()) return false;
-    return _isSplitCacheValid(bookDir, meta);
+    return _isSplitCacheValid(bookId, bookDir, meta);
   }
 
   Future<ReaderChapter?> getChapter(String bookId, int index) async {
+    final cacheKey = '$bookId:$index';
+    final cached = _chapterCache[cacheKey];
+    if (cached != null) {
+      _chapterCache.remove(cacheKey);
+      _chapterCache[cacheKey] = cached;
+      return cached;
+    }
     try {
       final bookDir = await _getExistingBookDir(bookId);
       if (!await bookDir.exists()) return null;
       final chapterFile = _getChapterFile(bookDir, index);
       if (!await chapterFile.exists()) return null;
       final json = await chapterFile.readAsString();
-      return ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      final expectedChecksum = await _getChapterChecksum(bookId, bookDir, index);
+      if (expectedChecksum != null && await _chapterChecksum(json) != expectedChecksum) {
+        _logger.warning(
+          'Cached chapter $index for $bookId failed integrity verification',
+          name: 'ReaderCache',
+        );
+        return null;
+      }
+      final chapter = ReaderChapter.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      if (chapter.index != index) {
+        _logger.warning(
+          'Cached chapter $index for $bookId has mismatched chapter index ${chapter.index}',
+          name: 'ReaderCache',
+        );
+        return null;
+      }
+      _chapterCache[cacheKey] = chapter;
+      if (_chapterCache.length > _chapterCacheMaxSize) {
+        _chapterCache.remove(_chapterCache.keys.first);
+      }
+      return chapter;
     } on Object catch (e) {
       _logger.warning(
         'Failed to load chapter $index for $bookId: $e',
@@ -129,6 +193,12 @@ class ReaderCacheService {
     final bookDir = await getBookDir(bookId);
     final chapterFile = _getChapterFile(bookDir, chapter.index);
     await _writeJsonAtomically(chapterFile, chapter.toJson());
+    final cacheKey = '$bookId:${chapter.index}';
+    _chapterCache.remove(cacheKey);
+    _chapterCache[cacheKey] = chapter;
+    if (_chapterCache.length > _chapterCacheMaxSize) {
+      _chapterCache.remove(_chapterCache.keys.first);
+    }
   }
 
   Future<void> putBook(String bookId, NormalizedBook book) async {
@@ -140,14 +210,13 @@ class ReaderCacheService {
     bool preserveImages = false,
   }) async {
     final bookDir = await _getExistingBookDir(bookId);
-    if (!await bookDir.exists()) return;
     try {
-      if (preserveImages) {
+      if (await bookDir.exists() && preserveImages) {
         final imagesDir = Directory('${bookDir.path}/epub_images');
         final hasImages = await imagesDir.exists();
-        final imagesBackup = hasImages
-            ? await imagesDir.rename('${bookDir.path}/epub_images_bak')
-            : null;
+        final backupPath =
+            '${bookDir.path}.epub_images_bak_${DateTime.now().microsecondsSinceEpoch}';
+        final imagesBackup = hasImages ? await imagesDir.rename(backupPath) : null;
 
         try {
           await bookDir.delete(recursive: true);
@@ -159,15 +228,25 @@ class ReaderCacheService {
         }
 
         if (imagesBackup != null) {
+          await bookDir.create(recursive: true);
           await imagesBackup.rename('${bookDir.path}/epub_images');
         }
-      } else {
+      } else if (await bookDir.exists()) {
         await bookDir.delete(recursive: true);
+      }
+
+      // A stale split-cache manifest must not be bypassed by migrating the
+      // pre-manifest cache back into place on the next open.
+      final legacyCacheFile = await _getLegacyCacheFile(bookId);
+      if (await legacyCacheFile.exists()) {
+        await legacyCacheFile.delete();
       }
       _logger.info(
         'Reader cache invalidated for $bookId (preserveImages=$preserveImages)',
         name: 'ReaderCache',
       );
+      _chapterChecksumsByBook.remove(bookId);
+      _chapterCache.removeWhere((key, _) => key.startsWith('$bookId:'));
     } on Object catch (e) {
       _logger.warning(
         'Failed to invalidate reader cache for $bookId: $e',
@@ -237,9 +316,11 @@ class ReaderCacheService {
   }
 
   Future<bool> _isSplitCacheValid(
+    String bookId,
     Directory bookDir,
     NormalizedBookMetadata meta,
   ) async {
+    _chapterChecksumsByBook.remove(bookId);
     final manifestFile = _getManifestFile(bookDir);
     if (await manifestFile.exists()) {
       try {
@@ -253,7 +334,8 @@ class ReaderCacheService {
         final cachedContentHash = manifest['contentHash'] as String?;
         final chapterCount = manifest['chapterCount'] as int?;
         final chapters = (manifest['chapters'] as List<dynamic>?)?.cast<int>() ?? const <int>[];
-        final source = await _fingerprintProvider(meta.id);
+        final chapterChecksums = manifest['chapterChecksums'] as Map<String, dynamic>?;
+        final source = await _fingerprintProvider(bookId);
         if (source == null) {
           return false;
         }
@@ -264,12 +346,23 @@ class ReaderCacheService {
             cachedFileMtime != source.fileMtime ||
             cachedContentHash != source.contentHash ||
             chapterCount != meta.chapterCount ||
-            chapters.length != meta.chapterCount) {
+            chapters.length != meta.chapterCount ||
+            chapterChecksums == null ||
+            chapterChecksums.length != meta.chapterCount) {
+          return false;
+        }
+        if (chapters.toSet().length != meta.chapterCount ||
+            chapters.any((index) => index < 0 || index >= meta.chapterCount)) {
           return false;
         }
         for (final index in chapters) {
+          final checksum = chapterChecksums['$index'];
+          if (checksum is! String || checksum.length != 64) return false;
           if (!await _getChapterFile(bookDir, index).exists()) return false;
         }
+        _chapterChecksumsByBook[bookId] = chapterChecksums.map(
+          (index, checksum) => MapEntry(index, checksum as String),
+        );
         return true;
       } on Object catch (e) {
         _logger.warning(
@@ -289,9 +382,12 @@ class ReaderCacheService {
     final metaFile = _getMetadataFile(bookDir);
     final source = await _fingerprintProvider(bookId);
     await _writeJsonAtomically(metaFile, book.toMetadata().toJson());
+    final chapterChecksums = <String, String>{};
     for (final chapter in book.chapters) {
       final chapterFile = _getChapterFile(bookDir, chapter.index);
-      await _writeJsonAtomically(chapterFile, chapter.toJson());
+      final chapterJson = jsonEncode(chapter.toJson());
+      await _writeTextAtomically(chapterFile, chapterJson);
+      chapterChecksums['${chapter.index}'] = await _chapterChecksum(chapterJson);
     }
     await _writeJsonAtomically(
       _getManifestFile(bookDir),
@@ -305,12 +401,34 @@ class ReaderCacheService {
         'contentHash': source?.contentHash,
         'chapterCount': book.chapters.length,
         'chapters': book.chapters.map((chapter) => chapter.index).toList(),
+        'chapterChecksums': chapterChecksums,
       },
     );
+    _chapterChecksumsByBook[bookId] = Map<String, String>.from(chapterChecksums);
 
     // Index content for full-text search
     await _indexFtsContent(bookId, book);
   }
+
+  Future<String?> _getChapterChecksum(String bookId, Directory bookDir, int index) async {
+    final cachedChecksums = _chapterChecksumsByBook[bookId];
+    if (cachedChecksums != null) return cachedChecksums['$index'];
+
+    final manifestFile = _getManifestFile(bookDir);
+    if (!await manifestFile.exists()) return null;
+    final manifest = jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+    final checksums = manifest['chapterChecksums'];
+    if (checksums is! Map<String, dynamic>) return null;
+    final parsedChecksums = <String, String>{};
+    for (final MapEntry<String, dynamic> entry in checksums.entries) {
+      if (entry.value is String) parsedChecksums[entry.key] = entry.value as String;
+    }
+    _chapterChecksumsByBook[bookId] = parsedChecksums;
+    return parsedChecksums['$index'];
+  }
+
+  static Future<String> _chapterChecksum(String json) async =>
+      rust_api.sha256Hash(bytes: utf8.encode(json));
 
   Future<void> _indexFtsContent(String bookId, NormalizedBook book) async {
     if (_ftsService == null) return;

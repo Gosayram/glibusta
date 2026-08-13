@@ -9,11 +9,27 @@ import '../frb_generated.dart';
 import '../lib.dart';
 import 'models.dart';
 
-// These functions are ignored because they are not marked as `pub`: `detect_format_from_path`, `dispatch_parse`, `ext_from_path`, `read_file_bytes`
+// These functions are ignored because they are not marked as `pub`: `apply_txt_filename_author`, `cache_fingerprint`, `ceil_char_boundary`, `chapter_has_renderable_content`, `cleanup_disk_cache`, `decode_cover_data_uri`, `detect_format_from_path`, `detect_hyphen_lang`, `disk_cache_key`, `disk_cache_lookup`, `disk_cache_store`, `dispatch_parse`, `ext_from_path`, `floor_char_boundary`, `load_dictionary`, `map_file`, `memory_cache_get`, `memory_cache_store`, `read_archive_asset`, `repair_normalized_book`, `repair_toc_entries`, `toc_has_invalid_chapter`, `validate_legacy_input_size`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookBytes`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `deref`
 
 /// Read a book from filesystem, detect format by extension, parse into NormalizedBook.
+/// Two-level cache: L1 moka RAM (TTL 10min) → L2 file disk → parse.
 Future<NormalizedBook> parseBook({required String path}) =>
     RustLib.instance.api.crateApiApiParseBook(path: path);
+
+/// RCE-1.4: Extract a single chapter from a book file.
+Future<ReaderChapter> parseChapter({
+  required String path,
+  required int chapterIndex,
+}) => RustLib.instance.api.crateApiApiParseChapter(
+  path: path,
+  chapterIndex: chapterIndex,
+);
+
+/// Panic-safe wrapper for parse_book. Returns error instead of crashing.
+Future<NormalizedBook> safeParseBook({required String path}) =>
+    RustLib.instance.api.crateApiApiSafeParseBook(path: path);
 
 /// Extract metadata without full chapter parsing.
 Future<BookMeta> extractMetadata({required String path}) =>
@@ -30,6 +46,115 @@ Future<String> detectFormat({required String path}) =>
 /// Calculate SHA-256 hash of a file (first 64KB for speed).
 Future<String> calculateHash({required String path}) =>
     RustLib.instance.api.crateApiApiCalculateHash(path: path);
+
+/// Extract table of contents without full chapter parsing.
+Future<List<TocEntry>> parseToc({required String path}) =>
+    RustLib.instance.api.crateApiApiParseToc(path: path);
+
+/// Get format capabilities (what features a book format supports).
+Future<FormatCapabilities> getFormatCapabilities({required String path}) =>
+    RustLib.instance.api.crateApiApiGetFormatCapabilities(path: path);
+
+/// Detect the language of a text snippet using whatlang.
+Future<ChapterLanguage> detectChapterLanguage({required String text}) =>
+    RustLib.instance.api.crateApiApiDetectChapterLanguage(text: text);
+
+/// Generate import report: parse book and return structured statistics.
+Future<ImportReport> generateImportReport({required String path}) =>
+    RustLib.instance.api.crateApiApiGenerateImportReport(path: path);
+
+/// Validate reading order: empty chapters, duplicates, spine/TOC mismatch.
+Future<BookValidationResult> validateBook({required String path}) =>
+    RustLib.instance.api.crateApiApiValidateBook(path: path);
+
+/// Repair a book: remove empty chapters, deduplicate, fix TOC/chapter index mapping.
+Future<NormalizedBook> repairBook({required String path}) =>
+    RustLib.instance.api.crateApiApiRepairBook(path: path);
+
+/// Get asset metadata (IDs, types, sizes) without downloading bytes.
+Future<List<BookAssetMeta>> getBookAssets({required String path}) =>
+    RustLib.instance.api.crateApiApiGetBookAssets(path: path);
+
+/// Lazy-load a single asset (image) from a book file by its asset_id (href).
+Future<Uint8List> getAssetBytes({
+  required String path,
+  required String assetId,
+}) =>
+    RustLib.instance.api.crateApiApiGetAssetBytes(path: path, assetId: assetId);
+
+/// Compare two books parsed from the same file at different times.
+Future<BookDiff> diffParsedBook({
+  required String oldPath,
+  required String newPath,
+}) => RustLib.instance.api.crateApiApiDiffParsedBook(
+  oldPath: oldPath,
+  newPath: newPath,
+);
+
+/// RCE-19.2: Hyphenate a word using Knuth-Liang TeX patterns.
+/// Returns byte positions where hyphenation is allowed.
+/// Falls back to every-grapheme approach when the dictionary is unavailable.
+Future<Uint64List> hyphenateWord({required String word}) =>
+    RustLib.instance.api.crateApiApiHyphenateWord(word: word);
+
+/// RCE-5.1: Search for a query across all chapters of a book.
+/// Returns SearchMatch results with chapter/block positions and preview text.
+Future<List<SearchMatch>> searchInBook({
+  required String path,
+  required String query,
+  required BigInt limit,
+}) => RustLib.instance.api.crateApiApiSearchInBook(
+  path: path,
+  query: query,
+  limit: limit,
+);
+
+/// Stub: PDF thumbnail not available without pdf feature.
+Future<Uint8List> renderPdfThumbnail({
+  required String path,
+  required BigInt pageIndex,
+  required BigInt maxWidth,
+}) => RustLib.instance.api.crateApiApiRenderPdfThumbnail(
+  path: path,
+  pageIndex: pageIndex,
+  maxWidth: maxWidth,
+);
+
+/// Stub: PDF text extraction not available without pdf feature.
+Future<String> extractPdfText({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractPdfText(path: path);
+
+/// Stub: PDF page count not available without pdf feature.
+Future<int> pdfPageCount({required String path}) =>
+    RustLib.instance.api.crateApiApiPdfPageCount(path: path);
+
+/// CRT-20.4: Render DjVu page to PNG thumbnail.
+Future<Uint8List> renderDjvuThumbnail({
+  required String path,
+  required BigInt pageIndex,
+  required BigInt maxWidth,
+}) => RustLib.instance.api.crateApiApiRenderDjvuThumbnail(
+  path: path,
+  pageIndex: pageIndex,
+  maxWidth: maxWidth,
+);
+
+/// CRT-20.5: Extract text from DjVu document (from all pages' OCR/embedded text layers).
+Future<String> extractDjvuText({required String path}) =>
+    RustLib.instance.api.crateApiApiExtractDjvuText(path: path);
+
+/// Get DjVu page count.
+Future<int> djvuPageCount({required String path}) =>
+    RustLib.instance.api.crateApiApiDjvuPageCount(path: path);
+
+/// RCE-1.6/2.2: Check if cached book needs reparse by comparing file hash.
+/// Returns (needs_reparse, file_hash, file_size).
+Future<(bool, String, BigInt)> checkBookCache({required String path}) =>
+    RustLib.instance.api.crateApiApiCheckBookCache(path: path);
+
+/// ARC-1.1: Open book and return opaque handle.
+Future<ArcBookEngine> openBookEngine({required String path}) =>
+    RustLib.instance.api.crateApiApiOpenBookEngine(path: path);
 
 /// Extract blocks from HTML content using html5ever + scraper.
 Future<List<ReaderBlock>> parseHtmlBlocks({required String html}) =>
@@ -83,6 +208,17 @@ Future<NormalizedBook> parseMobi({
   forcedEncoding: forcedEncoding,
 );
 
+/// Parse a CBR/RAR comic from a filesystem path.
+///
+/// The native UnRAR API is path-based, so unlike the legacy parsers this
+/// entry point deliberately does not accept an in-memory byte buffer.
+Future<NormalizedBook> parseCbr({required String path}) =>
+    RustLib.instance.api.crateApiApiParseCbr(path: path);
+
+/// Parse a CBZ (comic book ZIP) from a filesystem path.
+Future<NormalizedBook> parseCbz({required String path}) =>
+    RustLib.instance.api.crateApiApiParseCbz(path: path);
+
 Future<List<String>> decodeZipEntries({required List<int> bytes}) =>
     RustLib.instance.api.crateApiApiDecodeZipEntries(bytes: bytes);
 
@@ -104,6 +240,12 @@ Future<String> sha256Hash({required List<int> bytes, BigInt? maxBytes}) =>
       maxBytes: maxBytes,
     );
 
+/// Quality scoring for Russian/English text decoding.
+/// Returns 0.0–1.0 where higher is better. Catches cases where
+/// a charset detector confidently returns the wrong encoding.
+Future<double> scoreEncodingQuality({required String text}) =>
+    RustLib.instance.api.crateApiApiScoreEncodingQuality(text: text);
+
 /// Legacy dispatcher — kept for backward compat.
 Future<NormalizedBook> parseBookLegacy({
   required List<int> bytes,
@@ -115,12 +257,20 @@ Future<NormalizedBook> parseBookLegacy({
   forcedEncoding: forcedEncoding,
 );
 
-Future<Uint8List> renderPdfThumbnail({
-  required String path,
-  required int pageIndex,
-  required int width,
-}) => RustLib.instance.api.crateApiApiRenderPdfThumbnail(
-  path: path,
-  pageIndex: pageIndex,
-  width: width,
-);
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<Arc < BookEngine >>>
+abstract class ArcBookEngine implements RustOpaqueInterface {}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<BookEngine>>
+abstract class BookEngine implements RustOpaqueInterface {
+  Future<BigInt> chapterCount();
+
+  Future<void> dropEngine();
+
+  Future<ReaderChapter?> getChapter({required BigInt index});
+
+  // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
+  static Future<BookEngine> newInstance({required NormalizedBook book}) =>
+      RustLib.instance.api.crateApiApiBookEngineNew(book: book);
+
+  Future<String> title();
+}

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,6 +18,8 @@ class BookCard extends StatefulWidget {
   final double? progress;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onEditMetadata;
+  final VoidCallback? onAddToCollection;
 
   const BookCard({
     super.key,
@@ -25,6 +28,8 @@ class BookCard extends StatefulWidget {
     this.progress,
     this.onTap,
     this.onLongPress,
+    this.onEditMetadata,
+    this.onAddToCollection,
   });
 
   @override
@@ -33,6 +38,28 @@ class BookCard extends StatefulWidget {
 
 class _BookCardState extends State<BookCard> {
   bool _hovered = false;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _activate() {
+    final onTap = widget.onTap;
+    if (onTap != null) {
+      onTap();
+    } else {
+      unawaited(context.push('/book/${widget.book.id}'));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,121 +68,154 @@ class _BookCardState extends State<BookCard> {
     final format = widget.book.availableFormats.isNotEmpty
         ? widget.book.availableFormats.first.name.toUpperCase()
         : null;
+    final focused = _focusNode.hasFocus;
 
     return RepaintBoundary(
       child: Semantics(
         label: 'Книга: ${widget.book.title}${author.isNotEmpty ? ', $author' : ''}',
         button: true,
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (_) => setState(() => _hovered = true),
-          onExit: (_) => setState(() => _hovered = false),
-          child: GestureDetector(
-            onTap: widget.onTap ?? () => context.push('/book/${widget.book.id}'),
-            onLongPress: widget.onLongPress ?? () => _showStatusMenu(context),
-            onSecondaryTapDown: (details) => _showContextMenu(
-              context,
-              details.globalPosition,
-            ),
-            child: AnimatedScale(
-              scale: _hovered ? 1.025 : 1,
-              duration: const Duration(milliseconds: 140),
-              curve: Curves.easeOut,
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          BookCoverImage(book: widget.book),
-                          if (widget.book.readingStatus != ReadingStatus.none)
-                            Positioned(
-                              top: 4,
-                              left: 4,
-                              child: _StatusBadge(status: widget.book.readingStatus),
+        child: Focus(
+          focusNode: _focusNode,
+          onFocusChange: (hasFocus) {
+            if (hasFocus) {
+              unawaited(Scrollable.ensureVisible(context, alignment: 0.5));
+            }
+          },
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent) {
+              if (event.logicalKey == LogicalKeyboardKey.enter ||
+                  event.logicalKey == LogicalKeyboardKey.space) {
+                _activate();
+                return KeyEventResult.handled;
+              }
+            }
+            return KeyEventResult.ignored;
+          },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: GestureDetector(
+              onTap: _activate,
+              onLongPress: widget.onLongPress ?? () => _showStatusMenu(context),
+              onSecondaryTapDown: (details) => _showContextMenu(
+                context,
+                details.globalPosition,
+              ),
+              child: AnimatedScale(
+                scale: _hovered || focused ? 1.025 : 1,
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOut,
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    side: focused
+                        ? BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 2,
+                          )
+                        : BorderSide.none,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // ponytail: memCache dims prevent full-res decode (~8MB each)
+                            BookCoverImage(
+                              book: widget.book,
+                              memCacheWidth: 240,
+                              memCacheHeight: 360,
                             ),
-                          if (widget.isDownloaded == true)
-                            const Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Icon(
-                                Icons.download_done,
-                                size: 16,
-                                color: AppColors.success,
+                            if (widget.book.readingStatus != ReadingStatus.none)
+                              Positioned(
+                                top: 4,
+                                left: 4,
+                                child: _StatusBadge(status: widget.book.readingStatus),
                               ),
-                            )
-                          else if (widget.isDownloaded == false)
-                            const Positioned(
-                              top: 4,
-                              right: 4,
-                              child: Icon(
-                                Icons.cloud_download_outlined,
-                                size: 16,
-                                color: AppColors.info,
-                              ),
-                            ),
-                          if (widget.progress != null && widget.progress! > 0)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: LinearProgressIndicator(
-                                value: widget.progress,
-                                minHeight: 3,
-                                backgroundColor: Colors.black26,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  theme.colorScheme.secondary,
+                            if (widget.isDownloaded == true)
+                              const Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Icon(
+                                  Icons.download_done,
+                                  size: 16,
+                                  color: AppColors.success,
+                                ),
+                              )
+                            else if (widget.isDownloaded == false)
+                              const Positioned(
+                                top: 4,
+                                right: 4,
+                                child: Icon(
+                                  Icons.cloud_download_outlined,
+                                  size: 16,
+                                  color: AppColors.info,
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
-                      child: Text(
-                        widget.book.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.bold,
+                            if (widget.progress != null && widget.progress! > 0)
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: LinearProgressIndicator(
+                                  value: widget.progress,
+                                  minHeight: 3,
+                                  backgroundColor: Colors.black26,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    theme.colorScheme.secondary,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                    ),
-                    if (author.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
+                        padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
                         child: Text(
-                          author,
-                          maxLines: 1,
+                          widget.book.title,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    if (format != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                      if (author.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
                           child: Text(
-                            format,
+                            author,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              fontSize: 10,
-                              color: theme.colorScheme.onSecondaryContainer,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                      if (format != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondaryContainer,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              format,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -240,6 +300,26 @@ class _BookCardState extends State<BookCard> {
           contentPadding: EdgeInsets.zero,
         ),
       ),
+      if (widget.onEditMetadata != null)
+        PopupMenuItem<VoidCallback>(
+          value: widget.onEditMetadata,
+          child: const ListTile(
+            leading: Icon(Icons.edit),
+            title: Text('Редактировать'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+      if (widget.onAddToCollection != null)
+        PopupMenuItem<VoidCallback>(
+          value: widget.onAddToCollection,
+          child: const ListTile(
+            leading: Icon(Icons.collections_bookmark_outlined),
+            title: Text('Добавить в коллекцию'),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
     ];
 
     unawaited(

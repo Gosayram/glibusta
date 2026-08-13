@@ -4,13 +4,20 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:fl_charset/fl_charset.dart';
+import 'package:xml/xml.dart';
 
+import '../../../../core/encoding/encoding_utils.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/formats/archive_safety.dart';
 import 'book_parser.dart';
 import 'format_detector.dart';
 import 'normalized_book.dart';
+import 'rust_book_parser.dart';
 
 final class CbzParser implements BookParser {
+  static const int _maxComicInfoBytes = 1024 * 1024;
+
   @override
   bool supports(BookFormat format) => format == BookFormat.cbz || format == BookFormat.cbr;
 
@@ -21,7 +28,64 @@ final class CbzParser implements BookParser {
     String? forcedEncoding,
   }) async {
     try {
+      // Try Rust parser via temp file for best performance
+      final tempDir = Directory.systemTemp;
+      final safeName = (fileName ?? 'glibusta_cbz').replaceAll(RegExp(r'[/\\:*?"<>|]'), '_');
+      final tempFile = File(
+        '${tempDir.path}/$safeName-${DateTime.now().millisecondsSinceEpoch}.cbz',
+      );
+      try {
+        await tempFile.writeAsBytes(bytes, flush: true);
+        final book = await RustBookParser().parseFile(tempFile.path);
+        // Only override title if Rust parser used filename fallback
+        // (ComicInfo title takes precedence)
+        if (fileName != null) {
+          final fallbackTitle = _titleFromFileName(
+            tempFile.path.split('/').last,
+          );
+          if (book.title == fallbackTitle) {
+            return NormalizedBook(
+              id: book.id,
+              title: _titleFromFileName(fileName),
+              authors: book.authors,
+              description: book.description,
+              coverUrl: book.coverUrl,
+              chapters: book.chapters,
+              metadata: book.metadata,
+              fonts: book.fonts,
+            );
+          }
+        }
+        return book;
+      } finally {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
+      }
+    } on Object catch (_) {
+      // Fall back to Dart parser if Rust fails
+      return _parseDart(bytes, fileName: fileName);
+    }
+  }
+
+  @override
+  Future<NormalizedBook> parseFile(
+    String filePath, {
+    String? forcedEncoding,
+  }) async {
+    try {
+      return await RustBookParser().parseFile(filePath);
+    } on Object catch (e) {
+      throw ParserFailure('Rust CBZ parser failed: $e');
+    }
+  }
+
+  /// Dart fallback: parse CBZ from in-memory bytes.
+  NormalizedBook _parseDart(Uint8List bytes, {String? fileName}) {
+    try {
       final archive = ZipDecoder().decodeBytes(bytes);
+      ArchiveSafety.validateZip(archive);
+      final comicInfo = _readComicInfo(archive);
       final images = _sortedImageFiles(archive);
       if (images.isEmpty) {
         throw const ParserFailure('В архиве нет изображений');
@@ -31,7 +95,10 @@ final class CbzParser implements BookParser {
         final file = images[i];
         final ext = file.name.split('.').last.toLowerCase();
         final mimeType = _mimeTypeFor(ext);
-        final contentBytes = file.content as List<int>;
+        final contentBytes = ArchiveSafety.readEntryBytes(
+          file,
+          maxBytes: ArchiveSafety.maxSingleEntryBytes,
+        );
         final dataUri = 'data:$mimeType;base64,${base64Encode(contentBytes)}';
         blocks.add(
           ReaderBlock(
@@ -42,11 +109,16 @@ final class CbzParser implements BookParser {
           ),
         );
       }
-      final title = _titleFromFileName(fileName);
+      final metadata = <String, dynamic>{
+        if (comicInfo?.series case final String series) 'series': series,
+        if (comicInfo?.number case final String number) 'number': number,
+      };
       return NormalizedBook(
         id: fileName ?? 'unknown.cbz',
-        title: title,
-        authors: const [],
+        title: comicInfo?.title ?? _titleFromFileName(fileName),
+        authors: comicInfo?.authors ?? const [],
+        coverUrl: blocks.first.imageUrl,
+        metadata: metadata.isEmpty ? null : metadata,
         chapters: [
           ReaderChapter(index: 0, title: 'Страницы', blocks: blocks),
         ],
@@ -58,37 +130,22 @@ final class CbzParser implements BookParser {
     }
   }
 
-  @override
-  Future<NormalizedBook> parseFile(
-    String filePath, {
-    String? forcedEncoding,
-  }) async {
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        throw ParserFailure('Файл не найден: $filePath');
-      }
-      final bytes = await file.readAsBytes();
-      if (bytes.isEmpty) {
-        throw ParserFailure('Файл пуст: $filePath');
-      }
-      final name = filePath.split('/').last;
-      return parse(bytes, fileName: name, forcedEncoding: forcedEncoding);
-    } on ParserFailure {
-      rethrow;
-    } on FileSystemException catch (e) {
-      throw ParserFailure('Не удалось прочитать файл: ${e.message}');
-    }
-  }
-
   List<ArchiveFile> _sortedImageFiles(Archive archive) {
-    const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'};
+    const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'jxl', 'avif'};
     final files = archive.files.where((f) {
-      if (f.isFile) {
-        final ext = f.name.split('.').last.toLowerCase();
-        return imageExts.contains(ext);
+      if (!f.isFile) return false;
+
+      final pathParts = f.name.replaceAll(r'\', '/').split('/');
+      final fileName = pathParts.last;
+      // macOS adds AppleDouble resource forks to ZIP archives. Their names
+      // look like image pages (for example `__MACOSX/._001.jpg`), but their
+      // contents are metadata rather than decodable comic images.
+      if (pathParts.contains('__MACOSX') || fileName.startsWith('._')) {
+        return false;
       }
-      return false;
+
+      final ext = fileName.split('.').last.toLowerCase();
+      return imageExts.contains(ext);
     }).toList()..sort((a, b) => _naturalCompare(a.name, b.name));
     return files;
   }
@@ -146,6 +203,10 @@ final class CbzParser implements BookParser {
         return 'image/bmp';
       case 'tiff':
         return 'image/tiff';
+      case 'jxl':
+        return 'image/jxl';
+      case 'avif':
+        return 'image/avif';
       default:
         return 'image/jpeg';
     }
@@ -155,4 +216,80 @@ final class CbzParser implements BookParser {
     if (fileName == null || fileName.isEmpty) return 'Без названия';
     return fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
   }
+
+  _ComicInfo? _readComicInfo(Archive archive) {
+    ArchiveFile? file;
+    for (final entry in archive.files) {
+      final name = entry.name.split('/').last.toLowerCase();
+      if (entry.isFile && name == 'comicinfo.xml') {
+        file = entry;
+        break;
+      }
+    }
+    if (file == null || file.size > _maxComicInfoBytes) return null;
+
+    try {
+      final document = XmlDocument.parse(
+        _decodeComicInfoXml(
+          ArchiveSafety.readEntryBytes(file, maxBytes: _maxComicInfoBytes),
+        ),
+      );
+      String? value(String name) {
+        final elements = document.descendants.whereType<XmlElement>().where(
+          (element) => element.localName == name,
+        );
+        if (elements.isEmpty) return null;
+        final text = elements.first.innerText.trim();
+        return text.isEmpty ? null : text;
+      }
+
+      final writer = value('Writer');
+      return _ComicInfo(
+        title: value('Title'),
+        authors: writer?.split(RegExp(r'\s*[,;]\s*')).where((author) => author.isNotEmpty).toList(),
+        series: value('Series'),
+        number: value('Number'),
+      );
+    } on XmlException {
+      return null;
+    }
+  }
+
+  String _decodeComicInfoXml(List<int> bytes) {
+    if (bytes.length >= 2 && bytes[0] == 0xff && bytes[1] == 0xfe) {
+      return _decodeUtf16(bytes, littleEndian: true);
+    }
+    if (bytes.length >= 2 && bytes[0] == 0xfe && bytes[1] == 0xff) {
+      return _decodeUtf16(bytes, littleEndian: false);
+    }
+
+    final declaredEncoding = detectDeclaredEncoding(Uint8List.fromList(bytes));
+    if (declaredEncoding != null) {
+      final encoding = Charset.getByName(declaredEncoding);
+      if (encoding != null) {
+        return encoding.decode(bytes);
+      }
+    }
+
+    return utf8.decode(bytes, allowMalformed: true);
+  }
+
+  String _decodeUtf16(List<int> bytes, {required bool littleEndian}) {
+    final codeUnits = <int>[];
+    for (var index = 2; index + 1 < bytes.length; index += 2) {
+      final first = bytes[index];
+      final second = bytes[index + 1];
+      codeUnits.add(littleEndian ? first | (second << 8) : second | (first << 8));
+    }
+    return String.fromCharCodes(codeUnits);
+  }
+}
+
+final class _ComicInfo {
+  const _ComicInfo({this.title, this.authors, this.series, this.number});
+
+  final String? title;
+  final List<String>? authors;
+  final String? series;
+  final String? number;
 }

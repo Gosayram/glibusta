@@ -1,7 +1,7 @@
 name: glibusta
 description: Cross-platform book library app for Flibusta
 publish_to: 'none'
-version: 0.1.3+2038
+version: 0.1.3+2118
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
@@ -22,7 +22,7 @@ dependencies:
   dio: ^5.10.0
 
   # Background downloads
-  background_downloader: ^9.5.5
+  background_downloader: ^9.5.6
 
   # HTML parsing
   html: ^0.15.1
@@ -33,8 +33,9 @@ dependencies:
   intl: ^0.20.2
 
   # Local database
-  drift: ^2.34.0
-  drift_flutter: ^0.3.0
+  drift: ^2.34.1
+  drift_flutter: ^0.3.1
+  sqlite3: ^3.4.0
 
   # Models / serialization
   freezed_annotation: ^3.1.0
@@ -47,7 +48,7 @@ dependencies:
   receive_sharing_intent: ^1.9.0
 
   # Reader formats
-  pdfrx: ^2.4.4
+  pdfrx: ^2.4.7
   xml: ^7.0.1
   archive: ^4.0.0
 
@@ -58,7 +59,6 @@ dependencies:
   # Utilities
   collection: ^1.19.0
   image: ^4.5.4
-  crypto: ^3.0.7
   flutter_dotenv: ^6.0.1
   package_info_plus: ^10.2.0
   device_info_plus: ^13.2.0
@@ -84,13 +84,19 @@ dependencies:
   share_plus: ^13.2.0
   native_dio_adapter: ^1.6.0
   flutter_local_notifications: ^22.0.1
-  audio_service: ^0.18.19
-  audio_session: ^0.1.25
-  just_audio: ^0.9.42
+  audio_session: ^0.2.4
+  just_audio: ^0.10.6
   cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
   flutter_rust_bridge: 2.12.0
   flutter_tts: ^4.2.5
   flutter_svg: ^2.3.0
+
+  # --- Deep linking ---
+  in_app_review: ^2.0.12
+  flutter_displaymode: ^0.7.0
+
+  http: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -98,13 +104,26 @@ dev_dependencies:
   riverpod_generator: ^4.0.4-dev.1
   freezed: ^3.2.5
   json_serializable: ^6.14.0
-  build_runner: ^2.15.0
+  build_runner: ^2.15.1
   drift_dev: ^2.34.0
   mocktail: ^1.0.4
   go_router_builder: ^4.3.0
   integration_test:
     sdk: flutter
   very_good_analysis: ^10.3.0
+
+  # --- E2E testing ---
+  patrol: ^4.6.1
+
+  # --- Golden tests ---
+  alchemist: ^0.14.0
+
+  # --- Test data ---
+  faker: ^2.0.0
+  leak_tracker_flutter_testing: ^3.0.10
+  leak_tracker: ^11.0.2
+  accessibility_tools: ^2.8.0
+  stack_trace: ^1.12.1
 
 flutter:
   generate: true

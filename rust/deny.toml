@@ -5,6 +5,18 @@ ignore = [
     "RUSTSEC-2024-0388",
     # paste is unmaintained — pinned by flutter_rust_bridge_codegen, no fix available
     "RUSTSEC-2024-0436",
+    # ttf-parser is unmaintained — will switch to skrifa (fontations) in future
+    "RUSTSEC-2026-0192",
+    # archived crate — transitive dep of flutter_rust_bridge, no fix
+    "RUSTSEC-2023-0089",
+    # fxhash unmaintained — transitive dep of flutter_rust_bridge_codegen, no fix
+    "RUSTSEC-2025-0057",
+    # web-time unmaintained — transitive dep of flutter_rust_bridge, no fix
+    "RUSTSEC-2024-0384",
+    # instant archived — build-time dep via serial_test, no fix
+    "RUSTSEC-2023-0081",
+    # bincode unmaintained — build-time dep of hyphenation (embeds dictionaries), functionally complete per maintainer
+    "RUSTSEC-2025-0141",
 ]
 
 [bans]
@@ -14,25 +26,53 @@ wildcards = "allow"
 skip = [
     "ahash",
     "bitflags",
-    "block-buffer",
     "convert_case",
     "cpufeatures",
-    "crypto-common",
     "cssparser",
     "cssparser-macros",
-    "digest",
+    "derive_more",
+    "foldhash",
     "getrandom",
     "hashbrown",
     "heck",
+    "inotify",
+    "itertools",
+    "itoa",
+    "mio",
+    "notify",
     "phf",
     "phf_codegen",
     "phf_generator",
     "phf_macros",
     "phf_shared",
+    "ptr_meta",
+    "ptr_meta_derive",
     "r-efi",
+    "rand",
+    "rand_chacha",
+    "rand_core",
+    "rkyv",
+    "rkyv_derive",
+    "selectors",
+    "servo_arc",
+    "siphasher",
     "syn",
+    "thiserror",
+    "thiserror-impl",
     "toml",
+    "unicode-width",
+    "wasi",
     "windows-sys",
+    "windows-targets",
+    "windows_aarch64_gnullvm",
+    "windows_aarch64_msvc",
+    "windows_i686_gnu",
+    "windows_i686_msvc",
+    "windows_x86_64_gnu",
+    "windows_x86_64_gnullvm",
+    "windows_x86_64_msvc",
+    "dashmap",
+    "zip",
 ]
 
 [licenses]
@@ -40,6 +80,7 @@ version = 2
 allow = [
     "MIT",
     "Apache-2.0",
+    "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
@@ -48,6 +89,7 @@ allow = [
     "0BSD",
     "MPL-2.0",
     "CC0-1.0",
+    "IJG",
 ]
 
 [sources]

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 
 import 'series_provider.dart';
@@ -16,7 +17,7 @@ class SeriesScreen extends ConsumerWidget {
     final seriesAsync = ref.watch(allSeriesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Серии')),
+      appBar: const AdaptiveAppBar(title: Text('Серии')),
       body: seriesAsync.when(
         data: (List<SeriesInfo> seriesList) {
           if (seriesList.isEmpty) {
@@ -60,12 +61,12 @@ class SeriesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 6,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Bone.circle(size: 40),
-                title: Text(BoneMock.name),
-                subtitle: Text(BoneMock.subtitle),
+                leading: Bone.circle(size: 40),
+                title: Bone(width: 120, height: 12),
+                subtitle: Bone(width: 80, height: 12),
               ),
             ),
           ),

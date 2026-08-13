@@ -2,9 +2,46 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'reader.freezed.dart';
 
-enum ReaderTheme { system, light, paper, sepia, dark, oled, bedtime }
+enum ReaderTheme {
+  system('Системная'),
+  light('Светлая'),
+  paper('Бумага'),
+  sepia('Сепия'),
+  dark('Тёмная'),
+  oled('OLED'),
+  bedtime('Перед сном');
+
+  const ReaderTheme(this.displayName);
+
+  /// Localized name used by reader appearance controls.
+  final String displayName;
+}
 
 enum ReaderMode { paginated, continuous, focus, rsvp }
+
+/// Stable layout capability used to scope per-book layout preferences.
+///
+/// This deliberately describes the available reading layout instead of a
+/// device model, orientation, or pixel size. A fold/unfold or window resize can
+/// therefore select the appropriate profile without replacing the book's
+/// semantic [ReaderPosition].
+enum ReaderLayoutDeviceClass {
+  compact('compact'),
+  expanded('expanded');
+
+  const ReaderLayoutDeviceClass(this.storageKey);
+
+  /// Persisted key. Keep this stable when display breakpoints evolve.
+  final String storageKey;
+}
+
+/// Maps the current reader layout capability to its persistent profile.
+///
+/// The capability, rather than a hardware model or raw screen width, is the
+/// stable distinction that matters to a reading layout: a compact surface
+/// always renders one page, while an expanded surface can render a spread.
+ReaderLayoutDeviceClass readerLayoutDeviceClassFor({required bool canUseTwoPageMode}) =>
+    canUseTwoPageMode ? ReaderLayoutDeviceClass.expanded : ReaderLayoutDeviceClass.compact;
 
 enum ReaderLoadingStage {
   openingFile('Открытие файла...'),
@@ -70,9 +107,46 @@ enum PageTurnAnimation { none, slide, fade, curl, stack }
 
 enum ReaderTextDirection { ltr, rtl, auto }
 
-enum DoubleTapAction { toggleUI, addBookmark, translate, disabled }
+enum DoubleTapAction { toggleUI, addBookmark, searchInBook, disabled }
 
 enum LongPressAction { selectText, addBookmark, openMenu, disabled }
+
+/// Physical corner whose tap action may be configured per reader settings.
+///
+/// This belongs to the domain model because both settings UI and the provider
+/// persist it; the presentation helper only resolves a pointer position.
+enum ReaderCorner { topLeft, topRight, bottomLeft, bottomRight }
+
+/// Action assigned to a reader corner tap.
+///
+/// [inherit] keeps the regular edge-pagination or central UI-toggle behavior.
+enum CornerTapAction {
+  inherit('По умолчанию'),
+  previousPage('Предыдущая страница'),
+  nextPage('Следующая страница'),
+  toggleUi('Показать/скрыть UI'),
+  addBookmark('Добавить закладку'),
+  disabled('Ничего не делать');
+
+  const CornerTapAction(this.displayName);
+  final String displayName;
+}
+
+/// Action assigned to a reader corner long press.
+///
+/// This is deliberately distinct from [CornerTapAction] so a persisted
+/// long-press map cannot accidentally be interpreted as a tap preference.
+enum CornerLongPressAction {
+  inherit('По умолчанию'),
+  previousPage('Предыдущая страница'),
+  nextPage('Следующая страница'),
+  toggleUi('Показать/скрыть UI'),
+  addBookmark('Добавить закладку'),
+  disabled('Ничего не делать');
+
+  const CornerLongPressAction(this.displayName);
+  final String displayName;
+}
 
 enum HorizontalGesture { off, on, inverse }
 
@@ -83,6 +157,17 @@ enum OrientationLock { none, portrait, landscape }
 enum ImageAlignment { start, center, end }
 
 enum ImageColorEffect { off, grayscale, fontColor, backgroundColor }
+
+enum BackgroundStyle {
+  solid('Плоский'),
+  paper('Бумага'),
+  parchment('Пергамент'),
+  darkPaper('Тёмная бумага'),
+  warmSepia('Тёплая сепия');
+
+  const BackgroundStyle(this.displayName);
+  final String displayName;
+}
 
 enum ParagraphIndentMode {
   asInBook('Как в книге'),
@@ -120,6 +205,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderMode.paginated) ReaderMode mode,
     @Default(false) bool twoPageEnabled,
     @Default(18.0) double fontSize,
+    double? noteFontSize,
     @Default(1.6) double lineHeight,
     @Default(20.0) double margin,
     @Default(20.0) double marginTop,
@@ -127,6 +213,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(20.0) double marginLeft,
     @Default(20.0) double marginRight,
     @Default(false) bool separateMargins,
+    @Default(false) bool marginAsPercent,
     @Default(ReaderFont.literata) ReaderFont font,
     @Default(20.0) double paragraphSpacing,
     @Default(0.0) double letterSpacing,
@@ -134,6 +221,7 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(0.0) double fontWeightDelta,
     @Default(ReaderTextAlign.justify) ReaderTextAlign textAlign,
     @Default(AutoThemeMode.off) AutoThemeMode autoThemeMode,
+    @Default(ReaderTheme.dark) ReaderTheme nightTheme,
     @Default(7) int customDayHour,
     @Default(20) int customNightHour,
     @Default(1.0) double brightness,
@@ -150,8 +238,19 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(ReaderTextDirection.auto) ReaderTextDirection textDirection,
     @Default(820.0) double readerWidth,
     @Default(true) bool verticalSwipeBrightness,
+    @Default(false) bool pageTurnHaptic,
+    @Default(false) bool volumeButtonsEnabled,
+    @Default(false) bool twoFingerChapterNavigation,
     @Default(DoubleTapAction.toggleUI) DoubleTapAction doubleTapAction,
     @Default(LongPressAction.selectText) LongPressAction longPressAction,
+    @Default(CornerTapAction.inherit) CornerTapAction topLeftCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction topRightCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction bottomLeftCornerTapAction,
+    @Default(CornerTapAction.inherit) CornerTapAction bottomRightCornerTapAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction topLeftCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction topRightCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction bottomLeftCornerLongPressAction,
+    @Default(CornerLongPressAction.inherit) CornerLongPressAction bottomRightCornerLongPressAction,
     @Default(true) bool restoreLastPosition,
     String? forcedEncoding,
     @Default(HorizontalGesture.on) HorizontalGesture horizontalGesture,
@@ -161,6 +260,9 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default('') String customCss,
     @Default(false) bool perceptionExpander,
     @Default(false) bool hideBarsOnFastScroll,
+    @Default(true) bool showTopInfoBar,
+    @Default(true) bool showTopToolbar,
+    @Default(true) bool showBottomBar,
     @Default(OrientationLock.none) OrientationLock orientationLock,
     @Default(false) bool bionicReading,
     @Default(false) bool horizontalLimiter,
@@ -180,7 +282,15 @@ abstract class ReaderSettings with _$ReaderSettings {
     @Default(300) int rsvpWpm,
     @Default(false) bool ignoreBookAlignment,
     @Default(false) bool ignoreBookIndent,
+    @Default(false) bool eink,
+    @Default(false) bool scrollSnap,
+    @Default(BackgroundStyle.solid) BackgroundStyle backgroundStyle,
+    ReaderTheme? uiTheme,
   }) = _ReaderSettings;
+
+  const ReaderSettings._();
+
+  ReaderTheme get effectiveUiTheme => uiTheme ?? theme;
 }
 
 @freezed
@@ -193,6 +303,7 @@ abstract class ReaderPosition with _$ReaderPosition {
     @Default(0.0) double progressPercent,
     @Default('') String chapterId,
     @Default(0) int textOffset,
+    @Default('') String contentHash,
     required DateTime updatedAt,
   }) = _ReaderPosition;
   const ReaderPosition._();
@@ -212,6 +323,7 @@ abstract class ReaderPosition with _$ReaderPosition {
         bookId: bookId,
         chapterIndex: 0,
         paragraphIndex: 0,
+        contentHash: contentHash,
         updatedAt: updatedAt,
       );
     }
@@ -224,9 +336,75 @@ abstract class ReaderPosition with _$ReaderPosition {
       progressPercent: progressPercent.clamp(0.0, 1.0),
       chapterId: chapterId,
       textOffset: textOffset,
+      contentHash: contentHash,
       updatedAt: updatedAt,
     );
   }
+}
+
+/// Per-book typography overrides. Null fields mean "use global default".
+class ReaderTypography {
+  const ReaderTypography({
+    this.fontSize,
+    this.lineHeight,
+    this.marginHorizontal,
+    this.fontFamily,
+    this.darkMode,
+  });
+
+  final double? fontSize;
+  final double? lineHeight;
+  final double? marginHorizontal;
+  final String? fontFamily;
+  final bool? darkMode;
+
+  ReaderTypography copyWith({
+    double? fontSize,
+    bool clearFontSize = false,
+    double? lineHeight,
+    bool clearLineHeight = false,
+    double? marginHorizontal,
+    bool clearMarginHorizontal = false,
+    String? fontFamily,
+    bool clearFontFamily = false,
+    bool? darkMode,
+    bool clearDarkMode = false,
+  }) {
+    return ReaderTypography(
+      fontSize: clearFontSize ? null : (fontSize ?? this.fontSize),
+      lineHeight: clearLineHeight ? null : (lineHeight ?? this.lineHeight),
+      marginHorizontal: clearMarginHorizontal ? null : (marginHorizontal ?? this.marginHorizontal),
+      fontFamily: clearFontFamily ? null : (fontFamily ?? this.fontFamily),
+      darkMode: clearDarkMode ? null : (darkMode ?? this.darkMode),
+    );
+  }
+
+  bool get isEmpty =>
+      fontSize == null &&
+      lineHeight == null &&
+      marginHorizontal == null &&
+      fontFamily == null &&
+      darkMode == null;
+
+  Map<String, dynamic> toJson() => {
+    if (fontSize != null) 'fontSize': fontSize,
+    if (lineHeight != null) 'lineHeight': lineHeight,
+    if (marginHorizontal != null) 'marginHorizontal': marginHorizontal,
+    if (fontFamily != null) 'fontFamily': fontFamily,
+    if (darkMode != null) 'darkMode': darkMode,
+  };
+
+  factory ReaderTypography.fromJson(Map<String, dynamic> json) {
+    return ReaderTypography(
+      fontSize: (json['fontSize'] as num?)?.toDouble(),
+      lineHeight: (json['lineHeight'] as num?)?.toDouble(),
+      marginHorizontal: (json['marginHorizontal'] as num?)?.toDouble(),
+      fontFamily: json['fontFamily'] as String?,
+      darkMode: json['darkMode'] as bool?,
+    );
+  }
+
+  static const empty = ReaderTypography();
 }
 
 class ReadingProgress {

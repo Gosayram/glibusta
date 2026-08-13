@@ -3,6 +3,8 @@ import 'package:drift/drift.dart';
 import 'converters.dart';
 
 @TableIndex(name: 'idx_saved_books_content_hash', columns: {#contentHash})
+@TableIndex(name: 'idx_saved_books_added_at', columns: {#addedAt})
+@TableIndex(name: 'idx_saved_books_title', columns: {#title})
 class SavedBooks extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
@@ -28,6 +30,7 @@ class SavedBooks extends Table {
   TextColumn get userForcedEncoding => text().nullable()();
   TextColumn get storageMode => text().withDefault(const Constant('internal'))();
   TextColumn get externalUri => text().nullable()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -119,6 +122,8 @@ class Bookmarks extends Table {
   RealColumn get localOffset => real().withDefault(const Constant(0.0))();
   TextColumn get selectedText => text().nullable()();
   TextColumn get note => text().nullable()();
+  TextColumn get highlightStyle => text().nullable()();
+  TextColumn get highlightColor => text().nullable()();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();
 
   @override
@@ -228,6 +233,9 @@ class ReadingTime extends Table {
   TextColumn get bookId => text()();
   DateTimeColumn get date => dateTime()();
   IntColumn get readingTimeSeconds => integer().withDefault(const Constant(0))();
+  IntColumn get pagesRead => integer().withDefault(const Constant(0))();
+  RealColumn get wpm => real().withDefault(const Constant(0))();
+  IntColumn get wpmSessionCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get updatedAt => dateTime().clientDefault(DateTime.now)();
 
   @override
@@ -246,6 +254,7 @@ class TextHighlights extends Table {
   IntColumn get endOffset => integer()();
   TextColumn get selectedText => text()();
   TextColumn get color => text().withDefault(const Constant('yellow'))();
+  TextColumn get decoration => text().withDefault(const Constant('none'))();
   TextColumn get noteText => text().nullable()();
   BoolColumn get isOrphaned => boolean().withDefault(const Constant(false))();
   DateTimeColumn get createdAt => dateTime().clientDefault(DateTime.now)();

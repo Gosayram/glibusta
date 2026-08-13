@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/annotations/presentation/annotations_screen.dart';
+import '../features/bookmarks/presentation/all_bookmarks_screen.dart';
+import '../features/collections/presentation/collection_detail_screen.dart';
 import '../features/collections/presentation/collections_screen.dart';
 import '../features/highlights/presentation/highlights_notes_screen.dart';
 import '../features/reading_stats/presentation/reading_stats_screen.dart';
@@ -18,6 +20,18 @@ class CollectionsRoute extends GoRouteData with $CollectionsRoute {
   }
 }
 
+@TypedGoRoute<CollectionDetailRoute>(path: '/collections/:collectionId', name: 'collectionDetail')
+class CollectionDetailRoute extends GoRouteData with $CollectionDetailRoute {
+  const CollectionDetailRoute({required this.collectionId});
+
+  final String collectionId;
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return CollectionDetailScreen(collectionId: collectionId);
+  }
+}
+
 @TypedGoRoute<AnnotationsRoute>(path: '/annotations', name: 'annotations')
 class AnnotationsRoute extends GoRouteData with $AnnotationsRoute {
   const AnnotationsRoute();
@@ -25,6 +39,16 @@ class AnnotationsRoute extends GoRouteData with $AnnotationsRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) {
     return const AnnotationsScreen();
+  }
+}
+
+@TypedGoRoute<AllBookmarksRoute>(path: '/bookmarks', name: 'allBookmarks')
+class AllBookmarksRoute extends GoRouteData with $AllBookmarksRoute {
+  const AllBookmarksRoute();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) {
+    return const AllBookmarksScreen();
   }
 }
 

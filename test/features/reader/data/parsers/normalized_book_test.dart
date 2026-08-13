@@ -82,6 +82,43 @@ void main() {
       expect(meta.chapterCount, 2);
       expect(meta.chapterTitles, ['Ch1', 'Ch2']);
     });
+
+    test('withResolvedImageUrls replaces only matching image asset IDs', () {
+      const book = NormalizedBook(
+        id: 'docx',
+        title: 'DOCX',
+        authors: [],
+        chapters: [
+          ReaderChapter(
+            index: 0,
+            title: '',
+            blocks: [
+              ReaderBlock(index: 0, text: 'Text'),
+              ReaderBlock(
+                index: 1,
+                text: '',
+                type: BlockType.image,
+                imageUrl: 'word/media/image1.png',
+              ),
+              ReaderBlock(
+                index: 2,
+                text: '',
+                type: BlockType.image,
+                imageUrl: 'word/media/missing.png',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final resolved = book.withResolvedImageUrls({
+        'word/media/image1.png': '/cache/docx_images/image1.png',
+      });
+
+      expect(resolved.chapters[0].blocks[0].text, 'Text');
+      expect(resolved.chapters[0].blocks[1].imageUrl, '/cache/docx_images/image1.png');
+      expect(resolved.chapters[0].blocks[2].imageUrl, 'word/media/missing.png');
+    });
   });
 
   group('ReaderChapter', () {
@@ -99,6 +136,43 @@ void main() {
       expect(restored.title, 'Тест');
       expect(restored.blocks.length, 1);
       expect(restored.blocks[0].type, BlockType.heading);
+    });
+
+    test('removes a duplicated first paragraph from malformed chapter metadata', () {
+      const chapter = ReaderChapter(
+        index: 12,
+        title:
+            'Глава двенадцатая. Выбор пути '
+            'В крохотном окошке мастерской едва заметно посвет...',
+        blocks: [
+          ReaderBlock(
+            index: 0,
+            text: 'Глава двенадцатая. Выбор пути',
+            type: BlockType.heading,
+          ),
+          ReaderBlock(
+            index: 1,
+            text:
+                'В крохотном окошке мастерской едва заметно посветлело. '
+                'Было самое раннее утро.',
+          ),
+        ],
+      );
+
+      expect(chapter.withCleanedBlocks().title, 'Глава двенадцатая. Выбор пути');
+    });
+
+    test('keeps a title that does not duplicate the first paragraph', () {
+      const chapter = ReaderChapter(
+        index: 0,
+        title: 'Глава первая. Начало истории',
+        blocks: [
+          ReaderBlock(index: 0, text: 'Глава первая', type: BlockType.heading),
+          ReaderBlock(index: 1, text: 'Это самостоятельный первый абзац.'),
+        ],
+      );
+
+      expect(chapter.withCleanedBlocks().title, chapter.title);
     });
   });
 

@@ -1,11 +1,10 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
-
 import '../../../../core/encoding/encoding_detection.dart';
 import '../../../../core/formats/book_file_size_policy.dart';
 import '../../../../core/formats/format_capability.dart';
+import '../../../../src/rust/api/api/api.dart' as rust_api;
 import 'book_format_detector.dart';
 import 'book_inspection_result.dart';
 import 'book_metadata_extractor.dart';
@@ -71,6 +70,7 @@ final class BookFileInspector {
       bytes: metadataBytes,
       format: format,
       encodingDetector: encodingDetector,
+      isCompleteFile: metadataBytes.length == fileSize,
     );
 
     final decision = _decide(format: format, metadata: metadata);
@@ -96,8 +96,7 @@ final class BookFileInspector {
     if (metadata.isCorrupted) {
       return ImportDecision.corrupted;
     }
-    final capService = const FormatCapabilityService();
-    if (capService.isDocumentOnly(format)) {
+    if (format.isDocumentOnly) {
       return ImportDecision.importAsDocument;
     }
     if (format == BookFormat.epub || format == BookFormat.fb2) {
@@ -105,15 +104,14 @@ final class BookFileInspector {
         return ImportDecision.needsEncodingSelection;
       }
     }
-    if (capService.canReadInApp(format)) {
+    if (format.canReadInApp) {
       return ImportDecision.importAsBook;
     }
     return ImportDecision.unsupported;
   }
 
   Future<String> _computeStreamHash(File file) async {
-    final digest = await sha256.bind(file.openRead()).last;
-    return digest.toString();
+    return rust_api.calculateHash(path: file.path);
   }
 
   Future<Uint8List> _readFileHead(File file, int maxBytes) async {

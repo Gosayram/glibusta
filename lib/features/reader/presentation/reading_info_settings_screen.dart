@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
+import '../data/reading_info_formatter.dart';
 import '../data/reading_info_model.dart';
 import 'reading_info_provider.dart';
 
@@ -14,7 +16,7 @@ class ReadingInfoSettingsScreen extends ConsumerWidget {
     final config = ref.watch<ReadingInfoModel>(readingInfoProvider);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Reading Info Bar'),
         actions: [
           IconButton(
@@ -177,6 +179,12 @@ class _SlotPicker extends StatelessWidget {
         return 'Remaining Book';
       case InfoSlotMode.wpm:
         return 'WPM Speed';
+      case InfoSlotMode.sessionTime:
+        return 'Время за чтением';
+      case InfoSlotMode.streak:
+        return 'Серия дней';
+      case InfoSlotMode.todayTime:
+        return 'Сегодня мин';
     }
   }
 }
@@ -262,11 +270,21 @@ class _PreviewWidget extends StatelessWidget {
           ],
         );
       case InfoSlotMode.remainingChapter:
-        return Text('58% · 3 гл.', style: style, textAlign: TextAlign.center);
+        return Text(
+          formatCurrentChapterTimeEstimate(bookMinutesLeft: 95, chaptersRemaining: 3),
+          style: style,
+          textAlign: TextAlign.center,
+        );
       case InfoSlotMode.remainingBook:
-        return Text('32% · 8 гл.', style: style, textAlign: TextAlign.center);
+        return Text(formatReadingTimeEstimate(95), style: style, textAlign: TextAlign.center);
       case InfoSlotMode.wpm:
         return Text('245 сл/мин', style: style, textAlign: TextAlign.center);
+      case InfoSlotMode.sessionTime:
+        return Text('12 мин', style: style);
+      case InfoSlotMode.streak:
+        return Text('🔥 7 дней', style: style);
+      case InfoSlotMode.todayTime:
+        return Text('23 мин', style: style);
     }
   }
 }

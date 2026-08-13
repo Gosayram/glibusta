@@ -12,15 +12,13 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/auth/auth_repository.dart';
+import '../../../core/config/app_info.dart';
 import '../../../core/config/app_settings.dart';
 import '../../../core/connectivity/offline_mode.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/file_picker_service.dart';
 import '../../../core/services/backup_service.dart';
-import '../../../core/services/calibre_client.dart';
-import '../../../core/services/content_safety_service.dart';
-import '../../../core/services/webdav_client.dart';
 import '../../../core/storage/storage_bridge_impl.dart';
 import '../../../core/storage/storage_mode.dart';
 import '../../../core/storage/storage_settings_provider.dart';
@@ -183,12 +181,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           _SettingsTile(
-            icon: Icons.shield_outlined,
-            title: l10n.settingsContentFilter,
-            subtitle: l10n.settingsContentFilterSub,
-            onTap: () => _showContentSafety(context),
-          ),
-          _SettingsTile(
             icon: Icons.font_download,
             title: l10n.settingsFonts,
             subtitle: l10n.settingsFontsSub,
@@ -211,23 +203,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           const Divider(),
-          const _SectionHeader(title: 'Синхронизация'),
-          _SettingsTile(
-            icon: Icons.cloud_sync,
-            title: 'WebDAV',
-            subtitle: 'Настройка WebDAV сервера для синхронизации',
-            onTap: () => _showWebDavDialog(context),
-          ),
-          _SettingsTile(
-            icon: Icons.library_books,
-            title: 'Calibre',
-            subtitle: 'Подключение к Calibre Content Server',
-            onTap: () => _showCalibreDialog(context),
-          ),
-
-          const Divider(),
           _SectionHeader(title: l10n.settingsAbout),
           const _VersionTile(),
+          _SettingsTile(
+            icon: Icons.info_outline,
+            title: kAppName,
+            subtitle: appLegalese,
+            onTap: () => unawaited(_showAbout(context)),
+          ),
           _SettingsTile(
             icon: Icons.keyboard,
             title: l10n.settingsShortcuts,
@@ -241,42 +224,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/settings/diagnostics'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showContentSafety(BuildContext context) {
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          return FutureBuilder<ContentSafetyLevel>(
-            future: ContentSafetyService.load(),
-            builder: (context, snapshot) {
-              final current = snapshot.data ?? ContentSafetyLevel.standard;
-              return AlertDialog(
-                title: const Text('Фильтр контента'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: ContentSafetyLevel.values.map((level) {
-                    return ListTile(
-                      leading: Icon(
-                        level == current ? Icons.check_circle : Icons.circle_outlined,
-                        color: level == current ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                      title: Text(level.displayName),
-                      subtitle: Text(level.description),
-                      onTap: () {
-                        unawaited(ContentSafetyService.save(level));
-                        Navigator.of(context).pop();
-                      },
-                    );
-                  }).toList(),
-                ),
-              );
-            },
-          );
-        },
       ),
     );
   }
@@ -310,6 +257,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _showAbout(BuildContext context) async {
+    final info = await PackageInfo.fromPlatform();
+    if (!context.mounted) return;
+    showAboutDialog(
+      context: context,
+      applicationName: kAppName,
+      applicationVersion: '${info.version}+${info.buildNumber}',
+      applicationLegalese: appLegalese,
     );
   }
 
@@ -668,13 +626,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         return;
       }
 
-      final scanned = await bridge.scanBooks(uri);
+      final bookCount = await bridge.countBooks(uri);
       final name = uri.split('/').last;
 
       await ref.read(externalFolderProvider.notifier).updateFolder(uri: uri, name: name);
 
       if (context.mounted) {
-        unawaited(SmartDialog.showToast('Найдено книг: ${scanned.length}'));
+        unawaited(SmartDialog.showToast('Найдено книг: $bookCount'));
       }
     } on Object catch (e) {
       if (context.mounted) {
@@ -702,6 +660,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } on MissingPluginException {
       if (!context.mounted) return;
       unawaited(SmartDialog.showToast('Недоступно на этой платформе'));
+    } on PlatformException catch (error, stackTrace) {
+      AppLogger().warning(
+        'Storage permission channel failed: ${error.message}',
+        name: 'Settings',
+        error: error,
+        st: stackTrace,
+      );
+      if (!context.mounted) return;
+      unawaited(SmartDialog.showToast('Не удалось проверить разрешение: ${error.message}'));
     }
   }
 
@@ -725,131 +692,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
-  }
-
-  // MD-13.1: WebDAV sync settings dialog
-  void _showWebDavDialog(BuildContext context) {
-    final urlCtl = TextEditingController();
-    final userCtl = TextEditingController();
-    final passCtl = TextEditingController();
-    var connected = false;
-
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setSt) => AlertDialog(
-            title: const Text('WebDAV'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: urlCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'Server URL',
-                      hintText: 'https://example.com/dav/',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: userCtl,
-                    decoration: const InputDecoration(labelText: 'Username'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: passCtl,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password'),
-                  ),
-                  const SizedBox(height: 12),
-                  if (connected)
-                    const Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 18),
-                        SizedBox(width: 8),
-                        Text('Connected ✓', style: TextStyle(color: Colors.green)),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  final url = urlCtl.text.trim();
-                  if (url.isEmpty) return;
-                  final client = WebDavClient(baseUrl: url);
-                  final ok = await client.ping();
-                  setSt(() => connected = ok);
-                },
-                child: const Text('Test Connection'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // MD-13.2: Calibre Content Server settings dialog
-  void _showCalibreDialog(BuildContext context) {
-    final urlCtl = TextEditingController();
-    var connected = false;
-
-    unawaited(
-      showDialog<void>(
-        context: context,
-        builder: (ctx) => StatefulBuilder(
-          builder: (ctx, setSt) => AlertDialog(
-            title: const Text('Calibre Content Server'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: urlCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'Server URL',
-                      hintText: 'http://192.168.1.100:8080',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (connected)
-                    const Row(
-                      children: [
-                        Icon(Icons.check_circle, color: Colors.green, size: 18),
-                        SizedBox(width: 8),
-                        Text('Connected ✓', style: TextStyle(color: Colors.green)),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () async {
-                  final url = urlCtl.text.trim();
-                  if (url.isEmpty) return;
-                  final client = CalibreClient(baseUrl: url);
-                  final ok = await client.ping();
-                  setSt(() => connected = ok);
-                },
-                child: const Text('Test Connection'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

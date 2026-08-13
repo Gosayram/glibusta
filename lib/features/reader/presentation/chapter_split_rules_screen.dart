@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../data/chapter_split_rule.dart';
 import '../data/chapter_split_service.dart';
 
@@ -18,11 +19,19 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
   late final ChapterSplitService _service;
   final _testController = TextEditingController();
   ChapterSplitRule? _testResult;
+  var _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _service = ref.read(chapterSplitServiceProvider);
+    unawaited(_loadRules());
+  }
+
+  Future<void> _loadRules() async {
+    await _service.load();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -34,81 +43,83 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: const Text('Chapter Split Rules'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showAddRuleDialog(context),
+            onPressed: _isLoading ? null : () => _showAddRuleDialog(context),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const _SectionHeader(title: 'Test Pattern'),
-          Card(
-            child: Padding(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextField(
-                    controller: _testController,
-                    decoration: const InputDecoration(
-                      labelText: 'Paste sample text',
-                      border: OutlineInputBorder(),
-                      hintText: 'Chapter 1: The Beginning\nChapter 2: The End',
-                    ),
-                    maxLines: 5,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      FilledButton(
-                        onPressed: _testPattern,
-                        child: const Text('Test'),
-                      ),
-                      if (_testResult != null) ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Matched: ${_testResult!.name}',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
+              children: [
+                const _SectionHeader(title: 'Test Pattern'),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _testController,
+                          decoration: const InputDecoration(
+                            labelText: 'Paste sample text',
+                            border: OutlineInputBorder(),
+                            hintText: 'Chapter 1: The Beginning\nChapter 2: The End',
                           ),
+                          maxLines: 5,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            FilledButton(
+                              onPressed: _testPattern,
+                              child: const Text('Test'),
+                            ),
+                            if (_testResult != null) ...[
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Matched: ${_testResult!.name}',
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
-                    ],
+                    ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeader(title: 'Presets'),
-          ...ChapterSplitRule.presets.map(
-            (rule) => _RuleTile(
-              rule: rule,
-              onTest: () => _testWithRule(rule),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const _SectionHeader(title: 'Custom Rules'),
-          ..._service.rules
-              .where((r) => !r.isPreset)
-              .map(
-                (rule) => _RuleTile(
-                  rule: rule,
-                  onTest: () => _testWithRule(rule),
-                  onDelete: () => _deleteRule(rule),
-                  onEdit: () => _showEditRuleDialog(context, rule),
                 ),
-              ),
-        ],
-      ),
+                const SizedBox(height: 24),
+                const _SectionHeader(title: 'Presets'),
+                ...ChapterSplitRule.presets.map(
+                  (rule) => _RuleTile(
+                    rule: rule,
+                    onTest: () => _testWithRule(rule),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const _SectionHeader(title: 'Custom Rules'),
+                ..._service.rules
+                    .where((r) => !r.isPreset)
+                    .map(
+                      (rule) => _RuleTile(
+                        rule: rule,
+                        onTest: () => _testWithRule(rule),
+                        onDelete: () => _deleteRule(rule),
+                        onEdit: () => _showEditRuleDialog(context, rule),
+                      ),
+                    ),
+              ],
+            ),
     );
   }
 
@@ -167,15 +178,22 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
             FilledButton(
               onPressed: () {
                 if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                  _service.addRule(
-                    ChapterSplitRule(
-                      id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
-                      name: nameController.text,
-                      pattern: patternController.text,
-                    ),
-                  );
-                  Navigator.pop(ctx);
-                  setState(() {});
+                  try {
+                    RegExp(patternController.text);
+                    _service.addRule(
+                      ChapterSplitRule(
+                        id: 'custom_${DateTime.now().millisecondsSinceEpoch}',
+                        name: nameController.text,
+                        pattern: patternController.text,
+                      ),
+                    );
+                    Navigator.pop(ctx);
+                    setState(() {});
+                  } on FormatException {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Pattern is not a valid regular expression')),
+                    );
+                  }
                 }
               },
               child: const Text('Add'),
@@ -222,16 +240,23 @@ class _ChapterSplitRulesScreenState extends ConsumerState<ChapterSplitRulesScree
             FilledButton(
               onPressed: () {
                 if (nameController.text.isNotEmpty && patternController.text.isNotEmpty) {
-                  _service.updateRule(
-                    ChapterSplitRule(
-                      id: rule.id,
-                      name: nameController.text,
-                      pattern: patternController.text,
-                      isPreset: rule.isPreset,
-                    ),
-                  );
-                  Navigator.pop(ctx);
-                  setState(() {});
+                  try {
+                    RegExp(patternController.text);
+                    _service.updateRule(
+                      ChapterSplitRule(
+                        id: rule.id,
+                        name: nameController.text,
+                        pattern: patternController.text,
+                        isPreset: rule.isPreset,
+                      ),
+                    );
+                    Navigator.pop(ctx);
+                    setState(() {});
+                  } on FormatException {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Pattern is not a valid regular expression')),
+                    );
+                  }
                 }
               },
               child: const Text('Save'),

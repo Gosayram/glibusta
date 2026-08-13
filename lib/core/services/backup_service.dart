@@ -151,7 +151,21 @@ class BackupService {
       b.deleteAll(db.bookmarks);
       b.deleteAll(db.notes);
       b.deleteAll(db.quotes);
+      b.deleteAll(db.textHighlights);
+      b.deleteAll(db.readingSessions);
+      b.deleteAll(db.readingTime);
+      b.deleteAll(db.perBookSettings);
+      b.deleteAll(db.searchHistory);
+      b.deleteAll(db.downloads);
+      b.deleteAll(db.bookCollections);
+      b.deleteAll(db.bookTags);
+      b.deleteAll(db.bookSeries);
       b.deleteAll(db.collections);
+      b.deleteAll(db.tags);
+      b.deleteAll(db.series);
+      b.deleteAll(db.authors);
+      b.deleteAll(db.genres);
+      b.deleteAll(db.savedBooks);
     });
 
     final prefs = await SharedPreferences.getInstance();

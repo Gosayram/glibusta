@@ -1,19 +1,29 @@
-# Flibusta API — Complete Endpoint Reference
+# Flibusta HTML/OPDS candidate surface
 
-> Auto-generated from live site exploration. Base URL from `.env`.
+> **Verification status: unverified.** This is a historical candidate inventory,
+> not an official API contract and not evidence that an endpoint currently works.
+> The configured origin comes from `.env`; never add it to this file.
+
+The origin currently disallows automated crawling in `robots.txt`. Scripts
+using `FlibustaClient`, including `probe.py` and `test_endpoints.py`, fail
+closed. Run only `make flibusta-audit`; it first checks the policy and records
+metadata without saving HTML or downloading content.
+
+`openapi.yaml` mirrors this inventory for design/reference only. Its response
+schemas describe parser expectations, not JSON emitted by the origin.
 
 ## 1. BOOKS (`/b/`)
 
-| Endpoint           | Method | Auth | Description                 |
-| ------------------ | ------ | ---- | --------------------------- |
-| `/b`               | GET    | No   | Book index (alphabetical)   |
-| `/b/{id}`          | GET    | No   | Book details page           |
-| `/b/{id}/read`     | GET    | No   | Read online (HTML viewer)   |
-| `/b/{id}/download` | GET    | No   | Download page (all formats) |
-| `/b/{id}/fb2`      | GET    | No   | Direct FB2 download         |
-| `/b/{id}/epub`     | GET    | No   | Direct EPUB download        |
-| `/b/{id}/mail`     | POST   | Yes  | Send book to email          |
-| `/b/{id}/complain` | GET    | Yes  | Complain about file quality |
+| Endpoint           | Method   | Auth | Description                  |
+| ------------------ | -------- | ---- | ---------------------------- |
+| `/b`               | GET      | No   | Book index (alphabetical)    |
+| `/b/{id}`          | GET      | No   | Book details page            |
+| `/b/{id}/read`     | GET      | No   | Read online (HTML viewer)    |
+| `/b/{id}/download` | GET      | No   | Download page (all formats)  |
+| `/b/{id}/fb2`      | GET      | No   | Direct FB2 download          |
+| `/b/{id}/epub`     | GET      | No   | Direct EPUB download         |
+| `/b/{id}/mail`     | GET/POST | Yes  | Candidate mail form / submit |
+| `/b/{id}/complain` | GET      | Yes  | Complain about file quality  |
 
 ### Book details page (`/b/{id}`) — parsed fields:
 
@@ -57,6 +67,11 @@ POST /polka/add/{id}
 | `/{Letter}`      | GET    | No   | Authors by letter (e.g. `/Aa`, `/Bb`) |
 
 ### Author page (`/a/{id}`) — forms:
+
+Historical local snapshots also show optional avatar, biography, external links,
+series groups, book size/page count/rating, and format links. Treat these as
+parser candidates until a sanitised fixture covers them; they are not a live API
+guarantee.
 
 ```
 GET /a/{id}
@@ -325,7 +340,7 @@ GET /rec
 
 ---
 
-## 17. NEWLY DISCOVERED
+## 17. HISTORICAL CANDIDATES (NOT VALIDATED)
 
 | Endpoint                      | Method | Auth | Description                           |
 | ----------------------------- | ------ | ---- | ------------------------------------- |
@@ -341,7 +356,7 @@ GET /rec
 
 ---
 
-## PARSING NOTES
+## HISTORICAL PARSING ASSUMPTIONS (NOT VALIDATED)
 
 ### HTML Search Results
 

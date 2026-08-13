@@ -3,8 +3,64 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/database/app_database.dart';
+import 'package:glibusta/core/logging/app_logger.dart';
+import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/features/library/domain/book_file_repository.dart';
+import 'package:glibusta/features/reader/data/book_open_service.dart';
+import 'package:glibusta/features/reader/data/parsers/normalized_book.dart';
 import 'package:glibusta/features/reader/domain/reader.dart';
+import 'package:glibusta/features/reader/presentation/reader_content_helper.dart';
 import 'package:glibusta/features/reader/presentation/reader_controller.dart';
+import 'package:glibusta/features/reader/presentation/reader_providers.dart';
+import 'package:glibusta/features/reader/presentation/reader_two_finger_chapter_gesture.dart';
+
+class _LongBookOpenService extends BookOpenService {
+  _LongBookOpenService(AppDatabase database)
+    : super(
+        AppFileStorageImpl(),
+        BookFileRepositoryImpl(database),
+        logger: AppLogger(),
+      );
+
+  static const int chapterCount = 100;
+
+  @override
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    return NormalizedBookMetadata(
+      id: bookId,
+      title: 'Long reader session',
+      authors: const [],
+      chapterCount: chapterCount,
+      chapterTitles: List<String>.generate(chapterCount, (index) => 'Chapter $index'),
+    );
+  }
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    if (index < 0 || index >= chapterCount) return null;
+    return ReaderChapter(
+      index: index,
+      title: 'Chapter $index',
+      blocks: [ReaderBlock(index: 0, text: 'Content for chapter $index')],
+    );
+  }
+}
+
+class _WordyBookOpenService extends _LongBookOpenService {
+  _WordyBookOpenService(super.database);
+
+  static final String _chapterText = List<String>.filled(1000, 'word').join(' ');
+
+  @override
+  Future<ReaderChapter?> loadChapter(String bookId, int index) async {
+    if (index < 0 || index >= _LongBookOpenService.chapterCount) return null;
+    return ReaderChapter(
+      index: index,
+      title: 'Chapter $index',
+      blocks: [ReaderBlock(index: 0, text: _chapterText)],
+    );
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -113,6 +169,32 @@ void main() {
       expect(updated.errorFileSize, 512000);
     });
 
+    test('copyWith can clear stale book data for a reload', () {
+      final state = ReaderState(
+        metadata: const NormalizedBookMetadata(
+          id: 'old-book',
+          title: 'Old title',
+          authors: [],
+          chapterCount: 1,
+          chapterTitles: ['Old chapter'],
+        ),
+        loadedChapters: const {
+          0: ReaderChapter(index: 0, title: 'Old chapter', blocks: []),
+        },
+        errorMessage: 'Old error',
+      );
+
+      final reloading = state.copyWith(
+        clearMetadata: true,
+        loadedChapters: const {},
+        clearError: true,
+      );
+
+      expect(reloading.metadata, isNull);
+      expect(reloading.loadedChapters, isEmpty);
+      expect(reloading.errorMessage, isNull);
+    });
+
     test('ReaderState copyWith chain produces expected state', () {
       final state = ReaderState();
       final updated = state
@@ -129,13 +211,96 @@ void main() {
       final b = ReaderState(isSearchOpen: true);
       expect(a.isSearchOpen, isNot(equals(b.isSearchOpen)));
     });
+
+    test('collection state cannot be mutated after publication', () {
+      final checkpoints = <double>[0.25];
+      final state = ReaderState(checkpoints: checkpoints);
+
+      checkpoints.add(0.75);
+
+      expect(state.checkpoints, <double>[0.25]);
+      expect(state.loadedChapters.clear, throwsUnsupportedError);
+      expect(() => state.checkpoints.add(0.5), throwsUnsupportedError);
+    });
+
+    test('word count ignores empty and whitespace-only blocks', () {
+      final chapters = <ReaderChapter>[
+        const ReaderChapter(
+          index: 0,
+          title: 'Chapter',
+          blocks: [
+            ReaderBlock(index: 0, text: '  two\twords  '),
+            ReaderBlock(index: 1, text: ''),
+            ReaderBlock(index: 2, text: '\n  '),
+          ],
+        ),
+      ];
+
+      expect(ReaderContentHelper.countWords(chapters), 2);
+    });
+
+    test('position estimate uses progress within the selected chapter', () {
+      final chapters = <int, ReaderChapter>{
+        0: const ReaderChapter(
+          index: 0,
+          title: 'Short',
+          blocks: [
+            ReaderBlock(index: 0, text: 'One'),
+            ReaderBlock(index: 1, text: 'Two'),
+          ],
+        ),
+        1: const ReaderChapter(
+          index: 1,
+          title: 'Long',
+          blocks: [
+            ReaderBlock(index: 0, text: '1'),
+            ReaderBlock(index: 1, text: '2'),
+            ReaderBlock(index: 2, text: '3'),
+            ReaderBlock(index: 3, text: '4'),
+            ReaderBlock(index: 4, text: '5'),
+            ReaderBlock(index: 5, text: '6'),
+          ],
+        ),
+      };
+
+      final position = ReaderContentHelper.estimatePositionFromProgress(
+        progress: 0.5,
+        chapterCount: 2,
+        loadedChapters: chapters,
+      );
+
+      expect(position, (chapterIndex: 1, paragraphIndex: 2));
+    });
+
+    test('search chapters fall back when cached titles are incomplete', () {
+      const metadata = NormalizedBookMetadata(
+        id: 'book',
+        title: 'Book',
+        authors: [],
+        chapterCount: 2,
+        chapterTitles: ['Available title'],
+      );
+
+      final chapters = ReaderContentHelper.buildSearchChapters(metadata, const {});
+
+      expect(chapters.map((chapter) => chapter.title), ['Available title', 'Глава 2']);
+    });
   });
 
   group('ReaderController', () {
-    Future<ReaderController> createController(WidgetTester tester, String bookId) async {
+    Future<ReaderController> createController(
+      WidgetTester tester,
+      String bookId, {
+      BookOpenService? bookOpenService,
+      ReaderSettings? settings,
+    }) async {
       late ReaderController ctrl;
       final container = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)],
+        overrides: [
+          databaseProvider.overrideWithValue(db),
+          if (bookOpenService != null) bookOpenServiceProvider.overrideWithValue(bookOpenService),
+          if (settings != null) readerSettingsProvider.overrideWithValue(settings),
+        ],
       );
       addTearDown(container.dispose);
       await tester.runAsync(() async {
@@ -177,6 +342,102 @@ void main() {
       await tester.pump(const Duration(seconds: 60));
     });
 
+    testWidgets('chapter navigation ignores an unloaded book', (tester) async {
+      final ctrl = await createController(tester, 'book1');
+
+      expect(ctrl.scrollToNext, returnsNormally);
+      expect(ctrl.scrollToPrevious, returnsNormally);
+      expect(ctrl.state.currentPosition, ReaderPosition.initial);
+
+      ctrl.dispose();
+    });
+
+    testWidgets('continuous layout uses the semantic paginated position', (tester) async {
+      final service = _LongBookOpenService(db);
+      final ctrl = await createController(tester, 'long-book', bookOpenService: service);
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handlePageChanged(50);
+      ctrl.prepareForContinuousLayout();
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.scrollProgress, closeTo(0.5, 0.001));
+      ctrl.dispose();
+    });
+
+    testWidgets('paginated chapter changes keep progress and remaining time in sync', (
+      tester,
+    ) async {
+      final ctrl = await createController(
+        tester,
+        'wordy-book',
+        bookOpenService: _WordyBookOpenService(db),
+        settings: const ReaderSettings(),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+      final initialMinutesLeft = ctrl.state.estimatedMinutesLeft;
+
+      ctrl.handlePageChanged(50);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.currentPosition.progressPercent, closeTo(50 / 99, 0.001));
+      expect(ctrl.state.scrollProgress, closeTo(50 / 99, 0.001));
+      expect(ctrl.state.estimatedMinutesLeft, lessThan(initialMinutesLeft));
+      ctrl.dispose();
+    });
+
+    testWidgets('adjacent-chapter navigation preserves semantic chapter boundaries', (
+      tester,
+    ) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+        settings: const ReaderSettings(),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handlePageChanged(50);
+      ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.next);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 51);
+      expect(ctrl.state.currentPosition.paragraphIndex, 0);
+      expect(ctrl.state.scrollProgress, closeTo(51 / 99, 0.001));
+
+      ctrl.navigateToAdjacentChapter(direction: TwoFingerChapterDirection.previous);
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      ctrl.dispose();
+    });
+
+    testWidgets('focus page changes preserve the shown paragraph', (tester) async {
+      final service = _LongBookOpenService(db);
+      final ctrl = await createController(tester, 'long-book', bookOpenService: service);
+
+      await tester.runAsync(ctrl.loadBook);
+      ctrl.handleFocusPositionChanged(50, 3);
+
+      expect(ctrl.state.currentPosition.chapterIndex, 50);
+      expect(ctrl.state.currentPosition.paragraphIndex, 3);
+      ctrl.dispose();
+    });
+
+    testWidgets('focus mode opens with reader chrome hidden', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+        settings: const ReaderSettings(mode: ReaderMode.focus),
+      );
+
+      await tester.runAsync(ctrl.loadBook);
+
+      expect(ctrl.state.uiVisible, isFalse);
+      ctrl.toggleUi();
+      expect(ctrl.state.uiVisible, isTrue);
+      ctrl.dispose();
+    });
+
     testWidgets('onBottomSheetOpen/close toggles isBottomSheetOpen', (tester) async {
       final ctrl = await createController(tester, 'book1');
       expect(ctrl.state.isBottomSheetOpen, isFalse);
@@ -186,6 +447,25 @@ void main() {
       expect(ctrl.state.isBottomSheetOpen, isFalse);
       ctrl.dispose();
       await tester.pump(const Duration(seconds: 60));
+    });
+
+    testWidgets('suspends chrome auto-hide for accessibility navigation', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'book1',
+        settings: const ReaderSettings(autoHideDelay: 1),
+      );
+
+      ctrl.hideUi();
+      ctrl.setAutoHideSuspended(true);
+      ctrl.toggleUi();
+      await tester.pump(const Duration(seconds: 2));
+      expect(ctrl.state.uiVisible, isTrue);
+
+      ctrl.setAutoHideSuspended(false);
+      await tester.pump(const Duration(seconds: 2));
+      expect(ctrl.state.uiVisible, isFalse);
+      ctrl.dispose();
     });
 
     testWidgets('buildDiagnostics contains book ID', (tester) async {
@@ -208,6 +488,35 @@ void main() {
     testWidgets('dispose does not throw', (tester) async {
       final ctrl = await createController(tester, 'book1');
       expect(() => ctrl.dispose(), returnsNormally);
+    });
+
+    testWidgets('long chapter jumps keep the async chapter window bounded', (tester) async {
+      final ctrl = await createController(
+        tester,
+        'long-book',
+        bookOpenService: _LongBookOpenService(db),
+      );
+      await tester.runAsync(ctrl.loadBook);
+      expect(ctrl.state.loadedChapters.keys, everyElement(inInclusiveRange(0, chapterWindowSize)));
+
+      for (final chapterIndex in <int>[10, 20, 30, 40, 50, 60, 70, 80, 90]) {
+        ctrl.handlePageChanged(chapterIndex);
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pump();
+
+        expect(ctrl.state.loadedChapters.length, lessThanOrEqualTo(chapterWindowSize * 2 + 1));
+        expect(
+          ctrl.state.loadedChapters.keys,
+          everyElement(
+            inInclusiveRange(
+              chapterIndex - (chapterWindowSize + 1),
+              chapterIndex + (chapterWindowSize + 1),
+            ),
+          ),
+        );
+      }
+
+      ctrl.dispose();
     });
   });
 }

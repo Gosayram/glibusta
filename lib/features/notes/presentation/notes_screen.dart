@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../data/note_repository.dart';
@@ -23,8 +24,8 @@ class NotesScreen extends ConsumerWidget {
     final notesAsync = ref.watch(notesStreamProvider(bookId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Заметки'),
+      appBar: const AdaptiveAppBar(
+        title: Text('Заметки'),
       ),
       body: notesAsync.when(
         data: (notes) {
@@ -83,19 +84,17 @@ class NotesScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 5,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Skeleton.unite(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(BoneMock.title),
-                      const SizedBox(height: 8),
-                      Text(BoneMock.paragraph),
-                    ],
-                  ),
+                padding: EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Bone(width: 120, height: 12),
+                    SizedBox(height: 8),
+                    Bone(width: 160, height: 12),
+                  ],
                 ),
               ),
             ),

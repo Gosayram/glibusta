@@ -2,6 +2,69 @@ import 'package:flutter/material.dart';
 
 import '../domain/reader.dart';
 
+/// The contrast information shown when users create reader colour presets.
+///
+/// It describes only the three colours supplied by a preset. Rich publisher
+/// styles, images and text selection can still render with different colours,
+/// so this intentionally does not claim an accessibility conformance level.
+final class ReaderColorPreview {
+  const ReaderColorPreview._({
+    required this.textContrast,
+    required this.linkContrast,
+    required this.isApproximate,
+  });
+
+  factory ReaderColorPreview.fromColors({
+    required Color background,
+    required Color text,
+    required Color link,
+  }) {
+    final effectiveBackground = Color.alphaBlend(background, Colors.white);
+    return ReaderColorPreview._(
+      textContrast: ReaderColorContrast.ratio(text, effectiveBackground),
+      linkContrast: ReaderColorContrast.ratio(link, effectiveBackground),
+      isApproximate: background.a < 1 || text.a < 1 || link.a < 1,
+    );
+  }
+
+  /// Contrast of the main reader text against the selected background.
+  final double textContrast;
+
+  /// Contrast of links against the selected background.
+  final double linkContrast;
+
+  /// Whether alpha compositing made the displayed values an approximation.
+  final bool isApproximate;
+
+  /// A ready-to-use semantics label for a colour-preset preview.
+  String get semanticLabel {
+    final approximation = isApproximate ? ' Значения приблизительные.' : '';
+    return 'Цветовая схема. Контраст текста ${_format(textContrast)} к 1. '
+        'Контраст ссылок ${_format(linkContrast)} к 1.$approximation';
+  }
+
+  static String _format(double value) => value.toStringAsFixed(1);
+}
+
+/// Calculates contrast for reader colour previews without prescribing a
+/// compliance grade for arbitrary user-selected colours.
+abstract final class ReaderColorContrast {
+  /// Returns the contrast ratio after compositing [foreground] over
+  /// [background].
+  static double ratio(Color foreground, Color background) {
+    final effectiveForeground = Color.alphaBlend(foreground, background);
+    final foregroundLuminance = effectiveForeground.computeLuminance();
+    final backgroundLuminance = background.computeLuminance();
+    final lighter = foregroundLuminance > backgroundLuminance
+        ? foregroundLuminance
+        : backgroundLuminance;
+    final darker = foregroundLuminance > backgroundLuminance
+        ? backgroundLuminance
+        : foregroundLuminance;
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+}
+
 class ReaderColors {
   final Color scaffold;
   final Color text;
@@ -19,14 +82,27 @@ class ReaderColors {
     required this.accent,
   });
 
-  factory ReaderColors.fromPreset(Color bgColor, Color fgColor) {
+  /// Contrast and accessible preview data for this reader palette.
+  ReaderColorPreview get preview => ReaderColorPreview.fromColors(
+    background: scaffold,
+    text: text,
+    link: link,
+  );
+
+  factory ReaderColors.fromPreset(
+    Color bgColor,
+    Color fgColor, {
+    Color? linkColor,
+    Color? highlightColor,
+  }) {
+    final link = linkColor ?? Colors.blue;
     return ReaderColors(
       scaffold: bgColor,
       text: fgColor,
-      link: Colors.blue,
-      highlight: const Color(0x40FFEB3B),
+      link: link,
+      highlight: highlightColor ?? const Color(0x40FFEB3B),
       footnote: fgColor.withValues(alpha: 0.7),
-      accent: Colors.blue,
+      accent: link,
     );
   }
 

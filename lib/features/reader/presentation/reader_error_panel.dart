@@ -14,6 +14,45 @@ String _displayFileName(String path) {
   return lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
 }
 
+/// Announces the reader failure once while keeping recovery controls separate.
+class ReaderErrorSummary extends StatelessWidget {
+  const ReaderErrorSummary({
+    super.key,
+    required this.kind,
+    required this.message,
+  });
+
+  final ReaderErrorKind kind;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      excludeSemantics: true,
+      label: '${kind.defaultTitle}. $message',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(kind.icon, size: 48, color: Colors.orange),
+          const SizedBox(height: 12),
+          Text(
+            kind.defaultTitle,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ReaderErrorPanel extends StatelessWidget {
   final ReaderController controller;
   final ReaderState readerState;
@@ -52,17 +91,9 @@ class ReaderErrorPanel extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(kind.icon, size: 48, color: Colors.orange),
-                    const SizedBox(height: 12),
-                    Text(
-                      kind.defaultTitle,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      readerState.errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ReaderErrorSummary(
+                      kind: kind,
+                      message: readerState.errorMessage ?? '',
                     ),
                     if (readerState.errorFilePath != null) ...[
                       const SizedBox(height: 12),

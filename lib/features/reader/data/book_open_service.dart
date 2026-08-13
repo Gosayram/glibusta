@@ -1,59 +1,104 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
+import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/full_text_search.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/fonts/epub_font_loader.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
+import '../../../src/rust/api/api/api.dart' as rust_api;
 import '../../library/domain/book_file_repository.dart';
-import '../epub/epub_book_adapter.dart';
-import '../epub/epub_image_store.dart';
-import '../epub/epub_parser.dart' as new_epub;
+import 'content_transformers.dart';
+import 'parsers/book_parser.dart';
 import 'parsers/format_detector.dart';
 import 'parsers/normalized_book.dart';
-import 'parsers/parser_registry.dart';
+import 'parsers/parser_lookup.dart';
 import 'reader_cache_service.dart';
+
+enum BookOpenError {
+  corruptFile('Файл повреждён. Попробуйте загрузить заново.'),
+  unsupportedFormat('Формат не поддерживается.'),
+  missingContent('Содержимое книги отсутствует или повреждено.'),
+  emptyBook('Книга не содержит текста.');
+
+  const BookOpenError(this.userMessage);
+  final String userMessage;
+}
+
+BookOpenError _classifyBookOpenError(Object error) {
+  final message = error.toString().toLowerCase();
+  if (message.contains('zip') ||
+      message.contains('archive') ||
+      message.contains('corrupt') ||
+      message.contains('mimetype') ||
+      message.contains('unexpected end') ||
+      message.contains('invalid header') ||
+      message.contains('bad zip') ||
+      message.contains('загру') ||
+      error is ArchiveException) {
+    return BookOpenError.corruptFile;
+  }
+  if (message.contains('opf') ||
+      message.contains('container.xml') ||
+      message.contains('rootfile') ||
+      message.contains('package document') ||
+      message.contains('not found') && message.contains('epub')) {
+    return BookOpenError.missingContent;
+  }
+  if (message.contains('unsupported') || message.contains('не поддерживается')) {
+    return BookOpenError.unsupportedFormat;
+  }
+  return BookOpenError.corruptFile;
+}
+
+BookOpenFailure _toBookOpenFailure(Object error) {
+  final classified = _classifyBookOpenError(error);
+  switch (classified) {
+    case BookOpenError.corruptFile:
+      return CorruptFileFailure(error.toString());
+    case BookOpenError.missingContent:
+      return MissingContentFailure(error.toString());
+    case BookOpenError.unsupportedFormat:
+      return UnsupportedFormatFailure(error.toString());
+    case BookOpenError.emptyBook:
+      return const CacheCorruptedFailure('Книга не содержит текста');
+  }
+}
 
 final bookOpenServiceProvider = Provider<BookOpenService>((ref) {
   final storage = ref.watch(appFileStorageProvider);
   final fileRepo = ref.watch(bookFileRepositoryProvider);
   final ftsService = ref.watch(fullTextSearchProvider);
-  return BookOpenService(storage, fileRepo, ftsService);
+  final logger = ref.watch(appLoggerProvider);
+  return BookOpenService(storage, fileRepo, logger: logger, ftsService: ftsService);
 });
 
 class BookOpenService {
   final BookFileRepository _fileRepo;
-  final _logger = AppLogger();
+  final AppLogger _logger;
   late final ReaderCacheService cache;
 
   BookOpenService(
     AppFileStorage storage,
-    this._fileRepo, [
+    this._fileRepo, {
+    required AppLogger logger,
     FullTextSearchService? ftsService,
-  ]) {
+  }) : _logger = logger {
     cache = ReaderCacheService(
       fingerprintProvider: _computeCacheFingerprint,
       storage: storage,
+      logger: logger,
       ftsService: ftsService,
     );
   }
 
   static const Duration _parsingTimeout = Duration(seconds: 60);
 
-  static final _registry = BookParserRegistry.defaultInstance;
-
-  static Future<NormalizedBook> _parseEpubInWorker(
-    ({String filePath, String imagesDirPath, String bookId}) args,
-  ) async {
-    final imageStore = EpubImageStore(Directory(args.imagesDirPath));
-    final parser = new_epub.CustomEpubParser(imageStore: imageStore);
-    final epubBook = await parser.parse(args.filePath);
-    return EpubBookAdapter().toNormalizedBook(epubBook, args.bookId);
-  }
+  static final _parsers = parserForFormatMap;
 
   Future<NormalizedBook> openBook(String bookId) async {
     final cid = 'open-$bookId-${DateTime.now().millisecondsSinceEpoch}';
@@ -68,7 +113,12 @@ class BookOpenService {
       throw const BookMissingFailure('Файл книги не найден');
     }
 
-    final fileSize = await file.length();
+    int fileSize;
+    try {
+      fileSize = await file.length();
+    } on FileSystemException {
+      throw const BookMissingFailure('Файл книги не найден');
+    }
     if (fileSize == 0) {
       throw const CacheCorruptedFailure('Файл пуст');
     }
@@ -95,62 +145,92 @@ class BookOpenService {
     String filePath, [
     String? bookId,
   ]) async {
-    if (bookFormat == BookFormat.epub) {
-      final effectiveBookId = bookId ?? _extractBookId(filePath);
-      final bookDir = await cache.getBookDir(effectiveBookId);
-      final imagesDir = Directory('${bookDir.path}/epub_images');
-      if (!await imagesDir.exists()) {
-        await imagesDir.create(recursive: true);
-      }
-
-      try {
-        final normalized =
-            await Isolate.run(
-              () => _parseEpubInWorker((
-                filePath: filePath,
-                imagesDirPath: imagesDir.path,
-                bookId: effectiveBookId,
-              )),
-            ).timeout(
-              _parsingTimeout,
-              onTimeout: () => throw TimeoutException(
-                'Разбор EPUB занял слишком много времени (> ${_parsingTimeout.inSeconds}с). '
-                'Попробуйте повторить.',
-              ),
-            );
-        _logger.info(
-          'EPUB parsed: ${normalized.title}, ${normalized.chapters.length} chapters',
-          name: 'Reader',
-        );
-        return normalized.withCleanedBlocks();
-      } on TimeoutException {
-        rethrow;
-      } on Object catch (e, st) {
-        _logger.severe('EPUB parser failed: $e', name: 'Reader', error: e, st: st);
-        rethrow;
-      }
-    }
-
-    final parser = _registry.parserForFormat(bookFormat);
+    final parser = _parsers[bookFormat];
     if (parser == null) {
       throw UnsupportedFormatFailure('Формат не поддерживается: ${bookFormat.name}');
     }
-    return parser
+    Future<NormalizedBook> parseWithTimeout(BookParser selectedParser) => selectedParser
         .parseFile(filePath)
         .timeout(
           _parsingTimeout,
           onTimeout: () => throw TimeoutException(
             'Разбор ${bookFormat.name} занял слишком много времени.',
           ),
-        )
-        .then((book) => book.withCleanedBlocks());
+        );
+
+    NormalizedBook book;
+    try {
+      book = await parseWithTimeout(parser);
+    } on ParserFailure catch (e) {
+      if (filePath.toLowerCase().endsWith('.zip')) {
+        final cbzParser = _parsers[BookFormat.cbz]!;
+        book = await parseWithTimeout(cbzParser);
+      } else {
+        throw _toBookOpenFailure(e);
+      }
+    }
+    final cleaned = book.withCleanedBlocks();
+    final pipeline = ContentTransformerPipeline([
+      RichSpanColorTransformer(),
+    ]);
+    final transformed = pipeline.transform(cleaned);
+
+    if (bookId != null &&
+        (bookFormat == BookFormat.epub ||
+            bookFormat == BookFormat.docx ||
+            bookFormat == BookFormat.cbz)) {
+      return _materializeArchiveImages(transformed, filePath, bookId);
+    }
+    return transformed;
   }
 
-  String _extractBookId(String filePath) {
-    final name = filePath.split('/').last;
-    final dotIndex = name.lastIndexOf('.');
-    return dotIndex > 0 ? name.substring(0, dotIndex) : name;
+  Future<NormalizedBook> _materializeArchiveImages(
+    NormalizedBook book,
+    String filePath,
+    String bookId,
+  ) async {
+    final assetIds = <String>{
+      for (final chapter in book.chapters)
+        for (final block in chapter.blocks)
+          if (block.type == BlockType.image)
+            if (block.imageUrl case final String assetId) assetId,
+    };
+    if (assetIds.isEmpty) return book;
+
+    final bookDir = await cache.getBookDir(bookId);
+    final imagesDir = Directory('${bookDir.path}/docx_images');
+    await imagesDir.create(recursive: true);
+    final resolved = <String, String>{};
+
+    for (final assetId in assetIds) {
+      File? temporaryFile;
+      try {
+        final imageFile = File('${imagesDir.path}/${_docxImageFileName(assetId)}');
+        final bytes = await rust_api.getAssetBytes(path: filePath, assetId: assetId);
+        temporaryFile = File('${imageFile.path}.tmp');
+        await temporaryFile.writeAsBytes(bytes, flush: true);
+        await temporaryFile.rename(imageFile.path);
+        resolved[assetId] = imageFile.path;
+      } on Object catch (e, st) {
+        if (temporaryFile != null) {
+          try {
+            await temporaryFile.delete();
+          } on Object catch (_) {}
+        }
+        _logger.warning(
+          'Unable to materialize archive image $assetId',
+          name: 'Reader',
+          error: e,
+          st: st,
+        );
+      }
+    }
+
+    return book.withResolvedImageUrls(resolved);
   }
+
+  static String _docxImageFileName(String assetId) =>
+      Uri.encodeComponent(assetId).replaceAll('%', '_');
 
   Future<CacheSourceFingerprint?> _computeCacheFingerprint(
     String bookId,
@@ -175,7 +255,13 @@ class BookOpenService {
     );
   }
 
-  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) => cache.getMetadata(bookId);
+  Future<NormalizedBookMetadata?> getCachedMetadata(String bookId) async {
+    final metadata = await cache.getMetadata(bookId);
+    if (metadata == null || !await cache.isCacheValid(bookId, metadata)) {
+      return null;
+    }
+    return metadata;
+  }
 
   Future<ReaderChapter?> loadChapter(String bookId, int index) => cache.getChapter(bookId, index);
 
@@ -194,48 +280,35 @@ class BookOpenService {
     final sw = Stopwatch()..start();
     final cachedMeta = await cache.getMetadata(bookId);
     if (cachedMeta != null) {
-      _logger.info(
-        'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
-        name: 'Reader',
-        cid: cid,
-      );
       final isComplete = await cache.isCacheValid(bookId, cachedMeta);
-      if (!loadChapters) {
-        return NormalizedBook(
-          id: cachedMeta.id,
-          title: cachedMeta.title,
-          authors: cachedMeta.authors,
-          description: cachedMeta.description,
-          coverUrl: cachedMeta.coverUrl,
-          chapters: [
-            for (var i = 0; i < cachedMeta.chapterCount; i++)
-              ReaderChapter(
-                index: i,
-                title: i < cachedMeta.chapterTitles.length
-                    ? cachedMeta.chapterTitles[i]
-                    : 'Глава ${i + 1}',
-                blocks: const [],
-              ),
-          ],
-          metadata: cachedMeta.metadata,
-        );
-      }
-
       if (!isComplete) {
         _logger.warning(
-          'Split cache is incomplete for $bookId',
+          'Split cache is stale or incomplete for $bookId; reparsing source',
           name: 'Reader',
         );
+        await cache.invalidate(bookId, preserveImages: true);
       } else {
+        _logger.info(
+          'Cache HIT (split) for $bookId in ${sw.elapsedMilliseconds}ms',
+          name: 'Reader',
+          cid: cid,
+        );
+        if (!loadChapters) {
+          final book = _bookFromMetadata(cachedMeta);
+          await _loadEmbeddedFonts(book, bookId);
+          return book;
+        }
         final chapters = <ReaderChapter>[];
         for (var i = 0; i < cachedMeta.chapterCount; i++) {
-          final chapter = await cache.getChapter(bookId, i);
-          if (chapter != null) {
-            chapters.add(chapter);
+          try {
+            final chapter = await cache.getChapter(bookId, i);
+            if (chapter != null) chapters.add(chapter);
+          } on Object {
+            // Corrupt chapter cache — skip, will be re-fetched
           }
         }
         if (chapters.length == cachedMeta.chapterCount) {
-          return NormalizedBook(
+          final book = NormalizedBook(
             id: cachedMeta.id,
             title: cachedMeta.title,
             authors: cachedMeta.authors,
@@ -244,27 +317,15 @@ class BookOpenService {
             chapters: chapters,
             metadata: cachedMeta.metadata,
           );
+          await _loadEmbeddedFonts(book, bookId);
+          return book;
         }
+        _logger.warning(
+          'Split cache lost chapters while loading $bookId; reparsing source',
+          name: 'Reader',
+        );
+        await cache.invalidate(bookId, preserveImages: true);
       }
-
-      return NormalizedBook(
-        id: cachedMeta.id,
-        title: cachedMeta.title,
-        authors: cachedMeta.authors,
-        description: cachedMeta.description,
-        coverUrl: cachedMeta.coverUrl,
-        chapters: [
-          for (var i = 0; i < cachedMeta.chapterCount; i++)
-            ReaderChapter(
-              index: i,
-              title: i < cachedMeta.chapterTitles.length
-                  ? cachedMeta.chapterTitles[i]
-                  : 'Глава ${i + 1}',
-              blocks: const [],
-            ),
-        ],
-        metadata: cachedMeta.metadata,
-      );
     }
 
     final cached = await cache.getCachedBook(bookId);
@@ -275,6 +336,7 @@ class BookOpenService {
         cid: cid,
       );
       unawaited(cache.migrateLegacyCache(bookId, cached));
+      await _loadEmbeddedFonts(cached, bookId);
       return cached;
     }
 
@@ -291,5 +353,28 @@ class BookOpenService {
       await cache.invalidate(bookId, preserveImages: true);
       rethrow;
     }
+  }
+
+  Future<void> _loadEmbeddedFonts(NormalizedBook book, String bookId) async {
+    final fontMap = book.metadata?['fonts'];
+    if (fontMap is! Map || fontMap.isEmpty) return;
+    final filePath = await _fileRepo.getFilePath(bookId);
+    if (filePath == null) return;
+    await EpubFontLoader.loadFonts(
+      epubPath: filePath,
+      fontMap: Map<String, dynamic>.from(fontMap),
+    );
+  }
+
+  NormalizedBook _bookFromMetadata(NormalizedBookMetadata metadata) {
+    return NormalizedBook(
+      id: metadata.id,
+      title: metadata.title,
+      authors: metadata.authors,
+      description: metadata.description,
+      coverUrl: metadata.coverUrl,
+      chapters: metadata.buildChapters(),
+      metadata: metadata.metadata,
+    );
   }
 }

@@ -41,7 +41,7 @@ void main() {
     });
   });
 
-  group('FlibustaApiSource via MockBookSource', () {
+  group('BookSource via MockBookSource', () {
     test('searchBooks returns results for empty query', () async {
       final mockSource = MockBookSource();
       when(() => mockSource.searchBooks(any(), cancelToken: any(named: 'cancelToken'))).thenAnswer(

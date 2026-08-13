@@ -12,23 +12,79 @@ import '../../../core/logging/app_logger.dart';
 import '../../../core/utils/app_breakpoints.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/models/book.dart';
+import '../../../shared/utils/cache_entry.dart';
 import '../../../shared/widgets/book_card.dart';
+import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../../shared/widgets/error_state_widget.dart';
 import '../../../shared/widgets/restorable_scroll_view.dart';
-import '../data/catalog_repository_impl.dart';
+import '../../search/data/flibusta_models.dart';
+import '../../search/data/flibusta_source.dart';
 
 part 'catalog_screen.g.dart';
 
+const _cacheTtl = Duration(minutes: 10);
+final _categoriesCache = <String, CacheEntry<List<SearchGenreItem>>>{};
+final _booksCache = <String, CacheEntry<List<Book>>>{};
+
 @riverpod
-Future<List<String>> categories(Ref ref) async {
-  final repository = ref.watch(catalogRepositoryProvider);
-  return repository.getCategories();
+Future<List<SearchGenreItem>> categories(Ref ref) async {
+  final cached = _categoriesCache['categories'];
+  if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
+
+  final apiClient = ref.watch(flibustaSourceProvider);
+  try {
+    final response = await apiClient.getGenreList();
+    final result = response.genres;
+    _categoriesCache['categories'] = CacheEntry(result);
+    return result;
+  } on Object catch (e) {
+    AppLogger().warning('Genre list failed, using defaults: $e', name: 'Catalog');
+    return const [
+      SearchGenreItem(id: 'sf', name: 'Фантастика'),
+      SearchGenreItem(id: 'detive', name: 'Детективы'),
+      SearchGenreItem(id: 'love', name: 'Романы'),
+      SearchGenreItem(id: 'science', name: 'Научная литература'),
+      SearchGenreItem(id: 'history', name: 'История'),
+      SearchGenreItem(id: 'adventures', name: 'Приключения'),
+    ];
+  }
 }
 
 @riverpod
 Future<List<Book>> popularBooks(Ref ref) async {
-  final repository = ref.watch(catalogRepositoryProvider);
-  return repository.getPopularBooks();
+  final cached = _booksCache['popular'];
+  if (cached != null && !cached.isExpired(_cacheTtl)) return cached.value;
+
+  final apiClient = ref.watch(flibustaSourceProvider);
+  try {
+    final result = await apiClient.getPopularBooks();
+    final rawBase = apiClient.dio.options.baseUrl;
+    final base = rawBase.endsWith('/') ? rawBase.substring(0, rawBase.length - 1) : rawBase;
+    final books = result.books
+        .map(
+          (item) => Book(
+            id: item.id,
+            title: item.name,
+            authorIds: item.authors.map((a) => a.id).toList(),
+            authorNames: item.authors.map((a) => a.name).toList(),
+            genreIds: const [],
+            description: null,
+            coverUrl: null,
+            publishDate: null,
+            availableFormats: const [],
+            source: BookSourceInfo(
+              sourceId: 'flibusta-api',
+              sourceUrl: '$base/b/${item.id}',
+            ),
+          ),
+        )
+        .toList();
+    _booksCache['popular'] = CacheEntry(books);
+    return books;
+  } on Object catch (e) {
+    AppLogger().warning('Popular books query failed: $e', name: 'Catalog', error: e);
+    return const [];
+  }
 }
 
 class CatalogScreen extends ConsumerStatefulWidget {
@@ -73,21 +129,16 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       : 'cat_data_${categoriesAsync.value?.length ?? 0}',
                 ),
                 child: categoriesAsync.when(
-                  data: (List<String> categories) => _buildCategories(context, categories),
+                  data: (List<SearchGenreItem> categories) => _buildCategories(context, categories),
                   loading: () => SizedBox(
-                    height: 100,
+                    height: 120,
                     child: Skeletonizer.zone(
-                      child: ListView.builder(
+                      child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: 5,
-                        itemBuilder: (_, _) => Card(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: SizedBox(
-                            width: 100,
-                            child: Center(child: Text(BoneMock.name)),
-                          ),
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                        itemCount: 6,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (_, _) => const Bone(width: 80, height: 32),
                       ),
                     ),
                   ),
@@ -123,11 +174,12 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // ponytail: popular books already shown inline below — no separate screen
                   Expanded(
                     child: _QuickAccessTile(
                       icon: Icons.trending_up,
                       label: l10n.popularLabel,
-                      onTap: () => context.push('/catalog/popular'),
+                      onTap: () {},
                     ),
                   ),
                 ],
@@ -147,7 +199,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                 child: popularAsync.when(
                   data: (List<Book> books) => _buildPopularBooks(context, ref, books),
                   loading: () => SizedBox(
-                    height: 200,
+                    height: 300,
                     child: Skeletonizer.zone(
                       child: GridView.builder(
                         padding: const EdgeInsets.all(16),
@@ -155,16 +207,10 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                           crossAxisCount: 2,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: 0.75,
+                          childAspectRatio: 0.62,
                         ),
                         itemCount: 6,
-                        itemBuilder: (_, _) => Card(
-                          child: ListTile(
-                            leading: const Bone.circle(size: 48),
-                            title: Text(BoneMock.name),
-                            subtitle: Text(BoneMock.subtitle),
-                          ),
-                        ),
+                        itemBuilder: (_, _) => const BookCardSkeleton(),
                       ),
                     ),
                   ),
@@ -185,7 +231,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
     );
   }
 
-  Widget _buildCategories(BuildContext context, List<String> categories) {
+  Widget _buildCategories(BuildContext context, List<SearchGenreItem> categories) {
     final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,13 +261,11 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
             itemBuilder: (context, index) {
               final category = categories[index];
               return Padding(
-                key: ValueKey('$category-$index'),
+                key: ValueKey('${category.id}-$index'),
                 padding: const EdgeInsets.only(right: 8),
                 child: ActionChip(
-                  label: Text(category, style: const TextStyle(fontSize: 13)),
-                  onPressed: () {
-                    unawaited(context.push('/search?category=${Uri.encodeComponent(category)}'));
-                  },
+                  label: Text(category.name, style: const TextStyle(fontSize: 13)),
+                  onPressed: () => context.push('/genre/${category.id}'),
                 ),
               );
             },
@@ -274,29 +318,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
                       childAspectRatio: 0.62,
                     ),
                     itemCount: 4,
-                    itemBuilder: (_, _) => Card(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Expanded(
-                            child: Skeleton.replace(child: Bone.square()),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: Skeleton.unite(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(BoneMock.name),
-                                  const SizedBox(height: 4),
-                                  Text(BoneMock.subtitle),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    itemBuilder: (_, _) => const BookCardSkeleton(),
                   ),
                 );
               }

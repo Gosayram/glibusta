@@ -10,11 +10,14 @@ import '../../../core/auth/auth_repository.dart' as auth;
 import '../../../core/database/app_database.dart';
 import '../../../shared/models/book.dart';
 import '../../../shared/models/download_task.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../data/book_comments_service.dart';
 import 'book_details_providers.dart';
 import 'widgets/book_header.dart';
 import 'widgets/bottom_action_bar.dart';
 import 'widgets/reading_progress_indicator.dart';
+import 'widgets/reading_status_selector.dart';
+import 'widgets/reading_summary_card.dart';
 import 'widgets/series_info_section.dart';
 
 class BookDetailsScreen extends ConsumerWidget {
@@ -27,42 +30,40 @@ class BookDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(bookDetailsProvider(bookId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('О книге')),
+      appBar: const AdaptiveAppBar(title: Text('О книге')),
       body: detailsAsync.when(
         data: (BookDetails details) => BookDetailsContent(details: details, bookId: bookId),
-        loading: () => Skeletonizer(
+        loading: () => const Skeletonizer(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Skeleton.replace(
+                    Skeleton.replace(
                       child: Bone(width: 120, height: 180),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Expanded(
-                      child: Skeleton.unite(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(BoneMock.title),
-                            const SizedBox(height: 8),
-                            Text(BoneMock.subtitle),
-                            const SizedBox(height: 8),
-                            Text(BoneMock.name),
-                          ],
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Bone(width: 120, height: 12),
+                          SizedBox(height: 8),
+                          Bone(width: 80, height: 12),
+                          SizedBox(height: 8),
+                          Bone(width: 120, height: 12),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                const Bone(height: 40),
-                const SizedBox(height: 16),
-                const Bone(height: 100),
+                SizedBox(height: 24),
+                Bone(height: 40),
+                SizedBox(height: 16),
+                Bone(height: 100),
               ],
             ),
           ),
@@ -213,6 +214,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
+                  child: ReadingSummaryCard(bookId: widget.bookId),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
                   child: _buildReadingProgress(progressAsync),
                 ),
               ),
@@ -220,6 +227,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
                   child: SeriesInfoSection(bookId: widget.bookId),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(
+                  child: ReadingStatusSelector(bookId: widget.bookId),
                 ),
               ),
               SliverPersistentHeader(
@@ -269,6 +282,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
               SliverPadding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverToBoxAdapter(
+                  child: ReadingSummaryCard(bookId: widget.bookId),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverToBoxAdapter(
                   child: _buildReadingProgress(progressAsync),
                 ),
               ),
@@ -276,6 +295,12 @@ class BookDetailsContentState extends ConsumerState<BookDetailsContent>
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 sliver: SliverToBoxAdapter(
                   child: SeriesInfoSection(bookId: widget.bookId),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                sliver: SliverToBoxAdapter(
+                  child: ReadingStatusSelector(bookId: widget.bookId),
                 ),
               ),
               SliverPadding(
@@ -732,9 +757,9 @@ class _LoginPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Вход')),
-      body: const Center(
+    return const Scaffold(
+      appBar: AdaptiveAppBar(title: Text('Вход')),
+      body: Center(
         child: Text('Откройте Настройки → Вход для авторизации'),
       ),
     );

@@ -1,0 +1,5 @@
+---
+source: tests/parsers_test.rs
+expression: snapshot.to_string()
+---
+{"authors":["Author Name"],"chapters":1,"format":"Docx","images":1,"title":"DOCX Title"}

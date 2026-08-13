@@ -40,3 +40,12 @@ final readingHoursProvider = FutureProvider.autoDispose<List<int>>((ref) async {
   }
   return result;
 });
+
+final currentSessionStartProvider = Provider<DateTime?>((ref) {
+  final telemetryRepo = ref.watch(telemetry.readerTelemetryProvider);
+  return telemetryRepo.currentSessionStartTime;
+});
+
+final sessionTimerProvider = StreamProvider.autoDispose<DateTime>((ref) {
+  return Stream<DateTime>.periodic(const Duration(minutes: 1), (_) => DateTime.now());
+});

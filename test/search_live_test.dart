@@ -1,6 +1,9 @@
-import 'dart:io' as io;
+@Tags(['live'])
+@Timeout(Duration(seconds: 30))
+library;
 
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/http/http_client.dart';
 import 'package:glibusta/features/search/data/flibusta_source.dart';
@@ -10,11 +13,12 @@ void main() {
   late HttpClient client;
   late FlibustaHtmlSource source;
 
-  setUpAll(() {
-    io.HttpOverrides.global = _TestHttpOverrides();
+  setUpAll(() async {
+    await dotenv.load();
+    final baseUrl = dotenv.get('BASE_URL');
     final dio = Dio(
       BaseOptions(
-        baseUrl: 'https://www.flibusta.is',
+        baseUrl: baseUrl,
         responseType: ResponseType.plain,
         headers: {'User-Agent': 'Mozilla/5.0'},
       ),
@@ -76,11 +80,4 @@ void main() {
       expect(details.book.authorNames, isNotEmpty);
     });
   });
-}
-
-class _TestHttpOverrides extends io.HttpOverrides {
-  @override
-  io.HttpClient createHttpClient(io.SecurityContext? context) {
-    return super.createHttpClient(context)..badCertificateCallback = (_, _, _) => true;
-  }
 }

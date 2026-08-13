@@ -249,6 +249,17 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -273,6 +284,7 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
     userForcedEncoding,
     storageMode,
     externalUri,
+    deletedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -440,6 +452,12 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         ),
       );
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -541,6 +559,10 @@ class $SavedBooksTable extends SavedBooks with TableInfo<$SavedBooksTable, Saved
         DriftSqlType.string,
         data['${effectivePrefix}external_uri'],
       ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -576,6 +598,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
   final String? userForcedEncoding;
   final String storageMode;
   final String? externalUri;
+  final DateTime? deletedAt;
   const SavedBook({
     required this.id,
     required this.title,
@@ -599,6 +622,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     this.userForcedEncoding,
     required this.storageMode,
     this.externalUri,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -659,6 +683,9 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     if (!nullToAbsent || externalUri != null) {
       map['external_uri'] = Variable<String>(externalUri);
     }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -694,6 +721,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           : Value(userForcedEncoding),
       storageMode: Value(storageMode),
       externalUri: externalUri == null && nullToAbsent ? const Value.absent() : Value(externalUri),
+      deletedAt: deletedAt == null && nullToAbsent ? const Value.absent() : Value(deletedAt),
     );
   }
 
@@ -729,6 +757,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       ),
       storageMode: serializer.fromJson<String>(json['storageMode']),
       externalUri: serializer.fromJson<String?>(json['externalUri']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -757,6 +786,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
       'userForcedEncoding': serializer.toJson<String?>(userForcedEncoding),
       'storageMode': serializer.toJson<String>(storageMode),
       'externalUri': serializer.toJson<String?>(externalUri),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -783,6 +813,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     Value<String?> userForcedEncoding = const Value.absent(),
     String? storageMode,
     Value<String?> externalUri = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => SavedBook(
     id: id ?? this.id,
     title: title ?? this.title,
@@ -810,6 +841,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
         : this.userForcedEncoding,
     storageMode: storageMode ?? this.storageMode,
     externalUri: externalUri.present ? externalUri.value : this.externalUri,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   SavedBook copyWithCompanion(SavedBooksCompanion data) {
     return SavedBook(
@@ -841,6 +873,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           : this.userForcedEncoding,
       storageMode: data.storageMode.present ? data.storageMode.value : this.storageMode,
       externalUri: data.externalUri.present ? data.externalUri.value : this.externalUri,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -868,7 +901,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           ..write('encodingSource: $encodingSource, ')
           ..write('userForcedEncoding: $userForcedEncoding, ')
           ..write('storageMode: $storageMode, ')
-          ..write('externalUri: $externalUri')
+          ..write('externalUri: $externalUri, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
@@ -897,6 +931,7 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
     userForcedEncoding,
     storageMode,
     externalUri,
+    deletedAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -923,7 +958,8 @@ class SavedBook extends DataClass implements Insertable<SavedBook> {
           other.encodingSource == this.encodingSource &&
           other.userForcedEncoding == this.userForcedEncoding &&
           other.storageMode == this.storageMode &&
-          other.externalUri == this.externalUri);
+          other.externalUri == this.externalUri &&
+          other.deletedAt == this.deletedAt);
 }
 
 class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
@@ -949,6 +985,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
   final Value<String?> userForcedEncoding;
   final Value<String> storageMode;
   final Value<String?> externalUri;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const SavedBooksCompanion({
     this.id = const Value.absent(),
@@ -973,6 +1010,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.userForcedEncoding = const Value.absent(),
     this.storageMode = const Value.absent(),
     this.externalUri = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedBooksCompanion.insert({
@@ -998,6 +1036,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     this.userForcedEncoding = const Value.absent(),
     this.storageMode = const Value.absent(),
     this.externalUri = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title);
@@ -1024,6 +1063,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Expression<String>? userForcedEncoding,
     Expression<String>? storageMode,
     Expression<String>? externalUri,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1049,6 +1089,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       if (userForcedEncoding != null) 'user_forced_encoding': userForcedEncoding,
       if (storageMode != null) 'storage_mode': storageMode,
       if (externalUri != null) 'external_uri': externalUri,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1076,6 +1117,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     Value<String?>? userForcedEncoding,
     Value<String>? storageMode,
     Value<String?>? externalUri,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return SavedBooksCompanion(
@@ -1101,6 +1143,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
       userForcedEncoding: userForcedEncoding ?? this.userForcedEncoding,
       storageMode: storageMode ?? this.storageMode,
       externalUri: externalUri ?? this.externalUri,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1178,6 +1221,9 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
     if (externalUri.present) {
       map['external_uri'] = Variable<String>(externalUri.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1209,6 +1255,7 @@ class SavedBooksCompanion extends UpdateCompanion<SavedBook> {
           ..write('userForcedEncoding: $userForcedEncoding, ')
           ..write('storageMode: $storageMode, ')
           ..write('externalUri: $externalUri, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3738,6 +3785,28 @@ class $BookmarksTable extends Bookmarks with TableInfo<$BookmarksTable, Bookmark
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _highlightStyleMeta = const VerificationMeta(
+    'highlightStyle',
+  );
+  @override
+  late final GeneratedColumn<String> highlightStyle = GeneratedColumn<String>(
+    'highlight_style',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _highlightColorMeta = const VerificationMeta(
+    'highlightColor',
+  );
+  @override
+  late final GeneratedColumn<String> highlightColor = GeneratedColumn<String>(
+    'highlight_color',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -3759,6 +3828,8 @@ class $BookmarksTable extends Bookmarks with TableInfo<$BookmarksTable, Bookmark
     localOffset,
     selectedText,
     note,
+    highlightStyle,
+    highlightColor,
     createdAt,
   ];
   @override
@@ -3832,6 +3903,24 @@ class $BookmarksTable extends Bookmarks with TableInfo<$BookmarksTable, Bookmark
         note.isAcceptableOrUnknown(data['note']!, _noteMeta),
       );
     }
+    if (data.containsKey('highlight_style')) {
+      context.handle(
+        _highlightStyleMeta,
+        highlightStyle.isAcceptableOrUnknown(
+          data['highlight_style']!,
+          _highlightStyleMeta,
+        ),
+      );
+    }
+    if (data.containsKey('highlight_color')) {
+      context.handle(
+        _highlightColorMeta,
+        highlightColor.isAcceptableOrUnknown(
+          data['highlight_color']!,
+          _highlightColorMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -3875,6 +3964,14 @@ class $BookmarksTable extends Bookmarks with TableInfo<$BookmarksTable, Bookmark
         DriftSqlType.string,
         data['${effectivePrefix}note'],
       ),
+      highlightStyle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}highlight_style'],
+      ),
+      highlightColor: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}highlight_color'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -3896,6 +3993,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
   final double localOffset;
   final String? selectedText;
   final String? note;
+  final String? highlightStyle;
+  final String? highlightColor;
   final DateTime createdAt;
   const Bookmark({
     required this.id,
@@ -3905,6 +4004,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     required this.localOffset,
     this.selectedText,
     this.note,
+    this.highlightStyle,
+    this.highlightColor,
     required this.createdAt,
   });
   @override
@@ -3921,6 +4022,12 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
+    if (!nullToAbsent || highlightStyle != null) {
+      map['highlight_style'] = Variable<String>(highlightStyle);
+    }
+    if (!nullToAbsent || highlightColor != null) {
+      map['highlight_color'] = Variable<String>(highlightColor);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -3936,6 +4043,12 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           ? const Value.absent()
           : Value(selectedText),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      highlightStyle: highlightStyle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(highlightStyle),
+      highlightColor: highlightColor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(highlightColor),
       createdAt: Value(createdAt),
     );
   }
@@ -3953,6 +4066,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       localOffset: serializer.fromJson<double>(json['localOffset']),
       selectedText: serializer.fromJson<String?>(json['selectedText']),
       note: serializer.fromJson<String?>(json['note']),
+      highlightStyle: serializer.fromJson<String?>(json['highlightStyle']),
+      highlightColor: serializer.fromJson<String?>(json['highlightColor']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -3967,6 +4082,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       'localOffset': serializer.toJson<double>(localOffset),
       'selectedText': serializer.toJson<String?>(selectedText),
       'note': serializer.toJson<String?>(note),
+      'highlightStyle': serializer.toJson<String?>(highlightStyle),
+      'highlightColor': serializer.toJson<String?>(highlightColor),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -3979,6 +4096,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     double? localOffset,
     Value<String?> selectedText = const Value.absent(),
     Value<String?> note = const Value.absent(),
+    Value<String?> highlightStyle = const Value.absent(),
+    Value<String?> highlightColor = const Value.absent(),
     DateTime? createdAt,
   }) => Bookmark(
     id: id ?? this.id,
@@ -3988,6 +4107,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     localOffset: localOffset ?? this.localOffset,
     selectedText: selectedText.present ? selectedText.value : this.selectedText,
     note: note.present ? note.value : this.note,
+    highlightStyle: highlightStyle.present ? highlightStyle.value : this.highlightStyle,
+    highlightColor: highlightColor.present ? highlightColor.value : this.highlightColor,
     createdAt: createdAt ?? this.createdAt,
   );
   Bookmark copyWithCompanion(BookmarksCompanion data) {
@@ -3999,6 +4120,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
       localOffset: data.localOffset.present ? data.localOffset.value : this.localOffset,
       selectedText: data.selectedText.present ? data.selectedText.value : this.selectedText,
       note: data.note.present ? data.note.value : this.note,
+      highlightStyle: data.highlightStyle.present ? data.highlightStyle.value : this.highlightStyle,
+      highlightColor: data.highlightColor.present ? data.highlightColor.value : this.highlightColor,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -4013,6 +4136,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           ..write('localOffset: $localOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('note: $note, ')
+          ..write('highlightStyle: $highlightStyle, ')
+          ..write('highlightColor: $highlightColor, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4027,6 +4152,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
     localOffset,
     selectedText,
     note,
+    highlightStyle,
+    highlightColor,
     createdAt,
   );
   @override
@@ -4040,6 +4167,8 @@ class Bookmark extends DataClass implements Insertable<Bookmark> {
           other.localOffset == this.localOffset &&
           other.selectedText == this.selectedText &&
           other.note == this.note &&
+          other.highlightStyle == this.highlightStyle &&
+          other.highlightColor == this.highlightColor &&
           other.createdAt == this.createdAt);
 }
 
@@ -4051,6 +4180,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
   final Value<double> localOffset;
   final Value<String?> selectedText;
   final Value<String?> note;
+  final Value<String?> highlightStyle;
+  final Value<String?> highlightColor;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const BookmarksCompanion({
@@ -4061,6 +4192,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     this.localOffset = const Value.absent(),
     this.selectedText = const Value.absent(),
     this.note = const Value.absent(),
+    this.highlightStyle = const Value.absent(),
+    this.highlightColor = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4072,6 +4205,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     this.localOffset = const Value.absent(),
     this.selectedText = const Value.absent(),
     this.note = const Value.absent(),
+    this.highlightStyle = const Value.absent(),
+    this.highlightColor = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4086,6 +4221,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     Expression<double>? localOffset,
     Expression<String>? selectedText,
     Expression<String>? note,
+    Expression<String>? highlightStyle,
+    Expression<String>? highlightColor,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -4097,6 +4234,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       if (localOffset != null) 'local_offset': localOffset,
       if (selectedText != null) 'selected_text': selectedText,
       if (note != null) 'note': note,
+      if (highlightStyle != null) 'highlight_style': highlightStyle,
+      if (highlightColor != null) 'highlight_color': highlightColor,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4110,6 +4249,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     Value<double>? localOffset,
     Value<String?>? selectedText,
     Value<String?>? note,
+    Value<String?>? highlightStyle,
+    Value<String?>? highlightColor,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -4121,6 +4262,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
       localOffset: localOffset ?? this.localOffset,
       selectedText: selectedText ?? this.selectedText,
       note: note ?? this.note,
+      highlightStyle: highlightStyle ?? this.highlightStyle,
+      highlightColor: highlightColor ?? this.highlightColor,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -4150,6 +4293,12 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
+    if (highlightStyle.present) {
+      map['highlight_style'] = Variable<String>(highlightStyle.value);
+    }
+    if (highlightColor.present) {
+      map['highlight_color'] = Variable<String>(highlightColor.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4169,6 +4318,8 @@ class BookmarksCompanion extends UpdateCompanion<Bookmark> {
           ..write('localOffset: $localOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('note: $note, ')
+          ..write('highlightStyle: $highlightStyle, ')
+          ..write('highlightColor: $highlightColor, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7438,6 +7589,40 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _pagesReadMeta = const VerificationMeta(
+    'pagesRead',
+  );
+  @override
+  late final GeneratedColumn<int> pagesRead = GeneratedColumn<int>(
+    'pages_read',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _wpmMeta = const VerificationMeta('wpm');
+  @override
+  late final GeneratedColumn<double> wpm = GeneratedColumn<double>(
+    'wpm',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _wpmSessionCountMeta = const VerificationMeta(
+    'wpmSessionCount',
+  );
+  @override
+  late final GeneratedColumn<int> wpmSessionCount = GeneratedColumn<int>(
+    'wpm_session_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -7455,6 +7640,9 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
     bookId,
     date,
     readingTimeSeconds,
+    pagesRead,
+    wpm,
+    wpmSessionCount,
     updatedAt,
   ];
   @override
@@ -7494,6 +7682,27 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         ),
       );
     }
+    if (data.containsKey('pages_read')) {
+      context.handle(
+        _pagesReadMeta,
+        pagesRead.isAcceptableOrUnknown(data['pages_read']!, _pagesReadMeta),
+      );
+    }
+    if (data.containsKey('wpm')) {
+      context.handle(
+        _wpmMeta,
+        wpm.isAcceptableOrUnknown(data['wpm']!, _wpmMeta),
+      );
+    }
+    if (data.containsKey('wpm_session_count')) {
+      context.handle(
+        _wpmSessionCountMeta,
+        wpmSessionCount.isAcceptableOrUnknown(
+          data['wpm_session_count']!,
+          _wpmSessionCountMeta,
+        ),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -7521,6 +7730,18 @@ class $ReadingTimeTable extends ReadingTime with TableInfo<$ReadingTimeTable, Re
         DriftSqlType.int,
         data['${effectivePrefix}reading_time_seconds'],
       )!,
+      pagesRead: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pages_read'],
+      )!,
+      wpm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}wpm'],
+      )!,
+      wpmSessionCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}wpm_session_count'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -7538,11 +7759,17 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
   final String bookId;
   final DateTime date;
   final int readingTimeSeconds;
+  final int pagesRead;
+  final double wpm;
+  final int wpmSessionCount;
   final DateTime updatedAt;
   const ReadingTimeData({
     required this.bookId,
     required this.date,
     required this.readingTimeSeconds,
+    required this.pagesRead,
+    required this.wpm,
+    required this.wpmSessionCount,
     required this.updatedAt,
   });
   @override
@@ -7551,6 +7778,9 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     map['book_id'] = Variable<String>(bookId);
     map['date'] = Variable<DateTime>(date);
     map['reading_time_seconds'] = Variable<int>(readingTimeSeconds);
+    map['pages_read'] = Variable<int>(pagesRead);
+    map['wpm'] = Variable<double>(wpm);
+    map['wpm_session_count'] = Variable<int>(wpmSessionCount);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
   }
@@ -7560,6 +7790,9 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       bookId: Value(bookId),
       date: Value(date),
       readingTimeSeconds: Value(readingTimeSeconds),
+      pagesRead: Value(pagesRead),
+      wpm: Value(wpm),
+      wpmSessionCount: Value(wpmSessionCount),
       updatedAt: Value(updatedAt),
     );
   }
@@ -7573,6 +7806,9 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       bookId: serializer.fromJson<String>(json['bookId']),
       date: serializer.fromJson<DateTime>(json['date']),
       readingTimeSeconds: serializer.fromJson<int>(json['readingTimeSeconds']),
+      pagesRead: serializer.fromJson<int>(json['pagesRead']),
+      wpm: serializer.fromJson<double>(json['wpm']),
+      wpmSessionCount: serializer.fromJson<int>(json['wpmSessionCount']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -7583,6 +7819,9 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       'bookId': serializer.toJson<String>(bookId),
       'date': serializer.toJson<DateTime>(date),
       'readingTimeSeconds': serializer.toJson<int>(readingTimeSeconds),
+      'pagesRead': serializer.toJson<int>(pagesRead),
+      'wpm': serializer.toJson<double>(wpm),
+      'wpmSessionCount': serializer.toJson<int>(wpmSessionCount),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -7591,11 +7830,17 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
     String? bookId,
     DateTime? date,
     int? readingTimeSeconds,
+    int? pagesRead,
+    double? wpm,
+    int? wpmSessionCount,
     DateTime? updatedAt,
   }) => ReadingTimeData(
     bookId: bookId ?? this.bookId,
     date: date ?? this.date,
     readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
+    pagesRead: pagesRead ?? this.pagesRead,
+    wpm: wpm ?? this.wpm,
+    wpmSessionCount: wpmSessionCount ?? this.wpmSessionCount,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   ReadingTimeData copyWithCompanion(ReadingTimeCompanion data) {
@@ -7605,6 +7850,11 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
       readingTimeSeconds: data.readingTimeSeconds.present
           ? data.readingTimeSeconds.value
           : this.readingTimeSeconds,
+      pagesRead: data.pagesRead.present ? data.pagesRead.value : this.pagesRead,
+      wpm: data.wpm.present ? data.wpm.value : this.wpm,
+      wpmSessionCount: data.wpmSessionCount.present
+          ? data.wpmSessionCount.value
+          : this.wpmSessionCount,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -7615,13 +7865,24 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           ..write('bookId: $bookId, ')
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
+          ..write('pagesRead: $pagesRead, ')
+          ..write('wpm: $wpm, ')
+          ..write('wpmSessionCount: $wpmSessionCount, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(bookId, date, readingTimeSeconds, updatedAt);
+  int get hashCode => Object.hash(
+    bookId,
+    date,
+    readingTimeSeconds,
+    pagesRead,
+    wpm,
+    wpmSessionCount,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7629,6 +7890,9 @@ class ReadingTimeData extends DataClass implements Insertable<ReadingTimeData> {
           other.bookId == this.bookId &&
           other.date == this.date &&
           other.readingTimeSeconds == this.readingTimeSeconds &&
+          other.pagesRead == this.pagesRead &&
+          other.wpm == this.wpm &&
+          other.wpmSessionCount == this.wpmSessionCount &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -7636,12 +7900,18 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
   final Value<String> bookId;
   final Value<DateTime> date;
   final Value<int> readingTimeSeconds;
+  final Value<int> pagesRead;
+  final Value<double> wpm;
+  final Value<int> wpmSessionCount;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const ReadingTimeCompanion({
     this.bookId = const Value.absent(),
     this.date = const Value.absent(),
     this.readingTimeSeconds = const Value.absent(),
+    this.pagesRead = const Value.absent(),
+    this.wpm = const Value.absent(),
+    this.wpmSessionCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -7649,6 +7919,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     required String bookId,
     required DateTime date,
     this.readingTimeSeconds = const Value.absent(),
+    this.pagesRead = const Value.absent(),
+    this.wpm = const Value.absent(),
+    this.wpmSessionCount = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : bookId = Value(bookId),
@@ -7657,6 +7930,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Expression<String>? bookId,
     Expression<DateTime>? date,
     Expression<int>? readingTimeSeconds,
+    Expression<int>? pagesRead,
+    Expression<double>? wpm,
+    Expression<int>? wpmSessionCount,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -7664,6 +7940,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       if (bookId != null) 'book_id': bookId,
       if (date != null) 'date': date,
       if (readingTimeSeconds != null) 'reading_time_seconds': readingTimeSeconds,
+      if (pagesRead != null) 'pages_read': pagesRead,
+      if (wpm != null) 'wpm': wpm,
+      if (wpmSessionCount != null) 'wpm_session_count': wpmSessionCount,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -7673,6 +7952,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     Value<String>? bookId,
     Value<DateTime>? date,
     Value<int>? readingTimeSeconds,
+    Value<int>? pagesRead,
+    Value<double>? wpm,
+    Value<int>? wpmSessionCount,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -7680,6 +7962,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
       bookId: bookId ?? this.bookId,
       date: date ?? this.date,
       readingTimeSeconds: readingTimeSeconds ?? this.readingTimeSeconds,
+      pagesRead: pagesRead ?? this.pagesRead,
+      wpm: wpm ?? this.wpm,
+      wpmSessionCount: wpmSessionCount ?? this.wpmSessionCount,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -7697,6 +7982,15 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
     if (readingTimeSeconds.present) {
       map['reading_time_seconds'] = Variable<int>(readingTimeSeconds.value);
     }
+    if (pagesRead.present) {
+      map['pages_read'] = Variable<int>(pagesRead.value);
+    }
+    if (wpm.present) {
+      map['wpm'] = Variable<double>(wpm.value);
+    }
+    if (wpmSessionCount.present) {
+      map['wpm_session_count'] = Variable<int>(wpmSessionCount.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -7712,6 +8006,9 @@ class ReadingTimeCompanion extends UpdateCompanion<ReadingTimeData> {
           ..write('bookId: $bookId, ')
           ..write('date: $date, ')
           ..write('readingTimeSeconds: $readingTimeSeconds, ')
+          ..write('pagesRead: $pagesRead, ')
+          ..write('wpm: $wpm, ')
+          ..write('wpmSessionCount: $wpmSessionCount, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7819,6 +8116,18 @@ class $TextHighlightsTable extends TextHighlights
     requiredDuringInsert: false,
     defaultValue: const Constant('yellow'),
   );
+  static const VerificationMeta _decorationMeta = const VerificationMeta(
+    'decoration',
+  );
+  @override
+  late final GeneratedColumn<String> decoration = GeneratedColumn<String>(
+    'decoration',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('none'),
+  );
   static const VerificationMeta _noteTextMeta = const VerificationMeta(
     'noteText',
   );
@@ -7879,6 +8188,7 @@ class $TextHighlightsTable extends TextHighlights
     endOffset,
     selectedText,
     color,
+    decoration,
     noteText,
     isOrphaned,
     createdAt,
@@ -7972,6 +8282,12 @@ class $TextHighlightsTable extends TextHighlights
         color.isAcceptableOrUnknown(data['color']!, _colorMeta),
       );
     }
+    if (data.containsKey('decoration')) {
+      context.handle(
+        _decorationMeta,
+        decoration.isAcceptableOrUnknown(data['decoration']!, _decorationMeta),
+      );
+    }
     if (data.containsKey('note_text')) {
       context.handle(
         _noteTextMeta,
@@ -8041,6 +8357,10 @@ class $TextHighlightsTable extends TextHighlights
         DriftSqlType.string,
         data['${effectivePrefix}color'],
       )!,
+      decoration: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}decoration'],
+      )!,
       noteText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}note_text'],
@@ -8076,6 +8396,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
   final int endOffset;
   final String selectedText;
   final String color;
+  final String decoration;
   final String? noteText;
   final bool isOrphaned;
   final DateTime createdAt;
@@ -8090,6 +8411,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     required this.endOffset,
     required this.selectedText,
     required this.color,
+    required this.decoration,
     this.noteText,
     required this.isOrphaned,
     required this.createdAt,
@@ -8107,6 +8429,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     map['end_offset'] = Variable<int>(endOffset);
     map['selected_text'] = Variable<String>(selectedText);
     map['color'] = Variable<String>(color);
+    map['decoration'] = Variable<String>(decoration);
     if (!nullToAbsent || noteText != null) {
       map['note_text'] = Variable<String>(noteText);
     }
@@ -8129,6 +8452,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: Value(endOffset),
       selectedText: Value(selectedText),
       color: Value(color),
+      decoration: Value(decoration),
       noteText: noteText == null && nullToAbsent ? const Value.absent() : Value(noteText),
       isOrphaned: Value(isOrphaned),
       createdAt: Value(createdAt),
@@ -8151,6 +8475,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: serializer.fromJson<int>(json['endOffset']),
       selectedText: serializer.fromJson<String>(json['selectedText']),
       color: serializer.fromJson<String>(json['color']),
+      decoration: serializer.fromJson<String>(json['decoration']),
       noteText: serializer.fromJson<String?>(json['noteText']),
       isOrphaned: serializer.fromJson<bool>(json['isOrphaned']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -8170,6 +8495,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       'endOffset': serializer.toJson<int>(endOffset),
       'selectedText': serializer.toJson<String>(selectedText),
       'color': serializer.toJson<String>(color),
+      'decoration': serializer.toJson<String>(decoration),
       'noteText': serializer.toJson<String?>(noteText),
       'isOrphaned': serializer.toJson<bool>(isOrphaned),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -8187,6 +8513,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     int? endOffset,
     String? selectedText,
     String? color,
+    String? decoration,
     Value<String?> noteText = const Value.absent(),
     bool? isOrphaned,
     DateTime? createdAt,
@@ -8201,6 +8528,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     endOffset: endOffset ?? this.endOffset,
     selectedText: selectedText ?? this.selectedText,
     color: color ?? this.color,
+    decoration: decoration ?? this.decoration,
     noteText: noteText.present ? noteText.value : this.noteText,
     isOrphaned: isOrphaned ?? this.isOrphaned,
     createdAt: createdAt ?? this.createdAt,
@@ -8217,6 +8545,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
       endOffset: data.endOffset.present ? data.endOffset.value : this.endOffset,
       selectedText: data.selectedText.present ? data.selectedText.value : this.selectedText,
       color: data.color.present ? data.color.value : this.color,
+      decoration: data.decoration.present ? data.decoration.value : this.decoration,
       noteText: data.noteText.present ? data.noteText.value : this.noteText,
       isOrphaned: data.isOrphaned.present ? data.isOrphaned.value : this.isOrphaned,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -8236,6 +8565,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
           ..write('endOffset: $endOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('color: $color, ')
+          ..write('decoration: $decoration, ')
           ..write('noteText: $noteText, ')
           ..write('isOrphaned: $isOrphaned, ')
           ..write('createdAt: $createdAt, ')
@@ -8255,6 +8585,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
     endOffset,
     selectedText,
     color,
+    decoration,
     noteText,
     isOrphaned,
     createdAt,
@@ -8273,6 +8604,7 @@ class TextHighlight extends DataClass implements Insertable<TextHighlight> {
           other.endOffset == this.endOffset &&
           other.selectedText == this.selectedText &&
           other.color == this.color &&
+          other.decoration == this.decoration &&
           other.noteText == this.noteText &&
           other.isOrphaned == this.isOrphaned &&
           other.createdAt == this.createdAt &&
@@ -8289,6 +8621,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
   final Value<int> endOffset;
   final Value<String> selectedText;
   final Value<String> color;
+  final Value<String> decoration;
   final Value<String?> noteText;
   final Value<bool> isOrphaned;
   final Value<DateTime> createdAt;
@@ -8304,6 +8637,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     this.endOffset = const Value.absent(),
     this.selectedText = const Value.absent(),
     this.color = const Value.absent(),
+    this.decoration = const Value.absent(),
     this.noteText = const Value.absent(),
     this.isOrphaned = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8320,6 +8654,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     required int endOffset,
     required String selectedText,
     this.color = const Value.absent(),
+    this.decoration = const Value.absent(),
     this.noteText = const Value.absent(),
     this.isOrphaned = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -8343,6 +8678,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     Expression<int>? endOffset,
     Expression<String>? selectedText,
     Expression<String>? color,
+    Expression<String>? decoration,
     Expression<String>? noteText,
     Expression<bool>? isOrphaned,
     Expression<DateTime>? createdAt,
@@ -8359,6 +8695,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
       if (endOffset != null) 'end_offset': endOffset,
       if (selectedText != null) 'selected_text': selectedText,
       if (color != null) 'color': color,
+      if (decoration != null) 'decoration': decoration,
       if (noteText != null) 'note_text': noteText,
       if (isOrphaned != null) 'is_orphaned': isOrphaned,
       if (createdAt != null) 'created_at': createdAt,
@@ -8377,6 +8714,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     Value<int>? endOffset,
     Value<String>? selectedText,
     Value<String>? color,
+    Value<String>? decoration,
     Value<String?>? noteText,
     Value<bool>? isOrphaned,
     Value<DateTime>? createdAt,
@@ -8393,6 +8731,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
       endOffset: endOffset ?? this.endOffset,
       selectedText: selectedText ?? this.selectedText,
       color: color ?? this.color,
+      decoration: decoration ?? this.decoration,
       noteText: noteText ?? this.noteText,
       isOrphaned: isOrphaned ?? this.isOrphaned,
       createdAt: createdAt ?? this.createdAt,
@@ -8431,6 +8770,9 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
     if (color.present) {
       map['color'] = Variable<String>(color.value);
     }
+    if (decoration.present) {
+      map['decoration'] = Variable<String>(decoration.value);
+    }
     if (noteText.present) {
       map['note_text'] = Variable<String>(noteText.value);
     }
@@ -8461,6 +8803,7 @@ class TextHighlightsCompanion extends UpdateCompanion<TextHighlight> {
           ..write('endOffset: $endOffset, ')
           ..write('selectedText: $selectedText, ')
           ..write('color: $color, ')
+          ..write('decoration: $decoration, ')
           ..write('noteText: $noteText, ')
           ..write('isOrphaned: $isOrphaned, ')
           ..write('createdAt: $createdAt, ')
@@ -8504,6 +8847,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxSavedBooksContentHash = Index(
     'idx_saved_books_content_hash',
     'CREATE INDEX idx_saved_books_content_hash ON saved_books (content_hash)',
+  );
+  late final Index idxSavedBooksAddedAt = Index(
+    'idx_saved_books_added_at',
+    'CREATE INDEX idx_saved_books_added_at ON saved_books (added_at)',
+  );
+  late final Index idxSavedBooksTitle = Index(
+    'idx_saved_books_title',
+    'CREATE INDEX idx_saved_books_title ON saved_books (title)',
   );
   late final Index idxDownloadsBookId = Index(
     'idx_downloads_bookId',
@@ -8581,6 +8932,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     readingTime,
     textHighlights,
     idxSavedBooksContentHash,
+    idxSavedBooksAddedAt,
+    idxSavedBooksTitle,
     idxDownloadsBookId,
     idxBookmarksBookId,
     idxNotesBookId,
@@ -8617,6 +8970,7 @@ typedef $$SavedBooksTableCreateCompanionBuilder =
       Value<String?> userForcedEncoding,
       Value<String> storageMode,
       Value<String?> externalUri,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$SavedBooksTableUpdateCompanionBuilder =
@@ -8643,6 +8997,7 @@ typedef $$SavedBooksTableUpdateCompanionBuilder =
       Value<String?> userForcedEncoding,
       Value<String> storageMode,
       Value<String?> externalUri,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -8765,6 +9120,11 @@ class $$SavedBooksTableFilterComposer extends Composer<_$AppDatabase, $SavedBook
     column: $table.externalUri,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -8884,6 +9244,11 @@ class $$SavedBooksTableOrderingComposer extends Composer<_$AppDatabase, $SavedBo
     column: $table.externalUri,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $SavedBooksTable> {
@@ -8981,6 +9346,9 @@ class $$SavedBooksTableAnnotationComposer extends Composer<_$AppDatabase, $Saved
     column: $table.externalUri,
     builder: (column) => column,
   );
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 }
 
 class $$SavedBooksTableTableManager
@@ -9034,6 +9402,7 @@ class $$SavedBooksTableTableManager
                 Value<String?> userForcedEncoding = const Value.absent(),
                 Value<String> storageMode = const Value.absent(),
                 Value<String?> externalUri = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion(
                 id: id,
@@ -9058,6 +9427,7 @@ class $$SavedBooksTableTableManager
                 userForcedEncoding: userForcedEncoding,
                 storageMode: storageMode,
                 externalUri: externalUri,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9084,6 +9454,7 @@ class $$SavedBooksTableTableManager
                 Value<String?> userForcedEncoding = const Value.absent(),
                 Value<String> storageMode = const Value.absent(),
                 Value<String?> externalUri = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SavedBooksCompanion.insert(
                 id: id,
@@ -9108,6 +9479,7 @@ class $$SavedBooksTableTableManager
                 userForcedEncoding: userForcedEncoding,
                 storageMode: storageMode,
                 externalUri: externalUri,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) =>
@@ -10423,6 +10795,8 @@ typedef $$BookmarksTableCreateCompanionBuilder =
       Value<double> localOffset,
       Value<String?> selectedText,
       Value<String?> note,
+      Value<String?> highlightStyle,
+      Value<String?> highlightColor,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -10435,6 +10809,8 @@ typedef $$BookmarksTableUpdateCompanionBuilder =
       Value<double> localOffset,
       Value<String?> selectedText,
       Value<String?> note,
+      Value<String?> highlightStyle,
+      Value<String?> highlightColor,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -10479,6 +10855,16 @@ class $$BookmarksTableFilterComposer extends Composer<_$AppDatabase, $BookmarksT
 
   ColumnFilters<String> get note => $composableBuilder(
     column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get highlightStyle => $composableBuilder(
+    column: $table.highlightStyle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get highlightColor => $composableBuilder(
+    column: $table.highlightColor,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10531,6 +10917,16 @@ class $$BookmarksTableOrderingComposer extends Composer<_$AppDatabase, $Bookmark
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get highlightStyle => $composableBuilder(
+    column: $table.highlightStyle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get highlightColor => $composableBuilder(
+    column: $table.highlightColor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -10574,6 +10970,16 @@ class $$BookmarksTableAnnotationComposer extends Composer<_$AppDatabase, $Bookma
   GeneratedColumn<String> get note =>
       $composableBuilder(column: $table.note, builder: (column) => column);
 
+  GeneratedColumn<String> get highlightStyle => $composableBuilder(
+    column: $table.highlightStyle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get highlightColor => $composableBuilder(
+    column: $table.highlightColor,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 }
@@ -10611,6 +11017,8 @@ class $$BookmarksTableTableManager
                 Value<double> localOffset = const Value.absent(),
                 Value<String?> selectedText = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> highlightStyle = const Value.absent(),
+                Value<String?> highlightColor = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookmarksCompanion(
@@ -10621,6 +11029,8 @@ class $$BookmarksTableTableManager
                 localOffset: localOffset,
                 selectedText: selectedText,
                 note: note,
+                highlightStyle: highlightStyle,
+                highlightColor: highlightColor,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -10633,6 +11043,8 @@ class $$BookmarksTableTableManager
                 Value<double> localOffset = const Value.absent(),
                 Value<String?> selectedText = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> highlightStyle = const Value.absent(),
+                Value<String?> highlightColor = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BookmarksCompanion.insert(
@@ -10643,6 +11055,8 @@ class $$BookmarksTableTableManager
                 localOffset: localOffset,
                 selectedText: selectedText,
                 note: note,
+                highlightStyle: highlightStyle,
+                highlightColor: highlightColor,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -12426,6 +12840,9 @@ typedef $$ReadingTimeTableCreateCompanionBuilder =
       required String bookId,
       required DateTime date,
       Value<int> readingTimeSeconds,
+      Value<int> pagesRead,
+      Value<double> wpm,
+      Value<int> wpmSessionCount,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12434,6 +12851,9 @@ typedef $$ReadingTimeTableUpdateCompanionBuilder =
       Value<String> bookId,
       Value<DateTime> date,
       Value<int> readingTimeSeconds,
+      Value<int> pagesRead,
+      Value<double> wpm,
+      Value<int> wpmSessionCount,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -12458,6 +12878,21 @@ class $$ReadingTimeTableFilterComposer extends Composer<_$AppDatabase, $ReadingT
 
   ColumnFilters<int> get readingTimeSeconds => $composableBuilder(
     column: $table.readingTimeSeconds,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pagesRead => $composableBuilder(
+    column: $table.pagesRead,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get wpm => $composableBuilder(
+    column: $table.wpm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12490,6 +12925,21 @@ class $$ReadingTimeTableOrderingComposer extends Composer<_$AppDatabase, $Readin
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get pagesRead => $composableBuilder(
+    column: $table.pagesRead,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get wpm => $composableBuilder(
+    column: $table.wpm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -12512,6 +12962,17 @@ class $$ReadingTimeTableAnnotationComposer extends Composer<_$AppDatabase, $Read
 
   GeneratedColumn<int> get readingTimeSeconds => $composableBuilder(
     column: $table.readingTimeSeconds,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get pagesRead =>
+      $composableBuilder(column: $table.pagesRead, builder: (column) => column);
+
+  GeneratedColumn<double> get wpm =>
+      $composableBuilder(column: $table.wpm, builder: (column) => column);
+
+  GeneratedColumn<int> get wpmSessionCount => $composableBuilder(
+    column: $table.wpmSessionCount,
     builder: (column) => column,
   );
 
@@ -12551,12 +13012,18 @@ class $$ReadingTimeTableTableManager
                 Value<String> bookId = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<int> readingTimeSeconds = const Value.absent(),
+                Value<int> pagesRead = const Value.absent(),
+                Value<double> wpm = const Value.absent(),
+                Value<int> wpmSessionCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion(
                 bookId: bookId,
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
+                pagesRead: pagesRead,
+                wpm: wpm,
+                wpmSessionCount: wpmSessionCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12565,12 +13032,18 @@ class $$ReadingTimeTableTableManager
                 required String bookId,
                 required DateTime date,
                 Value<int> readingTimeSeconds = const Value.absent(),
+                Value<int> pagesRead = const Value.absent(),
+                Value<double> wpm = const Value.absent(),
+                Value<int> wpmSessionCount = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadingTimeCompanion.insert(
                 bookId: bookId,
                 date: date,
                 readingTimeSeconds: readingTimeSeconds,
+                pagesRead: pagesRead,
+                wpm: wpm,
+                wpmSessionCount: wpmSessionCount,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -12609,6 +13082,7 @@ typedef $$TextHighlightsTableCreateCompanionBuilder =
       required int endOffset,
       required String selectedText,
       Value<String> color,
+      Value<String> decoration,
       Value<String?> noteText,
       Value<bool> isOrphaned,
       Value<DateTime> createdAt,
@@ -12626,6 +13100,7 @@ typedef $$TextHighlightsTableUpdateCompanionBuilder =
       Value<int> endOffset,
       Value<String> selectedText,
       Value<String> color,
+      Value<String> decoration,
       Value<String?> noteText,
       Value<bool> isOrphaned,
       Value<DateTime> createdAt,
@@ -12683,6 +13158,11 @@ class $$TextHighlightsTableFilterComposer extends Composer<_$AppDatabase, $TextH
 
   ColumnFilters<String> get color => $composableBuilder(
     column: $table.color,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get decoration => $composableBuilder(
+    column: $table.decoration,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12760,6 +13240,11 @@ class $$TextHighlightsTableOrderingComposer extends Composer<_$AppDatabase, $Tex
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get decoration => $composableBuilder(
+    column: $table.decoration,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get noteText => $composableBuilder(
     column: $table.noteText,
     builder: (column) => ColumnOrderings(column),
@@ -12825,6 +13310,11 @@ class $$TextHighlightsTableAnnotationComposer
   GeneratedColumn<String> get color =>
       $composableBuilder(column: $table.color, builder: (column) => column);
 
+  GeneratedColumn<String> get decoration => $composableBuilder(
+    column: $table.decoration,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get noteText =>
       $composableBuilder(column: $table.noteText, builder: (column) => column);
 
@@ -12882,6 +13372,7 @@ class $$TextHighlightsTableTableManager
                 Value<int> endOffset = const Value.absent(),
                 Value<String> selectedText = const Value.absent(),
                 Value<String> color = const Value.absent(),
+                Value<String> decoration = const Value.absent(),
                 Value<String?> noteText = const Value.absent(),
                 Value<bool> isOrphaned = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12897,6 +13388,7 @@ class $$TextHighlightsTableTableManager
                 endOffset: endOffset,
                 selectedText: selectedText,
                 color: color,
+                decoration: decoration,
                 noteText: noteText,
                 isOrphaned: isOrphaned,
                 createdAt: createdAt,
@@ -12914,6 +13406,7 @@ class $$TextHighlightsTableTableManager
                 required int endOffset,
                 required String selectedText,
                 Value<String> color = const Value.absent(),
+                Value<String> decoration = const Value.absent(),
                 Value<String?> noteText = const Value.absent(),
                 Value<bool> isOrphaned = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12929,6 +13422,7 @@ class $$TextHighlightsTableTableManager
                 endOffset: endOffset,
                 selectedText: selectedText,
                 color: color,
+                decoration: decoration,
                 noteText: noteText,
                 isOrphaned: isOrphaned,
                 createdAt: createdAt,

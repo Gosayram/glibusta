@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart';
@@ -65,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -132,6 +133,23 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(readingProgress, readingProgress.chapterId);
             await m.addColumn(readingProgress, readingProgress.textOffset);
           }
+          if (from < 15) {
+            await m.addColumn(textHighlights, textHighlights.decoration);
+          }
+          if (from < 16) {
+            await m.addColumn(savedBooks, savedBooks.deletedAt);
+          }
+          if (from < 17) {
+            await m.addColumn(readingTime, readingTime.pagesRead);
+          }
+          if (from < 18) {
+            await m.addColumn(readingTime, readingTime.wpm);
+            await m.addColumn(readingTime, readingTime.wpmSessionCount);
+          }
+          if (from < 19) {
+            await m.addColumn(bookmarks, bookmarks.highlightStyle);
+            await m.addColumn(bookmarks, bookmarks.highlightColor);
+          }
         });
       } finally {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -142,6 +160,8 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA synchronous = NORMAL');
       await customStatement('PRAGMA foreign_keys = ON');
       await customStatement('PRAGMA cache_size = -8000');
+      await customStatement('PRAGMA busy_timeout = 5000');
+      await customStatement('PRAGMA temp_store = MEMORY');
     },
   );
 
@@ -235,45 +255,6 @@ class AppDatabase extends _$AppDatabase {
     }
   }
 
-  Future<void> fixDatabaseHeader() async {
-    final dbPath = await _databasePath;
-    final dbFile = File(dbPath);
-    if (!await dbFile.exists()) return;
-
-    try {
-      final bytes = await dbFile.readAsBytes();
-      if (bytes.length < 20) return;
-
-      const walMagicOffset = 18;
-      final byte0 = bytes[0];
-      final byte1 = bytes[1];
-
-      if (byte0 == 0x37 && byte1 == 0x0f && bytes.length > walMagicOffset + 2) {
-        final walByte0 = bytes[walMagicOffset];
-        final walByte1 = bytes[walMagicOffset + 1];
-
-        if (walByte0 == 0x37 && walByte1 == 0x0f) {
-          AppLogger().info(
-            'Patching WAL header for legacy compatibility',
-            name: 'Database',
-          );
-          final patched = Uint8List.fromList(bytes);
-          patched[walMagicOffset] = 0x37;
-          patched[walMagicOffset + 1] = 0x0f;
-          patched[walMagicOffset + 2] = 0x10;
-          patched[walMagicOffset + 3] = 0x20;
-          await dbFile.writeAsBytes(patched);
-        }
-      }
-    } on Object catch (e) {
-      AppLogger().warning(
-        'Failed to fix database header: $e',
-        name: 'Database',
-        error: e,
-      );
-    }
-  }
-
   Future<void> checkpointWal() async {
     try {
       await customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
@@ -317,6 +298,8 @@ QueryExecutor _openConnection() {
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
-  ref.onDispose(() => db.close());
+  ref.onDispose(() {
+    unawaited(db.checkpointWal().then((_) => db.close()));
+  });
   return db;
 });

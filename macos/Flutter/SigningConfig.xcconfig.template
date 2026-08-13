@@ -1,0 +1,12 @@
+// Copy this file to SigningConfig.xcconfig and fill in your values.
+// SigningConfig.xcconfig is gitignored — your local cert stays local.
+//
+//   cp SigningConfig.xcconfig.template SigningConfig.xcconfig
+//
+// Find your identity name:
+//   security find-identity -v -p codesigning
+//
+// Find your team ID (for Apple Developer certificates):
+//   security find-identity -v -p codesigning | grep "Developer ID"
+CODE_SIGN_IDENTITY = ""
+DEVELOPMENT_TEAM = ""

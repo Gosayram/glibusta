@@ -1,14 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
 import '../../../core/platform/app_file_storage.dart';
-import '../../../core/services/catalog_cover_cache_service.dart';
 import '../../../core/services/smart_cleanup_service.dart';
 import '../../../core/storage/storage_info_model.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
   const StorageManagementScreen({super.key});
@@ -27,7 +28,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: AdaptiveAppBar(
         title: Text(l10n.storageTitle),
         actions: [
           IconButton(
@@ -105,13 +106,6 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
               title: l10n.storageCleanCatalogCovers,
               subtitle: l10n.storageCleanCatalogCoversSub,
               onTap: _cleanCatalogCovers,
-              enabled: !_isCleaning,
-            ),
-            _ActionTile(
-              icon: Icons.timer,
-              title: l10n.storageCleanExpiredCovers,
-              subtitle: l10n.storageCleanExpiredCoversSub,
-              onTap: _cleanExpiredCatalogCovers,
               enabled: !_isCleaning,
             ),
           ],
@@ -258,25 +252,10 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
   Future<void> _cleanCatalogCovers() async {
     setState(() => _isCleaning = true);
     try {
-      final cacheService = ref.read(catalogCoverCacheServiceProvider);
-      await cacheService.clearAll();
+      await DefaultCacheManager().emptyCache();
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       unawaited(SmartDialog.showToast(l10n.storageCatalogCoversCleaned));
-      ref.invalidate(storageInfoProvider);
-    } finally {
-      if (mounted) setState(() => _isCleaning = false);
-    }
-  }
-
-  Future<void> _cleanExpiredCatalogCovers() async {
-    setState(() => _isCleaning = true);
-    try {
-      final cacheService = ref.read(catalogCoverCacheServiceProvider);
-      await cacheService.clearExpired();
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context);
-      unawaited(SmartDialog.showToast(l10n.storageExpiredCoversCleaned));
       ref.invalidate(storageInfoProvider);
     } finally {
       if (mounted) setState(() => _isCleaning = false);

@@ -1,102 +1,50 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/connectivity/offline_mode.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  group('NetworkState', () {
-    test('wifi is not metered', () {
-      const state = NetworkState(kind: NetworkKind.wifi, isMetered: false);
-      expect(state.canDownload, isTrue);
-      expect(state.shouldAskBeforeLargeDownload, isFalse);
-    });
+  test('a local mobile-download policy update wins over the initial load', () async {
+    SharedPreferences.setMockInitialValues({'allow_mobile_downloads': false});
+    final prefs = await SharedPreferences.getInstance();
+    final persistence = Completer<DownloadPolicyPersistence>();
+    final container = ProviderContainer(
+      overrides: [
+        downloadPolicyPersistenceProvider.overrideWith((ref) => persistence.future),
+      ],
+    );
+    addTearDown(container.dispose);
 
-    test('mobile is metered', () {
-      const state = NetworkState(kind: NetworkKind.mobile, isMetered: true);
-      expect(state.canDownload, isTrue);
-      expect(state.shouldAskBeforeLargeDownload, isTrue);
-    });
+    final notifier = container.read(allowMobileDownloadsProvider.notifier);
+    final update = notifier.update(true);
+    persistence.complete(DownloadPolicyPersistence(prefs));
 
-    test('offline cannot download', () {
-      const state = NetworkState(kind: NetworkKind.offline, isMetered: false);
-      expect(state.canDownload, isFalse);
-      expect(state.shouldAskBeforeLargeDownload, isFalse);
-    });
+    await update;
 
-    test('ethernet is not metered', () {
-      const state = NetworkState(kind: NetworkKind.ethernet, isMetered: false);
-      expect(state.canDownload, isTrue);
-      expect(state.shouldAskBeforeLargeDownload, isFalse);
-    });
+    expect(container.read(allowMobileDownloadsProvider), isTrue);
+    expect(prefs.getBool('allow_mobile_downloads'), isTrue);
   });
 
-  group('mapConnectivity', () {
-    test('none → offline', () {
-      final state = mapConnectivity([ConnectivityResult.none]);
-      expect(state.kind, NetworkKind.offline);
-      expect(state.isMetered, isFalse);
-    });
+  test('a local Wi-Fi resume policy update wins over the initial load', () async {
+    SharedPreferences.setMockInitialValues({'auto_resume_on_wifi': true});
+    final prefs = await SharedPreferences.getInstance();
+    final persistence = Completer<DownloadPolicyPersistence>();
+    final container = ProviderContainer(
+      overrides: [
+        downloadPolicyPersistenceProvider.overrideWith((ref) => persistence.future),
+      ],
+    );
+    addTearDown(container.dispose);
 
-    test('wifi → wifi', () {
-      final state = mapConnectivity([ConnectivityResult.wifi]);
-      expect(state.kind, NetworkKind.wifi);
-      expect(state.isMetered, isFalse);
-    });
+    final notifier = container.read(autoResumeOnWifiProvider.notifier);
+    final update = notifier.update(false);
+    persistence.complete(DownloadPolicyPersistence(prefs));
 
-    test('ethernet → ethernet', () {
-      final state = mapConnectivity([ConnectivityResult.ethernet]);
-      expect(state.kind, NetworkKind.ethernet);
-      expect(state.isMetered, isFalse);
-    });
+    await update;
 
-    test('mobile → mobile', () {
-      final state = mapConnectivity([ConnectivityResult.mobile]);
-      expect(state.kind, NetworkKind.mobile);
-      expect(state.isMetered, isTrue);
-    });
-
-    test('bluetooth → other', () {
-      final state = mapConnectivity([ConnectivityResult.bluetooth]);
-      expect(state.kind, NetworkKind.other);
-      expect(state.isMetered, isTrue);
-    });
-
-    test('wifi takes priority over mobile', () {
-      final state = mapConnectivity([
-        ConnectivityResult.wifi,
-        ConnectivityResult.mobile,
-      ]);
-      expect(state.kind, NetworkKind.wifi);
-      expect(state.isMetered, isFalse);
-    });
-
-    test('empty list → other', () {
-      final state = mapConnectivity([]);
-      expect(state.kind, NetworkKind.other);
-      expect(state.isMetered, isTrue);
-    });
-  });
-
-  group('canStartDownload', () {
-    test('wifi always allowed', () {
-      const wifi = NetworkState(kind: NetworkKind.wifi, isMetered: false);
-      expect(canStartDownload(network: wifi, allowMobileDownloads: false), isTrue);
-      expect(canStartDownload(network: wifi, allowMobileDownloads: true), isTrue);
-    });
-
-    test('offline never allowed', () {
-      const offline = NetworkState(kind: NetworkKind.offline, isMetered: false);
-      expect(canStartDownload(network: offline, allowMobileDownloads: true), isFalse);
-    });
-
-    test('mobile requires allowMobileDownloads', () {
-      const mobile = NetworkState(kind: NetworkKind.mobile, isMetered: true);
-      expect(canStartDownload(network: mobile, allowMobileDownloads: false), isFalse);
-      expect(canStartDownload(network: mobile, allowMobileDownloads: true), isTrue);
-    });
-
-    test('ethernet always allowed', () {
-      const eth = NetworkState(kind: NetworkKind.ethernet, isMetered: false);
-      expect(canStartDownload(network: eth, allowMobileDownloads: false), isTrue);
-    });
+    expect(container.read(autoResumeOnWifiProvider), isFalse);
+    expect(prefs.getBool('auto_resume_on_wifi'), isFalse);
   });
 }

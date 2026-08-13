@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart' show TextAlign;
 
 import 'smil_parser.dart';
@@ -10,6 +12,7 @@ class NormalizedBook {
   final String? coverUrl;
   final List<ReaderChapter> chapters;
   final Map<String, dynamic>? metadata;
+  final Map<String, Uint8List> fonts;
 
   const NormalizedBook({
     required this.id,
@@ -19,6 +22,7 @@ class NormalizedBook {
     this.coverUrl,
     this.chapters = const [],
     this.metadata,
+    this.fonts = const {},
   });
 
   NormalizedBookMetadata toMetadata() => NormalizedBookMetadata(
@@ -30,6 +34,7 @@ class NormalizedBook {
     chapterCount: chapters.length,
     chapterTitles: chapters.map((c) => c.title).toList(),
     metadata: metadata,
+    fonts: fonts,
   );
 
   Map<String, dynamic> toJson() => {
@@ -40,12 +45,13 @@ class NormalizedBook {
     'coverUrl': coverUrl,
     'chapters': chapters.map((c) => c.toJson()).toList(),
     'metadata': metadata,
+    if (fonts.isNotEmpty) 'fonts': fonts.map((k, v) => MapEntry(k, v)),
   };
 
   factory NormalizedBook.fromJson(Map<String, dynamic> json) => NormalizedBook(
     id: json['id'] as String,
     title: json['title'] as String,
-    authors: (json['authors'] as List<String>?) ?? [],
+    authors: (json['authors'] as List<dynamic>?)?.cast<String>() ?? const [],
     description: json['description'] as String?,
     coverUrl: json['coverUrl'] as String?,
     chapters:
@@ -54,6 +60,9 @@ class NormalizedBook {
             .toList() ??
         [],
     metadata: json['metadata'] as Map<String, dynamic>?,
+    fonts:
+        (json['fonts'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as Uint8List)) ??
+        const {},
   );
 
   NormalizedBook withCleanedBlocks() {
@@ -65,6 +74,37 @@ class NormalizedBook {
       coverUrl: coverUrl,
       chapters: chapters.map((ch) => ch.withCleanedBlocks()).toList(),
       metadata: metadata,
+      fonts: fonts,
+    );
+  }
+
+  NormalizedBook withResolvedImageUrls(Map<String, String> urls) {
+    if (urls.isEmpty) return this;
+    return NormalizedBook(
+      id: id,
+      title: title,
+      authors: authors,
+      description: description,
+      coverUrl: coverUrl,
+      chapters: chapters
+          .map(
+            (chapter) => ReaderChapter(
+              index: chapter.index,
+              title: chapter.title,
+              smilEntries: chapter.smilEntries,
+              blocks: chapter.blocks
+                  .map(
+                    (block) => switch (urls[block.imageUrl]) {
+                      final String url => block.withImageUrl(url),
+                      _ => block,
+                    },
+                  )
+                  .toList(),
+            ),
+          )
+          .toList(),
+      metadata: metadata,
+      fonts: fonts,
     );
   }
 }
@@ -78,6 +118,7 @@ class NormalizedBookMetadata {
   final int chapterCount;
   final List<String> chapterTitles;
   final Map<String, dynamic>? metadata;
+  final Map<String, Uint8List> fonts;
 
   const NormalizedBookMetadata({
     required this.id,
@@ -88,6 +129,7 @@ class NormalizedBookMetadata {
     required this.chapterCount,
     required this.chapterTitles,
     this.metadata,
+    this.fonts = const {},
   });
 
   Map<String, dynamic> toJson() => {
@@ -99,18 +141,36 @@ class NormalizedBookMetadata {
     'chapterCount': chapterCount,
     'chapterTitles': chapterTitles,
     'metadata': metadata,
+    if (fonts.isNotEmpty) 'fonts': fonts.map((k, v) => MapEntry(k, v)),
   };
 
   factory NormalizedBookMetadata.fromJson(Map<String, dynamic> json) => NormalizedBookMetadata(
     id: json['id'] as String,
     title: json['title'] as String,
-    authors: (json['authors'] as List<String>?) ?? [],
+    authors: (json['authors'] as List<dynamic>?)?.cast<String>() ?? const [],
     description: json['description'] as String?,
     coverUrl: json['coverUrl'] as String?,
     chapterCount: json['chapterCount'] as int,
     chapterTitles: (json['chapterTitles'] as List<dynamic>?)?.cast<String>() ?? [],
     metadata: json['metadata'] as Map<String, dynamic>?,
+    fonts:
+        (json['fonts'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as Uint8List)) ??
+        const {},
   );
+
+  /// Builds a chapter list from metadata, preferring [loadedChapters] when
+  /// available and falling back to empty blocks with title-derived names.
+  List<ReaderChapter> buildChapters([Map<int, ReaderChapter>? loadedChapters]) {
+    return List.generate(chapterCount, (i) {
+      final loaded = loadedChapters?[i];
+      if (loaded != null) return loaded;
+      return ReaderChapter(
+        index: i,
+        title: i < chapterTitles.length ? chapterTitles[i] : 'Глава ${i + 1}',
+        blocks: const [],
+      );
+    });
+  }
 }
 
 class ReaderChapter {
@@ -184,8 +244,45 @@ class ReaderChapter {
       }
       cleaned.add(block);
     }
-    return ReaderChapter(index: index, title: title, blocks: cleaned, smilEntries: smilEntries);
+    return ReaderChapter(
+      index: index,
+      title: _normalizedTitle(cleaned),
+      blocks: cleaned,
+      smilEntries: smilEntries,
+    );
   }
+
+  /// Repairs malformed source metadata that appends a chapter's first
+  /// paragraph to its heading. The rendered blocks remain the source of truth:
+  /// only discard the suffix when it demonstrably duplicates the paragraph
+  /// immediately following the first heading.
+  String _normalizedTitle(List<ReaderBlock> cleaned) {
+    final titleText = title.trim();
+    final headingIndex = cleaned.indexWhere((block) => block.type == BlockType.heading);
+    if (titleText.isEmpty || headingIndex < 0) return titleText;
+
+    final heading = cleaned[headingIndex].text.trim();
+    final paragraph = cleaned
+        .skip(headingIndex + 1)
+        .firstWhere(
+          (block) => block.type == BlockType.paragraph && block.text.trim().isNotEmpty,
+          orElse: () => const ReaderBlock(index: -1, text: ''),
+        );
+    final normalizedTitle = _collapseWhitespace(titleText);
+    final normalizedHeading = _collapseWhitespace(heading);
+    final normalizedParagraph = _collapseWhitespace(paragraph.text);
+    if (normalizedHeading.isEmpty || normalizedParagraph.isEmpty) return titleText;
+    if (!normalizedTitle.startsWith(normalizedHeading)) return titleText;
+
+    final suffix = normalizedTitle.substring(normalizedHeading.length).trimLeft();
+    final comparableSuffix = suffix.replaceFirst(RegExp(r'(?:\.\.\.|…)+$'), '').trimRight();
+    if (comparableSuffix.length < 24 || !normalizedParagraph.startsWith(comparableSuffix)) {
+      return titleText;
+    }
+    return heading;
+  }
+
+  static String _collapseWhitespace(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 class ReaderBlock {
@@ -202,9 +299,14 @@ class ReaderBlock {
   final String? imageAlt;
   final String? imageCaption;
   final double? textIndent;
+  final double? fontSize;
   final TextAlign? textAlign;
   final String? noteId;
   final String? whiteSpaceMode; // MD-1.7: 'pre', 'pre-wrap', 'nowrap'
+  final bool pageBreakBefore;
+  final bool pageBreakInsideAvoid;
+  final bool hasDropCap;
+  final String? rawCssProps;
 
   const ReaderBlock({
     required this.index,
@@ -220,10 +322,39 @@ class ReaderBlock {
     this.imageAlt,
     this.imageCaption,
     this.textIndent,
+    this.fontSize,
     this.textAlign,
     this.noteId,
     this.whiteSpaceMode,
+    this.pageBreakBefore = false,
+    this.pageBreakInsideAvoid = false,
+    this.hasDropCap = false,
+    this.rawCssProps,
   });
+
+  ReaderBlock withImageUrl(String value) => ReaderBlock(
+    index: index,
+    text: text,
+    type: type,
+    imageUrl: value,
+    noteRef: noteRef,
+    richSpans: richSpans,
+    headingLevel: headingLevel,
+    ordered: ordered,
+    listItems: listItems,
+    tableRows: tableRows,
+    imageAlt: imageAlt,
+    imageCaption: imageCaption,
+    textIndent: textIndent,
+    fontSize: fontSize,
+    textAlign: textAlign,
+    noteId: noteId,
+    whiteSpaceMode: whiteSpaceMode,
+    pageBreakBefore: pageBreakBefore,
+    pageBreakInsideAvoid: pageBreakInsideAvoid,
+    hasDropCap: hasDropCap,
+    rawCssProps: rawCssProps,
+  );
 
   Map<String, dynamic> toJson() => {
     'index': index,
@@ -241,116 +372,22 @@ class ReaderBlock {
     if (imageAlt != null) 'imageAlt': imageAlt,
     if (imageCaption != null) 'imageCaption': imageCaption,
     if (textIndent != null) 'textIndent': textIndent,
+    if (fontSize != null) 'fontSize': fontSize,
     if (textAlign != null || whiteSpaceMode != null)
       'textAlign': [
         if (textAlign != null) textAlign!.name,
         if (whiteSpaceMode != null) 'ws:$whiteSpaceMode',
       ].join('|'),
     if (noteId != null) 'noteId': noteId,
+    if (pageBreakBefore) 'pageBreakBefore': true,
+    if (pageBreakInsideAvoid) 'pageBreakInsideAvoid': true,
+    if (hasDropCap) 'hasDropCap': true,
+    if (rawCssProps != null) 'rawCssProps': rawCssProps,
   };
-
-  // CRT-21.1: normalize whitespace before typography processing
-  static String _normalizeWhitespace(String text) {
-    final cleaned = text.replaceAll('\r\n', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ').trim();
-    // Collapse 2+ consecutive spaces into one
-    final sb = StringBuffer();
-    var prevSpace = false;
-    for (var i = 0; i < cleaned.length; i++) {
-      final c = cleaned[i];
-      if (c == ' ' || c == '\t' || c == '\u{00A0}') {
-        if (!prevSpace) {
-          sb.write(c);
-          prevSpace = true;
-        }
-      } else {
-        sb.write(c);
-        prevSpace = false;
-      }
-    }
-    return sb.toString();
-  }
-
-  // HG-1.1: replace spaces with NBSP after initials, between digits, after short words
-  // ponytail: char-level scan, no regex. Runs once per block at load time.
-  static String _applyNonBreakingSpaces(String text) {
-    // Fast path: skip short strings
-    if (text.length < 3) return text;
-
-    final chars = text.split('');
-    final len = chars.length;
-    final result = StringBuffer();
-
-    for (var i = 0; i < len; i++) {
-      if (chars[i] == ' ' && i > 0 && i + 1 < len) {
-        final prev = chars[i - 1];
-        final next = chars[i + 1];
-
-        // After period (initial): "А." or "A."
-        if (prev == '.') {
-          result.write('\u{00A0}');
-          continue;
-        }
-
-        // Between digit groups: "100 000"
-        if (_isDigit(prev) && _isDigit(next)) {
-          result.write('\u{00A0}');
-          continue;
-        }
-
-        // After single letter (preposition)
-        var wordStart = i - 1;
-        while (wordStart > 0 && _isLetter(chars[wordStart - 1])) {
-          wordStart--;
-        }
-        final wordLen = (i - 1) - wordStart;
-        if (wordLen == 0 && _isLetter(prev)) {
-          result.write('\u{00A0}');
-          continue;
-        }
-
-        // Before short word (1-2 letters)
-        var nextWordEnd = i + 1;
-        while (nextWordEnd < len && _isLetter(chars[nextWordEnd])) {
-          nextWordEnd++;
-        }
-        final nextWordLen = nextWordEnd - (i + 1);
-        if (nextWordLen <= 2) {
-          result.write('\u{00A0}');
-          continue;
-        }
-      }
-      result.write(chars[i]);
-    }
-    // HG-1.5: protect against orphan word on last line (>=8 words → NBSP between last two)
-    final out = result.toString();
-    var sc = 0;
-    for (var i = 0; i < out.length; i++) {
-      if (out[i] == ' ') sc++;
-    }
-    if (sc >= 7) {
-      final ls = out.lastIndexOf(' ');
-      if (ls > 0) {
-        return '${out.substring(0, ls)}\u{00A0}${out.substring(ls + 1)}';
-      }
-    }
-    return out;
-  }
-
-  static bool _isDigit(String c) => c.codeUnitAt(0) >= 0x30 && c.codeUnitAt(0) <= 0x39;
-
-  static bool _isLetter(String c) {
-    final code = c.codeUnitAt(0);
-    // ASCII letters + Cyrillic ranges
-    return (code >= 0x41 && code <= 0x5A) || // A-Z
-        (code >= 0x61 && code <= 0x7A) || // a-z
-        (code >= 0xC0 && code <= 0xFF) || // А-я (partial, covers most Cyrillic in single code unit)
-        (code >= 0x100); // Extended Unicode (covers remaining Cyrillic + others)
-    // ponytail: conservative letter detection, may match some non-letter chars
-  }
 
   factory ReaderBlock.fromJson(Map<String, dynamic> json) => ReaderBlock(
     index: json['index'] as int,
-    text: _applyNonBreakingSpaces(_normalizeWhitespace(json['text'] as String)),
+    text: json['text'] as String,
     type: BlockType.values.firstWhere(
       (e) => e.name == json['type'],
       orElse: () => BlockType.paragraph,
@@ -371,9 +408,14 @@ class ReaderBlock {
     imageAlt: json['imageAlt'] as String?,
     imageCaption: json['imageCaption'] as String?,
     textIndent: (json['textIndent'] as num?)?.toDouble(),
+    fontSize: (json['fontSize'] as num?)?.toDouble(),
     textAlign: _parseTextAlign(json['textAlign']),
     noteId: json['noteId'] as String?,
     whiteSpaceMode: _parseWhiteSpaceMode(json['textAlign']),
+    pageBreakBefore: json['pageBreakBefore'] as bool? ?? false,
+    pageBreakInsideAvoid: json['pageBreakInsideAvoid'] as bool? ?? false,
+    hasDropCap: json['hasDropCap'] as bool? ?? false,
+    rawCssProps: json['rawCssProps'] as String?,
   );
 }
 
@@ -455,6 +497,10 @@ class RichSpan {
   final bool bold;
   final bool italic;
   final bool superscript;
+  final bool subscript;
+  final bool strikethrough;
+  final bool code;
+  final String? styleName;
   final bool lineBreak;
   final String? href;
   final String? color;
@@ -464,6 +510,10 @@ class RichSpan {
     this.bold = false,
     this.italic = false,
     this.superscript = false,
+    this.subscript = false,
+    this.strikethrough = false,
+    this.code = false,
+    this.styleName,
     this.lineBreak = false,
     this.href,
     this.color,
@@ -474,6 +524,10 @@ class RichSpan {
     if (bold) 'bold': true,
     if (italic) 'italic': true,
     if (superscript) 'superscript': true,
+    if (subscript) 'subscript': true,
+    if (strikethrough) 'strikethrough': true,
+    if (code) 'code': true,
+    if (styleName != null) 'styleName': styleName,
     if (lineBreak) 'lineBreak': true,
     if (href != null) 'href': href,
     if (color != null) 'color': color,
@@ -484,6 +538,10 @@ class RichSpan {
     bold: json['bold'] as bool? ?? false,
     italic: json['italic'] as bool? ?? false,
     superscript: json['superscript'] as bool? ?? false,
+    subscript: json['subscript'] as bool? ?? false,
+    strikethrough: json['strikethrough'] as bool? ?? false,
+    code: json['code'] as bool? ?? false,
+    styleName: json['styleName'] as String?,
     lineBreak: json['lineBreak'] as bool? ?? false,
     href: json['href'] as String?,
     color: json['color'] as String?,
@@ -504,4 +562,6 @@ enum BlockType {
   cite,
   textAuthor,
   subtitle,
+  listItem,
+  preformatted,
 }

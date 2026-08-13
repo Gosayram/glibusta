@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/platform/app_file_storage.dart';
+import 'package:glibusta/features/library/data/book_import_service.dart';
 import 'package:glibusta/features/library/data/cover_extraction_service.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
@@ -16,11 +18,22 @@ class _FakeAppFileStorage implements AppFileStorage {
       File(p.join(baseDir, 'books', '$bookId.${format.toString().split('.').last}'));
 
   @override
+  Future<File> downloadFile(String bookId, dynamic format) async =>
+      File(p.join(baseDir, 'downloads', '$bookId.${format.toString().split('.').last}'));
+
+  @override
   Future<File> coverFile(String bookId) async => File(p.join(baseDir, 'covers', '$bookId.jpg'));
 
   @override
   Future<Directory> booksDir() async {
     final dir = Directory(p.join(baseDir, 'books'));
+    await dir.create(recursive: true);
+    return dir;
+  }
+
+  @override
+  Future<Directory> downloadsDir() async {
+    final dir = Directory(p.join(baseDir, 'downloads'));
     await dir.create(recursive: true);
     return dir;
   }
@@ -113,6 +126,29 @@ void main() {
 
       expect(result, isNotNull);
       expect(result, contains('test_mobi_cover.jpg'));
+    });
+
+    test('normalizes a parser-provided MOBI data-uri cover', () async {
+      final fakeFile = File('${tempDir.path}/data_uri.mobi');
+      await fakeFile.writeAsBytes([0]);
+      final dataUri = 'data:image/jpeg;base64,${base64Encode(validJpegBytes)}';
+
+      final coverBytes = coverBytesFromDataUri(dataUri);
+      final result = await service.extractAndSaveCover(
+        bookId: 'test_mobi_data_uri_cover',
+        filePath: fakeFile.path,
+        format: 'mobi',
+        coverBytes: coverBytes,
+      );
+
+      expect(coverBytes, validJpegBytes);
+      expect(result, contains('test_mobi_data_uri_cover.jpg'));
+      expect(img.decodeImage(await File(result!).readAsBytes()), isNotNull);
+    });
+
+    test('rejects malformed or non-image parser cover data URIs', () {
+      expect(coverBytesFromDataUri('data:image/png;base64,not-base64'), isNull);
+      expect(coverBytesFromDataUri('data:text/plain;base64,Y292ZXI='), isNull);
     });
 
     test('falls back to file extraction when coverBytes is null', () async {

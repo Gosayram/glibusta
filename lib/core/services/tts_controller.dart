@@ -7,20 +7,58 @@ import 'package:flutter_tts/flutter_tts.dart';
 /// LW-11.1/11.2: TTS controller with headphone auto-pause/resume.
 /// ponytail: singleton — single TTS instance shared across app.
 class TtsController {
-  TtsController._();
+  /// Lowest playback-speed multiplier offered by the reader controls.
+  static const double minPlaybackRate = 0.5;
+
+  /// Highest playback-speed multiplier offered by the reader controls.
+  static const double maxPlaybackRate = 3;
+
+  static const double _defaultNativeRate = 0.5;
+  static const double _defaultPlaybackRate = 1;
+
+  TtsController._({
+    FlutterTts Function()? ttsFactory,
+    Timer Function(Duration, void Function())? timerFactory,
+  }) : _ttsFactory = ttsFactory ?? FlutterTts.new,
+       _timerFactory = timerFactory ?? Timer.new;
   static final TtsController instance = TtsController._();
 
+  @visibleForTesting
+  TtsController.forTesting(
+    FlutterTts Function() ttsFactory, {
+    Timer Function(Duration, void Function())? timerFactory,
+  }) : _ttsFactory = ttsFactory,
+       _timerFactory = timerFactory ?? Timer.new;
+
+  final FlutterTts Function() _ttsFactory;
+  final Timer Function(Duration, void Function()) _timerFactory;
   late FlutterTts _tts;
+  var _isTtsInitialized = false;
+  var _ttsAvailable = false;
   bool _isPlaying = false;
-  late String _lastLang;
+  String _lastLang = 'ru-RU';
   late double _lastRate;
+  var _playbackRate = _defaultPlaybackRate;
   String? _lastText;
+  var _isPaused = false;
   StreamSubscription<dynamic>? _noisySub;
+  Timer? _sleepTimer;
+  Duration? _sleepTimerDuration;
+  var _sleepTimerGeneration = 0;
 
   void _ensureTts() {
-    _tts = FlutterTts();
+    if (_isTtsInitialized) return;
+
+    try {
+      _tts = _ttsFactory();
+      _ttsAvailable = true;
+    } on Object catch (e) {
+      _ttsAvailable = false;
+      debugPrint('TTS unavailable: $e');
+    }
     _lastLang = 'ru-RU';
-    _lastRate = 0.5;
+    _lastRate = _defaultNativeRate;
+    _isTtsInitialized = true;
   }
 
   /// Start listening for headphone removal events.
@@ -42,36 +80,129 @@ class TtsController {
 
   Future<void> speak(String text, {String? lang, double? rate}) async {
     _ensureTts();
+    if (!_ttsAvailable) return;
     _lastText = text;
     if (lang != null) _lastLang = lang;
     if (rate != null) _lastRate = rate;
     await _tts.setLanguage(_lastLang);
     await _tts.setSpeechRate(_lastRate);
     _isPlaying = true;
+    _isPaused = false;
     await _tts.speak(text);
   }
 
-  /// Resume speaking last text.
+  /// Pauses the current utterance when the platform supports it.
+  ///
+  /// The `flutter_tts` Android implementation resumes through its own tracked
+  /// range offset when [resume] speaks the same text again.
+  Future<void> pause() async {
+    if (!_isTtsInitialized || !_isPlaying || !_ttsAvailable) return;
+    await _tts.pause();
+    _isPlaying = false;
+    _isPaused = true;
+  }
+
+  /// Resumes the last paused utterance through the platform TTS engine.
   Future<void> resume() async {
-    if (_lastText != null) {
+    if (_isPaused && _lastText != null) {
       await speak(_lastText!, lang: _lastLang, rate: _lastRate);
     }
   }
 
   void stop() {
     _isPlaying = false;
-    _tts.stop(); // ignore: discarded_futures
+    _isPaused = false;
+    if (_isTtsInitialized && _ttsAvailable) {
+      _tts.stop(); // ignore: discarded_futures
+    }
   }
 
   bool get isPlaying => _isPlaying;
 
+  bool get isPaused => _isPaused;
+
   bool get hasLastText => _lastText != null;
 
+  /// Reader-facing speech-speed multiplier, from 0.5× to 3×.
+  double get playbackRate => _playbackRate;
+
+  /// Language used for the next utterance when the caller does not override it.
+  String get language => _lastLang;
+
+  /// Selects the language for subsequent utterances without interrupting speech.
+  Future<void> setLanguage(String language) async {
+    final String normalizedLanguage = language.trim();
+    if (normalizedLanguage.isEmpty) {
+      throw ArgumentError.value(language, 'language', 'Must not be empty');
+    }
+
+    _ensureTts();
+    _lastLang = normalizedLanguage;
+    if (!_ttsAvailable) return;
+    await _tts.setLanguage(_lastLang);
+  }
+
+  /// Changes the speed for the next utterance without interrupting speech.
+  ///
+  /// `flutter_tts` uses a platform-native 0–1 rate. The reader presents the
+  /// more familiar multiplier range and maps it to that native scale.
+  Future<void> setPlaybackRate(double rate) async {
+    if (rate < minPlaybackRate || rate > maxPlaybackRate) {
+      throw ArgumentError.value(
+        rate,
+        'rate',
+        'Must be between $minPlaybackRate and $maxPlaybackRate',
+      );
+    }
+
+    _ensureTts();
+    _playbackRate = rate;
+    _lastRate = rate / 2;
+    if (!_ttsAvailable) return;
+    await _tts.setSpeechRate(_lastRate);
+  }
+
+  /// Stops speech after [duration]. Starting a new timer replaces the old one.
+  void startSleepTimer(Duration duration) {
+    if (duration <= Duration.zero) {
+      throw ArgumentError.value(duration, 'duration', 'Must be greater than zero');
+    }
+
+    cancelSleepTimer();
+    final int generation = ++_sleepTimerGeneration;
+    _sleepTimerDuration = duration;
+    _sleepTimer = _timerFactory(duration, () {
+      if (generation != _sleepTimerGeneration) return;
+
+      _sleepTimer = null;
+      _sleepTimerDuration = null;
+      stop();
+    });
+  }
+
+  /// Cancels the pending sleep timer without changing current speech.
+  void cancelSleepTimer() {
+    _sleepTimerGeneration++;
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerDuration = null;
+  }
+
+  /// Whether a timer is currently scheduled to stop speech.
+  bool get hasSleepTimer => _sleepTimer != null;
+
+  /// Initially scheduled duration for the active sleep timer.
+  Duration? get sleepTimerDuration => _sleepTimerDuration;
+
   void dispose() {
+    cancelSleepTimer();
     _noisySub?.cancel(); // ignore: discarded_futures
     _noisySub = null;
     _lastText = null;
-    _tts.stop(); // ignore: discarded_futures
+    if (_isTtsInitialized && _ttsAvailable) {
+      _tts.stop(); // ignore: discarded_futures
+    }
     _isPlaying = false;
+    _isPaused = false;
   }
 }

@@ -25,10 +25,8 @@ enum FormatCapability {
   bool get hasReaderRoute => canReadInApp || isDocumentOnly;
 }
 
-class FormatCapabilityService {
-  const FormatCapabilityService();
-
-  FormatCapability capabilityOf(BookFormat format) => switch (format) {
+extension BookFormatCapability on BookFormat {
+  FormatCapability get capability => switch (this) {
     BookFormat.epub ||
     BookFormat.fb2 ||
     BookFormat.txt ||
@@ -43,22 +41,16 @@ class FormatCapabilityService {
     BookFormat.unknown => FormatCapability.unsupported,
   };
 
-  bool canReadInApp(BookFormat format) => capabilityOf(format).canReadInApp;
+  bool get canReadInApp => capability.canReadInApp;
+  bool get canImport => capability.canImport;
+  bool get isDocumentOnly => capability.isDocumentOnly;
+  bool get hasReaderRoute => capability.hasReaderRoute;
 
-  bool canImport(BookFormat format) => capabilityOf(format).canImport;
-
-  bool isDocumentOnly(BookFormat format) => capabilityOf(format).isDocumentOnly;
-
-  bool hasReaderRoute(BookFormat format) => capabilityOf(format).hasReaderRoute;
-
-  String? warningLabel(BookFormat format) {
-    final cap = capabilityOf(format);
-    return switch (cap) {
-      FormatCapability.readable => null,
-      FormatCapability.documentOnly => 'Только хранение/просмотр',
-      FormatCapability.partial => 'Частичная поддержка (MOBI v1)',
-      FormatCapability.legacy => 'Устаревший формат (legacy)',
-      FormatCapability.unsupported => 'Формат не поддерживается',
-    };
-  }
+  String? warningLabel() => switch (capability) {
+    FormatCapability.readable => null,
+    FormatCapability.documentOnly => 'Только хранение/просмотр',
+    FormatCapability.partial => 'Частичная поддержка (MOBI v1)',
+    FormatCapability.legacy => 'Устаревший формат (legacy)',
+    FormatCapability.unsupported => 'Формат не поддерживается',
+  };
 }

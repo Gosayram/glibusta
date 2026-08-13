@@ -8,6 +8,8 @@ class ColorPreset {
   final String name;
   final Color backgroundColor;
   final Color fontColor;
+  final Color? linkColor;
+  final Color? highlightColor;
   final int order;
 
   const ColorPreset({
@@ -15,6 +17,8 @@ class ColorPreset {
     required this.name,
     required this.backgroundColor,
     required this.fontColor,
+    this.linkColor,
+    this.highlightColor,
     this.order = 0,
   });
 
@@ -22,6 +26,10 @@ class ColorPreset {
     String? name,
     Color? backgroundColor,
     Color? fontColor,
+    Color? linkColor,
+    bool clearLinkColor = false,
+    Color? highlightColor,
+    bool clearHighlightColor = false,
     int? order,
   }) {
     return ColorPreset(
@@ -29,6 +37,8 @@ class ColorPreset {
       name: name ?? this.name,
       backgroundColor: backgroundColor ?? this.backgroundColor,
       fontColor: fontColor ?? this.fontColor,
+      linkColor: clearLinkColor ? null : (linkColor ?? this.linkColor),
+      highlightColor: clearHighlightColor ? null : (highlightColor ?? this.highlightColor),
       order: order ?? this.order,
     );
   }
@@ -38,6 +48,8 @@ class ColorPreset {
     'name': name,
     'backgroundColor': backgroundColor.toARGB32(),
     'fontColor': fontColor.toARGB32(),
+    if (linkColor != null) 'linkColor': linkColor!.toARGB32(),
+    if (highlightColor != null) 'highlightColor': highlightColor!.toARGB32(),
     'order': order,
   };
 
@@ -46,6 +58,8 @@ class ColorPreset {
     name: json['name'] as String,
     backgroundColor: Color(json['backgroundColor'] as int),
     fontColor: Color(json['fontColor'] as int),
+    linkColor: json['linkColor'] != null ? Color(json['linkColor'] as int) : null,
+    highlightColor: json['highlightColor'] != null ? Color(json['highlightColor'] as int) : null,
     order: json['order'] as int? ?? 0,
   );
 }
@@ -77,7 +91,8 @@ class ColorPresetService {
       jsonEncode(indexed.map((p) => p.toJson()).toList()),
     );
     if (!ok) {
-      throw StateError('Failed to persist color presets');
+      // ponytail: preferences persist is best-effort, silently fail
+      return;
     }
   }
 

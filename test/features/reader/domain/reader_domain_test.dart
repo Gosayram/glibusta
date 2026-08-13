@@ -116,7 +116,7 @@ void main() {
       expect(settings.theme, ReaderTheme.system);
       expect(settings.mode, ReaderMode.paginated);
       expect(settings.fontSize, 18.0);
-      expect(settings.lineHeight, 1.55);
+      expect(settings.lineHeight, 1.6);
       expect(settings.margin, 20.0);
       expect(settings.font, ReaderFont.literata);
       expect(settings.autoThemeMode, AutoThemeMode.off);
@@ -132,7 +132,7 @@ void main() {
       );
       expect(updated.fontSize, 24.0);
       expect(updated.theme, ReaderTheme.dark);
-      expect(updated.lineHeight, 1.55);
+      expect(updated.lineHeight, 1.6);
     });
   });
 

@@ -4,7 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/config/app_settings.dart';
+import '../../../core/platform/app_platform.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/book_card_skeleton.dart';
 import '../../search/data/flibusta_models.dart';
@@ -28,6 +31,8 @@ class AuthorDetailScreen extends ConsumerWidget {
                 SliverAppBar(
                   title: Text(detail.name.isNotEmpty ? detail.name : l10n.authorFallback),
                   pinned: true,
+                  leading: hasNativeMenuBar ? const AdaptiveBackButton() : null,
+                  leadingWidth: hasNativeMenuBar ? kToolbarHeight + kMacTrafficLightsInset : null,
                 ),
                 const SliverFillRemaining(
                   child: Center(
@@ -107,6 +112,8 @@ class _AuthorDetailContentState extends State<_AuthorDetailContent> {
         SliverAppBar(
           title: Text(detail.name, maxLines: 1, overflow: TextOverflow.ellipsis),
           pinned: true,
+          leading: hasNativeMenuBar ? const AdaptiveBackButton() : null,
+          leadingWidth: hasNativeMenuBar ? kToolbarHeight + kMacTrafficLightsInset : null,
         ),
 
         SliverToBoxAdapter(
@@ -154,7 +161,7 @@ class _AuthorDetailContentState extends State<_AuthorDetailContent> {
 
 // ── Author Header ────────────────────────────────────────────────────────────
 
-class _AuthorHeader extends StatelessWidget {
+class _AuthorHeader extends ConsumerWidget {
   final String name;
   final String? avatarUrl;
   final String biography;
@@ -174,11 +181,11 @@ class _AuthorHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final hasBio = biography.isNotEmpty;
-    final baseUrl = 'https://www.flibusta.is';
+    final baseUrl = ref.watch(appSettingsControllerProvider).baseUrl;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -194,7 +201,9 @@ class _AuthorHeader extends StatelessWidget {
                     width: 80,
                     height: 80,
                     child: CachedNetworkImage(
-                      imageUrl: avatarUrl!.startsWith('http') ? avatarUrl! : '$baseUrl$avatarUrl',
+                      imageUrl: avatarUrl!.startsWith('http')
+                          ? avatarUrl!
+                          : Uri.parse(baseUrl).resolve(avatarUrl!).toString(),
                       fit: BoxFit.cover,
                       errorWidget: (context, error, stackTrace) => Container(
                         width: 80,

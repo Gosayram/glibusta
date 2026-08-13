@@ -35,12 +35,12 @@ install-python-tools: require-python ## Install local Python quality tools
 .PHONY: format
 format: require-dart ## Format Dart sources
 	@$(PRINT_STEP) "Formatting Dart sources"
-	$(DART_FORMAT) $(DART_FORMAT_PATHS)
+	$(DART_FORMAT) $$(find $(DART_FORMAT_PATHS) -type f -name '*.dart' ! -path 'lib/src/rust/*')
 
 .PHONY: format-check
 format-check: require-dart ## Check Dart formatting
 	@$(PRINT_STEP) "Checking Dart formatting"
-	$(DART_FORMAT) --set-exit-if-changed $(DART_FORMAT_PATHS)
+	$(DART_FORMAT) --set-exit-if-changed $$(find $(DART_FORMAT_PATHS) -type f -name '*.dart' ! -path 'lib/src/rust/*')
 
 .PHONY: fix
 fix: require-dart ## Apply Dart automated fixes
@@ -96,10 +96,32 @@ diagnostics-strict: require-flutter require-python ## Summarize diagnostics and 
 	@$(PRINT_STEP) "Collecting strict Dart analyzer diagnostics"
 	@$(PYTHON) $(DIAGNOSTICS_SCRIPT) --strict -- $(FLUTTER_ANALYZE_NO_FATAL)
 
-.PHONY: test
-test: require-flutter ## Run Flutter tests
-	@$(PRINT_STEP) "Running Flutter tests"
-	$(FLUTTER_TEST)
+.PHONY: test test-dart test-dart-coverage test-live test-native test-rust
+test: test-dart test-rust ## Run deterministic Dart and Rust tests
+
+test-dart: rust-build-release require-flutter ## Run deterministic Dart tests (offline)
+	@$(PRINT_STEP) "Running deterministic Dart tests"
+	FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR=$(CURDIR)/rust/target/release \
+		$(FLUTTER_TEST) --exclude-tags=live --exclude-tags=native
+
+test-dart-coverage: rust-build-release require-flutter ## Run deterministic Dart tests and write coverage/report artifacts
+	@$(PRINT_STEP) "Running deterministic Dart tests with coverage"
+	@mkdir -p build/test-results
+	FRB_DART_LOAD_EXTERNAL_LIBRARY_NATIVE_LIB_DIR=$(CURDIR)/rust/target/release \
+		$(FLUTTER_TEST) --coverage --file-reporter=json:build/test-results/dart-tests.json \
+		--exclude-tags=live --exclude-tags=native
+
+test-live: require-flutter ## Run opt-in live Dart tests
+	@$(PRINT_STEP) "Running live Dart tests"
+	$(FLUTTER_TEST) --tags=live
+
+test-native: rust-build-release require-flutter ## Run the native Flutter Rust bridge smoke test
+	@$(PRINT_STEP) "Running native Flutter Rust bridge smoke test"
+	$(FLUTTER_TEST) --tags=native test/rust_bridge_smoke_test.dart
+
+test-rust: require-rust ## Run Rust tests
+	@$(PRINT_STEP) "Running Rust tests"
+	cd rust && cargo test --locked
 
 .PHONY: rustfmt
 rustfmt: ## Format Rust sources
@@ -127,6 +149,13 @@ rust-check: ## Full Rust build check
 	@$(PRINT_STEP) "Running cargo check"
 	cd rust && cargo check
 
+.PHONY: djvu-oracle-check
+djvu-oracle-check: ## Compare djvu-rs text extraction with locally installed DjVuLibre
+	@$(PRINT_STEP) "Running optional DjVuLibre compatibility oracle"
+	@command -v djvutxt >/dev/null || (echo "ERROR: install DjVuLibre (djvutxt) first" >&2; exit 1)
+	cd rust && cargo test --test djvulibre_oracle_test -- --ignored --exact djvu_rs_text_matches_djvulibre_reference
+	@$(PRINT_OK) "DjVuLibre oracle check passed"
+
 .PHONY: rust-lints
 rust-lints: ## Run ltrs spell-check on Rust comments/strings
 	@$(PRINT_STEP) "Checking Rust strings with LanguageTool"
@@ -137,6 +166,12 @@ rust-lints: ## Run ltrs spell-check on Rust comments/strings
 rust-bloat: ## Analyze Rust binary size breakdown
 	@$(PRINT_STEP) "Analyzing Rust binary size"
 	cd rust && cargo bloat --release -n 30
+
+.PHONY: drift-schema-check
+drift-schema-check: require-dart ## Regenerate Drift schema and verify no diff
+	@$(PRINT_STEP) "Checking Drift schema consistency"
+	$(DART) run drift_dev schema dump lib/core/database/app_database.dart schema/
+	@cd schema && git diff --quiet drift_schema_v14.json || (echo "Schema drift detected! Run: dart run drift_dev schema dump" && exit 1)
 
 .PHONY: rust-size
 rust-size: ## Show Rust binary sizes
@@ -194,15 +229,73 @@ rust-nextest: ## Run Rust tests with cargo-nextest (faster)
 .PHONY: rust-nextest-ci
 rust-nextest-ci: ## Run Rust tests with nextest (CI mode, no re-runs)
 	@$(PRINT_STEP) "Running Rust tests (CI mode)"
-	cd rust && cargo nextest run --failure-quick
+	cd rust && cargo nextest run --fail-fast
+
+.PHONY: miri-setup
+miri-setup: require-rust ## Install Miri (nightly + component) for UB detection
+	@$(PRINT_STEP) "Installing Miri"
+	rustup toolchain install nightly --component miri 2>&1
+
+.PHONY: miri-check
+miri-check: require-rust ## Run fast deterministic Rust UB smoke tests under Miri
+	@$(PRINT_STEP) "Running Miri UB smoke checks"
+	@NIGHTLY_BIN="$$(dirname "$$(rustup which --toolchain nightly cargo 2>/dev/null)")"; \
+	if [ -n "$$NIGHTLY_BIN" ] && PATH="$$NIGHTLY_BIN:$$PATH" rustup run nightly cargo miri --version >/dev/null 2>&1; then \
+		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows" rustup run nightly cargo miri test --lib miri_smoke_tests && \
+		$(PRINT_OK) "Miri checks passed"; \
+	else \
+		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \
+		exit 1; \
+	fi
+
+.PHONY: miri-full
+miri-full: require-rust ## Run the complete Rust test suite under Miri (slow, manual/CI)
+	@$(PRINT_STEP) "Running full Miri UB checks"
+	@NIGHTLY_BIN="$$(dirname "$$(rustup which --toolchain nightly cargo 2>/dev/null)")"; \
+	if [ -n "$$NIGHTLY_BIN" ] && PATH="$$NIGHTLY_BIN:$$PATH" rustup run nightly cargo miri --version >/dev/null 2>&1; then \
+		cd rust && PATH="$$NIGHTLY_BIN:$$PATH" MIRIFLAGS="-Zmiri-tree-borrows" rustup run nightly cargo miri test && \
+		$(PRINT_OK) "Full Miri checks passed"; \
+	else \
+		$(PRINT_ERROR) "Miri is unavailable — install it with: make miri-setup"; \
+		exit 1; \
+	fi
+
+# ── Benchmark ──────────────────────────────────────────────────────────────────
+
+.PHONY: trace-startup
+trace-startup: require-flutter ## Build profile APK with --trace-startup and launch
+	@$(PRINT_STEP) "Building profile APK with startup tracing"
+	@set -o pipefail; $(FLUTTER) build apk --profile --target lib/main.dart --trace-startup 2>&1 | tee build/startup_trace.log
+	@if grep -q '"timeToFirstFrameMicros"' build/startup_trace.log 2>/dev/null; then \
+		$(PRINT_OK) "Startup trace logged in build/startup_trace.log"; \
+	else \
+		$(PRINT_WARN) "Install build/app/outputs/flutter-apk/app-profile.apk and launch manually"; \
+	fi
+
+.PHONY: benchmark
+benchmark: require-flutter ## Run integration benchmark on connected device
+	@$(PRINT_STEP) "Running benchmark trace"
+	@if [ -z "$$(adb devices 2>/dev/null | grep -v List | grep -v '^$$' | head -1)" ]; then \
+		$(PRINT_WARN) "No device connected — run with a device attached"; exit 1; \
+	fi
+	@$(FLUTTER) test integration_test/benchmark_test.dart --profile \
+		&& $(PRINT_OK) "Benchmark complete — trace in build/benchmark/"
+
+# ── Fix / Check ────────────────────────────────────────────────────────────────
 
 .PHONY: fix-all
 fix-all: get npm-install-nvm install-python-tools format fix prettier ruff-format ruff-fix rustfmt rust-clippy-fix ## Apply all automatic fixes and formatting
 	@$(PRINT_OK) "Automatic fixes completed"
 
+.PHONY: check-fast
+check-fast: format-check analyze test ## Run deterministic format, analysis, and tests
+
 .PHONY: check-all
-check-all: install-python-tools format-check prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-deny rust-sort-check ## Run all local linting and formatting checks
+check-all: check-fast install-python-tools prettier-check ruff-check shellcheck diagnostics-strict rustfmt-check rust-clippy rust-sort-check ## Run all local linting and formatting checks
 	@$(PRINT_OK) "All checks completed"
+
+.PHONY: check-deep
+check-deep: check-all rust-deny rust-audit miri-check ## Run optional deep dependency and UB checks
 
 .PHONY: check
 check: check-all ## Alias for check-all

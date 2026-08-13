@@ -97,8 +97,8 @@ class FullTextSearchService {
     await _ensureFtsTable();
     if (query.trim().isEmpty) return const [];
 
-    // Sanitize query for FTS5: wrap in quotes to handle special chars
-    final sanitized = query.replaceAll('"', '""');
+    // Treat user input as a literal FTS5 phrase rather than an FTS expression.
+    final sanitized = '"${query.replaceAll('"', '""')}"';
 
     try {
       final rows = await _db

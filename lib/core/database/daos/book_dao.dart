@@ -9,7 +9,31 @@ part 'book_dao.g.dart';
 class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   BookDao(super.attachedDatabase);
 
-  Future<List<SavedBook>> getAllBooks() async => select(savedBooks).get();
+  Future<List<SavedBook>> getAllBooks() async =>
+      (select(savedBooks)..where((t) => t.deletedAt.isNull())).get();
+
+  Future<List<SavedBook>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    List<OrderingTerm Function($SavedBooksTable t)>? orderBy,
+    String? formatFilter,
+    List<String>? bookIds,
+  }) async {
+    final query = select(savedBooks)
+      ..where(
+        (t) =>
+            t.deletedAt.isNull() &
+            (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)) &
+            (bookIds != null ? t.id.isIn(bookIds) : const Constant(true)),
+      )
+      ..limit(limit, offset: offset);
+    if (orderBy != null) {
+      query.orderBy(orderBy);
+    } else {
+      query.orderBy([(t) => OrderingTerm.desc(t.addedAt)]);
+    }
+    return query.get();
+  }
 
   Future<List<SavedBook>> searchBooks(String query) async {
     final lower = '%$query%';
@@ -18,6 +42,24 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
             (t) => t.title.like(lower) | t.description.like(lower),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)]))
+        .get();
+  }
+
+  Future<List<SavedBook>> searchBooksPaged(
+    String query, {
+    required int limit,
+    int offset = 0,
+    String? formatFilter,
+  }) async {
+    final lower = '%$query%';
+    return (select(savedBooks)
+          ..where(
+            (t) =>
+                (t.title.like(lower) | t.description.like(lower)) &
+                (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.title)])
+          ..limit(limit, offset: offset))
         .get();
   }
 
@@ -40,10 +82,39 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
 
   Future<int> deleteBook(String id) => (delete(savedBooks)..where((t) => t.id.equals(id))).go();
 
+  Future<int> softDeleteBook(String id) =>
+      (update(savedBooks)..where((t) => t.id.equals(id))).write(
+        SavedBooksCompanion(deletedAt: Value(DateTime.now())),
+      );
+
+  Future<int> restoreBook(String id) => (update(savedBooks)..where((t) => t.id.equals(id))).write(
+    const SavedBooksCompanion(deletedAt: Value(null)),
+  );
+
+  Future<List<SavedBook>> getDeletedBooks() =>
+      (select(savedBooks)..where((t) => t.deletedAt.isNotNull())).get();
+
+  Future<int> purgeDeletedBooks() =>
+      (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
+
   Future<int> updateReadingStatus(String bookId, String status) =>
       (update(savedBooks)..where((t) => t.id.equals(bookId))).write(
         SavedBooksCompanion(readingStatus: Value(status)),
       );
+
+  Future<int> updateBook({
+    required String bookId,
+    String? title,
+    List<String>? authorIds,
+    String? description,
+  }) {
+    final companion = SavedBooksCompanion(
+      title: title != null ? Value(title) : const Value.absent(),
+      authorIds: authorIds != null ? Value(authorIds) : const Value.absent(),
+      description: description != null ? Value(description) : const Value.absent(),
+    );
+    return (update(savedBooks)..where((t) => t.id.equals(bookId))).write(companion);
+  }
 
   Future<ReadingProgressData?> getReadingProgress(String bookId) async =>
       (select(readingProgress)..where((t) => t.bookId.equals(bookId))).getSingleOrNull();
@@ -53,6 +124,31 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
 
   Future<int> deleteReadingProgress(String bookId) =>
       (delete(readingProgress)..where((t) => t.bookId.equals(bookId))).go();
+
+  Future<List<SavedBook>> getPagedBooksWithProgress({
+    required int limit,
+    int offset = 0,
+    bool ascending = true,
+    String? formatFilter,
+    List<String>? bookIds,
+  }) async {
+    final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
+    final query =
+        select(savedBooks).join([
+            leftOuterJoin(readingProgress, readingProgress.bookId.equalsExp(savedBooks.id)),
+          ])
+          ..where(
+            savedBooks.deletedAt.isNull() &
+                (formatFilter != null
+                    ? savedBooks.filePath.like('%.$formatFilter')
+                    : const Constant(true)) &
+                (bookIds != null ? savedBooks.id.isIn(bookIds) : const Constant(true)),
+          )
+          ..orderBy([OrderingTerm(expression: readingProgress.progressPercent, mode: direction)])
+          ..limit(limit, offset: offset);
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(savedBooks)).toList();
+  }
 
   Future<List<SavedBook>> getBooksWithProgress() async {
     final query = select(savedBooks).join([

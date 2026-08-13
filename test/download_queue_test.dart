@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:glibusta/core/notifications/download_notification_service.dart';
+import 'package:glibusta/core/services/task_queue_service.dart';
 import 'package:glibusta/features/downloads/data/background_download_service.dart';
 import 'package:glibusta/features/downloads/domain/download_repository.dart';
 import 'package:glibusta/features/downloads/presentation/download_queue.dart';
@@ -16,11 +19,14 @@ class MockDownloadNotificationService extends Mock implements DownloadNotificati
 
 class MockBookImportService extends Mock implements BookImportService {}
 
+class MockTaskQueueService extends Mock implements TaskQueueService {}
+
 void main() {
   late MockDownloadRepository mockRepo;
   late MockBackgroundDownloadService mockBgDownload;
   late MockDownloadNotificationService mockNotificationService;
   late MockBookImportService mockBookImport;
+  late MockTaskQueueService mockTaskQueue;
 
   setUpAll(() {
     registerFallbackValue(DownloadStatus.queued);
@@ -45,6 +51,7 @@ void main() {
     mockBgDownload = MockBackgroundDownloadService();
     mockNotificationService = MockDownloadNotificationService();
     mockBookImport = MockBookImportService();
+    mockTaskQueue = MockTaskQueueService();
     when(() => mockNotificationService.cancel(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showCompleted(any())).thenAnswer((_) async {});
     when(() => mockNotificationService.showFailed(any(), any())).thenAnswer((_) async {});
@@ -54,9 +61,143 @@ void main() {
         speedBytesPerSec: any(named: 'speedBytesPerSec'),
       ),
     ).thenAnswer((_) async {});
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => const []);
   });
 
   group('DownloadQueue.enqueue', () {
+    test('reuses a persisted active download before the downloads stream is opened', () async {
+      const persistedTask = DownloadTask(
+        id: 'persisted-task',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      const duplicateTask = DownloadTask(
+        id: 'duplicate-task',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [persistedTask]);
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) async => duplicateTask);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => duplicateTask.id);
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+        mockTaskQueue,
+      );
+      addTearDown(queue.dispose);
+
+      final taskId = await queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+
+      expect(taskId, persistedTask.id);
+      verifyNever(
+        () => mockRepo.startDownload(
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      );
+    });
+
+    test('coalesces simultaneous requests for the same book and format', () async {
+      const task = DownloadTask(
+        id: 'task-1',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.queued,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      );
+      final startDownload = Completer<DownloadTask>();
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) => startDownload.future);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => task.id);
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+        mockTaskQueue,
+      );
+      addTearDown(queue.dispose);
+
+      final first = queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+      final second = queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+
+      await Future<void>.delayed(Duration.zero);
+      verify(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).called(1);
+
+      startDownload.complete(task);
+
+      expect(await first, task.id);
+      expect(await second, task.id);
+    });
+
     test('calls repo.startDownload with correct params', () async {
       const task = DownloadTask(
         id: 'task-1',
@@ -93,6 +234,7 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
 
       await queue.enqueue(
@@ -125,12 +267,105 @@ void main() {
         mockBgDownload,
         mockNotificationService,
         mockBookImport,
+        mockTaskQueue,
       );
+      when(() => mockBgDownload.cancel(any())).thenAnswer((_) async {});
       await queue.remove('task-99');
 
       verify(() => mockRepo.removeDownload('task-99')).called(1);
 
       queue.dispose();
     });
+  });
+
+  test(
+    'emits updated download data when progress changes',
+    () async {
+      const task = DownloadTask(
+        id: 'task-progress',
+        bookId: 'book-1',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+        targetPath: '/tmp/book-1.epub',
+        status: DownloadStatus.running,
+        downloadedBytes: 0,
+        totalBytes: 100,
+      );
+      when(
+        () => mockRepo.startDownload(
+          bookId: 'book-1',
+          bookTitle: 'Test Book',
+          format: BookFormat.epub,
+          sourceUrl: 'https://example.com/b/book-1/epub',
+        ),
+      ).thenAnswer((_) async => task);
+      when(
+        () => mockBgDownload.enqueue(
+          taskId: any(named: 'taskId'),
+          bookId: any(named: 'bookId'),
+          bookTitle: any(named: 'bookTitle'),
+          format: any(named: 'format'),
+          sourceUrl: any(named: 'sourceUrl'),
+        ),
+      ).thenAnswer((_) async => task.id);
+
+      final queue = DownloadQueue(
+        mockRepo,
+        mockBgDownload,
+        mockNotificationService,
+        mockBookImport,
+        mockTaskQueue,
+      );
+      final progressUpdate = Completer<List<DownloadTask>>();
+      final updates = queue.onDownloadsChanged.listen((tasks) {
+        if (tasks.length == 1 &&
+            tasks.single.downloadedBytes == 50 &&
+            !progressUpdate.isCompleted) {
+          progressUpdate.complete(tasks);
+        }
+      });
+      addTearDown(() async {
+        await updates.cancel();
+        queue.dispose();
+      });
+
+      await Future<void>.delayed(Duration.zero);
+      await queue.enqueue(
+        bookId: 'book-1',
+        bookTitle: 'Test Book',
+        format: BookFormat.epub,
+        sourceUrl: 'https://example.com/b/book-1/epub',
+      );
+      queue.onProgressChanged(task.id, 50, 100);
+
+      expect(await progressUpdate.future, hasLength(1));
+    },
+    timeout: const Timeout(Duration(seconds: 2)),
+  );
+
+  test('loads persisted downloads for a new queue instance', () async {
+    const persistedTask = DownloadTask(
+      id: 'persisted-task',
+      bookId: 'book-1',
+      format: BookFormat.epub,
+      sourceUrl: 'https://example.com/b/book-1/epub',
+      targetPath: '/tmp/book-1.epub',
+      status: DownloadStatus.paused,
+      downloadedBytes: 25,
+      totalBytes: 100,
+    );
+    when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [persistedTask]);
+    final queue = DownloadQueue(
+      mockRepo,
+      mockBgDownload,
+      mockNotificationService,
+      mockBookImport,
+      mockTaskQueue,
+    );
+    addTearDown(queue.dispose);
+
+    final initialTasks = await queue.onDownloadsChanged.first;
+
+    expect(initialTasks, [persistedTask]);
   });
 }

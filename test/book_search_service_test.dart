@@ -27,7 +27,7 @@ void main() {
         final book = _makeBook([
           ['Hello World', 'Flutter is great', 'Dart language'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('flutter');
         expect(results, hasLength(1));
         expect(results.first.matchText, 'Flutter is great');
@@ -40,7 +40,7 @@ void main() {
         final book = _makeBook([
           ['Hello World'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(await service.search(''), isEmpty);
         expect(await service.search('   '), isEmpty);
       });
@@ -49,14 +49,14 @@ void main() {
         final book = _makeBook([
           ['Hello World'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(await service.search('xyz'), isEmpty);
       });
 
       test('respects maxResults limit', () async {
         final paragraphs = List.generate(100, (i) => 'Match word in paragraph $i');
         final book = _makeBook([paragraphs]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('match', maxResults: 5);
         expect(results, hasLength(5));
       });
@@ -65,7 +65,7 @@ void main() {
         final book = _makeBook([
           ['Before paragraph', 'Target paragraph', 'After paragraph'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('Target');
         expect(results.first.beforeContext, 'Before paragraph');
         expect(results.first.afterContext, 'After paragraph');
@@ -75,7 +75,7 @@ void main() {
         final book = _makeBook([
           ['First paragraph', 'Second paragraph'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('First');
         expect(results.first.beforeContext, '');
         expect(results.first.afterContext, 'Second paragraph');
@@ -85,7 +85,7 @@ void main() {
         final book = _makeBook([
           ['First paragraph', 'Last paragraph'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('Last');
         expect(results.first.beforeContext, 'First paragraph');
         expect(results.first.afterContext, '');
@@ -97,7 +97,7 @@ void main() {
           ['Chapter two text'],
           ['Chapter three text'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = await service.search('text');
         expect(results, hasLength(3));
         expect(results[0].chapterIndex, 0);
@@ -109,7 +109,7 @@ void main() {
         final book = _makeBook([
           ['Hello', '', '   ', 'World'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(service.totalParagraphs, 2);
       });
     });
@@ -118,7 +118,7 @@ void main() {
       test('cancelPending stops stale search', () async {
         final paragraphs = List.generate(10000, (i) => 'Word $i match');
         final book = _makeBook([paragraphs]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
 
         final future = service.search('match');
         service.cancelPending();
@@ -132,7 +132,7 @@ void main() {
         final book = _makeBook([
           ['The quick brown fox jumps over the lazy dog'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = service.suggestions('quick');
         expect(results, hasLength(1));
         expect(results.first, contains('quick'));
@@ -142,7 +142,7 @@ void main() {
         final book = _makeBook([
           ['Hello World'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(service.suggestions(''), isEmpty);
         expect(service.suggestions('   '), isEmpty);
       });
@@ -153,7 +153,7 @@ void main() {
           (i) => 'UniqueWord$i appears in paragraph $i with UniqueWord$i',
         );
         final book = _makeBook([paragraphs]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = service.suggestions('Unique', maxSuggestions: 3);
         expect(results, hasLength(3));
       });
@@ -162,7 +162,7 @@ void main() {
         final book = _makeBook([
           ['Same text here', 'Same text here'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = service.suggestions('Same');
         expect(results, hasLength(1));
       });
@@ -172,7 +172,7 @@ void main() {
         final book = _makeBook([
           [longText],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = service.suggestions('match');
         expect(results.first, startsWith('…'));
       });
@@ -181,7 +181,7 @@ void main() {
         final book = _makeBook([
           ['match is here'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         final results = service.suggestions('match');
         expect(results.first, isNot(startsWith('…')));
       });
@@ -193,13 +193,13 @@ void main() {
           ['A', 'B'],
           ['C', '', 'D'],
         ]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(service.totalParagraphs, 4);
       });
 
       test('returns 0 for empty book', () {
         final book = _makeBook([]);
-        final service = BookSearchService(book);
+        final service = BookSearchService(book, '/dummy');
         expect(service.totalParagraphs, 0);
       });
     });

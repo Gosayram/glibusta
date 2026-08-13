@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:glibusta/shared/models/book.dart';
+import 'package:glibusta/features/reader/data/parsers/format_detector.dart';
 import 'package:glibusta/shared/models/search_query.dart';
 
 void main() {
@@ -45,6 +45,21 @@ void main() {
       expect(BookFormat.values, contains(BookFormat.cbz));
       expect(BookFormat.values, contains(BookFormat.cbr));
       expect(BookFormat.values, contains(BookFormat.unknown));
+    });
+  });
+
+  group('Import format detection', () {
+    test('routes macro-enabled Word documents through the DOCX parser', () {
+      expect(detectBookFormat('book.docm'), BookFormat.docx);
+      expect(formatForExtension('DOCM'), BookFormat.docx);
+      expect(importableExtensions, contains('docm'));
+    });
+
+    test('picker exposes every parser-backed document and comic extension', () {
+      expect(
+        importableExtensions,
+        containsAll(['docx', 'docm', 'cbz', 'cbr']),
+      );
     });
   });
 

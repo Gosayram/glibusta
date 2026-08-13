@@ -1,25 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
-import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/formats/book_file_size_policy.dart';
 import '../../../core/formats/format_capability.dart';
-
 import '../../../core/logging/app_logger.dart';
 import '../../../core/platform/app_file_storage.dart';
 import '../../../core/storage/external_book_file.dart';
 import '../../../core/storage/storage_bridge.dart';
-
+import '../../../src/rust/api/api/api.dart' as rust_api;
+import '../../reader/data/parsers/book_parser.dart';
 import '../../reader/data/parsers/format_detector.dart';
 import '../../reader/data/parsers/normalized_book.dart';
-import '../../reader/data/parsers/parser_registry.dart';
+import '../../reader/data/parsers/parser_lookup.dart';
 import 'cover_extraction_service.dart';
 import 'inspectors/book_inspection_result.dart';
 
@@ -36,15 +37,32 @@ class BookImportService {
   final CoverExtractionService _coverService;
   final _logger = AppLogger();
 
-  BookImportService(this._database, this._storage, this._coverService);
+  BookImportService(
+    this._database,
+    this._storage,
+    this._coverService, {
+    List<BookParser>? parsers,
+  }) : _overrides = parsers != null
+           ? {
+               for (final p in parsers)
+                 for (final f in BookFormat.values)
+                   if (p.supports(f)) f: p,
+             }
+           : null;
+  final Map<BookFormat, BookParser>? _overrides;
+  final Map<String, Future<ImportResult>> _importLocks = {};
 
-  final _registry = BookParserRegistry.defaultInstance;
-  final Map<String, Completer<void>> _importLocks = {};
+  BookParser? _parserForExtension(String ext) =>
+      _overrides?[formatForExtension(ext)] ?? lookupParserForExtension(ext);
 
-  static String generateAuthorId(String name) {
+  BookParser _parserFor(BookFormat fmt) => _overrides?[fmt] ?? lookupParserFor(fmt);
+  final Map<String, Future<ImportResult>> _contentImportLocks = {};
+
+  static Future<String> generateAuthorId(String name) async {
     final normalized = name.trim().toLowerCase();
     final bytes = utf8.encode(normalized);
-    return 'author_${sha256.convert(bytes).toString().substring(0, 16)}';
+    final hash = await rust_api.sha256Hash(bytes: bytes);
+    return 'author_${hash.substring(0, 16)}';
   }
 
   /// Import a file from its inspection result.
@@ -71,22 +89,12 @@ class BookImportService {
       );
     }
 
-    final normalizedPath = inspection.path.replaceAll(r'\', '/');
-    final existingLock = _importLocks[normalizedPath];
-    if (existingLock != null) {
-      await existingLock.future;
-    }
-    final lock = Completer<void>();
-    _importLocks[normalizedPath] = lock;
-    try {
+    return _coalesceImport(inspection.path, () async {
       if (inspection.decision == ImportDecision.importAsDocument) {
         return _doDocumentImport(inspection);
       }
       return _doImport(inspection.path, forcedEncoding: inspection.encoding);
-    } finally {
-      lock.complete();
-      _importLocks.remove(normalizedPath);
-    }
+    });
   }
 
   /// Import a file by path (runs full inspection + import).
@@ -107,15 +115,8 @@ class BookImportService {
     if (isBookFileTooLarge(format, size)) {
       return ImportResult.failure(bookFileTooLargeMessage(format, size));
     }
-    final normalizedPath = filePath.replaceAll(r'\', '/');
-    final existingLock = _importLocks[normalizedPath];
-    if (existingLock != null) {
-      await existingLock.future;
-    }
-    final lock = Completer<void>();
-    _importLocks[normalizedPath] = lock;
-    try {
-      if (const FormatCapabilityService().isDocumentOnly(format)) {
+    return _coalesceImport(filePath, () async {
+      if (format.isDocumentOnly) {
         return _doDocumentImport(
           BookFileInspectionResult(
             path: filePath,
@@ -127,10 +128,71 @@ class BookImportService {
         );
       }
       return _doImport(filePath);
-    } finally {
-      lock.complete();
-      _importLocks.remove(normalizedPath);
+    });
+  }
+
+  /// Shares one in-flight import result among requests for the same local file.
+  ///
+  /// A wait-then-retry lock still runs a second import after the first finishes,
+  /// which can turn a simultaneous import into a spurious "duplicate" result.
+  Future<ImportResult> _coalesceImport(
+    String filePath,
+    Future<ImportResult> Function() import,
+  ) {
+    final normalizedPath = filePath.replaceAll(r'\', '/');
+    return _coalesceByKey(_importLocks, normalizedPath, import);
+  }
+
+  /// Shares one in-flight import after its content identity is known.
+  ///
+  /// The format and explicit encoding remain part of the key because both can
+  /// change how identical bytes are interpreted.
+  Future<ImportResult> _coalesceContentImport(
+    _ImportCtx ctx,
+    Future<ImportResult> Function() import,
+  ) {
+    final key = _contentImportKey(ctx.contentHash, ctx.format, ctx.forcedEncoding);
+    return _coalesceByKey(_contentImportLocks, key, import);
+  }
+
+  Future<ImportResult> _coalesceExternalContentImport({
+    required String contentHash,
+    required BookFormat format,
+    required File cacheFile,
+    required Future<ImportResult> Function() import,
+  }) async {
+    final key = _contentImportKey(contentHash, format, null);
+    final activeImport = _contentImportLocks[key];
+    if (activeImport != null) {
+      await _tryDelete(cacheFile.path);
+      return activeImport;
     }
+    return _coalesceByKey(_contentImportLocks, key, import);
+  }
+
+  String _contentImportKey(String contentHash, BookFormat format, String? forcedEncoding) =>
+      '$contentHash:${format.name}:${forcedEncoding ?? ''}';
+
+  Future<ImportResult> _coalesceByKey(
+    Map<String, Future<ImportResult>> locks,
+    String key,
+    Future<ImportResult> Function() import,
+  ) {
+    final activeImport = locks[key];
+    if (activeImport != null) return activeImport;
+
+    late final Future<ImportResult> result;
+    result = Future.sync(import).whenComplete(() {
+      if (identical(locks[key], result)) {
+        final removedImport = locks.remove(key);
+        assert(
+          identical(removedImport, result),
+          'An import lock must only remove its own in-flight result.',
+        );
+      }
+    });
+    locks[key] = result;
+    return result;
   }
 
   Future<ImportResult> _doImport(String filePath, {String? forcedEncoding}) async {
@@ -140,7 +202,10 @@ class BookImportService {
     if (inspectResult != null) return inspectResult;
 
     await _readAndHash(ctx);
+    return _coalesceContentImport(ctx, () => _completeBookImport(ctx));
+  }
 
+  Future<ImportResult> _completeBookImport(_ImportCtx ctx) async {
     final dedupResult = await _deduplicate(ctx);
     if (dedupResult != null) return dedupResult;
 
@@ -151,7 +216,7 @@ class BookImportService {
       await _copyToStorage(ctx);
       await _registerBookInDb(ctx);
     } on Object catch (e) {
-      _logger.warning('Import failed for $filePath: $e', name: 'Import', error: e);
+      _logger.warning('Import failed for ${ctx.filePath}: $e', name: 'Import', error: e);
       await _cleanupFailedImport(ctx);
       return ImportResult.failure(_friendlyImportError(e));
     }
@@ -167,19 +232,22 @@ class BookImportService {
     if (inspectResult != null) return inspectResult;
 
     await _readAndHash(ctx);
+    return _coalesceContentImport(ctx, () => _completeDocumentImport(ctx));
+  }
 
+  Future<ImportResult> _completeDocumentImport(_ImportCtx ctx) async {
     final dedupResult = await _deduplicate(ctx);
     if (dedupResult != null) return dedupResult;
 
     ctx.title =
-        inspection.title ?? inspection.path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
+        ctx.inspection!.title ?? ctx.filePath.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '');
 
     try {
       await _copyToStorage(ctx);
       await _registerDocumentInDb(ctx);
     } on Object catch (e) {
       _logger.warning(
-        'Document import failed for ${inspection.path}: $e',
+        'Document import failed for ${ctx.filePath}: $e',
         name: 'Import',
         error: e,
       );
@@ -222,14 +290,17 @@ class BookImportService {
   }
 
   Future<void> _readAndHash(_ImportCtx ctx) async {
-    ctx.bytes = await ctx.file.readAsBytes();
-    if (ctx.bytes.isEmpty) {
+    final fileSize = await ctx.file.length();
+    if (fileSize == 0) {
       throw StateError('Файл пуст: ${ctx.filePath}');
     }
-    ctx.fileSize = ctx.bytes.length;
+    if (isBookFileTooLarge(ctx.format, fileSize)) {
+      throw StateError(bookFileTooLargeMessage(ctx.format, fileSize));
+    }
+    ctx.fileSize = fileSize;
     ctx.contentHash = ctx.inspection != null && ctx.inspection!.hash.isNotEmpty
         ? ctx.inspection!.hash
-        : sha256.convert(ctx.bytes).toString();
+        : await rust_api.calculateHash(path: ctx.filePath);
     ctx.bookId = ctx.contentHash;
   }
 
@@ -251,31 +322,47 @@ class BookImportService {
 
   Future<ImportResult?> _parseMetadata(_ImportCtx ctx) async {
     final parser =
-        _registry.parserForExtension(ctx.ext) ??
-        (ctx.ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
+        _parserForExtension(ctx.ext) ?? (ctx.ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
     if (parser == null) {
       return ImportResult.failure(_unsupportedReaderMessage(ctx.ext));
     }
 
     try {
-      ctx.book = await parser.parse(
-        ctx.bytes,
-        fileName: ctx.filePath.split('/').last,
-        forcedEncoding: ctx.forcedEncoding,
-      );
-      if (ctx.book!.metadata != null) {
-        ctx.coverBytes = ctx.book!.metadata!['mobiCoverBytes'] as Uint8List?;
+      try {
+        ctx.book = await _parseBook(parser, ctx);
+      } on ParserFailure catch (_) {
+        if (ctx.ext != 'zip') rethrow;
+        ctx.book = await _parseBook(_parserFor(BookFormat.cbz), ctx);
+        ctx.format = BookFormat.cbz;
       }
+
+      ctx.coverBytes = _coverBytesForBook(ctx.book!);
     } on Object catch (e) {
       return ImportResult.failure(_friendlyImportError(e));
     }
     return null;
   }
 
+  Future<NormalizedBook> _parseBook(BookParser parser, _ImportCtx ctx) async {
+    final forcedEncoding = ctx.forcedEncoding;
+    if (forcedEncoding == null) {
+      return parser.parseFile(ctx.filePath);
+    }
+    final bytes = ctx.bytes ??= await ctx.file.readAsBytes();
+    return parser.parse(
+      bytes,
+      fileName: ctx.filePath.split('/').last,
+      forcedEncoding: forcedEncoding,
+    );
+  }
+
   Future<void> _copyToStorage(_ImportCtx ctx) async {
     ctx.targetFile = await _storage.bookFile(ctx.bookId, ctx.format);
     await ctx.targetFile!.parent.create(recursive: true);
-    await ctx.file.copy(ctx.targetFile!.path);
+    await Isolate.run(() {
+      // ignore: avoid_slow_async_io
+      File(ctx.file.path).copySync(ctx.targetFile!.path);
+    });
   }
 
   Future<void> _registerBookInDb(_ImportCtx ctx) async {
@@ -283,7 +370,7 @@ class BookImportService {
     ctx.authorIds = [];
     final authorCompanions = <AuthorsCompanion>[];
     for (final authorName in book.authors) {
-      final authorId = generateAuthorId(authorName);
+      final authorId = await generateAuthorId(authorName);
       ctx.authorIds.add(authorId);
       authorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
     }
@@ -412,56 +499,92 @@ class BookImportService {
       return ImportResult.failure(bookFileTooLargeMessage(format, external.size));
     }
 
-    late String bookId;
     File? cacheFile;
     try {
-      final cachedPath = await bridge.copyToCache(external.uri);
+      // SAF providers may report an unknown or stale size. Pass the same
+      // per-format policy to Android so it stops streaming before a too-large
+      // TXT (or any other format) consumes cache storage.
+      final cachedPath = await bridge.copyToCache(
+        external.uri,
+        maxBytes: maxReadableBookBytes(format),
+      );
       if (cachedPath == null) {
         return ImportResult.failure('Не удалось прочитать файл: ${external.name}');
       }
-      cacheFile = File(cachedPath);
-      if (!await cacheFile.exists() || await cacheFile.length() == 0) {
+      final cachedFile = File(cachedPath);
+      cacheFile = cachedFile;
+      if (!await cachedFile.exists() || await cachedFile.length() == 0) {
         await _tryDelete(cachedPath);
         return ImportResult.failure('Файл пуст: ${external.name}');
       }
 
-      final fileSize = await cacheFile.length();
+      final fileSize = await cachedFile.length();
       if (isBookFileTooLarge(format, fileSize)) {
         await _tryDelete(cachedPath);
         return ImportResult.failure(bookFileTooLargeMessage(format, fileSize));
       }
 
-      final digest = await sha256.bind(cacheFile.openRead()).first;
-      final contentHash = digest.toString();
-      bookId = contentHash;
+      final contentHash = await rust_api.calculateHash(path: cachedFile.path);
+      return _coalesceExternalContentImport(
+        contentHash: contentHash,
+        format: format,
+        cacheFile: cachedFile,
+        import: () => _importCachedExternalBook(
+          external: external,
+          cacheFile: cachedFile,
+          format: format,
+          fileSize: fileSize,
+          contentHash: contentHash,
+        ),
+      );
+    } on Object catch (e) {
+      _logger.warning(
+        'External import failed for ${external.name}: $e',
+        name: 'Import',
+        error: e,
+      );
+      if (cacheFile != null) {
+        await _tryDelete(cacheFile.path);
+      }
+      return ImportResult.failure(_friendlyImportError(e));
+    }
+  }
+
+  Future<ImportResult> _importCachedExternalBook({
+    required ExternalBookFile external,
+    required File cacheFile,
+    required BookFormat format,
+    required int fileSize,
+    required String contentHash,
+  }) async {
+    final ext = external.extension.toLowerCase();
+    final bookId = contentHash;
+    var resolvedFormat = format;
+    try {
       final existing = await _findByHash(contentHash);
       if (existing != null) {
-        await _tryDelete(cachedPath);
+        await _tryDelete(cacheFile.path);
         return ImportResult.duplicate(existing.title, contentHash, existingBookId: existing.id);
       }
 
-      final bytes = await cacheFile.readAsBytes();
-
-      if (const FormatCapabilityService().isDocumentOnly(format)) {
+      if (resolvedFormat.isDocumentOnly) {
         final title = external.name.replaceAll(RegExp(r'\.[^.]+$'), '');
-        final documentBookId = contentHash;
-        bookId = documentBookId;
-        final targetFile = await _storage.bookFile(documentBookId, format);
+        final targetFile = await _storage.bookFile(bookId, resolvedFormat);
         await targetFile.parent.create(recursive: true);
-        await cacheFile.rename(targetFile.path);
+        await _moveCacheFileToStorage(cacheFile, targetFile);
 
         await _database.transaction(() async {
           await _database
               .into(_database.savedBooks)
               .insertOnConflictUpdate(
                 SavedBooksCompanion.insert(
-                  id: documentBookId,
+                  id: bookId,
                   title: title,
                   authorIds: const Value([]),
-                  description: Value(_documentDescription(format)),
+                  description: Value(_documentDescription(resolvedFormat)),
                   sourceUrl: Value(external.uri),
                   contentHash: Value(contentHash),
-                  fileSize: Value(external.size),
+                  fileSize: Value(fileSize),
                   filePath: Value(targetFile.path),
                   storageMode: const Value('external'),
                   externalUri: Value(external.uri),
@@ -472,10 +595,10 @@ class BookImportService {
               .into(_database.downloads)
               .insertOnConflictUpdate(
                 DownloadsCompanion.insert(
-                  id: documentBookId,
-                  bookId: documentBookId,
+                  id: bookId,
+                  bookId: bookId,
                   bookTitle: Value(title),
-                  format: format.name,
+                  format: resolvedFormat.name,
                   sourceUrl: external.uri,
                   targetPath: Value(targetFile.path),
                   status: DownloadStatusDb.completed,
@@ -486,39 +609,33 @@ class BookImportService {
         return ImportResult.success(title);
       }
 
-      final parser =
-          _registry.parserForExtension(ext) ??
-          (ext == 'zip' ? _registry.parserFor(BookFormat.fb2) : null);
+      final parser = _parserForExtension(ext) ?? (ext == 'zip' ? _parserFor(BookFormat.fb2) : null);
       if (parser == null) {
         return ImportResult.failure(_unsupportedReaderMessage(ext));
       }
 
-      final book = await parser.parse(
-        bytes,
-        fileName: external.name,
-      );
-
-      Uint8List? extCoverBytes;
-      if (book.metadata != null) {
-        extCoverBytes = book.metadata!['mobiCoverBytes'] as Uint8List?;
+      late final NormalizedBook book;
+      try {
+        book = await parser.parseFile(cacheFile.path);
+      } on ParserFailure catch (_) {
+        if (ext != 'zip') rethrow;
+        book = await _parserFor(BookFormat.cbz).parseFile(cacheFile.path);
+        resolvedFormat = BookFormat.cbz;
       }
+
+      final extCoverBytes = _coverBytesForBook(book);
 
       final targetFile = await _storage.bookFile(
         bookId,
-        format,
+        resolvedFormat,
       );
       await targetFile.parent.create(recursive: true);
-      try {
-        await cacheFile.rename(targetFile.path);
-      } on Object catch (_) {
-        await cacheFile.copy(targetFile.path);
-        await _tryDelete(cacheFile.path);
-      }
+      await _moveCacheFileToStorage(cacheFile, targetFile);
 
       final extAuthorIds = <String>[];
       final extAuthorCompanions = <AuthorsCompanion>[];
       for (final authorName in book.authors) {
-        final authorId = generateAuthorId(authorName);
+        final authorId = await generateAuthorId(authorName);
         extAuthorIds.add(authorId);
         extAuthorCompanions.add(AuthorsCompanion.insert(id: authorId, name: authorName));
       }
@@ -538,7 +655,7 @@ class BookImportService {
                 coverUrl: Value(book.coverUrl),
                 sourceUrl: Value(external.uri),
                 contentHash: Value(contentHash),
-                fileSize: Value(external.size),
+                fileSize: Value(fileSize),
                 filePath: Value(targetFile.path),
                 storageMode: const Value('external'),
                 externalUri: Value(external.uri),
@@ -552,7 +669,7 @@ class BookImportService {
                 id: bookId,
                 bookId: bookId,
                 bookTitle: Value(book.title),
-                format: formatToDbString(formatForExtension(ext)),
+                format: formatToDbString(resolvedFormat),
                 sourceUrl: external.uri,
                 targetPath: Value(targetFile.path),
                 status: DownloadStatusDb.completed,
@@ -575,14 +692,9 @@ class BookImportService {
         name: 'Import',
         error: e,
       );
-      if (cacheFile != null) {
-        await _tryDelete(cacheFile.path);
-      }
+      await _tryDelete(cacheFile.path);
       try {
-        final targetFile = await _storage.bookFile(
-          bookId,
-          bookFormatForImportExtension(ext),
-        );
+        final targetFile = await _storage.bookFile(bookId, resolvedFormat);
         if (await targetFile.exists()) {
           await targetFile.delete();
         }
@@ -595,6 +707,17 @@ class BookImportService {
         );
       }
       return ImportResult.failure(_friendlyImportError(e));
+    }
+  }
+
+  /// Moves an SAF cache file into the app directory, copying across volumes
+  /// when the platform rejects an atomic rename.
+  Future<void> _moveCacheFileToStorage(File cacheFile, File targetFile) async {
+    try {
+      await cacheFile.rename(targetFile.path);
+    } on FileSystemException {
+      await cacheFile.copy(targetFile.path);
+      await _tryDelete(cacheFile.path);
     }
   }
 
@@ -626,7 +749,7 @@ class BookImportService {
     }
 
     final importableFiles = <File>[];
-    await for (final entity in dir.list(recursive: true)) {
+    await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
         final ext = entity.path.split('.').last.toLowerCase();
         if (importableExtensions.contains(ext)) {
@@ -700,7 +823,7 @@ class BookImportService {
   Future<SavedBook?> _findByHash(String hash) async {
     final rows = await (_database.select(
       _database.savedBooks,
-    )..where((t) => t.contentHash.equals(hash))).get();
+    )..where((t) => t.contentHash.equals(hash) & t.deletedAt.isNull())).get();
     return rows.isNotEmpty ? rows.first : null;
   }
 
@@ -749,6 +872,37 @@ class BookImportService {
       _logger.warning('Cover extraction failed for $bookId: $e', name: 'Import', error: e);
     }
   }
+
+  Uint8List? _coverBytesForBook(NormalizedBook book) {
+    final metadataCover = book.metadata?['mobiCoverBytes'];
+    if (metadataCover is Uint8List && metadataCover.isNotEmpty) {
+      return metadataCover;
+    }
+    return coverBytesFromDataUri(book.coverUrl);
+  }
+}
+
+/// Decodes parser-provided image data without allowing a malformed cover URL
+/// to fail book import. Rust MOBI parsing exposes cover data through `coverUrl`
+/// because arbitrary JSON metadata is opaque across the bridge.
+@visibleForTesting
+Uint8List? coverBytesFromDataUri(String? coverUrl, {int maxBytes = 50 * 1024 * 1024}) {
+  if (coverUrl == null) return null;
+  final separator = coverUrl.indexOf(',');
+  if (separator <= 0) return null;
+  final metadata = coverUrl.substring(0, separator).toLowerCase();
+  if (!metadata.startsWith('data:image/') || !metadata.contains(';base64')) {
+    return null;
+  }
+  final encoded = coverUrl.substring(separator + 1);
+  final maxEncodedBytes = ((maxBytes + 2) ~/ 3) * 4;
+  if (encoded.length > maxEncodedBytes) return null;
+  try {
+    final decoded = base64Decode(encoded);
+    return decoded.length <= maxBytes ? Uint8List.fromList(decoded) : null;
+  } on FormatException {
+    return null;
+  }
 }
 
 class _ImportCtx {
@@ -766,9 +920,9 @@ class _ImportCtx {
   String? externalUri;
 
   late final String ext;
-  late final BookFormat format;
+  late BookFormat format;
   late final File file;
-  late final Uint8List bytes;
+  Uint8List? bytes;
   late final int fileSize;
   late final String contentHash;
   String bookId = '';

@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 """Flibusta API Client — Python port of flibusta-api with full parsing."""
 
-import os
+import hashlib
 import re
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-from urllib.parse import urljoin, quote
+from typing import Any, Optional
+from urllib import robotparser
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 import requests
-import urllib3
 from bs4 import BeautifulSoup
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
@@ -21,16 +20,36 @@ OS_NS = "http://a9.com/-/spec/opensearch/1.1/"
 
 def _load_base_url() -> str:
     env = Path(__file__).parent.parent / ".env"
-    if env.exists():
-        for line in env.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("BASE_URL="):
-                return line.split("=", 1)[1].strip().rstrip("/")
-    return "https://www.flibusta.is"
+    if not env.exists():
+        raise RuntimeError(".env is required; run 'make env-decrypt' first")
+    for line in env.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("BASE_URL="):
+            return line.split("=", 1)[1].strip().rstrip("/")
+    raise RuntimeError("BASE_URL is required in .env")
 
 
 def _get_numbers(s: str) -> str:
-    return re.sub(r"\D", "", s)
+    match = re.search(r"/(\d+)(?:/|$)", urlsplit(s).path)
+    return match.group(1) if match else ""
+
+
+def _download_format(href: str, book_id: str) -> str | None:
+    path = urlsplit(href).path
+    direct = re.fullmatch(rf"/b/{re.escape(book_id)}/([a-z0-9]+)", path, re.IGNORECASE)
+    if direct and direct.group(1).lower() not in {"complain", "download", "mail", "read"}:
+        return direct.group(1).lower()
+    download = re.fullmatch(rf"/b/{re.escape(book_id)}/download/[^/]+\.([a-z0-9]+)", path, re.IGNORECASE)
+    return download.group(1).lower() if download else None
+
+
+def _normalize_base_url(base_url: str) -> str:
+    parsed = urlsplit(base_url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("BASE_URL must be an absolute http(s) URL")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("BASE_URL must not contain credentials, a query, or a fragment")
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", ""))
 
 
 # ── Data classes ──────────────────────────────────────────────────────────────
@@ -86,6 +105,7 @@ class OpdsDownload:
 
 @dataclass
 class OpdsBook:
+    id: str = ""
     authors: list = field(default_factory=list)  # list[OpdsAuthor]
     title: str = ""
     updated: str = ""
@@ -136,11 +156,32 @@ OPDS_MIME_TYPES = {
 }
 
 
+class RobotsDisallowedError(RuntimeError):
+    """Raised before a request that the configured origin disallows."""
+
+
 class FlibustaClient:
     """Flibusta API client — parses both HTML and OPDS endpoints."""
 
-    def __init__(self, base_url: Optional[str] = None):
-        self.base_url = (base_url or _load_base_url()).rstrip("/")
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        *,
+        connect_timeout_seconds: float = 5,
+        read_timeout_seconds: float = 20,
+        min_request_interval_seconds: float = 1,
+    ) -> None:
+        if connect_timeout_seconds <= 0 or read_timeout_seconds <= 0:
+            raise ValueError("request timeouts must be positive")
+        if min_request_interval_seconds < 0:
+            raise ValueError("min_request_interval_seconds must not be negative")
+        self.base_url = _normalize_base_url(base_url or _load_base_url())
+        self._origin = urlsplit(self.base_url).netloc
+        self._timeout = (connect_timeout_seconds, read_timeout_seconds)
+        self._min_request_interval_seconds = min_request_interval_seconds
+        self._last_request_at: Optional[float] = None
+        self._robots_parser: Optional[robotparser.RobotFileParser] = None
+        self._robots_metadata: Optional[dict[str, Any]] = None
         self.session = requests.Session()
         self.session.headers["User-Agent"] = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -149,24 +190,87 @@ class FlibustaClient:
         )
         self._logged_in = False
 
-    def _get(self, path: str, **kwargs) -> Optional[requests.Response]:
+    def _resolve_url(self, path: str) -> str:
+        url = urljoin(f"{self.base_url}/", path.lstrip("/"))
+        parsed = urlsplit(url)
+        if parsed.scheme != urlsplit(self.base_url).scheme or parsed.netloc != self._origin:
+            raise ValueError("Refusing a request outside BASE_URL")
+        return url
+
+    def _wait_for_request_slot(self, minimum_interval_seconds: float = 0) -> None:
+        if self._last_request_at is None:
+            return
+        interval = max(self._min_request_interval_seconds, minimum_interval_seconds)
+        remaining = interval - (time.monotonic() - self._last_request_at)
+        if remaining > 0:
+            time.sleep(remaining)
+
+    def _request_unchecked(
+        self, method: str, path: str, *, minimum_interval_seconds: float = 0, **kwargs: Any
+    ) -> Optional[requests.Response]:
+        self._wait_for_request_slot(minimum_interval_seconds)
+        kwargs.setdefault("allow_redirects", False)
         try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            return self.session.get(url, timeout=15, verify=False, **kwargs)
-        except Exception as e:
-            print(f"  ERR GET {path}: {e}")
+            response = self.session.request(
+                method,
+                self._resolve_url(path),
+                timeout=self._timeout,
+                **kwargs,
+            )
+            self._last_request_at = time.monotonic()
+            return response
+        except requests.RequestException as error:
+            print(f"  ERR {method} {path}: {error}")
             return None
 
-    def _post(self, path: str, data: dict, **kwargs) -> Optional[requests.Response]:
-        try:
-            url = urljoin(self.base_url + "/", path.lstrip("/"))
-            return self.session.post(
-                url, data=data, timeout=15, verify=False,
-                allow_redirects=True, **kwargs,
+    def robots_policy(self, user_agent: Optional[str] = None, path: str = "/") -> dict[str, Any]:
+        """Return the cached robots policy; fail closed when it cannot be read."""
+        agent = user_agent or self.session.headers["User-Agent"]
+        if self._robots_metadata is None:
+            response = self._request_unchecked("GET", "/robots.txt", headers={"User-Agent": agent})
+            if response is None or not 200 <= response.status_code < 300:
+                self._robots_metadata = {
+                    "fetched": False,
+                    "reason": "robots.txt request failed",
+                }
+            else:
+                parser = robotparser.RobotFileParser()
+                parser.parse(response.text.splitlines())
+                self._robots_parser = parser
+                self._robots_metadata = {
+                    "fetched": True,
+                    "status": response.status_code,
+                    "sha256": hashlib.sha256(response.content).hexdigest(),
+                }
+
+        policy = dict(self._robots_metadata)
+        crawl_delay = self._robots_parser.crawl_delay(agent) if self._robots_parser else None
+        policy["crawl_delay_seconds"] = crawl_delay
+        policy["effective_delay_seconds"] = max(self._min_request_interval_seconds, crawl_delay or 0)
+        policy["allowed"] = bool(self._robots_parser and self._robots_parser.can_fetch(agent, self._resolve_url(path)))
+        return policy
+
+    def _request(self, method: str, path: str, **kwargs: Any) -> Optional[requests.Response]:
+        if path.rstrip("/") != "/robots.txt":
+            headers = kwargs.get("headers") or {}
+            policy = self.robots_policy(headers.get("User-Agent"), path)
+            if not policy["allowed"]:
+                raise RobotsDisallowedError(
+                    f"robots.txt disallows requests to {self._resolve_url(path)}; audit only with permission"
+                )
+            return self._request_unchecked(
+                method,
+                path,
+                minimum_interval_seconds=policy["effective_delay_seconds"],
+                **kwargs,
             )
-        except Exception as e:
-            print(f"  ERR POST {path}: {e}")
-            return None
+        return self._request_unchecked(method, path, **kwargs)
+
+    def _get(self, path: str, **kwargs: Any) -> Optional[requests.Response]:
+        return self._request("GET", path, **kwargs)
+
+    def _post(self, path: str, data: dict, **kwargs: Any) -> Optional[requests.Response]:
+        return self._request("POST", path, data=data, **kwargs)
 
     # ── Auth ──────────────────────────────────────────────────────────────────
 
@@ -259,22 +363,75 @@ class FlibustaClient:
                 return ul
         return None
 
+    def _book_search_results(self, soup: BeautifulSoup) -> list[BooksByName]:
+        """Parse list and table layouts seen in local search fixtures."""
+        main = soup.select_one("#main") or soup
+        items = []
+        results_ul = self._find_results_ul(soup, "/b/")
+        if results_ul:
+            items = results_ul.find_all("li", recursive=False)
+        else:
+            table = main.select_one("table.series")
+            if table:
+                items = table.find_all("tr")
+
+        results = []
+        for item in items:
+            links = item.find_all("a", href=True)
+            book_link = next(
+                (link for link in links if re.fullmatch(r"/b/\d+", link["href"])), None
+            )
+            if book_link is None:
+                continue
+            book_id = _get_numbers(book_link["href"])
+            book_name = book_link.get_text(strip=True)
+            if not book_id or not book_name:
+                continue
+            authors = []
+            for link in links:
+                href = link["href"]
+                author_id = _get_numbers(href) if href.startswith("/a/") else ""
+                author_name = link.get_text(strip=True)
+                if author_id and author_name:
+                    authors.append(Author(id=int(author_id), name=author_name))
+            results.append(BooksByName(book=Book(id=int(book_id), name=book_name), authors=authors))
+        return results
+
+    def _linked_books(self, soup: BeautifulSoup) -> list[dict[str, str]]:
+        """Return one title link per book, excluding read/download-format links."""
+        books = []
+        seen_ids = set()
+        for link in soup.find_all("a", href=True):
+            match = re.fullmatch(r"/b/(\d+)", urlsplit(link["href"]).path)
+            if match is None:
+                continue
+            book_id = match.group(1)
+            name = link.get_text(strip=True)
+            if name and book_id not in seen_ids:
+                books.append({"id": book_id, "name": name})
+                seen_ids.add(book_id)
+        return books
+
     def _remove_pager(self, soup: BeautifulSoup) -> BeautifulSoup:
-        for pager in soup.select("div.item-list .pager"):
+        for pager in soup.select("div.item-list .pager, .pager"):
             pager.decompose()
         return soup
 
     def _get_page_info(self, soup: BeautifulSoup) -> dict:
-        pager = soup.select_one("div.item-list .pager")
+        pager = soup.select_one("div.item-list .pager, .pager")
         if not pager:
             return {"total_pages": 1, "has_next": False, "has_previous": False}
 
-        pager_items = pager.find_all(class_=re.compile(r"pager-(current|item)"))
+        page_numbers = [
+            int(item.get_text(strip=True))
+            for item in pager.find_all(["a", "span"])
+            if item.get_text(strip=True).isdigit()
+        ]
         has_next = pager.find(class_="pager-next") is not None
         has_previous = pager.find(class_="pager-previous") is not None
 
         return {
-            "total_pages": len(pager_items),
+            "total_pages": max(page_numbers, default=1),
             "has_next": has_next,
             "has_previous": has_previous,
         }
@@ -301,24 +458,17 @@ class FlibustaClient:
 
     def _parse_opds_entry(self, entry: ET.Element) -> OpdsBook:
         authors = []
-        author_el = entry.find(f"{{{ATOM_NS}}}author")
-        if author_el is not None:
-            if isinstance(author_el, list):
-                for a in author_el:
-                    name_el = a.find(f"{{{ATOM_NS}}}name")
-                    uri_el = a.find(f"{{{ATOM_NS}}}uri")
-                    authors.append(OpdsAuthor(
-                        name=name_el.text if name_el is not None else "",
-                        uri=uri_el.text if uri_el is not None else "",
-                    ))
-            else:
-                name_el = author_el.find(f"{{{ATOM_NS}}}name")
-                uri_el = author_el.find(f"{{{ATOM_NS}}}uri")
-                authors.append(OpdsAuthor(
+        for author_el in entry.findall(f"{{{ATOM_NS}}}author"):
+            name_el = author_el.find(f"{{{ATOM_NS}}}name")
+            uri_el = author_el.find(f"{{{ATOM_NS}}}uri")
+            authors.append(
+                OpdsAuthor(
                     name=name_el.text if name_el is not None else "",
                     uri=uri_el.text if uri_el is not None else "",
-                ))
+                )
+            )
 
+        entry_id = entry.findtext(f"{{{ATOM_NS}}}id", "")
         title = entry.findtext(f"{{{ATOM_NS}}}title", "")
         updated = entry.findtext(f"{{{ATOM_NS}}}updated", "")
 
@@ -348,6 +498,7 @@ class FlibustaClient:
                 description = text_el.text
 
         return OpdsBook(
+            id=entry_id,
             authors=authors,
             title=title,
             updated=updated,
@@ -368,30 +519,7 @@ class FlibustaClient:
             return []
 
         soup = self._remove_pager(soup)
-        results = []
-        results_ul = self._find_results_ul(soup, "/b/")
-        if not results_ul:
-            return []
-
-        for li in results_ul.find_all("li", recursive=False):
-            children = li.find_all("a", recursive=False)
-            if not children:
-                continue
-            book_link = children[0]
-            href = book_link.get("href", "")
-            if not href.startswith("/b/"):
-                continue
-            book_id = _get_numbers(href)
-            book_name = book_link.get_text(strip=True)
-            if book_id and book_name:
-                results.append(BooksByName(
-                    book=Book(id=int(book_id), name=book_name),
-                    authors=[
-                        Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
-                        for a in children[1:]
-                    ],
-                ))
-        return results
+        return self._book_search_results(soup)
 
     def search_books_by_name_paginated(self, name: str, page: int = 0, limit: int = 50) -> PaginatedResult:
         """Search books by name with pagination."""
@@ -405,27 +533,7 @@ class FlibustaClient:
         total_count = self._get_total_count(soup)
         soup = self._remove_pager(soup)
 
-        results_ul = self._find_results_ul(soup, "/b/")
-        items = []
-        if results_ul:
-            for li in results_ul.find_all("li", recursive=False)[:limit]:
-                children = li.find_all("a", recursive=False)
-                if not children:
-                    continue
-                book_link = children[0]
-                href = book_link.get("href", "")
-                if not href.startswith("/b/"):
-                    continue
-                book_id = _get_numbers(href)
-                book_name = book_link.get_text(strip=True)
-                if book_id and book_name:
-                    items.append(BooksByName(
-                        book=Book(id=int(book_id), name=book_name),
-                        authors=[
-                            Author(id=_get_numbers(a.get("href", "")), name=a.get_text(strip=True))
-                            for a in children[1:]
-                        ],
-                    ))
+        items = self._book_search_results(soup)[:limit]
 
         return PaginatedResult(
             items=items,
@@ -721,7 +829,7 @@ class FlibustaClient:
 
         has_next = (start_index + items_per_page) < total_results
         has_previous = start_index > 0
-        total_pages = max(1, round(total_results / items_per_page)) if items_per_page else 1
+        total_pages = max(1, (total_results + items_per_page - 1) // items_per_page) if items_per_page else 1
 
         return PaginatedResult(
             items=items,
@@ -822,7 +930,7 @@ class FlibustaClient:
                 title = text
                 break
 
-        # Description: find h2 "Аннотация" and get following siblings until next h2
+        # Description: find h2 "Аннотация" and get following siblings until next h2.
         description = ""
         for h2 in soup.find_all("h2"):
             if "Аннотация" in h2.get_text():
@@ -833,6 +941,9 @@ class FlibustaClient:
                     desc_parts.append(sib.get_text(strip=True))
                 description = " ".join(desc_parts)
                 break
+        if not description:
+            description_el = soup.select_one(".book_description")
+            description = description_el.get_text(" ", strip=True) if description_el else ""
 
         # Cover image
         cover_img = soup.find("img", src=lambda s: s and "cover" in s.lower())
@@ -846,16 +957,14 @@ class FlibustaClient:
                 book_info_div = div
                 break
 
-        # Authors: only from /a/ links BEFORE the first /b/ download link
+        # Authors: only from /a/ links BEFORE the first book download link.
         authors = []
         seen_author_ids = set()
-        if book_info_div:
+        if book_info_div or soup:
             found_download = False
-            for a in book_info_div.find_all("a", href=True):
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
-                if href.startswith("/b/") and "/download" in href or any(
-                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
-                ):
+                if _download_format(href, book_id) is not None:
                     found_download = True
                     continue
                 if found_download:
@@ -870,13 +979,11 @@ class FlibustaClient:
         # Genres: from /g/ links in the book info div
         genres = []
         seen_genre_ids = set()
-        if book_info_div:
+        if book_info_div or soup:
             found_download = False
-            for a in book_info_div.find_all("a", href=True):
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
-                if href.startswith("/b/") and any(
-                    href.endswith(ext) for ext in ["/read", "/fb2", "/epub", "/mobi", "/txt", "/pdf"]
-                ):
+                if _download_format(href, book_id) is not None:
                     found_download = True
                     continue
                 if found_download:
@@ -894,10 +1001,9 @@ class FlibustaClient:
         seen_formats = set()
         for a in soup.find_all("a", href=True):
             href = a["href"]
-            fmt_match = re.match(rf"/b/{book_id}/(\w+)", href)
-            if fmt_match:
-                fmt = fmt_match.group(1)
-                if fmt not in seen_formats and fmt != "read":
+            fmt = _download_format(href, book_id)
+            if fmt:
+                if fmt not in seen_formats:
                     formats.append(fmt)
                     seen_formats.add(fmt)
                 if href not in download_urls:
@@ -906,8 +1012,8 @@ class FlibustaClient:
         # Series: from /sequence/ or /s/ links in book info div
         series = []
         seen_series_ids = set()
-        if book_info_div:
-            for a in book_info_div.find_all("a", href=True):
+        if book_info_div or soup:
+            for a in (book_info_div or soup).find_all("a", href=True):
                 href = a["href"]
                 if "/sequence/" in href or href.startswith("/s/"):
                     series_id = _get_numbers(href)
@@ -984,13 +1090,7 @@ class FlibustaClient:
         if not soup:
             return {"books": [], "total": 0}
 
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
+        books = self._linked_books(soup)
 
         return {"books": books, "total": len(books)}
 
@@ -999,14 +1099,7 @@ class FlibustaClient:
         soup = self._get_html_page("/stat/b")
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_all_genres(self) -> list:
         """Get complete genre list from /g (with 500+ genres)."""
@@ -1074,13 +1167,7 @@ class FlibustaClient:
         if not soup:
             return {"books": [], "sort_options": []}
 
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
+        books = self._linked_books(soup)
 
         sort_options = []
         for form in soup.find_all("form"):
@@ -1097,14 +1184,7 @@ class FlibustaClient:
         soup = self._get_html_page(f"/g/{genre_id}?order={order}")
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_author_books_filtered(self, author_id: int, lang=None, order="a", ghosts=False, translations=False) -> list:
         """Get author books with filters."""
@@ -1121,14 +1201,7 @@ class FlibustaClient:
         soup = self._get_html_page(path)
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)
 
     def get_mass_download_form(self) -> dict:
         """Get mass download form from /new page."""
@@ -1215,11 +1288,4 @@ class FlibustaClient:
         soup = self._get_html_page(path)
         if not soup:
             return []
-        books = []
-        for a in soup.find_all("a", href=lambda h: h and h.startswith("/b/")):
-            href = a["href"]
-            book_id = _get_numbers(href)
-            book_name = a.get_text(strip=True)
-            if book_id and book_name:
-                books.append({"id": book_id, "name": book_name})
-        return books
+        return self._linked_books(soup)

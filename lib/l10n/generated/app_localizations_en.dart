@@ -277,12 +277,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsDarkThemeSub => 'Use dark theme';
 
   @override
-  String get settingsContentFilter => 'Content Filter';
-
-  @override
-  String get settingsContentFilterSub => 'Security settings';
-
-  @override
   String get settingsFonts => 'Fonts';
 
   @override

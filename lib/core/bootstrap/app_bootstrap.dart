@@ -4,12 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../src/rust/api/frb_generated.dart';
 import '../logging/app_logger.dart';
 
 class AppBootstrap {
   AppBootstrap._();
+
+  /// SharedPreferences instance loaded before runApp; used for provider
+  /// overrides (e.g. readerTelemetryProvider).
+  static late final SharedPreferences prefs;
 
   static Future<void> init() async {
     await RustLib.init();
@@ -20,6 +25,7 @@ class AppBootstrap {
         'Check your .env file.',
       );
     }
+    prefs = await SharedPreferences.getInstance();
     Intl.defaultLocale = 'ru';
     _configureErrorHandlers();
     _configureImageCache();
@@ -51,7 +57,7 @@ class AppBootstrap {
   static void _configureImageCache() {
     final cache = PaintingBinding.instance.imageCache;
     cache.maximumSize = 100;
-    cache.maximumSizeBytes = 80 << 20;
+    cache.maximumSizeBytes = 50 << 20;
   }
 
   static Future<void> initApp({required void Function() appRunner}) async {

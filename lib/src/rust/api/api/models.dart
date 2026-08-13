@@ -8,8 +8,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import '../lib.dart';
 
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CoreError`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
+// These functions are ignored because they are not marked as `pub`: `append_hash_part`, `levenshtein_distance`, `levenshtein_ratio`, `stable_short_hash`, `text_fragments`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `BookCacheManifest`, `CoreError`, `Footnote`, `ParserEvent`, `TextNormalizationMode`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`
 
 enum BlockType {
   paragraph,
@@ -25,6 +26,8 @@ enum BlockType {
   cite,
   textAuthor,
   subtitle,
+  listItem,
+  preformatted,
   ;
 
   Future<void> asStr() => RustLib.instance.api.crateApiModelsBlockTypeAsStr(
@@ -33,6 +36,67 @@ enum BlockType {
 
   static Future<BlockType> fromStr({required String s}) =>
       RustLib.instance.api.crateApiModelsBlockTypeFromStr(s: s);
+}
+
+class BookAssetMeta {
+  final String assetId;
+  final String mediaType;
+  final BigInt size;
+
+  const BookAssetMeta({
+    required this.assetId,
+    required this.mediaType,
+    required this.size,
+  });
+
+  @override
+  int get hashCode => assetId.hashCode ^ mediaType.hashCode ^ size.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookAssetMeta &&
+          runtimeType == other.runtimeType &&
+          assetId == other.assetId &&
+          mediaType == other.mediaType &&
+          size == other.size;
+}
+
+class BookDiff {
+  final bool chaptersChanged;
+  final bool textChanged;
+  final bool metadataOnly;
+  final bool needsAnchorMigration;
+
+  const BookDiff({
+    required this.chaptersChanged,
+    required this.textChanged,
+    required this.metadataOnly,
+    required this.needsAnchorMigration,
+  });
+
+  static Future<BookDiff> compute({
+    required NormalizedBook old,
+    required NormalizedBook new_,
+  }) =>
+      RustLib.instance.api.crateApiModelsBookDiffCompute(old: old, new_: new_);
+
+  @override
+  int get hashCode =>
+      chaptersChanged.hashCode ^
+      textChanged.hashCode ^
+      metadataOnly.hashCode ^
+      needsAnchorMigration.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookDiff &&
+          runtimeType == other.runtimeType &&
+          chaptersChanged == other.chaptersChanged &&
+          textChanged == other.textChanged &&
+          metadataOnly == other.metadataOnly &&
+          needsAnchorMigration == other.needsAnchorMigration;
 }
 
 /// Book format detected by extension or content sniffing.
@@ -47,6 +111,8 @@ enum BookFormat {
   prc,
   pdf,
   djvu,
+  cbr,
+  cbz,
   unknown,
   ;
 
@@ -54,7 +120,13 @@ enum BookFormat {
     that: this,
   );
 
-  static Future<void> extensions() => RustLib.instance.api.crateApiModelsBookFormatExtensions();
+  Future<FormatCapabilities> capabilities() =>
+      RustLib.instance.api.crateApiModelsBookFormatCapabilities(
+        that: this,
+      );
+
+  static Future<void> extensions() =>
+      RustLib.instance.api.crateApiModelsBookFormatExtensions();
 
   static Future<BookFormat> fromExt({required String ext}) =>
       RustLib.instance.api.crateApiModelsBookFormatFromExt(ext: ext);
@@ -105,6 +177,58 @@ class BookMeta {
           toc == other.toc;
 }
 
+class BookValidationResult {
+  final bool valid;
+  final Int32List emptyChapters;
+  final Int32List duplicateChapters;
+  final bool spineTocMismatch;
+
+  const BookValidationResult({
+    required this.valid,
+    required this.emptyChapters,
+    required this.duplicateChapters,
+    required this.spineTocMismatch,
+  });
+
+  @override
+  int get hashCode =>
+      valid.hashCode ^
+      emptyChapters.hashCode ^
+      duplicateChapters.hashCode ^
+      spineTocMismatch.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookValidationResult &&
+          runtimeType == other.runtimeType &&
+          valid == other.valid &&
+          emptyChapters == other.emptyChapters &&
+          duplicateChapters == other.duplicateChapters &&
+          spineTocMismatch == other.spineTocMismatch;
+}
+
+class ChapterLanguage {
+  final String lang;
+  final double confidence;
+
+  const ChapterLanguage({
+    required this.lang,
+    required this.confidence,
+  });
+
+  @override
+  int get hashCode => lang.hashCode ^ confidence.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ChapterLanguage &&
+          runtimeType == other.runtimeType &&
+          lang == other.lang &&
+          confidence == other.confidence;
+}
+
 /// An embedded image extracted from the book.
 class EmbeddedImage {
   /// Identifier (filename or URL reference).
@@ -135,6 +259,101 @@ class EmbeddedImage {
           data == other.data;
 }
 
+/// Capabilities that each format supports.
+class FormatCapabilities {
+  final bool metadata;
+  final bool cover;
+  final bool toc;
+  final bool text;
+  final bool images;
+  final bool css;
+  final bool footnotes;
+
+  const FormatCapabilities({
+    required this.metadata,
+    required this.cover,
+    required this.toc,
+    required this.text,
+    required this.images,
+    required this.css,
+    required this.footnotes,
+  });
+
+  @override
+  int get hashCode =>
+      metadata.hashCode ^
+      cover.hashCode ^
+      toc.hashCode ^
+      text.hashCode ^
+      images.hashCode ^
+      css.hashCode ^
+      footnotes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FormatCapabilities &&
+          runtimeType == other.runtimeType &&
+          metadata == other.metadata &&
+          cover == other.cover &&
+          toc == other.toc &&
+          text == other.text &&
+          images == other.images &&
+          css == other.css &&
+          footnotes == other.footnotes;
+}
+
+class ImportReport {
+  final BookFormat format;
+  final String parserUsed;
+  final BigInt chaptersCount;
+  final BigInt blocksCount;
+  final BigInt imagesCount;
+  final BigInt footnotesCount;
+  final List<ParseWarning> warnings;
+  final BigInt parseTimeMs;
+  final String fileHash;
+
+  const ImportReport({
+    required this.format,
+    required this.parserUsed,
+    required this.chaptersCount,
+    required this.blocksCount,
+    required this.imagesCount,
+    required this.footnotesCount,
+    required this.warnings,
+    required this.parseTimeMs,
+    required this.fileHash,
+  });
+
+  @override
+  int get hashCode =>
+      format.hashCode ^
+      parserUsed.hashCode ^
+      chaptersCount.hashCode ^
+      blocksCount.hashCode ^
+      imagesCount.hashCode ^
+      footnotesCount.hashCode ^
+      warnings.hashCode ^
+      parseTimeMs.hashCode ^
+      fileHash.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ImportReport &&
+          runtimeType == other.runtimeType &&
+          format == other.format &&
+          parserUsed == other.parserUsed &&
+          chaptersCount == other.chaptersCount &&
+          blocksCount == other.blocksCount &&
+          imagesCount == other.imagesCount &&
+          footnotesCount == other.footnotesCount &&
+          warnings == other.warnings &&
+          parseTimeMs == other.parseTimeMs &&
+          fileHash == other.fileHash;
+}
+
 class NormalizedBook {
   final String id;
   final String title;
@@ -143,6 +362,9 @@ class NormalizedBook {
   final String? coverUrl;
   final List<ReaderChapter> chapters;
   final Value? metadata;
+
+  /// JSON-serialized metadata for Dart-side access
+  final String? metadataJson;
 
   /// New fields
   final BookFormat bookFormat;
@@ -159,6 +381,7 @@ class NormalizedBook {
     this.coverUrl,
     required this.chapters,
     this.metadata,
+    this.metadataJson,
     required this.bookFormat,
     this.language,
     required this.warnings,
@@ -166,12 +389,63 @@ class NormalizedBook {
     required this.toc,
   });
 
+  /// RCE-15.6: Stable annotation anchor from chapter + block + char offset.
+  static Future<String> annotationAnchorId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+    required BigInt charOffset,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookAnnotationAnchorId(
+    chapterIndex: chapterIndex,
+    blockIndex: blockIndex,
+    charOffset: charOffset,
+  );
+
+  /// RCE-15.4: Stable asset ID from image URL.
+  static Future<String> assetId({required String url}) =>
+      RustLib.instance.api.crateApiModelsNormalizedBookAssetId(url: url);
+
+  /// RCE-15.3: Stable block ID from chapter + block content.
+  Future<String> blockId({
+    required BigInt chapterIndex,
+    required BigInt blockIndex,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookBlockId(
+    that: this,
+    chapterIndex: chapterIndex,
+    blockIndex: blockIndex,
+  );
+
+  /// Compute content_hash per chapter for stable anchors during reparse.
+  Future<List<(int, String)>> chapterHashes() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookChapterHashes(
+        that: this,
+      );
+
+  /// RCE-15.2: Stable chapter ID from title + content.
+  Future<String> chapterId({required BigInt chapterIndex}) =>
+      RustLib.instance.api.crateApiModelsNormalizedBookChapterId(
+        that: this,
+        chapterIndex: chapterIndex,
+      );
+
   static Future<NormalizedBook> fromJsonStr({required String json}) =>
       RustLib.instance.api.crateApiModelsNormalizedBookFromJsonStr(json: json);
 
-  Future<String> toJsonString() => RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
-    that: this,
+  /// RCE-17.1 + RCE-17.2: Migrate an old reading position to new book state
+  /// with fuzzy title matching when exact hash fails.
+  static Future<int> migrateChapterIndex({
+    required String oldChapterId,
+    required NormalizedBook oldBook,
+    required NormalizedBook newBook,
+  }) => RustLib.instance.api.crateApiModelsNormalizedBookMigrateChapterIndex(
+    oldChapterId: oldChapterId,
+    oldBook: oldBook,
+    newBook: newBook,
   );
+
+  Future<String> toJsonString() =>
+      RustLib.instance.api.crateApiModelsNormalizedBookToJsonString(
+        that: this,
+      );
 
   @override
   int get hashCode =>
@@ -182,6 +456,7 @@ class NormalizedBook {
       coverUrl.hashCode ^
       chapters.hashCode ^
       metadata.hashCode ^
+      metadataJson.hashCode ^
       bookFormat.hashCode ^
       language.hashCode ^
       warnings.hashCode ^
@@ -200,6 +475,7 @@ class NormalizedBook {
           coverUrl == other.coverUrl &&
           chapters == other.chapters &&
           metadata == other.metadata &&
+          metadataJson == other.metadataJson &&
           bookFormat == other.bookFormat &&
           language == other.language &&
           warnings == other.warnings &&
@@ -221,7 +497,9 @@ class ParseWarning {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ParseWarning && runtimeType == other.runtimeType && message == other.message;
+      other is ParseWarning &&
+          runtimeType == other.runtimeType &&
+          message == other.message;
 }
 
 class ReaderBlock {
@@ -239,6 +517,9 @@ class ReaderBlock {
   final double? textIndent;
   final String? textAlign;
   final String? noteId;
+  final bool pageBreakBefore;
+  final bool pageBreakInsideAvoid;
+  final bool hasDropCap;
 
   const ReaderBlock({
     required this.index,
@@ -255,6 +536,9 @@ class ReaderBlock {
     this.textIndent,
     this.textAlign,
     this.noteId,
+    required this.pageBreakBefore,
+    required this.pageBreakInsideAvoid,
+    required this.hasDropCap,
   });
 
   @override
@@ -272,7 +556,10 @@ class ReaderBlock {
       imageAlt.hashCode ^
       textIndent.hashCode ^
       textAlign.hashCode ^
-      noteId.hashCode;
+      noteId.hashCode ^
+      pageBreakBefore.hashCode ^
+      pageBreakInsideAvoid.hashCode ^
+      hasDropCap.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -292,7 +579,10 @@ class ReaderBlock {
           imageAlt == other.imageAlt &&
           textIndent == other.textIndent &&
           textAlign == other.textAlign &&
-          noteId == other.noteId;
+          noteId == other.noteId &&
+          pageBreakBefore == other.pageBreakBefore &&
+          pageBreakInsideAvoid == other.pageBreakInsideAvoid &&
+          hasDropCap == other.hasDropCap;
 }
 
 class ReaderChapter {
@@ -324,6 +614,10 @@ class RichSpan {
   final bool bold;
   final bool italic;
   final bool superscript;
+  final bool subscript;
+  final bool strikethrough;
+  final bool code;
+  final String? styleName;
   final String? href;
   final bool lineBreak;
 
@@ -332,6 +626,10 @@ class RichSpan {
     required this.bold,
     required this.italic,
     required this.superscript,
+    required this.subscript,
+    required this.strikethrough,
+    required this.code,
+    this.styleName,
     this.href,
     required this.lineBreak,
   });
@@ -342,6 +640,10 @@ class RichSpan {
       bold.hashCode ^
       italic.hashCode ^
       superscript.hashCode ^
+      subscript.hashCode ^
+      strikethrough.hashCode ^
+      code.hashCode ^
+      styleName.hashCode ^
       href.hashCode ^
       lineBreak.hashCode;
 
@@ -354,8 +656,47 @@ class RichSpan {
           bold == other.bold &&
           italic == other.italic &&
           superscript == other.superscript &&
+          subscript == other.subscript &&
+          strikethrough == other.strikethrough &&
+          code == other.code &&
+          styleName == other.styleName &&
           href == other.href &&
           lineBreak == other.lineBreak;
+}
+
+class SearchMatch {
+  final int chapterIndex;
+  final int blockIndex;
+  final BigInt spanStart;
+  final BigInt spanEnd;
+  final String preview;
+
+  const SearchMatch({
+    required this.chapterIndex,
+    required this.blockIndex,
+    required this.spanStart,
+    required this.spanEnd,
+    required this.preview,
+  });
+
+  @override
+  int get hashCode =>
+      chapterIndex.hashCode ^
+      blockIndex.hashCode ^
+      spanStart.hashCode ^
+      spanEnd.hashCode ^
+      preview.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SearchMatch &&
+          runtimeType == other.runtimeType &&
+          chapterIndex == other.chapterIndex &&
+          blockIndex == other.blockIndex &&
+          spanStart == other.spanStart &&
+          spanEnd == other.spanEnd &&
+          preview == other.preview;
 }
 
 /// TOC entry for navigation.
@@ -375,7 +716,8 @@ class TocEntry {
   });
 
   @override
-  int get hashCode => title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
+  int get hashCode =>
+      title.hashCode ^ chapterIndex.hashCode ^ children.hashCode;
 
   @override
   bool operator ==(Object other) =>

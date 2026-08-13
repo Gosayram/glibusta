@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +12,10 @@ import '../data/per_book_settings_service.dart';
 import '../data/reader_colors.dart';
 import '../domain/reader.dart';
 import 'color_preset_provider.dart';
+import 'reader_custom_css_editor.dart';
 import 'reader_providers.dart';
+import 'reader_typography_provider.dart';
+import 'reading_break_reminder.dart';
 
 class _TypographyPreset {
   const _TypographyPreset(
@@ -67,46 +71,60 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget build(BuildContext context) {
     final settings = ref.watch(readerSettingsProvider);
     final notifier = ref.read(readerSettingsProvider.notifier);
+    final isEink = settings.eink;
+    final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        color: isEink ? Colors.white : theme.colorScheme.surface,
+        borderRadius: isEink ? null : const BorderRadius.vertical(top: Radius.circular(16)),
+        border: isEink ? const Border(top: BorderSide()) : null,
       ),
       padding: const EdgeInsets.only(top: 12),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
+        child: DefaultTextStyle(
+          style: TextStyle(
+            color: isEink ? Colors.black : theme.textTheme.bodyMedium?.color,
+            fontSize: theme.textTheme.bodyMedium?.fontSize,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isEink
+                        ? Colors.black54
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildPageIndicator(context),
-            const SizedBox(height: 8),
-            if (widget.bookId != null) _buildPerBookSection(context, ref, widget.bookId!),
-            SizedBox(
-              height: _estimatedPageHeight(context),
-              child: PageView(
-                controller: _pageController,
-                onPageChanged: (i) => setState(() => _currentPage = i),
-                children: [
-                  _buildPage1(context, settings, notifier),
-                  _buildPage2(context, settings, notifier),
-                  _buildPage3(context, settings, notifier),
-                ],
+              const SizedBox(height: 12),
+              _buildPageIndicator(context, isEink: isEink),
+              const SizedBox(height: 8),
+              if (widget.bookId != null) ...[
+                _buildPerBookSection(context, ref, widget.bookId!, settings),
+                _buildPerBookTypographySection(context, ref, widget.bookId!, settings),
+              ],
+              SizedBox(
+                height: _estimatedPageHeight(context),
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  children: [
+                    _buildPage1(context, settings, notifier, isEink: isEink),
+                    _buildPage2(context, settings, notifier, isEink: isEink),
+                    _buildPage3(context, settings, notifier, isEink: isEink),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -117,7 +135,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     return screenH * 0.5;
   }
 
-  Widget _buildPageIndicator(BuildContext context) {
+  Widget _buildPageIndicator(BuildContext context, {bool isEink = false}) {
     final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -134,19 +152,24 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             margin: const EdgeInsets.symmetric(horizontal: 4),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: isActive
-                  ? theme.colorScheme.primaryContainer
-                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(16),
+              color: isEink
+                  ? (isActive ? Colors.black : Colors.white)
+                  : (isActive
+                        ? theme.colorScheme.primaryContainer
+                        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(isEink ? 0 : 16),
+              border: isEink ? Border.all() : null,
             ),
             child: Text(
               _pageLabels[i],
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                color: isActive
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                color: isEink
+                    ? (isActive ? Colors.white : Colors.black)
+                    : (isActive
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6)),
               ),
             ),
           ),
@@ -160,18 +183,43 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage1(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
-        const _SectionTitle('Пресеты'),
-        _buildPresetRow(settings, notifier),
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Пресеты')),
+            IconButton(
+              key: const ValueKey('reset-typography-settings'),
+              icon: const Icon(Icons.restart_alt),
+              tooltip: 'Сбросить настройки типографики',
+              onPressed: notifier.resetTypography,
+            ),
+          ],
+        ),
+        _buildPresetRow(settings, notifier, isEink: isEink),
         const SizedBox(height: 16),
-        const _SectionTitle('Тема'),
-        _buildThemeRow(context, settings, notifier),
+        const _SectionTitle('Тема контента'),
+        _buildThemeRow(context, settings, notifier, isEink: isEink),
         const SizedBox(height: 8),
-        _buildColorPresetRow(context, ref, settings, notifier),
+        const _SectionTitle('Тема интерфейса'),
+        _buildUiThemeRow(context, settings, notifier, isEink: isEink),
+        const SizedBox(height: 8),
+        _buildColorPresetRow(context, ref, settings, notifier, isEink: isEink),
+        const SizedBox(height: 12),
+        const _SectionTitle('Текстура фона'),
+        _buildBackgroundStyleRow(context, settings, notifier, isEink: isEink),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'E-ink режим',
+          Icons.auto_awesome,
+          settings.eink,
+          (v) => notifier.updateEink(v),
+          isEink: isEink,
+        ),
         const SizedBox(height: 16),
         const _SectionTitle('Шрифт'),
         _buildFontRow(settings, notifier),
@@ -180,11 +228,17 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Размер шрифта'),
         _buildFontSizeRow(settings, notifier),
         const SizedBox(height: 12),
+        const _SectionTitle('Размер шрифта заметок'),
+        _buildNoteFontSizeRow(settings, notifier),
+        const SizedBox(height: 12),
         const _SectionTitle('Толщина шрифта'),
         _buildFontWeightRow(settings, notifier),
         const SizedBox(height: 12),
         const _SectionTitle('Межстрочный'),
         _buildLineHeightRow(settings, notifier),
+        const SizedBox(height: 12),
+        const _SectionTitle('Выравнивание'),
+        _buildTextAlignRow(settings, notifier),
         const SizedBox(height: 12),
         const _SectionTitle('Межбуквенный интервал'),
         _buildSliderRow(
@@ -217,6 +271,15 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ],
         const SizedBox(height: 12),
+        const _SectionTitle('Интервал между абзацами'),
+        _buildSliderRow(
+          'px',
+          settings.paragraphSpacing / 64.0,
+          0.0,
+          1.0,
+          (v) => notifier.updateParagraphSpacing(v * 64.0),
+        ),
+        const SizedBox(height: 12),
         const _SectionTitle('Отступы'),
         _buildMarginRow(settings, notifier),
         const SizedBox(height: 16),
@@ -234,6 +297,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.image,
           settings.showImages,
           (v) => notifier.updateShowImages(v),
+          isEink: isEink,
         ),
         if (settings.showImages) ...[
           const SizedBox(height: 8),
@@ -266,8 +330,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage2(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
@@ -292,7 +357,14 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                 'Две колонки',
                 Icons.view_column,
                 settings.twoPageEnabled,
-                (v) => notifier.updateTwoPageEnabled(v),
+                (enabled) => unawaited(
+                  _updateTwoPagePreference(
+                    context: context,
+                    notifier: notifier,
+                    enabled: enabled,
+                  ),
+                ),
+                isEink: isEink,
               );
             },
           ),
@@ -316,6 +388,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_textdirection_l_to_r,
           settings.hyphenation,
           (v) => notifier.updateHyphenation(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -323,6 +396,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.numbers,
           settings.oldStyleFigures,
           (v) => notifier.updateOldStyleFigures(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -330,6 +404,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.text_fields,
           settings.smallCaps,
           (v) => notifier.updateSmallCaps(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Анимация страниц'),
@@ -343,6 +418,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.screen_lock_portrait,
           settings.keepScreenAwake,
           (v) => notifier.updateKeepScreenAwake(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         const _SectionTitle('Кодировка'),
@@ -353,9 +429,41 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.restore,
           settings.restoreLastPosition,
           (v) => notifier.updateRestoreLastPosition(v),
+          isEink: isEink,
         ),
       ],
     );
+  }
+
+  Future<void> _updateTwoPagePreference({
+    required BuildContext context,
+    required ReaderSettingsNotifier notifier,
+    required bool enabled,
+  }) async {
+    final bookId = widget.bookId;
+    if (bookId == null) {
+      notifier.updateTwoPageEnabled(enabled);
+      return;
+    }
+
+    notifier.applyPerBookTwoPageEnabled(enabled);
+    try {
+      await ref
+          .read(perBookSettingsServiceProvider)
+          .saveTwoPageLayoutPreference(
+            bookId: bookId,
+            deviceClass: readerLayoutDeviceClassFor(
+              canUseTwoPageMode: context.canUseTwoPageMode,
+            ),
+            enabled: enabled,
+          );
+    } on Object catch (error, stackTrace) {
+      developer.log(
+        'Failed to save the per-book two-page preference',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   // ── Page 3: Жесты (Gestures & behavior) ──
@@ -363,11 +471,37 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   Widget _buildPage3(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       children: [
+        const _SectionTitle('Панели чтения'),
+        _buildToggleRow(
+          'Информация сверху',
+          Icons.info_outline,
+          settings.showTopInfoBar,
+          (v) => notifier.updateShowTopInfoBar(v),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Панель инструментов',
+          Icons.tune,
+          settings.showTopToolbar,
+          (v) => notifier.updateShowTopToolbar(v),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 8),
+        _buildToggleRow(
+          'Нижняя панель',
+          Icons.vertical_align_bottom,
+          settings.showBottomBar,
+          (v) => notifier.updateShowBottomBar(v),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 16),
         const _SectionTitle('Горизонтальный жест'),
         _buildHorizontalGestureRow(settings, notifier),
         const SizedBox(height: 12),
@@ -375,10 +509,19 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         _buildHorizontalGestureScrollRow(settings, notifier),
         const SizedBox(height: 16),
         _buildToggleRow(
-          'Вертикальный свайп для яркости',
+          'Вертикальный свайп: яркость и теплота',
           Icons.swipe_up,
           settings.verticalSwipeBrightness,
           (v) => notifier.updateVerticalSwipeBrightness(v),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Тактильный отклик при перелистывании',
+          Icons.vibration,
+          settings.pageTurnHaptic,
+          (v) => notifier.updatePageTurnHaptic(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -386,6 +529,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.view_sidebar_outlined,
           settings.perceptionExpander,
           (v) => notifier.updatePerceptionExpander(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
 
@@ -394,6 +538,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.center_focus_strong,
           settings.horizontalLimiter,
           (v) => notifier.updateHorizontalLimiter(v),
+          isEink: isEink,
         ),
         if (settings.horizontalLimiter) ...[
           const SizedBox(height: 8),
@@ -423,6 +568,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             Icons.horizontal_rule,
             settings.horizontalLimiterLines,
             (v) => notifier.updateHorizontalLimiterLines(v),
+            isEink: isEink,
           ),
         ],
         const SizedBox(height: 12),
@@ -432,6 +578,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.speed,
           settings.bionicReading,
           (v) => notifier.updateBionicReading(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 12),
         _buildToggleRow(
@@ -439,23 +586,67 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.view_sidebar_outlined,
           settings.scrollbarIndicator,
           (v) => notifier.updateScrollbarIndicator(v),
+          isEink: isEink,
         ),
+        if (settings.mode == ReaderMode.continuous) ...[
+          const SizedBox(height: 12),
+          _buildToggleRow(
+            'Привязка к границам глав',
+            Icons.swap_vert,
+            settings.scrollSnap,
+            (v) => notifier.updateScrollSnap(v),
+            isEink: isEink,
+          ),
+        ],
         const SizedBox(height: 12),
         _buildToggleRow(
           'Скрытие панелей при прокрутке',
           Icons.speed,
           settings.hideBarsOnFastScroll,
           (v) => notifier.updateHideBarsOnFastScroll(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 16),
         const _SectionTitle('Ориентация экрана'),
         _buildOrientationLockRow(settings, notifier),
         const SizedBox(height: 16),
+        const _SectionTitle('Зона тапа для листания'),
+        _buildSliderRow(
+          'Ширина боковой зоны',
+          settings.tapZoneWidth,
+          0.1,
+          0.5,
+          (v) => notifier.updateTapZoneWidth(v),
+        ),
+        const SizedBox(height: 16),
+        const _SectionTitle('Полноэкранный режим'),
+        _buildFullScreenModeRow(settings, notifier),
+        const SizedBox(height: 16),
         const _SectionTitle('Двойной тап'),
         _buildDoubleTapActionRow(settings, notifier),
         const SizedBox(height: 12),
+        _buildToggleRow(
+          'Два пальца: главы и назад',
+          Icons.swipe_vertical,
+          settings.twoFingerChapterNavigation,
+          (enabled) => notifier.updateTwoFingerChapterNavigation(enabled),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 12),
+        _buildToggleRow(
+          'Кнопки громкости: листание',
+          Icons.volume_up,
+          settings.volumeButtonsEnabled,
+          (enabled) => notifier.updateVolumeButtonsEnabled(enabled),
+          isEink: isEink,
+        ),
+        const SizedBox(height: 12),
         const _SectionTitle('Долгое нажатие'),
         _buildLongPressActionRow(settings, notifier),
+        const SizedBox(height: 16),
+        _buildCornerTapMap(settings, notifier),
+        const SizedBox(height: 16),
+        _buildCornerLongPressMap(settings, notifier),
         const SizedBox(height: 16),
         const _SectionTitle('Скрытие UI (сек)'),
         _buildAutoHideRow(settings, notifier),
@@ -466,8 +657,11 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         const _SectionTitle('Нижняя панель'),
         _buildBottomBarContentRow(settings, notifier),
         const SizedBox(height: 16),
+        const _SectionTitle('Забота о глазах'),
+        _buildReadingBreakReminderSettings(isEink: isEink),
+        const SizedBox(height: 16),
         // LW-10.1: Custom CSS editor
-        _buildCustomCssSection(settings, notifier),
+        ReaderCustomCssEditor(css: settings.customCss, onChanged: notifier.updateCustomCss),
         const SizedBox(height: 12),
         // LW-10.3: Ignore book CSS overrides
         _buildToggleRow(
@@ -475,6 +669,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_align_left,
           settings.ignoreBookAlignment,
           (v) => notifier.updateIgnoreBookAlignment(v),
+          isEink: isEink,
         ),
         const SizedBox(height: 8),
         _buildToggleRow(
@@ -482,14 +677,54 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           Icons.format_indent_increase,
           settings.ignoreBookIndent,
           (v) => notifier.updateIgnoreBookIndent(v),
+          isEink: isEink,
         ),
+      ],
+    );
+  }
+
+  Widget _buildReadingBreakReminderSettings({bool isEink = false}) {
+    final controller = ref.watch(readingBreakReminderControllerProvider);
+    final reminderSettings = controller.state.settings;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildToggleRow(
+          'Напомнить сделать паузу (эта сессия)',
+          Icons.visibility_outlined,
+          reminderSettings.enabled,
+          (enabled) => setState(
+            () => controller.configure(reminderSettings.copyWith(enabled: enabled)),
+          ),
+          isEink: isEink,
+        ),
+        if (reminderSettings.enabled)
+          DropdownButton<ReadingBreakInterval>(
+            value: reminderSettings.interval,
+            isExpanded: true,
+            items: [
+              for (final interval in ReadingBreakInterval.values)
+                DropdownMenuItem(
+                  value: interval,
+                  child: Text('Каждые ${interval.duration.inMinutes} минут'),
+                ),
+            ],
+            onChanged: (interval) {
+              if (interval == null) return;
+              setState(() => controller.configure(reminderSettings.copyWith(interval: interval)));
+            },
+          ),
       ],
     );
   }
 
   // ── Typography presets ──
 
-  static Widget _buildPresetRow(ReaderSettings settings, ReaderSettingsNotifier notifier) {
+  static Widget _buildPresetRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     const presets = <_TypographyPreset>[
       _TypographyPreset(
         'Классика',
@@ -565,14 +800,18 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               width: 100,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: active
-                    ? Colors.blue.withValues(alpha: 0.15)
-                    : Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                color: isEink
+                    ? (active ? Colors.black : Colors.white)
+                    : (active
+                          ? Colors.blue.withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.08)),
+                borderRadius: BorderRadius.circular(isEink ? 0 : 12),
                 border: Border.all(
-                  color: active
-                      ? Colors.blue.withValues(alpha: 0.5)
-                      : Colors.white.withValues(alpha: 0.15),
+                  color: isEink
+                      ? Colors.black
+                      : (active
+                            ? Colors.blue.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.15)),
                 ),
               ),
               child: Column(
@@ -584,7 +823,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: active ? Colors.blue : Colors.white,
+                      color: isEink
+                          ? (active ? Colors.white : Colors.black)
+                          : (active ? Colors.blue : Colors.white),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -593,7 +834,9 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     style: TextStyle(
                       fontSize: 11,
                       fontFamily: p.font.fontFamily,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: isEink
+                          ? (active ? Colors.white70 : Colors.black54)
+                          : Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -610,36 +853,55 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   static Widget _buildThemeRow(
     BuildContext context,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
+    final brightness = MediaQuery.platformBrightnessOf(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: ReaderTheme.values.map((theme) {
         final isSelected = settings.theme == theme;
-        final colors = ReaderColors.forTheme(theme);
-        return GestureDetector(
-          onTap: () => notifier.updateTheme(theme),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colors.scaffold,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                'Aa',
-                style: TextStyle(
-                  color: colors.text,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+        final colors = ReaderColors.forThemeWithContext(theme, brightness);
+        final preview = colors.preview;
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: '${theme.displayName}. ${preview.semanticLabel}',
+          hint: 'Двойное касание для выбора темы.',
+          excludeSemantics: true,
+          child: Tooltip(
+            message: '${theme.displayName}\n${preview.semanticLabel}',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => notifier.updateTheme(theme),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: colors.scaffold,
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 8),
+                    border: Border.all(
+                      color: isEink
+                          ? Colors.black
+                          : (isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Aa',
+                      style: TextStyle(
+                        color: isEink ? Colors.black : colors.text,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -649,12 +911,201 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
+  static Widget _buildBackgroundStyleRow(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: BackgroundStyle.values.map((style) {
+        final isSelected = settings.backgroundStyle == style;
+        final preview = _backgroundStylePreview(style);
+        return Semantics(
+          button: true,
+          selected: isSelected,
+          label: style.displayName,
+          hint: 'Двойное касание для выбора текстуры фона.',
+          excludeSemantics: true,
+          child: Tooltip(
+            message: style.displayName,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => notifier.updateBackgroundStyle(style),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: preview,
+                    borderRadius: BorderRadius.circular(isEink ? 0 : 8),
+                    border: Border.all(
+                      color: isEink
+                          ? Colors.black
+                          : (isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Aa',
+                      style: TextStyle(
+                        color:
+                            settings.theme == ReaderTheme.dark ||
+                                settings.theme == ReaderTheme.oled ||
+                                settings.theme == ReaderTheme.bedtime
+                            ? Colors.white70
+                            : Colors.black54,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  static Gradient? _backgroundStylePreview(BackgroundStyle style) {
+    return switch (style) {
+      BackgroundStyle.solid => null,
+      BackgroundStyle.paper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF8F4EC), Color(0xFFF0EBE0)],
+      ),
+      BackgroundStyle.parchment => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFE8D5B7), Color(0xFFD4BC94)],
+      ),
+      BackgroundStyle.darkPaper => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFF2A2725), Color(0xFF1E1C1A)],
+      ),
+      BackgroundStyle.warmSepia => const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFF0E0C0), Color(0xFFE0D0A8)],
+      ),
+    };
+  }
+
+  static Widget _buildUiThemeRow(
+    BuildContext context,
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
+    final brightness = MediaQuery.platformBrightnessOf(context);
+    final isSynced = settings.uiTheme == null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              isSynced ? Icons.link : Icons.link_off,
+              size: 16,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => notifier.updateUiTheme(isSynced ? settings.theme : null),
+              child: Text(
+                isSynced ? 'Синхронизировано с контентом' : 'Настроить отдельно',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Opacity(
+          opacity: isSynced ? 0.4 : 1.0,
+          child: IgnorePointer(
+            ignoring: isSynced,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ReaderTheme.values.map((theme) {
+                final current = settings.effectiveUiTheme;
+                final isSelected = current == theme;
+                final colors = ReaderColors.forThemeWithContext(theme, brightness);
+                final preview = colors.preview;
+                return Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: '${theme.displayName}. ${preview.semanticLabel}',
+                  hint: 'Двойное касание для выбора темы интерфейса.',
+                  excludeSemantics: true,
+                  child: Tooltip(
+                    message: '${theme.displayName}\n${preview.semanticLabel}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => notifier.updateUiTheme(theme),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: colors.scaffold,
+                            borderRadius: BorderRadius.circular(isEink ? 0 : 8),
+                            border: Border.all(
+                              color: isEink
+                                  ? Colors.black
+                                  : (isSelected
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.outline.withValues(alpha: 0.3)),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Aa',
+                              style: TextStyle(
+                                color: isEink ? Colors.black : colors.text,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildColorPresetRow(
     BuildContext context,
     WidgetRef ref,
     ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
+    ReaderSettingsNotifier notifier, {
+    bool isEink = false,
+  }) {
     final presetsAsync = ref.watch(colorPresetListProvider);
     return presetsAsync.when(
       data: (presets) => Column(
@@ -669,36 +1120,52 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               itemBuilder: (context, index) {
                 final preset = presets[index];
                 final isSelected = settings.activeColorPresetId == preset.id;
-                return GestureDetector(
-                  onTap: () => notifier.updateActiveColorPresetId(preset.id),
-                  onLongPress: () => _showColorPresetEditor(
-                    context,
-                    ref,
-                    preset,
-                    notifier,
-                  ),
-                  child: Tooltip(
-                    message: preset.name,
-                    child: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: preset.backgroundColor,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
-                          width: isSelected ? 2 : 1,
+                final preview = ReaderColorPreview.fromColors(
+                  background: preset.backgroundColor,
+                  text: preset.fontColor,
+                  link: ReaderColors.forTheme(settings.theme).link,
+                );
+                return Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: '${preset.name}. ${preview.semanticLabel}',
+                  hint: 'Двойное касание для выбора. Долгое нажатие для редактирования.',
+                  child: GestureDetector(
+                    excludeFromSemantics: true,
+                    onTap: () => notifier.updateActiveColorPresetId(preset.id),
+                    onLongPress: () => _showColorPresetEditor(
+                      context,
+                      ref,
+                      preset,
+                      notifier,
+                    ),
+                    child: Tooltip(
+                      message: '${preset.name}\n${preview.semanticLabel}',
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: preset.backgroundColor,
+                          borderRadius: BorderRadius.circular(isEink ? 0 : 8),
+                          border: Border.all(
+                            color: isEink
+                                ? Colors.black
+                                : (isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.outline.withValues(alpha: 0.3)),
+                            width: isSelected ? 2 : 1,
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Aa',
-                          style: TextStyle(
-                            color: preset.fontColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+                        child: Center(
+                          child: Text(
+                            'Aa',
+                            style: TextStyle(
+                              color: preset.fontColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -744,6 +1211,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
   ) {
     var bgColor = existing?.backgroundColor ?? Colors.white;
     var fgColor = existing?.fontColor ?? Colors.black87;
+    var linkColor = existing?.linkColor ?? Colors.blue.shade700;
+    var highlightColor = existing?.highlightColor ?? const Color(0x40FFEB3B);
     final nameController = TextEditingController(text: existing?.name ?? '');
 
     unawaited(
@@ -752,89 +1221,56 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
         builder: (ctx) => StatefulBuilder(
           builder: (ctx, setDialogState) => AlertDialog(
             title: Text(existing != null ? 'Редактировать' : 'Новый пресет'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Название'),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
-                      children: [
-                        const Text('Фон', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () async {
-                            final color = await showColorPicker(
-                              context: ctx,
-                              initialColor: bgColor,
-                            );
-                            if (color != null) setDialogState(() => bgColor = color);
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: bgColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Текст', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        GestureDetector(
-                          onTap: () async {
-                            final color = await showColorPicker(
-                              context: ctx,
-                              initialColor: fgColor,
-                            );
-                            if (color != null) setDialogState(() => fgColor = color);
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: fgColor,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Text('Превью', style: TextStyle(fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: bgColor,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Aa',
-                              style: TextStyle(color: fgColor, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Название'),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Фон',
+                    bgColor,
+                    (c) => setDialogState(() => bgColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Текст',
+                    fgColor,
+                    (c) => setDialogState(() => fgColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Ссылки',
+                    linkColor,
+                    (c) => setDialogState(() => linkColor = c),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildColorPickerRow(
+                    ctx,
+                    'Выделение',
+                    highlightColor,
+                    (c) => setDialogState(() => highlightColor = c),
+                  ),
+                  const SizedBox(height: 16),
+                  // Live preview card
+                  _PresetPreviewCard(
+                    background: bgColor,
+                    text: fgColor,
+                    link: linkColor,
+                    highlight: highlightColor,
+                  ),
+                  const SizedBox(height: 12),
+                  _ContrastWarning(background: bgColor, foreground: fgColor),
+                  _ContrastWarning(background: bgColor, foreground: linkColor),
+                ],
+              ),
             ),
             actions: [
               if (existing != null)
@@ -872,6 +1308,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                     name: name,
                     backgroundColor: bgColor,
                     fontColor: fgColor,
+                    linkColor: linkColor,
+                    highlightColor: highlightColor,
                   );
                   if (existing != null) {
                     unawaited(ref.read(colorPresetListProvider.notifier).updatePreset(preset));
@@ -887,6 +1325,35 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ),
       ).whenComplete(nameController.dispose),
+    );
+  }
+
+  static Widget _buildColorPickerRow(
+    BuildContext ctx,
+    String label,
+    Color color,
+    ValueChanged<Color> onChanged,
+  ) {
+    return Row(
+      children: [
+        GestureDetector(
+          onTap: () async {
+            final picked = await showColorPicker(context: ctx, initialColor: color);
+            if (picked != null) onChanged(picked);
+          },
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(label, style: const TextStyle(fontSize: 13)),
+      ],
     );
   }
 
@@ -986,6 +1453,8 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             max: 40,
             divisions: 30,
             label: '${settings.fontSize.round()}px',
+            semanticFormatterCallback: (value) =>
+                'Размер шрифта ${value.round()} пунктов, от 10 до 40 пунктов',
             onChanged: (v) => notifier.updateFontSize(v),
           ),
         ),
@@ -1002,6 +1471,54 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+        ),
+      ],
+    );
+  }
+
+  static Widget _buildNoteFontSizeRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final effectiveNoteFontSize = settings.noteFontSize ?? settings.fontSize;
+    return Row(
+      children: [
+        IconButton(
+          icon: const Icon(Icons.remove, size: 20),
+          onPressed: effectiveNoteFontSize > 10
+              ? () => notifier.updateNoteFontSize(effectiveNoteFontSize - 1)
+              : null,
+        ),
+        Expanded(
+          child: Slider(
+            value: effectiveNoteFontSize,
+            min: 10,
+            max: 40,
+            divisions: 30,
+            label: '${effectiveNoteFontSize.round()}px',
+            semanticFormatterCallback: (value) =>
+                'Размер шрифта заметок ${value.round()} пунктов, от 10 до 40 пунктов',
+            onChanged: (v) => notifier.updateNoteFontSize(v),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add, size: 20),
+          onPressed: effectiveNoteFontSize < 40
+              ? () => notifier.updateNoteFontSize(effectiveNoteFontSize + 1)
+              : null,
+        ),
+        SizedBox(
+          width: 40,
+          child: Text(
+            settings.noteFontSize != null ? '${effectiveNoteFontSize.round()}' : 'Авто',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.restart_alt, size: 18),
+          tooltip: 'Сбросить к размеру основного шрифта',
+          onPressed: settings.noteFontSize != null ? () => notifier.updateNoteFontSize(null) : null,
         ),
       ],
     );
@@ -1049,21 +1566,107 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     );
   }
 
-  static Widget _buildMarginRow(
+  Widget _buildTextAlignRow(
     ReaderSettings settings,
     ReaderSettingsNotifier notifier,
   ) {
-    const values = [8.0, 12.0, 16.0, 20.0, 24.0, 32.0];
+    const aligns = ReaderTextAlign.values;
+    const labels = {
+      ReaderTextAlign.left: 'Слева',
+      ReaderTextAlign.justify: 'По ширине',
+      ReaderTextAlign.center: 'Центр',
+      ReaderTextAlign.right: 'Справа',
+      ReaderTextAlign.asInBook: 'Как в книге',
+    };
     return Wrap(
       spacing: 8,
-      children: values.map((v) {
-        final isSelected = (settings.margin - v).abs() < 0.5;
+      runSpacing: 8,
+      children: aligns.map((align) {
         return ChoiceChip(
-          label: Text('${v.round()}'),
-          selected: isSelected,
-          onSelected: (_) => notifier.updateMargin(v),
+          label: Text(labels[align] ?? align.name),
+          selected: settings.textAlign == align,
+          onSelected: (_) => notifier.updateTextAlign(align),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildMarginRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    final pct = settings.marginAsPercent;
+    const pxValues = [8.0, 12.0, 16.0, 20.0, 24.0, 32.0];
+    const pctValues = [2.0, 4.0, 6.0, 8.0, 10.0, 12.0];
+    final values = pct ? pctValues : pxValues;
+    final unit = pct ? '%' : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!settings.separateMargins)
+          Wrap(
+            spacing: 8,
+            children: values.map((v) {
+              final isSelected = (settings.margin - v).abs() < 0.5;
+              return ChoiceChip(
+                label: Text('${v.round()}$unit'),
+                selected: isSelected,
+                onSelected: (_) => notifier.updateMargin(v),
+              );
+            }).toList(),
+          )
+        else
+          _buildSeparateMargins(settings, notifier),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Switch.adaptive(
+              value: settings.separateMargins,
+              onChanged: notifier.updateSeparateMargins,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Раздельные отступы',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('px')),
+                ButtonSegment(value: true, label: Text('%')),
+              ],
+              selected: {pct},
+              onSelectionChanged: (s) => notifier.updateMarginAsPercent(s.first),
+              style: const ButtonStyle(
+                visualDensity: VisualDensity(horizontal: -3, vertical: -3),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSeparateMargins(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    Widget marginSlider(String label, double value, ValueChanged<double> onChanged) {
+      return _buildSliderRow(label, value / 48.0, 0.0, 1.0, (v) => onChanged(v * 48.0));
+    }
+
+    return Column(
+      children: [
+        marginSlider('Сверху', settings.marginTop, notifier.updateMarginTop),
+        marginSlider('Снизу', settings.marginBottom, notifier.updateMarginBottom),
+        marginSlider('Слева', settings.marginLeft, notifier.updateMarginLeft),
+        marginSlider('Справа', settings.marginRight, notifier.updateMarginRight),
+      ],
     );
   }
 
@@ -1116,6 +1719,28 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
                 },
               ),
             ],
+          ),
+        ],
+        if (settings.autoThemeMode != AutoThemeMode.off) ...[
+          const SizedBox(height: 12),
+          const Text('Ночная тема:', style: TextStyle(fontSize: 13)),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                const [
+                  ReaderTheme.dark,
+                  ReaderTheme.oled,
+                  ReaderTheme.bedtime,
+                ].map((theme) {
+                  final isSelected = settings.nightTheme == theme;
+                  return ChoiceChip(
+                    label: Text(theme.displayName),
+                    selected: isSelected,
+                    onSelected: (_) => notifier.updateNightTheme(theme),
+                  );
+                }).toList(),
           ),
         ],
       ],
@@ -1180,48 +1805,6 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           ),
         ),
         const Icon(Icons.wb_sunny, size: 20, color: Colors.orange),
-      ],
-    );
-  }
-
-  // LW-10.1: Custom CSS editor
-  static Widget _buildCustomCssSection(
-    ReaderSettings settings,
-    ReaderSettingsNotifier notifier,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionTitle('Пользовательский CSS'),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Colors.black.withValues(alpha: 0.05),
-          ),
-          child: TextField(
-            controller: TextEditingController(text: settings.customCss)
-              ..selection = TextSelection.collapsed(offset: settings.customCss.length),
-            onChanged: notifier.updateCustomCss,
-            maxLines: 4,
-            minLines: 2,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-            ),
-            decoration: InputDecoration(
-              hintText: 'p { text-indent: 2em; }\n.epigraph { color: gray; }',
-              hintStyle: TextStyle(
-                color: Colors.black.withValues(alpha: 0.3),
-                fontSize: 12,
-              ),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -1295,14 +1878,26 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     String label,
     IconData icon,
     bool value,
-    ValueChanged<bool> onChanged,
-  ) {
+    ValueChanged<bool> onChanged, {
+    bool isEink = false,
+  }) {
     return Row(
       children: [
-        Icon(icon, size: 20),
+        Icon(icon, size: 20, color: isEink ? Colors.black : null),
         const SizedBox(width: 12),
-        Expanded(child: Text(label)),
-        Switch.adaptive(value: value, onChanged: onChanged),
+        Expanded(
+          child: Text(
+            label,
+            style: isEink ? const TextStyle(color: Colors.black) : null,
+          ),
+        ),
+        Switch.adaptive(
+          value: value,
+          onChanged: onChanged,
+          activeThumbColor: isEink ? Colors.black : null,
+          activeTrackColor: isEink ? Colors.black26 : null,
+          inactiveTrackColor: isEink ? Colors.grey.shade300 : null,
+        ),
       ],
     );
   }
@@ -1418,7 +2013,7 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     labels: const {
       DoubleTapAction.toggleUI: 'Скрыть/показать UI',
       DoubleTapAction.addBookmark: 'Закладка',
-      DoubleTapAction.translate: 'Перевести абзац',
+      DoubleTapAction.searchInBook: 'Поиск',
       DoubleTapAction.disabled: 'Выкл',
     },
     onChanged: (v) => notifier.updateDoubleTapAction(v),
@@ -1437,6 +2032,111 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     },
     onChanged: (v) => notifier.updateLongPressAction(v),
   );
+
+  static Widget _buildCornerTapMap(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = <ReaderCorner, String>{
+      ReaderCorner.topLeft: 'Верхний левый',
+      ReaderCorner.topRight: 'Верхний правый',
+      ReaderCorner.bottomLeft: 'Нижний левый',
+      ReaderCorner.bottomRight: 'Нижний правый',
+    };
+    final actions = <ReaderCorner, CornerTapAction>{
+      ReaderCorner.topLeft: settings.topLeftCornerTapAction,
+      ReaderCorner.topRight: settings.topRightCornerTapAction,
+      ReaderCorner.bottomLeft: settings.bottomLeftCornerTapAction,
+      ReaderCorner.bottomRight: settings.bottomRightCornerTapAction,
+    };
+    final isDefault = actions.values.every((action) => action == CornerTapAction.inherit);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Тапы по углам')),
+            TextButton(
+              onPressed: isDefault ? null : notifier.resetCornerTapActions,
+              child: const Text('Сбросить'),
+            ),
+          ],
+        ),
+        const Text(
+          'Угловой тап имеет приоритет над перелистыванием по краю. '
+          'Долгое нажатие остаётся доступным для выделения текста.',
+        ),
+        const SizedBox(height: 8),
+        for (final corner in ReaderCorner.values)
+          DropdownButtonFormField<CornerTapAction>(
+            key: ValueKey('corner-tap-${corner.name}'),
+            initialValue: actions[corner],
+            decoration: InputDecoration(labelText: labels[corner]),
+            items: [
+              for (final action in CornerTapAction.values)
+                DropdownMenuItem(value: action, child: Text(action.displayName)),
+            ],
+            onChanged: (action) {
+              if (action != null) notifier.updateCornerTapAction(corner, action);
+            },
+          ),
+      ],
+    );
+  }
+
+  static Widget _buildCornerLongPressMap(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    const labels = <ReaderCorner, String>{
+      ReaderCorner.topLeft: 'Верхний левый',
+      ReaderCorner.topRight: 'Верхний правый',
+      ReaderCorner.bottomLeft: 'Нижний левый',
+      ReaderCorner.bottomRight: 'Нижний правый',
+    };
+    final actions = <ReaderCorner, CornerLongPressAction>{
+      ReaderCorner.topLeft: settings.topLeftCornerLongPressAction,
+      ReaderCorner.topRight: settings.topRightCornerLongPressAction,
+      ReaderCorner.bottomLeft: settings.bottomLeftCornerLongPressAction,
+      ReaderCorner.bottomRight: settings.bottomRightCornerLongPressAction,
+    };
+    final isDefault = actions.values.every((action) => action == CornerLongPressAction.inherit);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle('Долгое нажатие по углам')),
+            TextButton(
+              key: const ValueKey('reset-corner-long-press-actions'),
+              onPressed: isDefault ? null : notifier.resetCornerLongPressActions,
+              child: const Text('Сбросить'),
+            ),
+          ],
+        ),
+        const Text(
+          'Настроенное действие срабатывает только в этом углу; '
+          'в остальном тексте долгое нажатие сохраняет выделение.',
+        ),
+        const SizedBox(height: 8),
+        for (final corner in ReaderCorner.values)
+          DropdownButtonFormField<CornerLongPressAction>(
+            key: ValueKey('corner-long-press-${corner.name}'),
+            initialValue: actions[corner],
+            decoration: InputDecoration(labelText: labels[corner]),
+            items: [
+              for (final action in CornerLongPressAction.values)
+                DropdownMenuItem(value: action, child: Text(action.displayName)),
+            ],
+            onChanged: (action) {
+              if (action != null) notifier.updateCornerLongPressAction(corner, action);
+            },
+          ),
+      ],
+    );
+  }
 
   static Widget _buildHorizontalGestureRow(
     ReaderSettings settings,
@@ -1463,6 +2163,23 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     },
     onChanged: (v) => notifier.updateHorizontalGestureScroll(v),
   );
+
+  static Widget _buildFullScreenModeRow(
+    ReaderSettings settings,
+    ReaderSettingsNotifier notifier,
+  ) {
+    return Wrap(
+      spacing: 8,
+      children: FullScreenMode.values.map((mode) {
+        final selected = settings.fullScreenMode == mode;
+        return ChoiceChip(
+          label: Text(mode.displayName),
+          selected: selected,
+          onSelected: selected ? null : (_) => notifier.updateFullScreenMode(mode),
+        );
+      }).toList(),
+    );
+  }
 
   static Widget _buildOrientationLockRow(
     ReaderSettings settings,
@@ -1535,12 +2252,12 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
     BuildContext context,
     WidgetRef ref,
     String bookId,
+    ReaderSettings settings,
   ) {
     return FutureBuilder<bool>(
       future: ref.read(perBookSettingsServiceProvider).hasPerBookSettings(bookId),
       builder: (context, snapshot) {
         final hasPerBook = snapshot.data ?? false;
-        if (!hasPerBook) return const SizedBox.shrink();
         final theme = Theme.of(context);
         return Container(
           margin: const EdgeInsets.only(bottom: 8, left: 20, right: 20),
@@ -1552,14 +2269,14 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
           child: Row(
             children: [
               Icon(
-                Icons.bookmark,
+                hasPerBook ? Icons.bookmark : Icons.bookmark_add_outlined,
                 size: 18,
                 color: theme.colorScheme.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Индивидуальные настройки',
+                  hasPerBook ? 'Индивидуальные настройки' : 'Сохранить оформление для этой книги',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onPrimaryContainer,
                   ),
@@ -1567,17 +2284,148 @@ class _ReaderQuickSettingsSheetState extends ConsumerState<ReaderQuickSettingsSh
               ),
               TextButton(
                 onPressed: () async {
-                  await ref.read(perBookSettingsServiceProvider).resetToGlobal(bookId);
+                  final service = ref.read(perBookSettingsServiceProvider);
+                  if (hasPerBook) {
+                    await service.resetToGlobal(bookId);
+                  } else {
+                    await service.saveReadingAppearance(bookId, settings);
+                  }
                   if (context.mounted) {
                     Navigator.of(context).pop();
                   }
                 },
-                child: const Text('Сбросить'),
+                child: Text(hasPerBook ? 'Сбросить' : 'Сохранить'),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPerBookTypographySection(
+    BuildContext context,
+    WidgetRef ref,
+    String bookId,
+    ReaderSettings settings,
+  ) {
+    final typo = ref.watch(readerTypographyProvider(bookId));
+    final notifier = ref.read(readerTypographyProvider(bookId).notifier);
+    final theme = Theme.of(context);
+    final hasOverrides = !typo.isEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8, left: 20, right: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.text_fields, size: 16, color: theme.colorScheme.tertiary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Индивидуальная типографика',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (hasOverrides)
+                TextButton(
+                  onPressed: () => notifier.reset(),
+                  child: const Text('Сбросить'),
+                ),
+            ],
+          ),
+          if (!hasOverrides)
+            TextButton.icon(
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Сохранить текущую типографику'),
+              onPressed: () => notifier.update(
+                ReaderTypography(
+                  fontSize: settings.fontSize,
+                  lineHeight: settings.lineHeight,
+                  marginHorizontal: settings.margin,
+                  fontFamily: settings.font.name,
+                ),
+              ),
+            )
+          else ...[
+            _buildPerBookSlider(
+              'Шрифт',
+              typo.fontSize ?? settings.fontSize,
+              10,
+              40,
+              (v) => notifier.update(typo.copyWith(fontSize: v)),
+              onClear: () => notifier.update(typo.copyWith(clearFontSize: true)),
+              isOverridden: typo.fontSize != null,
+            ),
+            _buildPerBookSlider(
+              'Межстрочный',
+              typo.lineHeight ?? settings.lineHeight,
+              1.0,
+              3.0,
+              (v) => notifier.update(typo.copyWith(lineHeight: v)),
+              onClear: () => notifier.update(typo.copyWith(clearLineHeight: true)),
+              isOverridden: typo.lineHeight != null,
+            ),
+            _buildPerBookSlider(
+              'Отступы',
+              typo.marginHorizontal ?? settings.margin,
+              0,
+              60,
+              (v) => notifier.update(typo.copyWith(marginHorizontal: v)),
+              onClear: () => notifier.update(typo.copyWith(clearMarginHorizontal: true)),
+              isOverridden: typo.marginHorizontal != null,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerBookSlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged, {
+    required VoidCallback onClear,
+    required bool isOverridden,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label ${value.round()}',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isOverridden ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
+        ),
+        if (isOverridden)
+          GestureDetector(
+            onTap: onClear,
+            child: const Icon(Icons.close, size: 16),
+          ),
+      ],
     );
   }
 }
@@ -1593,6 +2441,119 @@ class _SectionTitle extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _ContrastWarning extends StatelessWidget {
+  const _ContrastWarning({required this.background, required this.foreground});
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = ReaderColorPreview.fromColors(
+      background: background,
+      text: foreground,
+      link: foreground,
+    );
+    final ratio = preview.textContrast;
+    final passes = ratio >= 4.5;
+    if (passes) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.warning_amber_rounded, size: 16, color: Colors.amber.shade700),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Контраст ${ratio.toStringAsFixed(1)}:1 — ниже нормы WCAG AA (4.5:1)',
+              style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetPreviewCard extends StatelessWidget {
+  const _PresetPreviewCard({
+    required this.background,
+    required this.text,
+    required this.link,
+    required this.highlight,
+  });
+
+  final Color background;
+  final Color text;
+  final Color link;
+  final Color highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final preview = ReaderColorPreview.fromColors(
+      background: background,
+      text: text,
+      link: link,
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Обычный текст',
+            style: TextStyle(color: text, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Текст с ',
+                  style: TextStyle(color: text, fontSize: 14),
+                ),
+                TextSpan(
+                  text: 'ссылкой',
+                  style: TextStyle(
+                    color: link,
+                    fontSize: 14,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            color: highlight,
+            child: Text('Выделенный текст', style: TextStyle(color: text, fontSize: 14)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Т ${preview.textContrast.toStringAsFixed(1)} · С ${preview.linkContrast.toStringAsFixed(1)}',
+            style: TextStyle(
+              fontSize: 10,
+              color: text.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
       ),
     );
   }

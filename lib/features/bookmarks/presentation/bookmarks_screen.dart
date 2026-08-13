@@ -8,23 +8,63 @@ import 'package:go_router/go_router.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/app_animations.dart';
 import '../../../shared/widgets/error_state_widget.dart';
+import '../../reader/domain/reader.dart';
 import '../data/bookmark_repository.dart';
 import '../data/bookmarks_providers.dart';
 
-class BookmarksScreen extends ConsumerWidget {
+class BookmarksScreen extends ConsumerStatefulWidget {
   final String bookId;
 
   const BookmarksScreen({super.key, required this.bookId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bookmarksAsync = ref.watch(bookmarksStreamProvider(bookId));
+  ConsumerState<BookmarksScreen> createState() => _BookmarksScreenState();
+}
+
+class _BookmarksScreenState extends ConsumerState<BookmarksScreen> {
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) _searchController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bookmarksAsync = ref.watch(bookmarksStreamProvider(widget.bookId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Закладки'),
+      appBar: AdaptiveAppBar(
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск закладок',
+                  border: InputBorder.none,
+                ),
+                onChanged: (_) => setState(() {}),
+              )
+            : const Text('Закладки'),
+        actions: [
+          IconButton(
+            tooltip: _isSearching ? 'Закрыть поиск' : 'Поиск закладок',
+            icon: Icon(_isSearching ? Icons.close : Icons.search),
+            onPressed: _toggleSearch,
+          ),
+        ],
       ),
       body: bookmarksAsync.when(
         data: (bookmarks) {
@@ -64,14 +104,30 @@ class BookmarksScreen extends ConsumerWidget {
             );
           }
 
+          final filteredBookmarks = bookmarks
+              .where((bookmark) => _matchesBookmarkQuery(bookmark, _searchController.text))
+              .toList(growable: false);
+          if (filteredBookmarks.isEmpty) {
+            return const _BookmarksSearchEmptyState();
+          }
+
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            itemCount: bookmarks.length,
+            itemCount: filteredBookmarks.length,
             itemBuilder: (context, index) {
-              final bookmark = bookmarks[index];
+              final bookmark = filteredBookmarks[index];
               return BookmarkTile(
                 bookmark: bookmark,
-                onTap: () => context.push('/reader/${bookmark.bookId}'),
+                onTap: () => context.push(
+                  '/reader/${bookmark.bookId}',
+                  extra: ReaderPosition(
+                    bookId: bookmark.bookId,
+                    chapterIndex: bookmark.chapterIndex,
+                    paragraphIndex: bookmark.paragraphIndex,
+                    localOffset: bookmark.localOffset * 100,
+                    updatedAt: bookmark.createdAt,
+                  ),
+                ),
                 onDelete: () => _deleteBookmark(context, ref, bookmark),
               ).animate().listTileTransition(delay: (index * 50).ms);
             },
@@ -81,12 +137,12 @@ class BookmarksScreen extends ConsumerWidget {
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: 5,
-            itemBuilder: (_, _) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            itemBuilder: (_, _) => const Card(
+              margin: EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Bone.circle(size: 24),
-                title: Text(BoneMock.name),
-                subtitle: Text(BoneMock.subtitle),
+                leading: Bone.circle(size: 24),
+                title: Bone(width: 120, height: 12),
+                subtitle: Bone(width: 80, height: 12),
               ),
             ),
           ),
@@ -94,7 +150,7 @@ class BookmarksScreen extends ConsumerWidget {
         error: (e, _) => ErrorStateWidget(
           message: 'Не удалось загрузить закладки',
           details: e.toString(),
-          onRetry: () => ref.invalidate(bookmarksStreamProvider(bookId)),
+          onRetry: () => ref.invalidate(bookmarksStreamProvider(widget.bookId)),
         ),
       ),
     );
@@ -106,6 +162,34 @@ class BookmarksScreen extends ConsumerWidget {
     await repository.deleteBookmark(bookmark.id);
     if (!context.mounted) return;
     unawaited(SmartDialog.showToast('Закладка удалена'));
+  }
+}
+
+bool _matchesBookmarkQuery(Bookmark bookmark, String query) {
+  final normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery.isEmpty) return true;
+  return [bookmark.selectedText, bookmark.note, bookmark.highlightColor].any(
+    (value) => value?.toLowerCase().contains(normalizedQuery) ?? false,
+  );
+}
+
+class _BookmarksSearchEmptyState extends StatelessWidget {
+  const _BookmarksSearchEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off, size: 64),
+          SizedBox(height: 16),
+          Text('Ничего не найдено'),
+          SizedBox(height: 8),
+          Text('Измените запрос или очистите поиск'),
+        ],
+      ),
+    );
   }
 }
 
@@ -123,6 +207,8 @@ class BookmarkTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final note = bookmark.note;
+    final colorHex = bookmark.highlightColor;
     return RepaintBoundary(
       child: Dismissible(
         key: Key(bookmark.id),
@@ -154,7 +240,12 @@ class BookmarkTile extends StatelessWidget {
         ),
         onDismissed: (_) => onDelete?.call(),
         child: ListTile(
-          leading: const Icon(Icons.bookmark),
+          leading: colorHex != null
+              ? CircleAvatar(
+                  backgroundColor: _parseHighlightColor(colorHex),
+                  radius: 12,
+                )
+              : const Icon(Icons.bookmark),
           title: bookmark.selectedText != null
               ? Text(
                   bookmark.selectedText!,
@@ -162,13 +253,43 @@ class BookmarkTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 )
               : Text('Стр. ${bookmark.chapterIndex + 1}'),
-          subtitle: Text(
-            'Абзац ${bookmark.paragraphIndex + 1}',
-            style: Theme.of(context).textTheme.bodySmall,
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Абзац ${bookmark.paragraphIndex + 1}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (note case final nonEmptyNote? when nonEmptyNote.isNotEmpty)
+                Text(
+                  nonEmptyNote,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
           ),
           onTap: onTap,
         ),
       ),
     );
   }
+}
+
+Color _parseHighlightColor(String value) {
+  const named = {
+    'yellow': Color(0xFFFFEB3B),
+    'green': Color(0xFF81C784),
+    'blue': Color(0xFF90CAF9),
+    'pink': Color(0xFFF48FB1),
+  };
+  if (named.containsKey(value)) return named[value]!;
+  // try parsing hex like '#FFEB3B' or 'FFEB3B'
+  final hex = value.replaceFirst('#', '');
+  if (hex.length == 6) {
+    return Color(int.parse('FF$hex', radix: 16));
+  }
+  return const Color(0xFFFFEB3B);
 }

@@ -46,4 +46,4 @@ final class RecentBooksProvider
   }
 }
 
-String _$recentBooksHash() => r'6f09be0ab04d820fd6f5cc426f181ee5f3a625e4';
+String _$recentBooksHash() => r'456aef5e085d68b7d7ffc6f7659fd7bd3549dd05';

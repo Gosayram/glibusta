@@ -59,4 +59,38 @@ void main() {
       expect(color, const Color(0xFFD7CDBF));
     });
   });
+
+  group('ReaderColorPreview', () {
+    test('calculates text and link contrast independently', () {
+      final preview = ReaderColorPreview.fromColors(
+        background: Colors.white,
+        text: Colors.black,
+        link: const Color(0xFF1565C0),
+      );
+
+      expect(preview.textContrast, closeTo(21, 0.001));
+      expect(preview.linkContrast, isNot(closeTo(preview.textContrast, 0.001)));
+      expect(preview.isApproximate, isFalse);
+    });
+
+    test('marks translucent preset colours as approximate', () {
+      final preview = ReaderColorPreview.fromColors(
+        background: Colors.white.withValues(alpha: 0.8),
+        text: Colors.black,
+        link: Colors.blue.withValues(alpha: 0.5),
+      );
+
+      expect(preview.isApproximate, isTrue);
+      expect(preview.semanticLabel, contains('Контраст текста'));
+      expect(preview.semanticLabel, contains('Значения приблизительные'));
+    });
+
+    test('reader palette exposes a semantics-ready preview', () {
+      final preview = ReaderColors.forTheme(ReaderTheme.dark).preview;
+
+      expect(preview.textContrast, greaterThan(1));
+      expect(preview.linkContrast, greaterThan(1));
+      expect(preview.semanticLabel, contains('Контраст ссылок'));
+    });
+  });
 }

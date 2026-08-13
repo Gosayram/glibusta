@@ -80,7 +80,7 @@ final class AllowMobileDownloadsNotifierProvider
   }
 }
 
-String _$allowMobileDownloadsNotifierHash() => r'e52393c8f81aad27be2fed99b8e1d4a4e1d8f1ed';
+String _$allowMobileDownloadsNotifierHash() => r'9deba5ca33cfb6f5ed7bc0339f034f541ddb1a56';
 
 abstract class _$AllowMobileDownloadsNotifier extends $Notifier<bool> {
   bool build();
@@ -126,7 +126,7 @@ final class AutoResumeOnWifiNotifierProvider
   }
 }
 
-String _$autoResumeOnWifiNotifierHash() => r'25a78875c2ff20dc2b6b85f2daf0320b2ab030db';
+String _$autoResumeOnWifiNotifierHash() => r'244c44147941256ac70ca89bfeaed7475555c789';
 
 abstract class _$AutoResumeOnWifiNotifier extends $Notifier<bool> {
   bool build();

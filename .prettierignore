@@ -13,4 +13,5 @@ android/app/build/
 macos/Flutter/ephemeral/
 pubspec.lock
 package-lock.json
+schema/
 test_results/

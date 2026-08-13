@@ -7,13 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../shared/widgets/adaptive_app_bar.dart';
 import '../../../shared/widgets/book_card.dart';
 import 'smart_collections_provider.dart';
+import 'user_collections_provider.dart';
 
-final userCollectionsProvider = FutureProvider<List<Collection>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.collectionDao.getAllCollections();
-});
+export 'user_collections_provider.dart';
 
 class CollectionsScreen extends ConsumerStatefulWidget {
   const CollectionsScreen({super.key});
@@ -29,9 +28,8 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
     final userAsync = ref.watch(userCollectionsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Коллекции'),
-        automaticallyImplyLeading: false,
+      appBar: const AdaptiveAppBar(
+        title: Text('Коллекции'),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateDialog(context),
@@ -313,7 +311,7 @@ class _UserCollectionTile extends StatelessWidget {
             const PopupMenuItem(value: 'delete', child: Text('Удалить')),
           ],
         ),
-        onTap: () => context.go('/collections'),
+        onTap: () => context.push('/collections/${collection.id}'),
       ),
     );
   }

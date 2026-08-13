@@ -1,7 +1,69 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/reader_colors.dart';
+import '../data/reading_info_formatter.dart';
 import '../domain/reader.dart';
+
+/// Explains the reader controls that are temporarily revealed by a central tap.
+///
+/// This intentionally documents the current shared chrome behavior instead of
+/// introducing separate visibility preferences before their interaction and
+/// accessibility policy is defined.
+class ReaderChromeVisibilityGuide extends StatelessWidget {
+  const ReaderChromeVisibilityGuide({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      key: const Key('reader_chrome_visibility_guide'),
+      container: true,
+      label:
+          'Панели чтения. Центральное касание показывает или скрывает верхнюю и '
+          'нижнюю панель. Верхняя панель содержит содержание, поиск и настройки. '
+          'Нижняя показывает прогресс и режим чтения. Время автоскрытия настраивается '
+          'ниже. Строки информации на странице настраиваются в настройках приложения.',
+      child: ExcludeSemantics(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.touch_app_outlined, color: colors.primary),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Панели чтения', style: TextStyle(fontWeight: FontWeight.w600)),
+                    SizedBox(height: 4),
+                    Text(
+                      'Коснитесь центра страницы, чтобы показать или скрыть обе панели. '
+                      'Верхняя открывает содержание, поиск и настройки; нижняя — прогресс '
+                      'и режим чтения.',
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Время автоскрытия меняется ниже. Строки информации сверху и снизу '
+                      'настраиваются в настройках приложения.',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class ReaderTopBar extends StatelessWidget {
   const ReaderTopBar({
@@ -10,34 +72,49 @@ class ReaderTopBar extends StatelessWidget {
     required this.bookTitle,
     required this.onBack,
     this.bookAuthor,
+    this.coverUrl,
     this.onSearch,
     this.onToc,
     this.onBookmark,
     this.onMore,
     this.isBookmarked = false,
     this.hasLinkBack = false,
+    this.hasLinkForward = false,
+    this.onLinkForward,
     this.onBookInfo,
     this.onKaraoke,
+    this.onFontIncrease,
+    this.onFontDecrease,
+    this.onCycleTheme,
   });
 
   final ReaderSettings settings;
   final String bookTitle;
   final VoidCallback onBack;
   final String? bookAuthor;
+  final String? coverUrl;
   final VoidCallback? onSearch;
   final VoidCallback? onToc;
   final VoidCallback? onBookmark;
   final VoidCallback? onMore;
   final bool isBookmarked;
   final bool hasLinkBack;
+  final bool hasLinkForward;
+  final VoidCallback? onLinkForward;
   final VoidCallback? onBookInfo;
   final VoidCallback? onKaraoke;
+  final VoidCallback? onFontIncrease;
+  final VoidCallback? onFontDecrease;
+  final VoidCallback? onCycleTheme;
 
   @override
   Widget build(BuildContext context) {
     final colors = ReaderColors.forTheme(settings.theme);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final showTitle = screenWidth > 400; // ponytail: hide title on small screens
+    final bookLabel = bookAuthor?.isNotEmpty == true
+        ? 'Книга: $bookTitle. Автор: $bookAuthor'
+        : 'Книга: $bookTitle';
     return SafeArea(
       bottom: false,
       child: Container(
@@ -67,30 +144,50 @@ class ReaderTopBar extends StatelessWidget {
                 onPressed: onBack,
               ),
             ),
+            if (hasLinkForward)
+              Semantics(
+                button: true,
+                label: 'Вперёд по ссылке',
+                child: IconButton(
+                  icon: const Icon(Icons.subdirectory_arrow_right),
+                  color: colors.text,
+                  tooltip: 'Вперёд по ссылке',
+                  onPressed: onLinkForward,
+                ),
+              ),
+            if (coverUrl != null && coverUrl!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _CoverThumbnail(coverUrl: coverUrl!, color: colors.text),
+              ),
             Expanded(
-              child: showTitle
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          bookTitle,
-                          style: TextStyle(color: colors.text, fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                          semanticsLabel: 'Книга: $bookTitle',
-                        ),
-                        if (bookAuthor != null && bookAuthor!.isNotEmpty)
-                          Text(
-                            bookAuthor!,
-                            style: TextStyle(
-                              color: colors.text.withValues(alpha: 0.6),
-                              fontSize: 11,
+              child: Semantics(
+                label: bookLabel,
+                child: ExcludeSemantics(
+                  child: showTitle
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              bookTitle,
+                              style: TextStyle(color: colors.text, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
-                    )
-                  : const SizedBox.shrink(),
+                            if (bookAuthor != null && bookAuthor!.isNotEmpty)
+                              Text(
+                                bookAuthor!,
+                                style: TextStyle(
+                                  color: colors.text.withValues(alpha: 0.6),
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
             ),
             if (onSearch != null)
               Semantics(
@@ -150,6 +247,39 @@ class ReaderTopBar extends StatelessWidget {
                   onPressed: onKaraoke,
                 ),
               ),
+            if (onCycleTheme != null)
+              Semantics(
+                button: true,
+                label: 'Сменить тему',
+                child: IconButton(
+                  icon: Icon(_themeIcon(settings.theme)),
+                  color: colors.text,
+                  tooltip: 'Тема: ${settings.theme.displayName}',
+                  onPressed: onCycleTheme,
+                ),
+              ),
+            if (onFontDecrease != null)
+              Semantics(
+                button: true,
+                label: 'Уменьшить шрифт',
+                child: IconButton(
+                  icon: const Icon(Icons.text_decrease),
+                  color: colors.text,
+                  tooltip: 'Уменьшить шрифт',
+                  onPressed: onFontDecrease,
+                ),
+              ),
+            if (onFontIncrease != null)
+              Semantics(
+                button: true,
+                label: 'Увеличить шрифт',
+                child: IconButton(
+                  icon: const Icon(Icons.text_increase),
+                  color: colors.text,
+                  tooltip: 'Увеличить шрифт',
+                  onPressed: onFontIncrease,
+                ),
+              ),
             Semantics(
               button: true,
               label: 'Настройки',
@@ -165,6 +295,18 @@ class ReaderTopBar extends StatelessWidget {
       ),
     );
   }
+
+  IconData _themeIcon(ReaderTheme theme) {
+    return switch (theme) {
+      ReaderTheme.system => Icons.brightness_auto,
+      ReaderTheme.light => Icons.light_mode_outlined,
+      ReaderTheme.paper => Icons.menu_book,
+      ReaderTheme.sepia => Icons.wb_sunny_outlined,
+      ReaderTheme.dark => Icons.dark_mode_outlined,
+      ReaderTheme.oled => Icons.contrast,
+      ReaderTheme.bedtime => Icons.bedtime,
+    };
+  }
 }
 
 class ReaderBottomBar extends StatelessWidget {
@@ -175,6 +317,7 @@ class ReaderBottomBar extends StatelessWidget {
     required this.totalChapters,
     required this.scrollProgress,
     required this.estimatedMinutesLeft,
+    this.estimatedChapterMinutesLeft = 0,
     required this.chapterTitle,
     this.chapterTitleAt,
     this.onJumpToProgress,
@@ -182,6 +325,8 @@ class ReaderBottomBar extends StatelessWidget {
     this.checkpoints = const [],
     this.onCheckpointForward,
     this.onCheckpointBack,
+    this.onPrevChapter,
+    this.onNextChapter,
   });
 
   final ReaderSettings settings;
@@ -189,6 +334,7 @@ class ReaderBottomBar extends StatelessWidget {
   final int totalChapters;
   final double scrollProgress;
   final int estimatedMinutesLeft;
+  final int estimatedChapterMinutesLeft;
   final String chapterTitle;
   final String Function(int chapterIndex)? chapterTitleAt;
   final ValueChanged<double>? onJumpToProgress;
@@ -196,6 +342,8 @@ class ReaderBottomBar extends StatelessWidget {
   final List<double> checkpoints;
   final VoidCallback? onCheckpointForward;
   final VoidCallback? onCheckpointBack;
+  final VoidCallback? onPrevChapter;
+  final VoidCallback? onNextChapter;
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +353,9 @@ class ReaderBottomBar extends StatelessWidget {
     }
 
     final percent = (scrollProgress * 100).round();
-    final page = (scrollProgress * totalChapters).ceil().clamp(1, totalChapters);
+    final safeTotalChapters = totalChapters > 0 ? totalChapters : 1;
+    final currentChapter = currentChapterIndex.clamp(0, safeTotalChapters - 1) + 1;
+    final chapterPosition = 'Глава $currentChapter из $safeTotalChapters';
 
     return SafeArea(
       top: false,
@@ -227,28 +377,73 @@ class ReaderBottomBar extends StatelessWidget {
             if (chapterTitle.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  chapterTitle,
-                  style: TextStyle(
-                    color: colors.text.withValues(alpha: 0.8),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                child: Semantics(
+                  header: true,
+                  label: 'Текущая глава: $chapterTitle',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      chapterTitle,
+                      style: TextStyle(
+                        color: colors.text.withValues(alpha: 0.8),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _leftLabel(settings, page, totalChapters, percent),
-                  style: TextStyle(color: colors.text, fontSize: 12),
+                if (onPrevChapter != null)
+                  Semantics(
+                    button: true,
+                    label: 'Предыдущая глава',
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.skip_previous),
+                      color: colors.text.withValues(alpha: 0.7),
+                      tooltip: 'Предыдущая глава',
+                      onPressed: onPrevChapter,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 32),
+                Semantics(
+                  label: 'Позиция чтения: $chapterPosition',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      _leftLabel(settings, chapterPosition, percent),
+                      style: TextStyle(color: colors.text, fontSize: 12),
+                    ),
+                  ),
                 ),
                 Text(
-                  _rightLabel(settings, page, totalChapters, percent, estimatedMinutesLeft),
+                  _rightLabel(settings, chapterPosition, percent, estimatedMinutesLeft),
                   style: TextStyle(color: colors.text, fontSize: 12),
                 ),
+                if (onNextChapter != null)
+                  Semantics(
+                    button: true,
+                    label: 'Следующая глава',
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.skip_next),
+                      color: colors.text.withValues(alpha: 0.7),
+                      tooltip: 'Следующая глава',
+                      onPressed: onNextChapter,
+                    ),
+                  )
+                else
+                  const SizedBox(width: 32),
               ],
             ),
             if (onJumpToProgress != null) ...[
@@ -273,16 +468,19 @@ class ReaderBottomBar extends StatelessWidget {
     );
   }
 
-  String _leftLabel(ReaderSettings settings, int page, int totalChapters, int percent) {
+  String _leftLabel(ReaderSettings settings, String chapterPosition, int percent) {
     switch (settings.bottomBarContent) {
       case BottomBarContent.page:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.percent:
         return '$percent%';
       case BottomBarContent.chapter:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.time:
-        return '$page / $totalChapters';
+        if (estimatedChapterMinutesLeft > 0) {
+          return '$chapterPosition · ${formatReadingTimeEstimate(estimatedChapterMinutesLeft)}';
+        }
+        return chapterPosition;
       case BottomBarContent.none:
         return '';
     }
@@ -290,8 +488,7 @@ class ReaderBottomBar extends StatelessWidget {
 
   String _rightLabel(
     ReaderSettings settings,
-    int page,
-    int totalChapters,
+    String chapterPosition,
     int percent,
     int minutesLeft,
   ) {
@@ -299,11 +496,11 @@ class ReaderBottomBar extends StatelessWidget {
       case BottomBarContent.page:
         return '$percent%';
       case BottomBarContent.percent:
-        return '$page / $totalChapters';
+        return chapterPosition;
       case BottomBarContent.chapter:
         return '$percent%';
       case BottomBarContent.time:
-        return minutesLeft > 0 ? '~$minutesLeft мин' : '$percent%';
+        return minutesLeft > 0 ? formatReadingTimeEstimate(minutesLeft) : '$percent%';
       case BottomBarContent.none:
         return '';
     }
@@ -327,27 +524,41 @@ class ReaderBottomBar extends StatelessWidget {
             button: true,
             label: entry.value,
             selected: isSelected,
-            child: GestureDetector(
-              onTap: () => onModeChanged?.call(entry.key),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? colors.text.withValues(alpha: 0.15)
-                      : colors.text.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected
-                        ? colors.text.withValues(alpha: 0.3)
-                        : colors.text.withValues(alpha: 0.1),
-                  ),
+            child: FocusableActionDetector(
+              shortcuts: const {
+                SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
+                SingleActivator(LogicalKeyboardKey.space): ActivateIntent(),
+              },
+              actions: {
+                ActivateIntent: CallbackAction<ActivateIntent>(
+                  onInvoke: (_) {
+                    onModeChanged?.call(entry.key);
+                    return null;
+                  },
                 ),
-                child: Text(
-                  entry.value,
-                  style: TextStyle(
-                    color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              },
+              child: GestureDetector(
+                onTap: () => onModeChanged?.call(entry.key),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colors.text.withValues(alpha: 0.15)
+                        : colors.text.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? colors.text.withValues(alpha: 0.3)
+                          : colors.text.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(
+                      color: isSelected ? colors.text : colors.text.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
               ),
@@ -371,16 +582,23 @@ class ReaderProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progress = scrollProgress.clamp(0.0, 1.0);
     return SafeArea(
       bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: LinearProgressIndicator(
-          value: scrollProgress,
-          minHeight: 2,
-          backgroundColor: Colors.transparent,
-          valueColor: AlwaysStoppedAnimation<Color>(
-            ReaderColors.progressColor(theme),
+      child: Semantics(
+        label: 'Прогресс чтения',
+        value: '${(progress * 100).round()}%',
+        child: ExcludeSemantics(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 2,
+              backgroundColor: Colors.transparent,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                ReaderColors.progressColor(theme),
+              ),
+            ),
           ),
         ),
       ),
@@ -464,6 +682,15 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
   double _dragValue = 0;
   double _preDragValue = 0;
 
+  Future<void> _showPercentJumpDialog() async {
+    final target = await showDialog<double>(
+      context: context,
+      builder: (context) => _PercentJumpDialog(initialPercent: (widget.value * 100).round()),
+    );
+
+    if (target != null) widget.onChanged(target / 100);
+  }
+
   @override
   Widget build(BuildContext context) {
     final value = _dragging ? _dragValue : widget.value;
@@ -540,15 +767,10 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
         Row(
           children: [
             if (widget.onCheckpointBack != null)
-              GestureDetector(
-                onTap: widget.onCheckpointBack,
-                child: Icon(
-                  Icons.bookmark,
-                  size: 16,
-                  color: widget.checkpoints.any((c) => c < widget.value - 0.02)
-                      ? widget.colors.text.withValues(alpha: 0.6)
-                      : widget.colors.text.withValues(alpha: 0.15),
-                ),
+              _CheckpointButton(
+                label: 'Перейти к предыдущей закладке',
+                onActivate: widget.onCheckpointBack!,
+                color: widget.colors.text.withValues(alpha: 0.6),
               ),
             Expanded(
               child: SliderTheme(
@@ -575,16 +797,23 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
                 ),
               ),
             ),
-            if (widget.onCheckpointForward != null)
-              GestureDetector(
-                onTap: widget.onCheckpointForward,
-                child: Icon(
-                  Icons.bookmark,
-                  size: 16,
-                  color: widget.checkpoints.any((c) => c > widget.value + 0.02)
-                      ? widget.colors.text.withValues(alpha: 0.6)
-                      : widget.colors.text.withValues(alpha: 0.15),
+            Semantics(
+              button: true,
+              label: 'Перейти к проценту',
+              child: ExcludeSemantics(
+                child: IconButton(
+                  icon: const Icon(Icons.pin_drop_outlined),
+                  tooltip: 'Перейти к проценту',
+                  color: widget.colors.text.withValues(alpha: 0.7),
+                  onPressed: _showPercentJumpDialog,
                 ),
+              ),
+            ),
+            if (widget.onCheckpointForward != null)
+              _CheckpointButton(
+                label: 'Перейти к следующей закладке',
+                onActivate: widget.onCheckpointForward!,
+                color: widget.colors.text.withValues(alpha: 0.6),
               ),
           ],
         ),
@@ -601,6 +830,139 @@ class _SliderWithPreviewState extends State<_SliderWithPreview> {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _PercentJumpDialog extends StatefulWidget {
+  const _PercentJumpDialog({required this.initialPercent});
+
+  final int initialPercent;
+
+  @override
+  State<_PercentJumpDialog> createState() => _PercentJumpDialogState();
+}
+
+class _PercentJumpDialogState extends State<_PercentJumpDialog> {
+  String? _error;
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialPercent.toString(),
+  );
+
+  void _submit() {
+    final parsed = double.tryParse(_controller.text.trim().replaceAll(',', '.'));
+    if (parsed == null || parsed < 0 || parsed > 100) {
+      setState(() => _error = 'Введите число от 0 до 100');
+      return;
+    }
+    Navigator.of(context).pop(parsed);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Перейти к проценту'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(
+          labelText: 'Процент чтения',
+          hintText: '0–100',
+          suffixText: '%',
+          errorText: _error,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Отмена'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Перейти'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckpointButton extends StatelessWidget {
+  const _CheckpointButton({
+    required this.label,
+    required this.onActivate,
+    required this.color,
+  });
+
+  final String label;
+  final VoidCallback onActivate;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: ExcludeSemantics(
+        child: IconButton(
+          tooltip: label,
+          onPressed: onActivate,
+          icon: Icon(Icons.bookmark, size: 16, color: color),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverThumbnail extends StatelessWidget {
+  const _CoverThumbnail({required this.coverUrl, required this.color});
+
+  final String coverUrl;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDataUri = coverUrl.toLowerCase().startsWith('data:');
+    if (isDataUri) {
+      final parts = coverUrl.split(',');
+      if (parts.length != 2) return const SizedBox.shrink();
+      Uint8List bytes;
+      try {
+        bytes = base64Decode(parts.last);
+      } on FormatException {
+        return const SizedBox.shrink();
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: Image.memory(
+          bytes,
+          width: 24,
+          height: 36,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3),
+      child: Image.network(
+        coverUrl,
+        width: 24,
+        height: 36,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      ),
     );
   }
 }

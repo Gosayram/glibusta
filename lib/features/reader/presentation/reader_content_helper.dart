@@ -5,13 +5,15 @@ import '../data/parsers/normalized_book.dart';
 const int chapterWindowSize = 2;
 // MD-2.3: max loaded chapters before eviction kicks in
 const int maxLoadedChapters = 20;
+const int continuousBackwardWindow = 10;
+final _wordTokenPattern = RegExp(r'\S+');
 
-class ReaderContentHelper {
-  ReaderContentHelper(this._service, this._bookId);
+final class ReaderContentHelper {
+  ReaderContentHelper(this._service, this._bookId, this._logger);
 
   final BookOpenService _service;
   final String _bookId;
-  final _logger = AppLogger();
+  final AppLogger _logger;
 
   Future<NormalizedBookMetadata> loadMetadata({void Function(String)? onCacheMode}) async {
     final cached = await _service.getCachedMetadata(_bookId);
@@ -73,60 +75,131 @@ class ReaderContentHelper {
     return updates;
   }
 
-  Map<int, ReaderChapter> evictDistantChapters(
+  static Map<int, ReaderChapter> evictDistantChapters(
     int centerIndex,
     Map<int, ReaderChapter> loaded, {
     int? windowSize,
+    int? keepFrom,
+    bool keepAllBefore = false,
   }) {
     final win = (windowSize ?? chapterWindowSize + 1);
-    final minKeep = (centerIndex - win).clamp(0, centerIndex + win);
+    final int minKeep;
+    if (keepAllBefore) {
+      minKeep = (centerIndex - continuousBackwardWindow).clamp(0, centerIndex);
+    } else {
+      minKeep = keepFrom ?? (centerIndex - win).clamp(0, centerIndex + win);
+    }
     final maxKeep = centerIndex + win;
 
-    final updated = Map<int, ReaderChapter>.from(loaded);
     final keysToRemove = <int>[];
-    for (final key in updated.keys) {
+    for (final key in loaded.keys) {
       if (key < minKeep || key > maxKeep) {
         keysToRemove.add(key);
       }
     }
+
+    // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
+    final needsMemoryEviction = loaded.length > maxLoadedChapters;
+    if (keysToRemove.isEmpty && !needsMemoryEviction) return loaded;
+
+    final updated = Map<int, ReaderChapter>.from(loaded);
     for (final key in keysToRemove) {
       updated.remove(key);
     }
 
-    // MD-2.3: memory pressure — if too many chapters loaded, evict farthest
-    if (updated.length > maxLoadedChapters) {
-      final sortedKeys = updated.keys.toList()
-        ..sort((a, b) => (a - centerIndex).abs().compareTo((b - centerIndex).abs()));
-      while (updated.length > maxLoadedChapters) {
-        final farthest = sortedKeys.removeLast();
-        updated.remove(farthest);
+    if (needsMemoryEviction) {
+      if (keepAllBefore) {
+        final toEvict = updated.keys.where((k) => k > centerIndex).toList()..sort();
+        for (final key in toEvict) {
+          if (updated.length <= maxLoadedChapters) break;
+          updated.remove(key);
+        }
+      } else {
+        final sortedKeys = updated.keys.toList()
+          ..sort((a, b) => (a - centerIndex).abs().compareTo((b - centerIndex).abs()));
+        while (updated.length > maxLoadedChapters) {
+          final farthest = sortedKeys.removeLast();
+          updated.remove(farthest);
+        }
       }
     }
 
     return updated;
   }
 
-  int computeTotalWords(Map<int, ReaderChapter> chapters) {
+  /// Counts visible text tokens without allocating a list for every block.
+  static int countWords(Iterable<ReaderChapter> chapters) {
     var total = 0;
-    for (final chapter in chapters.values) {
+    for (final chapter in chapters) {
       for (final block in chapter.blocks) {
-        total += block.text.split(RegExp(r'\s+')).length;
+        total += _wordTokenPattern.allMatches(block.text).length;
       }
     }
     return total;
   }
 
+  int computeTotalWords(Map<int, ReaderChapter> chapters) => countWords(chapters.values);
+
+  /// Estimates a semantic location from reader progress.
+  ///
+  /// Loaded chapters use their real block counts. Unloaded chapters receive the
+  /// average loaded weight so progress remains stable while the window fills.
+  static ({int chapterIndex, int paragraphIndex}) estimatePositionFromProgress({
+    required double progress,
+    required int chapterCount,
+    required Map<int, ReaderChapter> loadedChapters,
+  }) {
+    if (chapterCount <= 0) return (chapterIndex: 0, paragraphIndex: 0);
+
+    var averageBlocks = 1.0;
+    if (loadedChapters.isNotEmpty) {
+      averageBlocks =
+          loadedChapters.values
+              .map((chapter) => chapter.blocks.isEmpty ? 1.0 : chapter.blocks.length.toDouble())
+              .fold<double>(0, (sum, count) => sum + count) /
+          loadedChapters.length;
+    }
+
+    var totalWeight = 0.0;
+    for (var i = 0; i < chapterCount; i++) {
+      final blockCount = loadedChapters[i]?.blocks.length;
+      totalWeight += blockCount == null || blockCount <= 0 ? averageBlocks : blockCount.toDouble();
+    }
+
+    final targetWeight = progress.clamp(0.0, 1.0) * totalWeight;
+    var precedingWeight = 0.0;
+    for (var index = 0; index < chapterCount; index++) {
+      final blockCount = loadedChapters[index]?.blocks.length;
+      final chapterWeight = blockCount == null || blockCount <= 0
+          ? averageBlocks
+          : blockCount.toDouble();
+      final cumulativeWeight = precedingWeight + chapterWeight;
+      if (targetWeight <= cumulativeWeight || index == chapterCount - 1) {
+        final loaded = loadedChapters[index]?.blocks.length ?? 0;
+        final lastParagraph = loaded > 0 ? loaded - 1 : 0;
+        final localProgress = ((targetWeight - precedingWeight) / chapterWeight).clamp(0.0, 1.0);
+        return (
+          chapterIndex: index,
+          paragraphIndex: (localProgress * lastParagraph).round(),
+        );
+      }
+      precedingWeight = cumulativeWeight;
+    }
+
+    return (chapterIndex: chapterCount - 1, paragraphIndex: 0);
+  }
+
+  /// Builds a complete chapter list while tolerating incomplete cached titles.
+  static List<ReaderChapter> buildSearchChapters(
+    NormalizedBookMetadata meta,
+    Map<int, ReaderChapter> loadedChapters,
+  ) => meta.buildChapters(loadedChapters);
+
   NormalizedBook buildBookForSearch(
     NormalizedBookMetadata meta,
     Map<int, ReaderChapter> loadedChapters,
   ) {
-    final chapters = <ReaderChapter>[];
-    for (var i = 0; i < meta.chapterCount; i++) {
-      chapters.add(
-        loadedChapters[i] ??
-            ReaderChapter(index: i, title: meta.chapterTitles[i], blocks: const []),
-      );
-    }
+    final chapters = buildSearchChapters(meta, loadedChapters);
     return NormalizedBook(
       id: meta.id,
       title: meta.title,

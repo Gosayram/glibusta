@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../reading_stats/data/reading_streak.dart';
 
 part 'reading_stats_provider.g.dart';
 
@@ -11,6 +12,13 @@ class DayReading {
   const DayReading({required this.date, required this.minutes});
 }
 
+enum WpmTrend {
+  up,
+  down,
+  stable,
+  unknown,
+}
+
 class ReadingStats {
   final int currentStreak;
   final int longestStreak;
@@ -19,7 +27,10 @@ class ReadingStats {
   final int thisMonthMinutes;
   final int totalMinutes;
   final int totalSessions;
+  final int todayPages;
   final List<DayReading> heatmapData;
+  final double averageWpm;
+  final WpmTrend wpmTrend;
 
   const ReadingStats({
     required this.currentStreak,
@@ -29,7 +40,10 @@ class ReadingStats {
     required this.thisMonthMinutes,
     required this.totalMinutes,
     required this.totalSessions,
+    required this.todayPages,
     required this.heatmapData,
+    required this.averageWpm,
+    required this.wpmTrend,
   });
 
   double get avgSessionMinutes =>
@@ -73,13 +87,14 @@ Future<ReadingStats> readingStats(Ref ref) async {
   final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
   final monthStart = DateTime(now.year, now.month);
 
-  final todaySessions = await db.bookDao.getSessionsForDateRange(todayStart, now);
-  final weekSessions = await db.bookDao.getSessionsForDateRange(weekStart, now);
-  final monthSessions = await db.bookDao.getSessionsForDateRange(monthStart, now);
   final allSessions = await db.bookDao.getSessionsForDateRange(
     now.subtract(const Duration(days: 365)),
     now,
   );
+
+  final todaySessions = allSessions.where((s) => s.startedAt.isAfter(todayStart)).toList();
+  final weekSessions = allSessions.where((s) => s.startedAt.isAfter(weekStart)).toList();
+  final monthSessions = allSessions.where((s) => s.startedAt.isAfter(monthStart)).toList();
 
   final todayMinutes = todaySessions.fold<int>(0, (sum, s) => sum + _sessionMinutes(s));
   final weekMinutes = weekSessions.fold<int>(0, (sum, s) => sum + _sessionMinutes(s));
@@ -93,31 +108,16 @@ Future<ReadingStats> readingStats(Ref ref) async {
     dailyMinutes[day] = (dailyMinutes[day] ?? 0) + minutes;
   }
 
-  int currentStreak = 0;
-  for (int i = 0; i < 365; i++) {
-    final day = todayStart.subtract(Duration(days: i));
-    if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
-      currentStreak++;
-    } else {
-      break;
-    }
-  }
+  final streak = calculateReadingStreak(
+    activeDays: dailyMinutes.entries.where((entry) => entry.value > 0).map((entry) => entry.key),
+    endingAt: now,
+  );
 
-  int longestStreak = currentStreak;
-  int tempStreak = 0;
+  final todayPages = await db.readingTimeDao.getTodayPages();
 
-  for (int i = 0; i < 365; i++) {
-    final day = todayStart.subtract(Duration(days: i));
-    if (dailyMinutes.containsKey(day) && dailyMinutes[day]! > 0) {
-      tempStreak++;
-    } else {
-      if (tempStreak > longestStreak) {
-        longestStreak = tempStreak;
-      }
-      tempStreak = 0;
-    }
-  }
-  if (tempStreak > longestStreak) longestStreak = tempStreak;
+  final averageWpm = await db.readingTimeDao.getAverageWpmLast7Days();
+  final dailyWpm = await db.readingTimeDao.getDailyWpmLast7Days();
+  final wpmTrend = computeWpmTrend(dailyWpm);
 
   final heatmapData = <DayReading>[];
   for (int i = 111; i >= 0; i--) {
@@ -131,13 +131,27 @@ Future<ReadingStats> readingStats(Ref ref) async {
   }
 
   return ReadingStats(
-    currentStreak: currentStreak,
-    longestStreak: longestStreak,
+    currentStreak: streak.currentDays,
+    longestStreak: streak.longestDays,
     todayMinutes: todayMinutes,
     thisWeekMinutes: weekMinutes,
     thisMonthMinutes: monthMinutes,
     totalMinutes: totalMinutes,
     totalSessions: allSessions.length,
+    todayPages: todayPages,
     heatmapData: heatmapData,
+    averageWpm: averageWpm,
+    wpmTrend: wpmTrend,
   );
+}
+
+WpmTrend computeWpmTrend(Map<DateTime, double> dailyWpm) {
+  if (dailyWpm.length < 2) return WpmTrend.unknown;
+  final sorted = dailyWpm.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+  final recent = sorted.last.value;
+  final earlier = sorted[sorted.length - 2].value;
+  final diff = recent - earlier;
+  if (diff > 10) return WpmTrend.up;
+  if (diff < -10) return WpmTrend.down;
+  return WpmTrend.stable;
 }

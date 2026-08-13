@@ -9,6 +9,9 @@ enum InfoSlotMode {
   remainingChapter,
   remainingBook,
   wpm,
+  sessionTime,
+  streak,
+  todayTime,
 }
 
 class ReadingInfoModel {
@@ -67,15 +70,23 @@ class ReadingInfoModel {
 
   factory ReadingInfoModel.fromJson(Map<String, dynamic> json) {
     return ReadingInfoModel(
-      headerLeft: InfoSlotMode.values[json['headerLeft'] as int? ?? 0],
-      headerCenter: InfoSlotMode.values[json['headerCenter'] as int? ?? 1],
-      headerRight: InfoSlotMode.values[json['headerRight'] as int? ?? 5],
-      footerLeft: InfoSlotMode.values[json['footerLeft'] as int? ?? 3],
-      footerCenter: InfoSlotMode.values[json['footerCenter'] as int? ?? 0],
-      footerRight: InfoSlotMode.values[json['footerRight'] as int? ?? 2],
+      headerLeft: _safeSlot(json, 'headerLeft', 0),
+      headerCenter: _safeSlot(json, 'headerCenter', 1),
+      headerRight: _safeSlot(json, 'headerRight', 5),
+      footerLeft: _safeSlot(json, 'footerLeft', 3),
+      footerCenter: _safeSlot(json, 'footerCenter', 0),
+      footerRight: _safeSlot(json, 'footerRight', 2),
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 12.0,
       margin: (json['margin'] as num?)?.toDouble() ?? 8.0,
     );
+  }
+
+  static InfoSlotMode _safeSlot(Map<String, dynamic> json, String key, int fallback) {
+    final idx = json[key];
+    if (idx is int && idx >= 0 && idx < InfoSlotMode.values.length) {
+      return InfoSlotMode.values[idx];
+    }
+    return InfoSlotMode.values[fallback];
   }
 
   static const ReadingInfoModel defaults = ReadingInfoModel();

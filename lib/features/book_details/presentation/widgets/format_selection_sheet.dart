@@ -55,9 +55,8 @@ class FormatSelectionSheet extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: formats.map((format) {
                   final info = _formatInfo(format);
-                  final capService = const FormatCapabilityService();
-                  final cap = capService.capabilityOf(format);
-                  final warning = capService.warningLabel(format);
+                  final cap = format.capability;
+                  final warning = format.warningLabel();
                   return ListTile(
                     leading: Icon(info.icon, color: info.color),
                     title: Row(

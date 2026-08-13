@@ -21,23 +21,48 @@ class ReadingGoalDialog extends ConsumerStatefulWidget {
 }
 
 class _ReadingGoalDialogState extends ConsumerState<ReadingGoalDialog> {
-  late double _dailyMinutes;
-  late bool _isEnabled;
+  late final ProviderSubscription<AsyncValue<ReadingGoal>> _goalSubscription;
+  double _dailyMinutes = 30;
+  bool _isEnabled = false;
+  bool _hasLoadedGoal = false;
 
   @override
   void initState() {
     super.initState();
-    final asyncGoal = ref.read(readingGoalProvider);
-    asyncGoal.whenData((goal) {
-      setState(() {
-        _dailyMinutes = goal.dailyMinutes.toDouble();
-        _isEnabled = goal.isEnabled;
-      });
-    });
+    _goalSubscription = ref.listenManual(
+      readingGoalProvider,
+      (_, next) => next.whenData(_loadInitialGoal),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _goalSubscription.close();
+    super.dispose();
+  }
+
+  void _loadInitialGoal(ReadingGoal goal) {
+    if (_hasLoadedGoal) return;
+    _dailyMinutes = goal.dailyMinutes.toDouble();
+    _isEnabled = goal.isEnabled;
+    _hasLoadedGoal = true;
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final goal = ref.watch(readingGoalProvider);
+    if (!_hasLoadedGoal) {
+      return goal.when(
+        loading: _LoadingReadingGoalDialog.new,
+        error: (error, _) => _ReadingGoalLoadErrorDialog(
+          onRetry: () => ref.invalidate(readingGoalProvider),
+        ),
+        data: (_) => const _LoadingReadingGoalDialog(),
+      );
+    }
+
     return AlertDialog(
       title: const Text('Цель чтения'),
       content: Column(
@@ -112,5 +137,40 @@ class _ReadingGoalDialogState extends ConsumerState<ReadingGoalDialog> {
     await repo.saveGoal(goal);
     ref.invalidate(readingGoalProvider);
     if (mounted) Navigator.of(context).pop();
+  }
+}
+
+class _LoadingReadingGoalDialog extends StatelessWidget {
+  const _LoadingReadingGoalDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AlertDialog(
+      title: Text('Цель чтения'),
+      content: Row(
+        children: [
+          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 16),
+          Text('Загружаем настройки…'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadingGoalLoadErrorDialog extends StatelessWidget {
+  const _ReadingGoalLoadErrorDialog({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Цель чтения'),
+      content: const Text('Не удалось загрузить настройки цели.'),
+      actions: [
+        TextButton(onPressed: onRetry, child: const Text('Повторить')),
+      ],
+    );
   }
 }

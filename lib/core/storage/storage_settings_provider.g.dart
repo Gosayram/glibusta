@@ -9,45 +9,6 @@ part of 'storage_settings_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(storageSettingsPersistence)
-final storageSettingsPersistenceProvider = StorageSettingsPersistenceProvider._();
-
-final class StorageSettingsPersistenceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<StorageSettingsPersistence>,
-          StorageSettingsPersistence,
-          FutureOr<StorageSettingsPersistence>
-        >
-    with $FutureModifier<StorageSettingsPersistence>, $FutureProvider<StorageSettingsPersistence> {
-  StorageSettingsPersistenceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'storageSettingsPersistenceProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$storageSettingsPersistenceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<StorageSettingsPersistence> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<StorageSettingsPersistence> create(Ref ref) {
-    return storageSettingsPersistence(ref);
-  }
-}
-
-String _$storageSettingsPersistenceHash() => r'b7b60f17a6bd9a464b44f320784167b3a35ebb1c';
-
 @ProviderFor(StorageModeNotifier)
 final storageModeProvider = StorageModeNotifierProvider._();
 
@@ -80,7 +41,7 @@ final class StorageModeNotifierProvider
   }
 }
 
-String _$storageModeNotifierHash() => r'736844511256b98081d243ba965d1fb45f9c0c19';
+String _$storageModeNotifierHash() => r'f565d290b02fc7d5bc6d584bac636ce0f367bd3d';
 
 abstract class _$StorageModeNotifier extends $Notifier<StorageMode> {
   StorageMode build();
@@ -134,7 +95,7 @@ final class ExternalFolderNotifierProvider
   }
 }
 
-String _$externalFolderNotifierHash() => r'8a2e0785cf897996070bad6b382dd4c4c9603d90';
+String _$externalFolderNotifierHash() => r'1329b12b2371f34846fe35ce53e0161525a2b4a6';
 
 abstract class _$ExternalFolderNotifier extends $Notifier<({String? name, String? uri})> {
   ({String? name, String? uri}) build();
@@ -185,7 +146,7 @@ final class DirectReadNotifierProvider extends $NotifierProvider<DirectReadNotif
   }
 }
 
-String _$directReadNotifierHash() => r'd30624bfff0142a53b34af8c65cc418768dc1184';
+String _$directReadNotifierHash() => r'4ea7ffc9d7e931d3d0fdfb4cd1e6e78657a5b721';
 
 abstract class _$DirectReadNotifier extends $Notifier<bool> {
   bool build();

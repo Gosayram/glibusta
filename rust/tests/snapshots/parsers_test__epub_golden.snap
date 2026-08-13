@@ -1,0 +1,5 @@
+---
+source: tests/parsers_test.rs
+expression: snapshot.to_string()
+---
+{"authors":["Test Author"],"chapter_titles":["Chapter 1"],"chapters":1,"format":"Epub","language":"en","title":"Test EPUB","toc":["Chapter 1"],"warnings":["Cover image not found"]}

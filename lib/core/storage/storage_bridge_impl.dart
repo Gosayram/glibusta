@@ -22,6 +22,11 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
+  Future<int> countBooks(String folderUri) async {
+    return await _channel.invokeMethod<int>('countBooks', {'uri': folderUri}) ?? 0;
+  }
+
+  @override
   Future<List<ExternalBookFile>> scanBooks(String folderUri) async {
     try {
       final result = await _channel.invokeMethod<List<dynamic>>(
@@ -46,24 +51,14 @@ class StorageBridgeImpl implements StorageBridge {
   }
 
   @override
-  Future<Uint8List> readFile(String fileUri) async {
-    try {
-      final bytes = await _channel.invokeMethod<Uint8List>(
-        'readFile',
-        {'uri': fileUri},
-      );
-      return bytes ?? Uint8List(0);
-    } on PlatformException {
-      return Uint8List(0);
-    }
-  }
-
-  @override
-  Future<String?> copyToCache(String fileUri) async {
+  Future<String?> copyToCache(String fileUri, {int? maxBytes}) async {
     try {
       final path = await _channel.invokeMethod<String>(
         'copyToCache',
-        {'uri': fileUri},
+        {
+          'uri': fileUri,
+          'maxBytes': ?maxBytes,
+        },
       );
       return path;
     } on PlatformException {

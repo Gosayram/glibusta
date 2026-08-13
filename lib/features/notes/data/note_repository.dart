@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/utils/monotonic_id.dart';
 
 class NoteRepository {
   final AppDatabase _db;
@@ -12,6 +13,30 @@ class NoteRepository {
           ..where((n) => n.bookId.equals(bookId))
           ..orderBy([(n) => OrderingTerm.desc(n.createdAt)]))
         .get();
+  }
+
+  Future<List<Note>> getNotesPage({
+    String? bookId,
+    required int limit,
+    required int offset,
+  }) {
+    final query = _db.select(_db.notes)
+      ..orderBy([(n) => OrderingTerm.desc(n.createdAt)])
+      ..limit(limit, offset: offset);
+    if (bookId != null) {
+      query.where((n) => n.bookId.equals(bookId));
+    }
+    return query.get();
+  }
+
+  Future<int> countNotes({String? bookId}) async {
+    final countExp = _db.notes.id.count();
+    final query = _db.selectOnly(_db.notes)..addColumns([countExp]);
+    if (bookId != null) {
+      query.where(_db.notes.bookId.equals(bookId));
+    }
+    final row = await query.getSingle();
+    return row.read(countExp)!;
   }
 
   Future<Note?> getNote(String id) async {
@@ -30,7 +55,7 @@ class NoteRepository {
         .into(_db.notes)
         .insert(
           NotesCompanion.insert(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            id: newMonotonicId(),
             bookId: bookId,
             chapterIndex: chapterIndex,
             paragraphIndex: paragraphIndex,

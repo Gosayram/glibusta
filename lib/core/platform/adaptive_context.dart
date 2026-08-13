@@ -1,3 +1,5 @@
+import 'dart:ui' show DisplayFeatureType;
+
 import 'package:flutter/material.dart';
 
 import '../utils/app_breakpoints.dart';
@@ -15,6 +17,38 @@ WindowClass windowClassOf(BuildContext context) {
   if (width < AppBreakpoints.compact) return WindowClass.compact;
   if (width < AppBreakpoints.medium) return WindowClass.medium;
   return WindowClass.expanded;
+}
+
+/// Whether the current display can safely render the reader as a two-page spread.
+///
+/// The paginated reader currently owns one uninterrupted [Row] for a spread.
+/// A folding feature crossing that row would place text behind a hinge or over
+/// a crease, so we deliberately fall back to one page until a panel-aware
+/// spread renderer is introduced. This keeps the user's two-page preference
+/// intact for when the display becomes suitable again.
+bool canUseTwoPageReaderMode(MediaQueryData mediaQuery) {
+  final size = mediaQuery.size;
+  if (size.width < 1000 || size.width < size.height) return false;
+
+  return !mediaQuery.displayFeatures.any(
+    (feature) => switch (feature.type) {
+      DisplayFeatureType.fold ||
+      DisplayFeatureType.hinge => _crossesReaderSpread(feature.bounds, size),
+      _ => false,
+    },
+  );
+}
+
+bool _crossesReaderSpread(Rect bounds, Size displaySize) {
+  final crossesVertically =
+      bounds.height >= displaySize.height / 2 &&
+      bounds.center.dx > 0 &&
+      bounds.center.dx < displaySize.width;
+  final crossesHorizontally =
+      bounds.width >= displaySize.width / 2 &&
+      bounds.center.dy > 0 &&
+      bounds.center.dy < displaySize.height;
+  return crossesVertically || crossesHorizontally;
 }
 
 /// Convenience extension on [BuildContext] for adaptive layout checks.
@@ -46,10 +80,7 @@ extension AdaptiveContext on BuildContext {
   bool get isLandscape => MediaQuery.orientationOf(this) == Orientation.landscape;
 
   /// True when screen is wide enough for two-page reader mode.
-  bool get canUseTwoPageMode {
-    final size = MediaQuery.sizeOf(this);
-    return size.width >= 1000 && isLandscape;
-  }
+  bool get canUseTwoPageMode => canUseTwoPageReaderMode(MediaQuery.of(this));
 
   /// Responsive horizontal padding based on window class.
   double get pagePadding => switch (windowClass) {

@@ -87,8 +87,6 @@
   "settingsTagsSub": "Manage book tags",
   "settingsDarkTheme": "Dark theme",
   "settingsDarkThemeSub": "Use dark theme",
-  "settingsContentFilter": "Content Filter",
-  "settingsContentFilterSub": "Security settings",
   "settingsFonts": "Fonts",
   "settingsFontsSub": "Download additional fonts",
   "settingsExport": "Export Data",

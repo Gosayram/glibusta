@@ -1,0 +1,6 @@
+/*
+ * Android NDK r29 folds pthread into libc and no longer ships a separate
+ * libpthread.so. unrar-ng-sys 0.7.x still emits -lpthread for every non-Windows
+ * target, so provide an ld.lld linker script for Android cross-links.
+ */
+INPUT ( libc.so )

@@ -22,6 +22,79 @@ class BookRepositoryImpl implements BookRepository {
   }
 
   @override
+  Future<List<Book>> getPagedBooks({
+    required int limit,
+    int offset = 0,
+    BookSortField sortField = BookSortField.addedAt,
+    bool ascending = false,
+    String? formatFilter,
+    String? collectionId,
+  }) async {
+    List<String>? bookIds;
+    if (collectionId != null) {
+      final colBooks = await _db.collectionDao.getBooksInCollection(collectionId);
+      bookIds = colBooks.map((b) => b.id).toList();
+      if (bookIds.isEmpty) return [];
+    }
+    final List<SavedBook> rows;
+    if (sortField == BookSortField.progress) {
+      rows = await _db.bookDao.getPagedBooksWithProgress(
+        limit: limit,
+        offset: offset,
+        ascending: ascending,
+        formatFilter: formatFilter,
+        bookIds: bookIds,
+      );
+    } else {
+      rows = await _db.bookDao.getPagedBooks(
+        limit: limit,
+        offset: offset,
+        orderBy: _buildOrderBy(sortField, ascending),
+        formatFilter: formatFilter,
+        bookIds: bookIds,
+      );
+    }
+    return _resolveAuthors(rows);
+  }
+
+  @override
+  Future<List<Book>> searchBooksPaged(
+    String query, {
+    required int limit,
+    int offset = 0,
+    String? formatFilter,
+  }) async {
+    final rows = await _db.bookDao.searchBooksPaged(
+      query,
+      limit: limit,
+      offset: offset,
+      formatFilter: formatFilter,
+    );
+    return _resolveAuthors(rows);
+  }
+
+  List<OrderingTerm Function($SavedBooksTable)> _buildOrderBy(
+    BookSortField field,
+    bool ascending,
+  ) {
+    final direction = ascending ? OrderingMode.asc : OrderingMode.desc;
+    return switch (field) {
+      BookSortField.addedAt => [
+        (t) => OrderingTerm(expression: t.addedAt, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+      BookSortField.title => [
+        (t) => OrderingTerm(expression: t.title, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+      BookSortField.progress => [
+        (t) => OrderingTerm(expression: t.addedAt, mode: direction),
+        (t) => OrderingTerm(expression: t.id),
+      ],
+    };
+  }
+
+  @override
   Future<List<Book>> getBooksByIds(List<String> ids) async {
     final rows = await _db.bookDao.getBooksByIds(ids);
     return _resolveAuthors(rows);
@@ -61,6 +134,16 @@ class BookRepositoryImpl implements BookRepository {
         sourceId: Value(book.source.sourceId),
         sourceUrl: Value(book.source.sourceUrl),
       ),
+    );
+  }
+
+  @override
+  Future<void> updateBook(Book book) async {
+    await _db.bookDao.updateBook(
+      bookId: book.id,
+      title: book.title,
+      authorIds: book.authorIds,
+      description: book.description,
     );
   }
 

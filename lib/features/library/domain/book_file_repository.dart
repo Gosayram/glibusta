@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/tables.dart';
+import '../../reader/data/online_read_service.dart';
 import '../../reader/data/parsers/format_detector.dart';
 
 abstract interface class BookFileRepository {
@@ -18,13 +19,16 @@ abstract interface class BookFileRepository {
 final bookFileRepositoryProvider = Provider<BookFileRepository>((ref) {
   return BookFileRepositoryImpl(
     ref.watch(databaseProvider),
+    onlineReadRegistry: ref.watch(onlineReadRegistryProvider),
   );
 });
 
 class BookFileRepositoryImpl implements BookFileRepository {
-  BookFileRepositoryImpl(this._db);
+  BookFileRepositoryImpl(this._db, {OnlineReadRegistry? onlineReadRegistry})
+    : _onlineRead = onlineReadRegistry;
 
   final AppDatabase _db;
+  final OnlineReadRegistry? _onlineRead;
 
   @override
   Future<File?> getFile(String bookId) async {
@@ -37,6 +41,11 @@ class BookFileRepositoryImpl implements BookFileRepository {
 
   @override
   Future<String?> getFilePath(String bookId) async {
+    // ponytail: online-read temp override wins over the downloads table
+    final online = _onlineRead?.pathFor(bookId);
+    if (online != null && online.isNotEmpty && await File(online).exists()) {
+      return online;
+    }
     final download = await _findDownload(bookId);
     if (download?.targetPath != null && download!.targetPath!.isNotEmpty) {
       return download.targetPath;

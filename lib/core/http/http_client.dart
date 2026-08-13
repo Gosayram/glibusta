@@ -52,6 +52,9 @@ class HttpClient {
       final result = await _encodingDetector.detect(bytes);
       return result.text;
     } on DioException catch (e) {
+      if (CancelToken.isCancel(e)) {
+        throw HttpException(message: 'Cancelled', url: url);
+      }
       _logger.warning('Dio failed for $url: ${e.type}', name: 'Http');
       throw _dioExceptionToHttpException(e, url);
     }
@@ -60,19 +63,49 @@ class HttpClient {
   Future<String> getUriWithFallback(Uri uri, {CancelToken? cancelToken}) async {
     try {
       return await getUri(uri, cancelToken: cancelToken);
-    } on HttpException catch (_) {
-      return _rawGet(uri);
+    } on HttpException catch (e) {
+      if (e.message == 'Cancelled') rethrow;
+      return _rawGet(uri, cancelToken: cancelToken);
     }
   }
 
-  Future<String> _rawGet(Uri uri) async {
+  /// Awaits an I/O operation while allowing Dio callers to cancel its fallback.
+  ///
+  /// Closing the native client in the caller's `finally` aborts the underlying
+  /// socket after the cancellation future wins the race.
+  Future<T> _awaitWithCancellation<T>(Future<T> operation, CancelToken? cancelToken) {
+    if (cancelToken == null) return operation;
+    return Future.any<T>([
+      operation,
+      cancelToken.whenCancel.then<T>(
+        (_) => throw const HttpException(message: 'Cancelled'),
+      ),
+    ]);
+  }
+
+  /// Stops waiting for the next download chunk as soon as cancellation completes.
+  ///
+  /// `HttpClientResponse` is a stream, so checking cancellation only inside an
+  /// `await for` body leaves a download blocked until the server sends another
+  /// chunk. Racing each `moveNext` call makes cancellation prompt even for a
+  /// stalled response. Errors from the cancellation notifier are intentionally
+  /// ignored to preserve the previous best-effort cancellation contract.
+  Future<T> _awaitDownloadOperation<T>(Future<T> operation, Future<void>? cancellation) {
+    if (cancellation == null) return operation;
+    return Future.any<T>([
+      operation,
+      cancellation.then<T>((_) => throw const HttpException(message: 'Cancelled')),
+    ]);
+  }
+
+  Future<String> _rawGet(Uri uri, {CancelToken? cancelToken}) async {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpIdle
-      ..maxConnectionsPerHost = 1;
+      ..maxConnectionsPerHost = 4;
 
     try {
-      final request = await client.getUrl(uri);
+      final request = await _awaitWithCancellation(client.getUrl(uri), cancelToken);
       request.headers
         ..set(
           io.HttpHeaders.acceptHeader,
@@ -80,14 +113,17 @@ class HttpClient {
         )
         ..set(io.HttpHeaders.acceptLanguageHeader, 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7')
         ..set(io.HttpHeaders.acceptEncodingHeader, 'gzip, deflate')
-        ..set(io.HttpHeaders.connectionHeader, 'close');
+        ..set(io.HttpHeaders.connectionHeader, 'keep-alive');
 
       final ua = await _getOrCreateUserAgent();
       if (ua != null) {
         request.headers.set(io.HttpHeaders.userAgentHeader, ua);
       }
 
-      final response = await request.close().timeout(AppDuration.httpReceive);
+      final response = await _awaitWithCancellation(
+        request.close().timeout(AppDuration.httpReceive),
+        cancelToken,
+      );
 
       final completer = Completer<Uint8List>();
       final bytes = <int>[];
@@ -96,11 +132,15 @@ class HttpClient {
         onDone: () => completer.complete(Uint8List.fromList(bytes)),
         onError: completer.completeError,
       );
-      final rawBytes = await completer.future;
+      final rawBytes = await _awaitWithCancellation(completer.future, cancelToken);
 
       if (rawBytes.isEmpty) return '';
       final detected = await _encodingDetector.detect(rawBytes);
       return detected.text;
+    } on io.SocketException catch (e) {
+      throw HttpException(message: 'Network error: ${e.message}', url: uri.toString());
+    } on TimeoutException catch (e) {
+      throw HttpException(message: 'Connection timed out: ${e.message}', url: uri.toString());
     } finally {
       client.close(force: true);
     }
@@ -163,12 +203,12 @@ class HttpClient {
     final client = io.HttpClient()
       ..connectionTimeout = AppDuration.httpConnect
       ..idleTimeout = AppDuration.httpDownloadIdle
-      ..maxConnectionsPerHost = 1;
+      ..maxConnectionsPerHost = 4;
     try {
       final request = await client.getUrl(uri);
       request.headers
         ..set(io.HttpHeaders.acceptHeader, '*/*')
-        ..set(io.HttpHeaders.connectionHeader, 'close');
+        ..set(io.HttpHeaders.connectionHeader, 'keep-alive');
 
       if (startBytes > 0) {
         request.headers.set(io.HttpHeaders.rangeHeader, 'bytes=$startBytes-');
@@ -196,36 +236,33 @@ class HttpClient {
         );
       }
 
+      // ponytail: server may ignore Range and return 200 with the full body —
+      // appending would corrupt the file, so truncate and recount from 0.
+      final serverHonoredRange = startBytes > 0 && response.statusCode == 206;
+      final effectiveMode = serverHonoredRange ? io.FileMode.append : io.FileMode.write;
       final file = io.File(savePath);
-      final sink = file.openWrite(mode: startBytes > 0 ? io.FileMode.append : io.FileMode.write);
-      var cancelled = false;
-      if (onCancel != null) {
-        unawaited(
-          onCancel
-              .then((_) {
-                cancelled = true;
-              })
-              .catchError((_) {}),
-        );
-      }
+      final sink = file.openWrite(mode: effectiveMode);
+      final cancellation = onCancel?.catchError((Object _) {});
       try {
-        int received = 0;
-        final total = response.contentLength;
+        int received = serverHonoredRange ? startBytes : 0;
+        final total = serverHonoredRange
+            ? response.contentLength + startBytes
+            : response.contentLength;
 
-        await for (final chunk in response) {
-          if (cancelled) break;
-
-          sink.add(chunk);
-          received += chunk.length;
-          if (onProgress != null) {
-            onProgress(received, total);
+        final iterator = StreamIterator<List<int>>(response);
+        try {
+          while (await _awaitDownloadOperation(iterator.moveNext(), cancellation)) {
+            final chunk = iterator.current;
+            sink.add(chunk);
+            received += chunk.length;
+            if (onProgress != null) {
+              onProgress(received, total);
+            }
           }
+        } finally {
+          await iterator.cancel();
         }
         await sink.close();
-
-        if (cancelled) {
-          throw HttpException(message: 'Cancelled', url: url);
-        }
 
         if (received == 0) {
           throw HttpException(message: 'Empty download', url: url);
@@ -269,3 +306,7 @@ class HttpException implements Exception {
   @override
   String toString() => 'HttpException($statusCode): $message [$url]';
 }
+
+/// Whether [error] is a cancelled-request [HttpException] (debounce/dispose),
+/// not a real failure — should be silenced, not logged as an error.
+bool isCancellation(Object error) => error is HttpException && error.message == 'Cancelled';

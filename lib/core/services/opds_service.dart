@@ -159,20 +159,25 @@ class OpdsService {
   }
 }
 
-const builtInCatalogs = [
-  OpdsCatalog(
-    id: 'flibusta_main',
-    name: 'Flibusta (Main)',
-    url: 'https://flibusta.is/opds',
-    isBuiltIn: true,
-  ),
-  OpdsCatalog(
-    id: 'flibusta_recent',
-    name: 'Flibusta (Recent)',
-    url: 'https://flibusta.is/opds/recent',
-    isBuiltIn: true,
-  ),
-];
+List<OpdsCatalog> builtInCatalogs(String baseUrl) {
+  final normalizedBaseUrl = baseUrl.endsWith('/')
+      ? baseUrl.substring(0, baseUrl.length - 1)
+      : baseUrl;
+  return [
+    OpdsCatalog(
+      id: 'flibusta_main',
+      name: 'Flibusta (Main)',
+      url: '$normalizedBaseUrl/opds',
+      isBuiltIn: true,
+    ),
+    OpdsCatalog(
+      id: 'flibusta_recent',
+      name: 'Flibusta (Recent)',
+      url: '$normalizedBaseUrl/opds/recent',
+      isBuiltIn: true,
+    ),
+  ];
+}
 
 final opdsServiceProvider = Provider<OpdsService>((ref) {
   return OpdsService(

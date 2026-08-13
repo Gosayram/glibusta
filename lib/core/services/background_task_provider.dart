@@ -38,11 +38,13 @@ class BackgroundTask {
 }
 
 class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
+  var _nextId = 0;
+
   @override
   List<BackgroundTask> build() => [];
 
   String start(BackgroundTaskType type, String message) {
-    final id = '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
+    final id = '${type.name}_${DateTime.now().microsecondsSinceEpoch}_${_nextId++}';
     final task = BackgroundTask(
       id: id,
       type: type,
@@ -66,7 +68,6 @@ class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
         else
           task,
     ];
-    _scheduleCleanup(id);
   }
 
   void fail(String id, String error) {
@@ -81,13 +82,6 @@ class BackgroundTaskNotifier extends Notifier<List<BackgroundTask>> {
         else
           task,
     ];
-    _scheduleCleanup(id);
-  }
-
-  void _scheduleCleanup(String id) {
-    Future.delayed(const Duration(seconds: 5), () {
-      state = state.where((t) => t.id != id).toList();
-    });
   }
 
   void clearCompleted() {

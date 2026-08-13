@@ -12,6 +12,7 @@ import '../../../../shared/models/download_task.dart';
 import '../../../downloads/presentation/download_queue.dart';
 import '../../../search/data/composite_source.dart';
 import '../book_details_providers.dart';
+import '../reading_launcher.dart';
 import 'format_selection_sheet.dart';
 
 class BottomActionBar extends ConsumerWidget {
@@ -29,11 +30,10 @@ class BottomActionBar extends ConsumerWidget {
     final isDownloading = downloadState == BookDownloadState.downloading;
     final isDownloaded = downloadState == BookDownloadState.downloaded;
     final hasFormats = details.availableFormats.isNotEmpty;
-    final capService = const FormatCapabilityService();
     final bestFormat = book.availableFormats.isNotEmpty
         ? book.availableFormats.first
         : BookFormat.unknown;
-    final isDocumentOnly = capService.isDocumentOnly(bestFormat);
+    final isDocumentOnly = bestFormat.isDocumentOnly;
     final readLabel = isDocumentOnly ? 'Документ' : 'Читать';
 
     return Container(
@@ -48,7 +48,15 @@ class BottomActionBar extends ConsumerWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => unawaited(context.push('/reader/${book.id}')),
+                onPressed: () => unawaited(
+                  startReading(
+                    context,
+                    ref,
+                    book,
+                    isDownloaded: isDownloaded,
+                    availableFormats: details.availableFormats,
+                  ),
+                ),
                 icon: Icon(isDocumentOnly ? Icons.description : Icons.play_arrow),
                 label: Text(readLabel),
               ),
