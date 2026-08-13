@@ -94,6 +94,7 @@ class NoteRepository {
             bookId: note.bookId,
             chapterIndex: note.chapterIndex,
             paragraphIndex: note.paragraphIndex,
+            localOffset: Value(note.localOffset),
             content: note.content,
             highlightColor: Value(note.highlightColor),
           ),

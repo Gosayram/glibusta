@@ -261,7 +261,12 @@ class HighlightRepository {
 
   Future<String> exportToTxt(String bookId) async {
     final md = await exportToMarkdown(bookId);
-    return md.replaceAll(RegExp(r'[#*>-]'), '').trim();
+    return md
+        .replaceAll(RegExp(r'^#{1,2}\s', multiLine: true), '')
+        .replaceAll(RegExp(r'^>\s', multiLine: true), '')
+        .replaceAll(RegExp(r'^---$', multiLine: true), '')
+        .replaceAll(RegExp(r'\*(.+?)\*'), r'$1')
+        .trim();
   }
 }
 

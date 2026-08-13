@@ -48,8 +48,12 @@ Future<List<SmartCollection>> smartCollections(Ref ref) async {
     progressMap[progress.bookId] = progress;
   }
 
-  // Currently reading: has progress
-  final reading = allBooks.where((b) => progressMap.containsKey(b.id)).toList();
+  // Currently reading: has progress, opened within last 30 days
+  final reading = allBooks.where((b) {
+    final progress = progressMap[b.id];
+    if (progress == null) return false;
+    return now.difference(progress.lastRead).inDays <= 30;
+  }).toList();
   collections.add(SmartCollection(type: SmartCollectionType.reading, books: reading));
 
   // Abandoned: has progress, last read > 30 days ago

@@ -39,7 +39,9 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     final lower = '%$query%';
     return (select(savedBooks)
           ..where(
-            (t) => t.title.like(lower) | t.description.like(lower),
+            (t) =>
+                (t.title.like(lower) | t.description.like(lower)) &
+                t.deletedAt.isNull(),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)]))
         .get();
@@ -56,6 +58,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
           ..where(
             (t) =>
                 (t.title.like(lower) | t.description.like(lower)) &
+                t.deletedAt.isNull() &
                 (formatFilter != null ? t.filePath.like('%.$formatFilter') : const Constant(true)),
           )
           ..orderBy([(t) => OrderingTerm.asc(t.title)])
@@ -157,6 +160,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
         readingProgress.bookId.equalsExp(savedBooks.id),
       ),
     ]);
+    query.where(savedBooks.deletedAt.isNull());
     query.orderBy([OrderingTerm.desc(readingProgress.lastRead)]);
     final rows = await query.get();
     return rows.map((row) => row.readTable(savedBooks)).toList();
@@ -169,6 +173,7 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
         readingProgress.bookId.equalsExp(savedBooks.id),
       ),
     ]);
+    query.where(savedBooks.deletedAt.isNull());
     query.orderBy([OrderingTerm.desc(readingProgress.lastRead)]);
     return query.watch().map(
       (rows) => rows.map((row) => row.readTable(savedBooks)).toList(),

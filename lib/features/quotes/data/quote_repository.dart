@@ -92,6 +92,8 @@ class QuoteRepository {
             chapterIndex: quote.chapterIndex,
             paragraphIndex: quote.paragraphIndex,
             selectedText: quote.selectedText,
+            beforeContext: Value(quote.beforeContext),
+            afterContext: Value(quote.afterContext),
             note: Value(quote.note),
           ),
         );

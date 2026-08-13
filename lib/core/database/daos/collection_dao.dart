@@ -19,9 +19,11 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
   Future<int> insertCollection(CollectionsCompanion entry) =>
       into(collections).insertOnConflictUpdate(entry);
 
-  Future<int> deleteCollection(String id) async {
-    await (delete(bookCollections)..where((t) => t.collectionId.equals(id))).go();
-    return (delete(collections)..where((t) => t.id.equals(id))).go();
+  Future<int> deleteCollection(String id) {
+    return attachedDatabase.transaction(() async {
+      await (delete(bookCollections)..where((t) => t.collectionId.equals(id))).go();
+      return (delete(collections)..where((t) => t.id.equals(id))).go();
+    });
   }
 
   Future<List<BookCollection>> getBookCollectionsForBook(String bookId) async =>
@@ -74,6 +76,8 @@ class CollectionDao extends DatabaseAccessor<AppDatabase> with _$CollectionDaoMi
     )..where((t) => t.collectionId.equals(collectionId))).get();
     if (bcRows.isEmpty) return [];
     final bookIds = bcRows.map((r) => r.bookId).toList();
-    return (select(savedBooks)..where((t) => t.id.isIn(bookIds))).get();
+    return (select(savedBooks)..where(
+      (t) => t.id.isIn(bookIds) & t.deletedAt.isNull(),
+    )).get();
   }
 }

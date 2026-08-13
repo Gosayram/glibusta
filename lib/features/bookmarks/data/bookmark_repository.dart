@@ -81,10 +81,10 @@ class BookmarkRepository {
   }) async {
     final count = await (_db.update(_db.bookmarks)..where((b) => b.id.equals(id))).write(
       BookmarksCompanion(
-        note: Value(note),
-        selectedText: Value(selectedText),
-        highlightStyle: Value(highlightStyle),
-        highlightColor: Value(highlightColor),
+        note: note != null ? Value(note) : const Value.absent(),
+        selectedText: selectedText != null ? Value(selectedText) : const Value.absent(),
+        highlightStyle: highlightStyle != null ? Value(highlightStyle) : const Value.absent(),
+        highlightColor: highlightColor != null ? Value(highlightColor) : const Value.absent(),
       ),
     );
     return count > 0;
@@ -109,6 +109,7 @@ class BookmarkRepository {
             highlightStyle: Value(bookmark.highlightStyle),
             highlightColor: Value(bookmark.highlightColor),
           ),
+          mode: InsertMode.insertOrReplace,
         );
   }
 
