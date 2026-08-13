@@ -78,12 +78,22 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
     return (select(savedBooks)..where((t) => t.id.isIn(ids))).get();
   }
 
-  Future<List<ReadingProgressData>> getAllReadingProgress() async => select(readingProgress).get();
+  Future<List<ReadingProgressData>> getAllReadingProgress() async {
+    final query = select(readingProgress).join([
+      innerJoin(savedBooks, savedBooks.id.equalsExp(readingProgress.bookId)),
+    ])..where(savedBooks.deletedAt.isNull());
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(readingProgress)).toList();
+  }
 
   Future<int> insertBook(SavedBooksCompanion entry) =>
       into(savedBooks).insertOnConflictUpdate(entry);
 
-  Future<int> deleteBook(String id) => (delete(savedBooks)..where((t) => t.id.equals(id))).go();
+  Future<int> deleteBook(String id) => transaction(() async {
+    await (delete(readingProgress)..where((t) => t.bookId.equals(id))).go();
+    await (delete(readingSessions)..where((t) => t.bookId.equals(id))).go();
+    return (delete(savedBooks)..where((t) => t.id.equals(id))).go();
+  });
 
   Future<int> softDeleteBook(String id) =>
       (update(savedBooks)..where((t) => t.id.equals(id))).write(
@@ -97,8 +107,17 @@ class BookDao extends DatabaseAccessor<AppDatabase> with _$BookDaoMixin {
   Future<List<SavedBook>> getDeletedBooks() =>
       (select(savedBooks)..where((t) => t.deletedAt.isNotNull())).get();
 
-  Future<int> purgeDeletedBooks() =>
-      (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
+  Future<int> purgeDeletedBooks() async {
+    final deletedIds = await getDeletedBooks().then((books) => books.map((b) => b.id).toList());
+    if (deletedIds.isEmpty) return 0;
+    return transaction(() async {
+      for (final id in deletedIds) {
+        await (delete(readingProgress)..where((t) => t.bookId.equals(id))).go();
+        await (delete(readingSessions)..where((t) => t.bookId.equals(id))).go();
+      }
+      return (delete(savedBooks)..where((t) => t.deletedAt.isNotNull())).go();
+    });
+  }
 
   Future<int> updateReadingStatus(String bookId, String status) =>
       (update(savedBooks)..where((t) => t.id.equals(bookId))).write(

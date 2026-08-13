@@ -437,7 +437,7 @@ impl MobiHtmlParser {
                     buf.push_str(&tag);
                     i = tag_end + 1;
                     if let Some(close_idx) = chars[i..].windows(4).position(|w| {
-                        w == ['<', '/', 'p', '>'] || w == ['<', '/', 'P', '>']
+                        w[0] == '<' && w[1] == '/' && w[3] == '>' && w[2].eq_ignore_ascii_case(&'p')
                     }) {
                         let inner: String = chars[i..i + close_idx].iter().collect();
                         buf.push_str(&inner);
@@ -457,7 +457,10 @@ impl MobiHtmlParser {
                         buf.clear();
                     }
                     if let Some(close_idx) = chars[i..].windows(6).position(|w| {
-                        w == ['<', '/', 'd', 'i', 'v', '>'] || w == ['<', '/', 'D', 'I', 'V', '>']
+                        w[0] == '<' && w[1] == '/' && w[5] == '>'
+                            && w[2].eq_ignore_ascii_case(&'d')
+                            && w[3].eq_ignore_ascii_case(&'i')
+                            && w[4].eq_ignore_ascii_case(&'v')
                     }) {
                         let inner: String = chars[i..i + close_idx].iter().collect();
                         let sub_chunks = self.split_into_block_chunks(&inner);
@@ -702,7 +705,7 @@ impl MobiHtmlParser {
         if let Some(m) = STRIP_OUTER_RE.captures(chunk) {
             let tag_name = m.get(1).unwrap().as_str();
             let after_open = &chunk[m.get(0).unwrap().end()..];
-            let close_tag = format!("</{}>", tag_name);
+            let close_tag = format!("</{}>", tag_name.to_lowercase());
             if let Some(close_idx) = after_open.to_lowercase().rfind(&close_tag) {
                 return after_open[..close_idx].to_string();
             }

@@ -262,6 +262,7 @@ TextStyle _readerTextStyle(
 }
 
 final Map<String, Map<String, double>> _cssCache = {};
+const int _cssCacheMaxSize = 50;
 
 @visibleForTesting
 void clearCssCache() => _cssCache.clear();
@@ -407,6 +408,9 @@ Map<String, double> _parseCustomCss(String css, {int? chapterIndex}) {
   }
 
   _cssCache[cacheKey] = result;
+  if (_cssCache.length > _cssCacheMaxSize) {
+    _cssCache.remove(_cssCache.keys.first);
+  }
   return result;
 }
 
@@ -2675,6 +2679,8 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     _disposed = true;
     _reusablePainter.dispose();
     _pageController.dispose();
+    _heightCache.clear();
+    _chapterPageCache.clear();
     super.dispose();
   }
 
@@ -2847,6 +2853,7 @@ class _PaginatedContentBodyState extends State<_PaginatedContentBody> {
     if (_disposed || generation != _repaginationGeneration) return;
     _isRepaginating = false;
     _cacheKey = null;
+    _heightCache.clear();
     if (mounted) setState(() {});
   }
 

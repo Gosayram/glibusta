@@ -277,7 +277,6 @@ final class ReaderController {
     _settingsSub?.close();
     _linkHistory.clear();
     _chapterPositions = const [];
-    saveProgress();
     _progressDebouncer.dispose();
     _chapterLoadDebouncer.dispose();
     _scrollDebouncer.dispose();
@@ -290,6 +289,7 @@ final class ReaderController {
     _scrollController?.removeListener(_onScroll);
     _scrollController?.dispose();
     _scrollController = null;
+    saveProgress();
     _flushSessionTime();
     _flushPages();
     _disposed = true;

@@ -31,8 +31,8 @@ impl PalmDocDecompressor {
                 }
                 let c2 = input[i];
                 i += 1;
-                let distance = (((c & 0x3F) as usize) << 5) | ((c2 >> 3) as usize);
-                let length = ((c2 & 0x07) as usize) + 3;
+                let distance = (((c & 0x3F) as usize) << 8) | (c2 as usize);
+                let length = ((c2 >> 3) as usize) + 3;
                 if distance == 0 || distance > out.len() {
                     bail!("Invalid PalmDOC back reference");
                 }
