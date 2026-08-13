@@ -16,6 +16,7 @@ import '../../../core/utils/debouncer.dart';
 import '../../../core/utils/monotonic_id.dart';
 import '../../highlights/data/highlight_repository.dart';
 import '../../highlights/presentation/highlight_providers.dart';
+import '../../reading_stats/data/reading_stats_providers.dart' as rsp;
 import '../data/auto_theme_service.dart';
 import '../data/book_open_service.dart';
 import '../data/book_search_service.dart';
@@ -271,6 +272,7 @@ final class ReaderController {
   Stream<ReaderState> get stateStream => _stateController.stream;
 
   void dispose() {
+    _ref.read(rsp.currentSessionStartProvider.notifier).endSession();
     _loadGeneration++;
     _settingsSub?.close();
     _linkHistory.clear();
@@ -387,6 +389,7 @@ final class ReaderController {
   // ── Load ──────────────────────────────────────────────
 
   Future<void> loadBook() async {
+    _ref.read(rsp.currentSessionStartProvider.notifier).startSession();
     final loadGeneration = ++_loadGeneration;
     _chapterLoadGeneration++;
     _loaded = false;

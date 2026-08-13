@@ -410,13 +410,13 @@ impl MobiHtmlParser {
                     }
                     buf.push_str(&tag);
                     i = tag_end + 1;
-                    let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
-                    let close_tag = format!("</{}>", name);
-                    if let Some(close_idx) = remaining.find(&close_tag) {
-                        let close_char_idx = remaining[..close_idx].chars().count();
-                        let inner: String = chars[i..i + close_char_idx].iter().collect();
+                    let close_tag: Vec<char> = format!("</{}>", name).chars().collect();
+                    if let Some(close_idx) = chars[i..].windows(close_tag.len()).position(|w| {
+                        w.iter().zip(&close_tag).all(|(a, b)| a.eq_ignore_ascii_case(b))
+                    }) {
+                        let inner: String = chars[i..i + close_idx].iter().collect();
                         buf.push_str(&inner);
-                        i = i + close_char_idx + close_tag.chars().count();
+                        i = i + close_idx + close_tag.len();
                     }
                     let s = buf.trim().to_string();
                     if !s.is_empty() {
@@ -436,12 +436,12 @@ impl MobiHtmlParser {
                     }
                     buf.push_str(&tag);
                     i = tag_end + 1;
-                    let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
-                    if let Some(close_idx) = remaining.find("</p>") {
-                        let close_char_idx = remaining[..close_idx].chars().count();
-                        let inner: String = chars[i..i + close_char_idx].iter().collect();
+                    if let Some(close_idx) = chars[i..].windows(4).position(|w| {
+                        w == ['<', '/', 'p', '>'] || w == ['<', '/', 'P', '>']
+                    }) {
+                        let inner: String = chars[i..i + close_idx].iter().collect();
                         buf.push_str(&inner);
-                        i = i + close_char_idx + 4;
+                        i = i + close_idx + 4;
                     }
                     let s = buf.trim().to_string();
                     if !s.is_empty() {
@@ -456,13 +456,13 @@ impl MobiHtmlParser {
                         }
                         buf.clear();
                     }
-                    let remaining: String = chars[i..].iter().collect::<String>().to_lowercase();
-                    if let Some(close_idx) = remaining.find("</div>") {
-                        let close_char_idx = remaining[..close_idx].chars().count();
-                        let inner: String = chars[i..i + close_char_idx].iter().collect();
+                    if let Some(close_idx) = chars[i..].windows(6).position(|w| {
+                        w == ['<', '/', 'd', 'i', 'v', '>'] || w == ['<', '/', 'D', 'I', 'V', '>']
+                    }) {
+                        let inner: String = chars[i..i + close_idx].iter().collect();
                         let sub_chunks = self.split_into_block_chunks(&inner);
                         result.extend(sub_chunks);
-                        i = i + close_char_idx + 6;
+                        i = i + close_idx + 6;
                     } else {
                         buf.push_str(&tag);
                         i = tag_end + 1;

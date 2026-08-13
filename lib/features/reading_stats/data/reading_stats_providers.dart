@@ -41,10 +41,16 @@ final readingHoursProvider = FutureProvider.autoDispose<List<int>>((ref) async {
   return result;
 });
 
-final currentSessionStartProvider = Provider<DateTime?>((ref) {
-  final telemetryRepo = ref.watch(telemetry.readerTelemetryProvider);
-  return telemetryRepo.currentSessionStartTime;
-});
+class _SessionStartNotifier extends Notifier<DateTime?> {
+  @override
+  DateTime? build() => null;
+
+  void startSession() => state = DateTime.now();
+  void endSession() => state = null;
+}
+
+final currentSessionStartProvider =
+    NotifierProvider<_SessionStartNotifier, DateTime?>(_SessionStartNotifier.new);
 
 final sessionTimerProvider = StreamProvider.autoDispose<DateTime>((ref) {
   return Stream<DateTime>.periodic(const Duration(minutes: 1), (_) => DateTime.now());
